@@ -1,27 +1,20 @@
 import { spawnSync } from 'node:child_process'
-import { createRequire } from 'node:module'
 import process from 'node:process'
 
-const isCi = process.env.GITHUB_ACTIONS === 'true' || process.env.CI === 'true'
-const require = createRequire(import.meta.url)
-// Run repo-pinned Bazelisk via Node so Windows does not depend on `.cmd` shell dispatch.
-const bazelisk = require.resolve('@bazel/bazelisk/bazelisk.js')
+// On Windows, pnpm is a .cmd file and requires shell dispatch.
+const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 
 function run(args) {
-  const result = spawnSync(process.execPath, [bazelisk, ...args], { stdio: 'inherit' })
-  if (result.error) {
-    console.error(result.error)
-  }
-  if (result.error || result.status !== 0) {
-    process.exit(result.status ?? 1)
-  }
+  const result = spawnSync(pnpm, args, { stdio: 'inherit' })
+  if (result.error) throw result.error
+  if (result.status !== 0) process.exit(result.status ?? 1)
 }
 
-if (isCi) {
-  // [#14956] Windows CI has issues with stale tsconfig files, so we only generated untracked files on CI runners.
-  // Additional check on Linux CI verifies that the state of committed tsconfigs matches the codebase,
-  // see "check:tsconfigs" pnpm script.
-  run(['run', '//:write_generated', '--verbose_failures'])
-} else {
-  run(['run', '//:write_all', '--verbose_failures'])
-}
+// Generate TypeScript AST types from the Rust parser schema (requires Cargo).
+run(['--filter', 'ydoc-shared', 'run', 'generate-ast'])
+// Generate icon name list from icons.svg.
+run(['--filter', 'enso-gui', 'run', 'generate-icons'])
+// Generate Lezer parser from the table-expression grammar file.
+run(['--filter', 'lezer-enso-table-expr', 'run', 'generate-parser'])
+
+// TODO Phase 2: add tsconfig generation to replace `bazel run //:write_all`.
