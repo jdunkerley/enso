@@ -6,7 +6,9 @@
       "PowerShell(head *)",
       "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\vite-node@3.0.3_@types+node_e9bb5fd2cf508cb4d23bbb299f5995e0\\\\node_modules\\\\vite-node\\\\package.json\" | ConvertFrom-Json; $pkg.bin | ConvertTo-Json; echo \"---\"; $pkg.exports | ConvertTo-Json -Depth 3 | Select-Object -First 30)",
       "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\@lezer+generator@1.8.0\\\\node_modules\\\\@lezer\\\\generator\\\\package.json\" -ErrorAction SilentlyContinue | ConvertFrom-Json; $pkg.bin)",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "Bash(corepack pnpm *)",
+      "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\typescript@5.7.2\\\\node_modules\\\\typescript\\\\package.json\" | ConvertFrom-Json; $pkg.bin; $pkg.exports | ConvertTo-Json -Depth 1 | Select-Object -First 10)"
     ]
   }
 }
