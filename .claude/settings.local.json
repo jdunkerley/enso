@@ -8,7 +8,10 @@
       "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\@lezer+generator@1.8.0\\\\node_modules\\\\@lezer\\\\generator\\\\package.json\" -ErrorAction SilentlyContinue | ConvertFrom-Json; $pkg.bin)",
       "PowerShell(Get-Content *)",
       "Bash(corepack pnpm *)",
-      "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\typescript@5.7.2\\\\node_modules\\\\typescript\\\\package.json\" | ConvertFrom-Json; $pkg.bin; $pkg.exports | ConvertTo-Json -Depth 1 | Select-Object -First 10)"
+      "PowerShell($pkg = Get-Content \"C:\\\\Repos\\\\Enso\\\\ide\\\\node_modules\\\\.pnpm\\\\typescript@5.7.2\\\\node_modules\\\\typescript\\\\package.json\" | ConvertFrom-Json; $pkg.bin; $pkg.exports | ConvertTo-Json -Depth 1 | Select-Object -First 10)",
+      "Bash(git stash *)",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\(JSON.stringify\\({name:p.name,scripts:p.scripts},null,2\\)\\)\")",
+      "Bash(node *)"
     ]
   }
 }

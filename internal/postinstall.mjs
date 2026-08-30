@@ -16,5 +16,3 @@ run(['--filter', 'ydoc-shared', 'run', 'generate-ast'])
 run(['--filter', 'enso-gui', 'run', 'generate-icons'])
 // Generate Lezer parser from the table-expression grammar file.
 run(['--filter', 'lezer-enso-table-expr', 'run', 'generate-parser'])
-
-// TODO Phase 2: add tsconfig generation to replace `bazel run //:write_all`.

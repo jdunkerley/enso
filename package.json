@@ -1,7 +1,6 @@
 {
   "type": "module",
   "devDependencies": {
-    "@bazel/ibazel": "^0.25.0",
     "@eslint/js": "^9.17.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
@@ -20,7 +19,6 @@
     "prettier-plugin-tailwindcss": "^0.5.14"
   },
   "dependencies": {
-    "@bazel/bazelisk": "^1.22.1",
     "playwright": "catalog:",
     "tslib": "^2.8.1",
     "typescript": "catalog:"
@@ -29,7 +27,6 @@
   "scripts": {
     "dev:gui": "corepack pnpm run --parallel -r --filter enso-gui --aggregate-output /^^^^dev:/",
     "dev:inspect": "corepack pnpm run -r --filter ydoc-inspect compile && node --inspect app/ydoc-inspect/dist/main.mjs",
-    "check:tsconfigs": "bazel run //:write_all --verbose_failures && node internal/checkTsconfigs.mjs",
     "compile": "corepack pnpm run -r compile",
     "build:gui": "corepack pnpm run -r compile && corepack pnpm run -r --filter enso-gui build",
     "build:ide": "corepack pnpm run -r compile && corepack pnpm run -r --filter enso build",
@@ -44,7 +41,6 @@
     "ci:unit-test": "corepack pnpm run -r --parallel test:unit",
     "ci:typecheck": "corepack pnpm run -r --parallel typecheck",
     "git-clean": "node git-clean.mjs",
-    "bazel-clean": "bazel clean --expunge_async",
     "postinstall": "node internal/postinstall.mjs"
   },
   "//": "To completely ignore deep dependencies, see .pnpmfile.cjs",
