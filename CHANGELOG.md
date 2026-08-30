@@ -1,5 +1,20 @@
 # Next Release
 
+#### Enso IDE
+
+- Fix AI prompt cancellation leaving the queue wedged. Cancelling an in-flight
+  prompt could leave the next prompt failing with `stdin write failed`, and any
+  subsequent prompt stuck on "waiting"; the cancel path now pre-swaps the
+  child's readiness deferred so follow-up prompts synchronize on the respawned
+  `claude` child instead of racing past a stale `ready` and writing into a dying
+  stdin.
+- AI mode in the Component Browser is now a first-class option, with a three-way
+  mode switch (robot / search / code) accessible by clicking the icon next to
+  the Component Browser input. The mode defaults to AI when the local `claude`
+  CLI is found, and to component search otherwise. Existing AI nodes can be
+  edited by reopening the Component Browser on them — the prior prompt is sent
+  back to the agent so the function definition is rewritten in place.
+
 #### Enso Language & Runtime
 
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
@@ -25,6 +40,7 @@
 - [Add right click menu for multiple components][14640].
 - [Execution can be scheduled for the specific version tag][14883]
 - [Add component spacing options][14888]
+- [When resizing component, other components are moved to make room][14904]
 - [A comment can be attached to the asset version][14923]
 - [New tabular view of session log with filtering][14953]
 - [Input ports no longer highlight on hover unless being connected to][14968]
@@ -49,6 +65,7 @@
 [14640]: https://github.com/enso-org/enso/pull/14640
 [14883]: https://github.com/enso-org/enso/pull/14883
 [14888]: https://github.com/enso-org/enso/pull/14888
+[14904]: https://github.com/enso-org/enso/pull/14904
 [14823]: https://github.com/enso-org/enso/pull/14823
 [14953]: https://github.com/enso-org/enso/pull/14953
 [14968]: https://github.com/enso-org/enso/pull/14968

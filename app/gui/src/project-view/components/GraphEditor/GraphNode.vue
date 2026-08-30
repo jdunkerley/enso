@@ -29,6 +29,7 @@ import GraphNodeMessage from '@/components/GraphEditor/GraphNodeMessage.vue'
 import GraphNodeSubmenu from '@/components/GraphEditor/GraphNodeSubmenu.vue'
 import GraphVisualization from '@/components/GraphEditor/GraphVisualization.vue'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
+import { useNodesDisplacing } from '@/components/GraphEditor/nodesDisplacing'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -90,6 +91,8 @@ const nodeExecution = useNodeExecution()
 const nodeId = computed(() => asNodeId(props.node.rootExpr.externalId))
 const primaryApplication = computed(() => props.node.primaryApplication)
 
+const scale = computed(() => navigator?.scale ?? 1)
+
 const nodePosition = computed(() => {
   // Positions of nodes that are not yet placed are set to `Infinity`.
   if (props.node.position.equals(Vec2.Infinity)) return Vec2.Zero
@@ -99,8 +102,25 @@ const nodePosition = computed(() => {
 onUnmounted(() => graph.unregisterNodeRect(nodeId.value))
 
 const rootNode = ref<HTMLElement>()
-const contentNode = ref<HTMLElement>()
-const nodeSize = useResizeObserver(rootNode)
+const widgetTreeNode = ref<HTMLElement>()
+
+const widgetsDomSizeClientPx = useResizeObserver(widgetTreeNode, false)
+const widgetsDomSize = ref(new Vec2(0, 0))
+// Maintain the size in scene px. The values reported by the resize observer are in client px, so they are dependent on
+// the scale; however, changes to the scale don't cause resize events--so the resize observer is non-reactively (via the
+// DOM) dependent on reactive state. Thus, we must correct for the scale by non-reactively sampling it at the time a
+// resize is observed.
+watch(widgetsDomSizeClientPx, (size) => (widgetsDomSize.value = size.scale(1 / scale.value)), {
+  immediate: true,
+  flush: 'sync',
+})
+// Compute the node's natural size based on the size of its widgets. We measure the widget tree instead of the node
+// directly, because measuring the node would cause a cycle:
+// - This value is used as in input to determine the size of the visualization.
+// - The size of the visualization affects the size of the node.
+const nodeDomSize = computed(() =>
+  widgetsDomSize.value.add(new Vec2(NODE_CONTENT_PADDING * 2, NODE_CONTENT_PADDING * 2)),
+)
 
 providePopoverRoot(rootNode)
 
@@ -180,25 +200,25 @@ function ensureSelected() {
 
 const outputHovered = computed(() => graph.nodeOutputHovered.get(nodeId.value))
 
-const scale = computed(() => navigator?.scale ?? 1)
-const nodeRect = computed(() => new Rect(props.node.position, nodeSize.value))
-
+const { displaceNodesForResize } = useNodesDisplacing()
 const {
   visualizationWidth,
   isVisualizationEnabled,
   isVisualizationPreviewed,
-  visRect,
+  vizHeight,
   visualization,
 } = useNodeVisualization({
   vis: () => props.node.vis,
   nodeHovered: () => nodeHovered.value || outputHovered.value,
-  nodeRect,
+  nodeWidgetsSize: nodeDomSize,
+  nodePos: () => props.node.position,
   scale,
   isFocused: detailedView,
   typeinfo: () => expressionInfo.value?.typeInfo,
   dataSource: () => ({ type: 'node', nodeId: props.node.rootExpr.externalId }) as const,
   hidden: toRef(props, 'edited'),
   emit,
+  onResize: (rect0, rect1) => displaceNodesForResize(nodeId.value, rect0, rect1),
 })
 
 watch(isVisualizationPreviewed, (newVal) => {
@@ -248,15 +268,15 @@ const nodeEditHandler = nodeEditBindings.handler({
   edit: () => actionHandlers['component.startEditing'].action(),
 })
 
-/// The visualization's contribution to the node's height.
-const vizBelowNode = computed(() => (visRect.value ? visRect.value.size.y - nodeSize.value.y : 0))
-
-const nodeOuterRect = ref<Rect>()
+let prevNodeRect: Rect | undefined = undefined
 watchEffect(() => {
-  const newValue = visRect.value ?? nodeRect.value
-  if (!newValue.size.isZero() && !nodeOuterRect.value?.equals(newValue)) {
-    nodeOuterRect.value = newValue
-    emit('update:rect', newValue)
+  if (nodeDomSize.value.isZero()) return
+  const width = Math.max(nodeDomSize.value.x, visualizationWidth.value)
+  const height = nodeDomSize.value.y + vizHeight.value
+  const newRect = new Rect(props.node.position, new Vec2(width, height))
+  if (!prevNodeRect?.equals(newRect)) {
+    emit('update:rect', newRect)
+    prevNodeRect = newRect
   }
 })
 
@@ -286,15 +306,16 @@ function useRecomputation() {
  * takes the size of the largest resizable widget present. If the user resizes the node, and the node is in expanded
  * mode, the specified height overrides any widget preferences.
  */
-const nodeHeight = computed(() => props.node.height)
+const nodeHeightOverride = computed(() => props.node.height)
+const nodeHeightOverridden = computed(() => props.node.height != null)
 const nodeStyle = computed(() => {
   return {
     transform: transform.value,
-    minWidth: isVisualizationEnabled.value ? `${visualizationWidth.value ?? 200}px` : undefined,
-    height: nodeHeight.value ? `${nodeHeight.value}px` : undefined,
+    minWidth: `${visualizationWidth.value ?? 200}px`,
+    height: nodeHeightOverride.value ? `${nodeHeightOverride.value}px` : undefined,
     '--node-group-color': baseColor.value,
     ...(props.node.zIndex ? { 'z-index': props.node.zIndex } : {}),
-    '--viz-below-node': `${vizBelowNode.value}px`,
+    '--viz-below-node': `${vizHeight.value}px`,
   }
 })
 
@@ -310,7 +331,7 @@ const { progressAnimating, backgroundProgressEvents } = watchProgress()
 
 const showProgressBar = computed(() => nodeProgress.value !== 100 || progressAnimating.value)
 
-const nodeClass = computed(() => {
+const nodeClass = computed<Record<string, boolean>>(() => {
   return {
     selected: selected.value,
     pending: pending.value,
@@ -320,7 +341,7 @@ const nodeClass = computed(() => {
     menuVisible: menuVisible.value,
     menuFull: menuFull.value,
     edited: props.edited,
-    nodeHeightOverridden: nodeHeight.value != null,
+    nodeHeightOverridden: nodeHeightOverridden.value,
   }
 })
 
@@ -462,7 +483,7 @@ const nodeName = computed(() => props.node.pattern?.code())
 // === Node resizing ===
 
 const resizeHandles = useResizeHandles({
-  size: nodeSize,
+  size: nodeDomSize,
   scale,
 })
 resizeHandles.onResizeHeight((value) => emit('update:height', value))
@@ -517,7 +538,6 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
         </div>
       </template>
       <div
-        ref="contentNode"
         :class="{ content: true, dragged: isDragged }"
         :style="contentNodeStyle"
         v-on="pointerEvents"
@@ -526,6 +546,7 @@ resizeHandles.onResizeHeight((value) => emit('update:height', value))
         @pointermove="updateNodeHover"
       >
         <ComponentWidgetTree
+          ref="widgetTreeNode"
           :ast="props.node.innerExpr"
           :nodeId="nodeId"
           :rootElement="rootNode"
