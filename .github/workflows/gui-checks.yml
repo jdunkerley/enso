@@ -51,9 +51,12 @@ jobs:
           path: |
             **/.eslintcache
             **/node_modules/.vite
-          key: ${{ runner.os }}-gui-lint-${{ github.run_id }}
+          # eslint's `.eslintcache` is keyed only on file content + eslint config, not on the
+          # tsconfigs that typed linting depends on. Fold those into the Actions cache key so a
+          # tsconfig change starts a fresh eslint cache instead of reusing stale results.
+          key: ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-gui-lint
+            ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}
 
       # Next Tasks are depend on Typecheck, because we build libraries at this stage
       - name: ⚙️ Compile
