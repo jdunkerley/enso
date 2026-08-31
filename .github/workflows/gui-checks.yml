@@ -117,6 +117,8 @@ jobs:
 
   playwright:
     name: 🎭 Playwright Tests
+    # Only run once lint (compile + typecheck + lint + unit tests) has passed.
+    needs: [lint]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     runs-on: ubuntu-latest
@@ -165,7 +167,9 @@ jobs:
 
   merge-reports:
     name: 🔗 Merge Playwright Reports
-    if: ${{ !cancelled() }}
+    # Merge whenever Playwright actually ran (pass or fail), but not when it was
+    # skipped because lint failed.
+    if: ${{ !cancelled() && needs.playwright.result != 'skipped' }}
     needs: [playwright]
     runs-on: ubuntu-latest
     steps:

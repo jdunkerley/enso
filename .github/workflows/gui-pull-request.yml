@@ -64,10 +64,11 @@ jobs:
           path: |
             node_modules/.cache/prettier
 
+  # Runs the GUI checks (lint, then playwright) only after Prettier has passed.
   gui-checks:
     name: 🧰 Checks
     uses: ./.github/workflows/gui-checks.yml
-    needs: [gui-changed-files]
+    needs: [gui-changed-files, prettier]
     if: needs.gui-changed-files.outputs.any_changed == 'true' || github.ref == 'refs/heads/develop'
     secrets: inherit
 
