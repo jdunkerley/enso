@@ -30,8 +30,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a file
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -62,8 +62,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Modify the file
     await fs.writeFile(filePath, 'updated content')
@@ -89,8 +89,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Delete the file
     await fs.unlink(filePath)
@@ -112,8 +112,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     const filePath = path.join(testDir, 'test.txt')
 
@@ -156,8 +156,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create first change
     await fs.writeFile(path.join(testDir, 'test1.txt'), 'content1')
@@ -190,8 +190,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a subdirectory and file
     const subDir = path.join(testDir, 'subdir')
@@ -218,8 +218,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // State should be executed since no changes were made
     expect(watcher.getState()).toBe('executed')
@@ -255,8 +255,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a file
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -280,8 +280,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a file
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -312,8 +312,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // State should be executed since no changes were made
     expect(watcher.getState()).toBe('executed')
@@ -333,8 +333,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a file
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -362,8 +362,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create a file
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -389,8 +389,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create rapid continuous changes that would normally reset the debounce
     const filePath = path.join(testDir, 'test.txt')
@@ -426,8 +426,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     const filePath = path.join(testDir, 'test.txt')
 
@@ -461,8 +461,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Single change that will execute via debounce before timeout
     await fs.writeFile(path.join(testDir, 'test.txt'), 'content')
@@ -491,8 +491,8 @@ describe('watch', () => {
       callback,
     })
 
-    // Wait for watcher to initialize
-    await new Promise((resolve) => setTimeout(resolve, 200))
+    // Wait for the watcher to be armed
+    await watcher.ready
 
     // Create changes to start timeout
     const filePath = path.join(testDir, 'test.txt')

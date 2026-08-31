@@ -29,6 +29,11 @@ export interface Watcher {
    * @returns 'pending' if callback is scheduled to be executed, 'executed' otherwise
    */
   getState: () => WatcherState
+  /**
+   * Resolves once the initial directory scan has completed and the watcher is armed, i.e. once
+   * subsequent filesystem changes are guaranteed to be observed.
+   */
+  ready: Promise<void>
 }
 
 interface FileState {
@@ -63,6 +68,10 @@ export function watch(options: WatchOptions): Watcher {
   // Track last observed metadata to dedupe duplicate OS events for the same state.
   const lastKnownStates = new Map<string, FileState>()
   let isReady = false
+  let markReady!: () => void
+  const ready = new Promise<void>((resolve) => {
+    markReady = resolve
+  })
 
   let debounceTimer: NodeJS.Timeout | null = null
   let timeoutTimer: NodeJS.Timeout | null = null
@@ -165,6 +174,7 @@ export function watch(options: WatchOptions): Watcher {
     .on('unlinkDir', handleEvent('unlinkDir'))
     .on('ready', () => {
       isReady = true
+      markReady()
     })
     .on('error', (error) => {
       console.error('Watcher error:', error)
@@ -193,5 +203,6 @@ export function watch(options: WatchOptions): Watcher {
     getState() {
       return debounceTimer !== null || timeoutTimer !== null ? 'pending' : 'executed'
     },
+    ready,
   }
 }
