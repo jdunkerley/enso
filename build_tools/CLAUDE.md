@@ -53,7 +53,7 @@ that can be built from sources or downloaded).
 For now, `./run` still drives most flows from the repo root:
 
 ```
-./run <command> [options]       # Linux/macOS (dispatches via cargo or bazel)
+./run <command> [options]       # Linux/macOS (runs `cargo run -p enso-build-cli`)
 ./run --help                     # enumerate commands
 ./run ide build                  # top-level IDE target
 ./run backend test               # test the engine bundle

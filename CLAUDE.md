@@ -63,9 +63,9 @@ Four coexist; **which one to use depends on what you're building**:
 
 The `./run` (or `run.cmd` / `run.ps1`) script at the repo root dispatches to the
 Enso build CLI (in `build_tools/cli/`) — the **legacy** end-to-end orchestrator.
-It still works (and transparently calls Bazel when available, Cargo otherwise),
-but the plan is to replace it with Bazel targets. Don't extend `./run` with new
-functionality unless Bazel can't cover the case yet.
+It runs the CLI via `cargo run -p enso-build-cli`. It still works, but the plan
+is to replace it with per-tool scripts and targets; don't extend `./run` with
+new functionality.
 
 ## Languages and toolchains
 

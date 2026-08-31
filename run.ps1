@@ -26,26 +26,9 @@ $InvokeProcess = {
     return $process.ExitCode
 }
 
-$BazelCmd = Get-Command bazel -ErrorAction SilentlyContinue
-if ($BazelCmd) {
-    $BuildExit = & $InvokeProcess "bazel" @("build", "//build_tools/cli:enso_build_cli_bin")
-    if ($BuildExit -ne 0) {
-        Write-Error "Bazel build failed."
-        Exit $BuildExit
-    }
-
-    $BinPath = Join-Path $PSScriptRoot "bazel-bin" "build_tools" "cli" "enso_build_cli_bin.exe"
-    $CliArgs = @()
-    if ($args.Length -gt 0) {
-        $CliArgs += $args
-    }
-    $CliExit = & $InvokeProcess $BinPath $CliArgs
-    Exit $CliExit
-} else {
-    $CargoArgs = @("run", "-p", "enso-build-cli", "--")
-    if ($args.Length -gt 0) {
-        $CargoArgs += $args
-    }
-    $CargoExit = & $InvokeProcess "cargo" $CargoArgs
-    Exit $CargoExit
+$CargoArgs = @("run", "-p", "enso-build-cli", "--")
+if ($args.Length -gt 0) {
+    $CargoArgs += $args
 }
+$CargoExit = & $InvokeProcess "cargo" $CargoArgs
+Exit $CargoExit
