@@ -82,9 +82,6 @@ importers:
 
   .:
     dependencies:
-      '@bazel/bazelisk':
-        specifier: ^1.22.1
-        version: 1.25.0
       playwright:
         specifier: 'catalog:'
         version: 1.55.1
@@ -95,9 +92,6 @@ importers:
         specifier: 'catalog:'
         version: 5.8.2
     devDependencies:
-      '@bazel/ibazel':
-        specifier: ^0.25.0
-        version: 0.25.0
       '@eslint/js':
         specifier: ^9.17.0
         version: 9.17.0
@@ -1508,14 +1502,6 @@ packages:
   '@babel/types@7.28.6':
     resolution: {integrity: sha512-0ZrskXVEHSWIqZM/sQZ4EV3jZJXRkio/WCxaqKZP1g//CEWEPSfeZFcms4XeKBCHU0ZKnIkdJeU/kF+eRp5lBg==}
     engines: {node: '>=6.9.0'}
-
-  '@bazel/bazelisk@1.25.0':
-    resolution: {integrity: sha512-IgesSUh9EwwLI9+Vs5rb/sx7vh6cI97CRLPqw9+/egFzeZlB5S2fTsKwbdDxtTVPjQMGS3GY64tTNsgejVFeKg==}
-    hasBin: true
-
-  '@bazel/ibazel@0.25.0':
-    resolution: {integrity: sha512-dtosfsuZCSaqlUe5EyxNdaN7Gow0Y+ZJixdlciytcSieUcB/1lXPFTx6OihxhjgtTHkeFovlQ/QbvArRPnk+nQ==}
-    hasBin: true
 
   '@bazel/runfiles@6.3.1':
     resolution: {integrity: sha512-1uLNT5NZsUVIGS4syuHwTzZ8HycMPyr6POA3FCE4GbMtc4rhoJk8aZKtNIRthJYfL+iioppi+rTfH3olMPr9nA==}
@@ -8990,10 +8976,6 @@ snapshots:
     dependencies:
       '@babel/helper-string-parser': 7.27.1
       '@babel/helper-validator-identifier': 7.28.5
-
-  '@bazel/bazelisk@1.25.0': {}
-
-  '@bazel/ibazel@0.25.0': {}
 
   '@bazel/runfiles@6.3.1': {}
 
