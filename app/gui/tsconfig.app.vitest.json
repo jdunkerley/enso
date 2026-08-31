@@ -1,5 +1,7 @@
 {
   "compilerOptions": { "types": ["node", "vitest/importMeta", "@testing-library/jest-dom"] },
   "extends": "./tsconfig.app.json",
-  "include": ["./src/**/__tests__"]
+  "include": ["./src/**/__tests__/**/*"],
+  "//": "tsconfig.app.json excludes `src/**/__tests__`; re-include it here (own `exclude` overrides the inherited one).",
+  "exclude": []
 }
