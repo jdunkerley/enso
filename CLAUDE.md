@@ -42,7 +42,7 @@ deserialize parser output.
 - `docs/` — Extensive developer documentation (RFCs, style guides, runtime
   internals, LSP protocol). Start at `docs/README.md`.
 - `project/` — SBT plugins and build helpers for the engine.
-- `internal/`, `nix/`, `patches/` — Build plumbing.
+- `internal/`, `patches/` — Build plumbing.
 
 ## Build systems
 
