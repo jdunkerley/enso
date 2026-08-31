@@ -21,7 +21,8 @@ consumed by `ydoc-shared` as the `rust-ffi` package (`main` →
 does **not** compile the Rust itself.
 
 - `corepack pnpm --filter rust-ffi run build-wasm` — explicit rebuild.
-- `internal/postinstall.mjs` runs it after `pnpm install` (before `generate-ast`).
+- `internal/postinstall.mjs` runs it after `pnpm install` (before
+  `generate-ast`).
 - It is also this package's `compile` script, so `pnpm -r compile` rebuilds it
   in dependency order ahead of `ydoc-shared`.
 

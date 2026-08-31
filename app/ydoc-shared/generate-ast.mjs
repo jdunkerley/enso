@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { join, dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const dir = dirname(fileURLToPath(import.meta.url))
@@ -21,7 +21,13 @@ try {
   // Compile parser-codegen TypeScript to JS (same as Bazel's ts_project step).
   const tscPkg = require.resolve('typescript/package.json')
   const tscBin = join(dirname(tscPkg), 'bin', 'tsc')
-  run(process.execPath, [tscBin, '-p', join(dir, 'parser-codegen', 'tsconfig.json'), '--outDir', codetmp])
+  run(process.execPath, [
+    tscBin,
+    '-p',
+    join(dir, 'parser-codegen', 'tsconfig.json'),
+    '--outDir',
+    codetmp,
+  ])
 
   // Build and run the Rust schema generator.
   run('cargo', ['run', '-p', 'enso-parser-schema', '--', schemaFile], repoRoot)

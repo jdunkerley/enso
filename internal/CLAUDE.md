@@ -6,10 +6,10 @@ published; ignored from linting.
 ## What each thing does
 
 - `postinstall.mjs` — Runs after `pnpm install`. Invokes the WASM build
-  (`rust-ffi build-wasm`) then codegen scripts for AST types (`ydoc-shared
-  generate-ast`), icon metadata (`enso-gui generate-icons`), and the Lezer
-  table-expression parser (`lezer-enso-table-expr generate-parser`). tsconfig
-  files are committed as static files. It re-invokes pnpm via
+  (`rust-ffi build-wasm`) then codegen scripts for AST types
+  (`ydoc-shared generate-ast`), icon metadata (`enso-gui generate-icons`), and
+  the Lezer table-expression parser (`lezer-enso-table-expr generate-parser`).
+  tsconfig files are committed as static files. It re-invokes pnpm via
   `process.env.npm_execpath` so it does not depend on `pnpm` being on `PATH`.
 - Version/commit info is **not** handled here. The `./run` (Cargo) build sets
   `ENSO_IDE_VERSION` / `ENSO_IDE_COMMIT_HASH` as env vars before the Vite build

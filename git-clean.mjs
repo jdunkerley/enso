@@ -3,12 +3,7 @@
  * Calls `git clean -xdf` with some exclusions.
  */
 
-const EXCLUSIONS = [
-  '.idea',
-  '.jj',
-  'app/gui/',
-  'app/electron-client/playwright/.auth/user.json',
-]
+const EXCLUSIONS = ['.idea', '.jj', 'app/gui/', 'app/electron-client/playwright/.auth/user.json']
 
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
