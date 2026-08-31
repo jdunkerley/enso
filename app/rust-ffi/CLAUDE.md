@@ -6,16 +6,27 @@ JavaScript. Built as a `cdylib` + `rlib`. Output is consumed by
 
 ## Gotcha: wasm-bindgen version pinning
 
-`wasm-bindgen = "=0.2.100"` is an **exact** pin. It must match the version baked
-into the `rules_rust_wasm_bindgen` Bazel toolchain. Patch-release bumps can
-change an internal format and break the GUI build — **never bump this with `~`
-or `^`**. Update the Bazel toolchain and this line in lockstep.
+`wasm-bindgen = "=0.2.100"` is an **exact** pin. It must match
+`WASM_BINDGEN_VERSION` in `build-wasm.mjs` — the `wasm-bindgen` CLI that
+generates the JS bindings. Patch-release bumps can change an internal format and
+break the GUI build, so keep the two in lockstep and **never bump this with `~`
+or `^`**.
 
 ## Build
 
-- Cargo path (used by Vite via `vite-plugin-wasm`): handled automatically by
-  pnpm workflows.
-- Bazel path: `BUILD.bazel` in this directory.
+`build-wasm.mjs` builds the crate for `wasm32-unknown-unknown` (release) and
+runs `wasm-bindgen --target bundler` into `dist/`, which is git-ignored and
+consumed by `ydoc-shared` as the `rust-ffi` package (`main` →
+`dist/rust_ffi.js`). Vite loads the prebuilt `dist/` via `vite-plugin-wasm`; it
+does **not** compile the Rust itself.
+
+- `corepack pnpm --filter rust-ffi run build-wasm` — explicit rebuild.
+- `internal/postinstall.mjs` runs it after `pnpm install` (before `generate-ast`).
+- It is also this package's `compile` script, so `pnpm -r compile` rebuilds it
+  in dependency order ahead of `ydoc-shared`.
+
+The script installs the pinned `wasm-bindgen-cli` via `cargo install` on first
+run if it is missing or the wrong version.
 
 ## Adding a new API
 

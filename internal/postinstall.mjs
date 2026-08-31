@@ -8,14 +8,17 @@ import process from 'node:process'
 const npmExecpath = process.env.npm_execpath
 
 function run(args) {
-  const [cmd, cmdArgs, shell] = npmExecpath
-    ? [process.execPath, [npmExecpath, ...args], false]
+  const [cmd, cmdArgs, shell] =
+    npmExecpath ?
+      [process.execPath, [npmExecpath, ...args], false]
     : [process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm', args, process.platform === 'win32']
   const result = spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell })
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
 
+// Build the Rust parser to WASM + wasm-bindgen bindings (requires Cargo).
+run(['--filter', 'rust-ffi', 'run', 'build-wasm'])
 // Generate TypeScript AST types from the Rust parser schema (requires Cargo).
 run(['--filter', 'ydoc-shared', 'run', 'generate-ast'])
 // Generate icon name list from icons.svg.
