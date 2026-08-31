@@ -35,8 +35,6 @@ use ide_ci::actions::workflow::definition::checkout_repo_step;
 use ide_ci::actions::workflow::definition::get_input_expression;
 use ide_ci::actions::workflow::definition::run;
 use ide_ci::actions::workflow::definition::setup_artifact_api;
-use ide_ci::actions::workflow::definition::setup_bazel;
-use ide_ci::actions::workflow::definition::setup_bazel_env;
 use ide_ci::actions::workflow::definition::setup_corepack;
 use ide_ci::actions::workflow::definition::setup_node;
 use ide_ci::actions::workflow::definition::shell;
@@ -254,7 +252,7 @@ pub fn cleaning_step(
     name: impl Into<String>,
     conditions: impl IntoIterator<Item = CleaningCondition>,
 ) -> Step {
-    let mut ret = shell("corepack pnpm run git-clean --verbose --clean-bazel").with_name(name);
+    let mut ret = shell("corepack pnpm run git-clean --verbose").with_name(name);
     ret.r#if = CleaningCondition::format_conjunction(conditions).map(wrap_expression);
     ret
 }
@@ -382,14 +380,8 @@ pub fn runs_on(os: OS, runner_type: RunnerType) -> Vec<RunnerLabel> {
 
 /// Initial CI job steps: check out the source code and set up the environment.
 pub fn setup_script_steps(fetch_depth: Option<u32>) -> Vec<Step> {
-    let mut ret = vec![
-        setup_bazel_env(),
-        setup_bazel(),
-        setup_artifact_api(),
-        checkout_repo_step(fetch_depth),
-        setup_node(),
-        setup_corepack(),
-    ];
+    let mut ret =
+        vec![setup_artifact_api(), checkout_repo_step(fetch_depth), setup_node(), setup_corepack()];
     // We run `./run --help` so:
     // * The build-script is build in a separate step. This allows us to monitor its build-time and
     //   not affect timing of the actual build.

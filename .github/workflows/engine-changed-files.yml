@@ -35,7 +35,6 @@ jobs:
             project/**
             std-bits/**
             test/**
-            .bazelrc
             build.sbt
             .cargo/**
             Cargo.lock

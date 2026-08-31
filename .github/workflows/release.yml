@@ -23,16 +23,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -68,16 +58,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -99,7 +79,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run release deploy-runtime
@@ -111,7 +91,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CI_PRIVATE_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -125,16 +105,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -156,7 +126,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run release dispatch-build-image
@@ -164,7 +134,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.CI_PRIVATE_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   enso-build-ci-gen-job-upload-backend-linux-amd64:
@@ -175,16 +145,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -206,7 +166,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend upload
@@ -219,7 +179,7 @@ jobs:
           path: distribution/editions/*.yaml
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -234,16 +194,6 @@ jobs:
       - macOS
       - ARM64
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -265,7 +215,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend upload
@@ -273,7 +223,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -287,16 +237,6 @@ jobs:
       - self-hosted
       - Windows
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -318,7 +258,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend upload
@@ -326,7 +266,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -344,16 +284,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -375,7 +305,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Download Edition File
@@ -388,7 +318,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -406,16 +336,6 @@ jobs:
       - self-hosted
       - Linux
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -437,7 +357,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run ide upload --backend-source release --backend-release ${{env.ENSO_RELEASE_ID}} --sign-artifacts
@@ -456,6 +376,7 @@ jobs:
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
+          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
           ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
@@ -470,7 +391,7 @@ jobs:
           path: dist/ide/enso-*.AppImage
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -486,16 +407,6 @@ jobs:
       - macOS
       - ARM64
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -517,7 +428,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run ide upload --backend-source release --backend-release ${{env.ENSO_RELEASE_ID}} --sign-artifacts
@@ -543,6 +454,7 @@ jobs:
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
+          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
           ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
@@ -557,7 +469,7 @@ jobs:
           path: dist/ide/enso-*.dmg
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -572,16 +484,6 @@ jobs:
       - self-hosted
       - Windows
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -603,7 +505,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run ide upload --backend-source release --backend-release ${{env.ENSO_RELEASE_ID}} --sign-artifacts
@@ -622,6 +524,7 @@ jobs:
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
+          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
           ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
@@ -638,7 +541,7 @@ jobs:
           path: dist/ide/enso-*.exe
       - if: ${{ (always()) }}
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:

@@ -40,16 +40,8 @@ jobs:
           node-version-file: .node-version
           cache: "pnpm"
 
-      - uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-cache: true
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: 🧾 Check generated tsconfigs
-        run: pnpm run check:tsconfigs
 
       - uses: actions/cache/restore@v4
         if: "${{ !(contains(github.event.pull_request.labels.*.name, 'CI: Clean build required')) }}"
@@ -149,10 +141,6 @@ jobs:
         with:
           node-version-file: .node-version
           cache: "pnpm"
-
-      - uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile

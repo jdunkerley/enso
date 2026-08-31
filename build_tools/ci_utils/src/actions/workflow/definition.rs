@@ -75,46 +75,6 @@ pub fn is_github_hosted() -> String {
     "startsWith(runner.name, 'GitHub Actions') || startsWith(runner.name, 'Hosted Agent')".into()
 }
 
-pub fn setup_bazel_env() -> Step {
-    Step {
-        name: Some("Setup required bazel environment".into()),
-        r#if: Some(is_windows_runner()),
-        shell: Some(Shell::Pwsh),
-        run: Some(
-            r#"
-"BAZEL_SH=C:\Program Files\Git\bin\bash.exe" >> $env:GITHUB_ENV
-"BAZEL_VC=C:\BuildTools\VC" >> $env:GITHUB_ENV
-        "#
-            .to_string(), // 17.9.34728.123
-        ),
-        ..default()
-    }
-}
-
-pub fn setup_bazel() -> Step {
-    Step {
-        name: Some("Setup bazel environment".into()),
-        uses: Some("bazel-contrib/setup-bazel@0.15.0".into()),
-        with: Some(step::Argument::Other(BTreeMap::from([
-            (
-                "output-base".to_string(),
-                Value::String(format!("${{{{ {} && 'c:/_bazel' || '' }}}}", is_windows_runner())),
-            ),
-            (
-                "bazelisk-version".to_string(),
-                Value::String("1.x".to_string()),
-            ),
-            (
-                "bazelrc".to_string(),
-                Value::String(
-                    "build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header=\"authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}\"".to_string(),
-                ),
-            ),
-        ]))),
-        ..default()
-    }
-}
-
 pub fn setup_node() -> Step {
     Step {
         name: Some("Setup nodejs version".into()),
