@@ -42,14 +42,8 @@ pub mod env {
         /// The host URL for the Enso Cloud.
         ENSO_IDE_HOST, String;
 
-        /// The name of the backend environment, typically 'production' for production builds.
-        ENSO_IDE_ENVIRONMENT, String;
-
         /// The root path for all API endpoints, without a trailing slash.
         ENSO_IDE_API_URL, String;
-
-        /// The URL for the WebSocket server for chat functionality.
-        ENSO_IDE_CHAT_URL, String;
 
         /// The Sentry DSN for error reporting in this environment.
         ENSO_IDE_SENTRY_DSN, String;
@@ -60,24 +54,6 @@ pub mod env {
         /// The Sentry project to push the source maps to.
         ENSO_IDE_SENTRY_PROJECT, String;
 
-        /// Stripe's publishable key for client-side operations.
-        ENSO_IDE_STRIPE_KEY, String;
-
-        // Endpoint used for proxying username/password based authentication.
-        ENSO_IDE_AUTH_ENDPOINT, String;
-
-        /// The ID of the Amplify user pool for authentication.
-        ENSO_IDE_COGNITO_USER_POOL_ID, String;
-
-        /// The client-side key for the Amplify user pool.
-        ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID, String;
-
-        /// The domain for Amplify requests.
-        ENSO_IDE_COGNITO_DOMAIN, String;
-
-        /// The AWS region for Amplify configuration, matching the domain region.
-        ENSO_IDE_COGNITO_REGION, String;
-
         /// The Google Analytics tag to which Google Analytics events should be sent.
         ENSO_IDE_GOOGLE_ANALYTICS_TAG, String;
 
@@ -86,18 +62,6 @@ pub mod env {
 
         /// The Mapbox API token for the GeoMap visualization.
         ENSO_IDE_MAPBOX_API_TOKEN, String;
-
-        /// The client ID for the Google OAuth integration used for Google Credentials.
-        ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID, String;
-
-        /// The client ID for the Strava OAuth integration used for Strava Credentials.
-        ENSO_IDE_STRAVA_OAUTH_CLIENT_ID, String;
-
-        /// The client ID for the MS365 OAuth integration used for MS365 Credentials.
-        ENSO_IDE_MS365_OAUTH_CLIENT_ID, String;
-
-        /// The client ID for the Salesforce OAuth integration used for Salesforce Credentials.
-        ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID, String;
 
         ENSO_IDE_COMMIT_HASH, String;
         ENSO_IDE_VERSION, String;

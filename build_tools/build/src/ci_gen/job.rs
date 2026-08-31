@@ -129,38 +129,8 @@ pub fn sbt_command(command: impl AsRef<str>) -> String {
 pub fn expose_gui_vars(step: Step) -> Step {
     step.with_variable_exposed_as(variables::ENSO_HOST, ide::web::env::ENSO_IDE_HOST)
         .with_variable_exposed_as(
-            variables::ENSO_CLOUD_ENVIRONMENT,
-            ide::web::env::ENSO_IDE_ENVIRONMENT,
-        )
-        .with_variable_exposed_as(variables::ENSO_CLOUD_API_URL, ide::web::env::ENSO_IDE_API_URL)
-        .with_variable_exposed_as(variables::ENSO_CLOUD_CHAT_URL, ide::web::env::ENSO_IDE_CHAT_URL)
-        .with_variable_exposed_as(
             variables::ENSO_CLOUD_SENTRY_DSN,
             ide::web::env::ENSO_IDE_SENTRY_DSN,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_STRIPE_KEY,
-            ide::web::env::ENSO_IDE_STRIPE_KEY,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_AUTH_ENDPOINT,
-            ide::web::env::ENSO_IDE_AUTH_ENDPOINT,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_USER_POOL_ID,
-            ide::web::env::ENSO_IDE_COGNITO_USER_POOL_ID,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID,
-            ide::web::env::ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_DOMAIN,
-            ide::web::env::ENSO_IDE_COGNITO_DOMAIN,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_REGION,
-            ide::web::env::ENSO_IDE_COGNITO_REGION,
         )
         .with_variable_exposed_as(
             variables::ENSO_CLOUD_GOOGLE_ANALYTICS_TAG,
@@ -173,22 +143,6 @@ pub fn expose_gui_vars(step: Step) -> Step {
         .with_variable_exposed_as(
             variables::ENSO_MAPBOX_API_TOKEN,
             ide::web::env::ENSO_IDE_MAPBOX_API_TOKEN,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_MS365_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_MS365_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
         )
 }
 
@@ -1071,7 +1025,7 @@ rm dist/backend/backend.tar"
                 let upload_test_traces_step = Step {
                     r#if: Some("failure()".into()),
                     name: Some("Upload Test Traces".into()),
-                    uses: Some("actions/upload-artifact@v4".into()),
+                    uses: Some("actions/upload-artifact@v5".into()),
                     with: Some(Argument::Other(BTreeMap::from_iter([
                         ("name".into(), format!("test-traces-{}-{}", target.0, target.1).into()),
                         ("path".into(), "app/electron-client/test-traces".into()),

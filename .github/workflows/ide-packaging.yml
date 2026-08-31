@@ -21,7 +21,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - name: Compile
@@ -29,7 +29,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           if-no-files-found: error
           name: enso-build-cli-${{ runner.os }}
@@ -41,7 +41,7 @@ jobs:
       - windows-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - name: Compile
@@ -49,7 +49,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           if-no-files-found: error
           name: enso-build-cli-${{ runner.os }}
@@ -63,22 +63,22 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: enso-build-cli-${{ runner.os }}
           path: ${{ runner.temp }}/enso-build-cli
@@ -104,19 +104,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Edition File
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Edition File
           path: distribution/editions/*.yaml
       - name: Upload fbs-schema
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: fbs-schema
           path: engine/language-server/src/main/schema/
       - name: Archive backend
         run: tar -cvf backend.tar -C dist/backend .
       - name: Upload backend
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-linux
           path: backend.tar
@@ -137,22 +137,22 @@ jobs:
       - windows-latest
     steps:
       - name: Expose Artifact API and context information.
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: enso-build-cli-${{ runner.os }}
           path: ${{ runner.temp }}/enso-build-cli
@@ -180,7 +180,7 @@ jobs:
       - name: Archive backend
         run: tar -cvf backend.tar -C dist/backend .
       - name: Upload backend
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-windows
           path: backend.tar
@@ -199,12 +199,12 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
@@ -222,24 +222,11 @@ jobs:
         run: corepack pnpm run build:gui --mode=production
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_API_URL: ${{ vars.ENSO_CLOUD_API_URL }}
-          ENSO_IDE_AUTH_ENDPOINT: ${{ vars.ENSO_CLOUD_AUTH_ENDPOINT }}
-          ENSO_IDE_CHAT_URL: ${{ vars.ENSO_CLOUD_CHAT_URL }}
-          ENSO_IDE_COGNITO_DOMAIN: ${{ vars.ENSO_CLOUD_COGNITO_DOMAIN }}
-          ENSO_IDE_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_IDE_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
           ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
-          ENSO_IDE_ENVIRONMENT: ${{ vars.ENSO_CLOUD_ENVIRONMENT }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
-          ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
-          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID }}
-          ENSO_IDE_STRIPE_KEY: ${{ vars.ENSO_CLOUD_STRIPE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODE: production
       - name: Collect GUI artifacts
@@ -248,7 +235,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload gui
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: gui
           path: dist/gui/
@@ -258,12 +245,12 @@ jobs:
       - windows-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
@@ -281,24 +268,11 @@ jobs:
         run: corepack pnpm run build:gui --mode=production
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_API_URL: ${{ vars.ENSO_CLOUD_API_URL }}
-          ENSO_IDE_AUTH_ENDPOINT: ${{ vars.ENSO_CLOUD_AUTH_ENDPOINT }}
-          ENSO_IDE_CHAT_URL: ${{ vars.ENSO_CLOUD_CHAT_URL }}
-          ENSO_IDE_COGNITO_DOMAIN: ${{ vars.ENSO_CLOUD_COGNITO_DOMAIN }}
-          ENSO_IDE_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_IDE_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
           ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
-          ENSO_IDE_ENVIRONMENT: ${{ vars.ENSO_CLOUD_ENVIRONMENT }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
-          ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
-          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID }}
-          ENSO_IDE_STRIPE_KEY: ${{ vars.ENSO_CLOUD_STRIPE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODE: production
       - name: Collect GUI artifacts
@@ -315,23 +289,23 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: enso-build-cli-${{ runner.os }}
           path: ${{ runner.temp }}/enso-build-cli
@@ -354,7 +328,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Download backend
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: backend-linux
           path: dist/backend
@@ -364,26 +338,13 @@ jobs:
       - run: ./run ide build --backend-source local --gui-upload-artifact false
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_API_URL: ${{ vars.ENSO_CLOUD_API_URL }}
-          ENSO_IDE_AUTH_ENDPOINT: ${{ vars.ENSO_CLOUD_AUTH_ENDPOINT }}
-          ENSO_IDE_CHAT_URL: ${{ vars.ENSO_CLOUD_CHAT_URL }}
-          ENSO_IDE_COGNITO_DOMAIN: ${{ vars.ENSO_CLOUD_COGNITO_DOMAIN }}
-          ENSO_IDE_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_IDE_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
-          ENSO_IDE_ENVIRONMENT: ${{ vars.ENSO_CLOUD_ENVIRONMENT }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
-          ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
-          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID }}
-          ENSO_IDE_STRIPE_KEY: ${{ vars.ENSO_CLOUD_STRIPE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload ide
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ide-linux
           path: dist/ide/enso-*.AppImage
@@ -401,7 +362,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: failure()
         name: Upload Test Traces
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           compression-level: 0
           name: test-traces-linux-amd64
@@ -426,23 +387,23 @@ jobs:
       - windows-latest
     steps:
       - name: Expose Artifact API and context information.
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
       - if: runner.os == 'macOS'
         name: Setup nodejs version
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: enso-build-cli-${{ runner.os }}
           path: ${{ runner.temp }}/enso-build-cli
@@ -465,7 +426,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Download backend
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: backend-windows
           path: dist/backend
@@ -475,28 +436,15 @@ jobs:
       - run: ./run ide build --backend-source local --gui-upload-artifact false
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_API_URL: ${{ vars.ENSO_CLOUD_API_URL }}
-          ENSO_IDE_AUTH_ENDPOINT: ${{ vars.ENSO_CLOUD_AUTH_ENDPOINT }}
-          ENSO_IDE_CHAT_URL: ${{ vars.ENSO_CLOUD_CHAT_URL }}
-          ENSO_IDE_COGNITO_DOMAIN: ${{ vars.ENSO_CLOUD_COGNITO_DOMAIN }}
-          ENSO_IDE_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_IDE_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
-          ENSO_IDE_ENVIRONMENT: ${{ vars.ENSO_CLOUD_ENVIRONMENT }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
           ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
-          ENSO_IDE_MS365_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_MS365_OAUTH_CLIENT_ID }}
-          ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: ${{ secrets.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID }}
-          ENSO_IDE_STRIPE_KEY: ${{ vars.ENSO_CLOUD_STRIPE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT_PASSWORD }}
           WIN_CSC_LINK: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT }}
       - name: Upload ide
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ide-windows
           path: dist/ide/enso-*.exe
@@ -514,7 +462,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: failure()
         name: Upload Test Traces
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           compression-level: 0
           name: test-traces-windows-amd64

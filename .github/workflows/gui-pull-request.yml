@@ -31,13 +31,13 @@ jobs:
     name: 🧹 Prettier
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           fetch-tags: false
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         name: ⎔ Setup Node
         with:
           node-version-file: .node-version

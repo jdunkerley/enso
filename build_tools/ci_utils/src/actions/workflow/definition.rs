@@ -78,7 +78,7 @@ pub fn is_github_hosted() -> String {
 pub fn setup_node() -> Step {
     Step {
         name: Some("Setup nodejs version".into()),
-        uses: Some("actions/setup-node@v4".into()),
+        uses: Some("actions/setup-node@v5".into()),
         with: Some(step::Argument::Other(BTreeMap::from([(
             "node-version-file".to_string(),
             Value::String(".node-version".to_string()),
@@ -104,7 +104,7 @@ pub fn setup_corepack() -> Step {
 pub fn github_script_step(name: impl Into<String>, script: impl Into<String>) -> Step {
     Step {
         name: Some(name.into()),
-        uses: Some("actions/github-script@v7".into()),
+        uses: Some("actions/github-script@v8".into()),
         with: Some(step::Argument::GitHubScript { script: script.into() }),
         ..default()
     }
@@ -1078,7 +1078,7 @@ pub enum RunnerLabel {
 pub fn checkout_repo_step(fetch_depth: Option<u32>) -> Step {
     Step {
         name: Some("Checking out the repository".into()),
-        uses: Some("actions/checkout@v4".into()),
+        uses: Some("actions/checkout@v5".into()),
         with: Some(step::Argument::Checkout {
             repository: None,
             clean: Some(false),

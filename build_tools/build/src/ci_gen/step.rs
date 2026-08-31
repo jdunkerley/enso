@@ -150,7 +150,7 @@ fn built_distribution_directories(engine_launcher: engine::EngineLauncher) -> St
 pub fn upload_artifact(step_name: impl Into<String>) -> Step {
     Step {
         name: Some(step_name.into()),
-        uses: Some("actions/upload-artifact@v4".into()),
+        uses: Some("actions/upload-artifact@v5".into()),
         ..default()
     }
 }
@@ -158,7 +158,7 @@ pub fn upload_artifact(step_name: impl Into<String>) -> Step {
 pub fn download_artifact(step_name: impl Into<String>) -> Step {
     Step {
         name: Some(step_name.into()),
-        uses: Some("actions/download-artifact@v4".into()),
+        uses: Some("actions/download-artifact@v5".into()),
         ..default()
     }
 }

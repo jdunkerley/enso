@@ -27,14 +27,14 @@ jobs:
     name: 👮 Lint GUI
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         name: ⎔ Setup Node
         with:
           node-version-file: .node-version
@@ -134,12 +134,12 @@ jobs:
         shardTotal: [4]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         name: ⎔ Setup Node
         with:
           node-version-file: .node-version
@@ -162,7 +162,7 @@ jobs:
 
       - name: ⬆️ Upload blob report to GitHub Actions Artifacts
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: blob-report-${{ matrix.shardIndex }}
           path: app/gui/blob-report
@@ -176,12 +176,12 @@ jobs:
     needs: [playwright]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 📦 Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
           cache: "pnpm"
@@ -190,7 +190,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: 📥 Download blob reports from GitHub Actions Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: app/gui/blob-report/
           pattern: blob-report-*
@@ -203,7 +203,7 @@ jobs:
 
       - name: ⬆️ Upload HTML report
         id: upload-html-report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: playwright-report-${{ github.run_attempt }}-${{ github.run_id }}
           path: app/gui/playwright-report/
