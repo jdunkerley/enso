@@ -90,7 +90,11 @@ pub fn setup_node() -> Step {
 
 pub fn setup_corepack() -> Step {
     Step {
-        run: Some("npm install -g corepack@0.36.0 && corepack --version".into()),
+        // A specific corepack is required (older ones fail pnpm signature verification, see
+        // enso-org/enso#12249). GitHub-hosted Windows/macOS runners already ship corepack, so
+        // `npm install -g` collides on the pre-existing `pnpm`/`yarn` bin shims — `--force`
+        // overwrites them with the pinned version's, which is exactly what we want.
+        run: Some("npm install -g --force corepack@0.36.0 && corepack --version".into()),
         r#if: Some(is_non_linux_runner()),
         ..default()
     }
