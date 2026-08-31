@@ -24,6 +24,8 @@ use ide_ci::actions::workflow::definition::Strategy;
 use ide_ci::actions::workflow::definition::Target;
 use ide_ci::actions::workflow::definition::cancel_workflow_action;
 use ide_ci::actions::workflow::definition::checkout_repo_step;
+use ide_ci::actions::workflow::definition::setup_corepack;
+use ide_ci::actions::workflow::definition::setup_node;
 use ide_ci::actions::workflow::definition::shell;
 use ide_ci::actions::workflow::definition::step::Argument;
 use ide_ci::cache::goodie::graalvm;
@@ -773,21 +775,52 @@ pub struct GuiBuild;
 
 impl JobArchetype for GuiBuild {
     fn job(&self, target: Target) -> Job {
-        let command: &str = "gui build";
-        RunStepsBuilder::new(command)
-            .customize(move |step| {
-                let mut steps = vec![expose_gui_vars(step)];
+        // The GUI build is inlined here (`pnpm` invoked directly) instead of going through
+        // `./run gui build`. That keeps this job independent of the shared `Build Script` binary
+        // and the "Build Script Setup" step — it only needs a checkout, Node, and corepack.
+        // `./run gui build` does little more than: resolve a version + commit hash, run
+        // `pnpm run build:gui`, and copy `app/gui/dist` into `dist/gui/assets`.
+        let derive_version =
+            shell("echo \"ENSO_IDE_VERSION=$(date -u '+%Y.%-m.%-d')-dev\" >> \"$GITHUB_ENV\"")
+                .with_name("Derive GUI version")
+                .with_shell(Shell::Bash);
 
-                if target.0 == OS::Linux {
-                    let upload_gui = step::upload_artifact("Upload gui")
-                        .with_custom_argument("name", "gui")
-                        .with_custom_argument("path", "dist/gui/");
-                    steps.push(upload_gui);
-                }
+        let install = shell("corepack pnpm install").with_name("Install dependencies");
 
-                steps
-            })
-            .build_job("GUI build", target)
+        let build = expose_gui_vars(shell("corepack pnpm run build:gui --mode=production"))
+            .with_name("Build GUI")
+            .with_env(ide::web::env::MODE, "production")
+            .with_env(ide::web::env::ENSO_IDE_COMMIT_HASH, "${{ github.sha }}");
+
+        // `./run gui build` mirrors `app/gui/dist` into `<dist>/gui/assets`; reproduce that layout
+        // so the uploaded `gui` artifact stays identical.
+        let collect = shell("mkdir -p dist/gui/assets && cp -R app/gui/dist/. dist/gui/assets/")
+            .with_name("Collect GUI artifacts")
+            .with_shell(Shell::Bash);
+
+        let mut steps = vec![
+            checkout_repo_step(None),
+            setup_node(),
+            setup_corepack(),
+            derive_version,
+            install,
+            build,
+            collect,
+        ];
+
+        if target.0 == OS::Linux {
+            steps.push(
+                step::upload_artifact("Upload gui")
+                    .with_custom_argument("name", "gui")
+                    .with_custom_argument("path", "dist/gui/"),
+            );
+        }
+
+        let name = match target.job_name_suffix() {
+            Some(suffix) => format!("GUI build ({suffix})"),
+            None => "GUI build".to_string(),
+        };
+        Job { name, runs_on: target.runs_on(), steps, ..default() }
     }
 }
 
