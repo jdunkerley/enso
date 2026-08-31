@@ -25,7 +25,10 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   checks.
 - `IRCaches.scala` — Compiles IR caches that ship with the stdlib for fast
   startup.
-- `BazelSupport.scala` — Hooks for the coexisting Bazel build.
+- `BazelSupport.scala` — Dormant hooks from the removed Bazel build; every
+  setting is gated on the `enso.BazelSupport.enabled` system property (never set
+  now), so all task branches take the non-Bazel path. Kept only because
+  unwiring it from `build.sbt` is invasive; safe to ignore.
 - `EnsoLint.scala` — Project-wide lint rules invoked as an SBT task.
 - `EnsoProjects.scala` — Shared project-configuration DSL used by `build.sbt`.
 - `SmallJDK.scala` — Builds a trimmed JDK image for the distribution.

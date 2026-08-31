@@ -4,9 +4,9 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 
 ## Subdirs
 
-- `http-test-helper/` — Local HTTP mock server used by `test/Base_Tests`. Java Bazel target.
+- `http-test-helper/` — Local HTTP mock server used by `test/Base_Tests`. Java, built via SBT.
 - `enso4igv/` — Enso language support for the GraalVM Ideal Graph Visualizer (IGV). Load this when debugging Truffle compilation graphs. See `docs/runtime-guide.md` §Tips.
-- `build-performance/` — Benchmark script (`bench-build.sh`) for measuring SBT/Bazel build performance.
+- `build-performance/` — Benchmark script (`bench-build.sh`) for measuring SBT build performance.
 - `performance/` — Engine benchmarks and analysis scaffolding (`engine-benchmarks/`, `benchmark-analysis/`).
 - `ci/` — CI helper scripts: `check-changelog.js`, docker images (`docker/`), nightly release (`nightly/`), release tooling (`releases/`).
 - `native-image-config-cleanup/` — TypeScript tool that de-duplicates Native Image `reflect-config.json` / `resource-config.json` across GraalVM builds.

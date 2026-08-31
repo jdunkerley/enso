@@ -185,7 +185,6 @@ const config = [
       '**/generated',
       '**/*.json',
       'app/rust-ffi/pkg/',
-      'app/electron-client/electron-builder-config.cjs',
     ],
   },
   {
@@ -215,12 +214,9 @@ const config = [
           allowDefaultProject: [
             'git-clean.mjs',
             'eslint.config.mjs',
-            'internal/envReplacer.mjs',
-            'internal/workspaceStatus.mjs',
             'app/vitest.node.base.ts',
             'app/project-manager-shim/scripts/*.js',
             'app/ide-desktop/icons/src/index.js',
-            'app/electron-client/electron-builder-config.cjs',
             'app/gui/scripts/generateIconMetadata.mjs',
           ],
         },
@@ -567,7 +563,6 @@ const config = [
   {
     files: [
       'app/electron-client/esbuild.config.mjs',
-      'app/electron-client/export-config.mjs',
       'app/electron-client/macos/*.cjs',
       'app/electron-client/macos/*.mjs',
       'app/electron-client/macos/lib/*.mjs',

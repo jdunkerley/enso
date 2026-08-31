@@ -21,6 +21,6 @@ Flags of note:
 
 Implement an `HttpHandler` under `src/main/java/org/enso/shttp/` and register it from the wiring file. Keep responses deterministic — tests diff bytes.
 
-## Bazel
+## Build
 
-A `BUILD.bazel` target exists; SBT is the canonical build path though.
+Built via SBT.

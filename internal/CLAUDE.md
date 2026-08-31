@@ -11,17 +11,11 @@ published; ignored from linting.
   table-expression parser (`lezer-enso-table-expr generate-parser`). tsconfig
   files are committed as static files. It re-invokes pnpm via
   `process.env.npm_execpath` so it does not depend on `pnpm` being on `PATH`.
-- `stampFiles.bzl`, `workspaceStatus.mjs`, `stableStatus.mjs`,
-  `generateVersionInfo.mjs`, `runWithVersionInfo.mjs`, `envReplacer.mjs` —
-  **Bazel-only** version/commit stamping (`--stamp` +
-  `--workspace_status_command`). The `./run` (Cargo) build does not use any of
-  these: it sets `ENSO_IDE_VERSION` / `ENSO_IDE_COMMIT_HASH` as real env vars
-  before the Vite build (`build_tools/build/src/ide/web.rs`), Vite exposes them
-  via `envPrefix: 'ENSO_IDE_'`, `app/electron-client/buildInfo.ts` reads them at
-  bundle time, and the engine gets its version from `project/BuildInfo.scala`.
-  These files are dead once Bazel is gone (deletion tracked with the rest of the
-  Bazel infra).
-- `prettierJson.mjs` — Custom Prettier config entry for JSON.
+- Version/commit info is **not** handled here. The `./run` (Cargo) build sets
+  `ENSO_IDE_VERSION` / `ENSO_IDE_COMMIT_HASH` as env vars before the Vite build
+  (`build_tools/build/src/ide/web.rs`); Vite exposes them via
+  `envPrefix: 'ENSO_IDE_'`; `app/electron-client/buildInfo.ts` reads them at
+  bundle time; the engine gets its version from `project/BuildInfo.scala`.
 - `dependenciesVersions.cjs` — Central catalog of deps versions to keep in sync
   between pnpm and other consumers.
 

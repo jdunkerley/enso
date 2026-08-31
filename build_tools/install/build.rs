@@ -17,8 +17,8 @@ use ide_ci::programs::cargo::build_env::OUT_DIR;
 fn main() {
     setup_logging().ok();
 
-    // Icon path can be provided via environment variable (for Bazel builds) or falls back to
-    // the default relative path (for Cargo builds).
+    // Icon path can be provided via environment variable (when set by the build orchestrator) or falls back to
+    // the default relative path (default).
     #[cfg(windows)]
     {
         let icon_path = std::env::var("ENSO_ICON_PATH").map(PathBuf::from).unwrap_or_else(|_| {
@@ -85,8 +85,8 @@ END
     // * https://github.com/gabdube/native-windows-gui/issues/251
     // * https://github.com/microsoft/windows-rs/issues/1294
     //
-    // Manifest path can be provided via environment variable (for Bazel builds) or falls back to
-    // the default relative path (for Cargo builds).
+    // Manifest path can be provided via environment variable (when set by the build orchestrator) or falls back to
+    // the default relative path (default).
     let manifest_path = std::env::var("ENSO_MANIFEST_PATH")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("enso-install.manifest"));

@@ -63,7 +63,6 @@ pub fn assume_installed() {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, strum::AsRefStr)]
 #[strum(serialize_all = "kebab-case")]
 pub enum Script {
-    BazelClean,
     CiCheck,
     Format,
     #[strum(serialize = "format:workflows")]

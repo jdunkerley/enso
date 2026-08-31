@@ -140,7 +140,6 @@ project/metals.sbt
 ## Build Cache ##
 #################
 
-bazel-*
 build-cache
 
 ##################

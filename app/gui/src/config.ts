@@ -1,7 +1,8 @@
 /**
  * @file This file defines a global environemnt config that can be used throughout the app.
- * It is included directly into index.html and kept as a separate built artifact, so that
- * we can easily replace its contents in a separate build postprocessing step in `BUILD.bazel`.
+ * It is included directly into index.html and kept as a separate built artifact (its own
+ * `config.js` chunk, see `vite.config.ts`) so it stays small and easy to inspect. The
+ * `ENSO_IDE_*` values are baked in by Vite at build time from the environment.
  */
 /**
  * When running dev server, the config variables are grabbed from appropriate .env file.
