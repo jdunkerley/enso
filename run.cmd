@@ -1,13 +1,10 @@
 @pushd %~dp0
-@where bazel >nul 2>nul
-@if not errorlevel 1 (
-@    bazel build //build_tools/cli:enso_build_cli_bin
-@    if errorlevel 1 goto end
-@    bazel-bin\build_tools\cli\enso_build_cli_bin %*
-) else (
-@    cargo run -p enso-build-cli -- %*
-)
+@rem CI can point ENSO_BUILD_CLI_BIN at a prebuilt binary to skip the cargo compile.
+@if exist "%ENSO_BUILD_CLI_BIN%" (
+@  "%ENSO_BUILD_CLI_BIN%" %*
+@) else (
+@  cargo run -p enso-build-cli -- %*
+@)
 @set EXITCODE=%ERRORLEVEL%
-:end
 @popd
 @exit /b %EXITCODE%

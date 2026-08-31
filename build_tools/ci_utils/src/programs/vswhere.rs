@@ -56,37 +56,24 @@ impl VsWhere {
     }
 }
 
+/// A single Visual Studio / Build Tools installation, as reported by `vswhere -format json`.
+///
+/// Only the fields we actually use are modeled; `vswhere` emits many more (`catalog`,
+/// `installDate`, `isPrerelease`, …) and their shape drifts between VS releases — e.g. the VS 2026
+/// image reports `catalog.productLineVersion` as `"18"` rather than `"2022"`. Unknown fields are
+/// ignored, and the optional ones below fall back to empty strings, so a schema change no longer
+/// breaks the build.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct InstanceInfo {
-    pub install_date: chrono::DateTime<chrono::Utc>,
     /// Example: `C:\Program Files\Microsoft Visual Studio\2022\Community`
     pub installation_path: PathBuf,
+    /// Example: `17.8.34309.116`. Empty if `vswhere` omits it.
+    #[serde(default)]
     pub installation_version: String,
-    pub is_prerelease: bool,
+    /// Example: `Visual Studio Community 2022`. Empty if `vswhere` omits it.
+    #[serde(default)]
     pub display_name: String,
-    pub catalog: Catalog,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "camelCase")]
-pub struct Catalog {
-    pub product_line_version: crate::programs::vs::Version,
-    /* "buildBranch": "d16.8",
-     * "buildVersion": "16.8.30711.63",
-     * "id": "VisualStudio/16.8.1+30711.63",
-     * "localBuild": "build-lab",
-     * "manifestName": "VisualStudio",
-     * "manifestType": "installer",
-     * "productDisplayVersion": "16.8.1",
-     * "productLine": "Dev16",
-     * "productMilestone": "RTW",
-     * "productMilestoneIsPreRelease": "False",
-     * "productName": "Visual Studio",
-     * "productPatchVersion": "1",
-     * "productPreReleaseMilestoneSuffix": "1.0",
-     * "productSemanticVersion": "16.8.1+30711.63",
-     * "requiredEngineVersion": "2.8.3267.30329" */
 }
 
 #[derive(Clone, Debug)]
@@ -266,5 +253,33 @@ mod tests {
 ]"#;
         let ret = serde_json::from_str::<Vec<InstanceInfo>>(sample_out);
         assert!(ret.is_ok());
+    }
+
+    /// The VS 2026 runner image reports `catalog.productLineVersion` as `"18"` (not `"2022"`) and
+    /// may drop or rename other fields. We must still parse it and read `installationPath`.
+    #[test]
+    fn parse_vs_2026() {
+        let sample_out = r#"
+[
+  {
+    "instanceId": "abc12345",
+    "installationPath": "C:\\Program Files\\Microsoft Visual Studio\\18\\Enterprise",
+    "installationVersion": "18.0.36109.1",
+    "displayName": "Visual Studio Enterprise 2026",
+    "isPrerelease": true,
+    "catalog": {
+      "productDisplayVersion": "18.0.0",
+      "productLine": "Dev18",
+      "productLineVersion": "18",
+      "productName": "Visual Studio"
+    }
+  }
+]"#;
+        let instances = serde_json::from_str::<Vec<InstanceInfo>>(sample_out).unwrap();
+        assert_eq!(
+            instances[0].installation_path,
+            PathBuf::from(r"C:\Program Files\Microsoft Visual Studio\18\Enterprise")
+        );
+        assert_eq!(instances[0].display_name, "Visual Studio Enterprise 2026");
     }
 }

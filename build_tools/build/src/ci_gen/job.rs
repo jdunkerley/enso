@@ -87,11 +87,9 @@ impl RunsOn for OS {
 impl RunsOn for (OS, Arch) {
     fn runs_on(&self) -> Vec<RunnerLabel> {
         match self {
-            (os, Arch::X86_64) => runs_on(*os, RunnerType::SelfHosted),
-            (OS::MacOS, Arch::AArch64) => {
-                let mut ret = runs_on(OS::MacOS, RunnerType::SelfHosted);
-                ret.push(RunnerLabel::Arm64);
-                ret
+            // GitHub-hosted `macos-latest` is already Apple silicon (arm64).
+            (os, Arch::X86_64) | (os @ OS::MacOS, Arch::AArch64) => {
+                runs_on(*os, RunnerType::GitHubHosted)
             }
             _ => panic!("Unsupported OS/arch combination: {self:?}"),
         }
@@ -224,6 +222,42 @@ impl JobArchetype for CancelWorkflow {
         // Necessary permission to cancel a run, as per:
         // https://docs.github.com/en/rest/actions/workflow-runs?apiVersion=2022-11-28#cancel-a-workflow-run
         .with_permission(Permission::Actions, Access::Write)
+    }
+}
+
+/// Name of the artifact holding the prebuilt `enso-build-cli` binary for a given runner OS.
+/// Keyed on `runner.os` (`Linux` / `Windows` / `macOS`) so a single expression works everywhere.
+pub const BUILD_SCRIPT_ARTIFACT_NAME: &str = "enso-build-cli-${{ runner.os }}";
+
+/// Directory the prebuilt build script is downloaded into. Kept **outside** the checkout so
+/// `git clean` (the "Clean before" step) can't wipe it mid-job.
+pub const BUILD_SCRIPT_DOWNLOAD_DIR: &str = "${{ runner.temp }}/enso-build-cli";
+
+/// Compiles `enso-build-cli` once per OS and uploads it, so every other job can download the binary
+/// instead of running `cargo run` (a multi-minute cold compile) in its "Build Script Setup" step.
+#[derive(Clone, Copy, Debug)]
+pub struct BuildScript;
+
+impl JobArchetype for BuildScript {
+    fn id_key_base(&self) -> String {
+        "build-script".into()
+    }
+
+    fn job(&self, target: Target) -> Job {
+        let exe_suffix = if target.0 == OS::Windows { ".exe" } else { "" };
+        let steps = vec![
+            checkout_repo_step(None),
+            shell("cargo build -p enso-build-cli").with_name("Compile"),
+            step::upload_artifact("Upload")
+                .with_custom_argument("name", BUILD_SCRIPT_ARTIFACT_NAME)
+                .with_custom_argument(
+                    "path",
+                    format!("target/rust/debug/enso-build-cli{exe_suffix}"),
+                )
+                .with_custom_argument("if-no-files-found", "error")
+                .with_custom_argument("retention-days", 1),
+        ];
+        Job { name: "Build Script".into(), runs_on: target.runs_on(), steps, ..default() }
     }
 }
 

@@ -1,15 +1,9 @@
 # build_tools
 
 The Rust implementation of the Enso build CLI. The repo root `./run` script
-dispatches to `cli/` (crate `enso-build-cli`). Historically this was the
-canonical build orchestrator for the engine, GUI, IDE, backend bundle, release
-artifacts, and Windows installer.
-
-**Status: legacy, being replaced by Bazel.** `./run` still works — developers
-and CI invoke it daily — but the plan is to replace it with direct Bazel targets
-across the repo. Don't extend the build CLI with new functionality when a Bazel
-target could cover the same case. Migrate existing flows to Bazel when you touch
-them.
+dispatches to `cli/` (crate `enso-build-cli`). This is the canonical build
+orchestrator for the engine, GUI, IDE, backend bundle, release artifacts, and
+Windows installer.
 
 See `README.md` for the principles and the concept of a **Target** (an artifact
 that can be built from sources or downloaded).
@@ -48,18 +42,16 @@ that can be built from sources or downloaded).
 - **Don't re-implement tools that exist.** We explicitly prefer to shell out to
   the canonical tool (SBT, pnpm, cargo) rather than reimplement its behavior.
 
-## Running (legacy path)
+## Running
 
-For now, `./run` still drives most flows from the repo root:
+`./run` drives most flows from the repo root:
 
 ```
-./run <command> [options]       # Linux/macOS (dispatches via cargo or bazel)
+./run <command> [options]       # Linux/macOS (runs `cargo run -p enso-build-cli`)
 ./run --help                     # enumerate commands
 ./run ide build                  # top-level IDE target
 ./run backend test               # test the engine bundle
 ```
 
 `run.cmd` / `run.ps1` are the Windows equivalents. See `README.md` for the
-target/subcommand catalog. Before reaching for `./run`, check whether a native
-Bazel target exists (e.g. `bazel build //...`, `bazel test //...`) — Bazel is
-where this directory is headed.
+target/subcommand catalog.

@@ -16,69 +16,45 @@ concurrency:
 jobs:
   enso-build-ci-gen-job-native-test-linux-amd64:
     name: Native Rust tests (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Checking out the repository
         uses: actions/checkout@v4
         with:
           clean: false
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
       - run: cargo test --workspace
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
   enso-build-ci-gen-job-wasm-lint-linux-amd64:
     name: Lint (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Checking out the repository
         uses: actions/checkout@v4
         with:
           clean: false
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
       - run: cargo fmt -- --check
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
   enso-build-ci-gen-job-parser-wasm-test-linux-amd64:
     name: Parser recursion test (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.13.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Checking out the repository
         uses: actions/checkout@v4
         with:
           clean: false
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
       - name: Installing wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
         with:
@@ -86,4 +62,4 @@ jobs:
       - run: WASM_BINDGEN_TEST_TIMEOUT=300 wasm-pack test --headless --firefox lib/rust/parser
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose

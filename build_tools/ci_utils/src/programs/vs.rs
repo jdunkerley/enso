@@ -115,16 +115,3 @@ pub async fn apply_dev_environment() -> Result {
     }
     Ok(())
 }
-
-/// A major Visual Studio version.
-///
-/// Serialization follows the VS Where `productLineVersion` format.
-#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub enum Version {
-    #[serde(rename = "2017")]
-    VS2017,
-    #[serde(rename = "2019")]
-    VS2019,
-    #[serde(rename = "2022")]
-    VS2022,
-}

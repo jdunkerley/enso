@@ -22,6 +22,7 @@
     "@lezer/highlight": "catalog:"
   },
   "scripts": {
+    "generate-parser": "lezer-generator src/expression.grammar --typeScript -o src/generated/parser",
     "test:unit": "vitest run",
     "compile": "tsc"
   }

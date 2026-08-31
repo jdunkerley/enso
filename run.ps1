@@ -26,26 +26,15 @@ $InvokeProcess = {
     return $process.ExitCode
 }
 
-$BazelCmd = Get-Command bazel -ErrorAction SilentlyContinue
-if ($BazelCmd) {
-    $BuildExit = & $InvokeProcess "bazel" @("build", "//build_tools/cli:enso_build_cli_bin")
-    if ($BuildExit -ne 0) {
-        Write-Error "Bazel build failed."
-        Exit $BuildExit
-    }
-
-    $BinPath = Join-Path $PSScriptRoot "bazel-bin" "build_tools" "cli" "enso_build_cli_bin.exe"
-    $CliArgs = @()
-    if ($args.Length -gt 0) {
-        $CliArgs += $args
-    }
-    $CliExit = & $InvokeProcess $BinPath $CliArgs
-    Exit $CliExit
+# CI (and anyone who wants to) can point this at a prebuilt `enso-build-cli` binary to skip the
+# `cargo` compile. See the `Build Script` job in `.github/workflows`.
+if ($env:ENSO_BUILD_CLI_BIN -and (Test-Path -LiteralPath $env:ENSO_BUILD_CLI_BIN -PathType Leaf)) {
+    $Exit = & $InvokeProcess $env:ENSO_BUILD_CLI_BIN $args
 } else {
     $CargoArgs = @("run", "-p", "enso-build-cli", "--")
     if ($args.Length -gt 0) {
         $CargoArgs += $args
     }
-    $CargoExit = & $InvokeProcess "cargo" $CargoArgs
-    Exit $CargoExit
+    $Exit = & $InvokeProcess "cargo" $CargoArgs
 }
+Exit $Exit

@@ -28,7 +28,6 @@ import java.nio.file.{Files, StandardCopyOption}
 // to IntelliJ.
 import JPMSPlugin.autoImport._
 import PackageListPlugin.autoImport._
-import BazelSupport.autoImport._
 import JarExtractPlugin.autoImport._
 
 import java.io.File
@@ -166,11 +165,7 @@ lazy val distributionArtifactRoot = SettingKey[File](
   "root directory where distribution artifacts will be built."
 )
 distributionArtifactRoot := {
-  if ((Bazel / wasStartedFromBazel).value) {
-    (Bazel / outputDir).value.get
-  } else {
-    file("built-distribution")
-  }
+  file("built-distribution")
 }
 
 lazy val packageBuilder = SettingKey[DistributionPackage.Builder](
@@ -670,18 +665,8 @@ lazy val rustParserTargetDirectory =
 
 val generateRustParserLib =
   TaskKey[Seq[File]]("generateRustParserLib", "Generates parser native library")
-`syntax-rust-definition` / generateRustParserLib := Def.taskIf {
-  if ((`syntax-rust-definition` / Bazel / wasStartedFromBazel).value) {
-    val libName = System.mapLibraryName("enso_parser")
-    val libDest =
-      (`syntax-rust-definition` / rustParserTargetDirectory).value / libName
-    val libFrombazel =
-      (`syntax-rust-definition` / Bazel / rustParserLib).value
-    IO.copyFile(libFrombazel, libDest)
-    Seq(
-      libDest
-    )
-  } else {
+`syntax-rust-definition` / generateRustParserLib := Def.task {
+  {
     val log        = state.value.log
     val profile    = if (BuildInfo.isReleaseMode) "release" else "dev"
     val profileDir = if (BuildInfo.isReleaseMode) "release" else "debug"
@@ -752,57 +737,31 @@ val generateRustParserLib =
 }.value
 
 `syntax-rust-definition` / generateRustParserLib / fileInputs := {
-  if ((`syntax-rust-definition` / Bazel / wasStartedFromBazel).value) {
-    Seq.empty
-  } else {
-    Seq(
-      (`syntax-rust-definition` / baseDirectory).value.toGlob / "jni" / "src" / ** / "*.rs",
-      (`syntax-rust-definition` / baseDirectory).value.toGlob / "src" / ** / "*.rs"
-    )
-  }
+  Seq(
+    (`syntax-rust-definition` / baseDirectory).value.toGlob / "jni" / "src" / ** / "*.rs",
+    (`syntax-rust-definition` / baseDirectory).value.toGlob / "src" / ** / "*.rs"
+  )
 }
 
 val generateParserJavaSources = TaskKey[Seq[File]](
   "generateParserJavaSources",
   "Generates Java sources for Rust parser"
 )
-`syntax-rust-definition` / generateParserJavaSources := Def.taskIf {
-  import scala.jdk.CollectionConverters._
-  if ((`syntax-rust-definition` / Bazel / wasStartedFromBazel).value) {
-    // Copy the generated sources from Bazel directory to our directory
-    val srcsFromBazel =
-      (`syntax-rust-definition` / Bazel / rustParserJavaSources).value
-    val base   = (`syntax-rust-definition` / Compile / sourceManaged).value
-    val outDir = base / "org" / "enso" / "syntax2"
-    if (!outDir.exists()) {
-      outDir.mkdirs()
-      srcsFromBazel.foreach { src =>
-        val fname = src.getName
-        val dest  = outDir / fname
-        IO.copyFile(src, dest)
-      }
-    }
-    FileUtils.listFiles(outDir, Array("scala", "java"), true).asScala.toSeq
-  } else {
-    val base   = (`syntax-rust-definition` / Compile / sourceManaged).value
-    val outDir = base / "org" / "enso" / "syntax2"
-    generateRustParser(
-      outDir,
-      (`syntax-rust-definition` / generateParserJavaSources).inputFileChanges,
-      state.value.log
-    )
-  }
+`syntax-rust-definition` / generateParserJavaSources := Def.task {
+  val base   = (`syntax-rust-definition` / Compile / sourceManaged).value
+  val outDir = base / "org" / "enso" / "syntax2"
+  generateRustParser(
+    outDir,
+    (`syntax-rust-definition` / generateParserJavaSources).inputFileChanges,
+    state.value.log
+  )
 }.value
 
 `syntax-rust-definition` / generateParserJavaSources / fileInputs := {
-  if ((`syntax-rust-definition` / Bazel / wasStartedFromBazel).value) {
-    Seq.empty
-  } else {
-    Seq(
-      (`syntax-rust-definition` / baseDirectory).value.toGlob / "generate-java" / "src" / ** / "*.rs",
-      (`syntax-rust-definition` / baseDirectory).value.toGlob / "src" / ** / "*.rs"
-    )
-  }
+  Seq(
+    (`syntax-rust-definition` / baseDirectory).value.toGlob / "generate-java" / "src" / ** / "*.rs",
+    (`syntax-rust-definition` / baseDirectory).value.toGlob / "src" / ** / "*.rs"
+  )
 }
 
 /** Generates Java sources via `enso-parser-generate-java` binary.
@@ -836,7 +795,7 @@ def generateRustParser(
 
 lazy val `syntax-rust-definition` = project
   .in(file("lib/rust/parser"))
-  .enablePlugins(BazelSupport && JPMSPlugin)
+  .enablePlugins(JPMSPlugin)
   .configs(Test)
   .settings(
     javadocSettings,
@@ -940,32 +899,26 @@ lazy val `python-extract` = project
     Compile / run / mainClass := Some("org.enso.pyextract.PythonExtract"),
     Compile / run / javaOptions ++= Seq("--enable-native-access=ALL-UNNAMED"),
     Compile / run / fork := true,
-    extractPythonResources := Def.taskIf {
-      if ((Bazel / wasStartedFromBazel).value) {
-        val resDir = (Bazel / extractedPythonResourceDir).value
-        val glob   = resDir.toGlob / ** / *
-        FileTreeView.default.list(Seq(glob)).map(_._1.toFile)
-      } else {
-        val outDir          = target.value / "python-resources"
-        val pyResourcesGlob = target.value.toGlob / "python-resources" / ** / *
-        val logger          = streams.value.log
-        val outs            = FileTreeView.default.list(Seq(pyResourcesGlob)).map(_._1)
-        val main            = (Compile / run / mainClass).value
-        val classPath       = (Compile / fullClasspath).value
-        val args = Seq(
-          outDir.getPath
+    extractPythonResources := Def.task {
+      val outDir          = target.value / "python-resources"
+      val pyResourcesGlob = target.value.toGlob / "python-resources" / ** / *
+      val logger          = streams.value.log
+      val outs            = FileTreeView.default.list(Seq(pyResourcesGlob)).map(_._1)
+      val main            = (Compile / run / mainClass).value
+      val classPath       = (Compile / fullClasspath).value
+      val args = Seq(
+        outDir.getPath
+      )
+      val javaRunner = (Compile / run / runner).value
+      if (outs.isEmpty) {
+        javaRunner.run(
+          main.get,
+          classPath.files,
+          args,
+          logger
         )
-        val javaRunner = (Compile / run / runner).value
-        if (outs.isEmpty) {
-          javaRunner.run(
-            main.get,
-            classPath.files,
-            args,
-            logger
-          )
-        }
-        FileTreeView.default.list(Seq(pyResourcesGlob)).map(_._1.toFile)
       }
+      FileTreeView.default.list(Seq(pyResourcesGlob)).map(_._1.toFile)
     }.value,
     clean := {
       val _      = clean.value
@@ -1651,19 +1604,17 @@ lazy val `version-output` = (project in file("lib/scala/version-output"))
     Compile / sourceGenerators += Def.task {
       val file =
         (Compile / sourceManaged).value / "org" / "enso" / "version" / "GeneratedVersion.java"
-      BazelSupport.generatedVersion(file, state.value.log) {
-        BuildInfo
-          .writeBuildInfoFile(
-            file                  = file,
-            log                   = state.value.log,
-            defaultDevEnsoVersion = defaultDevEnsoVersion,
-            ensoVersion           = ensoVersion,
-            scalacVersion         = scalacVersion,
-            graalVersion          = graalMavenPackagesVersion,
-            javaVersion           = graalVersion,
-            currentEdition        = currentEdition
-          )
-      }
+      BuildInfo
+        .writeBuildInfoFile(
+          file                  = file,
+          log                   = state.value.log,
+          defaultDevEnsoVersion = defaultDevEnsoVersion,
+          ensoVersion           = ensoVersion,
+          scalacVersion         = scalacVersion,
+          graalVersion          = graalMavenPackagesVersion,
+          javaVersion           = graalVersion,
+          currentEdition        = currentEdition
+        )
     }.taskValue
   )
 
@@ -1887,35 +1838,19 @@ lazy val `ydoc-server` = project
       )
       args
     },
-    Compile / resourceGenerators += Def.taskIf {
-      if ((Bazel / wasStartedFromBazel).value) {
-        val js = (Bazel / ydocServerPolyglotMainJs).value
-        val target =
-          (Compile / resourceManaged).value / "org" / "enso" / "ydoc" / "server" / "ydoc.cjs"
-        IO.createDirectory(target.getParentFile)
-        IO.copyFile(js, target)
-        Seq(target)
-      } else {
-        Ydoc.generateJsBundle(
-          (ThisBuild / baseDirectory).value,
-          baseDirectory.value,
-          (Compile / resourceManaged).value,
-          streams.value
-        )
-      }
+    Compile / resourceGenerators += Def.task {
+      Ydoc.generateJsBundle(
+        (ThisBuild / baseDirectory).value,
+        baseDirectory.value,
+        (Compile / resourceManaged).value,
+        streams.value
+      )
     }
   )
   .settings(
     NativeImage.smallJdk := None,
     NativeImage.additionalCp := Seq.empty,
     rebuildNativeImage := Def.taskDyn {
-      val cLibraryOpts = (Bazel / cLibraryPath).value
-        .map(cLib =>
-          Seq(
-            "-H:CLibraryPath=" + cLib.getAbsolutePath
-          )
-        )
-        .getOrElse(Seq())
       val mpp =
         (Compile / modulePath).value ++ Seq((Compile / packageBin).value)
       val mp = mpp.map(_.getAbsolutePath)
@@ -1923,7 +1858,7 @@ lazy val `ydoc-server` = project
         .buildNativeImage(
           "org.enso.ydoc.server",
           staticOnLinux       = false,
-          additionalOptions   = cLibraryOpts,
+          additionalOptions   = Seq.empty,
           targetDir           = engineDistributionRoot.value / "component",
           modulePath          = mp,
           mainModule          = Some("org.enso.ydoc.server"),
@@ -3968,13 +3903,6 @@ lazy val `engine-runner` = project
               "-Dnic=nic"
             )
           else Seq()
-        val cLibraryOpts = (Bazel / cLibraryPath).value
-          .map(cLib =>
-            Seq(
-              "-H:CLibraryPath=" + cLib.getAbsolutePath
-            )
-          )
-          .getOrElse(Seq())
         val mp = (Runtime / modulePath).value.map(_.getAbsolutePath)
         NativeImage
           .buildNativeImage(
@@ -4004,7 +3932,7 @@ lazy val `engine-runner` = project
               // Needed for grpc-gax
               "--add-opens=java.base/java.time=ALL-UNNAMED",
               "--enable-url-protocols=jar,https"
-            ) ++ enableHeapDumpOpts ++ debugOpts ++ linkOpts ++ cLibraryOpts,
+            ) ++ enableHeapDumpOpts ++ debugOpts ++ linkOpts,
             mainModule = Some("org.enso.runner"),
             mainClass  = Some("org.enso.runner.Main"),
             initializeAtRuntime = Seq(
@@ -4099,25 +4027,12 @@ lazy val buildSmallJdk =
 
 /** Command for building small JDK for the release.
   * Use as `buildSmallJdkForRelease <targetDir>`.
-  *
-  * If started from bazel, does not take an argument, small jdk will be
-  * built in [[BazelSupport.OUT_DIR_PROP]].
   */
-ThisBuild / commands += {
-  if ((Bazel / wasStartedFromBazel).value) {
-    Command.command("buildSmallJdkForRelease") { state =>
-      val targetDir = (Bazel / outputDir).value.get
-      SmallJDK.buildSmallJDKForRelease(targetDir)
-      state.log.info(s"Small JDK built in: $targetDir")
-      state
-    }
-  } else {
-    Command.single("buildSmallJdkForRelease") { (state, targetDir) =>
-      SmallJDK.buildSmallJDKForRelease(new File(targetDir))
-      state.log.info(s"Small JDK built in: $targetDir")
-      state
-    }
-  }
+ThisBuild / commands += Command.single("buildSmallJdkForRelease") {
+  (state, targetDir) =>
+    SmallJDK.buildSmallJDKForRelease(new File(targetDir))
+    state.log.info(s"Small JDK built in: $targetDir")
+    state
 }
 
 lazy val extraNITestLibs =
@@ -6385,28 +6300,14 @@ launcherDistributionRoot := packageBuilder.value.localArtifact(
   "launcher"
 ) / "enso"
 
-lazy val extraBazelEnvForStdLibIndexes = taskKey[Map[String, String]](
-  "Extra environment variables for subprocesses when running from Bazel - when compiling std libs"
+lazy val extraEnvForStdLibIndexes = taskKey[Map[String, String]](
+  "Extra environment variables for subprocesses when compiling std libs"
 )
-extraBazelEnvForStdLibIndexes := Def.taskIf {
-  if ((Bazel / wasStartedFromBazel).value) {
-    val home     = (Bazel / homeDir).value.get.getAbsolutePath
-    val repoRoot = (enso / baseDirectory).value
-    val libPath =
-      (engineDistributionRoot.value / "lib" / "Standard").getCanonicalPath
-    val langHome = (engineDistributionRoot.value / "component").getCanonicalPath
-    Map(
-      "HOME"              -> home,
-      "ENSO_HOME"         -> repoRoot.getAbsolutePath,
-      "ENSO_EDITION_PATH" -> (repoRoot / "distribution" / "editions").getCanonicalPath,
-      "JAVA_TOOL_OPTIONS" -> s"-Denso.languageHomeOverride=$langHome"
-    )
-  } else {
-    val langHome = (engineDistributionRoot.value / "component").getCanonicalPath
-    Map(
-      "JAVA_TOOL_OPTIONS" -> s"-Denso.languageHomeOverride=$langHome"
-    )
-  }
+extraEnvForStdLibIndexes := Def.task {
+  val langHome = (engineDistributionRoot.value / "component").getCanonicalPath
+  Map(
+    "JAVA_TOOL_OPTIONS" -> s"-Denso.languageHomeOverride=$langHome"
+  )
 }.value
 
 lazy val createStdLibsIndexes =
@@ -6424,7 +6325,7 @@ createStdLibsIndexes := {
     libRoot       = distributionRoot / "lib",
     javaOpts      = javaOpts,
     libsToUpload  = librariesToUpload.value,
-    env           = extraBazelEnvForStdLibIndexes.value,
+    env           = extraEnvForStdLibIndexes.value,
     cacheFactory  = cacheFactory.sub("stdlib"),
     log           = log
   )

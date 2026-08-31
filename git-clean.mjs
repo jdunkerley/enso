@@ -1,15 +1,9 @@
 /**
  * @file Clean workspace of all temporary files and directories.
- * Calls `git clean -xdf` with some exclusions, and also `bazel clean --expunge`, to clean Bazel build artifacts.
+ * Calls `git clean -xdf` with some exclusions.
  */
 
-const EXCLUSIONS = [
-  '.idea',
-  '.jj',
-  '.bazelrc.local',
-  'app/gui/',
-  'app/electron-client/playwright/.auth/user.json',
-]
+const EXCLUSIONS = ['.idea', '.jj', 'app/gui/', 'app/electron-client/playwright/.auth/user.json']
 
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
@@ -17,7 +11,6 @@ import fs from 'node:fs/promises'
 import process from 'node:process'
 
 const VERBOSE = process.argv.includes('--verbose') || process.argv.includes('-v')
-const CLEAN_BAZEL = process.argv.includes('--clean-bazel')
 
 async function runCommand(command, args) {
   const child = spawn(command, args, { stdio: 'pipe' })
@@ -49,11 +42,6 @@ async function runGitClean() {
   return runCommand('git', ['clean', '-xdf', ...EXCLUSIONS.flatMap((e) => ['--exclude', e])])
 }
 
-async function runBazelClean() {
-  let executable = 'bazel'
-  return runCommand(executable, ['clean', '--expunge_async'])
-}
-
 async function removeIfExists(path) {
   try {
     await fs.rm(path, { recursive: true, force: true })
@@ -76,9 +64,6 @@ async function cleanJunctions() {
   // whole linked packages or failing on files that were already deleted. Manually
   // deleting junction directories before running clean prevents this from happening.
   let junctions = [
-    'bazel-enso',
-    'bazel-out',
-    'bazel-bin',
     'node_modules',
     'app/common/node_modules',
     'app/gui/node_modules',
@@ -99,9 +84,6 @@ async function cleanJunctions() {
   await Promise.all(junctions.map((junction) => removeIfExists(junction)))
 }
 
-if (CLEAN_BAZEL) {
-  await runBazelClean()
-}
 if (process.platform === 'win32') {
   await cleanJunctions()
 }

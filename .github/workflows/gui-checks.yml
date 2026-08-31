@@ -40,16 +40,8 @@ jobs:
           node-version-file: .node-version
           cache: "pnpm"
 
-      - uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-cache: true
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: 🧾 Check generated tsconfigs
-        run: pnpm run check:tsconfigs
 
       - uses: actions/cache/restore@v4
         if: "${{ !(contains(github.event.pull_request.labels.*.name, 'CI: Clean build required')) }}"
@@ -59,9 +51,12 @@ jobs:
           path: |
             **/.eslintcache
             **/node_modules/.vite
-          key: ${{ runner.os }}-gui-lint-${{ github.run_id }}
+          # eslint's `.eslintcache` is keyed only on file content + eslint config, not on the
+          # tsconfigs that typed linting depends on. Fold those into the Actions cache key so a
+          # tsconfig change starts a fresh eslint cache instead of reusing stale results.
+          key: ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-gui-lint
+            ${{ runner.os }}-gui-lint-${{ hashFiles('eslint.config.mjs', 'tsconfig.json', 'app/gui/tsconfig*.json') }}
 
       # Next Tasks are depend on Typecheck, because we build libraries at this stage
       - name: ⚙️ Compile
@@ -125,11 +120,11 @@ jobs:
 
   playwright:
     name: 🎭 Playwright Tests
+    # Only run once lint (compile + typecheck + lint + unit tests) has passed.
+    needs: [lint]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -149,10 +144,6 @@ jobs:
         with:
           node-version-file: .node-version
           cache: "pnpm"
-
-      - uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -179,7 +170,9 @@ jobs:
 
   merge-reports:
     name: 🔗 Merge Playwright Reports
-    if: ${{ !cancelled() }}
+    # Merge whenever Playwright actually ran (pass or fail), but not when it was
+    # skipped because lint failed.
+    if: ${{ !cancelled() && needs.playwright.result != 'skipped' }}
     needs: [playwright]
     runs-on: ubuntu-latest
     steps:

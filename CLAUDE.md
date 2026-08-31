@@ -30,9 +30,8 @@ deserialize parser output.
   interpreter DSL, persistance, and ydoc server.
 - `lib/scala/` — Scala support libraries (pkg, project-manager, editions,
   logging, etc.).
-- `build_tools/` — The `./run` CLI (Rust). Historically the canonical build
-  orchestrator; now legacy and being replaced by Bazel. Still in active use for
-  many flows.
+- `build_tools/` — The `./run` CLI (Rust). The end-to-end build orchestrator for
+  the IDE/engine bundle.
 - `distribution/` — Packaged output layout, templates, and the **Enso standard
   library sources** under `distribution/lib/Standard/`.
 - `std-bits/` — Java helpers that the Enso standard library calls via host
@@ -43,12 +42,11 @@ deserialize parser output.
 - `docs/` — Extensive developer documentation (RFCs, style guides, runtime
   internals, LSP protocol). Start at `docs/README.md`.
 - `project/` — SBT plugins and build helpers for the engine.
-- `internal/`, `bazel_scripts/`, `toolchains/`, `nix/`, `patches/` — Build
-  plumbing.
+- `internal/`, `patches/` — Build plumbing.
 
 ## Build systems
 
-Four coexist; **which one to use depends on what you're building**:
+Three, **which one to use depends on what you're building**:
 
 - **Cargo** — for everything under the `[workspace]` in root `Cargo.toml`
   (build_tools + lib/rust + app/rust-ffi).
@@ -56,16 +54,14 @@ Four coexist; **which one to use depends on what you're building**:
   `pnpm-workspace.yaml`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See
   `docs/sbt-cheatsheet.md`.
-- **Bazel** — the **target** build system. Actively being rolled out across the
-  repo; `BUILD.bazel` files live alongside `Cargo.toml` / `package.json`. Prefer
-  Bazel targets for new build functionality, and migrate existing flows to Bazel
-  when you touch them.
+
+Bazel was previously being rolled out as a fourth ("target") build system and
+has been removed from the IDE side; some dormant `BazelSupport` hooks remain in
+the engine's `build.sbt`.
 
 The `./run` (or `run.cmd` / `run.ps1`) script at the repo root dispatches to the
-Enso build CLI (in `build_tools/cli/`) — the **legacy** end-to-end orchestrator.
-It still works (and transparently calls Bazel when available, Cargo otherwise),
-but the plan is to replace it with Bazel targets. Don't extend `./run` with new
-functionality unless Bazel can't cover the case yet.
+Enso build CLI (in `build_tools/cli/`) — the end-to-end orchestrator. It runs
+the CLI via `cargo run -p enso-build-cli`.
 
 ## Languages and toolchains
 

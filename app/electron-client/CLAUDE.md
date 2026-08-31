@@ -8,8 +8,8 @@ desktop binary (AppImage/DMG/exe + installer).
 - `src/` — Electron main process TypeScript.
 - `buildInfo.ts`, `esbuildConfig.ts`, `bundle.ts`, `dist.ts`, `watch.ts` — build
   orchestration (bundles `src/` with esbuild, runs `electron-builder`).
-- `electron-builder-config.cjs` / `electron-builder-config.ts` — packaging
-  config (icons, code signing, entitlements).
+- `electron-builder-config.ts` — packaging config (icons, code signing,
+  entitlements).
 - `macos/`, `entitlements.mac.plist` — macOS DMG/notarization extras.
 - `tasks/` — one-shot CLI tasks exposed for `vite-node`.
 - `assets/` — icons/images that end up in the installer.
@@ -48,9 +48,6 @@ before any IDE build (and before running the e2e suite that loads that build).
 
 For testing, always build with `--mode staging`, to not pollute production
 backend and telemetry with test runs.
-
-`./run` is slated to be replaced by a Bazel target; check for one before
-assuming `./run` is the only path.
 
 `watch:linux` / `watch:macos` / `watch:windows` scripts are for local iteration
 once `./run ide build` has produced the engine bundle.

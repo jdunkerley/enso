@@ -11,22 +11,73 @@ on:
         type: boolean
         default: false
 jobs:
+  build-script-linux-amd64:
+    name: Build Script
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-macos-aarch64:
+    name: Build Script
+    runs-on:
+      - macos-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-windows-amd64:
+    name: Build Script
+    runs-on:
+      - windows-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli.exe
+          retention-days: 1
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -41,14 +92,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend ci-build-engine-distribution
@@ -65,7 +130,7 @@ jobs:
         run: rm built-distribution.tar
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -73,21 +138,11 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (macos, aarch64)
+    needs:
+      - build-script-macos-aarch64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -102,14 +157,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend ci-build-engine-distribution
@@ -126,7 +195,7 @@ jobs:
         run: rm built-distribution.tar
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -134,20 +203,11 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (windows, amd64)
+    needs:
+      - build-script-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -162,14 +222,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend ci-build-engine-distribution
@@ -186,7 +260,7 @@ jobs:
         run: rm built-distribution.tar
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -194,20 +268,11 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64:
     name: Build Engine Distribution (Oracle GraalVM) (native,test) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -222,14 +287,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: ./run backend ci-build-engine-distribution
@@ -246,7 +325,7 @@ jobs:
         run: rm built-distribution.tar
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -255,21 +334,11 @@ jobs:
   enso-build-ci-gen-job-enso-code-lint-check-linux-amd64:
     name: Enso Code Lint (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -284,14 +353,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check syntax
@@ -313,7 +396,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -321,21 +404,11 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-linux-amd64:
     name: JVM Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -350,14 +423,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -396,7 +483,7 @@ jobs:
           reporter: java-junit
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -406,22 +493,11 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-macos-aarch64:
     name: JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -436,14 +512,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -482,7 +572,7 @@ jobs:
           reporter: java-junit
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -492,21 +582,11 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-windows-amd64:
     name: JVM Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -521,14 +601,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -567,7 +661,7 @@ jobs:
           reporter: java-junit
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -577,21 +671,11 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-oracle-graal-vm-linux-amd64:
     name: JVM Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -606,14 +690,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -652,7 +750,7 @@ jobs:
           reporter: java-junit
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -662,21 +760,11 @@ jobs:
   enso-build-ci-gen-job-standard-library-api-check-linux-amd64:
     name: Standard Library API check (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -691,14 +779,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -718,27 +820,17 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   stdlib-graal-vm-ce-standard-library-in-native-linux-amd64:
     name: Standard Library Native Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -753,14 +845,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -802,7 +908,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -812,22 +918,11 @@ jobs:
   stdlib-graal-vm-ce-standard-library-in-native-macos-aarch64:
     name: Standard Library Native Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -842,14 +937,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -891,7 +1000,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -901,21 +1010,11 @@ jobs:
   stdlib-graal-vm-ce-standard-library-in-native-windows-amd64:
     name: Standard Library Native Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -930,14 +1029,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -979,7 +1092,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -989,21 +1102,11 @@ jobs:
   stdlib-graal-vm-ce-standard-library-linux-amd64:
     name: Standard Library JVM Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1018,14 +1121,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1067,7 +1184,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1077,22 +1194,11 @@ jobs:
   stdlib-graal-vm-ce-standard-library-macos-aarch64:
     name: Standard Library JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1107,14 +1213,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1156,7 +1276,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1166,21 +1286,11 @@ jobs:
   stdlib-graal-vm-ce-standard-library-windows-amd64:
     name: Standard Library JVM Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1195,14 +1305,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1244,7 +1368,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1254,21 +1378,11 @@ jobs:
   stdlib-graal-vm-ce-std-microsoft-linux-amd64:
     name: Standard Library Microsoft Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1283,14 +1397,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1332,7 +1460,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1342,21 +1470,11 @@ jobs:
   stdlib-oracle-graal-vm-standard-library-in-native-linux-amd64:
     name: Standard Library Native Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1371,14 +1489,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1420,7 +1552,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1430,21 +1562,11 @@ jobs:
   stdlib-oracle-graal-vm-standard-library-linux-amd64:
     name: Standard Library JVM Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1459,14 +1581,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1508,7 +1644,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
@@ -1518,21 +1654,11 @@ jobs:
   stdlib-oracle-graal-vm-std-microsoft-linux-amd64:
     name: Standard Library Microsoft Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
-      - if: runner.os == 'Windows'
-        name: Setup required bazel environment
-        run: "\n\"BAZEL_SH=C:\\Program Files\\Git\\bin\\bash.exe\" >> $env:GITHUB_ENV\n\"BAZEL_VC=C:\\BuildTools\\VC\" >> $env:GITHUB_ENV\n        "
-        shell: pwsh
-      - name: Setup bazel environment
-        uses: bazel-contrib/setup-bazel@0.15.0
-        with:
-          bazelisk-version: 1.x
-          bazelrc: build --remote_cache=grpcs://${{ vars.ENSO_BAZEL_CACHE_URI }} --remote_cache_header="authorization=Basic ${{ secrets.ENSO_BAZEL_CACHE_TOKEN }}"
-          output-base: ${{ runner.os == 'Windows' && 'c:/_bazel' || '' }}
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
         with:
@@ -1547,14 +1673,28 @@ jobs:
         with:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
-        run: npm install -g corepack@0.31.0 && corepack --version
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean before
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: rm -rf built-distribution test
@@ -1596,7 +1736,7 @@ jobs:
           retention-days: 3
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
-        run: corepack pnpm run git-clean --verbose --clean-bazel
+        run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:

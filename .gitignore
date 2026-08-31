@@ -140,7 +140,6 @@ project/metals.sbt
 ## Build Cache ##
 #################
 
-bazel-*
 build-cache
 
 ##################
@@ -181,18 +180,6 @@ test-results
 *.ir
 *.meta
 .enso/
-
-##################
-## direnv cache ##
-##################
-
-.direnv
-
-########################
-## Nix-specific shims ##
-########################
-
-nix/shims/
 
 ##########################
 ## Playwright artifacts ##

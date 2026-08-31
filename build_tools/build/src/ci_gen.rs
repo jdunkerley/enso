@@ -22,7 +22,7 @@ use ide_ci::actions::workflow::definition::PullRequest;
 use ide_ci::actions::workflow::definition::PullRequestActivityType;
 use ide_ci::actions::workflow::definition::Push;
 use ide_ci::actions::workflow::definition::RunnerLabel;
-use ide_ci::actions::workflow::definition::Schedule;
+use ide_ci::actions::workflow::definition::Shell;
 use ide_ci::actions::workflow::definition::Step;
 use ide_ci::actions::workflow::definition::Target;
 use ide_ci::actions::workflow::definition::Workflow;
@@ -35,8 +35,6 @@ use ide_ci::actions::workflow::definition::checkout_repo_step;
 use ide_ci::actions::workflow::definition::get_input_expression;
 use ide_ci::actions::workflow::definition::run;
 use ide_ci::actions::workflow::definition::setup_artifact_api;
-use ide_ci::actions::workflow::definition::setup_bazel;
-use ide_ci::actions::workflow::definition::setup_bazel_env;
 use ide_ci::actions::workflow::definition::setup_corepack;
 use ide_ci::actions::workflow::definition::setup_node;
 use ide_ci::actions::workflow::definition::shell;
@@ -195,7 +193,10 @@ pub fn release_concurrency() -> Concurrency {
 
 impl RunsOn for BenchmarkRunner {
     fn runs_on(&self) -> Vec<RunnerLabel> {
-        vec![RunnerLabel::Benchmark]
+        // No dedicated `benchmark` runner on this fork; a GitHub-hosted runner still lets the
+        // benchmark workflows run (e.g. with the `just-check` input), though timing numbers from a
+        // shared runner are not comparable across runs.
+        vec![RunnerLabel::LinuxLatest]
     }
     fn job_name_suffix(&self) -> Option<String> {
         None
@@ -254,7 +255,7 @@ pub fn cleaning_step(
     name: impl Into<String>,
     conditions: impl IntoIterator<Item = CleaningCondition>,
 ) -> Step {
-    let mut ret = shell("corepack pnpm run git-clean --verbose --clean-bazel").with_name(name);
+    let mut ret = shell("corepack pnpm run git-clean --verbose").with_name(name);
     ret.r#if = CleaningCondition::format_conjunction(conditions).map(wrap_expression);
     ret
 }
@@ -380,27 +381,69 @@ pub fn runs_on(os: OS, runner_type: RunnerType) -> Vec<RunnerLabel> {
     }
 }
 
+/// Download the prebuilt `enso-build-cli` (produced by the per-OS `Build Script` job) and point
+/// `./run` at it via `ENSO_BUILD_CLI_BIN`, so no job has to `cargo run` a cold compile.
+fn use_prebuilt_build_script_steps() -> Vec<Step> {
+    let download = step::download_artifact("Download Build Script")
+        .with_custom_argument("name", job::BUILD_SCRIPT_ARTIFACT_NAME)
+        .with_custom_argument("path", job::BUILD_SCRIPT_DOWNLOAD_DIR);
+    let configure = shell(
+        r#"BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+[ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+chmod +x "$BIN" || true
+echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV""#,
+    )
+    .with_name("Configure Build Script")
+    .with_shell(Shell::Bash);
+    vec![download, configure]
+}
+
 /// Initial CI job steps: check out the source code and set up the environment.
 pub fn setup_script_steps(fetch_depth: Option<u32>) -> Vec<Step> {
-    let mut ret = vec![
-        setup_bazel_env(),
-        setup_bazel(),
-        setup_artifact_api(),
-        checkout_repo_step(fetch_depth),
-        setup_node(),
-        setup_corepack(),
-    ];
-    // We run `./run --help` so:
-    // * The build-script is build in a separate step. This allows us to monitor its build-time and
-    //   not affect timing of the actual build.
-    // * The help message is printed to the log, including environment-dependent flag defaults.
-    //
-    // If the first attempt fails, we clean the workspace and try again. This should help avoid
-    // a number of possible issues when the runner is in the "wrong state", e.g. when `cargo`
-    // workspace member unexpectedly disappears or linker error creeps in.
-    let command = "./run --help || (git clean -ffdx && ./run --help)";
-    ret.push(shell(command).with_name("Build Script Setup"));
+    let mut ret =
+        vec![setup_artifact_api(), checkout_repo_step(fetch_depth), setup_node(), setup_corepack()];
+    ret.extend(use_prebuilt_build_script_steps());
+    // Print the help message (including environment-dependent flag defaults) as its own step, so the
+    // build-script setup time is visible separately from the actual build.
+    ret.push(shell("./run --help").with_name("Build Script Setup"));
     ret
+}
+
+/// Add a per-OS `Build Script` job to `workflow` and make every job whose setup runs `./run` depend
+/// on (and download the binary from) the one matching its runner OS.
+pub fn share_build_script(workflow: &mut Workflow) {
+    fn os_of(job: &Job) -> Option<OS> {
+        job.runs_on.iter().find_map(|label| match label {
+            RunnerLabel::LinuxLatest => Some(OS::Linux),
+            RunnerLabel::WindowsLatest => Some(OS::Windows),
+            RunnerLabel::MacOSLatest => Some(OS::MacOS),
+            _ => None,
+        })
+    }
+    fn uses_build_script(job: &Job) -> bool {
+        job.steps.iter().any(|s| s.name.as_deref() == Some("Build Script Setup"))
+    }
+    fn target_for(os: OS) -> Target {
+        // GitHub-hosted runner arch: Linux/Windows are x86-64, macOS is Apple silicon.
+        (os, if os == OS::MacOS { Arch::AArch64 } else { Arch::X86_64 })
+    }
+
+    // One `Build Script` job per OS that at least one `./run` job actually uses.
+    let mut ids: Vec<(OS, String)> = vec![];
+    for os in [OS::Linux, OS::Windows, OS::MacOS] {
+        let used = workflow.jobs.values().any(|j| uses_build_script(j) && os_of(j) == Some(os));
+        if used {
+            ids.push((os, workflow.add(target_for(os), job::BuildScript)));
+        }
+    }
+    for job in workflow.jobs.values_mut() {
+        if !uses_build_script(job) {
+            continue;
+        }
+        if let Some((_, id)) = os_of(job).and_then(|os| ids.iter().find(|(o, _)| *o == os)) {
+            job.needs.insert(id.clone());
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -544,23 +587,16 @@ pub fn changelog() -> Result<Workflow> {
     ]));
     let mut changelog_check =
         RunStepsBuilder::new("changelog-check").build_job("Changelog", RunnerLabel::X64);
-    changelog_check.runs_on = vec![RunnerLabel::Linux, RunnerLabel::SelfHosted];
+    changelog_check.runs_on = vec![RunnerLabel::LinuxLatest];
     workflow.add_job(changelog_check);
     Ok(workflow)
 }
 
 pub fn nightly() -> Result<Workflow> {
     let workflow_dispatch = WorkflowDispatch::default();
-    let on = Event {
-        workflow_dispatch: Some(workflow_dispatch),
-        // 2am (UTC) every day.
-        schedule: vec![Schedule::new("0 2 * * *")?],
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(workflow_dispatch), ..default() };
 
     let mut workflow = Workflow { on, name: "Nightly Release".into(), ..default() };
-    // Scheduled workflows do not support input parameters. We need to provide an explicit default
-    // value. Feature request is tracked by https://github.com/orgs/community/discussions/74698
 
     let job = workflow_call_job("Promote nightly", PROMOTE_WORKFLOW_PATH)
         .with_with(input::name::DESIGNATOR, Designation::Nightly.as_ref());
@@ -570,6 +606,8 @@ pub fn nightly() -> Result<Workflow> {
 
 fn add_release_steps(workflow: &mut Workflow) -> Result {
     let prepare_job_id = workflow.add(PRIMARY_TARGET, DraftRelease);
+    // The license-package check gates publishing (see `publish_deps` below).
+    let license_check_job_id = workflow.add(PRIMARY_TARGET, job::VerifyLicensePackages);
     let mut packaging_job_ids = vec![];
 
     // Assumed, because Linux is necessary to deploy ECR runtime image.
@@ -594,6 +632,7 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 
     let publish_deps = {
         packaging_job_ids.push(prepare_job_id);
+        packaging_job_ids.push(license_check_job_id);
         packaging_job_ids
     };
 
@@ -781,7 +820,6 @@ pub fn engine_checks() -> Result<Workflow> {
         ..default()
     };
     let engine_launcher = engine::EngineLauncher::TestNative;
-    workflow.add(PRIMARY_TARGET, job::VerifyLicensePackages);
     for target in PR_REQUIRED_TARGETS {
         add_backend_checks(&mut workflow, target, graalvm::Edition::Community, engine_launcher);
     }
@@ -789,11 +827,7 @@ pub fn engine_checks() -> Result<Workflow> {
 }
 
 pub fn engine_checks_nightly() -> Result<Workflow> {
-    let on = Event {
-        schedule: vec![Schedule::new("0 3 * * *")?],
-        workflow_dispatch: Some(manual_workflow_dispatch()),
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(manual_workflow_dispatch()), ..default() };
     let mut workflow = Workflow { name: "Engine Nightly Checks".into(), on, ..default() };
     let engine_launcher = engine::EngineLauncher::TestNative;
 
@@ -819,13 +853,7 @@ pub fn engine_checks_nightly() -> Result<Workflow> {
 }
 
 pub fn extra_nightly_tests() -> Result<Workflow> {
-    let on = Event {
-        // We start at running the tests daily at 3 am, but we may adjust to run it every few days
-        // or only once a week.
-        schedule: vec![Schedule::new("0 3 * * *")?],
-        workflow_dispatch: Some(manual_workflow_dispatch()),
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(manual_workflow_dispatch()), ..default() };
     let mut workflow = Workflow { name: "Extra Nightly Tests".into(), on, ..default() };
 
     // We run the extra tests only on Linux, as they should not contain any platform-specific
@@ -945,7 +973,6 @@ fn benchmark_workflow(
                 .with_input(just_check_input_name, just_check_input)
                 .with_input(bench_name_input_name, bench_name_input),
         ),
-        schedule: vec![Schedule::new("0 0 * * *")?],
         ..default()
     };
     let mut workflow = Workflow { name: name.into(), on, ..default() };
@@ -1008,7 +1035,10 @@ pub fn generate(
     ];
     let workflows = workflows
         .into_iter()
-        .map(|(path, workflow)| WorkflowToWrite { workflow, path, source: module_path!().into() })
+        .map(|(path, mut workflow)| {
+            share_build_script(&mut workflow);
+            WorkflowToWrite { workflow, path, source: module_path!().into() }
+        })
         .collect();
     Ok(workflows)
 }
