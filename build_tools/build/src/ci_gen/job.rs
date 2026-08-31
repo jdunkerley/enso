@@ -87,11 +87,9 @@ impl RunsOn for OS {
 impl RunsOn for (OS, Arch) {
     fn runs_on(&self) -> Vec<RunnerLabel> {
         match self {
-            (os, Arch::X86_64) => runs_on(*os, RunnerType::SelfHosted),
-            (OS::MacOS, Arch::AArch64) => {
-                let mut ret = runs_on(OS::MacOS, RunnerType::SelfHosted);
-                ret.push(RunnerLabel::Arm64);
-                ret
+            // GitHub-hosted `macos-latest` is already Apple silicon (arm64).
+            (os, Arch::X86_64) | (os @ OS::MacOS, Arch::AArch64) => {
+                runs_on(*os, RunnerType::GitHubHosted)
             }
             _ => panic!("Unsupported OS/arch combination: {self:?}"),
         }

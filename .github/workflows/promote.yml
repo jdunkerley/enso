@@ -24,8 +24,7 @@ jobs:
   enso-build-ci-gen-promote-release-job-linux-amd64:
     name: Promote release (linux, amd64)
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7

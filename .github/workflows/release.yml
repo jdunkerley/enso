@@ -20,8 +20,7 @@ jobs:
   enso-build-ci-gen-draft-release-linux-amd64:
     name: Create a release draft.
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -55,8 +54,7 @@ jobs:
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -102,8 +100,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-deploy-runtime-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -142,8 +139,7 @@ jobs:
     needs:
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -190,9 +186,7 @@ jobs:
     needs:
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -234,8 +228,7 @@ jobs:
     needs:
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -281,8 +274,7 @@ jobs:
       - enso-build-ci-gen-upload-ide-macos-aarch64
       - enso-build-ci-gen-upload-ide-windows-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -333,8 +325,7 @@ jobs:
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -403,9 +394,7 @@ jobs:
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-macos-aarch64
     runs-on:
-      - self-hosted
-      - macOS
-      - ARM64
+      - macos-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -481,8 +470,7 @@ jobs:
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7

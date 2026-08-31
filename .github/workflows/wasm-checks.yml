@@ -16,9 +16,7 @@ concurrency:
 jobs:
   enso-build-ci-gen-job-native-test-linux-amd64:
     name: Native Rust tests (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v4
@@ -33,9 +31,7 @@ jobs:
         run: corepack pnpm run git-clean --verbose
   enso-build-ci-gen-job-wasm-lint-linux-amd64:
     name: Lint (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v4
@@ -50,9 +46,7 @@ jobs:
         run: corepack pnpm run git-clean --verbose
   enso-build-ci-gen-job-parser-wasm-test-linux-amd64:
     name: Parser recursion test (linux, amd64)
-    runs-on:
-      - self-hosted
-      - Linux
+    runs-on: ubuntu-latest
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v4

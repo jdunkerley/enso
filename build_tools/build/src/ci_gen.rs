@@ -192,7 +192,10 @@ pub fn release_concurrency() -> Concurrency {
 
 impl RunsOn for BenchmarkRunner {
     fn runs_on(&self) -> Vec<RunnerLabel> {
-        vec![RunnerLabel::Benchmark]
+        // No dedicated `benchmark` runner on this fork; a GitHub-hosted runner still lets the
+        // benchmark workflows run (e.g. with the `just-check` input), though timing numbers from a
+        // shared runner are not comparable across runs.
+        vec![RunnerLabel::LinuxLatest]
     }
     fn job_name_suffix(&self) -> Option<String> {
         None
@@ -535,7 +538,7 @@ pub fn changelog() -> Result<Workflow> {
     ]));
     let mut changelog_check =
         RunStepsBuilder::new("changelog-check").build_job("Changelog", RunnerLabel::X64);
-    changelog_check.runs_on = vec![RunnerLabel::Linux, RunnerLabel::SelfHosted];
+    changelog_check.runs_on = vec![RunnerLabel::LinuxLatest];
     workflow.add_job(changelog_check);
     Ok(workflow)
 }

@@ -18,8 +18,7 @@ jobs:
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -68,8 +67,7 @@ jobs:
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (windows, amd64)
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -120,8 +118,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -176,8 +173,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -251,8 +247,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -326,8 +321,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -376,8 +370,7 @@ jobs:
   license-check-linux-amd64:
     name: Verify License Packages (linux, amd64)
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -416,8 +409,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -494,8 +486,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -572,8 +563,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -650,8 +640,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
-      - self-hosted
-      - Windows
+      - windows-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
@@ -728,8 +717,7 @@ jobs:
     needs:
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
-      - self-hosted
-      - Linux
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7

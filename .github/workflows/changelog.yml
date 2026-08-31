@@ -14,8 +14,7 @@ jobs:
   changelog:
     name: Changelog
     runs-on:
-      - Linux
-      - self-hosted
+      - ubuntu-latest
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v7
