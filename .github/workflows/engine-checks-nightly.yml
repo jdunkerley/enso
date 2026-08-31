@@ -93,6 +93,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -158,6 +161,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -223,6 +229,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -288,6 +297,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -354,6 +366,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -424,6 +439,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -513,6 +531,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -602,6 +623,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -691,6 +715,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -780,6 +807,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -846,6 +876,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -938,6 +971,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1030,6 +1066,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1122,6 +1161,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1214,6 +1256,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1306,6 +1351,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1398,6 +1446,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1490,6 +1541,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1582,6 +1636,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:
@@ -1674,6 +1731,9 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - if: runner.os == 'Windows'
+        name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
       - name: Download Build Script
         uses: actions/download-artifact@v4
         with:

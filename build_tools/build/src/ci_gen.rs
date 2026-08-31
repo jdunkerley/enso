@@ -33,6 +33,7 @@ use ide_ci::actions::workflow::definition::WorkflowDispatchInputType;
 use ide_ci::actions::workflow::definition::WorkflowToWrite;
 use ide_ci::actions::workflow::definition::checkout_repo_step;
 use ide_ci::actions::workflow::definition::get_input_expression;
+use ide_ci::actions::workflow::definition::is_windows_runner;
 use ide_ci::actions::workflow::definition::run;
 use ide_ci::actions::workflow::definition::setup_artifact_api;
 use ide_ci::actions::workflow::definition::setup_corepack;
@@ -398,10 +399,30 @@ echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV""#,
     vec![download, configure]
 }
 
+/// Put the MSVC toolchain (`cl.exe`, `link.exe`, …) on `PATH` on Windows runners.
+///
+/// The engine's native-image build needs it, and without it `./run` tries to locate the toolchain
+/// itself via `vswhere` — whose JSON `enso-build` fails to parse on the VS 2026 runner image
+/// (`productLineVersion` is now `"18"`, not `"2022"`). With `cl.exe` already on `PATH`, `./run`
+/// skips that lookup entirely.
+fn setup_msvc_step() -> Step {
+    Step {
+        name: Some("Setup MSVC dev environment".into()),
+        r#if: Some(is_windows_runner()),
+        uses: Some("ilammy/msvc-dev-cmd@v1".into()),
+        ..default()
+    }
+}
+
 /// Initial CI job steps: check out the source code and set up the environment.
 pub fn setup_script_steps(fetch_depth: Option<u32>) -> Vec<Step> {
-    let mut ret =
-        vec![setup_artifact_api(), checkout_repo_step(fetch_depth), setup_node(), setup_corepack()];
+    let mut ret = vec![
+        setup_artifact_api(),
+        checkout_repo_step(fetch_depth),
+        setup_node(),
+        setup_corepack(),
+        setup_msvc_step(),
+    ];
     ret.extend(use_prebuilt_build_script_steps());
     // Print the help message (including environment-dependent flag defaults) as its own step, so the
     // build-script setup time is visible separately from the actual build.
