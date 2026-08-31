@@ -557,6 +557,8 @@ pub fn nightly() -> Result<Workflow> {
 
 fn add_release_steps(workflow: &mut Workflow) -> Result {
     let prepare_job_id = workflow.add(PRIMARY_TARGET, DraftRelease);
+    // The license-package check gates publishing (see `publish_deps` below).
+    let license_check_job_id = workflow.add(PRIMARY_TARGET, job::VerifyLicensePackages);
     let mut packaging_job_ids = vec![];
 
     // Assumed, because Linux is necessary to deploy ECR runtime image.
@@ -581,6 +583,7 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 
     let publish_deps = {
         packaging_job_ids.push(prepare_job_id);
+        packaging_job_ids.push(license_check_job_id);
         packaging_job_ids
     };
 
@@ -768,7 +771,6 @@ pub fn engine_checks() -> Result<Workflow> {
         ..default()
     };
     let engine_launcher = engine::EngineLauncher::TestNative;
-    workflow.add(PRIMARY_TARGET, job::VerifyLicensePackages);
     for target in PR_REQUIRED_TARGETS {
         add_backend_checks(&mut workflow, target, graalvm::Edition::Community, engine_launcher);
     }
