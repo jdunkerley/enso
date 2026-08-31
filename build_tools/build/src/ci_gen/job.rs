@@ -225,6 +225,42 @@ impl JobArchetype for CancelWorkflow {
     }
 }
 
+/// Name of the artifact holding the prebuilt `enso-build-cli` binary for a given runner OS.
+/// Keyed on `runner.os` (`Linux` / `Windows` / `macOS`) so a single expression works everywhere.
+pub const BUILD_SCRIPT_ARTIFACT_NAME: &str = "enso-build-cli-${{ runner.os }}";
+
+/// Directory the prebuilt build script is downloaded into. Kept **outside** the checkout so
+/// `git clean` (the "Clean before" step) can't wipe it mid-job.
+pub const BUILD_SCRIPT_DOWNLOAD_DIR: &str = "${{ runner.temp }}/enso-build-cli";
+
+/// Compiles `enso-build-cli` once per OS and uploads it, so every other job can download the binary
+/// instead of running `cargo run` (a multi-minute cold compile) in its "Build Script Setup" step.
+#[derive(Clone, Copy, Debug)]
+pub struct BuildScript;
+
+impl JobArchetype for BuildScript {
+    fn id_key_base(&self) -> String {
+        "build-script".into()
+    }
+
+    fn job(&self, target: Target) -> Job {
+        let exe_suffix = if target.0 == OS::Windows { ".exe" } else { "" };
+        let steps = vec![
+            checkout_repo_step(None),
+            shell("cargo build -p enso-build-cli").with_name("Compile"),
+            step::upload_artifact("Upload")
+                .with_custom_argument("name", BUILD_SCRIPT_ARTIFACT_NAME)
+                .with_custom_argument(
+                    "path",
+                    format!("target/rust/debug/enso-build-cli{exe_suffix}"),
+                )
+                .with_custom_argument("if-no-files-found", "error")
+                .with_custom_argument("retention-days", 1),
+        ];
+        Job { name: "Build Script".into(), runs_on: target.runs_on(), steps, ..default() }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct VerifyLicensePackages;
 impl JobArchetype for VerifyLicensePackages {

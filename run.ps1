@@ -26,9 +26,15 @@ $InvokeProcess = {
     return $process.ExitCode
 }
 
-$CargoArgs = @("run", "-p", "enso-build-cli", "--")
-if ($args.Length -gt 0) {
-    $CargoArgs += $args
+# CI (and anyone who wants to) can point this at a prebuilt `enso-build-cli` binary to skip the
+# `cargo` compile. See the `Build Script` job in `.github/workflows`.
+if ($env:ENSO_BUILD_CLI_BIN -and (Test-Path -LiteralPath $env:ENSO_BUILD_CLI_BIN -PathType Leaf)) {
+    $Exit = & $InvokeProcess $env:ENSO_BUILD_CLI_BIN $args
+} else {
+    $CargoArgs = @("run", "-p", "enso-build-cli", "--")
+    if ($args.Length -gt 0) {
+        $CargoArgs += $args
+    }
+    $Exit = & $InvokeProcess "cargo" $CargoArgs
 }
-$CargoExit = & $InvokeProcess "cargo" $CargoArgs
-Exit $CargoExit
+Exit $Exit

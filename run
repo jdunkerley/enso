@@ -4,7 +4,13 @@ set -e # Exit on error.
 # Change working directory to the script's directory.
 pushd "$(dirname "$0")" > /dev/null
 
-cargo run -p enso-build-cli -- "$@"
+# CI (and anyone who wants to) can point this at a prebuilt `enso-build-cli` binary to skip the
+# `cargo` compile. See the `Build Script` job in `.github/workflows`.
+if [[ -x "${ENSO_BUILD_CLI_BIN:-}" ]]; then
+    "${ENSO_BUILD_CLI_BIN}" "$@"
+else
+    cargo run -p enso-build-cli -- "$@"
+fi
 
 # Revert to the original working directory.
 popd > /dev/null

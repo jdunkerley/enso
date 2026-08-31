@@ -11,8 +11,30 @@ on:
         type: boolean
         default: false
 jobs:
+  build-script-linux-amd64:
+    name: Build Script
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -31,8 +53,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -63,6 +99,7 @@ jobs:
   enso-build-ci-gen-job-snowflake-tests-jvm-linux-amd64:
     name: Snowflake Tests (JVM) (LinuxLatest)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -82,8 +119,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -139,6 +190,7 @@ jobs:
   enso-build-ci-gen-job-snowflake-tests-native-linux-amd64:
     name: Snowflake Tests (Native) (LinuxLatest)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -158,8 +210,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -215,6 +281,7 @@ jobs:
   stdlib-graal-vm-ce-std-cloud-related-linux-amd64:
     name: Standard Library Cloud Tests (GraalVM CE) (LinuxLatest)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -234,8 +301,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"

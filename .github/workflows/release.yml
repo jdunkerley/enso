@@ -17,8 +17,70 @@ on:
         type: string
 concurrency: release
 jobs:
+  build-script-linux-amd64:
+    name: Build Script
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-macos-aarch64:
+    name: Build Script
+    runs-on:
+      - macos-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-windows-amd64:
+    name: Build Script
+    runs-on:
+      - windows-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli.exe
+          retention-days: 1
   enso-build-ci-gen-draft-release-linux-amd64:
     name: Create a release draft.
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -37,8 +99,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - id: prepare
@@ -51,6 +127,7 @@ jobs:
   enso-build-ci-gen-job-deploy-runtime-linux-amd64:
     name: Upload Runtime to ECR (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-linux-amd64
     runs-on:
@@ -71,8 +148,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -98,6 +189,7 @@ jobs:
   enso-build-ci-gen-job-dispatch-build-image-linux-amd64:
     name: Dispatch Cloud build-image workflow (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-deploy-runtime-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -117,8 +209,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -137,6 +243,7 @@ jobs:
   enso-build-ci-gen-job-upload-backend-linux-amd64:
     name: Upload Backend (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -156,8 +263,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -184,6 +305,7 @@ jobs:
   enso-build-ci-gen-job-upload-backend-macos-aarch64:
     name: Upload Backend (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
       - macos-latest
@@ -203,8 +325,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -226,6 +362,7 @@ jobs:
   enso-build-ci-gen-job-upload-backend-windows-amd64:
     name: Upload Backend (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
     runs-on:
       - windows-latest
@@ -245,8 +382,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -268,6 +419,7 @@ jobs:
   enso-build-ci-gen-publish-release-linux-amd64:
     name: Publish release (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-dispatch-build-image-linux-amd64
       - enso-build-ci-gen-upload-ide-linux-amd64
@@ -292,8 +444,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -323,6 +489,7 @@ jobs:
   enso-build-ci-gen-upload-ide-linux-amd64:
     name: Build IDE (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-linux-amd64
     runs-on:
@@ -343,8 +510,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -392,6 +573,7 @@ jobs:
   enso-build-ci-gen-upload-ide-macos-aarch64:
     name: Build IDE (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-macos-aarch64
     runs-on:
@@ -412,8 +594,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -468,6 +664,7 @@ jobs:
   enso-build-ci-gen-upload-ide-windows-amd64:
     name: Build IDE (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-upload-backend-windows-amd64
     runs-on:
@@ -488,8 +685,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -538,6 +749,8 @@ jobs:
       ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
   license-check-linux-amd64:
     name: Verify License Packages (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -556,8 +769,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"

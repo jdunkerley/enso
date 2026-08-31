@@ -17,6 +17,8 @@ on:
 jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -35,8 +37,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: ${{ (always()) }}
@@ -60,6 +76,26 @@ jobs:
     env:
       GRAAL_EDITION: GraalVM CE
     timeout-minutes: 240
+  build-script-linux-amd64:
+    name: Build Script
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
 env:
   ENSO_BUILD_BENCH_NAME: ${{ inputs.bench-name }}
   ENSO_BUILD_MINIMAL_RUN: ${{ true == inputs.just-check }}

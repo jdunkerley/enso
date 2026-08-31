@@ -11,8 +11,70 @@ on:
         type: boolean
         default: false
 jobs:
+  build-script-linux-amd64:
+    name: Build Script
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-macos-aarch64:
+    name: Build Script
+    runs-on:
+      - macos-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli
+          retention-days: 1
+  build-script-windows-amd64:
+    name: Build Script
+    runs-on:
+      - windows-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+      - name: Compile
+        run: cargo build -p enso-build-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: enso-build-cli-${{ runner.os }}
+          path: target/rust/debug/enso-build-cli.exe
+          retention-days: 1
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -31,8 +93,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -62,6 +138,8 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (macos, aarch64)
+    needs:
+      - build-script-macos-aarch64
     runs-on:
       - macos-latest
     steps:
@@ -80,8 +158,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -111,6 +203,8 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (windows, amd64)
+    needs:
+      - build-script-windows-amd64
     runs-on:
       - windows-latest
     steps:
@@ -129,8 +223,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -160,6 +268,8 @@ jobs:
       GRAAL_EDITION: GraalVM CE
   enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64:
     name: Build Engine Distribution (Oracle GraalVM) (native,test) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -178,8 +288,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -210,6 +334,7 @@ jobs:
   enso-build-ci-gen-job-enso-code-lint-check-linux-amd64:
     name: Enso Code Lint (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -229,8 +354,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -265,6 +404,7 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-linux-amd64:
     name: JVM Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -284,8 +424,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -339,6 +493,7 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-macos-aarch64:
     name: JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
       - macos-latest
@@ -358,8 +513,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -413,6 +582,7 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-graal-vm-ce-windows-amd64:
     name: JVM Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
       - windows-latest
@@ -432,8 +602,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -487,6 +671,7 @@ jobs:
   enso-build-ci-gen-job-jvm-tests-oracle-graal-vm-linux-amd64:
     name: JVM Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -506,8 +691,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -561,6 +760,7 @@ jobs:
   enso-build-ci-gen-job-standard-library-api-check-linux-amd64:
     name: Standard Library API check (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -580,8 +780,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -612,6 +826,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-in-native-linux-amd64:
     name: Standard Library Native Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -631,8 +846,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -689,6 +918,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-in-native-macos-aarch64:
     name: Standard Library Native Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
       - macos-latest
@@ -708,8 +938,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -766,6 +1010,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-in-native-windows-amd64:
     name: Standard Library Native Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
       - windows-latest
@@ -785,8 +1030,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -843,6 +1102,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-linux-amd64:
     name: Standard Library JVM Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -862,8 +1122,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -920,6 +1194,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-macos-aarch64:
     name: Standard Library JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
+      - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
       - macos-latest
@@ -939,8 +1214,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -997,6 +1286,7 @@ jobs:
   stdlib-graal-vm-ce-standard-library-windows-amd64:
     name: Standard Library JVM Tests (GraalVM CE) (windows, amd64)
     needs:
+      - build-script-windows-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
     runs-on:
       - windows-latest
@@ -1016,8 +1306,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -1074,6 +1378,7 @@ jobs:
   stdlib-graal-vm-ce-std-microsoft-linux-amd64:
     name: Standard Library Microsoft Tests (GraalVM CE) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -1093,8 +1398,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -1151,6 +1470,7 @@ jobs:
   stdlib-oracle-graal-vm-standard-library-in-native-linux-amd64:
     name: Standard Library Native Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -1170,8 +1490,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -1228,6 +1562,7 @@ jobs:
   stdlib-oracle-graal-vm-standard-library-linux-amd64:
     name: Standard Library JVM Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -1247,8 +1582,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
@@ -1305,6 +1654,7 @@ jobs:
   stdlib-oracle-graal-vm-std-microsoft-linux-amd64:
     name: Standard Library Microsoft Tests (Oracle GraalVM) (linux, amd64)
     needs:
+      - build-script-linux-amd64
       - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
     runs-on:
       - ubuntu-latest
@@ -1324,8 +1674,22 @@ jobs:
           node-version-file: .node-version
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v4
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build Script Setup
-        run: ./run --help || (git clean -ffdx && ./run --help)
+        run: ./run --help
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
