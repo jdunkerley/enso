@@ -22,7 +22,6 @@ use ide_ci::actions::workflow::definition::PullRequest;
 use ide_ci::actions::workflow::definition::PullRequestActivityType;
 use ide_ci::actions::workflow::definition::Push;
 use ide_ci::actions::workflow::definition::RunnerLabel;
-use ide_ci::actions::workflow::definition::Schedule;
 use ide_ci::actions::workflow::definition::Step;
 use ide_ci::actions::workflow::definition::Target;
 use ide_ci::actions::workflow::definition::Workflow;
@@ -543,16 +542,9 @@ pub fn changelog() -> Result<Workflow> {
 
 pub fn nightly() -> Result<Workflow> {
     let workflow_dispatch = WorkflowDispatch::default();
-    let on = Event {
-        workflow_dispatch: Some(workflow_dispatch),
-        // 2am (UTC) every day.
-        schedule: vec![Schedule::new("0 2 * * *")?],
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(workflow_dispatch), ..default() };
 
     let mut workflow = Workflow { on, name: "Nightly Release".into(), ..default() };
-    // Scheduled workflows do not support input parameters. We need to provide an explicit default
-    // value. Feature request is tracked by https://github.com/orgs/community/discussions/74698
 
     let job = workflow_call_job("Promote nightly", PROMOTE_WORKFLOW_PATH)
         .with_with(input::name::DESIGNATOR, Designation::Nightly.as_ref());
@@ -781,11 +773,7 @@ pub fn engine_checks() -> Result<Workflow> {
 }
 
 pub fn engine_checks_nightly() -> Result<Workflow> {
-    let on = Event {
-        schedule: vec![Schedule::new("0 3 * * *")?],
-        workflow_dispatch: Some(manual_workflow_dispatch()),
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(manual_workflow_dispatch()), ..default() };
     let mut workflow = Workflow { name: "Engine Nightly Checks".into(), on, ..default() };
     let engine_launcher = engine::EngineLauncher::TestNative;
 
@@ -811,13 +799,7 @@ pub fn engine_checks_nightly() -> Result<Workflow> {
 }
 
 pub fn extra_nightly_tests() -> Result<Workflow> {
-    let on = Event {
-        // We start at running the tests daily at 3 am, but we may adjust to run it every few days
-        // or only once a week.
-        schedule: vec![Schedule::new("0 3 * * *")?],
-        workflow_dispatch: Some(manual_workflow_dispatch()),
-        ..default()
-    };
+    let on = Event { workflow_dispatch: Some(manual_workflow_dispatch()), ..default() };
     let mut workflow = Workflow { name: "Extra Nightly Tests".into(), on, ..default() };
 
     // We run the extra tests only on Linux, as they should not contain any platform-specific
@@ -937,7 +919,6 @@ fn benchmark_workflow(
                 .with_input(just_check_input_name, just_check_input)
                 .with_input(bench_name_input_name, bench_name_input),
         ),
-        schedule: vec![Schedule::new("0 0 * * *")?],
         ..default()
     };
     let mut workflow = Workflow { name: name.into(), on, ..default() };
