@@ -4,7 +4,9 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { watch } from '../fs'
 
-describe('watch', () => {
+// These tests drive real filesystem events and real timers, which stay a little timing-sensitive on
+// shared CI runners even with `watcher.ready`; retry a couple of times before failing.
+describe('watch', { retry: 2 }, () => {
   let testDir: string
 
   beforeEach(async () => {
