@@ -19,7 +19,9 @@ const codetmp = join(dir, 'parser-codegen', '.compiled')
 // Skip the (Cargo-heavy) schema regeneration when the parser sources and the
 // codegen are unchanged and `ast.ts` is still in place. Set
 // `ENSO_FORCE_AST_GEN=1` to override.
-const stampFile = join(dir, 'src', 'ast', 'generated', '.input-stamp')
+// Not dot-prefixed: `actions/upload-artifact` drops hidden files by default, and this stamp
+// must travel inside the `wasm-artifacts` bundle.
+const stampFile = join(dir, 'src', 'ast', 'generated', 'ast-gen.stamp')
 const inputHash = hashInputs(repoRoot, [
   'lib/rust',
   'app/ydoc-shared/parser-codegen',

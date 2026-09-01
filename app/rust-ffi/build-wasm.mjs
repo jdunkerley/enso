@@ -16,7 +16,9 @@ const repoRoot = resolve(dir, '../..')
 // Skip the (Cargo-heavy) rebuild when the Rust sources feeding it are unchanged
 // and the previous output is still in place. Set `ENSO_FORCE_WASM_BUILD=1` to
 // override.
-const stampFile = join(dir, 'dist', '.input-stamp')
+// Not dot-prefixed: `actions/upload-artifact` drops hidden files by default, and this stamp
+// must travel inside the `wasm-artifacts` bundle.
+const stampFile = join(dir, 'dist', 'wasm-build.stamp')
 const stampInputs = [
   'lib/rust',
   'app/rust-ffi/src',
