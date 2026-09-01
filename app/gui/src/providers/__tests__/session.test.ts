@@ -18,7 +18,7 @@ import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { Result } from 'ts-results'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
-import { createSessionStore, USER_SESSION_QUERY_KEY } from '../session'
+import { createSessionStore, makeOfflineSession, USER_SESSION_QUERY_KEY } from '../session'
 
 function createUserSession(): UserSession {
   return {
@@ -112,6 +112,26 @@ describe('SessionProvider', () => {
       await nextTick()
       expect(authService.userSession).toBeCalled()
       await expect.poll(() => session.session?.email).toBe('test@test.com')
+    }))
+
+  it('serves a local stand-in session without hitting the auth service when auth is disabled', () =>
+    withSetup(async () => {
+      const httpClient = new HttpClient()
+      httpClient.setSessionToken = vi.fn()
+      const session = createSessionStore(
+        authService,
+        registerAuthEventListener,
+        httpClient,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      )
+      await expect.poll(() => session.session?.email).toBe(makeOfflineSession().email)
+      expect(authService.userSession).not.toBeCalled()
+      // The stand-in carries no real token, so none is pushed to the HTTP client.
+      expect(httpClient.setSessionToken).not.toBeCalled()
+      expect(session.isAuthDisabled).toBe(true)
     }))
 
   it('Should set the access token on the HTTP client', () =>

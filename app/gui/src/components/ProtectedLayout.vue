@@ -63,7 +63,10 @@ function redirect(auth: AuthStore, localStorage: LocalStorage) {
   return { path: localStorage.consume('loginRedirect') ?? DASHBOARD_PATH }
 }
 
-function requireUserAgreements(route: RouteLocation) {
+function requireUserAgreements(route: RouteLocation, auth: AuthStore) {
+  // The Terms of Service / Privacy Policy hashes are served by the Enso Cloud web host; when it
+  // is unavailable (a local-only deployment, or a cloud outage) there is nothing to agree to.
+  if (auth.session?.isCloudDataUnavailable) return false
   switch (route.meta.access) {
     case 'deleted':
     case 'guest':
@@ -90,7 +93,7 @@ export const dataLoader: DataLoader<Props> = {
       return Err(redirect(auth, localStorage) ?? false)
     }
 
-    if (requireUserAgreements(to)) {
+    if (requireUserAgreements(to, auth)) {
       scope = effectScope()
       return Ok({ agreementsModalProps: await scope.run(() => useUserAgreements(queryClient)) })
     }
@@ -105,7 +108,7 @@ export const dataLoader: DataLoader<Props> = {
       if (!routeAllowed(to, auth)) {
         return redirect(auth, localStorage) ?? false
       }
-      const agreementsRequired = requireUserAgreements(to)
+      const agreementsRequired = requireUserAgreements(to, auth)
       if (agreementsRequired && data.agreementsModalProps == null) {
         scope?.stop()
         scope = effectScope()

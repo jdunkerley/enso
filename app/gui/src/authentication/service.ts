@@ -106,6 +106,12 @@ export interface AuthConfig {
 export interface AuthService {
   /** @see {@link Cognito}. */
   readonly cognito: Ref<Cognito | undefined>
+  /**
+   * `true` once the remote configuration has settled without providing the Cognito details
+   * required for authentication (e.g. a deployment with no Enso Cloud backend). While this is
+   * `true` there is no {@link Cognito} client and the app runs in a signed-out, local-only mode.
+   */
+  readonly authDisabled: Ref<boolean>
   /** @see {@link listen.ListenFunction}. */
   readonly registerAuthEventListener: listen.ListenFunction
 }
@@ -135,11 +141,20 @@ export function useInitAuthService(): AuthService {
     }
   })
 
+  // The remote configuration has settled (either loaded or failed) but carries no usable Cognito
+  // configuration: authentication cannot run and the app falls back to a local-only mode.
+  const authDisabled = computed(
+    () =>
+      (config.remoteConfig !== undefined || config.isError) &&
+      !config.isFetching &&
+      amplifyConfig.value == null,
+  )
+
   if (detect.isOnElectron()) {
     setDeepLinkHandler((url) => void router.push(url), cognito)
   }
 
-  return { cognito, registerAuthEventListener: listen.registerAuthEventListener }
+  return { cognito, authDisabled, registerAuthEventListener: listen.registerAuthEventListener }
 }
 
 /** Return the appropriate Amplify configuration for the current platform. */
@@ -184,11 +199,16 @@ function loadAmplifyConfig(
   ]
   return computed(() => {
     const cfg = toValue(remoteConfig)
-    if (cfg != null) {
+    // Cognito needs at least a user pool and a client id to work. When the remote
+    // configuration omits them (e.g. a deployment with no Enso Cloud backend),
+    // authentication is disabled entirely rather than initialized with blanks.
+    const userPoolId = cfg?.ENSO_IDE_COGNITO_USER_POOL_ID
+    const userPoolWebClientId = cfg?.ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID
+    if (cfg != null && userPoolId && userPoolWebClientId) {
       return {
         endpoint: cfg.ENSO_IDE_AUTH_ENDPOINT,
-        userPoolId: cfg.ENSO_IDE_COGNITO_USER_POOL_ID ?? '',
-        userPoolWebClientId: cfg.ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID ?? '',
+        userPoolId,
+        userPoolWebClientId,
         domain: cfg.ENSO_IDE_COGNITO_DOMAIN ?? '',
         region: cfg.ENSO_IDE_COGNITO_REGION ?? '',
         redirectsSignIn: signInOutRedirect,

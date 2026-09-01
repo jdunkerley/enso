@@ -39,7 +39,16 @@ function createConfigStore() {
       if (!response.ok) {
         throw new Error(`Fetch config returned ${response.status}`)
       }
-      return REMOTE_CONFIG_SCHEMA.parse(await response.json())
+      // The endpoint may serve something other than JSON (e.g. an HTML fallback
+      // page when there is no cloud backend). Treat any non-JSON body as an
+      // empty configuration rather than failing the whole app.
+      let body: unknown = {}
+      try {
+        body = await response.json()
+      } catch {
+        console.warn('Remote configuration response was not valid JSON; using empty configuration.')
+      }
+      return REMOTE_CONFIG_SCHEMA.parse(body)
     },
   })
 

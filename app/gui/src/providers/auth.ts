@@ -29,6 +29,12 @@ export interface UserSession extends cognitoModule.UserSession {
    * `true` there.
    */
   readonly isCloudDataUnavailable?: boolean
+  /**
+   * `true` when authentication is disabled entirely (the deployment has no Cognito configuration).
+   * The session is a local stand-in and every cloud feature must be treated as unavailable. Implies
+   * {@link isCloudDataUnavailable}.
+   */
+  readonly isAuthDisabled?: boolean
 }
 
 const UsersMe = 'usersMe'
@@ -72,6 +78,7 @@ export function createUsersMeQuery(
   session: ToValue<Opt<cognitoModule.UserSession>>,
   remoteBackend: RemoteBackend,
   setUsername: (username: string) => Promise<boolean>,
+  authDisabled: ToValue<boolean> = false,
 ) {
   let refetchCount = 0
   return vueQuery.queryOptions({
@@ -84,7 +91,7 @@ export function createUsersMeQuery(
     retry: false,
     queryFn: async (): Promise<UserSession | null> => {
       const sessionVal = toValue(session)
-      if (!sessionVal) {
+      if (!sessionVal || toValue(authDisabled)) {
         return null
       }
 
@@ -142,6 +149,7 @@ function createAuthStore(
 ) {
   const { remoteBackend } = backends
   const session = toRef(sessionData, 'session')
+  const isAuthDisabled = toRef(sessionData, 'isAuthDisabled')
   const { organizationId, signOut } = sessionData
   const toastSuccess = useToast.success()
 
@@ -203,7 +211,12 @@ function createAuthStore(
     return true
   }
 
-  const usersMeQueryOptions = createUsersMeQuery(session, remoteBackend, setUsername)
+  const usersMeQueryOptions = createUsersMeQuery(
+    session,
+    remoteBackend,
+    setUsername,
+    isAuthDisabled,
+  )
 
   const usersMeQuery = vueQuery.useQuery(usersMeQueryOptions)
 
@@ -219,17 +232,19 @@ function createAuthStore(
   }
 
   /**
-   * `true` when Cognito sign-in succeeded but the subsequent `users/me` fetch failed
-   * with a non-auth error. Auth (401/403) failures are owned by `useUnauthorizedRecovery`
-   * and excluded here. Requires a local backend so the synthesised session has somewhere
-   * to land — on cloud-only deployments without `localBackend`, this stays `false` and
-   * the user falls through to the existing redirect-to-login path.
+   * `true` when the app is running without usable cloud user data — either authentication is
+   * disabled entirely ({@link isAuthDisabled}), or Cognito sign-in succeeded but the subsequent
+   * `users/me` fetch failed with a non-auth error. Auth (401/403) failures are owned by
+   * `useUnauthorizedRecovery` and excluded here. Requires a local backend so the synthesised
+   * session has somewhere to land — on cloud-only deployments without `localBackend`, this stays
+   * `false` and the user falls through to the existing redirect-to-login path.
    */
   const isCloudDataUnavailable = computed(() => {
     const cognitoSession = session.value
     if (!cognitoSession) return false
     if (sessionData.isLoggingOut || sessionData.isReconnectingSession) return false
     if (backends.localBackend == null) return false
+    if (isAuthDisabled.value) return true
     const error = usersMeQuery.error.value
     if (!error || backendModule.isUnauthorizedError(error)) return false
     return true
@@ -245,6 +260,7 @@ function createAuthStore(
       ...cognitoSession,
       user: getSyntheticUser(cognitoSession),
       isCloudDataUnavailable: true,
+      ...(isAuthDisabled.value ? { isAuthDisabled: true } : {}),
     } satisfies UserSession
   })
   const user = computed(() => userData.value?.user ?? null)
@@ -336,6 +352,7 @@ function createAuthStore(
     refetchSession,
     session: effectiveUserData,
     isCloudDataUnavailable,
+    isAuthDisabled,
     waitForSession: async () => {
       await sessionData.waitForSession()
       // Resolve once `users/me` settles, regardless of outcome — a failure switches the
