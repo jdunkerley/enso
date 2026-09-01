@@ -64,9 +64,11 @@ function redirect(auth: AuthStore, localStorage: LocalStorage) {
 }
 
 function requireUserAgreements(route: RouteLocation, auth: AuthStore) {
-  // The Terms of Service / Privacy Policy hashes are served by the Enso Cloud web host; when it
-  // is unavailable (a local-only deployment, or a cloud outage) there is nothing to agree to.
-  if (auth.session?.isCloudDataUnavailable) return false
+  // The Terms of Service / Privacy Policy hashes are served by the Enso Cloud web host. On a
+  // local-only deployment (no Cognito configuration) that host does not exist, so there is
+  // nothing to fetch or agree to. A transient cloud outage (degraded-auth mode) still shows the
+  // agreements — the endpoint typically stays reachable and the user may have already accepted.
+  if (auth.isAuthDisabled) return false
   switch (route.meta.access) {
     case 'deleted':
     case 'guest':

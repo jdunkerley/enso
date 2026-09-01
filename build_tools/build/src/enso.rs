@@ -395,8 +395,6 @@ impl Program for BuiltEnso {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
