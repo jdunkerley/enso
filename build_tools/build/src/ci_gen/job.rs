@@ -203,6 +203,7 @@ impl JobArchetype for BuildScript {
         let exe_suffix = if target.0 == OS::Windows { ".exe" } else { "" };
         let steps = vec![
             checkout_repo_step(None),
+            step::rust_cache("build-script"),
             shell("cargo build -p enso-build-cli").with_name("Compile"),
             step::upload_artifact("Upload")
                 .with_custom_argument("name", BUILD_SCRIPT_ARTIFACT_NAME)
@@ -748,6 +749,12 @@ impl JobArchetype for GuiBuild {
                 .with_name("Derive GUI version")
                 .with_shell(Shell::Bash);
 
+        // The `pnpm install` below compiles the Rust parser to WASM (a lifecycle script). Give it
+        // a warm Cargo cache and a prebuilt `wasm-bindgen`, and publish the result as
+        // `wasm-artifacts` so the `PackageIde` jobs don't recompile it.
+        let add_wasm_target =
+            shell("rustup target add wasm32-unknown-unknown").with_name("Add wasm target");
+
         let install = shell("corepack pnpm install").with_name("Install dependencies");
 
         let build = expose_gui_vars(shell("corepack pnpm run build:gui --mode=production"))
@@ -765,6 +772,9 @@ impl JobArchetype for GuiBuild {
             checkout_repo_step(None),
             setup_node(),
             setup_corepack(),
+            step::rust_cache("wasm-parser"),
+            add_wasm_target,
+            step::install_wasm_bindgen(),
             derive_version,
             install,
             build,
@@ -777,6 +787,7 @@ impl JobArchetype for GuiBuild {
                     .with_custom_argument("name", "gui")
                     .with_custom_argument("path", "dist/gui/"),
             );
+            steps.push(step::upload_wasm_artifacts());
         }
 
         let name = match target.job_name_suffix() {
@@ -997,6 +1008,11 @@ rm dist/backend/backend.tar"
                     .with_custom_argument("name", "gui")
                     .with_custom_argument("path", "dist/gui");
                 steps.push(download_gui);
+
+                // `./run ide build` runs `pnpm install`, whose lifecycle scripts would otherwise
+                // recompile the Rust parser to WASM. Drop the prebuilt bindings from the
+                // `GuiBuild` job into place so the input-hash guard skips that Cargo build.
+                steps.push(step::download_wasm_artifacts());
 
                 let mut packaging_steps =
                     prepare_packaging_steps(target.0, step, PackagingTarget::Development);
