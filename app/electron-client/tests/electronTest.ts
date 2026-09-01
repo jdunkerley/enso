@@ -159,10 +159,13 @@ export async function loginAsTestUser(page: Page) {
 /** Create a new Enso project */
 export async function createNewProject(page: Page) {
   await page.getByRole('button', { name: 'New Project' }).click()
-  await expect(page.locator('.GraphNode')).toHaveCount(1, { timeout: 60000 })
+  // The first project of a run is a cold engine start (JIT warm-up, no IR caches, and on
+  // Windows CI runners real-time antivirus scanning of the freshly-unpacked engine files);
+  // this can comfortably exceed the default timeouts even though the app is healthy.
+  await expect(page.locator('.GraphNode')).toHaveCount(1, { timeout: 90000 })
 
   const tableViz = page.locator('.TableVisualization')
-  await expect(tableViz).toContainText('Welcome To Enso!')
+  await expect(tableViz).toContainText('Welcome To Enso!', { timeout: 60000 })
 }
 
 /** If welcome project is to be opened, navigate back to the dashboard. */

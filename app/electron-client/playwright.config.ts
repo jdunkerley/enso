@@ -7,7 +7,10 @@ export default defineConfig({
   testIgnore: ['headless/**'],
   forbidOnly: !!process.env.CI,
   workers: 1,
-  timeout: 180000,
+  // Generous per-test budget: a cold engine start (JIT warm-up, no IR caches, antivirus
+  // scanning the freshly-unpacked engine on Windows CI runners) can push the first project's
+  // startup well past what a warm local run needs.
+  timeout: 240000,
   reportSlowTests: { max: 5, threshold: 60000 },
   expect: {
     timeout: 30000,
