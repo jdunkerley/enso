@@ -22,21 +22,30 @@ const POSSIBLE_ELECTRON_PATHS = [
   '../../../dist/ide/mac-arm64/Enso.app/Contents/MacOS/Enso',
 ]
 
+/**
+ * Enso Cloud test-user credentials, read from `playwright/.auth/user.json`.
+ *
+ * Empty strings when the file is missing or blank — a local-only build has no login screen, so
+ * {@link loginAsTestUser} never uses them. Cloud specs that genuinely need a real account gate
+ * themselves on `ENSO_TEST_CLOUD`.
+ */
 export const credentials: { readonly user: string; readonly password: string } = await fs
   .readFile(TEST_USER_FILE, { encoding: 'utf-8' })
-  .then(
-    (contents) => JSON.parse(contents),
-    (error) => {
-      throw new Error(`Cannot read Test User credentials from '${TEST_USER_FILE}'.`, {
-        cause: error,
-      })
-    },
-  )
-  .catch((error) => {
-    throw new Error(`Cannot parse Test User credentials from '${TEST_USER_FILE}'.`, {
-      cause: error,
-    })
+  .then((contents) => {
+    const parsed: unknown = JSON.parse(contents)
+    if (
+      parsed != null &&
+      typeof parsed === 'object' &&
+      'user' in parsed &&
+      typeof parsed.user === 'string' &&
+      'password' in parsed &&
+      typeof parsed.password === 'string'
+    ) {
+      return { user: parsed.user, password: parsed.password }
+    }
+    return { user: '', password: '' }
   })
+  .catch(() => ({ user: '', password: '' }))
 
 export const electronExecutablePath = await (async () => {
   try {
@@ -108,12 +117,21 @@ export const test = base.extend<{
 })
 
 /**
- * Login as test user - assert that page is the login page, and use credentials from
- * `playwright/.auth/user.json`.
+ * Bring the app to a ready dashboard.
+ *
+ * On a build with Enso Cloud configured this logs in as the test user (credentials from
+ * `playwright/.auth/user.json`) and accepts the Terms of Service / Privacy Policy. On a
+ * local-only build there is no login screen — the app starts already signed in with a local
+ * stand-in session — so this only waits for the app to finish loading.
  */
 export async function loginAsTestUser(page: Page) {
-  // Login screen
-  await expect(page.getByText('Login to your account')).toBeVisible({ timeout: LOADING_TIMEOUT })
+  const loginHeading = page.getByText('Login to your account')
+  const dashboardReady = page
+    .getByTestId('drive-view')
+    .or(page.getByRole('tab', { name: 'Getting Started with Enso Analytics' }))
+  await expect(loginHeading.or(dashboardReady).first()).toBeVisible({ timeout: 60000 })
+  if (!(await loginHeading.isVisible())) return
+
   await expect(page.getByRole('textbox', { name: 'email' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'password' })).toBeVisible()
   await page.getByRole('textbox', { name: 'email' }).fill(credentials.user)

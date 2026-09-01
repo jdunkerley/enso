@@ -99,6 +99,9 @@ pub enum Tests {
     /// Run a subset of Standard Library tests that deals with Cloud-related functionality.
     StdCloudRelated,
 
+    /// Run the AWS tests. Skipped with a warning when no AWS credentials are configured.
+    StdAws,
+
     /// Run Microsoft tests.
     StdMicrosoft,
 

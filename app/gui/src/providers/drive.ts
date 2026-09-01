@@ -46,9 +46,11 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore(
 
     // In degraded-auth mode the user must land on cloud so the "Enso Cloud is unavailable"
     // stub (rendered by the cloud-category view) is visible after sign-in. Otherwise the
-    // existing local-first default would silently hide the failure.
+    // existing local-first default would silently hide the failure. When auth is disabled
+    // entirely there is no cloud to fail, so the local-first default applies.
     const defaultCategory = computed<Category>(() => {
-      if (auth.session?.isCloudDataUnavailable) return { type: 'cloud' }
+      if (auth.session?.isCloudDataUnavailable && !auth.session.isAuthDisabled)
+        return { type: 'cloud' }
       return backends.localBackend != null ? { type: 'local' } : { type: 'cloud' }
     })
 

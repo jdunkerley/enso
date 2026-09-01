@@ -20,7 +20,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -45,7 +45,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -70,7 +70,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -95,7 +95,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -120,7 +120,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -145,7 +145,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -170,7 +170,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -195,7 +195,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -220,7 +220,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -245,7 +245,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -270,7 +270,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -295,7 +295,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -320,7 +320,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2
@@ -345,7 +345,7 @@ jobs:
       - ubuntu-latest
     steps:
       - name: Checking out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           clean: false
           fetch-depth: 2

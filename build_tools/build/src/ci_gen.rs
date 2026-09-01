@@ -688,6 +688,17 @@ pub fn add_backend_checks(
         },
         &[&build_engine_distribution_id],
     );
+    // AWS-specific standard library tests run in their own job: they need live AWS credentials
+    // and skip themselves with a warning when none are configured (e.g. on forks).
+    workflow.add_dependent(
+        target,
+        job::StandardLibraryTests {
+            graal_edition,
+            engine_launcher,
+            scope: job::StandardLibraryTestsScope::Aws,
+        },
+        &[&build_engine_distribution_id],
+    );
     // Microsoft-specific standard library tests are run only on Linux, as they require SQL Server
     // which is served from a docker image that only runs on Linux hosts.
     if target.0 == OS::Linux {

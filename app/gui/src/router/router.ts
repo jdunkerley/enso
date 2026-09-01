@@ -150,7 +150,9 @@ const router = createRouter({
 
 router.beforeEach(async () => {
   const config = useConfig()
-  await config.waitForRemoteConfig()
+  // A failed configuration fetch must not block navigation: `useConfig` records the error and
+  // the app continues in local-only mode (see `authDisabled` in the authentication service).
+  await config.waitForRemoteConfig().catch(() => {})
 })
 router.beforeEach(async (to, from) => {
   const auth = useAuth()

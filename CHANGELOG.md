@@ -2,6 +2,11 @@
 
 #### Enso IDE
 
+- The IDE now starts in a local-only mode when it has no Enso Cloud
+  configuration: a non-JSON configuration response is treated as empty, Cognito
+  authentication is disabled instead of initialized with blanks, and the app
+  boots straight into the local drive with a stand-in session rather than a
+  broken login screen.
 - Fix AI prompt cancellation leaving the queue wedged. Cancelling an in-flight
   prompt could leave the next prompt failing with `stdin write failed`, and any
   subsequent prompt stuck on "waiting"; the cancel path now pre-swaps the

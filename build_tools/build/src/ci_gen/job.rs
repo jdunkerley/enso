@@ -24,6 +24,8 @@ use ide_ci::actions::workflow::definition::Strategy;
 use ide_ci::actions::workflow::definition::Target;
 use ide_ci::actions::workflow::definition::cancel_workflow_action;
 use ide_ci::actions::workflow::definition::checkout_repo_step;
+use ide_ci::actions::workflow::definition::setup_corepack;
+use ide_ci::actions::workflow::definition::setup_node;
 use ide_ci::actions::workflow::definition::shell;
 use ide_ci::actions::workflow::definition::step::Argument;
 use ide_ci::cache::goodie::graalvm;
@@ -127,38 +129,8 @@ pub fn sbt_command(command: impl AsRef<str>) -> String {
 pub fn expose_gui_vars(step: Step) -> Step {
     step.with_variable_exposed_as(variables::ENSO_HOST, ide::web::env::ENSO_IDE_HOST)
         .with_variable_exposed_as(
-            variables::ENSO_CLOUD_ENVIRONMENT,
-            ide::web::env::ENSO_IDE_ENVIRONMENT,
-        )
-        .with_variable_exposed_as(variables::ENSO_CLOUD_API_URL, ide::web::env::ENSO_IDE_API_URL)
-        .with_variable_exposed_as(variables::ENSO_CLOUD_CHAT_URL, ide::web::env::ENSO_IDE_CHAT_URL)
-        .with_variable_exposed_as(
             variables::ENSO_CLOUD_SENTRY_DSN,
             ide::web::env::ENSO_IDE_SENTRY_DSN,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_STRIPE_KEY,
-            ide::web::env::ENSO_IDE_STRIPE_KEY,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_AUTH_ENDPOINT,
-            ide::web::env::ENSO_IDE_AUTH_ENDPOINT,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_USER_POOL_ID,
-            ide::web::env::ENSO_IDE_COGNITO_USER_POOL_ID,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID,
-            ide::web::env::ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_DOMAIN,
-            ide::web::env::ENSO_IDE_COGNITO_DOMAIN,
-        )
-        .with_variable_exposed_as(
-            variables::ENSO_CLOUD_COGNITO_REGION,
-            ide::web::env::ENSO_IDE_COGNITO_REGION,
         )
         .with_variable_exposed_as(
             variables::ENSO_CLOUD_GOOGLE_ANALYTICS_TAG,
@@ -171,22 +143,6 @@ pub fn expose_gui_vars(step: Step) -> Step {
         .with_variable_exposed_as(
             variables::ENSO_MAPBOX_API_TOKEN,
             ide::web::env::ENSO_IDE_MAPBOX_API_TOKEN,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_MS365_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_MS365_OAUTH_CLIENT_ID,
-        )
-        .with_secret_exposed_as(
-            secret::ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
-            ide::web::env::ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
         )
 }
 
@@ -357,6 +313,7 @@ pub enum StandardLibraryTestsScope {
     CloudRelated,
     StandardLibraryJvm,
     StandardLibraryInNative,
+    Aws,
     Microsoft,
 }
 
@@ -367,6 +324,9 @@ impl Display for StandardLibraryTestsScope {
             StandardLibraryTestsScope::StandardLibraryJvm => write!(f, "standard-library"),
             StandardLibraryTestsScope::StandardLibraryInNative => {
                 write!(f, "standard-library-in-native")
+            }
+            StandardLibraryTestsScope::Aws => {
+                write!(f, "std-aws")
             }
             StandardLibraryTestsScope::Microsoft => {
                 write!(f, "std-microsoft")
@@ -387,6 +347,7 @@ impl StandardLibraryTests {
         let title = match self.scope {
             StandardLibraryTestsScope::StandardLibraryJvm => "Standard Library JVM Tests",
             StandardLibraryTestsScope::StandardLibraryInNative => "Standard Library Native Tests",
+            StandardLibraryTestsScope::Aws => "Standard Library AWS Tests",
             StandardLibraryTestsScope::Microsoft => "Standard Library Microsoft Tests",
             StandardLibraryTestsScope::CloudRelated => "Standard Library Cloud Tests",
         };
@@ -441,7 +402,11 @@ impl JobArchetype for StandardLibraryTests {
                 step::check_engine_distribution(),
                 step::unpack_engine_distribution(),
                 updated_main_step,
-                step::stdlib_test_reporter(target, graal_edition),
+                step::stdlib_test_reporter(
+                    target,
+                    graal_edition,
+                    scope == StandardLibraryTestsScope::Aws,
+                ),
                 upload_hprof,
             ]
         });
@@ -773,21 +738,52 @@ pub struct GuiBuild;
 
 impl JobArchetype for GuiBuild {
     fn job(&self, target: Target) -> Job {
-        let command: &str = "gui build";
-        RunStepsBuilder::new(command)
-            .customize(move |step| {
-                let mut steps = vec![expose_gui_vars(step)];
+        // The GUI build is inlined here (`pnpm` invoked directly) instead of going through
+        // `./run gui build`. That keeps this job independent of the shared `Build Script` binary
+        // and the "Build Script Setup" step — it only needs a checkout, Node, and corepack.
+        // `./run gui build` does little more than: resolve a version + commit hash, run
+        // `pnpm run build:gui`, and copy `app/gui/dist` into `dist/gui/assets`.
+        let derive_version =
+            shell("echo \"ENSO_IDE_VERSION=$(date -u '+%Y.%-m.%-d')-dev\" >> \"$GITHUB_ENV\"")
+                .with_name("Derive GUI version")
+                .with_shell(Shell::Bash);
 
-                if target.0 == OS::Linux {
-                    let upload_gui = step::upload_artifact("Upload gui")
-                        .with_custom_argument("name", "gui")
-                        .with_custom_argument("path", "dist/gui/");
-                    steps.push(upload_gui);
-                }
+        let install = shell("corepack pnpm install").with_name("Install dependencies");
 
-                steps
-            })
-            .build_job("GUI build", target)
+        let build = expose_gui_vars(shell("corepack pnpm run build:gui --mode=production"))
+            .with_name("Build GUI")
+            .with_env(ide::web::env::MODE, "production")
+            .with_env(ide::web::env::ENSO_IDE_COMMIT_HASH, "${{ github.sha }}");
+
+        // `./run gui build` mirrors `app/gui/dist` into `<dist>/gui/assets`; reproduce that layout
+        // so the uploaded `gui` artifact stays identical.
+        let collect = shell("mkdir -p dist/gui/assets && cp -R app/gui/dist/. dist/gui/assets/")
+            .with_name("Collect GUI artifacts")
+            .with_shell(Shell::Bash);
+
+        let mut steps = vec![
+            checkout_repo_step(None),
+            setup_node(),
+            setup_corepack(),
+            derive_version,
+            install,
+            build,
+            collect,
+        ];
+
+        if target.0 == OS::Linux {
+            steps.push(
+                step::upload_artifact("Upload gui")
+                    .with_custom_argument("name", "gui")
+                    .with_custom_argument("path", "dist/gui/"),
+            );
+        }
+
+        let name = match target.job_name_suffix() {
+            Some(suffix) => format!("GUI build ({suffix})"),
+            None => "GUI build".to_string(),
+        };
+        Job { name, runs_on: target.runs_on(), steps, ..default() }
     }
 }
 
@@ -1038,7 +1034,7 @@ rm dist/backend/backend.tar"
                 let upload_test_traces_step = Step {
                     r#if: Some("failure()".into()),
                     name: Some("Upload Test Traces".into()),
-                    uses: Some("actions/upload-artifact@v4".into()),
+                    uses: Some("actions/upload-artifact@v5".into()),
                     with: Some(Argument::Other(BTreeMap::from_iter([
                         ("name".into(), format!("test-traces-{}-{}", target.0, target.1).into()),
                         ("path".into(), "app/electron-client/test-traces".into()),

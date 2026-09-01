@@ -14,22 +14,48 @@ import * as vueQuery from '@tanstack/vue-query'
 import { createGlobalState } from '@vueuse/core'
 import type { SignInOutput } from 'aws-amplify/auth'
 import type { HttpClient } from 'enso-common/src/services/HttpClient'
+import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
 import { unreachable } from 'enso-common/src/utilities/errors'
-import { computed, onScopeDispose, ref, toRaw, toValue, watchEffect } from 'vue'
+import { computed, onScopeDispose, ref, toRaw, toValue, watch, watchEffect } from 'vue'
 import { useHttpClient } from './httpClient'
 import { useUnauthorizedRecovery } from './session/useUnauthorizedRecovery'
 import { useText } from './text'
 
 export const USER_SESSION_QUERY_KEY = ['userSession'] as const
 
+const OFFLINE_SESSION_YEAR_MS = 365 * 24 * 60 * 60 * 1000
+
+/**
+ * A stand-in {@link cognito.UserSession} used when authentication is disabled. It carries no real
+ * tokens; its only purpose is to make the rest of the app treat the user as "signed in" so the
+ * local-only workflow is reachable without an Enso Cloud backend.
+ */
+export function makeOfflineSession(): cognito.UserSession {
+  return {
+    email: 'local@enso.localhost',
+    accessToken: '',
+    refreshToken: '',
+    refreshUrl: '',
+    expireAt: Rfc3339DateTime(new Date(Date.now() + OFFLINE_SESSION_YEAR_MS).toJSON()),
+    clientId: 'offline',
+  }
+}
+
 /** Create a query for the user session. */
-export function createSessionQuery(authService: ToValue<cognito.ISessionProvider | undefined>) {
+export function createSessionQuery(
+  authService: ToValue<cognito.ISessionProvider | undefined>,
+  authDisabled: ToValue<boolean> = false,
+) {
   return vueQuery.queryOptions({
     queryKey: USER_SESSION_QUERY_KEY,
-    queryFn: async () =>
-      toValue(authService)
-        ?.userSession()
-        .catch(() => null) ?? null,
+    queryFn: async () => {
+      if (toValue(authDisabled)) return makeOfflineSession()
+      return (
+        (await toValue(authService)
+          ?.userSession()
+          .catch(() => null)) ?? null
+      )
+    },
   })
 }
 
@@ -50,6 +76,7 @@ export function createSessionStore(
   { getText } = useText(),
   queryClient = vueQuery.useQueryClient(),
   localStorage = LocalStorage.getInstance(),
+  authDisabled: ToValue<boolean> = false,
 ) {
   const mainPageUrl = getMainPageUrl()
   const errorToast = useToast.error()
@@ -57,8 +84,15 @@ export function createSessionStore(
 
   const isLoggingOut = ref(false)
 
-  const sessionQueryOptions = createSessionQuery(authService)
+  const sessionQueryOptions = createSessionQuery(authService, authDisabled)
   const session = vueQuery.useQuery(sessionQueryOptions)
+
+  // `authDisabled` is `false` until the remote configuration settles; re-run the session query
+  // once it flips so the offline stand-in session replaces the initial `null`.
+  watch(
+    () => toValue(authDisabled),
+    () => void queryClient.invalidateQueries({ queryKey: USER_SESSION_QUERY_KEY, exact: true }),
+  )
 
   const assertAuthService = (): cognito.ISessionProvider => {
     const auth = toValue(authService)
@@ -249,7 +283,7 @@ export function createSessionStore(
 
   watchEffect(
     () => {
-      if (session.data.value) {
+      if (session.data.value && !toValue(authDisabled)) {
         httpClient.setSessionToken(session.data.value.accessToken)
       }
     },
@@ -328,7 +362,7 @@ export function createSessionStore(
   }
 
   watchEffect(() => {
-    if (session.data.value) {
+    if (session.data.value && !toValue(authDisabled)) {
       // Save access token so can it be reused by backend services
       // `saveAccessToken` passes its argument through Electron IPC.
       // `toRaw` is required because `session.data.value` is a reactive `Proxy`,
@@ -340,6 +374,7 @@ export function createSessionStore(
   return proxyRefs({
     signUp,
     session: session.data,
+    isAuthDisabled: computed(() => toValue(authDisabled)),
     waitForSession: () => waitForData(session),
     isLoggingOut,
     isReconnectingSession,
@@ -364,6 +399,14 @@ export function createSessionStore(
 }
 
 export const useSession = createGlobalState(() => {
-  const { cognito, registerAuthEventListener } = useInitAuthService()
-  return createSessionStore(cognito, registerAuthEventListener)
+  const { cognito, authDisabled, registerAuthEventListener } = useInitAuthService()
+  return createSessionStore(
+    cognito,
+    registerAuthEventListener,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    authDisabled,
+  )
 })

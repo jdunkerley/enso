@@ -14,6 +14,7 @@ use crate::sqlserver;
 use crate::sqlserver::EndpointConfiguration as SQLServerEndpointConfiguration;
 use crate::sqlserver::SQLServer;
 
+use ide_ci::env::accessor::RawVariable;
 use ide_ci::env::accessor::TypedVariable;
 use ide_ci::future::AsyncPolicy;
 use ide_ci::programs::docker::ContainerId;
@@ -33,6 +34,25 @@ impl From<bool> for Boolean {
 ide_ci::define_env_var! {
     JAVA_TOOL_OPTIONS, String;
     ENSO_BENCHMARK_TEST_DRY_RUN, Boolean;
+}
+
+/// Whether the given test selection targets the AWS tests and nothing else.
+fn is_aws_only_selection(selection: &StandardLibraryTestsSelection) -> bool {
+    matches!(
+        selection,
+        StandardLibraryTestsSelection::Whitelist(whitelist)
+            if whitelist.len() == 1 && whitelist.contains("AWS_Tests")
+    )
+}
+
+/// Whether the environment carries non-empty AWS credentials for the S3 standard-library tests.
+fn aws_test_credentials_available() -> bool {
+    [
+        crate::libraries_tests::s3::env::ENSO_LIB_S3_AWS_ACCESS_KEY_ID.name(),
+        crate::libraries_tests::s3::env::ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY.name(),
+    ]
+    .into_iter()
+    .all(|name| std::env::var(name).is_ok_and(|value| !value.is_empty()))
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -162,6 +182,21 @@ impl BuiltEnso {
         native_image: bool,
     ) -> Result {
         let paths = &self.paths;
+
+        // The AWS standard-library tests require live AWS credentials (an S3 bucket, IAM keys).
+        // When they are the only selected suite and no credentials are configured — the common
+        // case on forks and local checkouts — report a warning and treat the run as a success
+        // rather than failing CI on infrastructure that isn't available.
+        if is_aws_only_selection(&test_selection) && !aws_test_credentials_available() {
+            warn!(
+                "Skipping the AWS standard library tests: no AWS credentials found in the \
+                 environment ({} / {}).",
+                crate::libraries_tests::s3::env::ENSO_LIB_S3_AWS_ACCESS_KEY_ID.name(),
+                crate::libraries_tests::s3::env::ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY.name(),
+            );
+            return Ok(());
+        }
+
         // Environment for meta-tests. See:
         // https://github.com/enso-org/enso/tree/develop/test/Meta_Test_Suite_Tests
         ENSO_META_TEST_COMMAND.set(&self.wrapper_script_path(native_image))?;
@@ -357,5 +392,23 @@ impl Program for BuiltEnso {
         let stdout = self.version_string().await?;
         let version = serde_json::from_str::<VersionInfo>(&stdout)?;
         Ok(version.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::engine::Filter::Blacklist;
+    use crate::engine::Filter::Whitelist;
+
+    #[test]
+    fn aws_only_selection_recognizes_the_dedicated_whitelist() {
+        let names =
+            |items: &[&str]| items.iter().map(|item| item.to_string()).collect::<HashSet<_>>();
+        assert!(is_aws_only_selection(&Whitelist(names(&["AWS_Tests"]))));
+        assert!(!is_aws_only_selection(&Whitelist(names(&["AWS_Tests", "Base_Tests"]))));
+        assert!(!is_aws_only_selection(&Whitelist(names(&["Base_Tests"]))));
+        assert!(!is_aws_only_selection(&Blacklist(names(&["AWS_Tests"]))));
     }
 }

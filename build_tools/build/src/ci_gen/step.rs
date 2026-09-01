@@ -29,11 +29,20 @@ pub fn test_reporter(
     .with_custom_argument("name", report_name)
 }
 
-pub fn stdlib_test_reporter((os, arch): Target, graal_edition: graalvm::Edition) -> Step {
+/// Test reporter for the standard-library test jobs.
+///
+/// `allow_empty` tolerates a run that produced no report at all — used by the AWS job, which
+/// skips itself (successfully) when no AWS credentials are configured.
+pub fn stdlib_test_reporter(
+    (os, arch): Target,
+    graal_edition: graalvm::Edition,
+    allow_empty: bool,
+) -> Step {
     let step_name = "Standard Library Test Reporter";
     let report_name = format!("Standard Library Tests Report ({graal_edition}, {os}, {arch})");
     let path = format!("{}/*/*.xml", env_expression(&paths::ENSO_TEST_JUNIT_DIR));
-    test_reporter(step_name, report_name, path)
+    let step = test_reporter(step_name, report_name, path);
+    if allow_empty { step.with_custom_argument("fail-on-empty", false) } else { step }
 }
 
 pub fn engine_test_reporter((os, arch): Target, graal_edition: graalvm::Edition) -> Step {
@@ -150,7 +159,7 @@ fn built_distribution_directories(engine_launcher: engine::EngineLauncher) -> St
 pub fn upload_artifact(step_name: impl Into<String>) -> Step {
     Step {
         name: Some(step_name.into()),
-        uses: Some("actions/upload-artifact@v4".into()),
+        uses: Some("actions/upload-artifact@v5".into()),
         ..default()
     }
 }
@@ -158,7 +167,7 @@ pub fn upload_artifact(step_name: impl Into<String>) -> Step {
 pub fn download_artifact(step_name: impl Into<String>) -> Step {
     Step {
         name: Some(step_name.into()),
-        uses: Some("actions/download-artifact@v4".into()),
+        uses: Some("actions/download-artifact@v5".into()),
         ..default()
     }
 }

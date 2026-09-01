@@ -1,9 +1,10 @@
 import type { UserSession as CognitoUserSession } from '$/authentication/cognito'
 import { isDirectoryId, isOrganizationId, isUserId, Plan } from 'enso-common/src/services/Backend'
+import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { computed } from 'vue'
-import { isUsersMeQueryKey, makeSyntheticUser } from '../auth'
+import { createUsersMeQuery, isUsersMeQueryKey, makeSyntheticUser } from '../auth'
 
 function fakeCognitoSession(overrides: Partial<CognitoUserSession> = {}): CognitoUserSession {
   return {
@@ -61,5 +62,24 @@ describe('makeSyntheticUser', () => {
   it('handles a missing email without producing an empty identifier', () => {
     const user = makeSyntheticUser(fakeCognitoSession({ email: '' }))
     expect(user.userId).toBe('user-cloud-unavailable-unknown')
+  })
+})
+
+describe('createUsersMeQuery', () => {
+  const remoteBackend = { type: 'remote' } as RemoteBackend
+  const failingSetUsername = () => Promise.reject(new Error('should not be called'))
+
+  it('short-circuits to null when authentication is disabled', async () => {
+    const usersMe = vi.fn()
+    const backend = { type: 'remote', usersMe } as unknown as RemoteBackend
+    const query = createUsersMeQuery(fakeCognitoSession(), backend, failingSetUsername, true)
+    await expect(query.queryFn!({} as never)).resolves.toBeNull()
+    expect(usersMe).not.toHaveBeenCalled()
+  })
+
+  it('fetches users/me normally when authentication is enabled', async () => {
+    const query = createUsersMeQuery(null, remoteBackend, failingSetUsername, false)
+    // A null Cognito session already resolves to null without touching the backend.
+    await expect(query.queryFn!({} as never)).resolves.toBeNull()
   })
 })

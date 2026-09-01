@@ -10,7 +10,12 @@ import Standard.Base.Runtime.State
    The environment variable override is only visible to the Enso
    `Environment.get` method, the environment as seen from a direct
    `System.getenv` Java call remains unchanged.
-unsafe_with_environment_override : Text -> Text -> Any -> Any
+
+   Passing `Nothing` as the value makes `Environment.get` treat the variable as
+   not set for the duration of the action, even if it is set in the real
+   environment - useful for tests that assert default/fallback behaviour on CI
+   machines that export the variable.
+unsafe_with_environment_override : Text -> Text|Nothing -> Any -> Any
 unsafe_with_environment_override key value ~action =
     prev_value = State.get Environment if_missing=Dictionary.empty
     new_value = (prev_value:Dictionary).insert key value

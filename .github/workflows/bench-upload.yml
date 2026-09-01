@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout enso repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: enso-org/enso
           path: enso
       - name: Checkout engine-benchmark-results repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: enso-org/engine-benchmark-results
           path: engine-benchmark-results
