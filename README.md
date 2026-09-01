@@ -146,3 +146,18 @@ questions.
 Enso Analytics transforms complex processes into repeatable workflows, boosting
 productivity for data-intensive teams. Learn more at
 [ensoanalytics.com](https://www.ensoanalytics.com).
+
+## Fork Details
+
+This repository is a fork of the original Enso Analytics repository. The forked
+version adjusts the build process to not depend on Bazel or the services of Enso
+Analytics.
+
+It is adjusted so that it can run without the need for Enso Analytics' cloud 
+services and can be run in a community mode. The forked version is intended for
+community contributions and development, allowing users to build and run Enso
+for personal use (or when they would fit the 
+[license](https://ensoanalytics.com/eula) terms of Enso Analytics).
+
+It is not intended for commercial use or distribution.
+
