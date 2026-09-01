@@ -903,6 +903,17 @@ create_connection_builder =
 
 pgpass_file = enso_project.data / "pgpass.conf"
 
+## Runs `action` with the Postgres-related environment variables cleared, so the
+   connection-setup tests observe a clean baseline regardless of the host
+   machine. GitHub's Windows runner images, for example, export
+   `PGUSER=postgres` / `PGPASSWORD=root`, which would otherwise leak into the
+   "no configuration provided" assertions.
+with_clean_pg_env ~action =
+    Test_Environment.unsafe_with_environment_override "PGUSER" Nothing <|
+        Test_Environment.unsafe_with_environment_override "PGPASSWORD" Nothing <|
+            Test_Environment.unsafe_with_environment_override "PGPASSFILE" Nothing <|
+                action
+
 add_pgpass_specs suite_builder = suite_builder.group "[PostgreSQL] .pgpass" group_builder->
     make_pair username password =
         [Pair.new "user" username, Pair.new "password" password]
@@ -992,7 +1003,7 @@ add_connection_setup_specs suite_builder = suite_builder.group "[PostgreSQL] Con
         c.jdbc_properties . should_equal <| add_ssl [Pair.new "user" "myuser", Pair.new "password" "mypass"]
 
     ## pgpass support
-    group_builder.specify "should fallback to environment variables and fill-out missing information based on the PGPASS file (if available)" <|
+    group_builder.specify "should fallback to environment variables and fill-out missing information based on the PGPASS file (if available)" <| with_clean_pg_env <|
         c1 = Postgres.Server
         c1.jdbc_url . should_equal "jdbc:postgresql://localhost:5432/postgres"
 

@@ -26,9 +26,10 @@ polyglot java import java.lang.System as Java_System
    ```
 get key:Text ~if_missing:Text|Nothing=Nothing -> (Text|Nothing) =
     mock_dict = State.get Environment if_missing=Nothing
-    mock_value = if mock_dict == Nothing then Nothing else
-        (mock_dict:Dictionary).get key
-    value = if mock_value != Nothing then mock_value else
+    # A key present in the mock dictionary wins even when its value is `Nothing`:
+    # that is how a test pretends a variable is not set (see `Test_Environment`).
+    mock_has_key = mock_dict != Nothing && (mock_dict:Dictionary).contains_key key
+    value = if mock_has_key then (mock_dict:Dictionary).get key else
         Java_System.getenv key
     if value != Nothing then value else
         if_missing
