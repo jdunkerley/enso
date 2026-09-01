@@ -1443,6 +1443,7 @@ jobs:
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
         with:
+          fail-on-empty: false
           max-annotations: 50
           name: Standard Library Tests Report (GraalVM CE, linux, amd64)
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
@@ -1535,6 +1536,7 @@ jobs:
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
         with:
+          fail-on-empty: false
           max-annotations: 50
           name: Standard Library Tests Report (GraalVM CE, macos, aarch64)
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
@@ -1627,6 +1629,7 @@ jobs:
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
         with:
+          fail-on-empty: false
           max-annotations: 50
           name: Standard Library Tests Report (GraalVM CE, windows, amd64)
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
@@ -1995,6 +1998,7 @@ jobs:
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
         with:
+          fail-on-empty: false
           max-annotations: 50
           name: Standard Library Tests Report (Oracle GraalVM, linux, amd64)
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml

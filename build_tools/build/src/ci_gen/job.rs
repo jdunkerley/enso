@@ -402,7 +402,11 @@ impl JobArchetype for StandardLibraryTests {
                 step::check_engine_distribution(),
                 step::unpack_engine_distribution(),
                 updated_main_step,
-                step::stdlib_test_reporter(target, graal_edition),
+                step::stdlib_test_reporter(
+                    target,
+                    graal_edition,
+                    scope == StandardLibraryTestsScope::Aws,
+                ),
                 upload_hprof,
             ]
         });
