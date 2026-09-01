@@ -1375,6 +1375,282 @@ jobs:
       GRAAL_EDITION: GraalVM CE
     permissions:
       checks: write
+  stdlib-graal-vm-ce-std-aws-linux-amd64:
+    name: Standard Library AWS Tests (GraalVM CE) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
+      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Expose Artifact API and context information.
+        uses: actions/github-script@v8
+        with:
+          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - if: runner.os == 'macOS'
+        name: Setup nodejs version
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - if: runner.os != 'Linux'
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v5
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Script Setup
+        run: ./run --help
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean before
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: rm -rf built-distribution test
+        shell: bash
+      - name: Download Engine Distribution
+        uses: actions/download-artifact@v5
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+      - run: ls -l built-distribution.tar
+        shell: bash
+      - name: Unpack Engine Distribution
+        run: |-
+          tar -xvf built-distribution.tar -C .
+          rm built-distribution.tar
+      - run: ./run backend test std-aws
+        env:
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          max-annotations: 50
+          name: Standard Library Tests Report (GraalVM CE, linux, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library AWS Tests, linux, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean after
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GRAAL_EDITION: GraalVM CE
+    permissions:
+      checks: write
+  stdlib-graal-vm-ce-std-aws-macos-aarch64:
+    name: Standard Library AWS Tests (GraalVM CE) (macos, aarch64)
+    needs:
+      - build-script-macos-aarch64
+      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
+    runs-on:
+      - macos-latest
+    steps:
+      - name: Expose Artifact API and context information.
+        uses: actions/github-script@v8
+        with:
+          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - if: runner.os == 'macOS'
+        name: Setup nodejs version
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - if: runner.os != 'Linux'
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v5
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Script Setup
+        run: ./run --help
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean before
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: rm -rf built-distribution test
+        shell: bash
+      - name: Download Engine Distribution
+        uses: actions/download-artifact@v5
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (macos, aarch64)
+      - run: ls -l built-distribution.tar
+        shell: bash
+      - name: Unpack Engine Distribution
+        run: |-
+          tar -xvf built-distribution.tar -C .
+          rm built-distribution.tar
+      - run: ./run backend test std-aws
+        env:
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          max-annotations: 50
+          name: Standard Library Tests Report (GraalVM CE, macos, aarch64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library AWS Tests, macos, aarch64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean after
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GRAAL_EDITION: GraalVM CE
+    permissions:
+      checks: write
+  stdlib-graal-vm-ce-std-aws-windows-amd64:
+    name: Standard Library AWS Tests (GraalVM CE) (windows, amd64)
+    needs:
+      - build-script-windows-amd64
+      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-windows-amd64
+    runs-on:
+      - windows-latest
+    steps:
+      - name: Expose Artifact API and context information.
+        uses: actions/github-script@v8
+        with:
+          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - if: runner.os == 'macOS'
+        name: Setup nodejs version
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - if: runner.os != 'Linux'
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v5
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Script Setup
+        run: ./run --help
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean before
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: rm -rf built-distribution test
+        shell: bash
+      - name: Download Engine Distribution
+        uses: actions/download-artifact@v5
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (windows, amd64)
+      - run: ls -l built-distribution.tar
+        shell: bash
+      - name: Unpack Engine Distribution
+        run: |-
+          tar -xvf built-distribution.tar -C .
+          rm built-distribution.tar
+      - run: ./run backend test std-aws
+        env:
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          max-annotations: 50
+          name: Standard Library Tests Report (GraalVM CE, windows, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library AWS Tests, windows, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean after
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GRAAL_EDITION: GraalVM CE
+    permissions:
+      checks: write
   stdlib-graal-vm-ce-std-microsoft-linux-amd64:
     name: Standard Library Microsoft Tests (GraalVM CE) (linux, amd64)
     needs:
@@ -1638,6 +1914,98 @@ jobs:
         with:
           if-no-files-found: ignore
           name: Heap dumps (Standard Library JVM Tests, linux, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean after
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      GRAAL_EDITION: Oracle GraalVM
+    permissions:
+      checks: write
+  stdlib-oracle-graal-vm-std-aws-linux-amd64:
+    name: Standard Library AWS Tests (Oracle GraalVM) (linux, amd64)
+    needs:
+      - build-script-linux-amd64
+      - enso-build-ci-gen-job-build-engine-distribution-oracle-graal-vm-linux-amd64
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Expose Artifact API and context information.
+        uses: actions/github-script@v8
+        with:
+          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - if: runner.os == 'macOS'
+        name: Setup nodejs version
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - if: runner.os != 'Linux'
+        run: npm install -g --force corepack@0.36.0 && corepack --version
+      - name: Download Build Script
+        uses: actions/download-artifact@v5
+        with:
+          name: enso-build-cli-${{ runner.os }}
+          path: ${{ runner.temp }}/enso-build-cli
+      - name: Configure Build Script
+        run: |-
+          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
+          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
+          chmod +x "$BIN" || true
+          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Script Setup
+        run: ./run --help
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
+        name: Clean before
+        run: corepack pnpm run git-clean --verbose
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: rm -rf built-distribution test
+        shell: bash
+      - name: Download Engine Distribution
+        uses: actions/download-artifact@v5
+        with:
+          name: Engine Distribution (Oracle GraalVM) (native,test) (linux, amd64)
+      - run: ls -l built-distribution.tar
+        shell: bash
+      - name: Unpack Engine Distribution
+        run: |-
+          tar -xvf built-distribution.tar -C .
+          rm built-distribution.tar
+      - run: ./run backend test std-aws
+        env:
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          max-annotations: 50
+          name: Standard Library Tests Report (Oracle GraalVM, linux, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library AWS Tests, linux, amd64)
           path: |-
             test/**/*.hprof
             engine/**/*.hprof

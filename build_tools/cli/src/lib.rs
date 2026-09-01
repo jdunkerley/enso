@@ -389,6 +389,9 @@ impl Processor {
                             config.test_standard_library =
                                 Some(StandardLibraryTestsSelection::blacklist(vec![
                                     "Microsoft_Tests".to_string(),
+                                    // AWS tests need live AWS credentials; they run in their own
+                                    // `std-aws` job which skips gracefully when none are present.
+                                    "AWS_Tests".to_string(),
                                 ]));
                             config.use_native_runner = true;
                         }
@@ -396,6 +399,7 @@ impl Processor {
                             config.test_standard_library =
                                 Some(StandardLibraryTestsSelection::blacklist(vec![
                                     "Microsoft_Tests".to_string(),
+                                    "AWS_Tests".to_string(),
                                 ]));
                             config.use_native_runner = true;
                         }
@@ -430,6 +434,13 @@ impl Processor {
                                     "Image_Tests".to_string(),
                                     // Microsoft tests check interaction with OneDrive
                                     "Microsoft_Tests".to_string(),
+                                ]));
+                            config.use_native_runner = true;
+                        }
+                        Tests::StdAws => {
+                            config.test_standard_library =
+                                Some(StandardLibraryTestsSelection::whitelist(vec![
+                                    "AWS_Tests".to_string(),
                                 ]));
                             config.use_native_runner = true;
                         }

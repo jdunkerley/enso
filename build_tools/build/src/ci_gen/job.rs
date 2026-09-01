@@ -313,6 +313,7 @@ pub enum StandardLibraryTestsScope {
     CloudRelated,
     StandardLibraryJvm,
     StandardLibraryInNative,
+    Aws,
     Microsoft,
 }
 
@@ -323,6 +324,9 @@ impl Display for StandardLibraryTestsScope {
             StandardLibraryTestsScope::StandardLibraryJvm => write!(f, "standard-library"),
             StandardLibraryTestsScope::StandardLibraryInNative => {
                 write!(f, "standard-library-in-native")
+            }
+            StandardLibraryTestsScope::Aws => {
+                write!(f, "std-aws")
             }
             StandardLibraryTestsScope::Microsoft => {
                 write!(f, "std-microsoft")
@@ -343,6 +347,7 @@ impl StandardLibraryTests {
         let title = match self.scope {
             StandardLibraryTestsScope::StandardLibraryJvm => "Standard Library JVM Tests",
             StandardLibraryTestsScope::StandardLibraryInNative => "Standard Library Native Tests",
+            StandardLibraryTestsScope::Aws => "Standard Library AWS Tests",
             StandardLibraryTestsScope::Microsoft => "Standard Library Microsoft Tests",
             StandardLibraryTestsScope::CloudRelated => "Standard Library Cloud Tests",
         };
