@@ -75,9 +75,14 @@ function DriveInner(props: DriveProperties) {
     void auth.refetchSession()
   })
 
+  // When authentication is disabled entirely there is no cloud to retry, so the
+  // "cloud unavailable" stub is skipped and the user lands straight on the local drive.
+  const showCloudUnavailableStub =
+    session.isCloudDataUnavailable && !session.isAuthDisabled && (isCloud || !hasExplicitCategory)
+
   const status =
     isCloud && isOffline ? 'offline'
-    : session.isCloudDataUnavailable && (isCloud || !hasExplicitCategory) ? 'cloud-unavailable'
+    : showCloudUnavailableStub ? 'cloud-unavailable'
     : isCloud && !user.isEnabled ? 'not-enabled'
     : 'ok'
 
