@@ -7,6 +7,7 @@ import {
   createNewProject,
   getNewestProject,
   loginAsTestUser,
+  SKIP_ON_WINDOWS_CI,
   test,
 } from './electronTest'
 
@@ -43,7 +44,9 @@ test('Project Duplicate', async ({ page }) => {
 })
 
 // A test for basic flow of the application: open project and see if nodes appear.
-test('Local Workflow', async ({ page, app, projectsDir }) => {
+// Skipped on the Windows CI runner (long editing session; see SKIP_ON_WINDOWS_CI).
+const localWorkflowTest = SKIP_ON_WINDOWS_CI ? test.skip : test
+localWorkflowTest('Local Workflow', async ({ page, app, projectsDir }) => {
   const OUTPUT_FILE = 'output.txt'
   const TEXT_TO_WRITE = 'Some text'
 

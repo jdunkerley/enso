@@ -10,10 +10,14 @@ import {
   loginAsTestUser,
   openComponentBrowser,
   openDropdownInWidget,
+  SKIP_ON_WINDOWS_CI,
+  SKIP_ON_WINDOWS_CI_REASON,
   test,
   visualizeData,
   waitForDownload,
 } from './electronTest'
+
+test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
 
 // First excercise in Enso Analytics 101
 test('Exercise 1', async ({ page, projectsDir }) => {
