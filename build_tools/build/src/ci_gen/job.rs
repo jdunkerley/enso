@@ -968,7 +968,9 @@ pub struct PackageIde;
 
 impl JobArchetype for PackageIde {
     fn job(&self, target: Target) -> Job {
-        RunStepsBuilder::new("ide build --backend-source local --gui-upload-artifact false")
+        RunStepsBuilder::new(
+            "ide build --backend-source local --gui-source local --gui-upload-artifact false",
+        )
             .fetch_depth(2)
             .customize(move |step| {
                 let mut steps = vec![];
@@ -987,6 +989,14 @@ rm dist/backend/backend.tar"
                     ..Default::default()
                 };
                 steps.push(unpack_backend);
+
+                // The GUI is platform-independent web assets built once by the `GuiBuild` job;
+                // download that artifact instead of recompiling it here (`--gui-source local`
+                // above; the default `--gui-path` is `dist/gui`).
+                let download_gui = step::download_artifact("Download GUI")
+                    .with_custom_argument("name", "gui")
+                    .with_custom_argument("path", "dist/gui");
+                steps.push(download_gui);
 
                 let mut packaging_steps =
                     prepare_packaging_steps(target.0, step, PackagingTarget::Development);

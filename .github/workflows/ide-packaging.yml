@@ -239,52 +239,12 @@ jobs:
         with:
           name: gui
           path: dist/gui/
-  enso-build-ci-gen-job-gui-build-windows-amd64:
-    name: GUI build (windows, amd64)
-    runs-on:
-      - windows-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Derive GUI version
-        run: echo "ENSO_IDE_VERSION=$(date -u '+%Y.%-m.%-d')-dev" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install dependencies
-        run: corepack pnpm install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build GUI
-        run: corepack pnpm run build:gui --mode=production
-        env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
-          ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
-          ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          MODE: production
-      - name: Collect GUI artifacts
-        run: mkdir -p dist/gui/assets && cp -R app/gui/dist/. dist/gui/assets/
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   enso-build-ci-gen-job-package-ide-linux-amd64:
     name: Package New IDE (linux, amd64)
     needs:
       - build-script-linux-amd64
       - enso-build-ci-gen-job-build-backend-linux-amd64
+      - enso-build-ci-gen-job-gui-build-linux-amd64
     runs-on:
       - ubuntu-latest
     steps:
@@ -335,7 +295,12 @@ jobs:
       - run: |-
           tar -xvf dist/backend/backend.tar -C dist/backend
           rm dist/backend/backend.tar
-      - run: ./run ide build --backend-source local --gui-upload-artifact false
+      - name: Download GUI
+        uses: actions/download-artifact@v5
+        with:
+          name: gui
+          path: dist/gui
+      - run: ./run ide build --backend-source local --gui-source local --gui-upload-artifact false
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
@@ -383,6 +348,7 @@ jobs:
     needs:
       - build-script-windows-amd64
       - enso-build-ci-gen-job-build-backend-windows-amd64
+      - enso-build-ci-gen-job-gui-build-linux-amd64
     runs-on:
       - windows-latest
     steps:
@@ -433,7 +399,12 @@ jobs:
       - run: |-
           tar -xvf dist/backend/backend.tar -C dist/backend
           rm dist/backend/backend.tar
-      - run: ./run ide build --backend-source local --gui-upload-artifact false
+      - name: Download GUI
+        uses: actions/download-artifact@v5
+        with:
+          name: gui
+          path: dist/gui
+      - run: ./run ide build --backend-source local --gui-source local --gui-upload-artifact false
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}

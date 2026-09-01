@@ -808,12 +808,15 @@ pub fn ide_packaging() -> Result<Workflow> {
     };
 
     let engine_launcher = engine::EngineLauncher::Native;
+    // The GUI is platform-independent web assets. Build it once (on Linux) and have every
+    // `PackageIde` job consume that artifact rather than recompiling the GUI per platform.
+    let gui_job = workflow.add((OS::Linux, Arch::X86_64), job::GuiBuild);
     for target in PR_REQUIRED_TARGETS {
         let backend_job = workflow.add(target, job::BuildBackend { engine_launcher });
         workflow.add_customized(target, job::PackageIde, |job| {
             job.needs.insert(backend_job.clone());
+            job.needs.insert(gui_job.clone());
         });
-        workflow.add(target, job::GuiBuild);
     }
     Ok(workflow)
 }
