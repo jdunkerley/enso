@@ -7,10 +7,12 @@ export default defineConfig({
   testIgnore: ['headless/**'],
   forbidOnly: !!process.env.CI,
   workers: 1,
-  // Generous per-test budget: a cold engine start (JIT warm-up, no IR caches, antivirus
-  // scanning the freshly-unpacked engine on Windows CI runners) can push the first project's
-  // startup well past what a warm local run needs.
-  timeout: 240000,
+  // Generous per-test budget. Every spec pays a full cold engine start (JIT warm-up, a
+  // from-source standard-library compile, and antivirus scanning the freshly-unpacked engine
+  // on Windows CI runners) before its first project is interactive — see
+  // `FIRST_PROJECT_TIMEOUT` in `electronTest.ts` — and still needs room for the rest of its
+  // steps afterwards.
+  timeout: 360000,
   reportSlowTests: { max: 5, threshold: 60000 },
   expect: {
     timeout: 30000,

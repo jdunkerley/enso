@@ -156,16 +156,23 @@ export async function loginAsTestUser(page: Page) {
   await page.getByRole('button', { name: TEXT.accept }).click()
 }
 
+/**
+ * Time budget for the first project of a test to become interactive. Each spec launches a fresh
+ * Electron process, so every one of them pays a full cold start: JIT warm-up, a from-source
+ * compile of the standard library it imports (the packaged engine ships no IR cache and the LS
+ * writes none that a sibling process could reuse), and — on the Windows CI runner — real-time
+ * antivirus scanning of the freshly-unpacked engine. On that runner this reliably takes ~70 s
+ * even though the app is perfectly healthy.
+ */
+const FIRST_PROJECT_TIMEOUT = 150000
+
 /** Create a new Enso project */
 export async function createNewProject(page: Page) {
   await page.getByRole('button', { name: 'New Project' }).click()
-  // The first project of a run is a cold engine start (JIT warm-up, no IR caches, and on
-  // Windows CI runners real-time antivirus scanning of the freshly-unpacked engine files);
-  // this can comfortably exceed the default timeouts even though the app is healthy.
-  await expect(page.locator('.GraphNode')).toHaveCount(1, { timeout: 90000 })
+  await expect(page.locator('.GraphNode')).toHaveCount(1, { timeout: FIRST_PROJECT_TIMEOUT })
 
   const tableViz = page.locator('.TableVisualization')
-  await expect(tableViz).toContainText('Welcome To Enso!', { timeout: 60000 })
+  await expect(tableViz).toContainText('Welcome To Enso!', { timeout: FIRST_PROJECT_TIMEOUT })
 }
 
 /** If welcome project is to be opened, navigate back to the dashboard. */
