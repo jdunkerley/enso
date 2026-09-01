@@ -158,13 +158,11 @@ export async function loginAsTestUser(page: Page) {
 
 /**
  * Time budget for the first project of a test to become interactive. Each spec launches a fresh
- * Electron process, so every one of them pays a full cold start: JIT warm-up, a from-source
- * compile of the standard library it imports (the packaged engine ships no IR cache and the LS
- * writes none that a sibling process could reuse), and — on the Windows CI runner — real-time
- * antivirus scanning of the freshly-unpacked engine. On that runner this reliably takes ~70 s
- * even though the app is perfectly healthy.
+ * Electron process whose Language Server has to JIT-warm and load the standard library on the
+ * first project open; the IR cache is pre-warmed in `globalSetup.ts` so this is a load, not a
+ * from-source compile, but on a slow CI runner it can still take a while.
  */
-const FIRST_PROJECT_TIMEOUT = 150000
+const FIRST_PROJECT_TIMEOUT = 90000
 
 /** Create a new Enso project */
 export async function createNewProject(page: Page) {

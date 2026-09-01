@@ -5,14 +5,13 @@ export default defineConfig({
   testDir: './tests',
   // Headless tests are run via vitest, not playwright, so we ignore them here.
   testIgnore: ['headless/**'],
+  // Warms the engine's IR cache once so specs don't each pay a cold standard-library compile.
+  globalSetup: './globalSetup.ts',
   forbidOnly: !!process.env.CI,
   workers: 1,
-  // Generous per-test budget. Every spec pays a full cold engine start (JIT warm-up, a
-  // from-source standard-library compile, and antivirus scanning the freshly-unpacked engine
-  // on Windows CI runners) before its first project is interactive — see
-  // `FIRST_PROJECT_TIMEOUT` in `electronTest.ts` — and still needs room for the rest of its
-  // steps afterwards.
-  timeout: 360000,
+  // Headroom for a first project that still has to JIT-warm and load the (now cached) standard
+  // library, plus the rest of the spec.
+  timeout: 240000,
   reportSlowTests: { max: 5, threshold: 60000 },
   expect: {
     timeout: 30000,
