@@ -365,7 +365,16 @@ object NativeImage {
       } else {
         (Compile / fullClasspath).value
       }
-      val filesSet = classpath.flatMap(f => f.data.allPaths.get()).toSet
+      // `version-output` bakes the git commit hash, branch name and commit date into
+      // `GeneratedVersion`, so its class file changes on every commit even when no actual
+      // source did. Ignore it for up-to-date checking: a native image rebuilt from otherwise
+      // identical inputs would differ only in the version string it self-reports, which does
+      // not matter for the CI/dev packaging that this incremental check exists to speed up.
+      // Releases always build from a clean tree (no cached artifact), so they rebuild anyway.
+      val filesSet = classpath
+        .flatMap(f => f.data.allPaths.get())
+        .filterNot(_.getName.startsWith("GeneratedVersion"))
+        .toSet
 
       val store =
         streams.value.cacheStoreFactory.make("incremental_native_image")
