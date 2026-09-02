@@ -807,17 +807,13 @@ impl JobArchetype for BuildBackend {
     fn job(&self, target: Target) -> Job {
         let mut job = RunStepsBuilder::new("backend get")
             .customize(move |step| {
-                // Warm the sbt/Coursier downloads, the previous build's incremental-compile
-                // state, and the prebuilt native images, so `./run backend get` doesn't start
-                // from a cold cache every run. The build/native-image caches are saved
-                // explicitly (before "Clean after" wipes `target/` and `built-distribution/`).
+                // Warm the sbt/Coursier download caches so `./run backend get` doesn't re-fetch
+                // hundreds of MB of jars every run. (The engine compile and native-image builds
+                // can't be cached — `./run backend get` deliberately wipes `engine/runtime/target`
+                // and `built-distribution/` at the start of every build.)
                 let mut steps = vec![
                     step::sbt_dependency_cache_restore(),
-                    step::sbt_build_cache_restore(),
-                    step::sbt_native_image_cache_restore(),
                     step,
-                    step::sbt_native_image_cache_save(),
-                    step::sbt_build_cache_save(),
                     step::sbt_dependency_cache_save(),
                 ];
 
