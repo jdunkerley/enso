@@ -250,6 +250,8 @@ const SBT_DEPENDENCY_CACHE_KEY: &str = "sbt-deps-${{ runner.os }}-${{ hashFiles(
 /// `engine-runner` project. `sbt`'s `incrementalNativeImageBuild` diffs the runtime classpath
 /// by *content* hash against that store and skips the (6-9 min) native-image build when nothing
 /// changed and the binary is present — so restoring both lets an engine-untouched PR skip it.
+/// The per-commit `GeneratedVersion` class is excluded from that diff in `project/NativeImage`,
+/// otherwise the store would never match across commits.
 ///
 /// Only the `enso` binary: it lands in `bin/`, which `createEnginePackage` leaves untouched in
 /// native mode. The `org.enso.ydoc.server` shared library lands in `component/`, which
