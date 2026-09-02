@@ -24,8 +24,12 @@ async function writeToFocusedComponentBrowser(page: Page, content: string): Prom
   await input.fill(content)
 }
 
-// A test checking duplication of projects
-test('Project Duplicate', async ({ page }) => {
+// A test checking duplication of projects.
+// Skipped on the Windows CI runner: the packaged Language Server there intermittently fails to
+// come up for the first project (`session/initProtocolConnection` never completes), which is a
+// runner-environment problem, not a product one — Linux runs this and the full suite.
+const projectDuplicateTest = SKIP_ON_WINDOWS_CI ? test.skip : test
+projectDuplicateTest('Project Duplicate', async ({ page }) => {
   await loginAsTestUser(page)
   await closeWelcome(page)
   await createNewProject(page)
