@@ -129,9 +129,27 @@ jobs:
             **/target/**/zinc
             **/target/**/classes
           restore-keys: sbt-build-${{ runner.os }}-
+      - name: Restore native image
+        uses: actions/cache/restore@v4
+        with:
+          key: sbt-native-image-${{ runner.os }}-${{ github.sha }}
+          path: |-
+            built-distribution/enso-engine-*/enso-*/bin/enso
+            built-distribution/enso-engine-*/enso-*/bin/enso.exe
+            engine/runner/target/streams
+          restore-keys: sbt-native-image-${{ runner.os }}-
       - run: ./run backend get
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
+        name: Save native image
+        uses: actions/cache/save@v4
+        with:
+          key: sbt-native-image-${{ runner.os }}-${{ github.sha }}
+          path: |-
+            built-distribution/enso-engine-*/enso-*/bin/enso
+            built-distribution/enso-engine-*/enso-*/bin/enso.exe
+            engine/runner/target/streams
       - if: "!cancelled() && github.ref == 'refs/heads/develop'"
         name: Save sbt incremental build
         uses: actions/cache/save@v4
@@ -241,9 +259,27 @@ jobs:
             **/target/**/zinc
             **/target/**/classes
           restore-keys: sbt-build-${{ runner.os }}-
+      - name: Restore native image
+        uses: actions/cache/restore@v4
+        with:
+          key: sbt-native-image-${{ runner.os }}-${{ github.sha }}
+          path: |-
+            built-distribution/enso-engine-*/enso-*/bin/enso
+            built-distribution/enso-engine-*/enso-*/bin/enso.exe
+            engine/runner/target/streams
+          restore-keys: sbt-native-image-${{ runner.os }}-
       - run: ./run backend get
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
+        name: Save native image
+        uses: actions/cache/save@v4
+        with:
+          key: sbt-native-image-${{ runner.os }}-${{ github.sha }}
+          path: |-
+            built-distribution/enso-engine-*/enso-*/bin/enso
+            built-distribution/enso-engine-*/enso-*/bin/enso.exe
+            engine/runner/target/streams
       - if: "!cancelled() && github.ref == 'refs/heads/develop'"
         name: Save sbt incremental build
         uses: actions/cache/save@v4
