@@ -60,19 +60,26 @@ impl Storable for DownloadFile {
         store: PathBuf,
     ) -> BoxFuture<'static, Result<Self::Metadata>> {
         // FIXME use `download_to_dir`
-        let response = self.send_request();
-        let filename = filename_from_url(&self.key.url);
-        async move {
-            let response = response.await?;
-            let last_fallback_name = PathBuf::from("data");
-            let filename = filename_from_response(&response)
-                .map(ToOwned::to_owned)
-                .or(filename)
-                .unwrap_or(last_fallback_name);
-            let output = store.join(&filename);
-            stream_response_to_file(response, &output).await?;
-            Ok(filename) // We don't store absolute paths to keep cache relocatable.
-        }
+        let this = self.clone();
+        let filename_from_url = filename_from_url(&self.key.url).ok();
+        // Downloads from GitHub's release-asset CDN occasionally drop the connection mid-stream
+        // ("Connection reset by peer"); a fresh request almost always succeeds.
+        crate::io::retry(move || {
+            let this = this.clone();
+            let store = store.clone();
+            let filename_from_url = filename_from_url.clone();
+            async move {
+                let response = this.send_request().await?;
+                let filename = filename_from_response(&response)
+                    .ok()
+                    .map(ToOwned::to_owned)
+                    .or(filename_from_url)
+                    .unwrap_or_else(|| PathBuf::from("data"));
+                let output = store.join(&filename);
+                stream_response_to_file(response, &output).await?;
+                Ok(filename) // We don't store absolute paths to keep cache relocatable.
+            }
+        })
         .boxed()
     }
 
