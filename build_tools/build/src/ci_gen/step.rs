@@ -221,3 +221,70 @@ pub fn download_wasm_artifacts() -> Step {
         .with_custom_argument("name", WASM_ARTIFACTS_NAME)
         .with_custom_argument("path", "app")
 }
+
+/// The sbt boot dir and the Coursier/Ivy download caches, across every OS default location
+/// (`actions/cache` silently skips paths that do not exist), plus the `./run` tool cache that
+/// holds the downloaded sbt launcher, GraalVM toolchain, `flatc`, etc.
+const SBT_DEPENDENCY_CACHE_PATHS: &str = "\
+~/.sbt
+~/.ivy2/cache
+~/.cache/coursier
+~/AppData/Local/Coursier/Cache
+~/Library/Caches/Coursier
+~/.local/share/.enso-ci
+~/AppData/Local/.enso-ci";
+
+/// The engine's incremental-compile state: Zinc analysis and the compiled class directories.
+/// Native-image outputs, `target/streams` task state, and the assembled distribution live
+/// elsewhere under `target/` and are deliberately excluded — Zinc is enough to make scalac /
+/// javac incremental, and the rest carries more staleness risk than benefit.
+const SBT_BUILD_CACHE_PATHS: &str = "\
+**/target/**/zinc
+**/target/**/classes";
+
+/// Key derived from every file that can change dependency resolution.
+const SBT_DEPENDENCY_CACHE_KEY: &str = "sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', \
+ 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', \
+ 'build-config.yaml') }}";
+
+/// Caches the sbt/Coursier download caches and the `./run` tool cache, so a rebuild does not
+/// re-fetch hundreds of MB of jars and the GraalVM toolchain — and a flaky Maven or
+/// `repo.scala-sbt.org` mirror cannot fail the whole job.
+pub fn sbt_dependency_cache() -> Step {
+    Step {
+        name: Some("Cache sbt / Coursier downloads".into()),
+        uses: Some("actions/cache@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_DEPENDENCY_CACHE_PATHS)
+    .with_custom_argument("key", SBT_DEPENDENCY_CACHE_KEY)
+    .with_custom_argument("restore-keys", "sbt-deps-${{ runner.os }}-")
+}
+
+/// Restores the previous build's Zinc incremental-compile state so scalac/javac only recompile
+/// what actually changed. Pair with [`sbt_build_cache_save`]; the save has to run explicitly
+/// before the "Clean after" step wipes `target/`.
+pub fn sbt_build_cache_restore() -> Step {
+    Step {
+        name: Some("Restore sbt incremental build".into()),
+        uses: Some("actions/cache/restore@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
+    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
+    .with_custom_argument("restore-keys", "sbt-build-${{ runner.os }}-")
+}
+
+/// Saves the Zinc incremental-compile state. Only writes from the default branch (like
+/// `Swatinem/rust-cache`'s `save-if`) so PR runs restore a warm `target/` without thrashing
+/// the cache; runs before "Clean after" so the state is captured before `git clean`.
+pub fn sbt_build_cache_save() -> Step {
+    Step {
+        name: Some("Save sbt incremental build".into()),
+        r#if: Some("!cancelled() && github.ref == 'refs/heads/develop'".into()),
+        uses: Some("actions/cache/save@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
+    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
+}
