@@ -811,10 +811,11 @@ impl JobArchetype for BuildBackend {
                 // state so `./run backend get` doesn't start from a cold cache every run. The
                 // build cache is saved explicitly (before "Clean after" wipes `target/`).
                 let mut steps = vec![
-                    step::sbt_dependency_cache(),
+                    step::sbt_dependency_cache_restore(),
                     step::sbt_build_cache_restore(),
                     step,
                     step::sbt_build_cache_save(),
+                    step::sbt_dependency_cache_save(),
                 ];
 
                 if target.0 == OS::Linux {

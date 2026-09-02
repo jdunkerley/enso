@@ -110,8 +110,8 @@ jobs:
         run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cache sbt / Coursier downloads
-        uses: actions/cache@v4
+      - name: Restore sbt / Coursier downloads
+        uses: actions/cache/restore@v4
         with:
           key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
           path: |-
@@ -120,8 +120,6 @@ jobs:
             ~/.cache/coursier
             ~/AppData/Local/Coursier/Cache
             ~/Library/Caches/Coursier
-            ~/.local/share/.enso-ci
-            ~/AppData/Local/.enso-ci
           restore-keys: sbt-deps-${{ runner.os }}-
       - name: Restore sbt incremental build
         uses: actions/cache/restore@v4
@@ -142,6 +140,17 @@ jobs:
           path: |-
             **/target/**/zinc
             **/target/**/classes
+      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
+        name: Save sbt / Coursier downloads
+        uses: actions/cache/save@v4
+        with:
+          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
+          path: |-
+            ~/.sbt
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/AppData/Local/Coursier/Cache
+            ~/Library/Caches/Coursier
       - name: Upload Edition File
         uses: actions/upload-artifact@v5
         with:
@@ -213,8 +222,8 @@ jobs:
         run: corepack pnpm run git-clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cache sbt / Coursier downloads
-        uses: actions/cache@v4
+      - name: Restore sbt / Coursier downloads
+        uses: actions/cache/restore@v4
         with:
           key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
           path: |-
@@ -223,8 +232,6 @@ jobs:
             ~/.cache/coursier
             ~/AppData/Local/Coursier/Cache
             ~/Library/Caches/Coursier
-            ~/.local/share/.enso-ci
-            ~/AppData/Local/.enso-ci
           restore-keys: sbt-deps-${{ runner.os }}-
       - name: Restore sbt incremental build
         uses: actions/cache/restore@v4
@@ -245,6 +252,17 @@ jobs:
           path: |-
             **/target/**/zinc
             **/target/**/classes
+      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
+        name: Save sbt / Coursier downloads
+        uses: actions/cache/save@v4
+        with:
+          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
+          path: |-
+            ~/.sbt
+            ~/.ivy2/cache
+            ~/.cache/coursier
+            ~/AppData/Local/Coursier/Cache
+            ~/Library/Caches/Coursier
       - name: Archive backend
         run: tar -cvf backend.tar -C dist/backend .
       - name: Upload backend
