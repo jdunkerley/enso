@@ -126,8 +126,9 @@ jobs:
         with:
           key: sbt-build-${{ runner.os }}-${{ github.sha }}
           path: |-
-            **/target/**/zinc
-            **/target/**/classes
+            **/target
+            !target
+            !target/**
           restore-keys: sbt-build-${{ runner.os }}-
       - name: Restore native image
         uses: actions/cache/restore@v4
@@ -156,8 +157,9 @@ jobs:
         with:
           key: sbt-build-${{ runner.os }}-${{ github.sha }}
           path: |-
-            **/target/**/zinc
-            **/target/**/classes
+            **/target
+            !target
+            !target/**
       - if: "!cancelled() && github.ref == 'refs/heads/develop'"
         name: Save sbt / Coursier downloads
         uses: actions/cache/save@v4
@@ -256,8 +258,9 @@ jobs:
         with:
           key: sbt-build-${{ runner.os }}-${{ github.sha }}
           path: |-
-            **/target/**/zinc
-            **/target/**/classes
+            **/target
+            !target
+            !target/**
           restore-keys: sbt-build-${{ runner.os }}-
       - name: Restore native image
         uses: actions/cache/restore@v4
@@ -286,8 +289,9 @@ jobs:
         with:
           key: sbt-build-${{ runner.os }}-${{ github.sha }}
           path: |-
-            **/target/**/zinc
-            **/target/**/classes
+            **/target
+            !target
+            !target/**
       - if: "!cancelled() && github.ref == 'refs/heads/develop'"
         name: Save sbt / Coursier downloads
         uses: actions/cache/save@v4

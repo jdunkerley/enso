@@ -233,13 +233,14 @@ const SBT_DEPENDENCY_CACHE_PATHS: &str = "\
 ~/AppData/Local/Coursier/Cache
 ~/Library/Caches/Coursier";
 
-/// The engine's incremental-compile state: Zinc analysis and the compiled class directories.
-/// Native-image outputs, `target/streams` task state, and the assembled distribution live
-/// elsewhere under `target/` and are deliberately excluded — Zinc is enough to make scalac /
-/// javac incremental, and the rest carries more staleness risk than benefit.
+/// The engine's incremental-compile state. Zinc needs the whole per-module `target/` (analysis,
+/// class dirs, task streams, packaged jars), not just `zinc`/`classes` — a partial restore
+/// leaves it distrusting the analysis and recompiling from scratch. The root `target/` (Cargo
+/// output, native-image scratch) and the assembled `built-distribution/` are excluded.
 const SBT_BUILD_CACHE_PATHS: &str = "\
-**/target/**/zinc
-**/target/**/classes";
+**/target
+!target
+!target/**";
 
 /// Key derived from every file that can change dependency resolution.
 const SBT_DEPENDENCY_CACHE_KEY: &str = "sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', \
