@@ -13,6 +13,22 @@ import { dirname, join, relative, sep } from 'node:path'
 
 const SKIP_DIRS = new Set(['node_modules', 'target', 'dist'])
 
+/**
+ * File content with CRLF collapsed to LF, so a Windows checkout (`core.autocrlf`)
+ * hashes identically to a Linux one. Every hashed input is text.
+ */
+function normalizedContent(file) {
+  const buf = readFileSync(file)
+  const out = Buffer.allocUnsafe(buf.length)
+  let n = 0
+  for (let i = 0; i < buf.length; i += 1) {
+    if (buf[i] === 0x0d && buf[i + 1] === 0x0a) continue
+    out[n] = buf[i]
+    n += 1
+  }
+  return out.subarray(0, n)
+}
+
 /** Recursively collect files under `root` (a file or a directory). */
 function collectFiles(root, acc) {
   let stats
@@ -46,7 +62,7 @@ export function hashInputs(baseDir, inputs) {
   for (const file of files) {
     hash.update(relative(baseDir, file).split(sep).join('/'))
     hash.update('\0')
-    hash.update(readFileSync(file))
+    hash.update(normalizedContent(file))
     hash.update('\0')
   }
   return hash.digest('hex')
