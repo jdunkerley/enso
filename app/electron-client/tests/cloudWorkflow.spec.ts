@@ -9,6 +9,14 @@ import {
   test,
 } from './electronTest'
 
+// Every test here needs a configured Enso Cloud backend (and, for "Remove Member", an
+// organization membership). Skip at file scope so the Electron app is never even launched
+// when the cloud isn't available — an in-body `test.skip` still runs the fixtures first.
+test.skip(
+  process.env.ENSO_TEST_CLOUD !== '1',
+  'Requires a configured Enso Cloud backend and an organization membership.',
+)
+
 // A test controlling if project session logs aren't empty. Currently skipped due to unconsistency of session logs
 test.skip('Session logs', async ({ page }) => {
   await loginAsTestUser(page)
@@ -36,10 +44,6 @@ test.skip('Session logs', async ({ page }) => {
 
 // Test designed to see, if removing a member from Enso organisation shows imediately in GUI
 test('Remove Member', async ({ page }) => {
-  test.skip(
-    process.env.ENSO_TEST_CLOUD !== '1',
-    'Requires a configured Enso Cloud backend and an organization membership.',
-  )
   await loginAsTestUser(page)
   await closeWelcome(page)
 

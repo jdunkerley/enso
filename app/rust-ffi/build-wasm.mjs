@@ -4,6 +4,7 @@ import { homedir } from 'node:os'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { hashInputs, isUpToDate, writeStamp } from '../../internal/buildCache.mjs'
 
 // Builds `enso-parser` (via this crate) to WebAssembly and generates the
 // `wasm-bindgen` bundler bindings into `dist/`, which `ydoc-shared` consumes as
@@ -11,6 +12,28 @@ import { fileURLToPath } from 'node:url'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(dir, '../..')
+
+// Skip the (Cargo-heavy) rebuild when the Rust sources feeding it are unchanged
+// and the previous output is still in place. Set `ENSO_FORCE_WASM_BUILD=1` to
+// override.
+// Not dot-prefixed: `actions/upload-artifact` drops hidden files by default, and this stamp
+// must travel inside the `wasm-artifacts` bundle.
+const stampFile = join(dir, 'dist', 'wasm-build.stamp')
+const stampInputs = [
+  'lib/rust',
+  'app/rust-ffi/src',
+  'app/rust-ffi/Cargo.toml',
+  'app/rust-ffi/build-wasm.mjs',
+  'Cargo.toml',
+  'Cargo.lock',
+  'rust-toolchain.toml',
+]
+const inputHash = hashInputs(repoRoot, stampInputs)
+const expectedOutputs = [join(dir, 'dist', 'rust_ffi.js'), join(dir, 'dist', 'rust_ffi_bg.wasm')]
+if (!process.env.ENSO_FORCE_WASM_BUILD && isUpToDate(stampFile, inputHash, expectedOutputs)) {
+  console.log('rust-ffi: WASM bindings are up to date, skipping build.')
+  process.exit(0)
+}
 
 // MUST match the `wasm-bindgen` crate pin in `Cargo.toml` — a mismatched CLI
 // emits bindings against an incompatible ABI and breaks the GUI build.
@@ -69,3 +92,5 @@ if (!existsSync(wasmFile)) {
 const distDir = join(dir, 'dist')
 rmSync(distDir, { recursive: true, force: true })
 run(exe('wasm-bindgen'), [wasmFile, '--target', 'bundler', '--out-dir', distDir])
+
+writeStamp(stampFile, inputHash)

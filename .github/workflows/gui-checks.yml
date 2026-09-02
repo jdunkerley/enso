@@ -23,8 +23,12 @@ env:
   COREPACK_DEFAULT_TO_LATEST: 0
 
 jobs:
-  lint:
-    name: 👮 Lint GUI
+  # Compile the Rust parser to WASM (+ generate `ast.ts`) exactly once. Every other job
+  # downloads the `wasm-artifacts` artifact into place before `pnpm install`, so the
+  # `build-wasm` / `generate-ast` lifecycle scripts see their inputs unchanged and skip
+  # the (multi-minute, uncached) Cargo compile.
+  build-wasm:
+    name: 🦀 Build WASM parser
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -39,6 +43,62 @@ jobs:
         with:
           node-version-file: .node-version
           cache: "pnpm"
+
+      - name: 🦀 Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wasm-parser
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+
+      - name: 🎯 Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: 🔧 Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.100
+
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: 🏗️ Build WASM parser and generate ast.ts
+        run: |
+          pnpm --filter rust-ffi run build-wasm
+          pnpm --filter ydoc-shared run generate-ast
+
+      - name: ⬆️ Upload parser artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: |
+            app/rust-ffi/dist
+            app/ydoc-shared/src/ast/generated
+          if-no-files-found: error
+          retention-days: 1
+
+  lint:
+    name: 👮 Lint GUI
+    needs: [build-wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        name: ⎔ Setup Node
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+
+      - name: 📥 Download prebuilt WASM parser
+        uses: actions/download-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: app
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -121,7 +181,7 @@ jobs:
   playwright:
     name: 🎭 Playwright Tests
     # Only run once lint (compile + typecheck + lint + unit tests) has passed.
-    needs: [lint]
+    needs: [build-wasm, lint]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     runs-on: ubuntu-latest
@@ -144,6 +204,12 @@ jobs:
         with:
           node-version-file: .node-version
           cache: "pnpm"
+
+      - name: 📥 Download prebuilt WASM parser
+        uses: actions/download-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: app
 
       - name: 📦 Install dependencies
         run: pnpm install --frozen-lockfile

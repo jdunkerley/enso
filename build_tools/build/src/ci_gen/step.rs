@@ -171,3 +171,53 @@ pub fn download_artifact(step_name: impl Into<String>) -> Step {
         ..default()
     }
 }
+
+/// Name of the artifact holding the prebuilt Rust→WASM parser bindings and the generated
+/// `ast.ts`. Downloaded into `app/` before `pnpm install` so the `build-wasm` / `generate-ast`
+/// lifecycle scripts skip their (uncached, multi-minute) Cargo compile.
+pub const WASM_ARTIFACTS_NAME: &str = "wasm-artifacts";
+
+/// The two directories that make up [`WASM_ARTIFACTS_NAME`]. Their common ancestor is `app/`,
+/// so the artifact is downloaded with `path: app`.
+pub const WASM_ARTIFACTS_PATHS: &str = "app/rust-ffi/dist\napp/ydoc-shared/src/ast/generated";
+
+/// A `Swatinem/rust-cache` step. `shared_key` groups the cache across jobs that compile the
+/// same crates; the cache is only written from the default branch to keep PR runs from
+/// thrashing it.
+pub fn rust_cache(shared_key: impl Into<String>) -> Step {
+    Step {
+        name: Some("Cache Rust build".into()),
+        uses: Some("Swatinem/rust-cache@v2".into()),
+        ..default()
+    }
+    .with_custom_argument("shared-key", shared_key.into())
+    .with_custom_argument("save-if", "${{ github.ref == 'refs/heads/develop' }}")
+}
+
+/// Installs the pinned `wasm-bindgen-cli` from a prebuilt binary (seconds, versus the
+/// multi-minute `cargo install` that `build-wasm.mjs` falls back to). Keep the version in
+/// lockstep with `wasm-bindgen` in `Cargo.toml` and `WASM_BINDGEN_VERSION` in `build-wasm.mjs`.
+pub fn install_wasm_bindgen() -> Step {
+    Step {
+        name: Some("Install wasm-bindgen-cli".into()),
+        uses: Some("taiki-e/install-action@v2".into()),
+        ..default()
+    }
+    .with_custom_argument("tool", "wasm-bindgen-cli@0.2.100")
+}
+
+/// Uploads [`WASM_ARTIFACTS_NAME`] from the current checkout.
+pub fn upload_wasm_artifacts() -> Step {
+    upload_artifact("Upload WASM parser artifacts")
+        .with_custom_argument("name", WASM_ARTIFACTS_NAME)
+        .with_custom_argument("path", WASM_ARTIFACTS_PATHS)
+        .with_custom_argument("if-no-files-found", "error")
+        .with_custom_argument("retention-days", 1)
+}
+
+/// Downloads [`WASM_ARTIFACTS_NAME`] into `app/` (see [`WASM_ARTIFACTS_PATHS`]).
+pub fn download_wasm_artifacts() -> Step {
+    download_artifact("Download WASM parser artifacts")
+        .with_custom_argument("name", WASM_ARTIFACTS_NAME)
+        .with_custom_argument("path", "app")
+}
