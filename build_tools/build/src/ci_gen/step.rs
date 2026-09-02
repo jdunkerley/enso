@@ -221,3 +221,85 @@ pub fn download_wasm_artifacts() -> Step {
         .with_custom_argument("name", WASM_ARTIFACTS_NAME)
         .with_custom_argument("path", "app")
 }
+
+/// The sbt boot dir and the Coursier/Ivy download caches, across every OS default location
+/// (`actions/cache` silently skips paths that do not exist). The `./run` tool cache (GraalVM
+/// toolchain tarballs, sbt launcher) is deliberately not cached — it re-downloads from GitHub's
+/// own CDN in seconds and would nearly double the cache size.
+const SBT_DEPENDENCY_CACHE_PATHS: &str = "\
+~/.sbt
+~/.ivy2/cache
+~/.cache/coursier
+~/AppData/Local/Coursier/Cache
+~/Library/Caches/Coursier";
+
+/// The engine's incremental-compile state: Zinc analysis and the compiled class directories.
+/// Native-image outputs, `target/streams` task state, and the assembled distribution live
+/// elsewhere under `target/` and are deliberately excluded — Zinc is enough to make scalac /
+/// javac incremental, and the rest carries more staleness risk than benefit.
+const SBT_BUILD_CACHE_PATHS: &str = "\
+**/target/**/zinc
+**/target/**/classes";
+
+/// Key derived from every file that can change dependency resolution.
+const SBT_DEPENDENCY_CACHE_KEY: &str = "sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', \
+ 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', \
+ 'build-config.yaml') }}";
+
+/// Guards the cache-save steps: never save a partial cache from a cancelled run, and — like
+/// `Swatinem/rust-cache`'s `save-if` — only write from the default branch, so PR runs restore
+/// a warm tree without each adding a multi-GB branch-scoped copy to the 10 GB repo budget.
+const CACHE_SAVE_IF: &str = "!cancelled() && github.ref == 'refs/heads/develop'";
+
+/// Restores the sbt/Coursier download caches so a rebuild does not re-fetch hundreds of MB of
+/// jars — and a flaky Maven or `repo.scala-sbt.org` mirror cannot fail the whole job. Pair
+/// with [`sbt_dependency_cache_save`].
+pub fn sbt_dependency_cache_restore() -> Step {
+    Step {
+        name: Some("Restore sbt / Coursier downloads".into()),
+        uses: Some("actions/cache/restore@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_DEPENDENCY_CACHE_PATHS)
+    .with_custom_argument("key", SBT_DEPENDENCY_CACHE_KEY)
+    .with_custom_argument("restore-keys", "sbt-deps-${{ runner.os }}-")
+}
+
+/// Saves the sbt/Coursier download caches (default branch only — see [`CACHE_SAVE_IF`]).
+pub fn sbt_dependency_cache_save() -> Step {
+    Step {
+        name: Some("Save sbt / Coursier downloads".into()),
+        r#if: Some(CACHE_SAVE_IF.into()),
+        uses: Some("actions/cache/save@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_DEPENDENCY_CACHE_PATHS)
+    .with_custom_argument("key", SBT_DEPENDENCY_CACHE_KEY)
+}
+
+/// Restores the previous build's Zinc incremental-compile state so scalac/javac only recompile
+/// what actually changed. Pair with [`sbt_build_cache_save`]; the save has to run explicitly
+/// before the "Clean after" step wipes `target/`.
+pub fn sbt_build_cache_restore() -> Step {
+    Step {
+        name: Some("Restore sbt incremental build".into()),
+        uses: Some("actions/cache/restore@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
+    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
+    .with_custom_argument("restore-keys", "sbt-build-${{ runner.os }}-")
+}
+
+/// Saves the Zinc incremental-compile state (default branch only — see [`CACHE_SAVE_IF`]).
+/// Runs before "Clean after" so the state is captured before `git clean`.
+pub fn sbt_build_cache_save() -> Step {
+    Step {
+        name: Some("Save sbt incremental build".into()),
+        r#if: Some(CACHE_SAVE_IF.into()),
+        uses: Some("actions/cache/save@v4".into()),
+        ..default()
+    }
+    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
+    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
+}

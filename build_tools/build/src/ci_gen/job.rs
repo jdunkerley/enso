@@ -807,7 +807,16 @@ impl JobArchetype for BuildBackend {
     fn job(&self, target: Target) -> Job {
         let mut job = RunStepsBuilder::new("backend get")
             .customize(move |step| {
-                let mut steps = vec![step];
+                // Warm the sbt/Coursier downloads and the previous build's incremental-compile
+                // state so `./run backend get` doesn't start from a cold cache every run. The
+                // build cache is saved explicitly (before "Clean after" wipes `target/`).
+                let mut steps = vec![
+                    step::sbt_dependency_cache_restore(),
+                    step::sbt_build_cache_restore(),
+                    step,
+                    step::sbt_build_cache_save(),
+                    step::sbt_dependency_cache_save(),
+                ];
 
                 if target.0 == OS::Linux {
                     let upload_edition_file = step::upload_artifact("Upload Edition File")
