@@ -807,7 +807,10 @@ pub fn ide_packaging() -> Result<Workflow> {
         ..default()
     };
 
-    let engine_launcher = engine::EngineLauncher::Native;
+    // Quick-build (`-Ob`) native image: this is a PR/dev packaging path whose engine only has to
+    // run the smoke tests, so trading engine startup latency for a much faster native-image
+    // compile is worth it. Releases go through `UploadBackend`, which is unaffected.
+    let engine_launcher = engine::EngineLauncher::FastNative;
     // The GUI is platform-independent web assets. Build it once (on Linux) and have every
     // `PackageIde` job consume that artifact rather than recompiling the GUI per platform.
     let gui_job = workflow.add((OS::Linux, Arch::X86_64), job::GuiBuild);

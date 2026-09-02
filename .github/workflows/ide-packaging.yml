@@ -176,7 +176,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
-      ENSO_LAUNCHER: native
+      ENSO_LAUNCHER: native,fast
   enso-build-ci-gen-job-build-backend-windows-amd64:
     name: Build Backend (windows, amd64)
     needs:
@@ -278,7 +278,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
-      ENSO_LAUNCHER: native
+      ENSO_LAUNCHER: native,fast
   enso-build-ci-gen-job-gui-build-linux-amd64:
     name: GUI build (linux, amd64)
     runs-on:

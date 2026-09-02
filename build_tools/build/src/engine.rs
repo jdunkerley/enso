@@ -117,6 +117,11 @@ pub enum EngineLauncher {
     /// The binary inside the engine distribution will be built as an optimized native image
     /// without language server.
     NativeWithoutLS,
+    /// Native image built with GraalVM's quick-build (`-Ob`) instead of the size-optimized
+    /// release pass — markedly faster to compile, at some engine-startup/runtime cost. Full
+    /// language server, no assertions. For CI / dev IDE packaging, where build time matters
+    /// more than the packaged engine's startup latency.
+    FastNative,
     /// The binary inside the engine distribution will be built as native image with assertions
     /// enabled but no debug information
     TestNative,
@@ -141,6 +146,7 @@ impl Display for EngineLauncher {
         let str = match self {
             EngineLauncher::Native => "native".to_string(),
             EngineLauncher::NativeWithoutLS => "native,-ls".to_string(),
+            EngineLauncher::FastNative => "native,fast".to_string(),
             EngineLauncher::TestNative => "native,test".to_string(),
             EngineLauncher::TestDebugNative => "native,test,debug".to_string(),
             EngineLauncher::Shell => "shell".to_string(),
