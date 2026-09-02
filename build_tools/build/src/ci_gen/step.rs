@@ -233,38 +233,13 @@ const SBT_DEPENDENCY_CACHE_PATHS: &str = "\
 ~/AppData/Local/Coursier/Cache
 ~/Library/Caches/Coursier";
 
-/// The engine's incremental-compile state: Zinc analysis and the compiled class directories.
-/// Native-image outputs, `target/streams` task state, and the assembled distribution live
-/// elsewhere under `target/` and are deliberately excluded — Zinc is enough to make scalac /
-/// javac incremental, and the rest carries more staleness risk than benefit.
-const SBT_BUILD_CACHE_PATHS: &str = "\
-**/target/**/zinc
-**/target/**/classes";
-
 /// Key derived from every file that can change dependency resolution.
 const SBT_DEPENDENCY_CACHE_KEY: &str = "sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', \
  'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', \
  'build-config.yaml') }}";
 
-/// The `enso` GraalVM native image plus `sbt`'s incremental-native-image tracking store for the
-/// `engine-runner` project. `sbt`'s `incrementalNativeImageBuild` diffs the runtime classpath
-/// by *content* hash against that store and skips the (6-9 min) native-image build when nothing
-/// changed and the binary is present — so restoring both lets an engine-untouched PR skip it.
-/// The per-commit `GeneratedVersion` class is excluded from that diff in `project/NativeImage`,
-/// otherwise the store would never match across commits.
-///
-/// Only the `enso` binary: it lands in `bin/`, which `createEnginePackage` leaves untouched in
-/// native mode. The `org.enso.ydoc.server` shared library lands in `component/`, which
-/// `createEnginePackage` deletes and repopulates, so a cached copy there wouldn't survive to
-/// the native-image up-to-date check — its ~3-5 min rebuild stays.
-const SBT_NATIVE_IMAGE_CACHE_PATHS: &str = "\
-built-distribution/enso-engine-*/enso-*/bin/enso
-built-distribution/enso-engine-*/enso-*/bin/enso.exe
-engine/runner/target/streams";
-
 /// Guards the cache-save steps: never save a partial cache from a cancelled run, and — like
-/// `Swatinem/rust-cache`'s `save-if` — only write from the default branch, so PR runs restore
-/// a warm tree without each adding a multi-GB branch-scoped copy to the 10 GB repo budget.
+/// `Swatinem/rust-cache`'s `save-if` — only write from the default branch.
 const CACHE_SAVE_IF: &str = "!cancelled() && github.ref == 'refs/heads/develop'";
 
 /// Restores the sbt/Coursier download caches so a rebuild does not re-fetch hundreds of MB of
@@ -291,59 +266,4 @@ pub fn sbt_dependency_cache_save() -> Step {
     }
     .with_custom_argument("path", SBT_DEPENDENCY_CACHE_PATHS)
     .with_custom_argument("key", SBT_DEPENDENCY_CACHE_KEY)
-}
-
-/// Restores the previous build's Zinc incremental-compile state so scalac/javac only recompile
-/// what actually changed. Pair with [`sbt_build_cache_save`]; the save has to run explicitly
-/// before the "Clean after" step wipes `target/`.
-pub fn sbt_build_cache_restore() -> Step {
-    Step {
-        name: Some("Restore sbt incremental build".into()),
-        uses: Some("actions/cache/restore@v4".into()),
-        ..default()
-    }
-    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
-    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
-    .with_custom_argument("restore-keys", "sbt-build-${{ runner.os }}-")
-}
-
-/// Saves the Zinc incremental-compile state (default branch only — see [`CACHE_SAVE_IF`]).
-/// Runs before "Clean after" so the state is captured before `git clean`.
-pub fn sbt_build_cache_save() -> Step {
-    Step {
-        name: Some("Save sbt incremental build".into()),
-        r#if: Some(CACHE_SAVE_IF.into()),
-        uses: Some("actions/cache/save@v4".into()),
-        ..default()
-    }
-    .with_custom_argument("path", SBT_BUILD_CACHE_PATHS)
-    .with_custom_argument("key", "sbt-build-${{ runner.os }}-${{ github.sha }}")
-}
-
-/// Restores the prebuilt `enso` native image and its `sbt` tracking store (see
-/// [`SBT_NATIVE_IMAGE_CACHE_PATHS`]). Combined with the incremental-build cache this lets a PR
-/// that doesn't touch engine code skip the `enso` native-image build (~6-9 min). Pair with
-/// [`sbt_native_image_cache_save`].
-pub fn sbt_native_image_cache_restore() -> Step {
-    Step {
-        name: Some("Restore native image".into()),
-        uses: Some("actions/cache/restore@v4".into()),
-        ..default()
-    }
-    .with_custom_argument("path", SBT_NATIVE_IMAGE_CACHE_PATHS)
-    .with_custom_argument("key", "sbt-native-image-${{ runner.os }}-${{ github.sha }}")
-    .with_custom_argument("restore-keys", "sbt-native-image-${{ runner.os }}-")
-}
-
-/// Saves the native-image binaries and tracking stores (default branch only — see
-/// [`CACHE_SAVE_IF`]). Runs before "Clean after" wipes `built-distribution/`.
-pub fn sbt_native_image_cache_save() -> Step {
-    Step {
-        name: Some("Save native image".into()),
-        r#if: Some(CACHE_SAVE_IF.into()),
-        uses: Some("actions/cache/save@v4".into()),
-        ..default()
-    }
-    .with_custom_argument("path", SBT_NATIVE_IMAGE_CACHE_PATHS)
-    .with_custom_argument("key", "sbt-native-image-${{ runner.os }}-${{ github.sha }}")
 }
