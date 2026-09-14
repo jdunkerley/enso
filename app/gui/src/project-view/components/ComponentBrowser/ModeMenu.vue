@@ -165,6 +165,14 @@ function pickMode(mode: ComponentBrowserMode, disabled: boolean): void {
   background-color: var(--color-menu-entry-selected-bg, rgb(0 0 0 / 0.05));
 }
 
+/*
+ * MenuButton dims disabled entries to 0.2, too faint for an entry whose purpose is to be noticed
+ * and hovered for the hint explaining how to enable AI mode.
+ */
+.modeMenuPanel .modeOption.disabled {
+  opacity: 0.45;
+}
+
 .optionLabel {
   flex: 1;
   text-align: left;
