@@ -173,6 +173,17 @@ In order to build and run Enso you will need the following tools:
   direct `sbt` usage, you can download the `flatc` binary from the
   [release assets](https://github.com/google/flatbuffers/releases/tag/v24.3.25).
 - [Rustup](https://rustup.rs), the rust toolchain management utility.
+- [corepack](https://github.com/nodejs/corepack), to run the pinned `pnpm`
+  version declared in `package.json`'s `packageManager` field. Node dropped
+  bundled `corepack` starting with Node 25, so on newer Node versions you need
+  `npm install -g corepack` first. A `pnpm` installed some other way (e.g. the
+  Homebrew formula) can still satisfy the pinned version, but its binary isn't
+  invocable as `node <path-to-pnpm>`, which breaks `internal/postinstall.mjs`
+  (it re-invokes the package manager via `npm_execpath`) — use `corepack pnpm`
+  for all commands to avoid this.
+- A `7z`/`7za`/`7zz` executable (e.g. `brew install p7zip` on macOS, or the
+  `p7zip-full` package on Linux), used by the build CLI to unpack the
+  Flatbuffers compiler release asset.
 - On MacOS and Linux, the `tar` command is required for running some tests. It
   should be installed by default on most distributions.
 - On Windows, the `run` command must be run in the latest version of
