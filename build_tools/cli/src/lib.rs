@@ -92,11 +92,16 @@ impl Deref for Processor {
 impl Processor {
     /// Setup common build environment information based on command line input and local
     /// environment.
-    pub async fn new(cli: &Cli) -> Result<Self> {
+    pub async fn new(cli: &Cli, config: &Config) -> Result<Self> {
         let absolute_repo_path = cli.repo_path.absolutize()?;
         let octocrab = setup_octocrab().await?;
         let git = git::new(absolute_repo_path.as_ref()).await?;
-        let release_provider = || version::promote::releases_on_remote(&git);
+        let release_provider = || async {
+            match &config.latest_release {
+                Some(latest_release) => Ok(vec![latest_release.clone()]),
+                None => version::promote::releases_on_remote(&git).await,
+            }
+        };
         let versions = version::deduce_or_generate(release_provider).await?;
         let mut triple = TargetTriple::new(versions);
         triple.os = cli.target_os;
@@ -724,7 +729,8 @@ pub async fn main_internal(config: Option<Config>) -> Result {
         remove_if_exists(cli.repo_path.join("ci-build"))?;
     }
 
-    let ctx: Processor = Processor::new(&cli).instrument(info_span!("Building context.")).await?;
+    let ctx: Processor =
+        Processor::new(&cli, &config).instrument(info_span!("Building context.")).await?;
     match cli.target {
         Target::Gui(gui) => ctx.handle_gui(gui).await?,
         Target::Runtime(runtime) => ctx.handle_runtime(runtime).await?,

@@ -71,9 +71,11 @@ pub async fn setup_octocrab() -> Result<Octocrab> {
         builder.build()?
     };
 
-    // LPrint rate limit. This both helps debugging related issues and allows to validate the
-    // GitHub access token.
-    octocrab
+    // Print the rate limit. This both helps debugging related issues and validates the GitHub
+    // access token. Deliberately not fatal: most targets (a local `ide build` in particular) need
+    // no GitHub access at all, and failing here would block them on an unreachable or blocked
+    // api.github.com.
+    let _ = octocrab
         .ratelimit()
         .get()
         .await
@@ -83,7 +85,13 @@ pub async fn setup_octocrab() -> Result<Octocrab> {
                 rate.resources.core.used, rate.resources.core.limit
             )
         })
-        .context("Failed to get rate limit info. GitHub Personal Access Token might be invalid")?;
+        .inspect_err(|e| {
+            warn!(
+                "Failed to query the GitHub API rate limit: {e}. A GitHub Personal Access Token \
+            might be invalid, or api.github.com unreachable. Targets that need GitHub will fail \
+            later; the ones that do not are unaffected."
+            )
+        });
     Ok(octocrab)
 }
 

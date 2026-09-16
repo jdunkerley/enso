@@ -47,6 +47,8 @@ impl RecognizedProgram {
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigRaw {
     pub required_versions: HashMap<String, String>,
+    #[serde(default)]
+    pub latest_release: Option<Version>,
 }
 
 /// The configuration of the script that is being provided by the external environment.
@@ -55,6 +57,12 @@ pub struct ConfigRaw {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub required_versions: HashMap<RecognizedProgram, VersionReq>,
+    /// The most recent stable Enso release, as recorded in `build-config.yaml`.
+    ///
+    /// Builds that are not given an explicit `ENSO_VERSION` derive their `<next stable>-dev`
+    /// version from this instead of listing the repository's remote tags. `None` (the key is
+    /// absent) falls back to asking the remote.
+    pub latest_release: Option<Version>,
 }
 
 impl Config {
@@ -85,7 +93,7 @@ impl TryFrom<ConfigRaw> for Config {
             );
         }
 
-        Ok(Self { required_versions })
+        Ok(Self { required_versions, latest_release: value.latest_release })
     }
 }
 
