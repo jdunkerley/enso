@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
-import { computeUseBottomStatusBar } from '../TableVisualization.vue'
+import { computeStatusBar, computeUseBottomStatusBar } from '../TableVisualization.vue'
+import { TableVizStatusBar } from '../TableVisualization/TableVizStatusBar'
 
 const baseEnsoTableData = {
   type: 'EnsoTableOrColumn' as const,
@@ -38,5 +39,30 @@ describe('computeUseBottomStatusBar', () => {
   test('is false for data shapes without a use_bottom_status_bar field, regardless of license', () => {
     expect(computeUseBottomStatusBar('a plain string value', true)).toBe(false)
     expect(computeUseBottomStatusBar('a plain string value', false)).toBe(false)
+  })
+})
+
+describe('computeStatusBar', () => {
+  test('is undefined when unlicensed, even when the backend requests the bottom status bar', () => {
+    expect(computeStatusBar(false, true, 10, null)).toBeUndefined()
+  })
+
+  test('is undefined when unlicensed and the backend does not request the bottom status bar', () => {
+    expect(computeStatusBar(false, false, 10, null)).toBeUndefined()
+  })
+
+  test('is the status panel list when licensed and use_bottom_status_bar is true (unchanged behavior)', () => {
+    expect(computeStatusBar(true, true, 42, 7)).toEqual({
+      statusPanels: [
+        {
+          statusPanel: TableVizStatusBar,
+          statusPanelParams: { total: 42, filtered: 7 },
+        },
+      ],
+    })
+  })
+
+  test('is an empty status panel list when licensed but use_bottom_status_bar is false (unchanged behavior)', () => {
+    expect(computeStatusBar(true, false, 42, null)).toEqual({ statusPanels: [] })
   })
 })

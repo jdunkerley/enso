@@ -151,7 +151,7 @@ export type DataQualityMetricValue =
 export type TextFormatOptions = 'full' | 'partial' | 'off'
 
 /**
- * Whether to show the AG Grid Enterprise bottom Status Bar tool panel instead of the plain
+ * Whether to show the AG Grid Enterprise bottom Status Bar status bar panel instead of the plain
  * Community-safe top row-count line. The Status Bar is Enterprise-only, so this is `false`
  * whenever no AG Grid Enterprise license is configured, regardless of what the backend requests.
  */
@@ -162,6 +162,34 @@ export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boole
     'use_bottom_status_bar' in data &&
     Boolean(data.use_bottom_status_bar)
   )
+}
+
+/**
+ * The AG Grid `statusBar` grid option. `undefined` whenever no AG Grid Enterprise license is
+ * configured, so the `statusBar` grid option is omitted entirely rather than bound to an empty
+ * `{ statusPanels: [] }` — AG Grid's own module-registration validator requires the
+ * `@ag-grid-enterprise/status-bar` module for the `statusBar` grid option itself, regardless of
+ * whether any status bar panel is actually configured, and warns on every unlicensed table
+ * otherwise. When licensed, mirrors `useBottomStatusBar` exactly (unchanged behavior).
+ */
+export function computeStatusBar(
+  enterpriseAvailable: boolean,
+  useBottomStatusBar: boolean,
+  total: number | undefined,
+  filtered: number | null,
+) {
+  if (!enterpriseAvailable) return undefined
+  return {
+    statusPanels:
+      useBottomStatusBar ?
+        [
+          {
+            statusPanel: TableVizStatusBar,
+            statusPanelParams: { total, filtered },
+          },
+        ]
+      : [],
+  }
 }
 </script>
 
@@ -314,20 +342,14 @@ const ssrmDatasource = computed(() => {
   return isSSRM.value && createServerSideDatasource()
 })
 
-const statusBar = computed(() => ({
-  statusPanels:
-    useBottomStatusBar.value ?
-      [
-        {
-          statusPanel: TableVizStatusBar,
-          statusPanelParams: {
-            total: allRowCount.value,
-            filtered: isSSRM.value ? filteredRowCount.value : null,
-          },
-        },
-      ]
-    : [],
-}))
+const statusBar = computed(() =>
+  computeStatusBar(
+    AG_GRID_ENTERPRISE_AVAILABLE,
+    useBottomStatusBar.value,
+    allRowCount.value,
+    isSSRM.value ? filteredRowCount.value : null,
+  ),
+)
 
 const isTableFilteredOrSorted = computed(
   () =>
