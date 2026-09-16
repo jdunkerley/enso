@@ -13,11 +13,12 @@ import MenuButton from '@/components/MenuButton.vue'
 import MenuPanel from '@/components/MenuPanel.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
 import type { Icon } from '@/util/iconMetadata/iconName'
+import type { AiAvailability } from 'enso-common/src/ai'
 import { computed, ref } from 'vue'
 
-const { selectedMode, aiAvailable, modeLocked, codeEditIcon, asPort } = defineProps<{
+const { selectedMode, aiAvailability, modeLocked, codeEditIcon, asPort } = defineProps<{
   selectedMode: ComponentBrowserMode
-  aiAvailable: boolean
+  aiAvailability: AiAvailability
   modeLocked: boolean
   /** The icon to display for the "code editing" mode (varies by suggestion / node type). */
   codeEditIcon: Icon
@@ -37,16 +38,23 @@ interface ModeOption {
   readonly title: string
 }
 
+const aiTitle = computed(() => {
+  if (aiAvailability.status === 'ready') {
+    return 'Generate a User Defined Component from a natural-language prompt'
+  }
+  if (aiAvailability.status === 'starting') {
+    return 'The local Claude agent is still starting up; AI mode will be available shortly.'
+  }
+  return aiAvailability.reason
+})
+
 const options = computed<readonly ModeOption[]>(() => [
   {
     mode: 'aiPrompt',
     icon: 'robot',
     label: 'AI prompt',
-    disabled: !aiAvailable,
-    title:
-      aiAvailable ?
-        'Generate a User Defined Component from a natural-language prompt'
-      : 'Claude CLI not found on PATH. Install Claude Code to enable AI mode.',
+    disabled: aiAvailability.status !== 'ready',
+    title: aiTitle.value,
   },
   {
     mode: 'componentBrowsing',

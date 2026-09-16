@@ -16,7 +16,10 @@ import {
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 
 vi.mock('cross-spawn', () => ({ default: spawnMock }))
-vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }))
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn(), on: vi.fn() },
+  webContents: { getAllWebContents: () => [] },
+}))
 
 const { ChildAgent } = await import('../../src/ai/claudeAgentChild')
 

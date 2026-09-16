@@ -5,6 +5,7 @@
  * concerns (priming, stdout parsing, spawn flags, crash + respawn, timeout, tool events) are
  * exercised in `claudeAgentChild.test.ts`.
  */
+import type { AiAvailability } from 'enso-common/src/ai'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   attachSpawnMock,
@@ -23,7 +24,10 @@ import {
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
 
 vi.mock('cross-spawn', () => ({ default: spawnMock }))
-vi.mock('electron', () => ({ ipcMain: { handle: vi.fn(), on: vi.fn() } }))
+vi.mock('electron', () => ({
+  ipcMain: { handle: vi.fn(), on: vi.fn() },
+  webContents: { getAllWebContents: () => [] },
+}))
 
 const { ClaudeAgentSession, initClaudeAgentIpc, shutdownClaudeAgent } = await import(
   '../../src/ai/claudeAgent'
@@ -710,20 +714,24 @@ describe('ClaudeAgentSession', () => {
     session.shutdown()
   })
 
-  test('isAvailable resolves true once cross-spawn returns an alive child', async () => {
+  test('availability stays `starting` until the priming turn completes', async () => {
     const { session, children } = buildSession()
-    // The fake child returned by `attachSpawnMock` is alive from construction time, so its
-    // underlying `firstSpawn` promise resolves on the next microtask.
+    const seen: AiAvailability[] = []
+    session.onAvailabilityChanged((availability) => seen.push(availability))
     expect(children).toHaveLength(1)
-    await expect(session.isAvailable).resolves.toBe(true)
+    // A live child proves nothing: a `claude` that is missing or broken still yields a spawned
+    // process here, so availability must not turn on before priming settles.
+    await settle()
+    expect(session.availability).toEqual({ status: 'starting' })
+    await primeChild(children[0]!)
+    expect(session.availability).toEqual({ status: 'ready' })
+    expect(seen).toEqual([{ status: 'ready' }])
     session.shutdown()
   })
 
-  test('isAvailable resolves false when cross-spawn throws synchronously (ENOENT)', async () => {
+  test('availability reports unavailable with a hint when the CLI is missing', async () => {
     // Wire the mock to throw ENOENT directly (no `attachSpawnMock` here — it would override
-    // the mock back to a happy-path child). The `WatchedChildProcess` wrapper catches the
-    // synchronous throw inside `spawnNext` and rejects `firstSpawn`, which `firstSpawnSettled`
-    // converts to `false`.
+    // the mock back to a happy-path child).
     spawnMock.mockImplementation(() => {
       const err = new Error("spawn 'claude' ENOENT") as NodeJS.ErrnoException
       err.code = 'ENOENT'
@@ -733,7 +741,25 @@ describe('ClaudeAgentSession', () => {
       stdlibRoot: FAKE_STDLIB_ROOT,
       mcpConfigPath: undefined,
     })
-    await expect(session.isAvailable).resolves.toBe(false)
+    await settle()
+    const availability = session.availability
+    expect(availability.status).toBe('unavailable')
+    if (availability.status === 'unavailable') {
+      expect(availability.reason).toMatch(/not found on PATH/)
+    }
+    session.shutdown()
+  })
+
+  test('availability drops back to unavailable when the primed child crashes for good', async () => {
+    const { session, children } = buildSession()
+    await primeChild(children[0]!)
+    expect(session.availability).toEqual({ status: 'ready' })
+    // Crash past the respawn limit so the watcher suspends instead of re-priming.
+    for (let i = 0; i < 3; i++) {
+      children[children.length - 1]!.crash(1)
+      await settle()
+    }
+    expect(session.availability.status).toBe('unavailable')
     session.shutdown()
   })
 })
@@ -750,17 +776,19 @@ describe('initClaudeAgentIpc', () => {
   })
 
   test('without ENSO_AI_DISABLED: spawns the session and registers live IPC handlers', async () => {
-    attachSpawnMock(spawnMock)
+    const { children } = attachSpawnMock(spawnMock)
     initClaudeAgentIpc({ stdlibRoot: FAKE_STDLIB_ROOT, mcpConfigPath: undefined })
 
     // Session construction triggers cross-spawn for the primary child.
     expect(spawnMock).toHaveBeenCalled()
 
     const handleCalls = vi.mocked(ipcMain.handle).mock.calls
-    const aiIsAvailableHandler = handleCalls.find((call) => call[0] === Channel.aiIsAvailable)?.[1]
-    expect(aiIsAvailableHandler).toBeDefined()
-    // FakeChild is alive from construction, so `firstSpawnSettled` resolves true.
-    await expect((aiIsAvailableHandler as () => Promise<boolean>)()).resolves.toBe(true)
+    const availabilityHandler = handleCalls.find((call) => call[0] === Channel.aiAvailability)?.[1]
+    expect(availabilityHandler).toBeDefined()
+    const queryAvailability = availabilityHandler as () => Promise<AiAvailability>
+    await expect(queryAvailability()).resolves.toEqual({ status: 'starting' })
+    await primeChild(children[0]!)
+    await expect(queryAvailability()).resolves.toEqual({ status: 'ready' })
 
     expect(handleCalls.some((call) => call[0] === Channel.generateAiComponent)).toBe(true)
     const onCalls = vi.mocked(ipcMain.on).mock.calls
@@ -774,9 +802,11 @@ describe('initClaudeAgentIpc', () => {
     expect(spawnMock).not.toHaveBeenCalled()
 
     const handleCalls = vi.mocked(ipcMain.handle).mock.calls
-    const aiIsAvailableHandler = handleCalls.find((call) => call[0] === Channel.aiIsAvailable)?.[1]
-    expect(aiIsAvailableHandler).toBeDefined()
-    await expect((aiIsAvailableHandler as () => Promise<boolean>)()).resolves.toBe(false)
+    const availabilityHandler = handleCalls.find((call) => call[0] === Channel.aiAvailability)?.[1]
+    expect(availabilityHandler).toBeDefined()
+    await expect((availabilityHandler as () => Promise<AiAvailability>)()).resolves.toMatchObject({
+      status: 'unavailable',
+    })
 
     const generateHandler = handleCalls.find((call) => call[0] === Channel.generateAiComponent)?.[1]
     expect(generateHandler).toBeDefined()

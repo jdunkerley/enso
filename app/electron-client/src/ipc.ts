@@ -51,10 +51,16 @@ export enum Channel {
    */
   cancelAiComponent = 'cancel-ai-component',
   /**
-   * Renderer → main: query whether the local Claude agent is available — i.e. the `claude`
-   * binary was found on PATH and the child process spawned without a synchronous ENOENT.
-   * Resolves once the spawn outcome is known; does NOT wait for the priming turn to complete.
-   * Returns `false` when `ENSO_AI_DISABLED=1` is set in the main process environment.
+   * Renderer → main: query whether the local Claude agent can serve turns. Resolves with the
+   * current `AiAvailability` snapshot (from `enso-common/src/ai`) — `starting` until the
+   * priming turn completes, and always `unavailable` when `ENSO_AI_DISABLED=1` is set in the
+   * main process environment.
    */
-  aiIsAvailable = 'ai-is-available',
+  aiAvailability = 'ai-availability',
+  /**
+   * Main → renderer: broadcast whenever the local Claude agent's `AiAvailability`
+   * changes — priming completing, the child crashing, a context rotation. Sent to every live
+   * renderer, since availability is process-wide rather than per-request.
+   */
+  aiAvailabilityChanged = 'ai-availability-changed',
 }

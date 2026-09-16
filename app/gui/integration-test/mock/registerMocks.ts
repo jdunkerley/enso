@@ -143,8 +143,13 @@ async function mockElectronApi(page: Page, aiAvailable: boolean) {
               return { result: { ok: true, value }, usage: null }
             }
             return {
-              isAvailable: (): Promise<boolean> =>
-                Promise.resolve(w.__aiMockController.aiAvailable),
+              availability: (): Promise<{ status: string; reason?: string }> =>
+                Promise.resolve(
+                  w.__aiMockController.aiAvailable ?
+                    { status: 'ready' }
+                  : { status: 'unavailable', reason: 'Claude Code is not installed.' },
+                ),
+              onAvailabilityChanged: (): (() => void) => () => {},
               generateComponent: (request: AiRequest): Promise<AiReply> => {
                 w.__aiMockController.lastRequest = request
                 w.__aiMockController.requests.push(request)

@@ -15,10 +15,14 @@
   stdin.
 - AI mode in the Component Browser is now a first-class option, with a three-way
   mode switch (robot / search / code) accessible by clicking the icon next to
-  the Component Browser input. The mode defaults to AI when the local `claude`
-  CLI is found, and to component search otherwise. Existing AI nodes can be
-  edited by reopening the Component Browser on them — the prior prompt is sent
-  back to the agent so the function definition is rewritten in place.
+  the Component Browser input. A newly opened Component Browser reuses the mode
+  you last picked; until you pick one it defaults to AI, and falls back to
+  component search whenever the AI agent is not usable. AI counts as usable only
+  once the local `claude` agent has actually started and answered its warm-up
+  turn — a missing, broken, or unauthenticated CLI now leaves AI mode disabled,
+  with the reason shown as a hint on the entry. Existing AI nodes can be edited
+  by reopening the Component Browser on them — the prior prompt is sent back to
+  the agent so the function definition is rewritten in place.
 
 #### Enso Language & Runtime
 
