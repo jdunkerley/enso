@@ -1,5 +1,6 @@
 <script lang="ts">
 import AgGridTableView, { commonContextMenuActions } from '@/components/shared/AgGridTableView.vue'
+import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import {
   useTableVizToolbar,
   type SortModel,
@@ -148,6 +149,20 @@ export type DataQualityMetricValue =
     }
 
 export type TextFormatOptions = 'full' | 'partial' | 'off'
+
+/**
+ * Whether to show the AG Grid Enterprise bottom Status Bar tool panel instead of the plain
+ * Community-safe top row-count line. The Status Bar is Enterprise-only, so this is `false`
+ * whenever no AG Grid Enterprise license is configured, regardless of what the backend requests.
+ */
+export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boolean): boolean {
+  return (
+    enterpriseAvailable &&
+    typeof data === 'object' &&
+    'use_bottom_status_bar' in data &&
+    Boolean(data.use_bottom_status_bar)
+  )
+}
 </script>
 
 <script setup lang="ts">
@@ -278,11 +293,8 @@ const isSSRM = computed(
     props.data.is_using_server_sort_and_filter,
 )
 
-const useBottomStatusBar = computed(
-  () =>
-    typeof props.data === 'object' &&
-    'use_bottom_status_bar' in props.data &&
-    props.data.use_bottom_status_bar,
+const useBottomStatusBar = computed(() =>
+  computeUseBottomStatusBar(props.data, AG_GRID_ENTERPRISE_AVAILABLE),
 )
 
 const isCreateNewNodeEnabled = computed(
