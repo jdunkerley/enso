@@ -49,8 +49,10 @@ export interface Properties {
 
 /**
  * The subset of the `ag-grid-community` / `ag-grid-enterprise` module surface this file needs.
- * Identical between both packages (both re-export from `@ag-grid-community/core`) except
- * `LicenseManager`, which is Enterprise-only and resolved separately by callers.
+ * Identical between both packages: `ag-grid-enterprise`'s types re-export everything from
+ * `ag-grid-community` (which itself re-exports from an internal `./core/main`, not the npm
+ * package `@ag-grid-community/core`), except `LicenseManager`, which is Enterprise-only and
+ * resolved separately by callers.
  */
 export interface AgGridModule {
   ComponentUtil: (typeof import('ag-grid-community'))['ComponentUtil']

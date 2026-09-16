@@ -9,3 +9,11 @@
  */
 export const AG_GRID_ENTERPRISE_AVAILABLE =
   typeof $config.AG_GRID_LICENSE_KEY === 'string' && $config.AG_GRID_LICENSE_KEY.length > 0
+
+/**
+ * The configured AG Grid Enterprise license key, narrowed to a definite `string` when
+ * {@link AG_GRID_ENTERPRISE_AVAILABLE} is `true` and `undefined` otherwise. Lets callers pass the
+ * key to `LicenseManager.setLicenseKey` without an `as string` cast.
+ */
+export const AG_GRID_LICENSE_KEY: string | undefined =
+  AG_GRID_ENTERPRISE_AVAILABLE ? $config.AG_GRID_LICENSE_KEY : undefined

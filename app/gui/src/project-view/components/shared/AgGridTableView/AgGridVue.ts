@@ -36,7 +36,7 @@
 import { AG_GRID_LOCALE_EN } from '@ag-grid-community/locale'
 import type { AgEventType, GridApi, GridOptions, IRowNode, Module } from 'ag-grid-enterprise'
 import { defineComponent, getCurrentInstance, h, markRaw, toRaw, type PropType } from 'vue'
-import { AG_GRID_ENTERPRISE_AVAILABLE } from './agGridLicense'
+import { AG_GRID_ENTERPRISE_AVAILABLE, AG_GRID_LICENSE_KEY } from './agGridLicense'
 import { convertToRaw, getAgGridProperties, type Properties } from './Utils'
 
 // === Loading AGGrid and its license ===
@@ -55,10 +55,8 @@ const {
   createGrid,
 } = agGrid
 
-if (AG_GRID_ENTERPRISE_AVAILABLE) {
-  ;(agGrid as typeof import('ag-grid-enterprise')).LicenseManager.setLicenseKey(
-    $config.AG_GRID_LICENSE_KEY as string,
-  )
+if (AG_GRID_LICENSE_KEY != null) {
+  ;(agGrid as typeof import('ag-grid-enterprise')).LicenseManager.setLicenseKey(AG_GRID_LICENSE_KEY)
 } else {
   console.warn('The AG_GRID_LICENSE_KEY is not defined; using AG Grid Community.')
 }
