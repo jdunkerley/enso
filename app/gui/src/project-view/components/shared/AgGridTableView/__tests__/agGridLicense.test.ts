@@ -1,4 +1,3 @@
-import { $config } from '$/config'
 import { describe, expect, test } from 'vitest'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from '../agGridLicense'
 

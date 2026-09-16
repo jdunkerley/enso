@@ -1,5 +1,3 @@
-import { $config } from '$/config'
-
 /**
  * Whether a real AG Grid Enterprise license key is configured. When `false`, no code in this
  * codebase may import `ag-grid-enterprise` at runtime — merely importing that package
