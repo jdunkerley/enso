@@ -202,3 +202,4 @@ playwright/.auth/
 #####################
 
 /.claude/worktrees
+/.worktrees
