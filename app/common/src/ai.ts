@@ -69,6 +69,16 @@ export type AiProgressEvent =
       readonly input: unknown
     }
 
+/**
+ * Whether the local Claude agent can serve turns. `starting` covers the window between spawning
+ * the `claude` child and its priming turn completing; `unavailable` carries a user-facing
+ * explanation (CLI missing, priming failed, AI disabled) suitable for display as a hint.
+ */
+export type AiAvailability =
+  | { readonly status: 'starting' }
+  | { readonly status: 'ready' }
+  | { readonly status: 'unavailable'; readonly reason: string }
+
 /** Renderer → main payload for `Channel.cancelAiComponent`. */
 export interface AiCancelRequest {
   readonly requestId: string

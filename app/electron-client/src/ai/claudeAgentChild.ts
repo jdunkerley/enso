@@ -4,7 +4,7 @@
  */
 import spawn from 'cross-spawn'
 import type { WebContents } from 'electron'
-import type { AiProgressEvent } from 'enso-common/src/ai'
+import type { AiAvailability, AiProgressEvent } from 'enso-common/src/ai'
 import { createDeferred, type Deferred } from 'enso-common/src/utilities/async'
 import {
   ChildProcessHandle,
@@ -290,7 +290,8 @@ export class ChildAgent {
    * is only correctly observable through the LS.
    */
   private readonly sandboxCwd: string
-  private isReadyResolved = false
+  private availabilityState: AiAvailability = { status: 'starting' }
+  private readonly availabilityListeners = new Set<(availability: AiAvailability) => void>()
   /**
    * Set inside {@link escalateSignalCancel} when the in-band `control_request`/`interrupt`
    * fallback escalates to SIGTERM. Tells {@link onUnexpectedExit} that the upcoming exit is one
@@ -350,24 +351,28 @@ export class ChildAgent {
   }
 
   /**
-   * Resolves to `true` once the underlying `firstSpawn` succeeds (the OS reports the child
-   * process as alive), and `false` if it rejects (synchronous spawn failure — usually ENOENT
-   * because `claude` is not on PATH). Decoupled from {@link ready}, which additionally waits
-   * for the priming turn — this Promise is for "is the CLI installed at all?" probes.
-   */
-  get firstSpawnSettled(): Promise<boolean> {
-    return this.watcher.firstSpawn.then(
-      () => true,
-      () => false,
-    )
-  }
-
-  /**
    * Synchronous query: has the most recent `readyDeferred` resolved? Useful for the session
    * to ask "is warming primed yet?" without `await`ing.
    */
   get isReady(): boolean {
-    return this.isReadyResolved
+    return this.availabilityState.status === 'ready'
+  }
+
+  /**
+   * Synchronous mirror of the most recent `readyDeferred` settlement: `starting` while a
+   * priming turn is in flight, `ready` once it succeeded, `unavailable` (with the reason
+   * formatted for display) once it failed.
+   */
+  get availability(): AiAvailability {
+    return this.availabilityState
+  }
+
+  /** Subscribe to {@link availability} transitions. Returns a disposer. */
+  onAvailabilityChanged(listener: (availability: AiAvailability) => void): () => void {
+    this.availabilityListeners.add(listener)
+    return () => {
+      this.availabilityListeners.delete(listener)
+    }
   }
 
   /**
@@ -537,7 +542,7 @@ export class ChildAgent {
     // `readyDeferred`. Without this, a caller `await`ing `this.ready` mid-priming would hang
     // forever. Resolved (or already-rejected) deferreds ignore further calls, so this is safe
     // to call unconditionally.
-    if (!this.isReadyResolved) {
+    if (!this.isReady) {
       this.readyDeferred.reject(new Error('Claude agent shutting down'))
     }
     void this.watcher.close()
@@ -550,17 +555,39 @@ export class ChildAgent {
 
   // -------------- private --------------
 
+  /**
+   * Track `deferred`'s settlement in {@link availabilityState}. The identity guard keeps a
+   * late settlement of a superseded deferred from clobbering the state of the one that
+   * replaced it — settlement callbacks are microtasks, so a reject-then-swap sequence would
+   * otherwise report `unavailable` after the swap already moved us back to `starting`.
+   */
   private observeReadyDeferred(deferred: Deferred<void>): void {
     deferred.promise.then(
       () => {
-        if (this.readyDeferred === deferred) this.isReadyResolved = true
+        if (this.readyDeferred === deferred) this.setAvailability({ status: 'ready' })
       },
-      () => undefined,
+      (err: unknown) => {
+        if (this.readyDeferred === deferred) {
+          this.setAvailability({ status: 'unavailable', reason: formatNotReadyError(err) })
+        }
+      },
     )
   }
 
+  private setAvailability(next: AiAvailability): void {
+    const previous = this.availabilityState
+    const unchanged =
+      previous.status === next.status &&
+      (previous.status !== 'unavailable' ||
+        next.status !== 'unavailable' ||
+        previous.reason === next.reason)
+    if (unchanged) return
+    this.availabilityState = next
+    for (const listener of this.availabilityListeners) listener(next)
+  }
+
   private swapInReadyDeferred(): void {
-    this.isReadyResolved = false
+    this.setAvailability({ status: 'starting' })
     this.readyDeferred = createDeferred()
     this.observeReadyDeferred(this.readyDeferred)
   }
@@ -615,7 +642,6 @@ export class ChildAgent {
       // reject (auto-respawn won't fire, so the fresh deferred would hang otherwise).
       if (info.exceedsCrashLimit) {
         this.readyDeferred.reject(info.exitError ?? new Error(reason))
-        this.isReadyResolved = false
         console.warn(
           `[AI${labelTag}] claude crash-loop guard tripped (${MAX_RESPAWNS_IN_WINDOW} crashes within ${RESPAWN_WINDOW_MS}ms); auto-respawn is suspended until the next request.`,
         )
@@ -627,7 +653,6 @@ export class ChildAgent {
     // error object (when 'error' fired on the child, e.g. ENOENT) so the consumer can surface
     // the install hint via `.code` instead of parsing the reason string.
     this.readyDeferred.reject(info.exitError ?? new Error(reason))
-    this.isReadyResolved = false
 
     if (info.exceedsCrashLimit) {
       console.warn(

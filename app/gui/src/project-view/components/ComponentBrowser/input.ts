@@ -24,8 +24,18 @@ import { nodeDocumentationText } from '@/util/ast/node'
 import { ANY_TYPE } from '@/util/ensoTypes'
 import type { ProjectPath } from '@/util/projectPath'
 import { qnLastSegment } from '@/util/qualifiedName'
+import { createGlobalState } from '@vueuse/core'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { computed, readonly, ref, shallowRef, toRef, toValue, type ComputedRef } from 'vue'
+import {
+  computed,
+  readonly,
+  ref,
+  shallowRef,
+  toRef,
+  toValue,
+  type ComputedRef,
+  type Ref,
+} from 'vue'
 import { Range } from 'ydoc-shared/util/data/range'
 
 /** Information how the component browser is used, needed for proper input initializing. */
@@ -67,11 +77,19 @@ export type ComponentBrowserInterpretation =
  */
 export type ComponentBrowserMode = ComponentBrowserInterpretation['mode']
 
+/**
+ * The mode the user last picked by hand, shared by every Component Browser in the window and
+ * `undefined` until they pick one. Deliberately not persisted: a fresh app start opens in the
+ * AI-if-available default rather than in whatever the last session ended on.
+ */
+const useLastPickedMode = createGlobalState(() => ref<ComponentBrowserMode>())
+
 /** Component Browser Input Data */
 export function useComponentBrowserInput(
   aiAvailable: ToValue<boolean> = () => false,
   graphDb: ToValue<GraphDb> = toRef(useCurrentProject().graph.value, 'db'),
   suggestionDb: ToValue<SuggestionDb> = toRef(useCurrentProject().suggestionDb.value, 'entries'),
+  lastPickedMode: Ref<ComponentBrowserMode | undefined> = useLastPickedMode(),
 ) {
   const text = ref('')
   const cbUsage = ref<Usage>()
@@ -196,6 +214,11 @@ export function useComponentBrowserInput(
     return Ok()
   }
 
+  /**
+   * Move to `codeEditing` because the user accepted their raw input (an unmatched pattern or a
+   * literal) rather than a suggestion. Not a mode *pick*, so it does not become the default
+   * for the next Component Browser — see {@link setSelectedMode}.
+   */
   function switchToCodeEditMode() {
     if (modeLocked.value) return
     appliedSuggestion.value = undefined
@@ -206,7 +229,8 @@ export function useComponentBrowserInput(
    * User-driven mode change (from the mode menu or the Shift+Enter shortcut). Refuses when the
    * input is mode-locked (i.e. we're editing an existing node and the mode is determined by
    * the node type). When leaving `codeEditing`, the `appliedSuggestion` tracker is cleared so
-   * the next entry to `codeEditing` re-derives it from scratch.
+   * the next entry to `codeEditing` re-derives it from scratch. The picked mode is remembered
+   * as the default for Component Browsers opened later in this window.
    */
   function setSelectedMode(mode: ComponentBrowserMode): void {
     if (modeLocked.value) return
@@ -215,6 +239,7 @@ export function useComponentBrowserInput(
       appliedSuggestion.value = undefined
     }
     selectedMode.value = mode
+    lastPickedMode.value = mode
   }
 
   function inputAfterApplyingSuggestion(entry: SuggestionEntry): {
@@ -281,7 +306,7 @@ export function useComponentBrowserInput(
     cbUsage.value = usage
     switch (usage.type) {
       case 'newNode':
-        selectedMode.value = toValue(aiAvailable) ? 'aiPrompt' : 'componentBrowsing'
+        selectedMode.value = modeForNewNode()
         if (usage.sourcePort) {
           const ident = graphDbValue.getOutputPortIdentifier(usage.sourcePort)
           sourceNodeIdentifier.value = ident != null && Ast.isIdentifier(ident) ? ident : undefined
@@ -313,6 +338,17 @@ export function useComponentBrowserInput(
       }
     }
     imports.value = []
+  }
+
+  /**
+   * The mode a freshly-opened Component Browser starts in: the one the user last picked, else
+   * AI when it is available. A remembered `aiPrompt` degrades to component browsing while the
+   * agent is unavailable, so the CB never opens on a mode that cannot be submitted.
+   */
+  function modeForNewNode(): ComponentBrowserMode {
+    const remembered = lastPickedMode.value
+    if (remembered != null && (remembered !== 'aiPrompt' || toValue(aiAvailable))) return remembered
+    return toValue(aiAvailable) ? 'aiPrompt' : 'componentBrowsing'
   }
 
   function extractSourceNode(expression: string) {

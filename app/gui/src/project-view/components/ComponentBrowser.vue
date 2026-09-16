@@ -193,8 +193,8 @@ const selectedSuggestion = computed(() => {
 
 // === Input and Filtering ===
 
-const aiAvailable = toRef(useAiAvailability(), 'availability')
-const input = useComponentBrowserInput(aiAvailable)
+const aiAgent = useAiAvailability()
+const input = useComponentBrowserInput(toRef(aiAgent, 'ready'))
 
 onUnmounted(() => {
   graphStore.cbEditedEdge = undefined
@@ -378,7 +378,7 @@ const actions = registerHandlers({
   },
   'componentBrowser.switchToCodeEditMode': {
     enabled: insideComponentBrowsing,
-    action: input.switchToCodeEditMode,
+    action: () => input.setSelectedMode('codeEditing'),
   },
   'component.toggleVisualization': {
     ...toggledAction(isVisualizationVisible),
@@ -457,7 +457,7 @@ const listsHandler = listBindings.handler({
       :interpretation="input.interpretation"
       :selectedMode="input.selectedMode"
       :modeLocked="input.modeLocked"
-      :aiAvailable="aiAvailable"
+      :aiAvailability="aiAgent.availability"
       :nodeColor="nodeColor"
       :style="{ '--component-editor-padding': cssComponentEditorPadding }"
       @update:selectedMode="input.setSelectedMode"

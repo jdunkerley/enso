@@ -1,6 +1,7 @@
 /** @file Shared API types exposed on `window.api` for both GUI and Electron. */
 import type * as saveAccessToken from 'enso-common/src/accessToken'
 import type {
+  AiAvailability,
   AiComponentIpcReply,
   AiComponentRequest,
   AiProgressEvent,
@@ -68,13 +69,15 @@ export interface LogApi {
 
 export interface AiApi {
   /**
-   * Query whether the local Claude agent is available — i.e. the `claude` CLI was found on
-   * PATH and spawned without a synchronous error. Does NOT wait for the priming turn to
-   * complete. Returns `false` when the main process was started with `ENSO_AI_DISABLED=1`.
-   * The renderer typically calls this once at app start and caches the result in
-   * {@link useAiAvailability}.
+   * The local Claude agent's current availability: `starting` until its priming turn completes,
+   * `ready` once the agent can serve turns, `unavailable` (with a displayable reason) when the
+   * `claude` CLI is missing, failed to prime, or was disabled via `ENSO_AI_DISABLED=1`.
+   * Availability changes over the life of the process — {@link AiApi.onAvailabilityChanged}
+   * carries the updates, and {@link useAiAvailability} keeps both in one reactive store.
    */
-  readonly isAvailable: () => Promise<boolean>
+  readonly availability: () => Promise<AiAvailability>
+  /** Subscribe to {@link AiApi.availability} changes. Returns a disposer. */
+  readonly onAvailabilityChanged: (handler: (availability: AiAvailability) => void) => () => void
   readonly generateComponent: (request: AiComponentRequest) => Promise<AiComponentIpcReply>
   /**
    * Subscribe to mid-turn tool calls; the handler must reply via {@link AiApi.replyToolCall}

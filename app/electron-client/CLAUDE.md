@@ -179,6 +179,21 @@ same material (`## ` doc blocks, `Internal/` and `private: true` warnings, the
 per-library CLAUDE.md location), so even if priming partially fails the agent
 still has the high-level rules in front of it.
 
+### Availability
+
+`ChildAgent.availability` mirrors the current `readyDeferred`: `starting` while
+a priming turn is in flight, `ready` once it completed, `unavailable` (with the
+`formatNotReadyError` text) once it failed. The session forwards the primary
+child's state over `Channel.aiAvailability` (query) and
+`Channel.aiAvailabilityChanged` (broadcast to every renderer); the GUI gates AI
+mode on `ready` and shows the `unavailable` reason as the mode entry's hint.
+
+A spawned child is deliberately **not** enough to count as available. On POSIX,
+`spawn` of a missing executable still returns a live-looking child object and
+reports ENOENT asynchronously on the `'error'` event, so the first-spawn outcome
+says nothing about whether `claude` exists — let alone whether it is
+authenticated and able to answer. Only a completed priming turn proves that.
+
 ### AI tool bridge (MCP `evaluateExpression`)
 
 `src/ai/aiMcpServer.ts` owns an in-process MCP server bound to a random

@@ -6,9 +6,10 @@
  * `claudeAgentChild.ts`; see {@link ClaudeAgentSession} for orchestration details and
  * `electron-client/CLAUDE.md` for the wire-format and lifecycle background.
  */
-import { ipcMain, type WebContents } from 'electron'
+import { ipcMain, webContents, type WebContents } from 'electron'
 import {
   aiComponentResponseSchema,
+  type AiAvailability,
   type AiCancelRequest,
   type AiComponentIpcReply,
   type AiComponentRequest,
@@ -173,6 +174,18 @@ function emitProgressTo(sender: WebContents, event: AiProgressEvent): void {
   }
 }
 
+/** Broadcast the agent's availability to every live renderer. */
+function broadcastAvailability(availability: AiAvailability): void {
+  for (const contents of webContents.getAllWebContents()) {
+    if (contents.isDestroyed()) continue
+    try {
+      contents.send(Channel.aiAvailabilityChanged, availability)
+    } catch {
+      // Renderer destroyed mid-emit; the next broadcast will short-circuit on isDestroyed().
+    }
+  }
+}
+
 /** State of an in-progress context-rotation. See {@link ClaudeAgentSession} for semantics. */
 type SwapMode = 'none' | 'soft' | 'hard'
 
@@ -212,6 +225,8 @@ export class ClaudeAgentSession {
   private warming: ChildAgent | null = null
   private swapMode: SwapMode = 'none'
   private readonly queue = new AsyncQueue<void>(Promise.resolve())
+  private readonly availabilityListeners = new Set<(availability: AiAvailability) => void>()
+  private unsubscribePrimaryAvailability: () => void
   private disposed = false
   /** Ids cancelled while still queued behind another turn; consumed by the queue task on entry. */
   private readonly cancelled = new Set<string>()
@@ -236,6 +251,7 @@ export class ClaudeAgentSession {
     this.thresholds = resolveThresholds(config)
     this.extraArgs = config.extraArgs ?? readExtraArgsEnv()
     this.primary = new ChildAgent({ ...this.childConfig(), logLabel: 'primary' })
+    this.unsubscribePrimaryAvailability = this.subscribeToPrimaryAvailability()
   }
 
   /** Resolves once the current primary child has spawned and accepted the priming turn. */
@@ -244,12 +260,21 @@ export class ClaudeAgentSession {
   }
 
   /**
-   * Resolves to `true` once the primary `claude` child has spawned without a synchronous
-   * ENOENT-style failure, `false` if the spawn failed. Decoupled from priming — the CLI counts
-   * as "available" as soon as the process is alive.
+   * Whether the session can serve turns right now, mirroring the primary child's priming
+   * state. A spawned-but-unprimed `claude` is NOT available: a CLI that is missing, broken, or
+   * unauthenticated still yields a live child process on POSIX (the ENOENT surfaces
+   * asynchronously), so only a completed priming turn proves the agent actually works.
    */
-  get isAvailable(): Promise<boolean> {
-    return this.primary.firstSpawnSettled
+  get availability(): AiAvailability {
+    return this.primary.availability
+  }
+
+  /** Subscribe to {@link availability} transitions. Returns a disposer. */
+  onAvailabilityChanged(listener: (availability: AiAvailability) => void): () => void {
+    this.availabilityListeners.add(listener)
+    return () => {
+      this.availabilityListeners.delete(listener)
+    }
   }
 
   /**
@@ -379,6 +404,7 @@ export class ClaudeAgentSession {
   shutdown(): void {
     if (this.disposed) return
     this.disposed = true
+    this.unsubscribePrimaryAvailability()
     this.primary.shutdown()
     if (this.warming != null) {
       this.warming.shutdown()
@@ -387,6 +413,18 @@ export class ClaudeAgentSession {
   }
 
   // -------------- private --------------
+
+  /**
+   * Re-emit the current primary's availability to the session's own listeners. Called again on
+   * every rotation so the renderer keeps tracking whichever child is serving turns.
+   */
+  private subscribeToPrimaryAvailability(): () => void {
+    return this.primary.onAvailabilityChanged((availability) => this.emitAvailability(availability))
+  }
+
+  private emitAvailability(availability: AiAvailability): void {
+    for (const listener of this.availabilityListeners) listener(availability)
+  }
 
   private childConfig(): ChildAgentConfig {
     return {
@@ -407,6 +445,12 @@ export class ClaudeAgentSession {
     if (warming.isReady) {
       const oldPrimary = this.primary
       this.primary = warming
+      this.unsubscribePrimaryAvailability()
+      this.unsubscribePrimaryAvailability = this.subscribeToPrimaryAvailability()
+      // The promoted child is primed by definition, so a rotation that happens while the old
+      // primary was reporting `unavailable` (crash-loop) has to announce the recovery itself —
+      // subscribing alone emits nothing.
+      this.emitAvailability(this.primary.availability)
       this.warming = null
       this.swapMode = 'none'
       this.freshAgentPending = true
@@ -557,13 +601,17 @@ export async function initAiMcpServer(): Promise<string | undefined> {
  * Spawn the long-lived agent session and register the {@link Channel.generateAiComponent} IPC
  * handler. Pass `mcpConfigPath` from {@link initAiMcpServer} (or `undefined` to disable MCP).
  *
- * Honors `ENSO_AI_DISABLED=1`: when set, the session is NOT spawned, `aiIsAvailable` reports
- * `false`, and any stray call to `generateAiComponent` returns a structured error.
+ * Honors `ENSO_AI_DISABLED=1`: when set, the session is NOT spawned, {@link Channel.aiAvailability}
+ * reports `unavailable`, and any stray call to `generateAiComponent` returns a structured error.
  */
 export function initClaudeAgentIpc(config: ClaudeSessionConfig): void {
   if (process.env.ENSO_AI_DISABLED === '1') {
     console.info(`[AI] ENSO_AI_DISABLED=1; skipping 'claude' session startup.`)
-    ipcMain.handle(Channel.aiIsAvailable, async () => false)
+    const disabled: AiAvailability = {
+      status: 'unavailable',
+      reason: 'AI is disabled by ENSO_AI_DISABLED.',
+    }
+    ipcMain.handle(Channel.aiAvailability, async () => disabled)
     ipcMain.handle(
       Channel.generateAiComponent,
       async (): Promise<AiComponentIpcReply> => ({
@@ -596,7 +644,8 @@ export function initClaudeAgentIpc(config: ClaudeSessionConfig): void {
       console.warn(`[AI] failed to start 'claude' session: ${errno?.message ?? String(err)}`)
     }
   })
-  ipcMain.handle(Channel.aiIsAvailable, async () => currentSession.isAvailable)
+  currentSession.onAvailabilityChanged(broadcastAvailability)
+  ipcMain.handle(Channel.aiAvailability, async () => currentSession.availability)
   ipcMain.handle(
     Channel.generateAiComponent,
     async (event, request: AiComponentRequest): Promise<AiComponentIpcReply> =>
