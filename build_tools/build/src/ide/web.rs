@@ -205,11 +205,8 @@ impl IdeDesktop {
         if TARGET_OS == OS::MacOS && env::CSC_KEY_PASSWORD.is_set() {
             // This means that we will be doing code signing on MacOS. This requires JDK environment
             // to be set up.
-            let graalvm = crate::engine::deduce_graal(
-                self.octocrab.clone(),
-                &self.repo_root.project.dependencies_scala,
-            )
-            .await?;
+            let graalvm =
+                crate::engine::deduce_graal(&self.repo_root.project.dependencies_scala).await?;
             graalvm.install_if_missing(&self.cache).await?;
         }
 

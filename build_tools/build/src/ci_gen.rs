@@ -506,6 +506,61 @@ impl JobArchetype for PublishRelease {
     }
 }
 
+/// Open a pull request recording the just-released version in `build-config.yaml`.
+///
+/// Local builds read that entry to name themselves, so it has to follow the releases. The job is
+/// a no-op for prereleases and whenever the entry already holds the released version — the
+/// `release update-latest-version` step reports which of those happened, and only a real change
+/// raises the pull request.
+///
+/// The pull request is authored by the workflow token, so by GitHub's design it does not itself
+/// trigger further workflows; it is expected to be reviewed and merged by hand like any other.
+#[derive(Clone, Copy, Debug)]
+pub struct UpdateLatestReleaseVersion;
+
+impl UpdateLatestReleaseVersion {
+    /// Id of the step that rewrites the build configuration.
+    pub const UPDATE_STEP_ID: &'static str = "update";
+
+    fn open_pull_request_step() -> Step {
+        let updated = format!(
+            "steps.{}.outputs.{} == 'true'",
+            Self::UPDATE_STEP_ID,
+            crate::release::LATEST_RELEASE_UPDATED_OUTPUT
+        );
+        let script = [
+            "set -euo pipefail",
+            r#"BRANCH="bump-latest-release-$ENSO_VERSION""#,
+            r#"TITLE="Record $ENSO_VERSION as the latest release""#,
+            r#"BODY="Local builds derive their version from this entry, so it follows the releases. Raised automatically by the release workflow.""#,
+            r#"git config user.name "github-actions[bot]""#,
+            r#"git config user.email "41898282+github-actions[bot]@users.noreply.github.com""#,
+            r#"git switch -c "$BRANCH""#,
+            r#"git commit -m "$TITLE" -- build-config.yaml"#,
+            r#"git push --force-with-lease origin "$BRANCH""#,
+            r#"gh pr create --base "$GITHUB_REF_NAME" --head "$BRANCH" --title "$TITLE" --body "$BODY""#,
+        ]
+        .join("\n");
+        Step {
+            name: Some("Open a pull request with the update".into()),
+            r#if: Some(updated),
+            ..shell(script)
+        }
+    }
+}
+
+impl JobArchetype for UpdateLatestReleaseVersion {
+    fn job(&self, target: Target) -> Job {
+        RunStepsBuilder::new("release update-latest-version")
+            .customize(move |step| {
+                vec![step.with_id(Self::UPDATE_STEP_ID), Self::open_pull_request_step()]
+            })
+            .build_job("Update the latest release version", target)
+            .with_permission(Permission::Contents, Access::Write)
+            .with_permission(Permission::PullRequests, Access::Write)
+    }
+}
+
 /// Build new IDE and upload it as a release asset.
 #[derive(Clone, Copy, Debug)]
 pub struct UploadIde;
@@ -631,12 +686,18 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
     }
 
     let publish_deps = {
-        packaging_job_ids.push(prepare_job_id);
+        packaging_job_ids.push(prepare_job_id.clone());
         packaging_job_ids.push(license_check_job_id);
         packaging_job_ids
     };
 
-    let _publish_job_id = workflow.add_dependent(PRIMARY_TARGET, PublishRelease, publish_deps);
+    let publish_job_id = workflow.add_dependent(PRIMARY_TARGET, PublishRelease, publish_deps);
+    // Depends on the draft-release job as well, since that is what exposes `ENSO_VERSION`.
+    let _update_latest_job_id = workflow.add_dependent(
+        PRIMARY_TARGET,
+        UpdateLatestReleaseVersion,
+        [&prepare_job_id, &publish_job_id],
+    );
     workflow.env("RUST_BACKTRACE", "full");
     Ok(())
 }

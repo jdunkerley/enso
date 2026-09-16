@@ -4,6 +4,9 @@ use ide_ci::program;
 use ide_ci::programs;
 use semver::VersionReq;
 
+/// The `build-config.yaml` key recording the most recent stable Enso release.
+pub const LATEST_RELEASE_KEY: &str = "latest-release";
+
 /// Load the build configuration, based on the `build-config.yaml` and `.node-version` files in
 /// the repo root.
 pub fn load() -> Result<Config> {
@@ -47,6 +50,8 @@ impl RecognizedProgram {
 #[serde(rename_all = "kebab-case")]
 pub struct ConfigRaw {
     pub required_versions: HashMap<String, String>,
+    #[serde(default)]
+    pub latest_release: Option<Version>,
 }
 
 /// The configuration of the script that is being provided by the external environment.
@@ -55,6 +60,12 @@ pub struct ConfigRaw {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Config {
     pub required_versions: HashMap<RecognizedProgram, VersionReq>,
+    /// The most recent stable Enso release, as recorded in `build-config.yaml`.
+    ///
+    /// Builds that are not given an explicit `ENSO_VERSION` derive their `<next stable>-dev`
+    /// version from this instead of listing the repository's remote tags. `None` (the key is
+    /// absent) falls back to asking the remote.
+    pub latest_release: Option<Version>,
 }
 
 impl Config {
@@ -85,8 +96,32 @@ impl TryFrom<ConfigRaw> for Config {
             );
         }
 
-        Ok(Self { required_versions })
+        Ok(Self { required_versions, latest_release: value.latest_release })
     }
+}
+
+/// Rewrite the [`LATEST_RELEASE_KEY`] entry of a `build-config.yaml` to `version`.
+///
+/// Line-wise rather than a serde round-trip, so that the file's comments and layout survive.
+/// Fails if the key is absent — silently adding it would hide a renamed or removed entry.
+pub fn with_latest_release(config_yaml: &str, version: &Version) -> Result<String> {
+    let prefix = format!("{LATEST_RELEASE_KEY}:");
+    let mut found = false;
+    let mut lines = Vec::new();
+    for line in config_yaml.lines() {
+        if line.starts_with(&prefix) {
+            found = true;
+            lines.push(format!("{LATEST_RELEASE_KEY}: {version}"));
+        } else {
+            lines.push(line.to_owned());
+        }
+    }
+    ensure!(found, "The build configuration has no `{LATEST_RELEASE_KEY}` entry to update.");
+    let mut ret = lines.join("\n");
+    if config_yaml.ends_with('\n') {
+        ret.push('\n');
+    }
+    Ok(ret)
 }
 
 /// Check if the given program is installed in the system and has the required version.
@@ -159,6 +194,37 @@ required-versions:
         let config = serde_yaml::from_str::<ConfigRaw>(config)?;
         dbg!(&config);
         dbg!(Config::try_from(config))?;
+        Ok(())
+    }
+
+    #[test]
+    fn updating_latest_release_keeps_the_rest_of_the_file() -> Result {
+        let config =
+            "# A comment.\n\nlatest-release: 2025.3.4\n\nrequired-versions:\n  node: =16.15.0\n";
+        let updated = with_latest_release(config, &Version::from_str("2026.1.1")?)?;
+        assert_eq!(
+            updated,
+            "# A comment.\n\nlatest-release: 2026.1.1\n\nrequired-versions:\n  node: =16.15.0\n"
+        );
+        // Re-applying the same version is a no-op, so a release that did not move the key leaves
+        // the file (and therefore the pull request) empty.
+        assert_eq!(with_latest_release(&updated, &Version::from_str("2026.1.1")?)?, updated);
+        Ok(())
+    }
+
+    #[test]
+    fn updating_latest_release_requires_the_key() {
+        let config = "wasm-size-limit: 16.20 MiB\n";
+        assert!(with_latest_release(config, &Version::new(2026, 1, 1)).is_err());
+    }
+
+    #[test]
+    fn repo_build_config_is_updatable() -> Result {
+        // The real file must stay parseable *and* rewritable, since the release workflow edits it.
+        let config = include_str!("../../../build-config.yaml");
+        let parsed = serde_yaml::from_str::<ConfigRaw>(config)?;
+        assert!(parsed.latest_release.is_some());
+        with_latest_release(config, &Version::new(2026, 1, 1))?;
         Ok(())
     }
 }

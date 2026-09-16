@@ -12,7 +12,6 @@ pub const CE_BUILDS_REPOSITORY: RepoRef = RepoRef { owner: "oracle", name: "graa
 
 #[derive(Clone, Debug)]
 pub struct GraalPy {
-    pub client: Octocrab,
     pub version: Version,
     pub os: OS,
     pub arch: Arch,
@@ -34,7 +33,7 @@ async fn find_graalpy_version() -> Result<Version> {
 
 impl Goodie for GraalPy {
     fn get(&self, cache: &Cache) -> BoxFuture<'static, Result<PathBuf>> {
-        goodie::download_try_future_url(self.url(), cache)
+        goodie::download_try_url(self.url(), cache)
     }
 
     fn is_active(&self) -> BoxFuture<'static, Result<bool>> {
@@ -68,25 +67,38 @@ impl Goodie for GraalPy {
 }
 
 impl GraalPy {
-    pub fn url(&self) -> BoxFuture<'static, Result<Url>> {
-        let this = self.clone();
-        let client = self.client.clone();
+    /// Get the download URL.
+    ///
+    /// Built from the release's naming scheme rather than looked up through the GitHub API, so
+    /// that a build whose cache is already warm needs no network access at all.
+    ///
+    /// ```
+    /// use ide_ci::prelude::*;
+    /// use ide_ci::cache::goodie::graalpy::GraalPy;
+    ///
+    /// # fn main() -> Result {
+    /// let version = Version::from_str("25.0.1")?;
+    /// let graalpy = GraalPy { version, os: OS::MacOS, arch: Arch::AArch64 };
+    /// assert_eq!(
+    ///     graalpy.url()?.as_str(),
+    ///     "https://github.com/oracle/graalpython/releases/download/graal-25.0.1/graalpy-community-25.0.1-macos-aarch64.tar.gz"
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn url(&self) -> Result<Url> {
         let arch_name = match self.arch {
-            Arch::X86_64 => "amd64",
-            Arch::AArch64 => "aarch64",
-            _ => unimplemented!("Unsupported architecture: {}", self.arch.to_string()),
+            Arch::X86_64 | Arch::AArch64 => self.arch.as_str(),
+            other_arch => bail!("Unsupported architecture: {other_arch}."),
         };
-        async move {
-            let repo = CE_BUILDS_REPOSITORY.handle(&client);
-            let tag = format!("graal-{}", this.version);
-            let release = repo.find_release_by_tag(tag.as_str()).await?;
-            let asset_name =
-                format!("graalpy-community-{}-{}-{}", this.version, this.os, arch_name);
-            let asset =
-                crate::github::find_asset_url_by_text(&release, asset_name.as_str()).cloned();
-            asset
-        }
-        .boxed()
+        let extension = match self.os {
+            OS::Windows => "zip",
+            OS::Linux | OS::MacOS => "tar.gz",
+        };
+        let tag = format!("graal-{}", self.version);
+        let asset_name =
+            format!("graalpy-community-{}-{}-{arch_name}.{extension}", self.version, self.os);
+        Ok(crate::github::release::download_asset(&CE_BUILDS_REPOSITORY, &tag, asset_name))
     }
 }
 
@@ -96,7 +108,6 @@ mod tests {
     use crate::OS;
     use crate::cache::goodie::graalpy::GraalPy;
     use crate::cache::goodie::graalpy::graalpy_version_from_str;
-    use octocrab::Octocrab;
     use semver::Version;
 
     #[test]
@@ -108,20 +119,22 @@ mod tests {
     }
 
     #[test]
-    fn fetch_correct_url() {
-        let version = Version::new(23, 1, 0);
-        let client = Octocrab::builder().build().unwrap();
-        let graalpy = GraalPy { client, version, os: OS::Linux, arch: Arch::X86_64 };
-        let found_url_opt =
-            tokio::runtime::Runtime::new().unwrap().block_on(async { graalpy.url().await });
-        let found_url = match found_url_opt {
-            Ok(url) => url,
-            Err(err) => {
-                unreachable!("URL not found: {}", err);
-            }
-        };
-
-        let expected_url = "https://github.com/oracle/graalpython/releases/download/graal-23.1.0/graalpy-community-23.1.0-linux-amd64.tar.gz";
-        assert_eq!(found_url.as_str(), expected_url);
+    fn download_url_per_platform() {
+        let version = Version::new(25, 0, 1);
+        let url =
+            |os, arch| GraalPy { version: version.clone(), os, arch }.url().unwrap().to_string();
+        let prefix = "https://github.com/oracle/graalpython/releases/download/graal-25.0.1";
+        assert_eq!(
+            url(OS::Linux, Arch::X86_64),
+            format!("{prefix}/graalpy-community-25.0.1-linux-amd64.tar.gz")
+        );
+        assert_eq!(
+            url(OS::MacOS, Arch::AArch64),
+            format!("{prefix}/graalpy-community-25.0.1-macos-aarch64.tar.gz")
+        );
+        assert_eq!(
+            url(OS::Windows, Arch::X86_64),
+            format!("{prefix}/graalpy-community-25.0.1-windows-amd64.zip")
+        );
     }
 }

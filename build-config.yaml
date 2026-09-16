@@ -2,6 +2,15 @@
 
 wasm-size-limit: 16.20 MiB
 
+# The most recent stable Enso release.
+#
+# A build that is not given an explicit `ENSO_VERSION` derives its own `<next stable>-dev` version
+# from this. Keeping it here rather than reading the repository's tags means a local build needs no
+# network access. Must be updated by the release process whenever a stable release is published; a
+# stale value only misnames local dev builds, it does not affect a release build (which always sets
+# `ENSO_VERSION` explicitly).
+latest-release: 2025.3.4
+
 required-versions:
   # NB. The Rust version is pinned in rust-toolchain.toml.
   # NB. The Node version is pinned in .node-version.

@@ -291,6 +291,32 @@ pub async fn notify_cloud_about_gui(version: &Version) -> Result<Response> {
     handle_error_response(response).await
 }
 
+/// Step output reporting whether [`update_latest_release_version`] changed the build config.
+pub const LATEST_RELEASE_UPDATED_OUTPUT: &str = "ENSO_LATEST_RELEASE_UPDATED";
+
+/// Record the version being released as the latest stable one in `build-config.yaml`.
+///
+/// Returns whether the file changed, so that the caller can skip opening an empty pull request.
+/// Prereleases are ignored: the entry is the version that local builds base their `-dev` version
+/// on, which a prerelease never is.
+pub async fn update_latest_release_version(context: &BuildContext) -> Result<bool> {
+    let version = &context.triple.versions.version;
+    if version::Kind::deduce(version)?.is_prerelease() {
+        info!("{version} is a prerelease; leaving the latest-release entry untouched.");
+        return Ok(false);
+    }
+    let path = &context.repo_root.build_config_yaml;
+    let old_config = ide_ci::fs::tokio::read_to_string(path).await?;
+    let new_config = crate::config::with_latest_release(&old_config, version)?;
+    if new_config == old_config {
+        info!("{} already records {version} as the latest release.", path.display());
+        return Ok(false);
+    }
+    ide_ci::fs::tokio::write(path, &new_config).await?;
+    info!("Recorded {version} as the latest release in {}.", path.display());
+    Ok(true)
+}
+
 /// Generate a new version number of a requested kind.
 pub async fn resolve_version_designation(
     context: &BuildContext,

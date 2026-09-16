@@ -87,8 +87,6 @@ pub async fn find_graal_version() -> Result<(Version, Edition)> {
 /// Description necessary to download and install GraalVM.
 #[derive(Clone, Debug)]
 pub struct GraalVM {
-    /// Used to query GitHub about releases.
-    pub client: Octocrab,
     pub graal_version: Version,
     pub edition: Edition,
     pub os: OS,
@@ -97,7 +95,7 @@ pub struct GraalVM {
 
 impl Goodie for GraalVM {
     fn get(&self, cache: &Cache) -> BoxFuture<'static, Result<PathBuf>> {
-        goodie::download_try_future_url(self.url(), cache)
+        goodie::download_try_url(self.url(), cache)
     }
 
     fn is_active(&self) -> BoxFuture<'static, Result<bool>> {
@@ -141,29 +139,52 @@ impl Goodie for GraalVM {
 }
 
 impl GraalVM {
-    pub fn url(&self) -> BoxFuture<'static, Result<Url>> {
+    /// Get the download URL.
+    ///
+    /// Both editions' URLs are built from their naming scheme rather than looked up through the
+    /// GitHub API, so that a build whose cache is already warm needs no network access at all.
+    ///
+    /// ```
+    /// use ide_ci::prelude::*;
+    /// use ide_ci::cache::goodie::graalvm::Edition;
+    /// use ide_ci::cache::goodie::graalvm::GraalVM;
+    ///
+    /// # fn main() -> Result {
+    /// let graal_version = Version::from_str("25.0.1")?;
+    /// let edition = Edition::Community;
+    /// let graalvm = GraalVM { graal_version, edition, os: OS::MacOS, arch: Arch::AArch64 };
+    /// assert_eq!(
+    ///     graalvm.url()?.as_str(),
+    ///     "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-25.0.1/graalvm-community-jdk-25.0.1_macos-aarch64_bin.tar.gz"
+    /// );
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn url(&self) -> Result<Url> {
+        let graal_version_tag = self.graal_version.to_string_core();
         match self.edition {
             Edition::Community => {
-                let platform_string = self.platform_string();
-                let graal_version_tag = self.graal_version.to_string_core();
-                let client = self.client.clone();
-                async move {
-                    let repo = CE_BUILDS_REPOSITORY.handle(&client);
-                    let release = repo.find_release_by_text(&graal_version_tag).await?;
-                    crate::github::find_asset_url_by_text(&release, &platform_string).cloned()
-                }
-                .boxed()
+                let asset_name =
+                    format!("{}_bin.{}", self.platform_string(), self.archive_extension());
+                let tag = format!("jdk-{graal_version_tag}");
+                Ok(crate::github::release::download_asset(&CE_BUILDS_REPOSITORY, &tag, asset_name))
             }
             Edition::Enterprise => {
-                let graal_version_tag = self.graal_version.to_string_core();
                 let url = format!(
                     "https://download.oracle.com/graalvm/{}/archive/graalvm-jdk-{}_{}_bin.tar.gz",
                     self.graal_version.major,
                     graal_version_tag,
                     self.os_arch_string(),
                 );
-                Box::pin(ready(Url::parse(&url).context("Failed to parse URL.")))
+                Url::parse(&url).context("Failed to parse URL.")
             }
+        }
+    }
+
+    fn archive_extension(&self) -> &'static str {
+        match self.os {
+            OS::Windows => "zip",
+            OS::Linux | OS::MacOS => "tar.gz",
         }
     }
 
@@ -268,51 +289,45 @@ Java HotSpot(TM) 64-Bit Server VM Oracle GraalVM 21.0.2+13.1 (build 21.0.2+13-LT
         assert_eq!(graal_version, expected_graal_version);
     }
 
-    #[tokio::test]
-    async fn correct_url_for_enterprise_edition_21() {
-        let graalvm = GraalVM {
-            client: Octocrab::default(),
-            graal_version: Version::new(21, 0, 2),
-            edition: Edition::Enterprise,
-            os: OS::Linux,
-            arch: Arch::X86_64,
+    #[test]
+    fn correct_url_for_enterprise_edition() {
+        let url = |version, os, arch| {
+            GraalVM { graal_version: version, edition: Edition::Enterprise, os, arch }
+                .url()
+                .unwrap()
+                .to_string()
         };
-        let url = graalvm.url().await.unwrap();
         assert_eq!(
-            url.to_string(),
+            url(Version::new(21, 0, 2), OS::Linux, Arch::X86_64),
             "https://download.oracle.com/graalvm/21/archive/graalvm-jdk-21.0.2_linux-x64_bin.tar.gz"
         );
-    }
-
-    #[tokio::test]
-    async fn correct_url_for_enterprise_edition_17() {
-        let graalvm = GraalVM {
-            client: Octocrab::default(),
-            graal_version: Version::new(17, 0, 7),
-            edition: Edition::Enterprise,
-            os: OS::Linux,
-            arch: Arch::X86_64,
-        };
-        let url = graalvm.url().await.unwrap();
         assert_eq!(
-            url.to_string(),
+            url(Version::new(17, 0, 7), OS::Linux, Arch::X86_64),
             "https://download.oracle.com/graalvm/17/archive/graalvm-jdk-17.0.7_linux-x64_bin.tar.gz"
         );
     }
 
-    #[tokio::test]
-    async fn correct_url_for_community_edition() {
-        let graalvm = GraalVM {
-            client: Octocrab::default(),
-            graal_version: Version::new(21, 0, 2),
-            edition: Edition::Community,
-            os: OS::Linux,
-            arch: Arch::X86_64,
+    #[test]
+    fn correct_url_for_community_edition() {
+        let version = Version::new(21, 0, 2);
+        let url = |os, arch| {
+            GraalVM { graal_version: version.clone(), edition: Edition::Community, os, arch }
+                .url()
+                .unwrap()
+                .to_string()
         };
-        let url = graalvm.url().await.unwrap();
+        let prefix = "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2";
         assert_eq!(
-            url.to_string(),
-            "https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_linux-x64_bin.tar.gz"
+            url(OS::Linux, Arch::X86_64),
+            format!("{prefix}/graalvm-community-jdk-21.0.2_linux-x64_bin.tar.gz")
+        );
+        assert_eq!(
+            url(OS::MacOS, Arch::AArch64),
+            format!("{prefix}/graalvm-community-jdk-21.0.2_macos-aarch64_bin.tar.gz")
+        );
+        assert_eq!(
+            url(OS::Windows, Arch::X86_64),
+            format!("{prefix}/graalvm-community-jdk-21.0.2_windows-x64_bin.zip")
         );
     }
 }

@@ -430,14 +430,12 @@ impl BuiltArtifacts {
 }
 
 pub async fn deduce_graal(
-    client: Octocrab,
     deps: &generated::RepoRootProjectDependenciesScala,
 ) -> Result<ide_ci::cache::goodie::graalvm::GraalVM> {
     let deps_content = ide_ci::fs::tokio::read_to_string(deps).await?;
     let graal_edition = env::GRAAL_EDITION.get().map_or(Edition::default(), |e| e);
 
     Ok(ide_ci::cache::goodie::graalvm::GraalVM {
-        client,
         graal_version: get_graal_version(&deps_content)?,
         edition: graal_edition,
         os: TARGET_OS,

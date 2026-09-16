@@ -112,6 +112,7 @@
   build.sbt:
   run:
   CHANGELOG.md:
+  build-config.yaml:
 
 # Launcher Package
 { path: enso/, var: launcher_package }:
