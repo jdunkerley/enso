@@ -27,6 +27,11 @@ pub enum Action {
     DispatchBuildImage,
     Publish,
     Promote(Promote),
+    /// Record the released version as the latest one in `build-config.yaml`.
+    ///
+    /// A no-op for prereleases. Sets the `ENSO_LATEST_RELEASE_UPDATED` step output, so that CI
+    /// only raises a pull request when the entry actually moved.
+    UpdateLatestVersion,
 }
 
 #[derive(Args, Clone, Debug)]

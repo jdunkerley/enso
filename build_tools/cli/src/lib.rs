@@ -768,6 +768,14 @@ pub async fn main_internal(config: Option<Config>) -> Result {
                 let arg::release::Promote { designation } = args;
                 enso_build::release::promote_release(&ctx, designation).await?;
             }
+            Action::UpdateLatestVersion => {
+                let updated = enso_build::release::update_latest_release_version(&ctx).await?;
+                ide_ci::actions::workflow::set_output(
+                    enso_build::release::LATEST_RELEASE_UPDATED_OUTPUT,
+                    &updated,
+                )
+                .await?;
+            }
         },
         Target::JavaGen(command) => {
             let repo_root = ctx.repo_root.clone();
