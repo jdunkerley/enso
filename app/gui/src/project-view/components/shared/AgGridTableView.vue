@@ -174,6 +174,10 @@ import {
 } from 'vue'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
 import { useCommunityCellRange, type CellCoord } from './AgGridTableView/communityCellRange'
+import {
+  installCommunityClipboardPatch,
+  type ClipboardDeps,
+} from './AgGridTableView/communityClipboard'
 
 const props = defineProps<AgGridTableViewProps<TData, TValue>>()
 const emit = defineEmits<{
@@ -217,6 +221,22 @@ function onGridReady(event: GridReadyEvent<TData>) {
   gridApi.value = event.api
   if (rowModelType.value === 'serverSide') {
     gridApi.value.retryServerSideLoads()
+  }
+  installCommunityClipboardPatch(
+    event.api,
+    AG_GRID_ENTERPRISE_AVAILABLE,
+    clipboardDeps,
+    () => copyWithHeaders.value,
+  )
+}
+
+function clipboardDeps(): ClipboardDeps {
+  return {
+    enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
+    gridApi: gridApi.value as unknown as ClipboardDeps['gridApi'],
+    rectangle,
+    processCellForClipboard,
+    sendToClipboard,
   }
 }
 
