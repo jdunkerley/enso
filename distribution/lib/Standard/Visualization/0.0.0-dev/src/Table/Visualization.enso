@@ -298,6 +298,8 @@ get_distinct_values_for_column table column_index filter_col=Nothing filter_cond
 get_rows_for_table : Any -> Integer -> Vector | Nothing -> Vector | Nothing -> Vector | Nothing -> Vector | Nothing -> JS_Object
 get_rows_for_table table_or_column start_number sort_col_index_list=Nothing sort_direction_list=Nothing filter_col=Nothing filter_condition=Nothing =
     time_visualization Visualization ("get_rows_for_table: " + (short_display table_or_column) + "[" + start_number.to_text + "]") <|
+        # Must stay in sync with the IDE's `cacheBlockSize` in AgGridTableView.vue
+        # (app/gui/src/project-view/components/shared/AgGridTableView.vue) — a one-sided change would silently break paging.
         max_rows=1000
         table = case table_or_column of
             c : Column -> c.to_table

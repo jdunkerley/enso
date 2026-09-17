@@ -613,7 +613,12 @@ function createInfiniteDatasource(): IDatasource {
           const rows = createRowsForTable(response.data, 0, true)
           params.successCallback(rows, response.rowCount)
         } else {
-          params.failCallback()
+          // Community's Infinite Row Model has no failed-load visual state to hook into
+          // (unlike Enterprise's SSRM, whose `params.fail()` surfaces a "close and reopen to
+          // retry" message via the loading-cell renderer) and `params.failCallback()` is a
+          // no-op here, so settle the grid to visibly empty rather than leaving it spinning
+          // forever. Full failure-path parity is tracked as Playwright-suite follow-up work.
+          params.successCallback([], 0)
         }
       }
     },
@@ -772,7 +777,7 @@ function toField(
       showDataQuality: hasDataQualityMetrics,
     },
     cellDataType: cellValueType,
-    autoHeight: cellValueType === 'text' && isSSRM.value,
+    autoHeight: cellValueType === 'text' && isSSRM.value && AG_GRID_ENTERPRISE_AVAILABLE,
     sortable: valueType?.constructor !== 'Mixed',
   }
   if (valueType && ['Date', 'Date_Time', 'Time'].includes(valueType.constructor)) {
