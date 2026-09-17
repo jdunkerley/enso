@@ -139,10 +139,12 @@ import { modKey } from '@/composables/events'
 import { registerHandlers } from '@/providers/action'
 import { useAutoBlur } from '@/util/autoBlur'
 import type {
+  CellContextMenuEvent,
   CellEditingStartedEvent,
   CellEditingStoppedEvent,
   ColDef,
   ColGroupDef,
+  Column,
   ColumnMovedEvent,
   ColumnResizedEvent,
   ColumnVisibleEvent,
@@ -186,6 +188,8 @@ import {
   type ClipboardDeps,
   type PasteDeps,
 } from './AgGridTableView/communityClipboard'
+import GridPopupMenu from './AgGridTableView/GridPopupMenu.vue'
+import { resolveGridMenuItems, type GridMenuItem } from './AgGridTableView/gridPopupMenuItems'
 
 const props = defineProps<AgGridTableViewProps<TData, TValue>>()
 const emit = defineEmits<{
@@ -417,6 +421,79 @@ function stopIfPrevented(event: Event) {
   if (event.defaultPrevented) event.stopPropagation()
 }
 
+// === Context menu fallback (no AG Grid Enterprise license) ===
+
+const contextMenuState = ref<{
+  point: { x: number; y: number }
+  items: GridMenuItem[]
+} | null>(null)
+
+function resolveColumnOrGridContextMenuItems(
+  event: CellContextMenuEvent<TData>,
+): (string | MenuItemDef)[] {
+  const colDef = event.column?.getColDef()
+  const columnItems = colDef?.contextMenuItems
+  if (columnItems != null) {
+    return typeof columnItems === 'function' ?
+        columnItems({
+          api: event.api,
+          context: event.context,
+          column: event.column as Column,
+          node: event.node ?? null,
+          value: event.value,
+          defaultItems: undefined,
+        })
+      : columnItems
+  }
+  const gridItems = props.getContextMenuItems?.({
+    api: event.api,
+    context: event.context,
+    column: event.column ?? null,
+    node: event.node ?? null,
+    value: event.value,
+    defaultItems: undefined,
+  })
+  if (gridItems == null) return []
+  return typeof gridItems === 'function' ?
+      gridItems({
+        api: event.api,
+        context: event.context,
+        column: event.column ?? null,
+        node: event.node ?? null,
+        value: event.value,
+        defaultItems: undefined,
+      })
+    : gridItems
+}
+
+function onCellContextMenu(event: CellContextMenuEvent<TData>) {
+  if (AG_GRID_ENTERPRISE_AVAILABLE) return // native Enterprise context menu handles this instead
+  const domEvent = event.event
+  if (!(domEvent instanceof MouseEvent)) return
+  const rawItems = resolveColumnOrGridContextMenuItems(event)
+  if (!rawItems.length) return
+  domEvent.preventDefault()
+  contextMenuState.value = {
+    point: { x: domEvent.clientX, y: domEvent.clientY },
+    // `resolveGridMenuItems`'s parameter type narrows each item's `action` signature to the
+    // subset of `IMenuActionParams` it actually invokes it with (`{ node, api }`) — see
+    // `gridPopupMenuItems.ts`'s internal `RawMenuItem` type. A real AG Grid `MenuItemDef`'s
+    // `action` is typed to expect the full `IMenuActionParams`, which `exactOptionalPropertyTypes`
+    // then flags as a structural mismatch even though every actual action here only reads `node`
+    // and `api` (see `commonContextMenuActions`). The cast documents that the narrower call is
+    // intentional and safe for every item this codebase produces.
+    items: resolveGridMenuItems(rawItems as Parameters<typeof resolveGridMenuItems>[0], {
+      api: event.api,
+      column: event.column ?? null,
+      node: event.node ?? null,
+    }),
+  }
+}
+
+function closeContextMenu() {
+  contextMenuState.value = null
+}
+
 // === Community cell-range selection (unlicensed fallback for Enterprise `cellSelection`) ===
 
 function onCellMouseDown(event: {
@@ -610,8 +687,15 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
       @columnVisible="emit('columnVisibleChanged', $event)"
       @columnMoved="emit('columnMoved', $event)"
       @contextmenu="stopIfPrevented"
+      @cellContextMenu="onCellContextMenu"
     />
     <VueComponentHost :host="vueHost" />
+    <GridPopupMenu
+      v-if="contextMenuState"
+      :items="contextMenuState.items"
+      :point="contextMenuState.point"
+      @close="closeContextMenu"
+    />
   </div>
 </template>
 
