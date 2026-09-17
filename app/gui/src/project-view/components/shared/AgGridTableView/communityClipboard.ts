@@ -93,26 +93,72 @@ export function performCut(deps: ClipboardDeps): void {
   }
 }
 
+export interface PasteDeps {
+  enterpriseAvailable: boolean
+  gridApi: {
+    pasteFromClipboard?(): void
+    getFocusedCell(): {
+      rowIndex: number
+      column: { getColId(): string }
+    } | null
+  }
+  /**
+   * Reads clipboard text; separated out so tests don't need a real Clipboard API. Production call
+   * site passes `() => navigator.clipboard.readText()`.
+   */
+  readClipboardText: () => Promise<string>
+  processDataFromClipboard: (params: { data: string[][]; api: PasteDeps['gridApi'] }) => void
+  parseTsvData: (text: string) => string[][] | null
+}
+
 /**
- * Monkey-patches `copyToClipboard`/`cutToClipboard` directly onto a real AG Grid `gridApi`
- * instance when unlicensed, delegating to `performCopy`/`performCut` above. This is what lets
- * every existing caller of `gridApi.copyToClipboard()`/`cutToClipboard()` — the `grid.cutCells`/
- * `grid.copyCells` keybindings, and `commonContextMenuActions`'s `cut`/`copy`/`copyWithHeaders`
- * items (`AgGridTableView.vue:44-77`, consumed unchanged by the sibling Context Menu + Column
- * Menu plan's popup) — keep working without any of them branching on
- * `AG_GRID_ENTERPRISE_AVAILABLE` themselves. Licensed: a no-op, the real Enterprise methods are
- * left exactly as AG Grid installed them. Call once, from `onGridReady`, on the fresh `gridApi`
- * each time the grid is (re)created (see Task 2's `gridKey`-driven grid recreation).
+ * Paste clipboard TSV text at the focused cell. Licensed builds delegate to AG Grid Enterprise's
+ * own `pasteFromClipboard()`, which reads the clipboard itself. Unlicensed builds read the
+ * clipboard directly, parse it as TSV, and forward it to `processDataFromClipboard` (the same
+ * callback the licensed path already invokes) — a no-op if nothing is focused or the clipboard
+ * doesn't parse as tabular data.
+ */
+export async function performPaste(deps: PasteDeps): Promise<void> {
+  if (deps.enterpriseAvailable) {
+    deps.gridApi.pasteFromClipboard?.()
+    return
+  }
+  if (deps.gridApi.getFocusedCell() == null) return
+  const text = await deps.readClipboardText()
+  const data = deps.parseTsvData(text)
+  if (data == null) return
+  deps.processDataFromClipboard({ data, api: deps.gridApi })
+}
+
+/**
+ * Monkey-patches `copyToClipboard`/`cutToClipboard`/`pasteFromClipboard` directly onto a real AG
+ * Grid `gridApi` instance when unlicensed, delegating to `performCopy`/`performCut`/`performPaste`
+ * above. This is what lets every existing caller of
+ * `gridApi.copyToClipboard()`/`cutToClipboard()`/`pasteFromClipboard()` — the `grid.cutCells`/
+ * `grid.copyCells`/`grid.pasteCells` keybindings, and `commonContextMenuActions`'s
+ * `cut`/`copy`/`copyWithHeaders`/`paste` items (`AgGridTableView.vue:44-77`, consumed unchanged by
+ * the sibling Context Menu + Column Menu plan's popup) — keep working without any of them
+ * branching on `AG_GRID_ENTERPRISE_AVAILABLE` themselves. Licensed: a no-op, the real Enterprise
+ * methods are left exactly as AG Grid installed them. Call once, from `onGridReady`, on the fresh
+ * `gridApi` each time the grid is (re)created (see Task 2's `gridKey`-driven grid recreation).
  */
 export function installCommunityClipboardPatch(
-  api: { copyToClipboard?(): void; cutToClipboard?(): void },
+  api: {
+    copyToClipboard?(): void
+    cutToClipboard?(): void
+    pasteFromClipboard?(): void
+  },
   enterpriseAvailable: boolean,
   clipboardDeps: () => ClipboardDeps,
+  pasteDeps: () => PasteDeps,
   copyWithHeaders: () => boolean,
 ): void {
   if (enterpriseAvailable) return
   Object.assign(api, {
     copyToClipboard: () => performCopy(clipboardDeps(), copyWithHeaders()),
     cutToClipboard: () => performCut(clipboardDeps()),
+    pasteFromClipboard: () => {
+      void performPaste(pasteDeps())
+    },
   })
 }

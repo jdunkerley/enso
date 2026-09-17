@@ -3,7 +3,9 @@ import {
   installCommunityClipboardPatch,
   performCopy,
   performCut,
+  performPaste,
   type ClipboardDeps,
+  type PasteDeps,
 } from '../communityClipboard'
 
 function makeDeps(overrides: Partial<ClipboardDeps> = {}): ClipboardDeps {
@@ -87,36 +89,95 @@ describe('performCut', () => {
   })
 })
 
+function makePasteDeps(overrides: Partial<PasteDeps> = {}): PasteDeps {
+  return {
+    enterpriseAvailable: false,
+    gridApi: {
+      pasteFromClipboard: vi.fn(),
+      getFocusedCell: () => ({ rowIndex: 1, column: { getColId: () => 'a' } }),
+    },
+    readClipboardText: vi.fn(async () => 'x\ty\n1\t2'),
+    processDataFromClipboard: vi.fn(),
+    parseTsvData: (text) => text.split('\n').map((row) => row.split('\t')),
+    ...overrides,
+  }
+}
+
+describe('performPaste', () => {
+  test('licensed: delegates to the real AG Grid API', async () => {
+    const deps = makePasteDeps({ enterpriseAvailable: true })
+    await performPaste(deps)
+    expect(deps.gridApi.pasteFromClipboard).toHaveBeenCalled()
+    expect(deps.readClipboardText).not.toHaveBeenCalled()
+  })
+
+  test('unlicensed: reads the clipboard, parses TSV, and forwards it with the focused cell', async () => {
+    const deps = makePasteDeps()
+    await performPaste(deps)
+    expect(deps.processDataFromClipboard).toHaveBeenCalledWith({
+      data: [
+        ['x', 'y'],
+        ['1', '2'],
+      ],
+      api: deps.gridApi,
+    })
+  })
+
+  test('unlicensed: no-ops if no cell is focused', async () => {
+    const deps = makePasteDeps({
+      gridApi: { pasteFromClipboard: vi.fn(), getFocusedCell: () => null },
+    })
+    await performPaste(deps)
+    expect(deps.processDataFromClipboard).not.toHaveBeenCalled()
+  })
+})
+
 describe('installCommunityClipboardPatch', () => {
-  test('licensed: leaves the real copyToClipboard/cutToClipboard untouched', () => {
+  test('licensed: leaves the real copyToClipboard/cutToClipboard/pasteFromClipboard untouched', () => {
     const realCopy = vi.fn()
     const realCut = vi.fn()
-    const api = { copyToClipboard: realCopy, cutToClipboard: realCut }
+    const realPaste = vi.fn()
+    const api = {
+      copyToClipboard: realCopy,
+      cutToClipboard: realCut,
+      pasteFromClipboard: realPaste,
+    }
     installCommunityClipboardPatch(
       api,
       true,
       () => makeDeps(),
+      () => makePasteDeps(),
       () => false,
     )
     expect(api.copyToClipboard).toBe(realCopy)
     expect(api.cutToClipboard).toBe(realCut)
+    expect(api.pasteFromClipboard).toBe(realPaste)
   })
 
-  test('unlicensed: replaces copyToClipboard/cutToClipboard with Community-backed implementations', () => {
-    const api: { copyToClipboard?(): void; cutToClipboard?(): void } = {
+  test('unlicensed: replaces copyToClipboard/cutToClipboard/pasteFromClipboard with Community-backed implementations', () => {
+    const api: {
+      copyToClipboard?(): void
+      cutToClipboard?(): void
+      pasteFromClipboard?(): void
+    } = {
       copyToClipboard: vi.fn(),
       cutToClipboard: vi.fn(),
+      pasteFromClipboard: vi.fn(),
     }
-    const deps = makeDeps()
+    const clipboardDeps = makeDeps()
+    const pasteDeps = makePasteDeps()
     installCommunityClipboardPatch(
       api,
       false,
-      () => deps,
+      () => clipboardDeps,
+      () => pasteDeps,
       () => false,
     )
     api.copyToClipboard!()
-    expect(deps.sendToClipboard).toHaveBeenCalledWith({
+    expect(clipboardDeps.sendToClipboard).toHaveBeenCalledWith({
       data: 'A\tB\nx1\ty1\nx2\ty2',
     })
+    api.pasteFromClipboard!()
+    expect(pasteDeps.readClipboardText).toHaveBeenCalled()
   })
 })

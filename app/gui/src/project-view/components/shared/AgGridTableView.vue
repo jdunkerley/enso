@@ -177,6 +177,7 @@ import { useCommunityCellRange, type CellCoord } from './AgGridTableView/communi
 import {
   installCommunityClipboardPatch,
   type ClipboardDeps,
+  type PasteDeps,
 } from './AgGridTableView/communityClipboard'
 
 const props = defineProps<AgGridTableViewProps<TData, TValue>>()
@@ -226,6 +227,7 @@ function onGridReady(event: GridReadyEvent<TData>) {
     event.api,
     AG_GRID_ENTERPRISE_AVAILABLE,
     clipboardDeps,
+    pasteClipboardDeps,
     () => copyWithHeaders.value,
   )
 }
@@ -237,6 +239,16 @@ function clipboardDeps(): ClipboardDeps {
     rectangle,
     processCellForClipboard,
     sendToClipboard,
+  }
+}
+
+function pasteClipboardDeps(): PasteDeps {
+  return {
+    enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
+    gridApi: gridApi.value as unknown as PasteDeps['gridApi'],
+    readClipboardText: () => navigator.clipboard.readText(),
+    processDataFromClipboard: (params) => props.processDataFromClipboard?.(params as any),
+    parseTsvData,
   }
 }
 
