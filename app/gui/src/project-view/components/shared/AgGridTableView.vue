@@ -1,4 +1,6 @@
 <script lang="ts">
+import type { CellCoord } from './AgGridTableView/communityCellRange'
+
 export type AgGridTableViewProps<TData, TValue> = {
   rowData: TData[]
   columnDefs: (ColDef<TData, TValue> | ColGroupDef<TData>)[] | null
@@ -78,35 +80,40 @@ export const commonContextMenuActions = {
 
 /**
  * Grid options controlling cell selection. Licensed builds use AG Grid Enterprise's native
- * `cellSelection`; unlicensed builds disable it and rely on `communityCellRangeSelected`
- * (applied via `cellClassRules` in the template) for the visual highlight instead — see
- * `communityCellRange.ts` for the range-tracking logic driving that class.
+ * `cellSelection`. Unlicensed builds disable it — the visual highlight instead comes from
+ * `buildDefaultColDef` merging a `cellClassRules` entry into `defaultColDef` (NOT a top-level grid
+ * option — `cellClassRules` only exists on `ColDef`, verified against
+ * `ComponentUtil.ALL_PROPERTIES`, which is why this used to silently do nothing).
  */
 export function buildSelectionGridOptions(enterpriseAvailable: boolean) {
-  return enterpriseAvailable ?
-      { cellSelection: true as const, cellClassRules: undefined }
-    : {
-        cellSelection: undefined,
-        cellClassRules: {
-          communityCellRangeSelected: (params: {
-            node: { rowIndex: number | null }
-            colDef: { colId?: string }
-          }) =>
-            params.node.rowIndex != null &&
-            params.colDef.colId != null &&
-            isInCommunityRange({
-              rowIndex: params.node.rowIndex,
-              colId: params.colDef.colId,
-            }),
-        },
-      }
+  return enterpriseAvailable ? { cellSelection: true as const } : { cellSelection: undefined }
 }
 
-// `cellClassRules` predicates are plain functions AG Grid calls with no closure over component
-// state, so route them through this module-level indirection, reassigned per active grid.
-let isInCommunityRangeRef: (coord: CellCoord) => boolean = () => false
-function isInCommunityRange(coord: CellCoord) {
-  return isInCommunityRangeRef(coord)
+/**
+ * Merges the Community range-selection highlight into `defaultColDef` when unlicensed, closing
+ * directly over this grid instance's own `isInRange` predicate — no module-level indirection
+ * needed (a prior version routed through a module-level ref, which leaked state across
+ * simultaneously-mounted grid instances; closing per-instance avoids that entirely).
+ */
+export function buildDefaultColDef<TData, TValue>(
+  defaultColDef: ColDef<TData, TValue>,
+  enterpriseAvailable: boolean,
+  isInRange: (coord: CellCoord) => boolean,
+): ColDef<TData, TValue> {
+  if (enterpriseAvailable) return defaultColDef
+  return {
+    ...defaultColDef,
+    cellClassRules: {
+      ...defaultColDef.cellClassRules,
+      communityCellRangeSelected: (params: {
+        node: { rowIndex: number | null }
+        colDef: { colId?: string }
+      }) =>
+        params.node.rowIndex != null &&
+        params.colDef.colId != null &&
+        isInRange({ rowIndex: params.node.rowIndex, colId: params.colDef.colId }),
+    },
+  }
 }
 </script>
 
@@ -114,8 +121,7 @@ function isInCommunityRange(coord: CellCoord) {
 /**
  * Component adding some useful logic to AGGrid table component (like keeping track of colum sizes),
  * and using common style for tables in our application.
- */
-import { LINE_BOUNDARIES } from '$/utils/data/string'
+ */ import { LINE_BOUNDARIES } from '$/utils/data/string'
 import { gridBindings } from '@/bindings'
 import { clipboardNodeData, writeClipboard } from '@/components/GraphEditor/graphClipboard'
 import {
@@ -164,6 +170,7 @@ import * as objects from 'enso-common/src/utilities/data/object'
 import {
   computed,
   h,
+  onMounted,
   onUnmounted,
   reactive,
   ref,
@@ -173,7 +180,7 @@ import {
   type ComponentInstance,
 } from 'vue'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
-import { useCommunityCellRange, type CellCoord } from './AgGridTableView/communityCellRange'
+import { useCommunityCellRange } from './AgGridTableView/communityCellRange'
 import {
   installCommunityClipboardPatch,
   type ClipboardDeps,
@@ -211,12 +218,9 @@ const {
   () => gridApi.value?.getAllDisplayedColumns().map((c) => c.getColId()) ?? [],
 )
 
-// `cellClassRules` predicates are plain functions AG Grid calls with no closure over component
-// state, so route them through this module-level indirection, reassigned per active grid.
-isInCommunityRangeRef = isInRange
-onUnmounted(() => {
-  if (isInCommunityRangeRef === isInRange) isInCommunityRangeRef = () => false
-})
+const effectiveDefaultColDef = computed(() =>
+  buildDefaultColDef(props.defaultColDef, AG_GRID_ENTERPRISE_AVAILABLE, isInRange),
+)
 
 function onGridReady(event: GridReadyEvent<TData>) {
   gridApi.value = event.api
@@ -415,9 +419,24 @@ function stopIfPrevented(event: Event) {
 
 // === Community cell-range selection (unlicensed fallback for Enterprise `cellSelection`) ===
 
-function onCellMouseDown(event: { rowIndex: number | null; column: { getColId(): string } }) {
+function onCellMouseDown(event: {
+  rowIndex: number | null
+  column: { getColId(): string }
+  event?: Event | null
+}) {
   if (AG_GRID_ENTERPRISE_AVAILABLE || event.rowIndex == null) return
-  startAt({ rowIndex: event.rowIndex, colId: event.column.getColId() })
+  const nativeEvent = event.event instanceof MouseEvent ? event.event : undefined
+  // Only the left/primary button starts or extends a range — right-click (context menu) and
+  // middle-click must not collapse an existing selection.
+  if (nativeEvent != null && nativeEvent.button !== 0) return
+  const coord = { rowIndex: event.rowIndex, colId: event.column.getColId() }
+  // Shift+Click extends the existing range from its anchor, matching the licensed Set Filter's
+  // own Shift+Click behavior and the design spec's requirement for Shift+Click range extension.
+  if (nativeEvent?.shiftKey && communityRange.value != null) {
+    extendTo(coord)
+  } else {
+    startAt(coord)
+  }
   gridApi.value?.refreshCells({ force: true })
 }
 
@@ -438,8 +457,21 @@ function onWrapperMouseUp() {
   mouseButtonDown = false
 }
 
+// Also listen on `window`, not just the wrapper's own `mouseup` — releasing the mouse button
+// outside the grid (a normal thing to do mid-drag) would otherwise leave `mouseButtonDown` stuck
+// `true`, so subsequent hovering (not dragging) keeps extending the range.
+onMounted(() => {
+  window.addEventListener('mouseup', onWrapperMouseUp)
+})
+onUnmounted(() => {
+  window.removeEventListener('mouseup', onWrapperMouseUp)
+})
+
 function extendRangeByKeyboard(event: KeyboardEvent) {
   if (AG_GRID_ENTERPRISE_AVAILABLE || !event.shiftKey) return
+  // Back off while a cell editor is active, matching AG Grid's own native Shift+Arrow handling —
+  // otherwise this fights with text selection inside an active cell editor (e.g. Table Input).
+  if ((gridApi.value?.getEditingCells().length ?? 0) > 0) return
   const delta =
     event.key === 'ArrowDown' ? { rowIndex: 1, colIndex: 0 }
     : event.key === 'ArrowUp' ? { rowIndex: -1, colIndex: 0 }
@@ -449,15 +481,19 @@ function extendRangeByKeyboard(event: KeyboardEvent) {
   const focused = gridApi.value?.getFocusedCell()
   if (delta == null || focused == null) return
   const columnIds = gridApi.value?.getAllDisplayedColumns().map((c) => c.getColId()) ?? []
-  const currentColIndex = columnIds.indexOf(focused.column.getColId())
   const current = communityRange.value ?? {
     anchor: { rowIndex: focused.rowIndex, colId: focused.column.getColId() },
     focus: { rowIndex: focused.rowIndex, colId: focused.column.getColId() },
   }
+  // Use the tracked range's own focus column, not `focused.column` — AG Grid's native Shift+Arrow
+  // navigation has already moved the DOM focus by the time this handler runs, so reading it here
+  // would double-apply `delta.colIndex`.
+  const currentColIndex = columnIds.indexOf(current.focus.colId)
   const nextColId = columnIds[currentColIndex + delta.colIndex] ?? current.focus.colId
   if (communityRange.value == null) startAt(current.anchor)
+  const maxRowIndex = (gridApi.value?.getDisplayedRowCount() ?? 1) - 1
   extendTo({
-    rowIndex: Math.max(0, current.focus.rowIndex + delta.rowIndex),
+    rowIndex: Math.min(maxRowIndex, Math.max(0, current.focus.rowIndex + delta.rowIndex)),
     colId: nextColId,
   })
   gridApi.value?.refreshCells({ force: true })
@@ -543,7 +579,7 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
       :rowCount="rowCount"
       :rowData="rowModelType === 'clientSide' ? rowData : null"
       :columnDefs="columnDefs"
-      :defaultColDef="defaultColDef"
+      :defaultColDef="effectiveDefaultColDef"
       :copyHeadersToClipboard="true"
       :processCellForClipboard="processCellForClipboard"
       :sendToClipboard="sendToClipboard"
@@ -569,8 +605,8 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
       @cellEditingStopped="emit('cellEditingStopped', $event)"
       @rowEditingStarted="emit('rowEditingStarted', $event)"
       @rowEditingStopped="emit('rowEditingStopped', $event)"
-      @sortChanged="emit('sortOrFilterUpdated', $event)"
-      @filterChanged="emit('sortOrFilterUpdated', $event)"
+      @sortChanged="(clear(), emit('sortOrFilterUpdated', $event))"
+      @filterChanged="(clear(), emit('sortOrFilterUpdated', $event))"
       @columnVisible="emit('columnVisibleChanged', $event)"
       @columnMoved="emit('columnMoved', $event)"
       @contextmenu="stopIfPrevented"

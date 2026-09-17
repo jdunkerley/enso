@@ -41,12 +41,12 @@ function buildTsv(deps: ClipboardDeps): string | undefined {
     const rowNode = deps.gridApi.getDisplayedRowAtIndex(rowIndex)
     return rect.colIds.map((colId) => {
       const value = rowNode ? deps.gridApi.getValue(colId, rowNode) : undefined
-      return tsvEscape(
-        deps.processCellForClipboard({
-          value,
-          formatValue: (v) => (v == null ? '' : String(v)),
-        }),
-      )
+      // `processCellForClipboard` already performs its own RFC-4180 quoting/escaping (see its doc
+      // comment in AgGridTableView.vue) — applying `tsvEscape` again here would double-escape.
+      return deps.processCellForClipboard({
+        value,
+        formatValue: (v) => (v == null ? '' : String(v)),
+      })
     })
   })
   return [headerRow.map(tsvEscape), ...dataRows].map((row) => row.join('\t')).join('\n')
@@ -158,7 +158,9 @@ export function installCommunityClipboardPatch(
     copyToClipboard: () => performCopy(clipboardDeps(), copyWithHeaders()),
     cutToClipboard: () => performCut(clipboardDeps()),
     pasteFromClipboard: () => {
-      void performPaste(pasteDeps())
+      void performPaste(pasteDeps()).catch((error: unknown) => {
+        console.warn('Error pasting from clipboard.', error)
+      })
     },
   })
 }

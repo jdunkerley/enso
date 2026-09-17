@@ -61,6 +61,19 @@ describe('performCopy', () => {
     performCopy(deps, false)
     expect(deps.sendToClipboard).not.toHaveBeenCalled()
   })
+
+  test('unlicensed: does not double-escape values processCellForClipboard already quoted', () => {
+    // `processCellForClipboard` performs its own RFC-4180 quoting (see AgGridTableView.vue); a
+    // value it already wrapped in quotes must pass through `buildTsv` unchanged, not get
+    // quote-wrapped a second time.
+    const deps = makeDeps({
+      processCellForClipboard: () => '"he said ""hi"""',
+    })
+    performCopy(deps, false)
+    expect(deps.sendToClipboard).toHaveBeenCalledWith({
+      data: 'A\tB\n"he said ""hi"""\t"he said ""hi"""\n"he said ""hi"""\t"he said ""hi"""',
+    })
+  })
 })
 
 describe('performCut', () => {
