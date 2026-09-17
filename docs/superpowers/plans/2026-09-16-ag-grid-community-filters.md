@@ -41,12 +41,22 @@ live-narrowing behavior the real Set Filter's own built-in mini-filter search
 box already has) — it is not a second, independent filter condition. This keeps
 the component's model a single `{ filterType: 'set', values: string[] }`,
 matching the real Set Filter's model 1:1 and requiring zero changes to
-filter-model parsing. The alternative reading (search box = a separate always-on
-text-contains condition, ANDed with the checklist selection) would require
-inventing a new composite model shape that `tableVizFilterUtils.ts` cannot parse
-without changes, contradicting the design's own claim that model parsing is
-"reused unchanged." Flag this interpretation in review if it doesn't match
-intent.
+filter-model parsing.
+
+**Correction (post-implementation whole-branch review):** the paragraph
+originally justified this by claiming the alternative reading (search box = a
+separate always-on text-contains condition, ANDed with the checklist selection)
+"would require inventing a new composite model shape that
+`tableVizFilterUtils.ts` cannot parse without changes." That claim is false —
+`tableVizFilterUtils.ts`'s `makeFilterModelList` already parses the Enterprise
+Multi Filter's own composite `{ filterType: 'multi', filterModels: [...] }`
+shape today, so the parser was never the blocking constraint. The interpretation
+above is still correct, but for a different, real reason: the backend only ever
+requests the multi-filter (`is_using_multi_filter`) for columns with ≤100
+distinct values (`DataQualityMetrics.java`'s `DISTINCT_THRESHOLD`), where a
+search-narrowed checklist is behaviorally equivalent to a contains-search —
+high-cardinality Char columns already get the Community-native
+`agTextColumnFilter` and are untouched by this change.
 
 **Task order note:** the design spec's own build order suggests
 filter-type/params selection before the component. This plan builds the
