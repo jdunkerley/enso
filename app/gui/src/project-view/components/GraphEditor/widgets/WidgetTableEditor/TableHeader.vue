@@ -1,6 +1,6 @@
 <script lang="ts">
+import GridPopupMenu from '@/components/GridPopupMenu.vue'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
-import GridPopupMenu from '@/components/shared/AgGridTableView/GridPopupMenu.vue'
 import {
   resolveGridMenuItems,
   type GridMenuItem,

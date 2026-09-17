@@ -188,7 +188,19 @@ import {
   type ClipboardDeps,
   type PasteDeps,
 } from './AgGridTableView/communityClipboard'
-import GridPopupMenu from './AgGridTableView/GridPopupMenu.vue'
+
+/**
+ * `GridPopupMenu` deliberately lives outside `components/shared/` even though this shared
+ * component imports it. `shared/README.md`'s "shared components must depend only on shared
+ * components" rule exists because a non-shared dependency would be missing styles *inside the
+ * shadow root* — but `GridPopupMenu` always `<Teleport>`s to `#floatingLayer` in the light DOM
+ * and never renders in the shadow root, so it needs globally-injected (non-shared) styles, which
+ * is exactly what living outside `shared/` gives it. Keeping it in `shared/` is what breaks it:
+ * custom-element-mode compilation (`vite.config.ts`'s `customElement` matcher) would leave its
+ * styles unapplied in both this component's light-DOM path and the shadow-DOM visualization path
+ * (see `GridPopupMenu.vue`'s own comment for the visualization-side half of that story). Do not
+ * "fix" this by moving it back.
+ */ import GridPopupMenu from '@/components/GridPopupMenu.vue'
 import { resolveGridMenuItems, type GridMenuItem } from './AgGridTableView/gridPopupMenuItems'
 
 const props = defineProps<AgGridTableViewProps<TData, TValue>>()
@@ -417,7 +429,39 @@ function suppressCopy(event: KeyboardEvent) {
 }
 
 function stopIfPrevented(event: Event) {
-  // When AG Grid handles the context menu event it prevents-default, but it doesn't stop propagation.
+  // Licensed path: Enterprise's own `MenuUtils.onContextMenu` calls `preventDefault()`
+  // synchronously, during the browser's native `contextmenu` dispatch — so by the time this
+  // handler runs (also synchronously, since it's bound to the native `contextmenu` event), it can
+  // already see `event.defaultPrevented` and stop propagation from reaching ancestors (e.g.
+  // `WidgetTableEditor`'s enclosing `GraphNode.vue`).
+  //
+  // Unlicensed path: AG Grid dispatches its own `cellContextMenu` event *asynchronously*
+  // (`LocalEventService.dispatchAsync`, queued behind a `setTimeout(…, 0)` because
+  // `cellContextMenu` isn't in `ALWAYS_SYNC_GLOBAL_EVENTS` and `suppressAsyncEvents` is never set
+  // in this repo). `onCellContextMenu` below — and its `preventDefault()` — therefore runs a
+  // macrotask *after* this handler and after the browser already finished dispatching
+  // `contextmenu`, so checking `event.defaultPrevented` here would always see `false` for cells.
+  // Do the prevent/stop synchronously ourselves instead, whenever the right-click lands on a grid
+  // cell: `.ag-cell` is the class AG Grid puts on every cell element (verified against
+  // `ag-grid.css`, e.g. its `.ag-cell { ... }` rule) — `preventDefaultOnContextMenu: true` is not a
+  // substitute, since under Community it's honored only for the body viewport background and
+  // header cells, not for cells. This intentionally suppresses the native menu over every cell,
+  // matching how the background/header already suppress theirs, even for a cell whose resolved
+  // item list later turns out empty — consistent Community behavior across the whole grid body,
+  // rather than a menu that sometimes appears and sometimes silently does nothing.
+  //
+  // Right-clicks that aren't over a cell (the header — handled by `TableHeader.vue`'s own
+  // `@click.right` — or outside the grid body entirely) are left alone and continue to bubble.
+  if (
+    !AG_GRID_ENTERPRISE_AVAILABLE &&
+    event instanceof MouseEvent &&
+    event.target instanceof Element &&
+    event.target.closest('.ag-cell')
+  ) {
+    event.preventDefault()
+    event.stopPropagation()
+    return
+  }
   if (event.defaultPrevented) event.stopPropagation()
 }
 
@@ -472,7 +516,8 @@ function onCellContextMenu(event: CellContextMenuEvent<TData>) {
   if (!(domEvent instanceof MouseEvent)) return
   const rawItems = resolveColumnOrGridContextMenuItems(event)
   if (!rawItems.length) return
-  domEvent.preventDefault()
+  // No `domEvent.preventDefault()` here: it would run too late to matter (see `stopIfPrevented`'s
+  // comment above, on the synchronous `@contextmenu` handler that now does this instead).
   contextMenuState.value = {
     point: { x: domEvent.clientX, y: domEvent.clientY },
     // `resolveGridMenuItems`'s parameter type narrows each item's `action` signature to the

@@ -18,6 +18,14 @@ const config = mergeConfig(
       root: fileURLToPath(new URL('./', import.meta.url)),
       restoreMocks: true,
       setupFiles: './src/dashboard/test/setup.ts',
+      css: {
+        // CSS is stubbed by default (`configDefaults.css.include` is `[]`) to keep the suite fast.
+        // `GridPopupMenu.test.ts` needs its real stylesheet actually applied — it's a regression
+        // guard for a bug where the component's styles silently never applied at all — so opt only
+        // that one component's style modules back in, rather than enabling CSS processing (and its
+        // cost) suite-wide.
+        include: [/GridPopupMenu/],
+      },
     },
   }),
 )

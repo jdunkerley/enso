@@ -8,10 +8,10 @@ import MenuButton from '@/components/MenuButton.vue'
 import MenuPanel from '@/components/MenuPanel.vue'
 import { useResizeObserver } from '@/composables/events'
 import { injectInteractionHandler } from '@/providers/interactionHandler'
-import { endOnClickOutside } from '@/util/autoBlur'
+import { endOnClickOutside, targetIsOutside } from '@/util/autoBlur'
 import { autoUpdate, flip, shift, useFloating } from '@floating-ui/vue'
-import { computed, onMounted, ref, watch } from 'vue'
-import type { GridMenuItem } from './gridPopupMenuItems'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { GridMenuItem } from './shared/AgGridTableView/gridPopupMenuItems'
 
 const { items, point } = defineProps<{
   items: GridMenuItem[]
@@ -21,7 +21,16 @@ const { items, point } = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const menu = ref<HTMLElement>()
-const interaction = injectInteractionHandler()
+// `true` here means "don't throw if no ancestor provided this" — required because `GridPopupMenu`
+// is also mounted from `TableVisualization`, which lives inside an `enso-visualization-host-N`
+// *custom element*. Vue 3 only inherits `provide()`s from an ancestor that is itself a
+// `VueElement`; this custom element's DOM ancestors are plain elements, so none of ProjectView's
+// providers (the interaction handler included) reach it — `VisualizationHost.vue` provides only
+// `initializeActions()`/`provideVisualizationConfig(...)` for exactly this reason (see its own
+// source). Without this, mounting the popup there throws during setup and no menu appears at all.
+// When the handler IS available (the `WidgetTableEditor` column-menu path), it's still used, so
+// dismissal there is unchanged; otherwise `onWindowPointerDown` below is the fallback.
+const interaction = injectInteractionHandler(true)
 
 const virtualEl = computed(() => {
   const { x, y } = point
@@ -56,12 +65,28 @@ function activate(item: Extract<GridMenuItem, { type: 'item' }>) {
 }
 
 onMounted(() => {
-  const menuInteraction = endOnClickOutside(menu, {
-    cancel: () => emit('close'),
-    end: () => emit('close'),
-  })
-  interaction.setCurrent(menuInteraction)
+  if (interaction) {
+    const menuInteraction = endOnClickOutside(menu, {
+      cancel: () => emit('close'),
+      end: () => emit('close'),
+    })
+    interaction.setCurrent(menuInteraction)
+  } else {
+    // Fallback dismissal when there's no interaction handler to hook into (see `interaction`'s
+    // declaration above). Capture-phase, mirroring how `App.vue` wires the handler-backed path's
+    // own `pointerdown` listener (`interaction.handlePointerDown`) the same way.
+    window.addEventListener('pointerdown', onWindowPointerDown, { capture: true })
+  }
 })
+
+onUnmounted(() => {
+  if (!interaction)
+    window.removeEventListener('pointerdown', onWindowPointerDown, { capture: true })
+})
+
+function onWindowPointerDown(event: PointerEvent) {
+  if (targetIsOutside(event, menu.value)) emit('close')
+}
 </script>
 
 <template>
