@@ -19,8 +19,9 @@ import type {
   GetContextMenuItems,
   GetContextMenuItemsParams,
   ICellRendererParams,
+  IDatasource,
+  IGetRowsParams,
   IServerSideDatasource,
-  IServerSideGetRowsRequest,
   ITooltipParams,
   MenuItemDef,
   SetFilterValuesFuncParams,
@@ -49,6 +50,7 @@ import {
   convertSortModel,
   createDistinctExpressionTemplate,
   createExpressionRowTemplate,
+  type RowsRequestParams,
   type ValueTypeArgumentChild,
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
@@ -337,9 +339,10 @@ const ssrmServer = computed(() => {
 })
 
 const refreshDataSource = ref(0)
-const ssrmDatasource = computed(() => {
+const datasource = computed(() => {
   const value = refreshDataSource.value
-  return isSSRM.value && createServerSideDatasource()
+  if (!isSSRM.value) return false
+  return AG_GRID_ENTERPRISE_AVAILABLE ? createServerSideDatasource() : createInfiniteDatasource()
 })
 
 const statusBar = computed(() =>
@@ -524,7 +527,7 @@ function createServer() {
         }
       }
     },
-    getData: async (request: IServerSideGetRowsRequest) => {
+    getData: async (request: RowsRequestParams) => {
       const columnHeaders =
         typeof props.data === 'object' && 'header' in props.data ? (props.data.header ?? []) : []
 
@@ -592,6 +595,25 @@ function createServerSideDatasource(): IServerSideDatasource {
           params.success({ rowData: rows, rowCount: response.rowCount })
         } else {
           params.fail()
+        }
+      }
+    },
+  }
+}
+
+function createInfiniteDatasource(): IDatasource {
+  return {
+    getRows: async (params: IGetRowsParams) => {
+      const server = ssrmServer.value
+      if (server) {
+        const serverResponse = await server.getData(params)
+        const response: Response =
+          serverResponse ? serverResponse : { data: [], success: false, rowCount: 0 }
+        if (response.success) {
+          const rows = createRowsForTable(response.data, 0, true)
+          params.successCallback(rows, response.rowCount)
+        } else {
+          params.failCallback()
         }
       }
     },
@@ -1253,7 +1275,7 @@ config.setToolbar(
         :rowData="rowData"
         :defaultColDef="defaultColDef"
         :textFormatOption="textFormatterSelected"
-        :datasource="ssrmDatasource"
+        :datasource="datasource"
         :rowCount="allRowCount"
         :isServerSideModel="isSSRM"
         :statusBar="statusBar"
