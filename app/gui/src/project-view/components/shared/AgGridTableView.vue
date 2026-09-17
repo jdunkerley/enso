@@ -11,7 +11,7 @@ export type AgGridTableViewProps<TData, TValue> = {
   suppressMoveWhenColumnDragging?: boolean
   textFormatOption?: TextFormatOptions
   processDataFromClipboard?: (params: ProcessDataFromClipboardParams<TData>) => string[][] | null
-  datasource?: IServerSideDatasource | boolean
+  datasource?: IServerSideDatasource | IDatasource | boolean
   rowCount?: number
   isServerSideModel?: boolean
   gridIdHash?: string | null
@@ -114,6 +114,7 @@ import type {
   GridApi,
   GridReadyEvent,
   ICellEditorComp,
+  IDatasource,
   IHeaderComp,
   IHeaderParams,
   IServerSideDatasource,
@@ -137,6 +138,7 @@ import {
   type Component,
   type ComponentInstance,
 } from 'vue'
+import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
 
 const props = defineProps<AgGridTableViewProps<TData, TValue>>()
 const emit = defineEmits<{
@@ -165,7 +167,17 @@ function onGridReady(event: GridReadyEvent<TData>) {
   }
 }
 
-const rowModelType = computed(() => (props.isServerSideModel ? 'serverSide' : 'clientSide'))
+const rowModelType = computed(() => {
+  if (!props.isServerSideModel) return 'clientSide'
+  return AG_GRID_ENTERPRISE_AVAILABLE ? 'serverSide' : 'infinite'
+})
+
+const serverSideDatasourceValue = computed(() =>
+  rowModelType.value === 'serverSide' ? (props.datasource as IServerSideDatasource) : undefined,
+)
+const infiniteDatasourceValue = computed(() =>
+  rowModelType.value === 'infinite' ? (props.datasource as IDatasource) : undefined,
+)
 
 const gridKeyIncrement = ref(0)
 const gridKey = computed(() =>
@@ -384,7 +396,8 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
       class="ag-theme-alpine agGridTableView"
       :headerHeight="26"
       :rowModelType="rowModelType"
-      :serverSideDatasource="datasource"
+      :serverSideDatasource="serverSideDatasourceValue"
+      :datasource="infiniteDatasourceValue"
       :rowCount="rowCount"
       :rowData="rowModelType === 'clientSide' ? rowData : null"
       :columnDefs="columnDefs"
