@@ -86,4 +86,84 @@ describe('CommunitySetFilter', () => {
     expect(filter.doesFilterPass(passParams('b'))).toBe(true)
     expect(filter.doesFilterPass(passParams('a'))).toBe(false)
   })
+
+  test('when no values callback is provided, derives the distinct values from the grid row data (client-side row model)', () => {
+    const filterChangedCallback = vi.fn()
+    const filter = new CommunitySetFilter()
+    const rows = [{ col: 'x' }, { col: 'y' }, { col: 'x' }]
+    filter.init({
+      colDef: { field: 'col' },
+      column: {},
+      api: {
+        forEachNode: (cb: (node: { data: { col: string } }) => void) =>
+          rows.forEach((data) => cb({ data })),
+      },
+      context: undefined,
+      getValue: (node: { data: { col: string } }) => node.data.col,
+      filterChangedCallback,
+      filterModifiedCallback: vi.fn(),
+      doesRowPassOtherFilter: () => true,
+      rowModel: {},
+    } as unknown as CommunitySetFilterParams)
+
+    expect(filter.getModel()).toBeNull()
+    const labels = Array.from(filter.getGui().querySelectorAll('.community-set-filter-option')).map(
+      (el) => el.textContent,
+    )
+    expect(labels).toEqual(['x', 'y'])
+  })
+
+  test('shows a "No values" message when there are zero distinct values', () => {
+    const { filter } = makeFilter([])
+    expect(filter.getGui().querySelector<HTMLElement>('.community-set-filter-empty')?.hidden).toBe(
+      false,
+    )
+  })
+
+  test('afterGuiAttached re-fetches values while preserving explicit deselection', () => {
+    let currentValues: string[] = ['a', 'b', 'c']
+    const filter = new CommunitySetFilter()
+    filter.init({
+      colDef: { field: 'col' },
+      column: {},
+      api: {},
+      context: undefined,
+      getValue: () => '',
+      filterChangedCallback: vi.fn(),
+      filterModifiedCallback: vi.fn(),
+      doesRowPassOtherFilter: () => true,
+      rowModel: {},
+      values: (params: { success: (values: string[]) => void }) => params.success(currentValues),
+    } as unknown as CommunitySetFilterParams)
+
+    // Deselect 'b' (checkboxes render sorted: a, b, c) — 'b' survives the refresh below, so this
+    // exercises "stays unchecked if still present after refresh".
+    const checkboxes = filter.getGui().querySelectorAll<HTMLInputElement>('input[type="checkbox"]')
+    checkboxes[1]!.checked = false
+    checkboxes[1]!.dispatchEvent(new Event('change'))
+    expect(filter.getModel()).toEqual({ filterType: 'set', values: ['a', 'c'] })
+
+    // 'c' disappears (dropped from both lists), 'a' and 'b' remain, 'd' newly appears (defaults
+    // selected).
+    currentValues = ['a', 'b', 'd']
+    filter.afterGuiAttached?.()
+
+    expect(filter.getModel()).toEqual({ filterType: 'set', values: ['a', 'd'] })
+  })
+
+  test('Select All and Clear buttons work', () => {
+    const { filter, filterChangedCallback } = makeFilter(['a', 'b'])
+    const clearButton = filter
+      .getGui()
+      .querySelector<HTMLButtonElement>('.community-set-filter-clear')!
+    clearButton.click()
+    expect(filter.getModel()).toEqual({ filterType: 'set', values: [] })
+
+    const selectAllButton = filter
+      .getGui()
+      .querySelector<HTMLButtonElement>('.community-set-filter-select-all')!
+    selectAllButton.click()
+    expect(filter.getModel()).toBeNull()
+    expect(filterChangedCallback).toHaveBeenCalled()
+  })
 })

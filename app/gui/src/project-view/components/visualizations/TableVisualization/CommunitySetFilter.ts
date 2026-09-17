@@ -9,8 +9,11 @@ import type {
 export interface CommunitySetFilterParams extends IFilterParams {
   /** Same shape as `ISetFilterParams.values` when given a function: sources the distinct values
    * to show in the checkbox list. Reused unchanged from the existing Set Filter wiring — see
-   * `getFilterValues` in `TableVisualization.vue`. */
-  values: (params: SetFilterValuesFuncParams) => void
+   * `getFilterValues` in `TableVisualization.vue`. Omitted (as it is for the client-side row
+   * model, which has no server round-trip) means "derive the distinct values directly from the
+   * grid's own row data", matching AG Grid's own Set Filter's behavior when no `values` callback
+   * is configured. */
+  values?: (params: SetFilterValuesFuncParams) => void
 }
 
 interface CommunitySetFilterModel {
@@ -25,13 +28,20 @@ interface CommunitySetFilterModel {
  * checkbox list of distinct column values — the search box only narrows which checkboxes are
  * shown, it is not a separate filter condition — and produces the same
  * `{ filterType: 'set', values: string[] }` model AG Grid's own Set Filter produces, so existing
- * filter-model parsing (`tableVizFilterUtils.ts`) needs no changes.
+ * filter-model parsing (`tableVizFilterUtils.ts`) needs no changes. When `filterParams.values` is
+ * not provided (the client-side row model has no server-side value source), distinct values are
+ * derived directly from the grid's own row data instead. Values are re-fetched every time the
+ * popup reopens (`afterGuiAttached`), preserving explicit deselections across the refresh — AG
+ * Grid caches one filter instance per column for its lifetime, so without this the checklist would
+ * go stale after the first open. Provides its own Select All / Clear controls, since a custom
+ * `IFilterComp`'s GUI gets none of AG Grid's built-in filter-menu chrome.
  */
 export class CommunitySetFilter implements IFilterComp {
   private params!: CommunitySetFilterParams
   private eGui!: HTMLElement
   private searchInput!: HTMLInputElement
   private listEl!: HTMLElement
+  private emptyMessageEl!: HTMLElement
   private allValues: string[] = []
   private selected = new Set<string>()
 
@@ -50,23 +60,79 @@ export class CommunitySetFilter implements IFilterComp {
     })
     this.searchInput.addEventListener('input', () => this.renderList())
 
+    const buttonsRow = document.createElement('div')
+    Object.assign(buttonsRow.style, { display: 'flex', gap: '6px', marginBottom: '6px' })
+
+    const selectAllButton = document.createElement('button')
+    selectAllButton.type = 'button'
+    selectAllButton.textContent = 'Select All'
+    selectAllButton.className = 'community-set-filter-select-all'
+    selectAllButton.addEventListener('click', () => {
+      this.selected = new Set(this.allValues)
+      this.renderList()
+      this.params.filterChangedCallback()
+    })
+
+    const clearButton = document.createElement('button')
+    clearButton.type = 'button'
+    clearButton.textContent = 'Clear'
+    clearButton.className = 'community-set-filter-clear'
+    clearButton.addEventListener('click', () => {
+      this.selected = new Set()
+      this.renderList()
+      this.params.filterChangedCallback()
+    })
+
+    buttonsRow.append(selectAllButton, clearButton)
+
     this.listEl = document.createElement('div')
     this.listEl.className = 'community-set-filter-list'
     Object.assign(this.listEl.style, { maxHeight: '200px', overflowY: 'auto' })
 
-    this.eGui.append(this.searchInput, this.listEl)
+    this.emptyMessageEl = document.createElement('div')
+    this.emptyMessageEl.className = 'community-set-filter-empty'
+    this.emptyMessageEl.textContent = 'No values'
+    Object.assign(this.emptyMessageEl.style, { opacity: '0.7', padding: '4px 0' })
+    this.emptyMessageEl.hidden = true
 
-    this.params.values({
-      colDef: this.params.colDef,
-      column: this.params.column,
-      api: this.params.api,
-      context: this.params.context,
-      success: (values: (string | null)[]) => {
-        this.allValues = values.filter((value): value is string => value != null)
-        this.selected = new Set(this.allValues)
-        this.renderList()
-      },
-    } as SetFilterValuesFuncParams)
+    this.eGui.append(this.searchInput, buttonsRow, this.listEl, this.emptyMessageEl)
+
+    this.loadValues()
+  }
+
+  afterGuiAttached() {
+    this.loadValues()
+  }
+
+  private loadValues() {
+    const previouslyDeselected = new Set(
+      this.allValues.filter((value) => !this.selected.has(value)),
+    )
+
+    const applyValues = (values: (string | null)[]) => {
+      this.allValues = Array.from(
+        new Set(values.filter((value): value is string => value != null)),
+      ).sort()
+      this.selected = new Set(this.allValues.filter((value) => !previouslyDeselected.has(value)))
+      this.renderList()
+    }
+
+    if (typeof this.params.values === 'function') {
+      this.params.values({
+        colDef: this.params.colDef,
+        column: this.params.column,
+        api: this.params.api,
+        context: this.params.context,
+        success: applyValues,
+      } as SetFilterValuesFuncParams)
+    } else {
+      const values: (string | null)[] = []
+      this.params.api.forEachNode((node) => {
+        const value = this.params.getValue(node)
+        values.push(value == null ? null : String(value))
+      })
+      applyValues(values)
+    }
   }
 
   private renderList() {
@@ -75,6 +141,8 @@ export class CommunitySetFilter implements IFilterComp {
       search ?
         this.allValues.filter((value) => value.toLowerCase().includes(search))
       : this.allValues
+
+    this.emptyMessageEl.hidden = this.allValues.length > 0
 
     this.listEl.replaceChildren(
       ...visibleValues.map((value) => {
@@ -102,9 +170,10 @@ export class CommunitySetFilter implements IFilterComp {
   }
 
   doesFilterPass(params: IDoesFilterPassParams) {
-    // Filtering itself is always performed server-side (Infinite Row Model) in this application —
-    // this only matters if the filter is ever paired with a client-side row model, so it mirrors
-    // the real Set Filter's own semantics for parity rather than being unreachable dead code.
+    // For the client-side row model (no `values` callback — filtering happens in the browser),
+    // this is what AG Grid actually calls to filter rows. For server-driven row models, filtering
+    // happens on the backend and this method is unreachable in practice — kept for parity with
+    // the real Set Filter's own semantics.
     const value = this.params.getValue(params.node)
     return this.selected.has(String(value))
   }
