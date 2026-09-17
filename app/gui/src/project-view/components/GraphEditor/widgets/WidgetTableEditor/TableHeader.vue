@@ -1,4 +1,10 @@
 <script lang="ts">
+import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
+import GridPopupMenu from '@/components/shared/AgGridTableView/GridPopupMenu.vue'
+import {
+  resolveGridMenuItems,
+  type GridMenuItem,
+} from '@/components/shared/AgGridTableView/gridPopupMenuItems'
 import SvgButton from '@/components/SvgButton.vue'
 import type { IHeaderParams } from 'ag-grid-enterprise'
 import { computed, ref, watch } from 'vue'
@@ -86,11 +92,50 @@ function onMouseClick(event: MouseEvent) {
   }
 }
 
+const columnMenuState = ref<{
+  point: { x: number; y: number }
+  items: GridMenuItem[]
+} | null>(null)
+
+function closeColumnMenu() {
+  columnMenuState.value = null
+}
+
 function onMouseRightClick(event: MouseEvent) {
-  if (!editing.value) {
+  if (editing.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (AG_GRID_ENTERPRISE_AVAILABLE) {
     props.showColumnMenuAfterMouseClick(event)
-    event.preventDefault()
-    event.stopPropagation()
+    return
+  }
+  const colDef = props.column.getColDef()
+  const rawMainMenuItems = colDef.mainMenuItems
+  const rawItems =
+    typeof rawMainMenuItems === 'function' ?
+      rawMainMenuItems({
+        api: props.api,
+        context: props.context,
+        column: props.column,
+        defaultItems: [],
+      })
+    : (rawMainMenuItems ?? [])
+  if (!rawItems.length) return
+  columnMenuState.value = {
+    point: { x: event.clientX, y: event.clientY },
+    // `resolveGridMenuItems`'s parameter type narrows each item's `action` signature to the subset
+    // of `IMenuActionParams` it actually invokes it with (`{ node, api }`) — see
+    // `gridPopupMenuItems.ts`'s internal `RawMenuItem` type. A real AG Grid `MenuItemDef`'s `action`
+    // is typed to expect the full `IMenuActionParams`, which `exactOptionalPropertyTypes` then flags
+    // as a structural mismatch even though every actual action here only reads `node` and `api`
+    // (see `commonContextMenuActions`). The cast documents that the narrower call is intentional and
+    // safe for every item this codebase produces (same cast as `AgGridTableView.vue`'s
+    // `resolveColumnOrGridContextMenuItems` caller, for the analogous `contextMenuItems` case).
+    items: resolveGridMenuItems(rawItems as Parameters<typeof resolveGridMenuItems>[0], {
+      api: props.api,
+      column: props.column,
+      node: null,
+    }),
   }
 }
 </script>
@@ -134,6 +179,12 @@ function onMouseRightClick(event: MouseEvent) {
       >
     </div>
   </div>
+  <GridPopupMenu
+    v-if="columnMenuState"
+    :items="columnMenuState.items"
+    :point="columnMenuState.point"
+    @close="closeColumnMenu"
+  />
 </template>
 
 <style scoped>
