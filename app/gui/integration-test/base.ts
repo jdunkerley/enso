@@ -18,6 +18,13 @@ export const test = base.extend<{
    * specs assume `false`. AI specs opt in with `test.use({ aiAvailable: true })`.
    */
   aiAvailable: boolean
+  /**
+   * The `$config` the page should boot with, injected before any app script runs. Supplied by
+   * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
+   * explicitly per project rather than inherited from whatever the build happened to bake in.
+   * See `integration-test/CLAUDE.md` for how the licensed/unlicensed projects differ.
+   */
+  appConfig: Record<string, string | undefined>
   setupApi: {
     cloud?: (api: MockCloudApi) => void
     local?: (api: MockLocalApi) => void
@@ -31,6 +38,7 @@ export const test = base.extend<{
 }>({
   featureFlags: [{}, { option: true }],
   aiAvailable: [false, { option: true }],
+  appConfig: [{}, { option: true }],
   setupApi: [{}, { option: true }],
   cloudApi: async ({ page, setupApi }, use) => {
     const api = await mockCloudApi(page)
@@ -53,10 +61,10 @@ export const test = base.extend<{
     setupApi.local?.(api)
     return use(api)
   },
-  loginPage: async ({ page, cloudApi, localApi, featureFlags, aiAvailable }, use) => {
+  loginPage: async ({ page, cloudApi, localApi, featureFlags, aiAvailable, appConfig }, use) => {
     // Only make sure that API mocks are registered, do not actually use the values
     const _ = { cloudApi, localApi }
-    await registerMocks(page, featureFlags, { aiAvailable })
+    await registerMocks(page, featureFlags, { aiAvailable, appConfig })
 
     const loginPage = new LoginPageActions(page, {}).do(async () => {
       await page.goto('/')

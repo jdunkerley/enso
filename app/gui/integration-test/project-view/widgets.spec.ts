@@ -1022,7 +1022,7 @@ test('Autoscoped constructors', async ({ editorPage }) => {
     })
 })
 
-test('Table widget', async ({ editorPage, page }) => {
+test('Table widget', { tag: '@ag-grid' }, async ({ editorPage, page }) => {
   await editorPage
 
   const node = await actions.createTableNode(page)

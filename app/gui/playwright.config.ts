@@ -11,6 +11,7 @@ import path from 'node:path'
 import url from 'node:url'
 import { defineConfig } from 'playwright/test'
 import invariant from 'tiny-invariant'
+import { loadEnv } from 'vite'
 
 const UNSAFE_SKIP_BUILD = process.env.PW_UNSAFE_SKIP_BUILD === 'true'
 const DEBUG = process.env.DEBUG_TEST === 'true'
@@ -25,6 +26,30 @@ const EXPECT_TIMEOUT_MS = DEBUG ? 100_000_000 : 10_000
 const WORKERS = isCI ? 2 : '35%'
 
 const dirName = path.dirname(url.fileURLToPath(import.meta.url))
+
+// === AG Grid licensed / unlicensed test configurations ===
+//
+// The AG Grid licence key is normally baked in at build time, but `src/config.ts` prefers
+// `window.$config` when it is already set — so both code paths can be exercised against a single
+// build by injecting the config per project (see `integration-test/mock/registerMocks.ts`).
+//
+// `appConfig` below is derived from the very `.env.testing` file the test build itself loads, so
+// the injected object matches what the build produced, field for field. The AG Grid key is then
+// set explicitly per project rather than being inherited: without that, a licence key present in
+// the build environment would silently make the "unlicensed" project licensed.
+const testingEnv = loadEnv('testing', dirName, 'ENSO_IDE_')
+const appConfig = Object.fromEntries(
+  Object.entries(testingEnv).map(([key, value]) => [key.replace(/^ENSO_IDE_/, ''), value]),
+)
+const agGridLicenseKey = appConfig.AG_GRID_LICENSE_KEY
+const unlicensedAppConfig = { ...appConfig, AG_GRID_LICENSE_KEY: undefined }
+
+if (!agGridLicenseKey) {
+  console.log(
+    'No ENSO_IDE_AG_GRID_LICENSE_KEY configured — skipping the AG Grid licensed project. ' +
+      'Only the Community (unlicensed) table code paths will be covered.',
+  )
+}
 
 const viteServerKind =
   UNSAFE_SKIP_BUILD ? 'preview'
@@ -125,14 +150,35 @@ export default defineConfig({
       testMatch: 'setup.ts',
     },
     {
+      // Runs the whole suite with no AG Grid licence, exercising the Community fallbacks.
       name: 'Integration Tests',
       testDir: './integration-test',
       testMatch: '**/*.spec.ts',
       dependencies: ['Setup'],
       use: {
         storageState: path.join(dirName, './playwright/.auth/user.json'),
+        appConfig: unlicensedAppConfig,
       },
     },
+    // Re-runs only the grid-dependent specs (tagged `@ag-grid`) with a licence configured, so the
+    // AG Grid Enterprise path keeps its coverage too. Registered only when a key is available —
+    // an invalid key would exercise a watermarked, licence-erroring grid rather than the real
+    // licensed behaviour, which is worse than honestly skipping it.
+    ...(agGridLicenseKey ?
+      [
+        {
+          name: 'Integration Tests (AG Grid licensed)',
+          testDir: './integration-test',
+          testMatch: '**/*.spec.ts',
+          grep: /@ag-grid/,
+          dependencies: ['Setup'],
+          use: {
+            storageState: path.join(dirName, './playwright/.auth/user.json'),
+            appConfig,
+          },
+        },
+      ]
+    : []),
   ],
   webServer: [
     {

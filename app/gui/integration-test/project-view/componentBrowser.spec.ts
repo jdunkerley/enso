@@ -324,43 +324,51 @@ test('Editing existing nodes', async ({ editorPage, page }) => {
   await expect(node.locator('.WidgetText')).toBeHidden()
 })
 
-test('Visualization preview: type-based visualization selection', async ({ editorPage, page }) => {
-  await editorPage
-  const nodeCount = await locate.graphNode(page).count()
-  await locate.addNewNodeButton(page).click()
-  await expect(locate.componentBrowser(page)).toExist()
-  await expect(locate.componentBrowserEntry(page)).toExist()
-  const content = locate.componentBrowserInput(page)
-  await content.fill('Table.ne')
-  await expect(content).toHaveText('Table.ne')
-  await page.keyboard.press(`Shift+Enter`)
-  await expect(locate.tableVisualization(page)).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(locate.componentBrowser(page)).toBeHidden()
-  await expect(locate.graphNode(page)).toHaveCount(nodeCount)
-})
+test(
+  'Visualization preview: type-based visualization selection',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page }) => {
+    await editorPage
+    const nodeCount = await locate.graphNode(page).count()
+    await locate.addNewNodeButton(page).click()
+    await expect(locate.componentBrowser(page)).toExist()
+    await expect(locate.componentBrowserEntry(page)).toExist()
+    const content = locate.componentBrowserInput(page)
+    await content.fill('Table.ne')
+    await expect(content).toHaveText('Table.ne')
+    await page.keyboard.press(`Shift+Enter`)
+    await expect(locate.tableVisualization(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await expect(locate.graphNode(page)).toHaveCount(nodeCount)
+  },
+)
 
-test('Visualization preview: user visualization selection', async ({ editorPage, page }) => {
-  await editorPage
-  const nodeCount = await locate.graphNode(page).count()
-  await locate.addNewNodeButton(page).click()
-  await expect(locate.componentBrowser(page)).toExist()
-  const content = locate.componentBrowserInput(page)
-  await content.fill('4')
-  await expect(content).toHaveText('4')
-  await page.keyboard.press(`Shift+Enter`)
-  await expect(locate.jsonVisualization(page)).toBeVisible()
-  await expect(locate.jsonVisualization(page)).toContainText('"visualizedExpr": "4"')
-  await locate.toggleVisualizationSelectorButton(page).click()
-  await page
-    .getByTestId('visualization-selector-entries')
-    .getByRole('button', { name: 'Table' })
-    .click()
-  await expect(locate.tableVisualization(page)).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(locate.componentBrowser(page)).toBeHidden()
-  await expect(locate.graphNode(page)).toHaveCount(nodeCount)
-})
+test(
+  'Visualization preview: user visualization selection',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page }) => {
+    await editorPage
+    const nodeCount = await locate.graphNode(page).count()
+    await locate.addNewNodeButton(page).click()
+    await expect(locate.componentBrowser(page)).toExist()
+    const content = locate.componentBrowserInput(page)
+    await content.fill('4')
+    await expect(content).toHaveText('4')
+    await page.keyboard.press(`Shift+Enter`)
+    await expect(locate.jsonVisualization(page)).toBeVisible()
+    await expect(locate.jsonVisualization(page)).toContainText('"visualizedExpr": "4"')
+    await locate.toggleVisualizationSelectorButton(page).click()
+    await page
+      .getByTestId('visualization-selector-entries')
+      .getByRole('button', { name: 'Table' })
+      .click()
+    await expect(locate.tableVisualization(page)).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await expect(locate.graphNode(page)).toHaveCount(nodeCount)
+  },
+)
 
 // TODO[#10949]: the record button on node is disabled.
 test.skip('Component browser handling of overridden record-mode', async ({ editorPage, page }) => {
