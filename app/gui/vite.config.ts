@@ -6,7 +6,7 @@ import postcssNesting from 'postcss-nesting'
 import { downloadEnsoEngine, findEnsoExecutable } from 'project-manager-shim'
 import tailwindcss from 'tailwindcss'
 import tailwindcssNesting from 'tailwindcss/nesting'
-import { defaultClientConditions, defineConfig, type Plugin } from 'vite'
+import { defaultClientConditions, defineConfig, loadEnv, type Plugin } from 'vite'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import wasm from 'vite-plugin-wasm'
 import tailwindConfig from './tailwind.config'
@@ -29,6 +29,7 @@ export default defineConfig({
   ...(IS_ELECTRON_DEV_MODE ? { root: fileURLToPath(new URL('.', import.meta.url)) } : {}),
   cacheDir: fileURLToPath(new URL('../../node_modules/.cache/vite', import.meta.url)),
   plugins: [
+    requireAgGridLicense(),
     wasm(),
     ...(isDevMode ?
       [
@@ -142,6 +143,36 @@ export default defineConfig({
     port: 5173,
   },
 })
+
+/**
+ * Fails the build when a release is built without an AG Grid Enterprise licence key.
+ *
+ * Without a key the table view falls back to AG Grid Community
+ * (`src/project-view/components/shared/AgGridTableView/agGridLicense.ts`). That is the intended
+ * behaviour for development, CI and third-party builds — but a *release* built that way would ship
+ * a reduced table view with nothing to give it away: no watermark, no console error. So releases
+ * opt in to this gate via `ENSO_IDE_REQUIRE_AG_GRID_LICENSE`, which CI sets for release packaging
+ * only (see `prepare_packaging_steps` in `build_tools/build/src/ci_gen/job.rs`).
+ */
+function requireAgGridLicense(): Plugin {
+  return {
+    name: 'enso-require-ag-grid-license',
+    apply: 'build',
+    config(_config, { mode }) {
+      const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'ENSO_IDE_')
+      if (env.ENSO_IDE_REQUIRE_AG_GRID_LICENSE !== 'true') return
+      // `.env` ships an empty placeholder, so merely *being set* is not enough.
+      if ((env.ENSO_IDE_AG_GRID_LICENSE_KEY ?? '').trim() === '') {
+        throw new Error(
+          'ENSO_IDE_REQUIRE_AG_GRID_LICENSE is set, but ENSO_IDE_AG_GRID_LICENSE_KEY is empty. ' +
+            'This build would silently fall back to AG Grid Community and ship a reduced table ' +
+            'view. Supply the key (in CI, the `ENSO_AG_GRID_LICENSE_KEY` repository variable), or ' +
+            'unset ENSO_IDE_REQUIRE_AG_GRID_LICENSE to build without AG Grid Enterprise.',
+        )
+      }
+    },
+  }
+}
 
 async function projectManagerShim(): Promise<Plugin> {
   const module = await import('./project-manager-shim-middleware')
