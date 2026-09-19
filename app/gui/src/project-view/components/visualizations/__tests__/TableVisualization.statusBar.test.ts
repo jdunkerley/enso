@@ -1,3 +1,7 @@
+// The fixtures below mirror the engine's visualization payload, whose field names are snake_case
+// on the wire (`use_bottom_status_bar`, `value_type`, …). Renaming them to satisfy the lint rule
+// would stop them matching what `Data` actually receives, so the rule is disabled for this file.
+/* eslint-disable camelcase */
 import { describe, expect, test } from 'vitest'
 import {
   computeCommunityStatusBar,
