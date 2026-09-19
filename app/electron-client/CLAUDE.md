@@ -34,6 +34,25 @@ Currently driven by `./run ide build` (the legacy Enso build CLI). Don't call
 — the build CLI wires the engine bundle, GUI, and Electron together with the
 right env vars.
 
+**Build the engine locally — don't bundle a released one.** `./run ide build`
+defaults to `--backend-source build`, which compiles the engine from these
+sources. Reaching for `--backend-source release --backend-release latest` to
+skip that ~25 minute Scala build produces an app that **launches fine but cannot
+open any project**: a develop-branch IDE is not protocol-compatible with the
+last released engine, so `session/initProtocolConnection` never completes and
+every attempt dies on a 15 s timeout. The Language Server log
+(`%LOCALAPPDATA%\enso\log\`) names the engine it booted — check it matches the
+IDE version before debugging anything else.
+
+When reading `%APPDATA%\enso\logs\` for this, note that a single
+`Failed to initialize Language Server connection, retrying after 3ms...` caused
+by `Cannot read properties of undefined (reading 'request')` is **benign and
+always present**: `LanguageServer`'s constructor
+(`app/ydoc-shared/src/languageServer.ts`) registers its `transport.on('open')`
+handler before assigning `this.client`, so the first attempt always throws and
+the retry recovers. A healthy session shows that warning exactly once and no
+`Request timeout` lines at all. Repeated 15 s timeouts are the real failure.
+
 **Always run `git submodule update --init --recursive` before building.** In
 particular, `app/gui/.dev-env/` (a private submodule) holds `.env.staging` /
 `.env.production` with the Cognito client ids and the staging cloud API URL. A

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import ColorRing from '@/components/ColorRing.vue'
 import { injectNodeColors } from '@/providers/graphNodeColors'
 import { useGraphSelection } from '@/providers/graphSelection'

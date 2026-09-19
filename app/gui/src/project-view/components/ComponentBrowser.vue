@@ -7,7 +7,7 @@ import {
 import type { NodeId } from '$/providers/openedProjects/graph'
 import type { RequiredImport } from '$/providers/openedProjects/module/imports'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
-import { type Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { debouncedGetter } from '$/utils/reactivity'
 import { componentBrowserBindings, listBindings } from '@/bindings'
 import ActionButton from '@/components/ActionButton.vue'

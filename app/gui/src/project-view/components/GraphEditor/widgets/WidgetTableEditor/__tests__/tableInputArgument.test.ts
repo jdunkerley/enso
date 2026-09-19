@@ -1,4 +1,4 @@
-import { type RequiredImport } from '$/providers/openedProjects/module/imports'
+import type { RequiredImport } from '$/providers/openedProjects/module/imports'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { makeType } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { WidgetInput } from '$/providers/openedProjects/widgetRegistry'

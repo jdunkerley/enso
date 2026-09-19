@@ -247,13 +247,26 @@ impl Tar {
             .args(compression)
             .args(&Switch::TargetFile(output_archive.as_ref()))
             .args(&Switch::WorkingDir(root_directory.as_ref()));
-        if TARGET_OS == OS::Windows && Tar.flavor().await.contains(&Flavor::Bsd) {
-            // Used only when `tar` is `bsdtar`. This is the default
-            // but e.g. Git can come with its own non-bsd tar. GNU tar does not support this option.
-            //
-            // This flag is to tell `tar` to resolve symlinks that appear on the command line.
-            // On Windows when "." is a symlink, only the symlink is archived otherwise.
-            cmd.arg(bsd::Switch::FollowSymlinksInCommand);
+        if TARGET_OS == OS::Windows {
+            let flavor = Tar.flavor().await;
+            if flavor.contains(&Flavor::Bsd) {
+                // Used only when `tar` is `bsdtar`. This is the default
+                // but e.g. Git can come with its own non-bsd tar. GNU tar does not support this
+                // option.
+                //
+                // This flag is to tell `tar` to resolve symlinks that appear on the command line.
+                // On Windows when "." is a symlink, only the symlink is archived otherwise.
+                cmd.arg(bsd::Switch::FollowSymlinksInCommand);
+            } else if flavor.contains(&Flavor::Gnu) {
+                // GNU tar reads `-f C:\path\to\archive` as the remote specification `host:path`,
+                // and fails with "Cannot connect to C: resolve failed". `--force-local` makes it
+                // treat the argument as a local path even though it contains a colon. bsdtar has
+                // no such option (and needs none), hence the flavor check.
+                //
+                // This matters whenever GNU tar precedes the Windows-bundled bsdtar on `PATH`,
+                // which is what a Git for Windows installation does.
+                cmd.arg("--force-local");
+            }
         }
 
         cmd.arg(".").run_ok().await

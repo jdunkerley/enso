@@ -5,7 +5,7 @@ import {
   type ExpressionInfo,
 } from '$/providers/openedProjects/project/computedValueRegistry'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
-import { type SuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { SuggestionEntry } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
   makeArgument,
   makeConstructor,

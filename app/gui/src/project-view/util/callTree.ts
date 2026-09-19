@@ -4,7 +4,7 @@ import * as widgetCfg from '$/providers/openedProjects/widgetRegistry/configurat
 import { DisplayMode } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { syntheticPortId, type PortId } from '@/providers/portInfo'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { type GraphDb, type MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
+import type { GraphDb, MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
 import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import {
   isRequiredArgument,

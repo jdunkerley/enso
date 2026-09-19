@@ -1,10 +1,12 @@
+import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import type { SetFilterValuesFuncParams } from 'ag-grid-community'
+import { CommunitySetFilter } from './CommunitySetFilter'
 import { isNumericType, type ValueType } from './tableVizUtils'
 
 export const getFilterParams = (
   isSSRM: boolean,
   valueType: ValueType | null | undefined,
-  filterType: string | null,
+  filterType: string | typeof CommunitySetFilter | null,
   getFilterValues: (params: SetFilterValuesFuncParams<any, string>) => Promise<void>,
 ) => {
   const filterOptions = valueType ? getFilterOptions(valueType.constructor) : null
@@ -44,11 +46,12 @@ export const getFilterType = (valueType: string, usingMultiFilter: boolean) => {
   } else if (isNumericType(valueType)) {
     return 'agNumberColumnFilter'
   } else if (valueType === 'Char') {
-    return usingMultiFilter ? 'agMultiColumnFilter' : 'agTextColumnFilter'
+    if (!usingMultiFilter) return 'agTextColumnFilter'
+    return AG_GRID_ENTERPRISE_AVAILABLE ? 'agMultiColumnFilter' : CommunitySetFilter
   } else if (valueType === 'Date_Time' || valueType === 'Time_Of_Day' || valueType === 'Mixed') {
     return null
   } else {
-    return 'agSetColumnFilter'
+    return AG_GRID_ENTERPRISE_AVAILABLE ? 'agSetColumnFilter' : CommunitySetFilter
   }
 }
 

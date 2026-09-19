@@ -1,7 +1,7 @@
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { assert } from '@/util/assert'
 import { findDifferenceIndex } from '@/util/data/array'
-import { type Opt } from '@/util/data/opt'
+import type { Opt } from '@/util/data/opt'
 import {
   methodPointerEquals,
   stackItemsEqual,

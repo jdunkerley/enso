@@ -19,7 +19,7 @@ async function initGraph(editorPage: EditorPageActions) {
     contain 10 rows and the values 0,0 to 3,0, which are just some sample values that should be visible in the table
     after opening it.
  */
-test('Load Table Visualisation', async ({ editorPage, page }) => {
+test('Load Table Visualisation', { tag: '@ag-grid' }, async ({ editorPage, page }) => {
   await initGraph(editorPage)
 
   const aggregatedNode = graphNodeByBinding(page, 'aggregated')
@@ -34,36 +34,42 @@ test('Load Table Visualisation', async ({ editorPage, page }) => {
   await expect(tableVisualization).toContainText('3,0')
 })
 
-test('Column size can be set and is retained', async ({ editorPage, page, localApi }) => {
-  await initGraph(editorPage)
+test(
+  'Column size can be set and is retained',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
-  await expect(tableVisualization).toContainText('10 rows.')
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
+    await expect(tableVisualization).toContainText('10 rows.')
 
-  const col = tableVisualization.getByRole('columnheader', { name: /^0/ })
-  const colManualSize = await resizeCol(col)
+    const col = tableVisualization.getByRole('columnheader', { name: /^0/ })
+    const colManualSize = await resizeCol(col)
 
-  // A data update causes column autosizing to run
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    {
-      type: 'Matrix',
-      // eslint-disable-next-line camelcase
-      column_count: 5,
-      // eslint-disable-next-line camelcase
-      all_rows_count: 10,
-      json: Array.from({ length: 10 }, (_, i) => Array.from({ length: 5 }, (_, j) => `${i},${j}b`)),
-    },
-  )
-  await expect(tableVisualization).toContainText('0,0b')
+    // A data update causes column autosizing to run
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      {
+        type: 'Matrix',
+        // eslint-disable-next-line camelcase
+        column_count: 5,
+        // eslint-disable-next-line camelcase
+        all_rows_count: 10,
+        json: Array.from({ length: 10 }, (_, i) =>
+          Array.from({ length: 5 }, (_, j) => `${i},${j}b`),
+        ),
+      },
+    )
+    await expect(tableVisualization).toContainText('0,0b')
 
-  const colSizeAfterDataUpdate = await getElWidth(col)
-  expect(colSizeAfterDataUpdate).toBe(colManualSize)
-})
+    const colSizeAfterDataUpdate = await getElWidth(col)
+    expect(colSizeAfterDataUpdate).toBe(colManualSize)
+  },
+)
 
 async function getElWidth(col: Locator): Promise<number> {
   await col.elementHandle().then((el) => el!.waitForElementState('stable'))
@@ -86,7 +92,7 @@ async function resizeCol(col: Locator): Promise<number> {
   return widthAfterResize
 }
 
-test('Copy/paste from Table Visualization', async ({ page, editorPage }) => {
+test('Copy/paste from Table Visualization', { tag: '@ag-grid' }, async ({ page, editorPage }) => {
   const expectClipboard = expect.poll(() =>
     page.evaluate(() => window.navigator.clipboard.readText()),
   )
@@ -163,43 +169,43 @@ async function expectTableInputContent(page: Page, node: Locator) {
   ])
 }
 
-test('Single Column Of Actions Table Visualisation Test', async ({
-  editorPage,
-  page,
-  localApi,
-}) => {
-  await initGraph(editorPage)
+test(
+  'Single Column Of Actions Table Visualisation Test',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
 
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
-    {
-      type: 'Generic_Grid',
-      headers: [
-        { visualization_header: 'table', child_label: 'table', get_child_node_action: 'read' },
-      ],
-      data: [['Sheet1', 'Sheet2', 'Sheet3']],
-    },
-    /* eslint-enable camelcase */
-  )
-  await expect(tableVisualization).toContainText('table')
-  await expect(tableVisualization).toContainText('Sheet1')
-  await expect(tableVisualization).toContainText('Sheet2')
-  await expect(tableVisualization).toContainText('Sheet3')
-  const sheet2 = tableVisualization.getByText('Sheet2')
-  await sheet2.dblclick()
-  const newNode = graphNodeByBinding(page, 'node1')
-  await expect(newNode).toContainText('read')
-  await expect(newNode).toContainText('Sheet2')
-})
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      /* eslint-disable camelcase */
+      {
+        type: 'Generic_Grid',
+        headers: [
+          { visualization_header: 'table', child_label: 'table', get_child_node_action: 'read' },
+        ],
+        data: [['Sheet1', 'Sheet2', 'Sheet3']],
+      },
+      /* eslint-enable camelcase */
+    )
+    await expect(tableVisualization).toContainText('table')
+    await expect(tableVisualization).toContainText('Sheet1')
+    await expect(tableVisualization).toContainText('Sheet2')
+    await expect(tableVisualization).toContainText('Sheet3')
+    const sheet2 = tableVisualization.getByText('Sheet2')
+    await sheet2.dblclick()
+    const newNode = graphNodeByBinding(page, 'node1')
+    await expect(newNode).toContainText('read')
+    await expect(newNode).toContainText('Sheet2')
+  },
+)
 
-test('Error Visualisation Test', async ({ editorPage, page, localApi }) => {
+test('Error Visualisation Test', { tag: '@ag-grid' }, async ({ editorPage, page, localApi }) => {
   await initGraph(editorPage)
 
   const aggregatedNode = graphNodeByBinding(page, 'aggregated')
@@ -218,161 +224,169 @@ test('Error Visualisation Test', async ({ editorPage, page, localApi }) => {
   await expect(tableVisualization).toContainText('This is an error message.')
 })
 
-test('get_child_node_action temmplate Test as number', async ({ editorPage, page, localApi }) => {
-  await initGraph(editorPage)
+test(
+  'get_child_node_action temmplate Test as number',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
 
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
-    {
-      type: 'Generic_Grid',
-      headers: [
-        {
-          visualization_header: 'table',
-          child_label: 'table',
-          get_child_node_action: 'read {{#table}}',
-        },
-      ],
-      data: [['1', '2', '3']],
-    },
-    /* eslint-enable camelcase */
-  )
-  await expect(tableVisualization).toContainText('table')
-  await expect(tableVisualization).toContainText('1')
-  await expect(tableVisualization).toContainText('2')
-  await expect(tableVisualization).toContainText('3')
-  const value2 = tableVisualization.getByText('2')
-  await value2.dblclick()
-  const newNode = graphNodeByBinding(page, 'node1')
-  await expect(newNode).toContainText('read')
-  const numberWidget = newNode.locator('.WidgetNumber')
-  await expect(numberWidget).toBeVisible()
-  await expect(numberWidget).toHaveValue('2')
-})
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      /* eslint-disable camelcase */
+      {
+        type: 'Generic_Grid',
+        headers: [
+          {
+            visualization_header: 'table',
+            child_label: 'table',
+            get_child_node_action: 'read {{#table}}',
+          },
+        ],
+        data: [['1', '2', '3']],
+      },
+      /* eslint-enable camelcase */
+    )
+    await expect(tableVisualization).toContainText('table')
+    await expect(tableVisualization).toContainText('1')
+    await expect(tableVisualization).toContainText('2')
+    await expect(tableVisualization).toContainText('3')
+    const value2 = tableVisualization.getByText('2')
+    await value2.dblclick()
+    const newNode = graphNodeByBinding(page, 'node1')
+    await expect(newNode).toContainText('read')
+    const numberWidget = newNode.locator('.WidgetNumber')
+    await expect(numberWidget).toBeVisible()
+    await expect(numberWidget).toHaveValue('2')
+  },
+)
 
-test('get_child_node_action temmplate Test as text', async ({ editorPage, page, localApi }) => {
-  await initGraph(editorPage)
+test(
+  'get_child_node_action temmplate Test as text',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
 
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
-    {
-      type: 'Generic_Grid',
-      headers: [
-        {
-          visualization_header: 'table',
-          child_label: 'table',
-          get_child_node_action: 'read {{@table}}',
-        },
-      ],
-      data: [['1', '2', '3']],
-    },
-    /* eslint-enable camelcase */
-  )
-  await expect(tableVisualization).toContainText('table')
-  await expect(tableVisualization).toContainText('1')
-  await expect(tableVisualization).toContainText('2')
-  await expect(tableVisualization).toContainText('3')
-  const value2 = tableVisualization.getByText('2')
-  await value2.dblclick()
-  const newNode = graphNodeByBinding(page, 'node1')
-  const textWidget = newNode.locator('.WidgetText')
-  await expect(textWidget).toBeVisible()
-  await expect(textWidget.getByTestId('widget-text-content')).toHaveText('2')
-})
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      /* eslint-disable camelcase */
+      {
+        type: 'Generic_Grid',
+        headers: [
+          {
+            visualization_header: 'table',
+            child_label: 'table',
+            get_child_node_action: 'read {{@table}}',
+          },
+        ],
+        data: [['1', '2', '3']],
+      },
+      /* eslint-enable camelcase */
+    )
+    await expect(tableVisualization).toContainText('table')
+    await expect(tableVisualization).toContainText('1')
+    await expect(tableVisualization).toContainText('2')
+    await expect(tableVisualization).toContainText('3')
+    const value2 = tableVisualization.getByText('2')
+    await value2.dblclick()
+    const newNode = graphNodeByBinding(page, 'node1')
+    const textWidget = newNode.locator('.WidgetText')
+    await expect(textWidget).toBeVisible()
+    await expect(textWidget.getByTestId('widget-text-content')).toHaveText('2')
+  },
+)
 
-test('GenericGrid Table Visualisation Test - single column - no links', async ({
-  editorPage,
-  page,
-  localApi,
-}) => {
-  await initGraph(editorPage)
+test(
+  'GenericGrid Table Visualisation Test - single column - no links',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
 
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
-    {
-      type: 'Generic_Grid',
-      headers: [{ visualization_header: 'table' }],
-      data: [['Sheet1', 'Sheet2', 'Sheet3']],
-    },
-    /* eslint-enable camelcase */
-  )
-  await expect(tableVisualization).toContainText('table')
-  await expect(tableVisualization).toContainText('Sheet1')
-  await expect(tableVisualization).toContainText('Sheet2')
-  await expect(tableVisualization).toContainText('Sheet3')
-})
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      /* eslint-disable camelcase */
+      {
+        type: 'Generic_Grid',
+        headers: [{ visualization_header: 'table' }],
+        data: [['Sheet1', 'Sheet2', 'Sheet3']],
+      },
+      /* eslint-enable camelcase */
+    )
+    await expect(tableVisualization).toContainText('table')
+    await expect(tableVisualization).toContainText('Sheet1')
+    await expect(tableVisualization).toContainText('Sheet2')
+    await expect(tableVisualization).toContainText('Sheet3')
+  },
+)
 
-test('GenericGrid Table Visualisation Test - two column - link on second', async ({
-  editorPage,
-  page,
-  localApi,
-}) => {
-  await initGraph(editorPage)
+test(
+  'GenericGrid Table Visualisation Test - two column - link on second',
+  { tag: '@ag-grid' },
+  async ({ editorPage, page, localApi }) => {
+    await initGraph(editorPage)
 
-  const aggregatedNode = graphNodeByBinding(page, 'aggregated')
-  await aggregatedNode.click()
-  await editorPage.press('Space')
-  const tableVisualization = locate.tableVisualization(page)
-  await expect(tableVisualization).toExist()
+    const aggregatedNode = graphNodeByBinding(page, 'aggregated')
+    await aggregatedNode.click()
+    await editorPage.press('Space')
+    const tableVisualization = locate.tableVisualization(page)
+    await expect(tableVisualization).toExist()
 
-  await localApi.updateVisualization(
-    'Standard.Visualization.Table.Visualization.prepare_visualization',
-    /* eslint-disable camelcase */
-    {
-      type: 'Generic_Grid',
-      headers: [
-        { visualization_header: 'table' },
-        { visualization_header: 'number', get_child_node_action: 'read {{#number}} {{@table}}' },
-      ],
-      data: [
-        ['SheetA', 'SheetB', 'SheetC'],
-        ['1', '2', '3'],
-      ],
-    },
-    /* eslint-enable camelcase */
-  )
-  await expect(tableVisualization).toContainText('table')
-  await expect(tableVisualization).toContainText('SheetA')
-  await expect(tableVisualization).toContainText('SheetB')
-  await expect(tableVisualization).toContainText('SheetC')
-  await expect(tableVisualization).toContainText('number')
-  await expect(tableVisualization).toContainText('1')
-  await expect(tableVisualization).toContainText('2')
-  await expect(tableVisualization).toContainText('3')
-  const value2 = tableVisualization.getByText('2')
-  await value2.dblclick()
-  const newNode = graphNodeByBinding(page, 'node1')
+    await localApi.updateVisualization(
+      'Standard.Visualization.Table.Visualization.prepare_visualization',
+      /* eslint-disable camelcase */
+      {
+        type: 'Generic_Grid',
+        headers: [
+          { visualization_header: 'table' },
+          { visualization_header: 'number', get_child_node_action: 'read {{#number}} {{@table}}' },
+        ],
+        data: [
+          ['SheetA', 'SheetB', 'SheetC'],
+          ['1', '2', '3'],
+        ],
+      },
+      /* eslint-enable camelcase */
+    )
+    await expect(tableVisualization).toContainText('table')
+    await expect(tableVisualization).toContainText('SheetA')
+    await expect(tableVisualization).toContainText('SheetB')
+    await expect(tableVisualization).toContainText('SheetC')
+    await expect(tableVisualization).toContainText('number')
+    await expect(tableVisualization).toContainText('1')
+    await expect(tableVisualization).toContainText('2')
+    await expect(tableVisualization).toContainText('3')
+    const value2 = tableVisualization.getByText('2')
+    await value2.dblclick()
+    const newNode = graphNodeByBinding(page, 'node1')
 
-  await expect(newNode).toContainText('read')
+    await expect(newNode).toContainText('read')
 
-  const textWidget = newNode.locator('.WidgetText')
-  await expect(textWidget).toBeVisible()
-  await expect(textWidget.getByTestId('widget-text-content')).toHaveText('SheetB')
+    const textWidget = newNode.locator('.WidgetText')
+    await expect(textWidget).toBeVisible()
+    await expect(textWidget.getByTestId('widget-text-content')).toHaveText('SheetB')
 
-  const numberWidget = newNode.locator('.WidgetNumber')
-  await expect(numberWidget).toBeVisible()
-  await expect(numberWidget).toHaveValue('2')
-})
+    const numberWidget = newNode.locator('.WidgetNumber')
+    await expect(numberWidget).toBeVisible()
+    await expect(numberWidget).toHaveValue('2')
+  },
+)
 
 /*
    These tests pair with the Enso tests found at test/Visualization_Tests/src/Table_Visualisation_Integration_Spec.enso
@@ -383,98 +397,110 @@ test('GenericGrid Table Visualisation Test - two column - link on second', async
    Then run the js prettier
    Remember to comment the write back out
 */
-test.describe('Table_Visualisation_Integration_Spec and clipboard', () => {
-  test('Datetime test - sorting and copying', async ({ editorPage, localApi, page, context }) => {
-    await loadData(editorPage, localApi, singleColumnDatetimes)
-    await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
-    ])
-    const value = getHeaderLocator(page, { colHeaderName: 'Value' })
-    await value.click() // Sort ascending
-    await expectCellDataToBe(page, 'Value', [
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
-    ])
-    await value.click() // Sort descending
-    await expectCellDataToBe(page, 'Value', [
-      '2025-01-03 12:13:14.123[MET]',
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-    ])
-    await value.click() // remove sort
-    await expectCellDataToBe(page, 'Value', [
-      '2025-01-02 12:13:14.123[MET]',
-      '2025-01-01 12:13:14.123[MET]',
-      '2025-01-03 12:13:14.123[MET]',
-    ])
-    await expectCopyingColumnClipboardToBe(
-      editorPage,
-      context,
-      'Value',
-      0,
-      1,
-      '2025-01-02 12:13:14.123[MET]\r\n2025-01-01 12:13:14.123[MET]',
-    )
-  })
+test.describe('Table_Visualisation_Integration_Spec and clipboard', { tag: '@ag-grid' }, () => {
+  test(
+    'Datetime test - sorting and copying',
+    { tag: '@ag-grid' },
+    async ({ editorPage, localApi, page, context }) => {
+      await loadData(editorPage, localApi, singleColumnDatetimes)
+      await expectCellDataToBe(page, 'Value', [
+        '2025-01-02 12:13:14.123[MET]',
+        '2025-01-01 12:13:14.123[MET]',
+        '2025-01-03 12:13:14.123[MET]',
+      ])
+      const value = getHeaderLocator(page, { colHeaderName: 'Value' })
+      await value.click() // Sort ascending
+      await expectCellDataToBe(page, 'Value', [
+        '2025-01-01 12:13:14.123[MET]',
+        '2025-01-02 12:13:14.123[MET]',
+        '2025-01-03 12:13:14.123[MET]',
+      ])
+      await value.click() // Sort descending
+      await expectCellDataToBe(page, 'Value', [
+        '2025-01-03 12:13:14.123[MET]',
+        '2025-01-02 12:13:14.123[MET]',
+        '2025-01-01 12:13:14.123[MET]',
+      ])
+      await value.click() // remove sort
+      await expectCellDataToBe(page, 'Value', [
+        '2025-01-02 12:13:14.123[MET]',
+        '2025-01-01 12:13:14.123[MET]',
+        '2025-01-03 12:13:14.123[MET]',
+      ])
+      await expectCopyingColumnClipboardToBe(
+        editorPage,
+        context,
+        'Value',
+        0,
+        1,
+        '2025-01-02 12:13:14.123[MET]\r\n2025-01-01 12:13:14.123[MET]',
+      )
+    },
+  )
 
-  test('Date test - sorting and copying', async ({ editorPage, localApi, page, context }) => {
-    await loadData(editorPage, localApi, singleColumnDates)
-    await expectCellDataToBe(page, 'Value', ['2025-01-02', '2025-01-01', '2025-01-03'])
-    const value = getHeaderLocator(page, { colHeaderName: 'Value' })
-    await value.click({ position: { x: 10, y: 10 } }) // Sort ascending
-    await expectCellDataToBe(page, 'Value', ['2025-01-01', '2025-01-02', '2025-01-03'])
-    await value.click({ position: { x: 10, y: 10 } }) // Sort descending
-    await expectCellDataToBe(page, 'Value', ['2025-01-03', '2025-01-02', '2025-01-01'])
-    await value.click({ position: { x: 10, y: 10 } }) // remove sort
-    await expectCellDataToBe(page, 'Value', ['2025-01-02', '2025-01-01', '2025-01-03'])
-    await expectCopyingColumnClipboardToBe(
-      editorPage,
-      context,
-      'Value',
-      0,
-      1,
-      '2025-01-02\r\n2025-01-01',
-    )
-  })
+  test(
+    'Date test - sorting and copying',
+    { tag: '@ag-grid' },
+    async ({ editorPage, localApi, page, context }) => {
+      await loadData(editorPage, localApi, singleColumnDates)
+      await expectCellDataToBe(page, 'Value', ['2025-01-02', '2025-01-01', '2025-01-03'])
+      const value = getHeaderLocator(page, { colHeaderName: 'Value' })
+      await value.click({ position: { x: 10, y: 10 } }) // Sort ascending
+      await expectCellDataToBe(page, 'Value', ['2025-01-01', '2025-01-02', '2025-01-03'])
+      await value.click({ position: { x: 10, y: 10 } }) // Sort descending
+      await expectCellDataToBe(page, 'Value', ['2025-01-03', '2025-01-02', '2025-01-01'])
+      await value.click({ position: { x: 10, y: 10 } }) // remove sort
+      await expectCellDataToBe(page, 'Value', ['2025-01-02', '2025-01-01', '2025-01-03'])
+      await expectCopyingColumnClipboardToBe(
+        editorPage,
+        context,
+        'Value',
+        0,
+        1,
+        '2025-01-02\r\n2025-01-01',
+      )
+    },
+  )
 
-  test('Time test - sorting and copying', async ({ editorPage, localApi, page, context }) => {
-    await loadData(editorPage, localApi, singleColumnTimes)
-    await expectCellDataToBe(page, 'Value', [
-      '12:14:14.123004',
-      '12:13:14.123004',
-      '12:15:14.123004',
-    ])
-    const value = getHeaderLocator(page, { colHeaderName: 'Value' })
-    await value.click({ position: { x: 10, y: 10 } }) // Sort ascending
-    await expectCellDataToBe(page, 'Value', [
-      '12:13:14.123004',
-      '12:14:14.123004',
-      '12:15:14.123004',
-    ])
-    await value.click({ position: { x: 10, y: 10 } }) // Sort descending
-    await expectCellDataToBe(page, 'Value', [
-      '12:15:14.123004',
-      '12:14:14.123004',
-      '12:13:14.123004',
-    ])
-    await value.click({ position: { x: 10, y: 10 } }) // remove sort
-    await expectCellDataToBe(page, 'Value', [
-      '12:14:14.123004',
-      '12:13:14.123004',
-      '12:15:14.123004',
-    ])
-    await expectCopyingColumnClipboardToBe(
-      editorPage,
-      context,
-      'Value',
-      0,
-      1,
-      '12:14:14.123004\r\n12:13:14.123004',
-    )
-  })
+  test(
+    'Time test - sorting and copying',
+    { tag: '@ag-grid' },
+    async ({ editorPage, localApi, page, context }) => {
+      await loadData(editorPage, localApi, singleColumnTimes)
+      await expectCellDataToBe(page, 'Value', [
+        '12:14:14.123004',
+        '12:13:14.123004',
+        '12:15:14.123004',
+      ])
+      const value = getHeaderLocator(page, { colHeaderName: 'Value' })
+      await value.click({ position: { x: 10, y: 10 } }) // Sort ascending
+      await expectCellDataToBe(page, 'Value', [
+        '12:13:14.123004',
+        '12:14:14.123004',
+        '12:15:14.123004',
+      ])
+      await value.click({ position: { x: 10, y: 10 } }) // Sort descending
+      await expectCellDataToBe(page, 'Value', [
+        '12:15:14.123004',
+        '12:14:14.123004',
+        '12:13:14.123004',
+      ])
+      await value.click({ position: { x: 10, y: 10 } }) // remove sort
+      await expectCellDataToBe(page, 'Value', [
+        '12:14:14.123004',
+        '12:13:14.123004',
+        '12:15:14.123004',
+      ])
+      await expectCopyingColumnClipboardToBe(
+        editorPage,
+        context,
+        'Value',
+        0,
+        1,
+        '12:14:14.123004\r\n12:13:14.123004',
+      )
+    },
+  )
 
   async function expectCopyingColumnClipboardToBe(
     editorPage: EditorPageActions,

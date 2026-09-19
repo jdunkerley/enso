@@ -1,5 +1,5 @@
-import { type NodeId } from '$/providers/openedProjects/graph'
-import { type ProjectStore } from '$/providers/openedProjects/project'
+import type { NodeId } from '$/providers/openedProjects/graph'
+import type { ProjectStore } from '$/providers/openedProjects/project'
 import { createContextStore } from '@/providers'
 import { computed, reactive, ref } from 'vue'
 import type { ExecutionEnvironment } from 'ydoc-shared/languageServerTypes'

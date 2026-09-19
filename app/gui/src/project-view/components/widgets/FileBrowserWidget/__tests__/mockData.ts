@@ -1,4 +1,4 @@
-import { type Directory } from '@/components/widgets/FileBrowserWidget/pathBrowsing'
+import type { Directory } from '@/components/widgets/FileBrowserWidget/pathBrowsing'
 import {
   type AnyAsset,
   AssetType,

@@ -6,7 +6,7 @@ import {
   type NodeVisualizationConfiguration,
 } from '$/providers/openedProjects/project/executionContext'
 import { VisualizationDataRegistry } from '$/providers/openedProjects/project/visualizationDataRegistry'
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { proxyRefs } from '$/utils/reactivity'
 import { Awareness } from '@/stores/awareness'
 import { attachProvider, useObserveYjs } from '@/util/crdt'

@@ -85,32 +85,59 @@ export function newVisRequestId(): VisRequestId {
 
 /** Read-only view over one slot in the visualizations Y.Map. */
 export class VisualizationSlotView {
+  /**
+   *
+   */
   constructor(
     readonly requestId: VisRequestId,
     readonly inner: Y.Map<unknown>,
   ) {}
 
+  /**
+   *
+   */
   get visualizationId(): VisualizationId | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.visualizationId) as VisualizationId | undefined
   }
+  /**
+   *
+   */
   get contextId(): ContextId | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.contextId) as ContextId | undefined
   }
+  /**
+   *
+   */
   get nodeExternalId(): ExpressionId | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.nodeExternalId) as ExpressionId | undefined
   }
+  /**
+   *
+   */
   get request(): VisRequestPreprocessor | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
   }
+  /**
+   *
+   */
   get status(): VisSlotStatus | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.status) as VisSlotStatus | undefined
   }
+  /**
+   *
+   */
   get response(): Uint8Array | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.response) as Uint8Array | undefined
   }
+  /**
+   *
+   */
   get failure(): VisSlotFailure | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.failure) as VisSlotFailure | undefined
   }
+  /**
+   *
+   */
   get createdAt(): number | undefined {
     return this.inner.get(VIS_SLOT_FIELDS.createdAt) as number | undefined
   }
@@ -153,16 +180,25 @@ export class Visualizations {
   readonly doc: Y.Doc
   readonly slots: Y.Map<Y.Map<unknown>>
 
+  /**
+   *
+   */
   constructor(doc: Y.Doc) {
     this.doc = doc
     this.slots = doc.getMap<Y.Map<unknown>>('slots')
   }
 
+  /**
+   *
+   */
   getSlot(requestId: VisRequestId): VisualizationSlotView | null {
     const inner = this.slots.get(requestId)
     return inner ? new VisualizationSlotView(requestId, inner) : null
   }
 
+  /**
+   *
+   */
   *entries(): IterableIterator<VisualizationSlotView> {
     for (const [key, inner] of this.slots.entries()) {
       yield new VisualizationSlotView(key as VisRequestId, inner)

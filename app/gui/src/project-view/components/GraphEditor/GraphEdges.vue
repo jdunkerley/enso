@@ -5,12 +5,12 @@ export const EDGE_ARROW_PATH =
 </script>
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import { requiredImports } from '$/providers/openedProjects/module/imports'
 import GraphEdge from '@/components/GraphEditor/GraphEdge.vue'
 import GraphNodeOutputPorts from '@/components/GraphEditor/GraphNodeOutputPorts.vue'
 import { useEventConditional } from '@/composables/events'
-import { type GraphNavigator } from '@/providers/graphNavigator'
+import type { GraphNavigator } from '@/providers/graphNavigator'
 import { useGraphSelection } from '@/providers/graphSelection'
 import { injectInteractionHandler, type Interaction } from '@/providers/interactionHandler'
 import type { PortId } from '@/providers/portInfo'

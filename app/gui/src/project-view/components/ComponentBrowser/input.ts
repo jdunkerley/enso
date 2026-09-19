@@ -1,12 +1,12 @@
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import {
   requiredImportEquals,
   requiredImports,
   type RequiredImport,
 } from '$/providers/openedProjects/module/imports'
-import { type SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
+import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import {
   entryDisplayOwner,
   entryDisplayPath,

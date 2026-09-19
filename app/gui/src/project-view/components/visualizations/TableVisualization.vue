@@ -1,5 +1,6 @@
 <script lang="ts">
 import AgGridTableView, { commonContextMenuActions } from '@/components/shared/AgGridTableView.vue'
+import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import {
   useTableVizToolbar,
   type SortModel,
@@ -18,8 +19,9 @@ import type {
   GetContextMenuItems,
   GetContextMenuItemsParams,
   ICellRendererParams,
+  IDatasource,
+  IGetRowsParams,
   IServerSideDatasource,
-  IServerSideGetRowsRequest,
   ITooltipParams,
   MenuItemDef,
   SetFilterValuesFuncParams,
@@ -48,6 +50,7 @@ import {
   convertSortModel,
   createDistinctExpressionTemplate,
   createExpressionRowTemplate,
+  type RowsRequestParams,
   type ValueTypeArgumentChild,
   type ValueTypes,
 } from './TableVisualization/TableVizDataSourceUtils'
@@ -148,6 +151,77 @@ export type DataQualityMetricValue =
     }
 
 export type TextFormatOptions = 'full' | 'partial' | 'off'
+
+/**
+ * Whether to show the AG Grid Enterprise bottom Status Bar status bar panel instead of the plain
+ * Community-safe top row-count line. The Status Bar is Enterprise-only, so this is `false`
+ * whenever no AG Grid Enterprise license is configured, regardless of what the backend requests.
+ */
+export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boolean): boolean {
+  return (
+    enterpriseAvailable &&
+    typeof data === 'object' &&
+    'use_bottom_status_bar' in data &&
+    Boolean(data.use_bottom_status_bar)
+  )
+}
+
+/**
+ * Community stand-in for the Enterprise bottom status bar, or `undefined` when none is needed.
+ *
+ * `computeUseBottomStatusBar` is deliberately false when unlicensed, because it drives AG Grid's
+ * Enterprise-only `statusBar` grid option. The row counts that panel shows are plain information
+ * rather than an Enterprise feature, so dropping them silently would be a real loss — it is what
+ * `gettingStarted.spec.ts` asserts on, for a user-facing workflow. When the backend asks for the
+ * bottom status bar and we cannot mount AG Grid's own panel, the visualization renders this instead.
+ *
+ * `showFiltered` mirrors `TableVizStatusBar`: the filtered line appears only when it differs from
+ * the total.
+ *
+ * When this returns a value the template hides the top status bar, exactly as it does for the
+ * licensed bottom bar — otherwise the row count would be displayed twice.
+ */
+export function computeCommunityStatusBar(
+  data: Data,
+  enterpriseAvailable: boolean,
+  total: number | undefined,
+  filtered: number | null,
+): { total: number | undefined; filtered: number | null; showFiltered: boolean } | undefined {
+  const requested =
+    typeof data === 'object' &&
+    'use_bottom_status_bar' in data &&
+    Boolean(data.use_bottom_status_bar)
+  if (enterpriseAvailable || !requested) return undefined
+  return { total, filtered, showFiltered: filtered != null && filtered !== total }
+}
+
+/**
+ * The AG Grid `statusBar` grid option. `undefined` whenever no AG Grid Enterprise license is
+ * configured, so the `statusBar` grid option is omitted entirely rather than bound to an empty
+ * `{ statusPanels: [] }` — AG Grid's own module-registration validator requires the
+ * `@ag-grid-enterprise/status-bar` module for the `statusBar` grid option itself, regardless of
+ * whether any status bar panel is actually configured, and warns on every unlicensed table
+ * otherwise. When licensed, mirrors `useBottomStatusBar` exactly (unchanged behavior).
+ */
+export function computeStatusBar(
+  enterpriseAvailable: boolean,
+  useBottomStatusBar: boolean,
+  total: number | undefined,
+  filtered: number | null,
+) {
+  if (!enterpriseAvailable) return undefined
+  return {
+    statusPanels:
+      useBottomStatusBar ?
+        [
+          {
+            statusPanel: TableVizStatusBar,
+            statusPanelParams: { total, filtered },
+          },
+        ]
+      : [],
+  }
+}
 </script>
 
 <script setup lang="ts">
@@ -278,11 +352,17 @@ const isSSRM = computed(
     props.data.is_using_server_sort_and_filter,
 )
 
-const useBottomStatusBar = computed(
-  () =>
-    typeof props.data === 'object' &&
-    'use_bottom_status_bar' in props.data &&
-    props.data.use_bottom_status_bar,
+const useBottomStatusBar = computed(() =>
+  computeUseBottomStatusBar(props.data, AG_GRID_ENTERPRISE_AVAILABLE),
+)
+
+const communityStatusBar = computed(() =>
+  computeCommunityStatusBar(
+    props.data,
+    AG_GRID_ENTERPRISE_AVAILABLE,
+    allRowCount.value,
+    isSSRM.value ? filteredRowCount.value : null,
+  ),
 )
 
 const isCreateNewNodeEnabled = computed(
@@ -297,25 +377,20 @@ const ssrmServer = computed(() => {
 })
 
 const refreshDataSource = ref(0)
-const ssrmDatasource = computed(() => {
+const datasource = computed(() => {
   const value = refreshDataSource.value
-  return isSSRM.value && createServerSideDatasource()
+  if (!isSSRM.value) return false
+  return AG_GRID_ENTERPRISE_AVAILABLE ? createServerSideDatasource() : createInfiniteDatasource()
 })
 
-const statusBar = computed(() => ({
-  statusPanels:
-    useBottomStatusBar.value ?
-      [
-        {
-          statusPanel: TableVizStatusBar,
-          statusPanelParams: {
-            total: allRowCount.value,
-            filtered: isSSRM.value ? filteredRowCount.value : null,
-          },
-        },
-      ]
-    : [],
-}))
+const statusBar = computed(() =>
+  computeStatusBar(
+    AG_GRID_ENTERPRISE_AVAILABLE,
+    useBottomStatusBar.value,
+    allRowCount.value,
+    isSSRM.value ? filteredRowCount.value : null,
+  ),
+)
 
 const isTableFilteredOrSorted = computed(
   () =>
@@ -478,6 +553,15 @@ function createServer() {
 
       try {
         const response = await config.executeExpression(expressionFunction, 2000)
+        // `executeExpression` resolves to `null` while the visualization subdoc is still syncing,
+        // and to an `Err` when evaluation fails — neither carries a `value`. Reading it
+        // unconditionally turned both into an opaque "Cannot read properties of undefined", which
+        // hid whatever actually went wrong.
+        if (response == null) return { success: false, data: [] }
+        if (!response.ok) {
+          response.error.log('Error loading filterValues for column')
+          return { success: false, data: [] }
+        }
         return {
           success: true,
           data: response.value.distinct_vals,
@@ -490,7 +574,7 @@ function createServer() {
         }
       }
     },
-    getData: async (request: IServerSideGetRowsRequest) => {
+    getData: async (request: RowsRequestParams) => {
       const columnHeaders =
         typeof props.data === 'object' && 'header' in props.data ? (props.data.header ?? []) : []
 
@@ -522,6 +606,15 @@ function createServer() {
 
       try {
         const response = await config.executeExpression(expressionFunction)
+        // See the note on the `getFilterValues` call above: `null` means "subdoc not synced yet"
+        // and `Err` means the evaluation failed. Neither has a `value`, and reading one produced
+        // the misleading "Cannot read properties of undefined (reading 'row_count')" that masked
+        // the real failure.
+        if (response == null) return { success: false, data: null, rowCount: undefined }
+        if (!response.ok) {
+          response.error.log('Error loading rows for table')
+          return { success: false, data: null, rowCount: undefined }
+        }
         filteredRowCount.value = response.value.row_count
         return {
           success: true,
@@ -558,6 +651,30 @@ function createServerSideDatasource(): IServerSideDatasource {
           params.success({ rowData: rows, rowCount: response.rowCount })
         } else {
           params.fail()
+        }
+      }
+    },
+  }
+}
+
+function createInfiniteDatasource(): IDatasource {
+  return {
+    getRows: async (params: IGetRowsParams) => {
+      const server = ssrmServer.value
+      if (server) {
+        const serverResponse = await server.getData(params)
+        const response: Response =
+          serverResponse ? serverResponse : { data: [], success: false, rowCount: 0 }
+        if (response.success) {
+          const rows = createRowsForTable(response.data, 0, true)
+          params.successCallback(rows, response.rowCount)
+        } else {
+          // Community's Infinite Row Model has no failed-load visual state to hook into
+          // (unlike Enterprise's SSRM, whose `params.fail()` surfaces a "close and reopen to
+          // retry" message via the loading-cell renderer) and `params.failCallback()` is a
+          // no-op here, so settle the grid to visibly empty rather than leaving it spinning
+          // forever. Full failure-path parity is tracked as Playwright-suite follow-up work.
+          params.successCallback([], 0)
         }
       }
     },
@@ -716,7 +833,7 @@ function toField(
       showDataQuality: hasDataQualityMetrics,
     },
     cellDataType: cellValueType,
-    autoHeight: cellValueType === 'text' && isSSRM.value,
+    autoHeight: cellValueType === 'text' && isSSRM.value && AG_GRID_ENTERPRISE_AVAILABLE,
     sortable: valueType?.constructor !== 'Mixed',
   }
   if (valueType && ['Date', 'Date_Time', 'Time'].includes(valueType.constructor)) {
@@ -1185,7 +1302,11 @@ config.setToolbar(
 
 <template>
   <div ref="rootNode" class="TableVisualization" @wheel.stop.passive @pointerdown.stop>
-    <template v-if="!useBottomStatusBar">
+    <!-- Hidden whenever a bottom status bar is shown — AG Grid's own when licensed, ours when not.
+         Otherwise the unlicensed path would render this row-count line *and* `communityStatusBar`,
+         showing the count twice. Mirrors the licensed layout, which also drops the row-limit
+         selector in favour of the bottom bar. -->
+    <template v-if="!useBottomStatusBar && !communityStatusBar">
       <div class="table-visualization-status-bar">
         <select
           v-if="isRowCountSelectorVisible"
@@ -1219,7 +1340,7 @@ config.setToolbar(
         :rowData="rowData"
         :defaultColDef="defaultColDef"
         :textFormatOption="textFormatterSelected"
-        :datasource="ssrmDatasource"
+        :datasource="datasource"
         :rowCount="allRowCount"
         :isServerSideModel="isSSRM"
         :statusBar="statusBar"
@@ -1230,6 +1351,12 @@ config.setToolbar(
         @columnMoved="onColumnStateChange"
       />
     </Suspense>
+    <div v-if="communityStatusBar" class="communityStatusBar">
+      <div><b>Total Row Count:</b> {{ communityStatusBar.total }}</div>
+      <div v-if="communityStatusBar.showFiltered">
+        <b>Filtered Row Count:</b> {{ communityStatusBar.filtered }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1239,6 +1366,16 @@ config.setToolbar(
   flex-flow: column;
   position: relative;
   height: 100%;
+}
+
+/* Community stand-in for AG Grid Enterprise's status bar; see `communityStatusBar`. */
+.communityStatusBar {
+  flex: none;
+  display: flex;
+  gap: 16px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  border-top: 1px solid rgb(0 0 0 / 0.1);
 }
 
 .grid {

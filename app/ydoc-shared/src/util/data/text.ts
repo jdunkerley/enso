@@ -25,15 +25,24 @@ export class SourceRangeEditDesc {
     readonly insert: { length: number },
   ) {}
 
+  /**
+   *
+   */
   static replace(range: SourceRange, insert: { length: number }) {
     assert(length >= 0)
     return new SourceRangeEditDesc(range.from, range.to, insert)
   }
 
+  /**
+   *
+   */
   get range(): SourceRange {
     return SourceRange.unsafeFromBounds(this.from, this.to)
   }
 
+  /**
+   *
+   */
   get lengthChange(): number {
     return this.insert.length - this.range.length
   }
@@ -47,22 +56,37 @@ export class SourceRangeEdit extends SourceRangeEditDesc {
     super(from, to, insert)
   }
 
+  /**
+   *
+   */
   static override replace(range: SourceRange, insert: string) {
     return new SourceRangeEdit(range.from, range.to, insert)
   }
 
+  /**
+   *
+   */
   static insert(pos: number, insert: string) {
     return new SourceRangeEdit(pos, pos, insert)
   }
 
+  /**
+   *
+   */
   static delete(range: SourceRange) {
     return new SourceRangeEdit(range.from, range.to, '')
   }
 
+  /**
+   *
+   */
   withInsert(insert: string) {
     return new SourceRangeEdit(this.from, this.to, insert)
   }
 
+  /**
+   *
+   */
   withRange(range: SourceRange) {
     return new SourceRangeEdit(range.from, range.to, this.insert)
   }

@@ -283,6 +283,12 @@
     <path fill-rule="evenodd" clip-rule="evenodd" d="M5 1V5L9 5L9 1H5ZM5 6V10H9L9 6H5ZM5 15V11H9L9 15H5ZM12 5H14V7H16V9H14V11H12V9H10V7H12V5Z" fill="currentColor"></path>
   </symbol>
 
+  <!-- Mirrors `column_add`: identical grid, with the plus replaced by a minus. -->
+  <symbol id="column_remove" viewBox="0 0 16 16" width="16" height="16" fill="none">
+    <path opacity="0.4" fill-rule="evenodd" clip-rule="evenodd" d="M0 5V1H4L4 5L0 5ZM0 10V6H4L4 10H0ZM0 11V15H4L4 11H0Z" fill="currentColor"></path>
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M5 1V5L9 5L9 1H5ZM5 6V10H9L9 6H5ZM5 15V11H9L9 15H5ZM10 7H16V9H10V7Z" fill="currentColor"></path>
+  </symbol>
+
   <symbol id="columns_increasing" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M4 10H2C1.44772 10 1 10.4477 1 11V15C1 15.5523 1.44772 16 2 16H4C4.55228 16 5 15.5523 5 15V11C5 10.4477 4.55228 10 4 10ZM9 5H7C6.44772 5 6 5.44772 6 6V15C6 15.5523 6.44772 16 7 16H9C9.55228 16 10 15.5523 10 15V6C10 5.44772 9.55228 5 9 5ZM14 0H12C11.4477 0 11 .44772 11 1V15C11 15.5523 11.4477 16 12 16H14C14.5523 16 15 15.5523 15 15V1C15 .44772 14.5523 0 14 0Z" fill="currentColor"></path>
   </symbol>
@@ -1151,6 +1157,12 @@
 
   <symbol id="row_add" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M5 5H1V9H5V5ZM15 5H11V9H15V5ZM7 10H9V12H11V14H9V16H7V14H5V12H7V10ZM6 5H10V9H6V5Z" fill="currentColor"></path>
+    <path opacity="0.4" fill-rule="evenodd" clip-rule="evenodd" d="M5 0H1V4H5V0ZM6 0H10V4H6V0ZM11 0H15V4H11V0Z" fill="currentColor"></path>
+  </symbol>
+
+  <!-- Mirrors `row_add`: identical grid, with the plus replaced by a minus. -->
+  <symbol id="row_remove" viewBox="0 0 16 16" width="16" height="16" fill="none">
+    <path fill-rule="evenodd" clip-rule="evenodd" d="M5 5H1V9H5V5ZM15 5H11V9H15V5ZM5 12H11V14H5V12ZM6 5H10V9H6V5Z" fill="currentColor"></path>
     <path opacity="0.4" fill-rule="evenodd" clip-rule="evenodd" d="M5 0H1V4H5V0ZM6 0H10V4H6V0ZM11 0H15V4H11V0Z" fill="currentColor"></path>
   </symbol>
 

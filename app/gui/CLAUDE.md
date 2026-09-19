@@ -98,6 +98,20 @@ their `name` prop against that list via `svgUseHref`
 name — `ai_sparkle` was a painful example of an invented name that rendered
 blank.
 
+## Gotcha: releases require an AG Grid licence
+
+The table view falls back to AG Grid Community when
+`ENSO_IDE_AG_GRID_LICENSE_KEY` is empty — silently, by design, so development,
+CI and third-party builds work without a key. Because nothing at runtime reveals
+the fallback, `vite.config.ts` carries a `requireAgGridLicense` plugin that
+**fails the build** when `ENSO_IDE_REQUIRE_AG_GRID_LICENSE=true` and the key is
+empty. CI sets that flag for release packaging only (`prepare_packaging_steps`
+in `build_tools/build/src/ci_gen/job.rs` → `release.yml`); `ide-packaging.yml`
+and `gui-checks.yml` deliberately do not.
+
+Note `.env` sets `ENSO_IDE_AG_GRID_LICENSE_KEY=` as an empty placeholder, so any
+check on this key must test for non-empty, never merely "is set".
+
 ## Gotcha: node memory
 
 Vite production builds need `NODE_OPTIONS=--max-old-space-size=6144` (already

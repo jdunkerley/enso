@@ -653,15 +653,24 @@ export function useStateBeforePointerdown<T>(
 ) {
   const stateBeforeClick = ref<T>()
 
-  const { globalEventRegistryPre } = useGlobalEventRegistry()
-  useEvent(
-    globalEventRegistryPre,
-    'pointerdown',
-    (e) => {
-      if (unrefElement(element)?.contains(e.target as Node)) stateBeforeClick.value = getState()
-    },
-    { capture: true },
-  )
+  // `allowMissing: true` — this composable backs `MenuButton`, which can now be mounted from
+  // `GridPopupMenu` inside a visualization's custom-element subtree, where no ancestor provides
+  // the global event registry (only `App.vue` does, and Vue's provide/inject doesn't cross a
+  // custom-element boundary; see `GridPopupMenu.vue`'s comment on its own interaction-handler
+  // injection for the full story). Degrade gracefully there: `stateBeforeClick` simply never
+  // updates, so `MenuButton`'s toggle-preservation behavior is skipped rather than the whole menu
+  // crashing on mount.
+  const registry = useGlobalEventRegistry(true)
+  if (registry) {
+    useEvent(
+      registry.globalEventRegistryPre,
+      'pointerdown',
+      (e) => {
+        if (unrefElement(element)?.contains(e.target as Node)) stateBeforeClick.value = getState()
+      },
+      { capture: true },
+    )
+  }
 
   return {
     /**

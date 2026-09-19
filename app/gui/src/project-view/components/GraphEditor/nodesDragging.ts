@@ -1,5 +1,5 @@
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import { useApproach } from '@/composables/animation'
 import { useGraphSelection } from '@/providers/graphSelection'
 import { partitionPoint } from '@/util/data/array'

@@ -960,9 +960,9 @@ pub fn expose_os_specific_signing_secret(os: OS, step: Step) -> Step {
 /// or a development build (PRs).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PackagingTarget {
-    /// The artifact is being built for a release build (nightlies, releases).
-    Development,
     /// The artifact is being built for a development build (PRs).
+    Development,
+    /// The artifact is being built for a release build (nightlies, releases).
     Release,
 }
 
@@ -970,11 +970,15 @@ pub enum PackagingTarget {
 ///
 /// This involves:
 /// * exposing secrets necessary for code signing and notarization;
-/// * exposing variables defining cloud environment for dashboard.
+/// * exposing variables defining cloud environment for dashboard;
+/// * for releases, requiring an AG Grid Enterprise license.
 pub fn prepare_packaging_steps(os: OS, step: Step, packaging_target: PackagingTarget) -> Vec<Step> {
     let step = expose_gui_vars(step);
     let step = if packaging_target == PackagingTarget::Release {
+        // A release must never silently fall back to AG Grid Community, so the GUI build fails
+        // outright if `ENSO_AG_GRID_LICENSE_KEY` was not supplied.
         expose_debugging_vars(step)
+            .with_env(ide::web::env::ENSO_IDE_REQUIRE_AG_GRID_LICENSE, "true")
     } else {
         step
     };

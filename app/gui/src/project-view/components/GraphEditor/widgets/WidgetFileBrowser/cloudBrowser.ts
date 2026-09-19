@@ -1,12 +1,12 @@
-import { type FileType } from '$/providers/openedProjects/widgetRegistry/configuration'
-import { type ToValue } from '$/utils/reactivity'
-import { type BrowserItem } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
-import {
-  type Actions,
-  type CustomDropdownItem,
+import type { FileType } from '$/providers/openedProjects/widgetRegistry/configuration'
+import type { ToValue } from '$/utils/reactivity'
+import type { BrowserItem } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
+import type {
+  Actions,
+  CustomDropdownItem,
 } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
 import FileBrowserWidget from '@/components/widgets/FileBrowserWidget.vue'
-import { type Icon } from '@/util/iconMetadata/iconName'
+import type { Icon } from '@/util/iconMetadata/iconName'
 import { computed, type ComputedRef, h, toValue } from 'vue'
 
 const TYPES = new Map<BrowserItem, { label: string; icon?: Icon }>([

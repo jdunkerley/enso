@@ -1,4 +1,4 @@
-import { type Node } from '$/providers/openedProjects/graph'
+import type { Node } from '$/providers/openedProjects/graph'
 import testCases from '@/components/GraphEditor/__tests__/clipboardTestCases.json' with { type: 'json' }
 import {
   isSpreadsheetTsv,

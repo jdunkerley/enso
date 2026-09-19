@@ -1,6 +1,6 @@
-import { type GraphStore, type NodeId } from '$/providers/openedProjects/graph'
+import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
 import type { NodeType } from '$/providers/openedProjects/graph/graphDatabase'
-import { type GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
+import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import { colorFromString } from '@/util/colors'
 import { ProjectPath } from '@/util/projectPath'
 import { computed } from 'vue'
