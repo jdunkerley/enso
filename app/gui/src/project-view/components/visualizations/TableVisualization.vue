@@ -177,6 +177,9 @@ export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boole
  *
  * `showFiltered` mirrors `TableVizStatusBar`: the filtered line appears only when it differs from
  * the total.
+ *
+ * When this returns a value the template hides the top status bar, exactly as it does for the
+ * licensed bottom bar — otherwise the row count would be displayed twice.
  */
 export function computeCommunityStatusBar(
   data: Data,
@@ -1299,7 +1302,11 @@ config.setToolbar(
 
 <template>
   <div ref="rootNode" class="TableVisualization" @wheel.stop.passive @pointerdown.stop>
-    <template v-if="!useBottomStatusBar">
+    <!-- Hidden whenever a bottom status bar is shown — AG Grid's own when licensed, ours when not.
+         Otherwise the unlicensed path would render this row-count line *and* `communityStatusBar`,
+         showing the count twice. Mirrors the licensed layout, which also drops the row-limit
+         selector in favour of the bottom bar. -->
+    <template v-if="!useBottomStatusBar && !communityStatusBar">
       <div class="table-visualization-status-bar">
         <select
           v-if="isRowCountSelectorVisible"
