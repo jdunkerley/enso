@@ -31,6 +31,12 @@ export async function registerMocks(
  * stays unlicensed even when `ENSO_IDE_AG_GRID_LICENSE_KEY` is present in the build environment.
  */
 async function injectAppConfig(page: Page, appConfig: Record<string, string | undefined>) {
+  // An empty object means the project set no override — leave the baked-in values alone. Defining
+  // `window.$config` as `{}` does not merge, it *replaces*: `src/config.ts` prefers it wholesale,
+  // so the app would lose its API URL and Cognito settings and never render a login form. The
+  // `Setup` project takes exactly this path (it has no reason to care which grid is in use), and
+  // defining an empty config there broke authentication for every shard.
+  if (Object.keys(appConfig).length === 0) return
   await test.step('Inject $config', () => {
     return page.addInitScript((config) => {
       Object.defineProperty(window, '$config', {

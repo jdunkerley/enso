@@ -23,6 +23,10 @@ export const test = base.extend<{
    * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
    * explicitly per project rather than inherited from whatever the build happened to bake in.
    * See `integration-test/CLAUDE.md` for how the licensed/unlicensed projects differ.
+   *
+   * Empty (the default) means "no override": nothing is injected and the page boots with whatever
+   * Vite baked in. It is not a merge — a non-empty value replaces the whole config — so a project
+   * that sets this must supply a complete one, as both integration projects do via `loadEnv`.
    */
   appConfig: Record<string, string | undefined>
   setupApi: {
