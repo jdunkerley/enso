@@ -27,6 +27,7 @@ import { tarFsPack, unzipEntries, zipWriteStream } from '@/archive'
 import { downloadCloudProject } from '@/assetManagement'
 import { BUNDLED_PROJECT_SUFFIX } from '@/fileAssociations'
 import * as paths from '@/paths'
+import { resolveServedFile } from '@/servedFile'
 import * as electron from 'electron'
 import { app } from 'electron'
 import {
@@ -349,29 +350,34 @@ export class Server {
       // `preload.mjs` must be specialcased here as it is loaded by electron from the root,
       // in contrast to all assets loaded by the window, which are loaded from `assets/` via
       // this server.
-      const resourceFile =
-        resource === '/preload.mjs.map' ?
-          paths.appPath(electron) + resource
-        : this.config.dir + resource
+      const resourceBase =
+        resource === '/preload.mjs.map' ? paths.appPath(electron) : this.config.dir
+      const resourceFile = resolveServedFile(resourceBase, resource)
       for (const [header, value] of COOP_COEP_CORP_HEADERS) {
         response.setHeader(header, value)
       }
-      readFile(resourceFile)
-        .then((data) => {
-          const contentType = mime.contentType(path.extname(resourceFile))
-          const contentLength = data.length
-          if (contentType !== false) {
-            response.setHeader('Content-Type', contentType)
-          }
-          response.setHeader('Content-Length', contentLength)
-          response.writeHead(HTTP_STATUS_OK)
-          response.end(data)
-        })
-        .catch(() => {
-          console.error(`Resource '${resource}' not found at '${resourceFile}'.`)
-          response.writeHead(HTTP_STATUS_NOT_FOUND)
-          response.end()
-        })
+      if (resourceFile == null) {
+        console.error(`Resource '${resource}' does not name a file under '${resourceBase}'.`)
+        response.writeHead(HTTP_STATUS_NOT_FOUND)
+        response.end()
+      } else {
+        readFile(resourceFile)
+          .then((data) => {
+            const contentType = mime.contentType(path.extname(resourceFile))
+            const contentLength = data.length
+            if (contentType !== false) {
+              response.setHeader('Content-Type', contentType)
+            }
+            response.setHeader('Content-Length', contentLength)
+            response.writeHead(HTTP_STATUS_OK)
+            response.end(data)
+          })
+          .catch(() => {
+            console.error(`Resource '${resource}' not found at '${resourceFile}'.`)
+            response.writeHead(HTTP_STATUS_NOT_FOUND)
+            response.end()
+          })
+      }
     }
   }
 
