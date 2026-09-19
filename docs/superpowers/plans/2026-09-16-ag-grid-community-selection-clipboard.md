@@ -664,9 +664,7 @@ export interface ClipboardDeps {
     copyToClipboard?(): void;
     getDisplayedRowAtIndex(rowIndex: number): { data: unknown } | undefined;
     getValue(colId: string, rowNode: { data: unknown }): unknown;
-    getColumn(
-      colId: string,
-    ): {
+    getColumn(colId: string): {
       getColDef(): {
         headerName?: string;
         valueSetter?: (params: unknown) => boolean;
@@ -842,9 +840,7 @@ export interface ClipboardDeps {
     copyToClipboard?(): void;
     getDisplayedRowAtIndex(rowIndex: number): { data: unknown } | undefined;
     getValue(colId: string, rowNode: { data: unknown }): unknown;
-    getColumn(
-      colId: string,
-    ): {
+    getColumn(colId: string): {
       getColDef(): {
         headerName?: string;
         valueSetter?: (params: unknown) => boolean;
