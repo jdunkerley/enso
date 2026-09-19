@@ -167,6 +167,32 @@ export function computeUseBottomStatusBar(data: Data, enterpriseAvailable: boole
 }
 
 /**
+ * Community stand-in for the Enterprise bottom status bar, or `undefined` when none is needed.
+ *
+ * `computeUseBottomStatusBar` is deliberately false when unlicensed, because it drives AG Grid's
+ * Enterprise-only `statusBar` grid option. The row counts that panel shows are plain information
+ * rather than an Enterprise feature, so dropping them silently would be a real loss — it is what
+ * `gettingStarted.spec.ts` asserts on, for a user-facing workflow. When the backend asks for the
+ * bottom status bar and we cannot mount AG Grid's own panel, the visualization renders this instead.
+ *
+ * `showFiltered` mirrors `TableVizStatusBar`: the filtered line appears only when it differs from
+ * the total.
+ */
+export function computeCommunityStatusBar(
+  data: Data,
+  enterpriseAvailable: boolean,
+  total: number | undefined,
+  filtered: number | null,
+): { total: number | undefined; filtered: number | null; showFiltered: boolean } | undefined {
+  const requested =
+    typeof data === 'object' &&
+    'use_bottom_status_bar' in data &&
+    Boolean(data.use_bottom_status_bar)
+  if (enterpriseAvailable || !requested) return undefined
+  return { total, filtered, showFiltered: filtered != null && filtered !== total }
+}
+
+/**
  * The AG Grid `statusBar` grid option. `undefined` whenever no AG Grid Enterprise license is
  * configured, so the `statusBar` grid option is omitted entirely rather than bound to an empty
  * `{ statusPanels: [] }` — AG Grid's own module-registration validator requires the
@@ -325,6 +351,15 @@ const isSSRM = computed(
 
 const useBottomStatusBar = computed(() =>
   computeUseBottomStatusBar(props.data, AG_GRID_ENTERPRISE_AVAILABLE),
+)
+
+const communityStatusBar = computed(() =>
+  computeCommunityStatusBar(
+    props.data,
+    AG_GRID_ENTERPRISE_AVAILABLE,
+    allRowCount.value,
+    isSSRM.value ? filteredRowCount.value : null,
+  ),
 )
 
 const isCreateNewNodeEnabled = computed(
@@ -1309,6 +1344,12 @@ config.setToolbar(
         @columnMoved="onColumnStateChange"
       />
     </Suspense>
+    <div v-if="communityStatusBar" class="communityStatusBar">
+      <div><b>Total Row Count:</b> {{ communityStatusBar.total }}</div>
+      <div v-if="communityStatusBar.showFiltered">
+        <b>Filtered Row Count:</b> {{ communityStatusBar.filtered }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1318,6 +1359,16 @@ config.setToolbar(
   flex-flow: column;
   position: relative;
   height: 100%;
+}
+
+/* Community stand-in for AG Grid Enterprise's status bar; see `communityStatusBar`. */
+.communityStatusBar {
+  flex: none;
+  display: flex;
+  gap: 16px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  border-top: 1px solid rgb(0 0 0 / 0.1);
 }
 
 .grid {

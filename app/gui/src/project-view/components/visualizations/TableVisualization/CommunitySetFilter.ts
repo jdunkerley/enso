@@ -150,7 +150,12 @@ export class CommunitySetFilter implements IFilterComp {
         this.allValues.filter((value) => value.toLowerCase().includes(search))
       : this.allValues
 
-    this.emptyMessageEl.hidden = this.allValues.length > 0
+    // Keyed off what is actually being rendered, not the unfiltered set: a search matching nothing
+    // leaves `visibleValues` empty while `allValues` is still non-empty, which showed a blank list
+    // with no explanation. The wording follows AG Grid's own locale, which separates the
+    // nothing-to-show case from the search-found-nothing case.
+    this.emptyMessageEl.textContent = search ? 'No matches' : 'No values'
+    this.emptyMessageEl.hidden = visibleValues.length > 0
 
     this.listEl.replaceChildren(
       ...visibleValues.map((value) => {

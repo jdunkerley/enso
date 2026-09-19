@@ -74,7 +74,8 @@ exporting:
 
 ```ts
 export const AG_GRID_ENTERPRISE_AVAILABLE =
-  typeof $config.AG_GRID_LICENSE_KEY === "string";
+  typeof $config.AG_GRID_LICENSE_KEY === "string" &&
+  $config.AG_GRID_LICENSE_KEY.length > 0;
 ```
 
 A plain module-level constant, not a Vue ref — the key is fixed per session,
@@ -93,9 +94,14 @@ self-registers the Enterprise core and triggers the watermark/console error
 independent of grid options. `AgGridTableView/Utils.ts` has the same issue for
 `ComponentUtil` and `_processOnChange`.
 
-(Other files' `import {...} from 'ag-grid-enterprise'` statements are type-only
-in practice and are elided by Vite/esbuild — they don't cause the Enterprise
-runtime to load and don't need to change.)
+(Other files' imports from `ag-grid-enterprise` must use the **top-level**
+`import type {...}` form. `import { type A } from 'ag-grid-enterprise'` is NOT
+elided: `verbatimModuleSyntax` is on, and under it TypeScript strips only the
+inline specifiers and leaves a bare `import 'ag-grid-enterprise'` side-effect
+import, which loads the Enterprise runtime regardless of the licence flag. One
+such import put Enterprise into the ProjectView chunk and was only caught by
+running the packaged app. `@typescript-eslint/no-import-type-side-effects` now
+enforces this repo-wide; `consistent-type-imports` does not catch it.)
 
 **Fix:** these two files switch their value imports to
 `await import(AG_GRID_ENTERPRISE_AVAILABLE ? 'ag-grid-enterprise' : 'ag-grid-community')`.
@@ -249,9 +255,12 @@ condition.
   round-trip.
 - **Component/integration (Playwright):** existing `TableVisualization`/
   `WidgetTableEditor` suites need a second run configuration with no license key
-  configured (today's dev/test env always sets one — see `.dev-env/.env.staging`
-  and CI config) so the fallback path is actually exercised. New specs: custom
-  filter popup (Boolean column), custom context menu
+  configured so the fallback path is actually exercised. (This spec originally
+  claimed dev/test environments always set a key. That was wrong: `app/gui/.env`
+  ships an empty placeholder, and the Playwright suite now deliberately runs its
+  main project unlicensed, injecting an unlicensed `$config`, with a second
+  project re-running the `@ag-grid`-tagged specs when a key is present.) New
+  specs: custom filter popup (Boolean column), custom context menu
   (copy/cut/paste/copy-with-headers), custom column menu
   (autosize/remove-column), multi-cell drag-select + copy, and Infinite Row
   Model paging on a large table.

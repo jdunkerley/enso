@@ -105,13 +105,24 @@ export function buildDefaultColDef<TData, TValue>(
     ...defaultColDef,
     cellClassRules: {
       ...defaultColDef.cellClassRules,
+      // Read the column id from the runtime column, not from `colDef`: `colDef` is the definition
+      // as supplied, and TableVisualization's `toField` sets only `field`/`headerName`, leaving
+      // `colDef.colId` undefined there. AG Grid derives an id for the runtime column regardless,
+      // so keying off `colDef` made this predicate always false for visualizations — the highlight
+      // never appeared, even though range tracking (which uses `column.getColId()` throughout) was
+      // working. `colDef.colId` remains as a fallback for callers that do set it explicitly.
       communityCellRangeSelected: (params: {
         node: { rowIndex: number | null }
+        column?: { getColId: () => string } | null | undefined
         colDef: { colId?: string }
-      }) =>
-        params.node.rowIndex != null &&
-        params.colDef.colId != null &&
-        isInRange({ rowIndex: params.node.rowIndex, colId: params.colDef.colId }),
+      }) => {
+        const colId = params.column?.getColId() ?? params.colDef.colId
+        return (
+          params.node.rowIndex != null &&
+          colId != null &&
+          isInRange({ rowIndex: params.node.rowIndex, colId })
+        )
+      },
     },
   }
 }
@@ -240,6 +251,11 @@ const effectiveDefaultColDef = computed(() =>
 
 function onGridReady(event: GridReadyEvent<TData>) {
   gridApi.value = event.api
+  // A new grid means the previous one's coordinates are meaningless. `gridKey` changes on a table
+  // version change or `forceGridRefresh`, which recreates the grid without any sort/filter event —
+  // the two places that otherwise clear the range — so a stale rectangle would survive and both
+  // highlight and copy/cut the wrong cells.
+  clear()
   if (rowModelType.value === 'serverSide') {
     gridApi.value.retryServerSideLoads()
   }
