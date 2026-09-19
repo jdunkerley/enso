@@ -20,13 +20,30 @@ interface Range {
 export function useCommunityCellRange(displayedColumnIds: () => string[]) {
   const range: Ref<Range | undefined> = ref(undefined)
 
-  function startAt(coord: CellCoord) {
-    range.value = { anchor: coord, focus: coord }
+  /**
+   * `startAt` and `extendTo` report whether the range actually moved, so callers can skip
+   * repainting when it did not. `mouseover` fires repeatedly while the pointer moves *within* one
+   * cell, and repainting on each of those forced a full grid re-render many times per second —
+   * enough that cell elements were never stable between animation frames.
+   */
+  function sameCoord(a: CellCoord | undefined, b: CellCoord | undefined): boolean {
+    return a?.rowIndex === b?.rowIndex && a?.colId === b?.colId
   }
 
-  function extendTo(coord: CellCoord) {
-    if (range.value == null) return
+  function startAt(coord: CellCoord): boolean {
+    const current = range.value
+    if (current != null && sameCoord(current.anchor, coord) && sameCoord(current.focus, coord)) {
+      return false
+    }
+    range.value = { anchor: coord, focus: coord }
+    return true
+  }
+
+  function extendTo(coord: CellCoord): boolean {
+    if (range.value == null) return false
+    if (sameCoord(range.value.focus, coord)) return false
     range.value = { anchor: range.value.anchor, focus: coord }
+    return true
   }
 
   function clear() {

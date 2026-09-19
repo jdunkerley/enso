@@ -570,12 +570,9 @@ function onCellMouseDown(event: {
   const coord = { rowIndex: event.rowIndex, colId: event.column.getColId() }
   // Shift+Click extends the existing range from its anchor, matching the licensed Set Filter's
   // own Shift+Click behavior and the design spec's requirement for Shift+Click range extension.
-  if (nativeEvent?.shiftKey && communityRange.value != null) {
-    extendTo(coord)
-  } else {
-    startAt(coord)
-  }
-  gridApi.value?.refreshCells({ force: true })
+  const changed =
+    nativeEvent?.shiftKey && communityRange.value != null ? extendTo(coord) : startAt(coord)
+  if (changed) gridApi.value?.refreshCells({ force: true })
 }
 
 function onCellMouseOver(
@@ -583,8 +580,13 @@ function onCellMouseOver(
   mouseButtonDown: boolean,
 ) {
   if (AG_GRID_ENTERPRISE_AVAILABLE || event.rowIndex == null || !mouseButtonDown) return
-  extendTo({ rowIndex: event.rowIndex, colId: event.column.getColId() })
-  gridApi.value?.refreshCells({ force: true })
+  // Only repaint when the range actually moved. `mouseover` fires continuously while dragging
+  // within a single cell, and `refreshCells({ force: true })` re-renders every displayed cell —
+  // doing that on each event replaced the cell DOM many times a second, so nothing in the grid
+  // was ever stable mid-drag.
+  if (extendTo({ rowIndex: event.rowIndex, colId: event.column.getColId() })) {
+    gridApi.value?.refreshCells({ force: true })
+  }
 }
 
 let mouseButtonDown = false
@@ -630,11 +632,11 @@ function extendRangeByKeyboard(event: KeyboardEvent) {
   const nextColId = columnIds[currentColIndex + delta.colIndex] ?? current.focus.colId
   if (communityRange.value == null) startAt(current.anchor)
   const maxRowIndex = (gridApi.value?.getDisplayedRowCount() ?? 1) - 1
-  extendTo({
+  const moved = extendTo({
     rowIndex: Math.min(maxRowIndex, Math.max(0, current.focus.rowIndex + delta.rowIndex)),
     colId: nextColId,
   })
-  gridApi.value?.refreshCells({ force: true })
+  if (moved) gridApi.value?.refreshCells({ force: true })
   event.preventDefault()
 }
 

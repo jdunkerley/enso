@@ -53,3 +53,31 @@ describe('useCommunityCellRange', () => {
     expect(rectangle()).toEqual({ rowIndices: [5], colIds: ['d'] })
   })
 })
+
+describe('useCommunityCellRange change reporting', () => {
+  // Callers repaint the grid only when these report `true`. `mouseover` fires continuously while
+  // dragging within one cell, and repainting on every event re-rendered the whole grid many times
+  // a second, leaving no cell stable between animation frames.
+  test('extendTo reports no change when the focus cell is unchanged', () => {
+    const { startAt, extendTo } = useCommunityCellRange(columnIds)
+    startAt({ rowIndex: 0, colId: 'a' })
+    expect(extendTo({ rowIndex: 2, colId: 'b' })).toBe(true)
+    expect(extendTo({ rowIndex: 2, colId: 'b' })).toBe(false)
+    expect(extendTo({ rowIndex: 2, colId: 'c' })).toBe(true)
+  })
+
+  test('extendTo reports no change when there is no range to extend', () => {
+    const { extendTo } = useCommunityCellRange(columnIds)
+    expect(extendTo({ rowIndex: 1, colId: 'a' })).toBe(false)
+  })
+
+  test('startAt reports no change when it would re-anchor on the same single cell', () => {
+    const { startAt, extendTo } = useCommunityCellRange(columnIds)
+    expect(startAt({ rowIndex: 1, colId: 'b' })).toBe(true)
+    expect(startAt({ rowIndex: 1, colId: 'b' })).toBe(false)
+    expect(startAt({ rowIndex: 1, colId: 'c' })).toBe(true)
+    // Collapsing a multi-cell range back to its anchor *is* a change.
+    extendTo({ rowIndex: 3, colId: 'd' })
+    expect(startAt({ rowIndex: 1, colId: 'c' })).toBe(true)
+  })
+})
