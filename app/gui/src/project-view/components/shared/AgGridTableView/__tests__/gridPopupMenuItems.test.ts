@@ -78,3 +78,30 @@ test('a non-string icon (DOM Element) is dropped rather than rendered, since not
   if (item?.type !== 'item') throw new Error('expected an item')
   expect(item.icon).toBeUndefined()
 })
+
+test('built-in menu items carry an icon', () => {
+  // `export` shipped without one, so "Export to CSV" rendered with a blank icon slot.
+  const [item] = resolveGridMenuItems(['export'], makeContext())
+  if (item?.type !== 'item') throw new Error('expected an item')
+  expect(item.icon).toBeTruthy()
+})
+
+test('AG Grid icon-font spans are replaced with Enso sprite icons', () => {
+  // These render blank in GridPopupMenu: the `ag-icon` glyphs come from the AG Grid theme
+  // stylesheet, which is scoped to the grid's shadow root, while the popup is in the light DOM.
+  const agIcon = '<span class="ag-icon ag-icon-copy" unselectable="on" role="presentation"></span>'
+  const [item] = resolveGridMenuItems(
+    [{ name: 'Copy', icon: agIcon, action: vi.fn() }],
+    makeContext(),
+  )
+  if (item?.type !== 'item') throw new Error('expected an item')
+  expect(item.icon).not.toContain('ag-icon')
+  expect(item.icon).toContain('<svg')
+})
+
+test('a non-AG-Grid icon is passed through untouched', () => {
+  const custom = '<svg id="mine"/>'
+  const [item] = resolveGridMenuItems([{ name: 'X', icon: custom, action: vi.fn() }], makeContext())
+  if (item?.type !== 'item') throw new Error('expected an item')
+  expect(item.icon).toBe(custom)
+})

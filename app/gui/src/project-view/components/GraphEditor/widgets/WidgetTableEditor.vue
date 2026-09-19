@@ -16,6 +16,7 @@ import {
   tableInputCallMayBeHandled,
   useTableInputArgument,
 } from '@/components/GraphEditor/widgets/WidgetTableEditor/tableInputArgument'
+import { AG_GRID_ENTERPRISE_AVAILABLE } from '@/components/shared/AgGridTableView/agGridLicense'
 import { injectWidgetTree } from '@/providers/widgetTree'
 import { targetIsOutside } from '@/util/autoBlur'
 import { ProjectPath } from '@/util/projectPath'
@@ -161,7 +162,10 @@ const defaultColDef: ColDef<RowData> & {
   resizable: true,
   sortable: false,
   lockPinned: true,
-  menuTabs: ['generalMenuTab'],
+  // `menuTabs` is an Enterprise-only ColDef property — AG Grid Community logs a module error for
+  // it at grid construction. Spread it in only when licensed rather than setting it to
+  // `undefined`, which `exactOptionalPropertyTypes` forbids here.
+  ...(AG_GRID_ENTERPRISE_AVAILABLE ? { menuTabs: ['generalMenuTab' as const] } : {}),
   headerComponentParams,
   cellStyle: { 'padding-left': 0, 'border-right': '1px solid #C0C0C0' },
 }
