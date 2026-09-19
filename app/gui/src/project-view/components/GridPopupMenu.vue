@@ -103,6 +103,9 @@ function onWindowPointerDown(event: PointerEvent) {
         <MenuButton v-else :disabled="item.disabled" class="entry" @activate="activate(item)">
           <!-- eslint-disable-next-line vue/no-v-html -->
           <span v-if="item.icon" class="icon" v-html="item.icon" />
+          <!-- Keep the gutter when an item has no icon, so labels stay aligned in a menu that
+               mixes the two (e.g. the column menu's autosize entries alongside Remove Column). -->
+          <span v-else class="icon" aria-hidden="true" />
           <span class="name" v-text="item.name" />
           <span v-if="item.shortcut" class="shortcut" v-text="item.shortcut" />
         </MenuButton>
@@ -130,6 +133,10 @@ function onWindowPointerDown(event: PointerEvent) {
 }
 .icon {
   display: inline-flex;
+  /* Fixed, so an item without an icon still reserves the gutter and labels line up. Matches the
+     16x16 sprite `menuIconHtml` emits. */
+  flex: none;
+  width: 16px;
   margin-right: 8px;
 }
 .name {

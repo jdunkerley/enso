@@ -4,6 +4,7 @@ import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase
 import type { UpdateHandler, WidgetInput } from '$/providers/openedProjects/widgetRegistry'
 import { cachedGetter, type ToValue } from '$/utils/reactivity'
 import { commonContextMenuActions, type MenuItem } from '@/components/shared/AgGridTableView.vue'
+import { menuIconHtml } from '@/components/shared/AgGridTableView/gridPopupMenuItems'
 import { Ast } from '@/util/ast'
 import { arrayEquals, findIndexOpt } from '@/util/data/array'
 import { ProjectPath } from '@/util/projectPath'
@@ -274,6 +275,7 @@ export function useTableInputArgument(
 
   const removeRowMenuItem = {
     name: 'Remove Row',
+    icon: menuIconHtml('trash'),
     action: ({ node }: { node: { data: RowData | undefined } | null }) => {
       toValue(module).edit(
         (edit) => {
@@ -289,6 +291,7 @@ export function useTableInputArgument(
 
   const removeColumnMenuItem = (colId: Ast.AstId) => ({
     name: 'Remove Column',
+    icon: menuIconHtml('trash'),
     action: () => {
       toValue(module).edit(
         (edit) => {
