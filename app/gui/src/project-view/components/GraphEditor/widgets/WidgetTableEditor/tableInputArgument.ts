@@ -275,7 +275,7 @@ export function useTableInputArgument(
 
   const removeRowMenuItem = {
     name: 'Remove Row',
-    icon: menuIconHtml('trash'),
+    icon: menuIconHtml('row_remove'),
     action: ({ node }: { node: { data: RowData | undefined } | null }) => {
       toValue(module).edit(
         (edit) => {
@@ -291,7 +291,7 @@ export function useTableInputArgument(
 
   const removeColumnMenuItem = (colId: Ast.AstId) => ({
     name: 'Remove Column',
-    icon: menuIconHtml('trash'),
+    icon: menuIconHtml('column_remove'),
     action: () => {
       toValue(module).edit(
         (edit) => {
