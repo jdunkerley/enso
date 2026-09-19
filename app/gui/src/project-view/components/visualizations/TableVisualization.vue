@@ -515,6 +515,15 @@ function createServer() {
 
       try {
         const response = await config.executeExpression(expressionFunction, 2000)
+        // `executeExpression` resolves to `null` while the visualization subdoc is still syncing,
+        // and to an `Err` when evaluation fails — neither carries a `value`. Reading it
+        // unconditionally turned both into an opaque "Cannot read properties of undefined", which
+        // hid whatever actually went wrong.
+        if (response == null) return { success: false, data: [] }
+        if (!response.ok) {
+          response.error.log('Error loading filterValues for column')
+          return { success: false, data: [] }
+        }
         return {
           success: true,
           data: response.value.distinct_vals,
@@ -559,6 +568,15 @@ function createServer() {
 
       try {
         const response = await config.executeExpression(expressionFunction)
+        // See the note on the `getFilterValues` call above: `null` means "subdoc not synced yet"
+        // and `Err` means the evaluation failed. Neither has a `value`, and reading one produced
+        // the misleading "Cannot read properties of undefined (reading 'row_count')" that masked
+        // the real failure.
+        if (response == null) return { success: false, data: null, rowCount: undefined }
+        if (!response.ok) {
+          response.error.log('Error loading rows for table')
+          return { success: false, data: null, rowCount: undefined }
+        }
         filteredRowCount.value = response.value.row_count
         return {
           success: true,
