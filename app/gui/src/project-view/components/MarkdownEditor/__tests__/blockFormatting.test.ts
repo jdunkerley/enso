@@ -5,9 +5,9 @@ import {
   removeCodeBlock,
   setBlockType,
 } from '@/components/MarkdownEditor/codemirror/formatting/block'
-import {
-  type DelimitedBlockType,
-  type SupportedBlockType,
+import type {
+  DelimitedBlockType,
+  SupportedBlockType,
 } from '@/components/MarkdownEditor/markdown/types'
 import { EditorView } from '@codemirror/view'
 import * as objects from 'enso-common/src/utilities/data/object'

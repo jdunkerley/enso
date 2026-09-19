@@ -6,9 +6,9 @@ import {
   splitRange,
   trimRangeDelimiters,
 } from '@/components/MarkdownEditor/markdown/trees'
-import {
-  type NormalizedRange,
-  type SeminormalizedRange,
+import type {
+  NormalizedRange,
+  SeminormalizedRange,
 } from '@/components/MarkdownEditor/markdown/types'
 import { Text } from '@codemirror/state'
 import { expect, test } from 'vitest'

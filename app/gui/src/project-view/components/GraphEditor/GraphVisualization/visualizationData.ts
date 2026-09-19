@@ -1,5 +1,5 @@
 import { useGraphStore, useProjectStore } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph/graphDatabase'
+import type { NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
 import { visualizationConfigPreprocessorEqual } from '$/providers/openedProjects/project/executionContext'

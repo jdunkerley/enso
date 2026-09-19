@@ -1,6 +1,6 @@
-import { type GraphStore, type NodeId } from '$/providers/openedProjects/graph'
+import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
 import { asNodeId } from '$/providers/openedProjects/graph/graphDatabase'
-import { type ModuleStore } from '$/providers/openedProjects/module'
+import type { ModuleStore } from '$/providers/openedProjects/module'
 import type { RequiredImport } from '$/providers/openedProjects/module/imports'
 import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { ToValue } from '$/utils/reactivity'

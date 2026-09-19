@@ -7,11 +7,11 @@ import {
   useUnconnectedEdges,
   type UnconnectedEdge,
 } from '$/providers/openedProjects/graph/unconnectedEdges'
-import { type RequiredImport } from '$/providers/openedProjects/module/imports'
-import { type ProjectStore } from '$/providers/openedProjects/project'
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
-import { type SuggestionDbStore } from '$/providers/openedProjects/suggestionDatabase'
-import { type Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { RequiredImport } from '$/providers/openedProjects/module/imports'
+import type { ProjectStore } from '$/providers/openedProjects/project'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { SuggestionDbStore } from '$/providers/openedProjects/suggestionDatabase'
+import type { Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { UpdateHandler, UpdateResult } from '$/providers/openedProjects/widgetRegistry'
 import { useCallbackRegistry } from '$/utils/data/callbacks'
 import { proxyRefs, useWatchContext } from '$/utils/reactivity'
@@ -49,7 +49,7 @@ import type { ExpressionUpdate } from 'ydoc-shared/languageServerTypes'
 import { reachable } from 'ydoc-shared/util/data/graph'
 import type { ExternalId, VisualizationMetadata } from 'ydoc-shared/yjsModel'
 import { visMetadataEquals } from 'ydoc-shared/yjsModel'
-import { type ModuleStore } from '../module'
+import type { ModuleStore } from '../module'
 
 const FALLBACK_BINDING_PREFIX = 'node'
 

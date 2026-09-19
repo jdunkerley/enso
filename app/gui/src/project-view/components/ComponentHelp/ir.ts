@@ -4,7 +4,7 @@ import type {
   SuggestionId,
 } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { SuggestionKind } from '$/providers/openedProjects/suggestionDatabase/entry'
-import { type ProjectPath } from '@/util/projectPath'
+import type { ProjectPath } from '@/util/projectPath'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import type { SuggestionEntryArgument } from 'ydoc-shared/languageServerTypes/suggestions'
 

@@ -10,7 +10,7 @@ import {
   useGraphStore,
   useProjectStore,
 } from '$/components/WithCurrentProject.vue'
-import { type Node } from '$/providers/openedProjects/graph'
+import type { Node } from '$/providers/openedProjects/graph'
 import { asNodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import { evaluationProgress } from '$/providers/openedProjects/project/computedValueRegistry'
 import { useNodeExecution } from '$/providers/openedProjects/project/nodeExecution'

@@ -1,7 +1,7 @@
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
-import { type ProjectStore } from '$/providers/openedProjects/project'
-import { type NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { ProjectStore } from '$/providers/openedProjects/project'
+import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import type { GroupInfo } from '$/providers/openedProjects/suggestionDatabase'
 import { entryIsAnnotatable } from '$/providers/openedProjects/suggestionDatabase/entry'
 import type { WidgetInput } from '$/providers/openedProjects/widgetRegistry'
@@ -20,7 +20,7 @@ import {
   getMethodCallInfoRecursively,
   interpretCall,
 } from '@/util/callTree'
-import { type MethodPointer } from '@/util/methodPointer'
+import type { MethodPointer } from '@/util/methodPointer'
 import { ProjectPath } from '@/util/projectPath'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { computed, toValue, type DeepReadonly } from 'vue'

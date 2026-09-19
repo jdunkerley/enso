@@ -3,7 +3,7 @@ import { Score, defineWidget, widgetProps } from '$/providers/openedProjects/wid
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import GrowingSpinner from '@/components/shared/GrowingSpinner.vue'
 import SvgIcon from '@/components/SvgIcon.vue'
-import { type AnyWidgetIcon } from '@/util/icons'
+import type { AnyWidgetIcon } from '@/util/icons'
 import { computed } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))

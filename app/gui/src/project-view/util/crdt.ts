@@ -1,4 +1,4 @@
-import { type ToValue } from '$/utils/reactivity'
+import type { ToValue } from '$/utils/reactivity'
 import type { Opt } from '@/util/data/opt'
 import { ref, toValue, watchEffect, type Ref } from 'vue'
 import type { Awareness } from 'y-protocols/awareness'

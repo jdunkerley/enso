@@ -3,16 +3,16 @@ import type { PasteData } from '#/utilities/pasteData'
 import { EMPTY_SET } from '#/utilities/set'
 import { createStore, useStore, type StoreApi } from '#/utilities/zustand'
 import type { Category } from '$/providers/category'
-import {
-  type AnyAsset,
-  type AssetId,
-  type BackendType,
-  type DirectoryId,
-  type LabelName,
+import type {
+  AnyAsset,
+  AssetId,
+  BackendType,
+  DirectoryId,
+  LabelName,
 } from 'enso-common/src/services/Backend'
 import * as React from 'react'
 import invariant from 'tiny-invariant'
-import { type TransferrableAsset } from '../layouts/Drive/Categories'
+import type { TransferrableAsset } from '../layouts/Drive/Categories'
 
 /** Attached data for a paste payload. */
 export interface DrivePastePayload {

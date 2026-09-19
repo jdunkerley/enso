@@ -12,7 +12,7 @@ import * as iter from 'enso-common/src/utilities/data/iter'
 import { unwrap } from 'enso-common/src/utilities/data/result'
 import { expect, test } from 'vitest'
 import { watchEffect } from 'vue'
-import { type Identifier } from 'ydoc-shared/ast'
+import type { Identifier } from 'ydoc-shared/ast'
 import { nodeIdFromOuterAst } from '../../../../providers/openedProjects/graph/graphDatabase'
 
 // ===============================

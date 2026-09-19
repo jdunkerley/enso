@@ -1,5 +1,5 @@
 /** @file A Vue composable for keeping track of selected DOM elements. */
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import { dataAttribute, selectorHierarchy } from '$/utils/dom'
 import { selectionMouseBindings } from '@/bindings'
 import { useEvent } from '@/composables/events'

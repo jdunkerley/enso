@@ -1,4 +1,4 @@
-import { type ModuleStore } from '$/providers/openedProjects/module'
+import type { ModuleStore } from '$/providers/openedProjects/module'
 import { requiredImportsByProjectPath } from '$/providers/openedProjects/module/imports'
 import type { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import type { UpdateHandler, WidgetInput } from '$/providers/openedProjects/widgetRegistry'

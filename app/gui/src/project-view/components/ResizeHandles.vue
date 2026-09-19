@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePointer } from '@/composables/events'
-import { type BoundsSet } from '@/util/data/rect'
+import type { BoundsSet } from '@/util/data/rect'
 import { Vec2 } from '@/util/data/vec2'
 
 const props = defineProps<BoundsSet>()

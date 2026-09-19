@@ -2,7 +2,7 @@ import {
   WidgetEditHandler,
   type WidgetEditHooks,
 } from '$/providers/openedProjects/widgetRegistry/editHandler'
-import { type ToValue } from '$/utils/reactivity'
+import type { ToValue } from '$/utils/reactivity'
 import { NEW_COLUMN_ID } from '@/components/GraphEditor/widgets/WidgetTableEditor/tableInputArgument'
 // `import type`, not `import { type … }`: under `verbatimModuleSyntax` the latter is not erased —
 // it leaves a bare side-effect import that loads AG Grid Enterprise into the ProjectView chunk and

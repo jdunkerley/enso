@@ -7,12 +7,14 @@ import type {
 
 /** `filterParams` shape this filter expects, in addition to the standard `IFilterParams`. */
 export interface CommunitySetFilterParams extends IFilterParams {
-  /** Same shape as `ISetFilterParams.values` when given a function: sources the distinct values
+  /**
+   * Same shape as `ISetFilterParams.values` when given a function: sources the distinct values
    * to show in the checkbox list. Reused unchanged from the existing Set Filter wiring — see
    * `getFilterValues` in `TableVisualization.vue`. Omitted (as it is for the client-side row
    * model, which has no server round-trip) means "derive the distinct values directly from the
    * grid's own row data", matching AG Grid's own Set Filter's behavior when no `values` callback
-   * is configured. */
+   * is configured.
+   */
   values?: (params: SetFilterValuesFuncParams) => void
 }
 
@@ -45,6 +47,9 @@ export class CommunitySetFilter implements IFilterComp {
   private allValues: string[] = []
   private selected = new Set<string>()
 
+  /**
+   *
+   */
   init(params: CommunitySetFilterParams) {
     this.params = params
     this.eGui = document.createElement('div')
@@ -100,6 +105,9 @@ export class CommunitySetFilter implements IFilterComp {
     this.loadValues()
   }
 
+  /**
+   *
+   */
   afterGuiAttached() {
     this.loadValues()
   }
@@ -165,10 +173,16 @@ export class CommunitySetFilter implements IFilterComp {
     )
   }
 
+  /**
+   *
+   */
   getGui() {
     return this.eGui
   }
 
+  /**
+   *
+   */
   doesFilterPass(params: IDoesFilterPassParams) {
     // For the client-side row model (no `values` callback — filtering happens in the browser),
     // this is what AG Grid actually calls to filter rows. For server-driven row models, filtering
@@ -178,15 +192,24 @@ export class CommunitySetFilter implements IFilterComp {
     return this.selected.has(String(value))
   }
 
+  /**
+   *
+   */
   isFilterActive() {
     return this.selected.size !== this.allValues.length
   }
 
+  /**
+   *
+   */
   getModel(): CommunitySetFilterModel | null {
     if (!this.isFilterActive()) return null
     return { filterType: 'set', values: Array.from(this.selected) }
   }
 
+  /**
+   *
+   */
   setModel(model: CommunitySetFilterModel | null) {
     this.selected = model ? new Set(model.values) : new Set(this.allValues)
     this.renderList()

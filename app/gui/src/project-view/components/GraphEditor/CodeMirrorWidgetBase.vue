@@ -17,7 +17,7 @@ import {
 } from '@/util/codemirror'
 import { highlightStyle } from '@/util/codemirror/highlight'
 import { useToast } from '@/util/toast'
-import { type Extension } from '@codemirror/state'
+import type { Extension } from '@codemirror/state'
 import { Ok } from 'enso-common/src/utilities/data/result'
 import { ref, useTemplateRef, watch, type ComponentInstance } from 'vue'
 

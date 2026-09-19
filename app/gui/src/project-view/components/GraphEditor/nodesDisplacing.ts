@@ -1,5 +1,5 @@
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import { Vec2 } from '@/util/data/vec2'
 
 /** Composable supporting moving nodes in response to a node being resized. */

@@ -1,5 +1,5 @@
 import type { MethodCallInfo } from '$/providers/openedProjects/graph/graphDatabase'
-import { type ExpressionInfo } from '$/providers/openedProjects/project/computedValueRegistry'
+import type { ExpressionInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import { createContextStore } from '@/providers'
 import { Ast } from '@/util/ast'
 import { ProjectPath } from '@/util/projectPath'
