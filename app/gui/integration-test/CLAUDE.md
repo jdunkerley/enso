@@ -54,8 +54,11 @@ in both modes. Anything else runs once, unlicensed.
   `vite.config.ts`).
 - The Playwright `webServer` command uses a POSIX path, so the integration suite
   does not run on native Windows. Use WSL, or rely on CI.
-- Requires `NODE_OPTIONS='--experimental-wasm-modules'` until Node 24 is default
-  (the Rust parser WASM module).
+- The Rust parser is imported as an ESM WebAssembly module
+  (`import * as wasm from './rust_ffi_bg.wasm'` in `app/rust-ffi/dist/`). Node
+  24 supports this unflagged; on Node 22 it needs
+  `NODE_OPTIONS='--experimental-wasm-modules'`, which is why `.node-version`
+  pins 24.
 - Install browsers once with `pnpm run playwright:install` (Chromium only).
 - CI runs with a matrix of {dashboard, project-view} × {chromium}. Don't add
   cross-suite test IDs — they must stay independent.

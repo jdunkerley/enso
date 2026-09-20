@@ -62,8 +62,7 @@ into `src/` and importing via `$/`, or cross the framework bridge via `veaury`.
 - `build` / `build-cloud` — production bundle (with `ENSO_IDE_CLOUD_BUILD` env
   toggle for cloud-specific behavior).
 - `test:unit` — vitest.
-- `test:integration` — Playwright (needs
-  `NODE_OPTIONS='--experimental-wasm-modules'` until Node 24 is default).
+- `test:integration` — Playwright.
 - `playwright:install` — install the pinned browser.
 
 ## ProjectView ↔ backend
