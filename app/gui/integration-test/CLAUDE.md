@@ -60,6 +60,21 @@ in both modes. Anything else runs once, unlicensed.
   `NODE_OPTIONS='--experimental-wasm-modules'`, which is why `.node-version`
   pins 24.
 - Install browsers once with `pnpm run playwright:install` (Chromium only).
+- **Playwright is held at 1.55.1** (exact-pinned in the workspace catalog).
+  1.63.0 makes the three `sorting and copying` tests in
+  `tableVisualisation.spec.ts` about 3× flakier — the Shift+Click stops
+  extending the cell range, so a two-row copy yields one row. Our code isn't the
+  cause, and two attempted fixes made it no better. Don't bump it without
+  re-measuring; the recipe and numbers are in #32.
+- Switching between branches that pin different Playwright versions needs
+  `corepack pnpm exec playwright install chromium` each way — they use different
+  Chromium revisions, and the error ("Looks like Playwright Test or Playwright
+  was just installed or updated") doesn't make the branch switch the obvious
+  cause.
+- **These tests are timing-sensitive.** Several pass in isolation and only fail
+  under `--workers=2` with the whole spec running. When judging whether a change
+  broke something here, run the full spec several times on both branches and
+  compare rates — a single run proves nothing either way.
 - CI runs with a matrix of {dashboard, project-view} × {chromium}. Don't add
   cross-suite test IDs — they must stay independent.
 
