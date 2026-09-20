@@ -35,7 +35,7 @@
 
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
-- [Engine toolchain: GraalVM 25.0.2, Scala 2.13.17, sbt 1.13][33]
+- [Engine toolchain: Scala 2.13.17, sbt 1.13, and the sbt plugin set][33]
 
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
