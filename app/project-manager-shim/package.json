@@ -42,9 +42,9 @@
     "chokidar": "^4.0.3",
     "enso-common": "workspace:*",
     "ksuid": "^3.0.0",
-    "portfinder": "^1.0.32",
-    "tar": "^7.5.13",
+    "portfinder": "^1.0.38",
+    "tar": "^7.5.22",
     "trash": "^9.0.0",
-    "yaml": "^2.8.3"
+    "yaml": "^2.9.1"
   }
 }

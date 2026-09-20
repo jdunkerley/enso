@@ -22,15 +22,15 @@
     }
   },
   "dependencies": {
-    "debug": "^4.4.0",
+    "debug": "^4.4.3",
     "enso-common": "workspace:^",
     "fast-diff": "^1.3.0",
-    "lib0": "^0.2.99",
+    "lib0": "^0.2.117",
     "modern-isomorphic-ws": "^1.0.5",
-    "y-protocols": "^1.0.6",
+    "y-protocols": "^1.0.7",
     "ydoc-channel": "workspace:*",
     "ydoc-shared": "workspace:*",
-    "yjs": "^13.6.21",
+    "yjs": "^13.6.32",
     "zod": "catalog:"
   },
   "devDependencies": {
