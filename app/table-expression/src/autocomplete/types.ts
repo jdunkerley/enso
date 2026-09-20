@@ -37,7 +37,4 @@ export interface BinOpCompletion extends AnyCompletion {
 }
 
 export type CompletionType =
-  | NameCompletion
-  | FunctionInfoCompletion
-  | ValueCompletion
-  | BinOpCompletion
+  NameCompletion | FunctionInfoCompletion | ValueCompletion | BinOpCompletion

@@ -65,8 +65,7 @@ export function useLanguageSupport(syntax: ToValue<Opt<string>>): Readonly<Ref<E
     autocompletion({ filterStrict: true }),
     startCompletionWhenEmptyDocumentFocused(),
   ])
-  return computed(
-    (): Extension =>
-      languageExt.value ? [languageExt.value, ...anyLanguageExt.value] : NULL_EXTENSION,
+  return computed((): Extension =>
+    languageExt.value ? [languageExt.value, ...anyLanguageExt.value] : NULL_EXTENSION,
   )
 }

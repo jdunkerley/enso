@@ -218,9 +218,7 @@ export interface FieldUpdate<T> {
 }
 
 export type SuggestionArgumentUpdate =
-  | SuggestionArgumentUpdate.Add
-  | SuggestionArgumentUpdate.Remove
-  | SuggestionArgumentUpdate.Modify
+  SuggestionArgumentUpdate.Add | SuggestionArgumentUpdate.Remove | SuggestionArgumentUpdate.Modify
 
 export namespace SuggestionArgumentUpdate {
   export interface Add {

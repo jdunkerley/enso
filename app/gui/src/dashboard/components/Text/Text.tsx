@@ -13,9 +13,7 @@ import { TEXT_STYLE } from './variants'
 
 /** Props for the Text component */
 export interface TextProps
-  extends Omit<aria.TextProps, 'color'>,
-    VariantProps<typeof TEXT_STYLE>,
-    TestIdProps {
+  extends Omit<aria.TextProps, 'color'>, VariantProps<typeof TEXT_STYLE>, TestIdProps {
   readonly elementType?: keyof HTMLElementTagNameMap
   readonly lineClamp?: number
   readonly tooltip?: TooltipElementType

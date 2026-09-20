@@ -10,8 +10,10 @@ import { PLAN_TO_UPGRADE_LABEL_ID, TRIAL_DURATION_DAYS } from '../../../constant
 import { PlanSelectorDialog, type PlanSelectorDialogProps } from './PlanSelectorDialog'
 
 /** Props for a {@link SubscribeButton}. */
-export interface SubscribeButtonProps
-  extends Omit<PlanSelectorDialogProps, 'isTrialing' | 'title'> {
+export interface SubscribeButtonProps extends Omit<
+  PlanSelectorDialogProps,
+  'isTrialing' | 'title'
+> {
   readonly isOrganizationAdmin: boolean
   readonly userHasSubscription: boolean
   readonly isCurrent: boolean

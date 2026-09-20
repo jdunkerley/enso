@@ -27,8 +27,7 @@ const STATUS_BADGE_STYLES = tv({
 
 /** Props for a {@link StatusBadge}. */
 export interface StatusBadgeProps
-  extends Readonly<PropsWithChildren>,
-    VariantProps<typeof STATUS_BADGE_STYLES> {}
+  extends Readonly<PropsWithChildren>, VariantProps<typeof STATUS_BADGE_STYLES> {}
 
 /** A status badge to notify the user of the state of an item. */
 export function StatusBadge(props: StatusBadgeProps) {

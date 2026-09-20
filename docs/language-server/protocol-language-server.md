@@ -665,12 +665,7 @@ The suggestion entry type that is used as a filter in search requests.
 ```typescript
 // The kind of a suggestion.
 type SuggestionEntryType =
-  | Module
-  | Type
-  | Constructor
-  | Method
-  | Function
-  | Local;
+  Module | Type | Constructor | Method | Function | Local;
 ```
 
 ### `SuggestionId`
@@ -731,9 +726,7 @@ An operation applied to the suggestion argument.
 
 ```typescript
 type SuggestionArgumentUpdate =
-  | SuggestionArgumentAdd
-  | SuggestionArgumentRemove
-  | SuggestionArgumentModify;
+  SuggestionArgumentAdd | SuggestionArgumentRemove | SuggestionArgumentModify;
 
 interface SuggestionArgumentAdd {
   /** The position of the argument. */

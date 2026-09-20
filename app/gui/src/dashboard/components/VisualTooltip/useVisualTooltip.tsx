@@ -8,8 +8,10 @@ import { isOverflowing } from '$/utils/dom'
 import * as React from 'react'
 
 /** Props for {@link useVisualTooltip}. */
-export interface VisualTooltipOptions
-  extends Pick<TooltipProps, 'maxWidth' | 'rounded' | 'size' | 'variant'> {
+export interface VisualTooltipOptions extends Pick<
+  TooltipProps,
+  'maxWidth' | 'rounded' | 'size' | 'variant'
+> {
   readonly children: React.ReactNode
   readonly className?: string
   readonly targetRef: React.RefObject<HTMLElement>
@@ -133,8 +135,10 @@ export function useVisualTooltip(props: VisualTooltipOptions): VisualTooltipRetu
 }
 
 /** Props for {@link TooltipInner}. */
-interface TooltipInnerProps
-  extends Pick<TooltipProps, 'maxWidth' | 'rounded' | 'size' | 'variant'> {
+interface TooltipInnerProps extends Pick<
+  TooltipProps,
+  'maxWidth' | 'rounded' | 'size' | 'variant'
+> {
   readonly id: string
   readonly disabled: boolean
   readonly handleHoverChange: (isHovered: boolean) => void

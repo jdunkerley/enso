@@ -5,8 +5,10 @@ import { Input, type InputProps } from '#/components/Inputs/Input'
 import { useState } from 'react'
 
 /** Props for a {@link Password}. */
-export interface PasswordProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, string>>
-  extends Omit<InputProps<Schema, TFieldName, string>, 'type'> {}
+export interface PasswordProps<
+  Schema extends TSchema,
+  TFieldName extends FieldPath<Schema, string>,
+> extends Omit<InputProps<Schema, TFieldName, string>, 'type'> {}
 
 /** A component wrapping {@link Input} with the ability to show and hide password. */
 export function Password<Schema extends TSchema, TFieldName extends FieldPath<Schema, string>>(

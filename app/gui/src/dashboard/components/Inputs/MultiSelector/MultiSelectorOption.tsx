@@ -7,8 +7,7 @@ import { TEXT_STYLE } from '../../Text'
 
 /** Props for a {@link MultiSelectorOption}. */
 export interface MultiSelectorOptionProps
-  extends ListBoxItemProps,
-    VariantProps<typeof MULTI_SELECTOR_OPTION_STYLES> {
+  extends ListBoxItemProps, VariantProps<typeof MULTI_SELECTOR_OPTION_STYLES> {
   readonly label: string
 }
 

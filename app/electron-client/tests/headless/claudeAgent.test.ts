@@ -29,9 +29,8 @@ vi.mock('electron', () => ({
   webContents: { getAllWebContents: () => [] },
 }))
 
-const { ClaudeAgentSession, initClaudeAgentIpc, shutdownClaudeAgent } = await import(
-  '../../src/ai/claudeAgent'
-)
+const { ClaudeAgentSession, initClaudeAgentIpc, shutdownClaudeAgent } =
+  await import('../../src/ai/claudeAgent')
 const { ipcMain } = await import('electron')
 const { Channel } = await import('../../src/ipc.js')
 

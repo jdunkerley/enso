@@ -347,8 +347,7 @@ export function unsafe_assetFromCacheQueryOptions(options: AssetFromCacheQueryOp
           if (Array.isArray(data)) {
             // eslint-disable-next-line no-restricted-syntax
             const asset = data.find((maybeAsset) => assetSchema.safeParse(maybeAsset).success) as
-              | AnyAsset
-              | undefined
+              AnyAsset | undefined
             if (asset != null) return asset
           }
           // And sometimes we store them directly

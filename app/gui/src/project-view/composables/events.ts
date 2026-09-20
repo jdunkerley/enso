@@ -575,9 +575,7 @@ export function useWheelActions(
 ) {
   let prevEventPanInfo:
     | ({ expiration: number } & (
-        | { type: 'trackpad-zoom' }
-        | { type: 'wheel-zoom' }
-        | { type: 'pan'; trackpad: boolean }
+        { type: 'trackpad-zoom' } | { type: 'wheel-zoom' } | { type: 'pan'; trackpad: boolean }
       ))
     | undefined = undefined
 

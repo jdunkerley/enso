@@ -65,13 +65,12 @@ export function useBlockTypeDropdown({
     : blockTypesOrdered.includes(blockType.value) ? undefined
     : menuOption(blockType.value),
   )
-  const blockTypeOptions = computed(
-    (): Record<string, SelectionMenuOption> =>
-      Object.fromEntries(
-        currentTypeOption.value ?
-          [...standardOptions.value, [blockType.value, currentTypeOption.value]]
-        : standardOptions.value,
-      ),
+  const blockTypeOptions = computed((): Record<string, SelectionMenuOption> =>
+    Object.fromEntries(
+      currentTypeOption.value ?
+        [...standardOptions.value, [blockType.value, currentTypeOption.value]]
+      : standardOptions.value,
+    ),
   )
 
   return computed((): ComponentProps<typeof SelectionDropdown> | undefined =>

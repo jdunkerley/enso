@@ -115,7 +115,9 @@ function normalizeDateSegment(segment: DateSegmentType): DateSegmentType {
 export interface DatePickerProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, DateValue>,
-> extends Pick<AriaDatePickerProps<DateValue>, 'granularity'>,
+>
+  extends
+    Pick<AriaDatePickerProps<DateValue>, 'granularity'>,
     FieldStateProps<
       Omit<
         AriaDatePickerProps<Extract<FieldValues<Schema>[TFieldName], DateValue>>,

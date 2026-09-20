@@ -301,15 +301,17 @@
   --radius-full: 9999px;
   --radius-default: 16px;
   --section-gap: 160px;
-  --font-sans: "M PLUS 1", /* System sans-serif font stack */ system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-code: "M PLUS 1", /* System sans-serif font stack */ system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
-    "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "DejaVu Sans Mono",
-    /* System monspace font stack */ ui-monospace, Menlo, Monaco,
-    "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", "Oxygen Mono",
+  --font-sans:
+    "M PLUS 1", /* System sans-serif font stack */ system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-code:
+    "M PLUS 1", /* System sans-serif font stack */ system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "DejaVu Sans Mono", /* System monospace font stack */ ui-monospace, Menlo,
+    Monaco, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", "Oxygen Mono",
     "Ubuntu Monospace", "Source Code Pro", "Fira Mono", "Droid Sans Mono",
     "Courier New", monospace;
   /* Default resize handle widths, used for panels. */

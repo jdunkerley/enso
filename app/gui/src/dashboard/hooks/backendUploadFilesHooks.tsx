@@ -197,8 +197,7 @@ export interface UploadFileToCloudMutationOptions {
  * Theoretically, we _could_ upload folders to the cloud, but at this point it is a bit complex to do
  */
 export type UploadableAsset =
-  | UploadToCloudAsset<AssetType.file>
-  | UploadToCloudAsset<AssetType.project>
+  UploadToCloudAsset<AssetType.file> | UploadToCloudAsset<AssetType.project>
 
 /** An asset that can be uploaded to the cloud. */
 export type UploadToCloudAsset<Type extends AssetType> = Pick<
@@ -343,18 +342,14 @@ export function useUploadFileToCloud() {
 
           await upload(localBackend, {
             assets: [
-              ...renames.map(
-                (resolution): UploadToCloudAsset<AssetType> => ({
-                  ...resolution.asset,
-                  newName: resolution.newName,
-                }),
-              ),
-              ...replaces.map(
-                (resolution): UploadToCloudAsset<AssetType> => ({
-                  ...resolution.asset,
-                  cloudId: resolution.cloudId,
-                }),
-              ),
+              ...renames.map((resolution): UploadToCloudAsset<AssetType> => ({
+                ...resolution.asset,
+                newName: resolution.newName,
+              })),
+              ...replaces.map((resolution): UploadToCloudAsset<AssetType> => ({
+                ...resolution.asset,
+                cloudId: resolution.cloudId,
+              })),
             ],
             targetDirectoryId,
           })

@@ -110,12 +110,12 @@ type ExecutionContextState =
 type EntryPoint = Omit<ExplicitCall, 'type'>
 
 type ExecutionContextNotification = {
-  'expressionUpdates'(updates: ExpressionUpdate[]): void
-  'executionFailed'(message: string): void
-  'executionComplete'(): void
-  'executionStatus'(diagnostics: Diagnostic[]): void
-  'newVisualizationConfiguration'(configs: Set<Uuid>): void
-  'visualizationsConfigured'(configs: Set<Uuid>): void
+  expressionUpdates(updates: ExpressionUpdate[]): void
+  executionFailed(message: string): void
+  executionComplete(): void
+  executionStatus(diagnostics: Diagnostic[]): void
+  newVisualizationConfiguration(configs: Set<Uuid>): void
+  visualizationsConfigured(configs: Set<Uuid>): void
 }
 
 enum SyncStatus {

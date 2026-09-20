@@ -7,8 +7,7 @@ import { TEXT_STYLE } from '../../Text'
 
 /** Props for a {@link SelectorOption}. */
 export interface SelectorOptionProps
-  extends RadioProps,
-    VariantProps<typeof SELECTOR_OPTION_STYLES> {
+  extends RadioProps, VariantProps<typeof SELECTOR_OPTION_STYLES> {
   readonly label: string
   readonly isSelected: boolean
 }

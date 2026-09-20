@@ -21,8 +21,7 @@ import { DIALOG_BACKGROUND } from './variants'
 
 /** Props for a {@link Popover}. */
 export interface PopoverProps
-  extends Omit<aria.PopoverProps, 'children' | 'placement'>,
-    VariantProps<typeof POPOVER_STYLES> {
+  extends Omit<aria.PopoverProps, 'children' | 'placement'>, VariantProps<typeof POPOVER_STYLES> {
   readonly children:
     | React.ReactNode
     | ((opts: aria.PopoverRenderProps & { readonly close: () => void }) => React.ReactNode)

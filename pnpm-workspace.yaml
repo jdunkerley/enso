@@ -20,12 +20,18 @@ catalog:
   vite: ^7.3.2
   vitest: ^3.2.4
   vue: ^3.5.13
+  # HELD at 1.55.1 on purpose — do not bump without re-measuring. See #32.
+  # 1.63.0 makes the three `sorting and copying` tests in tableVisualisation.spec.ts
+  # roughly 3x flakier (7 failures per 3 spec runs, vs 2 on this version). Our code is
+  # not at fault: ag-grid is unchanged, and fixes to both the grid's repaint scope and
+  # the test's modifier handling made it no better or worse. Pinned exactly rather than
+  # by range, so `pnpm install` cannot float past it.
   playwright: 1.55.1
-  "@codemirror/autocomplete": ^6.18.7
-  "@codemirror/language": ^6.11.3
-  "@codemirror/state": ^6.5.2
-  "@codemirror/view": ^6.38.2
+  "@codemirror/autocomplete": ^6.20.3
+  "@codemirror/language": ^6.12.4
+  "@codemirror/state": ^6.7.5
+  "@codemirror/view": ^6.43.12
   "@fast-check/vitest": ^0.2.1
-  "@lezer/common": ^1.2.3
-  "@lezer/highlight": ^1.2.1
+  "@lezer/common": ^1.5.2
+  "@lezer/highlight": ^1.2.3
   zod: ^3.25.49

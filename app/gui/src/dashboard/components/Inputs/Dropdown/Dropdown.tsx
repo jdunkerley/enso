@@ -114,7 +114,8 @@ interface InternalChildrenProps<T> {
 
 /** Props for a {@link Dropdown} shared between all variants. */
 interface InternalBaseDropdownProps<T>
-  extends InternalChildrenProps<T>,
+  extends
+    InternalChildrenProps<T>,
     Omit<VariantProps<typeof DROPDOWN_STYLES>, 'isFocused' | 'isReadOnly' | 'multiple'> {
   readonly readOnly?: boolean
   readonly className?: string
@@ -327,7 +328,9 @@ export interface FormDropdownProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, Constraint>,
   Constraint,
-> extends FieldStateProps<
+>
+  extends
+    FieldStateProps<
       Omit<DropdownProps<Constraint>, 'aria-label' | 'multiple' | 'onChange'> & {
         value: FieldValues<Schema>[TFieldName]
       },

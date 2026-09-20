@@ -223,9 +223,7 @@ export type Offset<T extends OffsetConstraint> = number & {
 }
 type AnyOffset = Offset<OffsetConstraint>
 export type CreateOffset<T extends OffsetConstraint> =
-  | ((builder: Builder) => Offset<T>)
-  | null
-  | undefined
+  ((builder: Builder) => Offset<T>) | null | undefined
 
 interface IGeneratedObject<T extends OffsetConstraint> {
   pack(builder: Builder): Offset<T>
@@ -806,13 +804,7 @@ export enum OutboundPayload {
 }
 
 export type AnyOutboundPayload =
-  | None
-  | Error
-  | Success
-  | FileContentsReply
-  | WriteBytesReply
-  | ReadBytesReply
-  | ChecksumBytesReply
+  None | Error | Success | FileContentsReply | WriteBytesReply | ReadBytesReply | ChecksumBytesReply
 
 export enum ErrorPayload {
   NONE = 0,

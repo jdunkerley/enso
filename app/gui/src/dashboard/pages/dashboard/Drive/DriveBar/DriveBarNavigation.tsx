@@ -264,8 +264,9 @@ export function DriveBarNavigation() {
 }
 
 /** Props for {@link DriveBarBreadcrumbsItem}. */
-interface DriveBarBreadcrumbsItemProps<IconType extends string>
-  extends BreadcrumbItemProps<IconType> {
+interface DriveBarBreadcrumbsItemProps<
+  IconType extends string,
+> extends BreadcrumbItemProps<IconType> {
   readonly navigateToDirectory: (id: React.Key) => void
 }
 

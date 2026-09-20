@@ -8,8 +8,10 @@ import { Button } from './Button'
 import type { ButtonProps } from './types'
 
 /** Props for a {@link CopyButton}. */
-export interface CopyButtonProps<IconType extends string>
-  extends Omit<ButtonProps<IconType>, 'icon' | 'loading' | 'onPress'> {
+export interface CopyButtonProps<IconType extends string> extends Omit<
+  ButtonProps<IconType>,
+  'icon' | 'loading' | 'onPress'
+> {
   /** The text to copy to the clipboard. */
   readonly copyText: string
   /**

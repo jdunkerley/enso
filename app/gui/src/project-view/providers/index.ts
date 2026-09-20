@@ -17,8 +17,7 @@ export function injectImmediate<T>(key: InjectionKey<T>, defaultValue: T): T {
   // NOTE: Usage of Vue internal API. Consult sources in case this breaks during vue update:
   // https://github.com/vuejs/core/blob/45547e69b25baa99a0ed52ba5110c5bd8b4a35e4/packages/runtime-core/src/apiInject.ts#L28
   const instance = getCurrentInstance() as
-    | (ComponentInternalInstance & { provides: Record<InjectionKey<T>, T> })
-    | null
+    (ComponentInternalInstance & { provides: Record<InjectionKey<T>, T> }) | null
   const instanceProvides = instance?.provides
 
   // Assertion to check if the internal propery exist when we expect it. If this fails after update,

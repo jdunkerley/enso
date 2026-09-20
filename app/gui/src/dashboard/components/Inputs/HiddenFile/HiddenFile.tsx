@@ -12,7 +12,8 @@ import { Input, type InputProps } from '#/components/aria'
 
 /** Props for {@link HiddenFile}. */
 export interface HiddenFileProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, File>>
-  extends FieldStateProps<
+  extends
+    FieldStateProps<
       Omit<InputProps, 'children' | 'value'> & { value: FieldValues<Schema>[TFieldName] },
       Schema,
       TFieldName,

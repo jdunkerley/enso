@@ -325,13 +325,11 @@ async function loadGroups(lsRpc: LanguageServer, firstExecution: Promise<unknown
     }
     return []
   }
-  return groups.value.componentGroups.map(
-    (group): GroupInfo => ({
-      name: group.name,
-      ...(group.color ? { color: group.color } : {}),
-      project: group.library as QualifiedName,
-    }),
-  )
+  return groups.value.componentGroups.map((group): GroupInfo => ({
+    name: group.name,
+    ...(group.color ? { color: group.color } : {}),
+    project: group.library as QualifiedName,
+  }))
 }
 
 /** {@link useSuggestionDbStore} composable object */

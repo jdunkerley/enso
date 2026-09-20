@@ -28,7 +28,8 @@ const PROGRESS_BAR_STYLES = tv({
 
 /** Props for a {@link ProgressBar}. */
 export interface ProgressBarProps
-  extends Omit<AriaProgressBarProps, 'className' | 'value'>,
+  extends
+    Omit<AriaProgressBarProps, 'className' | 'value'>,
     VariantProps<typeof PROGRESS_BAR_STYLES> {
   /** A number from 0 (not yet started, or just started) to 1 (about to complete, or completed). */
   readonly progress: number | 'indeterminate'

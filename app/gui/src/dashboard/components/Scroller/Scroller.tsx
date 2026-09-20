@@ -110,7 +110,8 @@ export const SCROLLER_STYLES = tv({
 
 /** Props for {@link Scroller}. */
 export interface ScrollerProps
-  extends HTMLAttributes<HTMLDivElement>,
+  extends
+    HTMLAttributes<HTMLDivElement>,
     PropsWithChildren,
     TestIdProps,
     Omit<VariantProps<typeof SCROLLER_STYLES>, 'endHidden' | 'startHidden'> {

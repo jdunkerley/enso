@@ -32,12 +32,9 @@ const CONTENT_EDITABLE_STYLES = tv({
 export interface ResizableContentEditableInputProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
-> extends FieldStateProps<
-      HTMLAttributes<HTMLDivElement> & { value: string },
-      Schema,
-      TFieldName,
-      string
-    >,
+>
+  extends
+    FieldStateProps<HTMLAttributes<HTMLDivElement> & { value: string }, Schema, TFieldName, string>,
     Pick<
       VariantProps<typeof INPUT_STYLES>,
       'disabled' | 'invalid' | 'rounded' | 'size' | 'variant'

@@ -39,7 +39,8 @@ const ICON_DISPLAY_STYLES = tv({
 
 /** Props for an {@link IconDisplay}. */
 export interface IconDisplayProps<IconType extends string>
-  extends Omit<TextProps, 'children' | 'variant' | 'variants'>,
+  extends
+    Omit<TextProps, 'children' | 'variant' | 'variants'>,
     VariantProps<typeof ICON_DISPLAY_STYLES> {
   readonly icon: IconProp<IconType>
   readonly children: TooltipElementType

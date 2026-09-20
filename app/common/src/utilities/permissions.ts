@@ -196,11 +196,7 @@ interface ViewPermissions extends BasePermissions<Permission.view> {
 
 /** Detailed permission information. This is used to draw the border. */
 export type Permissions =
-  | AdminPermissions
-  | EditPermissions
-  | OwnerPermissions
-  | ReadPermissions
-  | ViewPermissions
+  AdminPermissions | EditPermissions | OwnerPermissions | ReadPermissions | ViewPermissions
 
 export const DEFAULT_PERMISSIONS: Permissions = Object.freeze({
   type: Permission.view,

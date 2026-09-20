@@ -35,9 +35,7 @@ export type OnResizeCallback = (bounds: RectReadOnly) => void
 /** Options for the useMeasure hook. */
 export interface Options {
   readonly debounce?:
-    | number
-    | false
-    | { readonly scroll: number | false; readonly resize: number | false }
+    number | false | { readonly scroll: number | false; readonly resize: number | false }
   readonly scroll?: boolean
   readonly offsetSize?: boolean
   readonly onResize?: OnResizeCallback

@@ -61,9 +61,7 @@ const STYLES = tv({
 
 /** Props for a {@link ButtonGroup}. */
 export interface ButtonGroupProps
-  extends React.PropsWithChildren,
-    VariantProps<typeof STYLES>,
-    TestIdProps {
+  extends React.PropsWithChildren, VariantProps<typeof STYLES>, TestIdProps {
   readonly className?: string | undefined
   readonly buttonVariants?: ButtonGroupSharedButtonProps
 }

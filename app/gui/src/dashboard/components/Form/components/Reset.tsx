@@ -8,8 +8,10 @@ import type * as types from './types'
 import { useFormState } from './useFormState'
 
 /** Props for the Reset component. */
-export interface ResetProps<IconType extends string>
-  extends Omit<ButtonProps<IconType>, 'href' | 'loading'> {
+export interface ResetProps<IconType extends string> extends Omit<
+  ButtonProps<IconType>,
+  'href' | 'loading'
+> {
   /**
    * Connects the reset button to a form.
    * If not provided, the button will use the nearest form context.

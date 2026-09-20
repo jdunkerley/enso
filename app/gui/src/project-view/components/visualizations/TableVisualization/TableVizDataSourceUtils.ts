@@ -10,19 +10,10 @@ import {
 import { getCellValueType } from './tableVizUtils'
 
 export type ValueTypes =
-  | 'Date'
-  | 'Time'
-  | 'Date_Time'
-  | 'Integer'
-  | 'Char'
-  | 'Boolean'
-  | 'Float'
-  | 'Decimal'
-  | 'Byte'
+  'Date' | 'Time' | 'Date_Time' | 'Integer' | 'Char' | 'Boolean' | 'Float' | 'Decimal' | 'Byte'
 export type ValueTypeArgumentChild = { valueType: ValueTypes; value: string }
 type ValueTypeArgumentParent =
-  | { valueType: ValueTypes; value: string }
-  | { valueType: 'Mixed'; value: ValueTypeArgumentChild[] }
+  { valueType: ValueTypes; value: string } | { valueType: 'Mixed'; value: ValueTypeArgumentChild[] }
 type PossibleArguments = string | ValueTypeArgumentParent
 export type Argument = string | Array<PossibleArguments>
 type SortDirection = 'asc' | 'desc'

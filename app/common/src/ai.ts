@@ -170,6 +170,5 @@ export interface AiToolCallRequest {
 export interface AiToolCallReply {
   readonly requestId: string
   readonly result:
-    | { readonly ok: true; readonly value: string }
-    | { readonly ok: false; readonly error: string }
+    { readonly ok: true; readonly value: string } | { readonly ok: false; readonly error: string }
 }

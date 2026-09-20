@@ -4,8 +4,10 @@
  */
 
 /** An arbitrary {@link HTMLElement} without the unsafe {@link EventTarget} overloads. */
-interface SanitizedHTMLElementEventTarget
-  extends Omit<HTMLElement, 'addEventListener' | 'removeEventListener'> {
+interface SanitizedHTMLElementEventTarget extends Omit<
+  HTMLElement,
+  'addEventListener' | 'removeEventListener'
+> {
   readonly addEventListener: <K extends keyof HTMLElementEventMap>(
     type: K,
     listener: (this: Document, ev: HTMLElementEventMap[K]) => unknown,
@@ -19,8 +21,10 @@ interface SanitizedHTMLElementEventTarget
 }
 
 /** `document` without the unsafe {@link EventTarget} overloads. */
-interface SanitizedDocumentEventTarget
-  extends Omit<Document, 'addEventListener' | 'body' | 'removeEventListener'> {
+interface SanitizedDocumentEventTarget extends Omit<
+  Document,
+  'addEventListener' | 'body' | 'removeEventListener'
+> {
   readonly addEventListener: <K extends keyof DocumentEventMap>(
     type: K,
     listener: (this: Document, ev: DocumentEventMap[K]) => unknown,
@@ -39,8 +43,10 @@ interface SanitizedDocumentEventTarget
 export const document: SanitizedDocumentEventTarget = globalThis.document
 
 /** `window` without the unsafe {@link EventTarget} overloads. */
-interface SanitizedWindowEventTarget
-  extends Omit<Window, 'addEventListener' | 'removeEventListener'> {
+interface SanitizedWindowEventTarget extends Omit<
+  Window,
+  'addEventListener' | 'removeEventListener'
+> {
   readonly addEventListener: <K extends keyof WindowEventMap>(
     type: K,
     listener: (this: Document, ev: WindowEventMap[K]) => unknown,

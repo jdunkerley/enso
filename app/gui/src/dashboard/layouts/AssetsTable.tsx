@@ -377,14 +377,12 @@ function AssetsTable(props: AssetsTableProps) {
 
   useEffect(() => {
     const allVisible = () =>
-      assets.map(
-        (node): assetSearchBar.Suggestion => ({
-          key: node.id,
-          render: () => node.title,
-          addToQuery: (oldQuery) => oldQuery.add('names', [node.title]),
-          deleteFromQuery: (oldQuery) => oldQuery.delete('names', [node.title]),
-        }),
-      )
+      assets.map((node): assetSearchBar.Suggestion => ({
+        key: node.id,
+        render: () => node.title,
+        addToQuery: (oldQuery) => oldQuery.add('names', [node.title]),
+        deleteFromQuery: (oldQuery) => oldQuery.delete('names', [node.title]),
+      }))
 
     const terms = AssetQuery.terms(query.query)
     const term = terms.find((otherTerm) => otherTerm.values.length === 0) ?? terms[terms.length - 1]
@@ -411,15 +409,12 @@ function AssetsTable(props: AssetsTableProps) {
             .filter((node) => node.type === AssetType.file)
             .map((node) => fileExtension(node.title))
           setSuggestions(
-            Array.from(
-              new Set(extensions),
-              (extension): assetSearchBar.Suggestion => ({
-                key: extension,
-                render: () => AssetQuery.termToString({ tag: 'extension', values: [extension] }),
-                addToQuery: (oldQuery) => oldQuery.add('extensions', [extension]),
-                deleteFromQuery: (oldQuery) => oldQuery.delete('extensions', [extension]),
-              }),
-            ),
+            Array.from(new Set(extensions), (extension): assetSearchBar.Suggestion => ({
+              key: extension,
+              render: () => AssetQuery.termToString({ tag: 'extension', values: [extension] }),
+              addToQuery: (oldQuery) => oldQuery.add('extensions', [extension]),
+              deleteFromQuery: (oldQuery) => oldQuery.delete('extensions', [extension]),
+            })),
           )
           break
         }
@@ -429,19 +424,16 @@ function AssetsTable(props: AssetsTableProps) {
             return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
           })
           setSuggestions(
-            Array.from(
-              new Set(['today', ...modifieds]),
-              (modified): assetSearchBar.Suggestion => ({
-                key: modified,
-                render: () =>
-                  AssetQuery.termToString({
-                    tag: 'modified',
-                    values: [modified],
-                  }),
-                addToQuery: (oldQuery) => oldQuery.add('modifieds', [modified]),
-                deleteFromQuery: (oldQuery) => oldQuery.delete('modifieds', [modified]),
-              }),
-            ),
+            Array.from(new Set(['today', ...modifieds]), (modified): assetSearchBar.Suggestion => ({
+              key: modified,
+              render: () =>
+                AssetQuery.termToString({
+                  tag: 'modified',
+                  values: [modified],
+                }),
+              addToQuery: (oldQuery) => oldQuery.add('modifieds', [modified]),
+              deleteFromQuery: (oldQuery) => oldQuery.delete('modifieds', [modified]),
+            })),
           )
           break
         }
@@ -469,40 +461,34 @@ function AssetsTable(props: AssetsTableProps) {
         }
         case 'label': {
           setSuggestions(
-            (labels ?? []).map(
-              (label): assetSearchBar.Suggestion => ({
-                key: label.value,
-                render: () => (
-                  <Label active color={label.color} onPress={() => {}}>
-                    {label.value}
-                  </Label>
-                ),
-                addToQuery: (oldQuery) => oldQuery.add('labels', [label.value]),
-                deleteFromQuery: (oldQuery) => oldQuery.delete('labels', [label.value]),
-              }),
-            ),
+            (labels ?? []).map((label): assetSearchBar.Suggestion => ({
+              key: label.value,
+              render: () => (
+                <Label active color={label.color} onPress={() => {}}>
+                  {label.value}
+                </Label>
+              ),
+              addToQuery: (oldQuery) => oldQuery.add('labels', [label.value]),
+              deleteFromQuery: (oldQuery) => oldQuery.delete('labels', [label.value]),
+            })),
           )
           break
         }
         case 'owner': {
           setSuggestions([
-            ...(users ?? []).map(
-              (otherUser): assetSearchBar.Suggestion => ({
-                key: otherUser.userId,
-                render: () => <UserWithPopover user={otherUser} />,
-                addToQuery: (oldQuery) => oldQuery.add('owners', [otherUser.name]),
-                deleteFromQuery: (oldQuery) => oldQuery.delete('owners', [otherUser.name]),
-              }),
-            ),
-            ...(userGroups ?? []).map(
-              (userGroup): assetSearchBar.Suggestion => ({
-                key: userGroup.id,
-                render: () =>
-                  AssetQuery.termToString({ tag: 'owner', values: [userGroup.groupName] }),
-                addToQuery: (oldQuery) => oldQuery.add('owners', [userGroup.groupName]),
-                deleteFromQuery: (oldQuery) => oldQuery.delete('owners', [userGroup.groupName]),
-              }),
-            ),
+            ...(users ?? []).map((otherUser): assetSearchBar.Suggestion => ({
+              key: otherUser.userId,
+              render: () => <UserWithPopover user={otherUser} />,
+              addToQuery: (oldQuery) => oldQuery.add('owners', [otherUser.name]),
+              deleteFromQuery: (oldQuery) => oldQuery.delete('owners', [otherUser.name]),
+            })),
+            ...(userGroups ?? []).map((userGroup): assetSearchBar.Suggestion => ({
+              key: userGroup.id,
+              render: () =>
+                AssetQuery.termToString({ tag: 'owner', values: [userGroup.groupName] }),
+              addToQuery: (oldQuery) => oldQuery.add('owners', [userGroup.groupName]),
+              deleteFromQuery: (oldQuery) => oldQuery.delete('owners', [userGroup.groupName]),
+            })),
           ])
           break
         }

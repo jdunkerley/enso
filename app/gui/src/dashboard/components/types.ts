@@ -12,16 +12,11 @@ export interface TestIdProps {
 
 /** Any icon. */
 export type IconProp<Icon extends string = string, Render = never> =
-  | IconPropSvgUse<Render>
-  | LegacyIconProp<Icon, Render>
+  IconPropSvgUse<Render> | LegacyIconProp<Icon, Render>
 
 /** The possible return values for a legacy icon. */
 export type LegacyAvailableIconReturn<Icon extends string> =
-  | LegacyIcon<Icon>
-  | ReactElement
-  | false
-  | null
-  | undefined
+  LegacyIcon<Icon> | ReactElement | false | null | undefined
 
 /** The possible return values for a legacy icon. */
 export type AvailableIconReturn = ReactElement | SvgUseIcon | false | null | undefined
@@ -31,8 +26,7 @@ export type AvailableIconReturn = ReactElement | SvgUseIcon | false | null | und
  * @deprecated Prefer defined keys over importing from `#/assets/*.svg`.
  */
 export type LegacyIconProp<Icon extends string, Render> =
-  | LegacyAvailableIconReturn<Icon>
-  | ((render: Render) => LegacyAvailableIconReturn<Icon>)
+  LegacyAvailableIconReturn<Icon> | ((render: Render) => LegacyAvailableIconReturn<Icon>)
 
 /** Generic type for imported from figma icons. */
 export type IconPropSvgUse<Render> = AvailableIconReturn | ((render: Render) => AvailableIconReturn)

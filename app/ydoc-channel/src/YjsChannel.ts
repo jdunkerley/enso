@@ -345,8 +345,7 @@ export class YjsChannel<
    */
   private hasActiveEventListeners(): boolean {
     const observers = (this as any)._observers as
-      | Map<string, Set<(...args: any[]) => void>>
-      | undefined
+      Map<string, Set<(...args: any[]) => void>> | undefined
     return (observers?.get('message')?.size ?? 0) > 0
   }
 

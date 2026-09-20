@@ -55,8 +55,7 @@ export interface PropsWithoutHref {
 
 /** Base props for a button. */
 export interface BaseButtonProps<IconType extends string, Render>
-  extends Omit<ButtonVariants, 'iconOnly' | 'isJoined' | 'loading' | 'position'>,
-    TestIdProps {
+  extends Omit<ButtonVariants, 'iconOnly' | 'isJoined' | 'loading' | 'position'>, TestIdProps {
   /** If `true`, the loader will not be shown. */
   readonly hideLoader?: boolean
   /** Falls back to `aria-label`. Pass `false` to explicitly disable the tooltip. */

@@ -20,11 +20,11 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "vite-plugin-wasm": "^3.5.0",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "catalog:"
   },
   "dependencies": {
-    "lib0": "^0.2.99",
-    "yjs": "^13.6.19"
+    "lib0": "^0.2.117",
+    "yjs": "^13.6.32"
   }
 }

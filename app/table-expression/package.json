@@ -17,9 +17,9 @@
   "dependencies": {
     "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
-    "@lezer/lr": "^1.3.0",
     "@lezer/common": "catalog:",
-    "@lezer/highlight": "catalog:"
+    "@lezer/highlight": "catalog:",
+    "@lezer/lr": "^1.4.10"
   },
   "scripts": {
     "generate-parser": "lezer-generator src/expression.grammar --typeScript -o src/generated/parser",

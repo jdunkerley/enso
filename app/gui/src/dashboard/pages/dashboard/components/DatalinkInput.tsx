@@ -37,8 +37,10 @@ export default function DatalinkInput(props: DatalinkInputProps) {
 }
 
 /** Props for a {@link DatalinkFormInput}. */
-export interface DatalinkFormInputProps<Schema extends TSchema>
-  extends Omit<DatalinkInputProps, 'onChange' | 'value'> {
+export interface DatalinkFormInputProps<Schema extends TSchema> extends Omit<
+  DatalinkInputProps,
+  'onChange' | 'value'
+> {
   readonly form?: FormInstance<Schema>
   readonly name: FieldPath<Schema>
 }

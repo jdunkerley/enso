@@ -27,3 +27,23 @@ overrides:
     options:
       printWidth: 80
       proseWrap: "always"
+
+  # Vue SFCs deliberately skip prettier-plugin-organize-imports: it corrupts
+  # them. It delegates to vue-tsc for .vue files and writes the language
+  # service's result back by character offset, and on Linux those offsets are
+  # wrong -- the write lands one character out. The damage is silent (prettier
+  # exits 0) and looks like `import` -> `iimport`, stripped indentation, and a
+  # lost space in `{ computed, ref }`. See #19.
+  #
+  # Reproduced on Linux at plugin versions 4.1.0 and 4.3.0, under prettier
+  # 3.4.2 and 3.9.8, with vue-tsc 2 and 3 -- no available combination avoids
+  # it, so the only fix is not to run the plugin over .vue at all. It does not
+  # reproduce on Windows, which is why CI caught it and local checks did not.
+  #
+  # Overrides are applied in order and later entries win, so this must stay
+  # AFTER the block above. Only `plugins` is restated; every other option is
+  # inherited from that block.
+  - files: "*.vue"
+    options:
+      plugins:
+        - "prettier-plugin-tailwindcss"

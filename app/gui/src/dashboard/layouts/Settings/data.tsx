@@ -672,8 +672,7 @@ export interface SettingsContext {
  * TODO: Add support for other types.
  */
 export type SettingsInputType =
-  | Extract<HTMLInputTypeAttribute, 'email' | 'password' | 'text'>
-  | 'comboBox'
+  Extract<HTMLInputTypeAttribute, 'email' | 'password' | 'text'> | 'comboBox'
 
 /** Either `T`, or a function that returns `T` given a `SettingsContext`. */
 type ToValue<T> = T | ((context: SettingsContext) => T)

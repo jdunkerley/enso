@@ -21,7 +21,9 @@ import { CheckboxGroupProvider } from './CheckboxContext'
 export interface CheckboxGroupProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, readonly string[]>,
-> extends FieldStateProps<AriaCheckboxGroupProps, Schema, TFieldName, readonly string[]>,
+>
+  extends
+    FieldStateProps<AriaCheckboxGroupProps, Schema, TFieldName, readonly string[]>,
     FieldProps,
     FieldVariantProps,
     Omit<VariantProps<typeof CHECKBOX_GROUP_STYLES>, 'disabled' | 'invalid'>,

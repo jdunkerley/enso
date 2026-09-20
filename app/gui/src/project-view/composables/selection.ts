@@ -36,8 +36,7 @@ interface SelectionPackingOptions<T, PackedT> {
   unpack: (packed: PackedT) => T | undefined
 }
 export type SelectionOptions<T, PackedT> =
-  | BaseSelectionOptions<T>
-  | (BaseSelectionOptions<T> & SelectionPackingOptions<T, PackedT>)
+  BaseSelectionOptions<T> | (BaseSelectionOptions<T> & SelectionPackingOptions<T, PackedT>)
 
 export function useSelection<T>(
   navigator: NavigatorComposable,

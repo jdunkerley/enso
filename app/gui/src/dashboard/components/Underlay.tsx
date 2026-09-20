@@ -12,8 +12,7 @@ import type { HTMLAttributes } from 'react'
  * Props for the {@link Underlay} component.
  */
 export interface UnderlayProps
-  extends HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof DIALOG_BACKGROUND> {}
+  extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof DIALOG_BACKGROUND> {}
 
 /**
  * Component that renders an blurry underlay, that matches our design guidelines
