@@ -153,6 +153,15 @@ has silently produced a wrong result here:
   Metals/IntelliJ), the YAML round-trip in `DistributionPackage.scala`, or any
   test actually running — `Test/compile` only proves test sources build. Say
   which of these a change did _not_ verify.
+- **Run the formatting job's own command after touching `project/plugins.sbt` or
+  `project/build.properties`.** Neither `compile` nor `buildEngineDistribution`
+  invokes `scalafmtCheck`, so a green native-image build is silent about an
+  sbt/plugin version mismatch (sbt-scalafmt 2.6.x refuses to start below sbt
+  1.12.9). The check is cheap:
+
+  ```bash
+  sbt "scalafmtCheckAll; javafmtCheckAll; scalafmtSbtCheck"
+  ```
 
 ## Cross-cutting gotchas
 
