@@ -52,7 +52,7 @@ import org.enso.build.BenchTasks.Benchmark
   */
 object Dependencies {
   // === project-wide versions =====================================================
-  val scalacVersion = "2.13.18"
+  val scalacVersion = "2.13.17"
   // source version of the Java language
   val javaVersion = "25"
   // version of the GraalVM JDK
