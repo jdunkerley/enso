@@ -1,5 +1,5 @@
 addSbtPlugin("com.eed3si9n"    % "sbt-assembly"       % "2.5.0")
-addSbtPlugin("ch.epfl.scala"   % "sbt-bloop"          % "1.5.13")
+addSbtPlugin("ch.epfl.scala"   % "sbt-bloop"          % "2.1.2")
 addSbtPlugin("com.github.sbt"  % "sbt-license-report" % "1.5.0")
 addSbtPlugin("org.scalameta"   % "sbt-scalafmt"       % "2.6.2")
 addSbtPlugin("com.simplytyped" % "sbt-antlr4"         % "0.8.3")
