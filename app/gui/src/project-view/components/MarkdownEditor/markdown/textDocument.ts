@@ -1,6 +1,6 @@
-import {
-  type DelimitersTrimmedRange,
-  type TrimmedRange,
+import type {
+  DelimitersTrimmedRange,
+  TrimmedRange,
 } from '@/components/MarkdownEditor/markdown/types'
 import type { Text } from '@codemirror/state'
 import { Range } from 'ydoc-shared/util/data/range'

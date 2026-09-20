@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type Node } from '$/providers/openedProjects/graph'
+import type { Node } from '$/providers/openedProjects/graph'
 import { readAiPrompt } from '@/components/GraphEditor/aiNode'
 import PlainTextEditor from '@/components/PlainTextEditor.vue'
 import { useFocusDelayed } from '@/composables/focus'

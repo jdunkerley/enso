@@ -1,4 +1,4 @@
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import type { ConnectedEdge } from '$/providers/openedProjects/graph/graph'
 import { proxyRefs } from '$/utils/reactivity'
 import type { NavigatorComposable } from '@/composables/navigator'

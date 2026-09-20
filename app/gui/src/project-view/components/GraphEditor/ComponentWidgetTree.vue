@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
-import {
-  type NodeType,
-  type PrimaryApplication,
-} from '$/providers/openedProjects/graph/graphDatabase'
+import type { NodeId } from '$/providers/openedProjects/graph'
+import type { NodeType, PrimaryApplication } from '$/providers/openedProjects/graph/graphDatabase'
 import {
   applyWidgetUpdates,
   WidgetInput,

@@ -1,5 +1,5 @@
 import { useBackends } from '$/providers/backends'
-import { type ToValue } from '$/utils/reactivity'
+import type { ToValue } from '$/utils/reactivity'
 import * as vueQuery from '@tanstack/vue-query'
 import { projectSessionBackendType, type ProjectSessionId } from 'enso-common/src/services/Backend'
 import { computed, toRef } from 'vue'

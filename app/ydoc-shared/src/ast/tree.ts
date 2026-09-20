@@ -114,6 +114,9 @@ export interface NodePositionMetadata {
   y: number
   h?: number
 }
+/**
+ *
+ */
 export function normalizePosition(
   position: NodePositionMetadata | (Omit<NodePositionMetadata, 'h'> & { h: undefined }),
 ): NodePositionMetadata {

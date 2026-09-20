@@ -1,5 +1,8 @@
-import type { WidgetComponent, WidgetInput } from '$/providers/openedProjects/widgetRegistry'
-import { type UpdateHandler } from '$/providers/openedProjects/widgetRegistry'
+import type {
+  UpdateHandler,
+  WidgetComponent,
+  WidgetInput,
+} from '$/providers/openedProjects/widgetRegistry'
 import { createContextStore } from '@/providers'
 import { identity } from '@vueuse/core'
 

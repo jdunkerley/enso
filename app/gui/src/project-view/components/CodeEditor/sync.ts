@@ -13,7 +13,7 @@ import { Err, Ok } from 'enso-common/src/utilities/data/result'
 import { createDebouncer } from 'lib0/eventloop'
 import { onUnmounted, type Ref, watch } from 'vue'
 import { type SourceRangeEdit, textChangeToEdits } from 'ydoc-shared/util/data/text'
-import { type Origin } from 'ydoc-shared/yjsModel'
+import type { Origin } from 'ydoc-shared/yjsModel'
 
 // Indicates a change updating the text to correspond to the given module state.
 const synchronizedModule = Annotation.define<true>()

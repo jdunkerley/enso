@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type NodeId } from '$/providers/openedProjects/graph'
+import type { NodeId } from '$/providers/openedProjects/graph'
 import AiPendingNode from '@/components/GraphEditor/AiPendingNode.vue'
 import GraphNode from '@/components/GraphEditor/GraphNode.vue'
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'

@@ -2,10 +2,10 @@ import {
   mockProjectNameStore,
   type ProjectNameStore,
 } from '$/providers/openedProjects/projectNames'
-import {
-  type MethodSuggestionEntry,
-  type SuggestionEntry,
-  type SuggestionEntryArgument,
+import type {
+  MethodSuggestionEntry,
+  SuggestionEntry,
+  SuggestionEntryArgument,
 } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { SuggestionUpdateProcessor } from '$/providers/openedProjects/suggestionDatabase/lsUpdate'
 import { frontmatter } from '@/components/ComponentHelp/metadata'

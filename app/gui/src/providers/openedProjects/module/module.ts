@@ -1,4 +1,4 @@
-import { type ProjectStore } from '$/providers/openedProjects/project'
+import type { ProjectStore } from '$/providers/openedProjects/project'
 import { ConditionVariable } from '$/utils/ConditionVariable'
 import { proxyRefs } from '$/utils/reactivity'
 import { assert } from '@/util/assert'
@@ -6,7 +6,7 @@ import { Ast } from '@/util/ast'
 import { type AstId, MutableModule } from '@/util/ast/abstract'
 import { reactiveModule } from '@/util/ast/reactive'
 import { type Events, stringUnionToArray } from '@/util/data/observable'
-import { type MethodPointer } from '@/util/methodPointer'
+import type { MethodPointer } from '@/util/methodPointer'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { computed, effectScope, markRaw, reactive, ref, type Ref, watch } from 'vue'
 import { SourceDocument } from 'ydoc-shared/ast/sourceDocument'
@@ -17,8 +17,8 @@ import {
   type Origin,
 } from 'ydoc-shared/yjsModel'
 import * as Y from 'yjs'
-import { type ProjectNameStore } from '../projectNames'
-import { type SuggestionDbStore } from '../suggestionDatabase'
+import type { ProjectNameStore } from '../projectNames'
+import type { SuggestionDbStore } from '../suggestionDatabase'
 import {
   type AbstractImport,
   addImports,

@@ -1,4 +1,4 @@
-import { type ProjectStore } from '$/providers/openedProjects/project'
+import type { ProjectStore } from '$/providers/openedProjects/project'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import * as geoMapVisualization from '@/components/visualizations/GeoMapVisualization.vue'
 import * as imageBase64Visualization from '@/components/visualizations/ImageBase64Visualization.vue'

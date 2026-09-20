@@ -3,8 +3,8 @@ import {
   type WidgetInstanceId,
 } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import { InteractionHandler } from '@/providers/interactionHandler'
-import { type PortId } from '@/providers/portInfo'
-import { type CellPosition } from 'ag-grid-enterprise'
+import type { PortId } from '@/providers/portInfo'
+import type { CellPosition } from 'ag-grid-enterprise'
 import { expect, test, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useTableEditHandler, type EditedCell } from '../editHandler'

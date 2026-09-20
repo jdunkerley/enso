@@ -41,7 +41,7 @@ import type { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
 import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
-import { type Watcher } from 'project-manager-shim/fs'
+import type { Watcher } from 'project-manager-shim/fs'
 import {
   handleFilesystemCommand,
   handleProjectServiceRequest,

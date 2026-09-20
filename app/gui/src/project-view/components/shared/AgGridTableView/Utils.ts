@@ -25,7 +25,6 @@
  * SOFTWARE.
  */
 
-import { ComponentUtil, _processOnChange } from 'ag-grid-enterprise'
 import { markRaw, toRaw } from 'vue'
 
 export const kebabProperty = (property: string) => {
@@ -48,7 +47,20 @@ export interface Properties {
   [propertyName: string]: any
 }
 
-export const getAgGridProperties = (): [Properties, Properties, Properties] => {
+/**
+ * The subset of the `ag-grid-community` / `ag-grid-enterprise` module surface this file needs.
+ * Identical between both packages: `ag-grid-enterprise`'s types re-export everything from
+ * `ag-grid-community` (which itself re-exports from an internal `./core/main`, not the npm
+ * package `@ag-grid-community/core`), except `LicenseManager`, which is Enterprise-only and
+ * resolved separately by callers.
+ */
+export interface AgGridModule {
+  ComponentUtil: (typeof import('ag-grid-community'))['ComponentUtil']
+  _processOnChange: (typeof import('ag-grid-community'))['_processOnChange']
+}
+
+export const getAgGridProperties = (agGrid: AgGridModule): [Properties, Properties, Properties] => {
+  const { ComponentUtil, _processOnChange } = agGrid
   const props: Properties = {}
 
   // for example, 'grid-ready' would become 'onGrid-ready': undefined

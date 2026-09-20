@@ -1,10 +1,10 @@
-import { type ModuleStore } from '$/providers/openedProjects/module'
+import type { ModuleStore } from '$/providers/openedProjects/module'
 import {
   printRequiredImport,
   requiredImports,
   type RequiredImport,
 } from '$/providers/openedProjects/module/imports'
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import {
   entryDisplayPath,

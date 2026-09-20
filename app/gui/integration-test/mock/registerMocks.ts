@@ -5,6 +5,7 @@ import LATEST_GITHUB_RELEASES from './data/latestGithubReleases.json' with { typ
 
 export interface RegisterMocksOptions {
   readonly aiAvailable?: boolean
+  readonly appConfig?: Record<string, string | undefined>
 }
 
 /** Execute registration hooks for all playwright mocks that are shared across all tests. */
@@ -19,7 +20,33 @@ export async function registerMocks(
     mockFeatureFlags(page, featureFlags),
     mockElectronApi(page, options.aiAvailable ?? false),
     addMockClipboardInitScript(page),
+    ...(options.appConfig ? [injectAppConfig(page, options.appConfig)] : []),
   ])
+}
+
+/**
+ * Pre-set `window.$config`, which `src/config.ts` prefers over the values Vite baked in at build
+ * time. Used to fix the AG Grid licence key per Playwright project, so the licensed and unlicensed
+ * table code paths can both be exercised against a single build — and so the unlicensed project
+ * stays unlicensed even when `ENSO_IDE_AG_GRID_LICENSE_KEY` is present in the build environment.
+ */
+async function injectAppConfig(page: Page, appConfig: Record<string, string | undefined>) {
+  // An empty object means the project set no override — leave the baked-in values alone. Defining
+  // `window.$config` as `{}` does not merge, it *replaces*: `src/config.ts` prefers it wholesale,
+  // so the app would lose its API URL and Cognito settings and never render a login form. The
+  // `Setup` project takes exactly this path (it has no reason to care which grid is in use), and
+  // defining an empty config there broke authentication for every shard.
+  if (Object.keys(appConfig).length === 0) return
+  await test.step('Inject $config', () => {
+    return page.addInitScript((config) => {
+      Object.defineProperty(window, '$config', {
+        value: config,
+        writable: false,
+        configurable: false,
+        enumerable: false,
+      })
+    }, appConfig)
+  })
 }
 
 /** A placeholder date for visual regression testing. */

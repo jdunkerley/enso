@@ -1,6 +1,6 @@
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
-import type { IServerSideGetRowsRequest } from 'ag-grid-enterprise'
+import type { SortModelItem } from 'ag-grid-community'
 import {
   actionMap,
   type FilterAction,
@@ -29,6 +29,18 @@ type SortDirection = 'asc' | 'desc'
 const sortDirectionMap = {
   asc: '1',
   desc: '-1',
+}
+
+/**
+ * The subset of a row-fetch request that request-building logic here needs. Satisfied by both
+ * `IServerSideGetRowsRequest` (AG Grid Enterprise's Server-Side Row Model) and `IGetRowsParams`
+ * (AG Grid Community's Infinite Row Model) — see `TableVisualization.vue`'s two datasource
+ * factories, which both build one of these and pass it to `createServer().getData()`.
+ */
+export interface RowsRequestParams {
+  startRow: number | undefined
+  sortModel: SortModelItem[]
+  filterModel: any
 }
 
 const parseFilterValues = (
@@ -105,7 +117,7 @@ const parseFilterCondition = (
   return filterCondition.instantiateCopied([action, filterVal])
 }
 
-export const convertSortModel = (request: IServerSideGetRowsRequest, columnHeaders: string[]) => {
+export const convertSortModel = (request: RowsRequestParams, columnHeaders: string[]) => {
   const sortColIndexesMap = request.sortModel.map((sortCol) => {
     return `${columnHeaders.findIndex((h: string) => sortCol.colId === h)}`
   })

@@ -2,6 +2,13 @@
 
 #### Enso IDE
 
+- Table views no longer require an AG Grid Enterprise license to work. When no
+  `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
+  provides its own equivalents for the Enterprise features the IDE uses —
+  server-driven paging (via the Infinite Row Model), set/multi-value column
+  filters, multi-cell range selection with copy/cut/paste, and the cell and
+  column context menus — instead of running Enterprise code unlicensed behind a
+  watermark. With a licence key configured, behaviour is unchanged.
 - The IDE now starts in a local-only mode when it has no Enso Cloud
   configuration: a non-JSON configuration response is treated as empty, Cognito
   authentication is disabled instead of initialized with blanks, and the app

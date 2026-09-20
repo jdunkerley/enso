@@ -37,3 +37,10 @@
     );
   }
 }
+
+.ag-theme-alpine .communityCellRangeSelected {
+  background-color: var(
+    --ag-range-selection-background-color,
+    rgba(0, 89, 255, 0.1)
+  );
+}

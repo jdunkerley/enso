@@ -10,7 +10,7 @@ import {
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
 import { isOnElectron } from 'enso-common/src/utilities/detect'
 import { ref, shallowReactive } from 'vue'
-import { type ProjectInfo, type RunningProjectInfo } from './openedProjects/projectInfo'
+import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
 import {
   useProjectStates,
   type HybridLocallyClosed,

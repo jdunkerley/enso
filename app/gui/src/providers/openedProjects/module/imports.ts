@@ -1,4 +1,4 @@
-import { type ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import {
   SuggestionKind,

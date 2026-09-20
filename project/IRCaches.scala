@@ -8,8 +8,11 @@ object IRCaches {
     * the total cache size is 90.49 MB. Increased to 105 MB by #14492.
     * Temporarily increased to 110 MB check by #14703. Then decreased significantly
     * by removing `DataflowAnalysis` metadata by #14697 which brings the caches size down to ~62MB.
+    * As of 2026-09-19 a local `buildEngineDistribution` measures 79.69 MB, with no engine or
+    * stdlib change of our own — the ~53 stdlib commits since #14697 account for the growth.
+    * Raised to 88 to restore roughly the same ~10% headroom the previous values carried.
     */
-  val EXPECTED_MAX_SIZE_MB = 68
+  val EXPECTED_MAX_SIZE_MB = 88
 
   /** Ensures that IR caches of all standard libraries
     * are within the size limit.

@@ -224,6 +224,12 @@ jobs:
 
       - name: 🎭 Playwright Tests
         working-directory: app/gui
+        # The suite runs unlicensed (exercising the AG Grid Community fallbacks), and re-runs the
+        # `@ag-grid`-tagged specs with a licence so the Enterprise path keeps coverage too. Without
+        # this key the licensed project is skipped rather than run against an invalid licence —
+        # see app/gui/playwright.config.ts.
+        env:
+          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
         run: pnpm run test:integration --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
 
       - name: ⬆️ Upload blob report to GitHub Actions Artifacts

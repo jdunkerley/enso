@@ -39,6 +39,9 @@ export interface PrefixOpNode<T = Range> {
   rhs: T
 }
 
+/**
+ *
+ */
 export function parseNode(cursor: TreeCursor): SyntaxNode | null {
   const { child, childOpt, siblingOpt, match, anyChild, anySibling } = useParserCombinators(cursor)
   return match<SyntaxNode | null>({

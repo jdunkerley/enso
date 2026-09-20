@@ -166,6 +166,16 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     version = version.substring(2)
   }
 
+  // Electron Builder validates the *whole* configuration object, not just the platform it is
+  // packaging. Writing the `--target` override into every platform block therefore fails the
+  // build whenever the requested target is not also valid elsewhere — e.g. `--target nsis` on
+  // Windows is rejected because `nsis` is not a legal macOS target. Apply it only to the
+  // platform actually being built.
+  const targetFor = (buildConfigurationKey: string, platformDefault: string) =>
+    passedArgs.platform.buildConfigurationKey === buildConfigurationKey ?
+      (passedArgs.target ?? platformDefault)
+    : platformDefault
+
   return {
     appId: 'org.enso',
     productName: common.PRODUCT_NAME,
@@ -210,7 +220,7 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       // almost zero.
       // This type assertion is UNSAFE, and any users MUST verify that
       // they are passing a valid value to `target`.
-      target: (passedArgs.target as any) ?? 'dmg',
+      target: targetFor('mac', 'dmg') as any,
       icon: `./assets/icons/icon.icns`,
       category: 'public.app-category.developer-tools',
       darkModeSupport: true,
@@ -233,13 +243,13 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     win: {
       // Compression is not used as the build time is huge and file size saving
       // almost zero.
-      target: passedArgs.target ?? 'dir',
+      target: targetFor('win', 'dir'),
       icon: `./assets/icons/icon.ico`,
     },
     linux: {
       // Compression is not used as the build time is huge and file size saving
       // is almost zero.
-      target: passedArgs.target ?? 'AppImage',
+      target: targetFor('linux', 'AppImage'),
       icon: `./assets/icons/icon.icns`,
       category: 'Development',
     },
@@ -458,6 +468,17 @@ export async function buildPackage(passedArgs: Arguments) {
     `${passedArgs.ideDist}/electron-builder-config.yaml`
   console.log(`Writing configuration to ${configPath}`)
   await dumpConfiguration(configPath, config)
+
+  // Electron Builder's node-module-collector shells out to the package manager to enumerate the
+  // dependency tree. `./run ide build` drives this whole chain through `corepack pnpm`, so that
+  // child would inherit `COREPACK_ROOT` — and pnpm refuses to switch to the version pinned in
+  // `packageManager` while it believes it is running under corepack. Anyone whose ambient pnpm
+  // differs from the pin then fails packaging with "This project is configured to use <pinned> of
+  // pnpm. Your current pnpm is <ambient>". Dropping the variable here lets that child self-switch
+  // to the pinned version, which is what we wanted in the first place.
+  // `Reflect.deleteProperty` rather than `delete`: this project types `process.env`'s index
+  // signature as read-only.
+  Reflect.deleteProperty(process.env, 'COREPACK_ROOT')
 
   console.log('Building with configuration:', cliOpts)
   const result = await electronBuilder.build(cliOpts)

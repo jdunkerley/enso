@@ -1,7 +1,7 @@
 import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/graphDatabase.test'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
-import { type NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
+import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'
 import { mockProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { entryMethodPointer } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {

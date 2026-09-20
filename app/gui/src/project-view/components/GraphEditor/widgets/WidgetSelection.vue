@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
-import { type SuggestionEntryArgument } from '$/providers/openedProjects/suggestionDatabase/entry'
+import type { SuggestionEntryArgument } from '$/providers/openedProjects/suggestionDatabase/entry'
 import {
   Score,
   WidgetInput,
