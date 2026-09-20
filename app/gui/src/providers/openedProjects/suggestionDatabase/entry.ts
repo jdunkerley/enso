@@ -113,20 +113,12 @@ const blessedTypes = new Set([
 ])
 
 export interface ConstructorSuggestionEntry
-  extends SuggestionEntryCommon,
-    Reexportable,
-    Annotatable,
-    TakesArguments,
-    IsMemberOf {
+  extends SuggestionEntryCommon, Reexportable, Annotatable, TakesArguments, IsMemberOf {
   readonly kind: SuggestionKind.Constructor
 }
 
 export interface MethodSuggestionEntry
-  extends SuggestionEntryCommon,
-    Reexportable,
-    Annotatable,
-    TakesArguments,
-    IsMemberOf {
+  extends SuggestionEntryCommon, Reexportable, Annotatable, TakesArguments, IsMemberOf {
   readonly kind: SuggestionKind.Method
   /** Type of the "self" argument. */
   selfType: ProjectPath | undefined
@@ -153,9 +145,7 @@ export type SuggestionEntry =
  * {@link SuggestionKind.Type}.
  */
 export type CallableSuggestionEntry =
-  | MethodSuggestionEntry
-  | ConstructorSuggestionEntry
-  | FunctionSuggestionEntry
+  MethodSuggestionEntry | ConstructorSuggestionEntry | FunctionSuggestionEntry
 
 /** Type predicate for {@link CallableSuggestionEntry}. */
 export function entryIsCallable(entry: SuggestionEntry): entry is CallableSuggestionEntry {

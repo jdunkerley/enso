@@ -455,8 +455,10 @@ function ResolveDuplicationsModalInner(props: ResolveDuplicationsProps) {
 }
 
 /** Options for resolving duplicates. */
-export interface ResolveDuplicationsOptions
-  extends Omit<ResolveDuplicationsProps, 'onCancel' | 'onSubmit'> {}
+export interface ResolveDuplicationsOptions extends Omit<
+  ResolveDuplicationsProps,
+  'onCancel' | 'onSubmit'
+> {}
 
 /** Function for resolving duplicates. */
 // eslint-disable-next-line react-refresh/only-export-components

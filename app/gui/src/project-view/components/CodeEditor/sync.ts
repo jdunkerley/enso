@@ -24,8 +24,7 @@ export function useEnsoSourceSync(
   editorView: EditorView,
 ) {
   let pendingChanges:
-    | { changes: ChangeSet; selectionBefore: EditorSelection; textBefore: Text }
-    | undefined
+    { changes: ChangeSet; selectionBefore: EditorSelection; textBefore: Text } | undefined
 
   const notifyErrorToast = useToast.error()
   const notifyError = notifyErrorToast.show.bind(notifyErrorToast)

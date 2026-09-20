@@ -55,7 +55,8 @@ const COMBO_BOX_STYLES = tv({
 
 /** Props for a {@link ComboBox}. */
 export interface ComboBoxProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, string>>
-  extends FieldStateProps<
+  extends
+    FieldStateProps<
       Omit<
         AriaComboBoxProps<FieldValues<Schema>[TFieldName]>,
         'children' | 'className' | 'style'

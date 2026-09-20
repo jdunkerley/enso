@@ -34,7 +34,9 @@ export interface MultiSelectorProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, readonly T[]>,
   T,
-> extends FieldStateProps<
+>
+  extends
+    FieldStateProps<
       Omit<ListBoxItemProps, 'children' | 'value'> & { value: FieldValues<Schema>[TFieldName] },
       Schema,
       TFieldName,

@@ -4,8 +4,10 @@ import { Icon } from '../Icon'
 import { PROFILE_PICTURE_STYLES } from './variants'
 
 /** Props for a {@link ProfilePicture}. */
-export interface ProfilePictureProps
-  extends Omit<VariantProps<typeof PROFILE_PICTURE_STYLES>, 'default'> {
+export interface ProfilePictureProps extends Omit<
+  VariantProps<typeof PROFILE_PICTURE_STYLES>,
+  'default'
+> {
   /**
    * The valid `src` attribute of the profile picture. If `null`, the default user icon is displayed.
    */

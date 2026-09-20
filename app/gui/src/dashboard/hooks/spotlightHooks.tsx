@@ -12,9 +12,7 @@ const DEFAULT_PADDING_PX = 8
 
 // eslint-disable-next-line no-restricted-syntax
 const BACKGROUND_ELEMENT = document.getElementsByClassName('enso-spotlight')[0] as
-  | HTMLElement
-  | SVGElement
-  | undefined
+  HTMLElement | SVGElement | undefined
 
 /** Props for {@link useSpotlight}. */
 export interface SpotlightOptions {

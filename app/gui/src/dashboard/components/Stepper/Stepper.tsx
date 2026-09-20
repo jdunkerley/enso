@@ -15,15 +15,10 @@ export interface StepperProps {
   readonly state: StepperState
   readonly children: ReactNode | ((props: RenderChildrenProps) => ReactNode)
   readonly className?:
-    | string
-    | ((props: BaseRenderProps) => string | null | undefined)
-    | null
-    | undefined
+    string | ((props: BaseRenderProps) => string | null | undefined) | null | undefined
   readonly renderStep?: ((props: RenderStepProps) => ReactNode) | null
   readonly style?:
-    | CSSProperties
-    | ((props: BaseRenderProps) => CSSProperties | undefined)
-    | undefined
+    CSSProperties | ((props: BaseRenderProps) => CSSProperties | undefined) | undefined
 }
 
 const STEPPER_STYLES = tv({

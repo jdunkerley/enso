@@ -27,9 +27,7 @@ export type OnDrop = (key: Key, e: DropEvent) => Promise<void> | void
 
 /** Props for {@link Breadcrumbs}. */
 export interface BreadcrumbsProps
-  extends AriaBreadcrumbsProps,
-    VariantProps<typeof BREADCRUMBS_STYLES>,
-    TestIdProps {
+  extends AriaBreadcrumbsProps, VariantProps<typeof BREADCRUMBS_STYLES>, TestIdProps {
   /** The breadcrumb items. */
   readonly children: ReactNode
   /** Called when an item is acted upon (usually selection via press). */

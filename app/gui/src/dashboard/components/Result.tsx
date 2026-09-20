@@ -77,9 +77,7 @@ interface StatusIcon {
 
 /** Props for a {@link Result}. */
 export interface ResultProps
-  extends PropsWithChildren,
-    VariantProps<typeof RESULT_STYLES>,
-    TestIdProps {
+  extends PropsWithChildren, VariantProps<typeof RESULT_STYLES>, TestIdProps {
   readonly className?: string
   readonly title?: JSX.Element | string
   readonly subtitle?: JSX.Element | string

@@ -24,9 +24,9 @@ export interface SettingsAriaInputProps<
   TFieldName extends FieldPath<Schema, Constraint>,
   Constraint extends number | string = number | string,
 > extends Omit<
-    InputProps<Schema, TFieldName, Constraint>,
-    'fieldVariants' | 'size' | 'variant' | 'variants'
-  > {}
+  InputProps<Schema, TFieldName, Constraint>,
+  'fieldVariants' | 'size' | 'variant' | 'variants'
+> {}
 
 /** A styled input for settings pages. */
 export function SettingsAriaInput<

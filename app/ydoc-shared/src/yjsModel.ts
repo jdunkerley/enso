@@ -9,9 +9,7 @@ declare const brandExternalId: unique symbol
 export type ExternalId = Uuid & { [brandExternalId]: never }
 
 export type VisualizationModule =
-  | { kind: 'Builtin' }
-  | { kind: 'CurrentProject' }
-  | { kind: 'Library'; name: string }
+  { kind: 'Builtin' } | { kind: 'CurrentProject' } | { kind: 'Library'; name: string }
 
 export interface VisualizationIdentifier {
   module: VisualizationModule

@@ -10,8 +10,7 @@ import type * as types from './types'
 
 /** Props for Field component */
 export interface FieldComponentProps<Schema extends types.TSchema>
-  extends VariantProps<typeof FIELD_STYLES>,
-    types.FieldProps {
+  extends VariantProps<typeof FIELD_STYLES>, types.FieldProps {
   readonly 'data-testid'?: string | undefined
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   readonly name: Path<types.FieldValues<Schema>, any>
@@ -179,8 +178,8 @@ export const FIELD_ERROR_STYLES = tv({
 export interface FieldErrorProps<
   Schema extends types.TSchema,
   TFieldName extends types.FieldPath<Schema, string>,
-> extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof FIELD_ERROR_STYLES> {
+>
+  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof FIELD_ERROR_STYLES> {
   readonly error?: React.ReactNode | string | null | undefined
   readonly id?: string | undefined
   readonly form?: types.FormInstance<Schema> | undefined

@@ -17,7 +17,8 @@ import { SelectorOption } from './SelectorOption'
 
 /** * Props for the Selector component. */
 export interface SelectorProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, T>, T>
-  extends FieldStateProps<
+  extends
+    FieldStateProps<
       Omit<RadioGroupProps, 'children' | 'value'> & { value: T },
       Schema,
       TFieldName,

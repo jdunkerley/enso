@@ -35,8 +35,7 @@ import { CheckboxGroup } from './CheckboxGroup'
 
 /** Props common between all {@link CheckboxProps} variants. */
 interface CheckboxSharedProps
-  extends Omit<VariantProps<typeof CHECKBOX_STYLES>, 'isDisabled' | 'isInvalid'>,
-    TestIdProps {
+  extends Omit<VariantProps<typeof CHECKBOX_STYLES>, 'isDisabled' | 'isInvalid'>, TestIdProps {
   readonly className?: string
   readonly style?: CSSProperties
   readonly checkboxRef?: MutableRefObject<HTMLInputElement>
@@ -44,8 +43,7 @@ interface CheckboxSharedProps
 
 /** Props for the {@link Checkbox} component. */
 export type CheckboxProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, boolean>> =
-  | CheckboxGroupCheckboxProps
-  | StandaloneCheckboxProps<Schema, TFieldName>
+  CheckboxGroupCheckboxProps | StandaloneCheckboxProps<Schema, TFieldName>
 
 /** Props for the {@link Checkbox} component when used inside a {@link CheckboxGroup}. */
 export type CheckboxGroupCheckboxProps = AriaCheckboxProps &

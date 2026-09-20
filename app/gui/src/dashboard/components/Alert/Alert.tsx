@@ -48,9 +48,7 @@ export const ALERT_STYLES = tv({
 
 /** Props for an {@link Alert}. */
 export interface AlertProps<IconType extends string = string>
-  extends PropsWithChildren,
-    VariantProps<typeof ALERT_STYLES>,
-    HTMLAttributes<HTMLDivElement> {
+  extends PropsWithChildren, VariantProps<typeof ALERT_STYLES>, HTMLAttributes<HTMLDivElement> {
   /** The icon to display in the Alert */
   readonly icon?: IconProp<IconType> | null | undefined
 }

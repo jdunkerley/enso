@@ -12,7 +12,9 @@ import { RadioGroupProvider } from './RadioGroupContext'
 export interface RadioGroupProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
-> extends FieldStateProps<
+>
+  extends
+    FieldStateProps<
       Omit<aria.AriaRadioGroupProps, 'description' | 'label'>,
       Schema,
       TFieldName,

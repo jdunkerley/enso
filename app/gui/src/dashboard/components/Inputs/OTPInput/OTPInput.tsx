@@ -24,7 +24,8 @@ import type { TestIdProps } from '../../types'
 
 /** Props for an {@link OTPInput}. */
 export interface OtpInputProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, string>>
-  extends FieldStateProps<Omit<OTPInputProps, 'children' | 'render'>, Schema, TFieldName, string>,
+  extends
+    FieldStateProps<Omit<OTPInputProps, 'children' | 'render'>, Schema, TFieldName, string>,
     FieldProps,
     FieldVariantProps,
     Omit<VariantProps<typeof STYLES>, 'disabled' | 'invalid'>,

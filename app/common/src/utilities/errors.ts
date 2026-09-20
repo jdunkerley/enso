@@ -94,10 +94,7 @@ type MustBeAny<T> =
  * `{}`, `object`, `unknown` and `any`.
  */
 export type MustNotBeKnown<T> =
-  | MustBe<T, NonNullable<unknown>>
-  | MustBe<T, object>
-  | MustBe<T, unknown>
-  | MustBeAny<T>
+  MustBe<T, NonNullable<unknown>> | MustBe<T, object> | MustBe<T, unknown> | MustBeAny<T>
 
 /**
  * Extracts the `message` property of a value if it is a string. Intended to be used on

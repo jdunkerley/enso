@@ -529,18 +529,12 @@ export function visitRecursive(
 
 /** Values that may be found in fields of `Ast` subtypes. */
 type FieldData<T extends TreeRefs = RawRefs> =
-  | NonArrayFieldData<T>
-  | NonArrayFieldData<T>[]
-  | (T['ast'] | T['token'])[]
+  NonArrayFieldData<T> | NonArrayFieldData<T>[] | (T['ast'] | T['token'])[]
 
 // Logically `FieldData<T>[]` could be a type of `FieldData`, but the type needs to be non-recursive so that it can be
 // used with `DeepReadonly`.
 type NonArrayFieldData<T extends TreeRefs> =
-  | T['ast']
-  | T['token']
-  | undefined
-  | StructuralField<T>
-  | string
+  T['ast'] | T['token'] | undefined | StructuralField<T> | string
 
 /** Objects that do not directly contain `AstId`s or `SyncTokenId`s, but may have `NodeChild` fields. */
 type StructuralField<T extends TreeRefs = RawRefs> =

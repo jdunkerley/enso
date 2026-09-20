@@ -9,7 +9,14 @@ const { src, title } = defineProps<{ src: string; title: string | undefined }>()
         class="youtube-video"
         :src="src"
         :title="title ?? 'Video'"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="
+          accelerometer;
+          autoplay;
+          clipboard-write;
+          encrypted-media;
+          gyroscope;
+          picture-in-picture;
+        "
         referrerpolicy="strict-origin-when-cross-origin"
         allowfullscreen
       >

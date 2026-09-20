@@ -39,9 +39,7 @@ export const MENU_SEPARATOR_STYLES = tv({
 
 /** Props for {@link Menu} */
 export interface MenuProps<T extends object>
-  extends aria.MenuProps<T>,
-    VariantProps<typeof MENU_STYLES>,
-    TestIdProps {
+  extends aria.MenuProps<T>, VariantProps<typeof MENU_STYLES>, TestIdProps {
   readonly variant?: 'dark' | 'light'
   readonly placement?: Placement | undefined
   readonly className?: string
@@ -158,8 +156,7 @@ function MenuSection<T extends object>(props: MenuSectionProps<T>) {
 
 /** Props for {@link MenuSectionHeader} */
 export interface MenuSectionHeaderProps
-  extends VariantProps<typeof MENU_SECTION_STYLES>,
-    TestIdProps {
+  extends VariantProps<typeof MENU_SECTION_STYLES>, TestIdProps {
   readonly title: string
   readonly className?: string
 }
@@ -193,8 +190,7 @@ export const MenuSectionHeader = createLeafComponent(
 
 /** Props for {@link MenuSeparator} */
 export interface MenuSeparatorProps
-  extends SeparatorProps,
-    VariantProps<typeof MENU_SEPARATOR_STYLES> {}
+  extends SeparatorProps, VariantProps<typeof MENU_SEPARATOR_STYLES> {}
 
 /**
  * A separator in a menu.

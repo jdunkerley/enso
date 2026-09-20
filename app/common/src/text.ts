@@ -204,8 +204,7 @@ type SanityCheck<T extends TextId = keyof PlaceholderOverrides> = T
 
 /** An tuple of `string` for placeholders for each {@link TextId}. */
 export interface Replacements
-  extends PlaceholderOverrides,
-    Record<Exclude<TextId, keyof PlaceholderOverrides>, []> {}
+  extends PlaceholderOverrides, Record<Exclude<TextId, keyof PlaceholderOverrides>, []> {}
 
 export const TEXTS: Readonly<Record<Language, Texts>> = {
   english: ENGLISH,

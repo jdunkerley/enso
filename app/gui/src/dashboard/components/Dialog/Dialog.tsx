@@ -23,8 +23,7 @@ import { DIALOG_MODAL_STYLES, DIALOG_OVERLAY_STYLES, DIALOG_STYLES } from './var
 
 /** Props for the {@link Dialog} component. */
 export interface DialogProps
-  extends types.DialogProps,
-    Omit<VariantProps<typeof DIALOG_STYLES>, 'scrolledToTop'> {}
+  extends types.DialogProps, Omit<VariantProps<typeof DIALOG_STYLES>, 'scrolledToTop'> {}
 
 /**
  * A dialog is an overlay shown above other content in an application.

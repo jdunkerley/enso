@@ -612,13 +612,10 @@ export function initClaudeAgentIpc(config: ClaudeSessionConfig): void {
       reason: 'AI is disabled by ENSO_AI_DISABLED.',
     }
     ipcMain.handle(Channel.aiAvailability, async () => disabled)
-    ipcMain.handle(
-      Channel.generateAiComponent,
-      async (): Promise<AiComponentIpcReply> => ({
-        result: Err('AI is disabled by ENSO_AI_DISABLED'),
-        usage: null,
-      }),
-    )
+    ipcMain.handle(Channel.generateAiComponent, async (): Promise<AiComponentIpcReply> => ({
+      result: Err('AI is disabled by ENSO_AI_DISABLED'),
+      usage: null,
+    }))
     ipcMain.on(Channel.cancelAiComponent, () => {
       // No-op: there's no session to cancel against.
     })

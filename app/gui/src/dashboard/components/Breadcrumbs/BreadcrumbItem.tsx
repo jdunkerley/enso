@@ -56,7 +56,8 @@ export interface BreadcrumbItemRenderProps {
 
 /** Props for {@link BreadcrumbItem}. */
 export interface BreadcrumbItemProps<IconType extends string>
-  extends Omit<AriaBreadcrumbItemProps, 'id'>,
+  extends
+    Omit<AriaBreadcrumbItemProps, 'id'>,
     Omit<aria.LinkProps, 'children' | 'className' | 'style'>,
     TestIdProps,
     VariantProps<typeof BREADCRUMB_ITEM_STYLES> {
@@ -70,8 +71,7 @@ export interface BreadcrumbItemProps<IconType extends string>
   readonly className?: string | ((renderProps: BreadcrumbItemRenderProps) => string)
   readonly style?: CSSProperties | ((renderProps: BreadcrumbItemRenderProps) => CSSProperties)
   readonly children:
-    | TooltipElementType
-    | ((renderProps: BreadcrumbItemRenderProps) => TooltipElementType)
+    TooltipElementType | ((renderProps: BreadcrumbItemRenderProps) => TooltipElementType)
   readonly isLoading?: boolean
   readonly isDroppable?: boolean
   readonly onDragDelay?: DragDelayCallback<HTMLElement> | undefined

@@ -52,12 +52,10 @@ export function useVisualizationSelector({ selectedType, types }: VisualizationS
     set: (value) => (selectedType.value = visualizationByKey(value)!),
   })
 
-  return computed(
-    (): ComponentProps<typeof SelectionDropdown> => ({
-      ...bindModelValue(selectedTypeKey),
-      options: visualizationOptions.value,
-      title: 'Visualization Selector',
-      entriesTestId: 'visualization-selector-entries',
-    }),
-  )
+  return computed((): ComponentProps<typeof SelectionDropdown> => ({
+    ...bindModelValue(selectedTypeKey),
+    options: visualizationOptions.value,
+    title: 'Visualization Selector',
+    entriesTestId: 'visualization-selector-entries',
+  }))
 }

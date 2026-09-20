@@ -32,10 +32,10 @@ const STORY_LAYOUT_STYLES = tv({
 
 /** Props for a {@link StoryVariants}. */
 export interface StoryVariantsProps<
-    Component extends (props: Props) => ReactNode,
-    Props = Parameters<Component>[0],
-    T = Props,
-  >
+  Component extends (props: Props) => ReactNode,
+  Props = Parameters<Component>[0],
+  T = Props,
+>
   // `variants` is intentionally omitted
   extends Omit<VariantProps<typeof STORY_LAYOUT_STYLES>, 'variants'> {
   readonly render: Component

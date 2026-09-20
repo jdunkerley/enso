@@ -32,7 +32,9 @@ export interface InputProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, Constraint>,
   Constraint extends number | string = number | string,
-> extends FieldStateProps<
+>
+  extends
+    FieldStateProps<
       Omit<aria.InputProps, 'autoFocus' | 'children' | 'size'>,
       Schema,
       TFieldName,
@@ -174,7 +176,8 @@ export const Input = forwardRef(function Input<
 
 /** Props for an {@link BasicInput}. */
 export interface BasicInputProps
-  extends Omit<aria.InputProps, 'autoFocus' | 'children' | 'size'>,
+  extends
+    Omit<aria.InputProps, 'autoFocus' | 'children' | 'size'>,
     Omit<VariantProps<typeof INPUT_STYLES>, 'disabled' | 'invalid'>,
     TestIdProps {
   readonly inputRef?: Ref<HTMLInputElement> | undefined

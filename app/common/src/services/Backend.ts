@@ -934,11 +934,7 @@ export enum ReplaceableAssetType {
 
 /** The types of assets that can be retrieved from the backend. */
 export type RealAssetType =
-  | AssetType.project
-  | AssetType.file
-  | AssetType.datalink
-  | AssetType.secret
-  | AssetType.directory
+  AssetType.project | AssetType.file | AssetType.datalink | AssetType.secret | AssetType.directory
 
 /** The corresponding ID newtype for each {@link AssetType}. */
 export interface IdType {
@@ -1277,8 +1273,7 @@ export interface UpdateProjectExecutionRequestBody {
 
 /** HTTP request body for the "create secret or credential" endpoint. */
 export type CreateSecretOrCredentialRequestBody =
-  | CreateSecretRequestBody
-  | CreateCredentialRequestBody
+  CreateSecretRequestBody | CreateCredentialRequestBody
 
 /** HTTP request body for the "create secret" endpoint. */
 export interface CreateSecretRequestBody {
@@ -1375,10 +1370,7 @@ export interface ExecutionUsageSummary {
 }
 
 export type AssetSortExpression =
-  | 'asset_id_discriminator_and_modified_at'
-  | 'modified_at'
-  | 'title'
-  | 'created_at'
+  'asset_id_discriminator_and_modified_at' | 'modified_at' | 'title' | 'created_at'
 
 export type AssetSortDirection = 'ascending' | 'descending'
 

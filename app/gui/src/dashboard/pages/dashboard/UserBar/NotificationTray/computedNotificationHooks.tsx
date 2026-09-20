@@ -24,8 +24,10 @@ export function useIsMutatingForBothBackends(makeKey: (backendType: BackendType)
 }
 
 /** Functions to manipulate notification state. */
-export interface NotificationStateControls
-  extends Omit<ReturnType<typeof useNotificationState>, 'computedNotifications'> {}
+export interface NotificationStateControls extends Omit<
+  ReturnType<typeof useNotificationState>,
+  'computedNotifications'
+> {}
 
 /** Return notification state and a set of functions to control it. */
 export function useNotificationState() {

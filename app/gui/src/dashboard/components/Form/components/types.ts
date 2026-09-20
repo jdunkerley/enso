@@ -30,9 +30,7 @@ export type FieldPath<Schema extends TSchema, Constraint = unknown> = Extract<
 
 /** Schema type */
 export type TSchema<Shape extends z.AnyZodObject = z.AnyZodObject> =
-  | Shape
-  | z.ZodEffects<Shape>
-  | z.ZodEffects<z.ZodEffects<Shape>>
+  Shape | z.ZodEffects<Shape> | z.ZodEffects<z.ZodEffects<Shape>>
 
 /** A callback that returns a schema. */
 export type SchemaCallback<Schema extends TSchema = TSchema> = (z: SchemaBuilder) => Schema
@@ -75,7 +73,8 @@ export interface OnSubmitCallbacks<Schema extends TSchema, SubmitResult = void> 
 
 /** Props for the useForm hook. */
 export interface UseFormOptions<Schema extends TSchema, SubmitResult = void>
-  extends Omit<
+  extends
+    Omit<
       reactHookForm.UseFormProps<FieldValues<Schema>>,
       'handleSubmit' | 'resetOptions' | 'resolver'
     >,
@@ -136,11 +135,10 @@ export interface UseFormRegisterReturn<
  */
 // @ts-expect-error This is type-safe, we are just using a narrower definition of `FieldPath` in
 // `UseFormRegister<Schema>`.
-export interface UseFormReturn<Schema extends TSchema>
-  extends Omit<
-    reactHookForm.UseFormReturn<FieldValues<Schema>, unknown, TransformedValues<Schema>>,
-    'onSubmit' | 'resetOptions' | 'resolver'
-  > {
+export interface UseFormReturn<Schema extends TSchema> extends Omit<
+  reactHookForm.UseFormReturn<FieldValues<Schema>, unknown, TransformedValues<Schema>>,
+  'onSubmit' | 'resetOptions' | 'resolver'
+> {
   readonly register: UseFormRegister<Schema>
   readonly submit: (event?: FormEvent<HTMLFormElement> | null) => Promise<void>
   readonly schema: Schema
@@ -256,8 +254,10 @@ export type FieldStateProps<
   Constraint,
 > = FormFieldProps<BaseProps['value'], Schema, TFieldName, Constraint> & {
   // to avoid conflicts with the FormFieldProps we need to omit the FormFieldProps from the BaseProps
-  [K in keyof Omit<
-    BaseProps,
-    keyof FormFieldProps<BaseProps['value'], Schema, TFieldName, Constraint>
-  >]: BaseProps[K]
+  [
+    K in keyof Omit<
+      BaseProps,
+      keyof FormFieldProps<BaseProps['value'], Schema, TFieldName, Constraint>
+    >
+  ]: BaseProps[K]
 }

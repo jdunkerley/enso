@@ -58,7 +58,8 @@ const DEFAULT_OFFSET = 9
 
 /** Props for a {@link Tooltip}. */
 export interface TooltipProps
-  extends Omit<Readonly<aria.TooltipProps>, 'offset' | 'UNSTABLE_portalContainer'>,
+  extends
+    Omit<Readonly<aria.TooltipProps>, 'offset' | 'UNSTABLE_portalContainer'>,
     Omit<VariantProps<typeof TOOLTIP_STYLES>, 'isEntering' | 'isExiting'> {}
 
 /** Displays the description of an element on hover or focus. */

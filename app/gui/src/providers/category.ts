@@ -150,12 +150,10 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
 
   const teamCategories = computed(
     () =>
-      toValue(userData)?.groups?.map(
-        (group): TeamDirectory => ({
-          type: 'team',
-          groupId: group.id,
-        }),
-      ) ?? [],
+      toValue(userData)?.groups?.map((group): TeamDirectory => ({
+        type: 'team',
+        groupId: group.id,
+      })) ?? [],
   )
   const groupById = computed(
     () => new Map(toValue(userData)?.groups?.map((group) => [group.id, group])),

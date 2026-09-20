@@ -13,7 +13,8 @@ import { TEXT_STYLE } from '../Text'
 
 /** Props for a {@link Switch}. */
 export interface SwitchProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, boolean>>
-  extends FieldStateProps<
+  extends
+    FieldStateProps<
       Omit<AriaSwitchProps, 'children' | 'size' | 'value'> & { value: boolean },
       Schema,
       TFieldName,

@@ -65,7 +65,9 @@ const DATE_PICKER_STYLES = tv({
 export interface TimeFieldProps<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, TimeValue>,
-> extends Pick<AriaTimeFieldProps<TimeValue>, 'granularity'>,
+>
+  extends
+    Pick<AriaTimeFieldProps<TimeValue>, 'granularity'>,
     FieldStateProps<
       Omit<
         AriaTimeFieldProps<Extract<FieldValues<Schema>[TFieldName], TimeValue>>,

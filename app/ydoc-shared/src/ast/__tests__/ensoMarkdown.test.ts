@@ -145,9 +145,7 @@ test.each([
       ['BulletList', ['ListItem', ['ListMark', '-'], ['Paragraph', '']]],
       ['Paragraph', 'Empty bullet, not a setext heading'],
     ],
-    not: [
-      /* TODO */
-    ],
+    not: [/* TODO */],
   },
   {
     description: 'Empty bold not parsed as HorizontalRule',

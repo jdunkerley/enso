@@ -236,8 +236,7 @@ describe('SessionProvider', () => {
     } as never
 
     const authEventListener = registerAuthEventListener.mock.calls[0]?.[0] as
-      | ((event: AuthEvent) => void)
-      | undefined
+      ((event: AuthEvent) => void) | undefined
     expect(authEventListener).toBeDefined()
 
     onQueryError(new NotAuthorizedError('Not authorized', 401), query)

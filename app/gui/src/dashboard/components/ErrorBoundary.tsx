@@ -42,8 +42,7 @@ export interface ErrorBoundaryProps extends Readonly<React.PropsWithChildren> {
    * Alternatively, you can use the error boundary api to reset the error boundary based on the error.
    */
   readonly onBeforeFallbackShown?:
-    | ((args: OnBeforeFallbackShownArgs) => React.ReactNode | null | undefined)
-    | undefined
+    ((args: OnBeforeFallbackShownArgs) => React.ReactNode | null | undefined) | undefined
   /** Title to show when there is an error. */
   readonly title?: string | undefined
   /** Subtitle to show when there is an error. */

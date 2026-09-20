@@ -10,10 +10,7 @@ import type { Placement, SvgUseIcon, TestIdProps } from '../types'
  * Props for the {@link ContextualHelp} component.
  */
 export interface ContextualHelpProps
-  extends TestIdProps,
-    OverlayTriggerProps,
-    AriaLabelingProps,
-    PropsWithChildren {
+  extends TestIdProps, OverlayTriggerProps, AriaLabelingProps, PropsWithChildren {
   readonly placement: Placement
   readonly variant?: 'help' | 'info'
 }

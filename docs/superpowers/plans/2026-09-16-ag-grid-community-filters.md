@@ -436,9 +436,8 @@ vi.mock("@/components/shared/AgGridTableView/agGridLicense", () => ({
 }));
 
 const { CommunitySetFilter } = await import("../CommunitySetFilter");
-const { getFilterParams, getFilterType } = await import(
-  "../tableVizFilterSetUpUtils"
-);
+const { getFilterParams, getFilterType } =
+  await import("../tableVizFilterSetUpUtils");
 
 describe("getFilterType (no AG Grid Enterprise license configured)", () => {
   test("a Char column using the multi-filter gets CommunitySetFilter instead of agMultiColumnFilter", () => {
