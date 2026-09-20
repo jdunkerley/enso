@@ -21,11 +21,11 @@ catalog:
   vitest: ^3.2.4
   vue: ^3.5.13
   playwright: 1.63.0
-  "@codemirror/autocomplete": ^6.18.7
-  "@codemirror/language": ^6.11.3
-  "@codemirror/state": ^6.5.2
-  "@codemirror/view": ^6.38.2
+  "@codemirror/autocomplete": ^6.20.3
+  "@codemirror/language": ^6.12.4
+  "@codemirror/state": ^6.7.5
+  "@codemirror/view": ^6.43.12
   "@fast-check/vitest": ^0.2.1
-  "@lezer/common": ^1.2.3
-  "@lezer/highlight": ^1.2.1
+  "@lezer/common": ^1.5.2
+  "@lezer/highlight": ^1.2.3
   zod: ^3.25.49
