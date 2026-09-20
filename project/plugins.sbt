@@ -1,7 +1,9 @@
 addSbtPlugin("com.eed3si9n"    % "sbt-assembly"       % "2.5.0")
 addSbtPlugin("ch.epfl.scala"   % "sbt-bloop"          % "2.1.2")
 addSbtPlugin("com.github.sbt"  % "sbt-license-report" % "1.5.0")
-addSbtPlugin("org.scalameta"   % "sbt-scalafmt"       % "2.6.2")
+// 2.6.x requires sbt 1.12.9+, and sbt is held at 1.10.6; see the note in
+// `project/build.properties`. 2.5.6 is the newest release that still runs there.
+addSbtPlugin("org.scalameta"   % "sbt-scalafmt"       % "2.5.6")
 addSbtPlugin("com.simplytyped" % "sbt-antlr4"         % "0.8.3")
 
 libraryDependencies += "io.circe"                   %% "circe-yaml"         % "1.15.0"
