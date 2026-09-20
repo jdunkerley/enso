@@ -165,9 +165,10 @@ public final class Function extends EnsoObject {
    * runtime compilation ({@code ReentrantLock}, {@code ConcurrentHashMap}). Native Image then fails
    * the build with "Blocklisted methods are reachable for runtime compilation".
    *
-   * <p>This is latent on GraalVM 25.0.1 — its points-to analysis does not reach these — but 25.0.2
-   * reports 40 violations, every one of them routed through this method. The boundary costs nothing
-   * measurable: the generated binary is 249 MB either way.
+   * <p>Whether the analysis reaches this depends on how much lands on the classpath Native Image
+   * sees, so it can stay latent for a long time: removing the boundary reports 20 violations on
+   * GraalVM 25.0.1 and 40 on 25.0.2, every one of them routed through this method. The boundary
+   * costs nothing measurable — the generated binary is the same size either way.
    */
   @TruffleBoundary
   @ExportMessage
