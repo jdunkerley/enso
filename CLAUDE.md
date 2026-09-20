@@ -98,8 +98,14 @@ has silently produced a wrong result here:
 
 ## Conventions worth knowing up front
 
-- Root `CHANGELOG.md` is user-facing and PR-linked — add an entry when shipping
-  a user-visible change.
+- **Always add a `CHANGELOG.md` entry.** Every PR gets one — the `Changelog` CI
+  job fails otherwise, and reaching for the `CI: No changelog needed` label
+  should be the rare exception, not the reflex. Add it to the `# Next Release`
+  section under the right heading (`#### Enso IDE`,
+  `#### Enso Language & Runtime`, `#### Enso Standard Library`), in the existing
+  `- [Description][NNN]` form with a matching link definition, where `NNN` is
+  the PR number. Write it for someone reading release notes, not for a reviewer
+  reading the diff.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules
@@ -134,6 +140,19 @@ has silently produced a wrong result here:
   only under `--workers=2` with a whole spec running. A single run is not
   evidence in either direction — run the full spec several times on both
   branches and compare rates.
+- **Toolchain versions are duplicated into CI, and nothing enforces it.**
+  Bumping `graalVersion` or `sbt.version` is not finished until the copies in
+  `.github/workflows/` move too — `formatting.yml` carries `javaVersion` and
+  `sbtVersion` (with "please ensure this is in sync" comments), and
+  `enso4igv.yml` hardcodes its own `java-version`. sbt fails hard on a mismatch
+  (`Running on GraalVM version X. Expected GraalVM version Y.`), so this shows
+  up as an unrelated-looking job failing — the formatting check, not a build.
+  Grep the old version across `.github/` before pushing.
+- **A clean `sbt compile` proves less than it looks.** It does not exercise
+  `gatherLicenses` (legal-review report shape), `bloopInstall` (BSP config for
+  Metals/IntelliJ), the YAML round-trip in `DistributionPackage.scala`, or any
+  test actually running — `Test/compile` only proves test sources build. Say
+  which of these a change did _not_ verify.
 
 ## Cross-cutting gotchas
 
