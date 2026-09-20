@@ -100,7 +100,7 @@ object Dependencies {
   def akkaPkg(name: String)     = akkaURL %% s"akka-$name" % akkaVersion
   def akkaHTTPPkg(name: String) = akkaURL %% s"akka-$name" % akkaHTTPVersion
   val akkaURL                   = "com.typesafe.akka"
-  val akkaVersion               = "2.6.20" // See Note [Akka Is Frozen]
+  val akkaVersion               = "2.6.20"  // See Note [Akka Is Frozen]
   val akkaHTTPVersion           = "10.2.10" // See Note [Akka Is Frozen]
   val akkaMockSchedulerVersion  = "0.5.5"
   val reactiveStreamsVersion    = "1.0.3"
