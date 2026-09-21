@@ -155,6 +155,22 @@ public final class Function extends EnsoObject {
     return getCallTarget().getRootNode().getName();
   }
 
+  /**
+   * Deliberately behind a {@link TruffleBoundary}, like {@link #getSourceSection()} just below,
+   * which makes the same {@code getRootNode().getSourceSection()} call.
+   *
+   * <p>Without it, partial evaluation descends through {@code getSourceSection()} into whatever the
+   * root node's language does to build one — for GraalPy that reaches {@code Source.createTextMap},
+   * then Enso's rope text buffer, then Scala collections, and finally methods blocklisted for
+   * runtime compilation ({@code ReentrantLock}, {@code ConcurrentHashMap}). Native Image then fails
+   * the build with "Blocklisted methods are reachable for runtime compilation".
+   *
+   * <p>Whether the analysis reaches this depends on how much lands on the classpath Native Image
+   * sees, so it can stay latent for a long time: removing the boundary reports 20 violations on
+   * GraalVM 25.0.1 and 40 on 25.0.2, every one of them routed through this method. The boundary
+   * costs nothing measurable — the generated binary is the same size either way.
+   */
+  @TruffleBoundary
   @ExportMessage
   boolean hasSourceLocation() {
     return getCallTarget().getRootNode().getSourceSection() != null;

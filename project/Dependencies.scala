@@ -52,15 +52,36 @@ import org.enso.build.BenchTasks.Benchmark
   */
 object Dependencies {
   // === project-wide versions =====================================================
-  val scalacVersion = "2.13.15"
+  val scalacVersion = "2.13.17"
   // source version of the Java language
   val javaVersion = "25"
   // version of the GraalVM JDK
+  // See Note [GraalVM Is Held At 25.0.1]
   val graalVersion = "25.0.1"
   // Version used for the Graal/Truffle related Maven packages
   // Keep in sync with GraalVM.version. Do not change the name of this variable,
   // it is used by the Rust build script via regex matching.
+  // See Note [GraalVM Is Held At 25.0.1]
   val graalMavenPackagesVersion = "25.0.1"
+
+  /* Note [GraalVM Is Held At 25.0.1]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * 25.0.2 breaks host-interop overload resolution. Its only Truffle change is
+   * "Fixed overloaded method caching regression in HostExecuteNode", and that is
+   * exactly what fails: HostExecuteNode.fillArgTypesArray asserts that its cached
+   * argument types still validate against the overload it selected, and they do
+   * not.
+   *
+   * Standard Library tests run with -enableassertions, so this surfaces as a hard
+   * crash in Column_Operations_Spec under both the DuckDB and SQLite backends.
+   * Verified one variable at a time, same commit, only this version changed:
+   * 25.0.2 crashes DuckDB_Tests, 25.0.1 passes it.
+   *
+   * Without assertions the same defect silently selects a possibly-wrong
+   * overload, so this is not a test-only concern.
+   *
+   * See https://github.com/jdunkerley/enso/issues/36 before bumping this.
+   */
 
   def runningInAnIde: Boolean = {
     val idea = System.getProperty("idea.managed")
@@ -84,11 +105,24 @@ object Dependencies {
 
   // === Akka ===================================================================
 
+  /* Note [Akka Is Frozen]
+   * ~~~~~~~~~~~~~~~~~~~~~
+   * `akkaVersion` and `akkaHTTPVersion` are deliberately NOT kept current.
+   *
+   * Akka relicensed from Apache-2.0 to the Business Source License with 2.7.0
+   * (and akka-http with 10.3.0). 2.6.20 and 10.2.10 are the last Apache-2.0
+   * releases, so these pins are a licence floor for the engine, not neglect.
+   * Newer versions exist and a routine "sweep the stale dependencies" pass will
+   * offer them — do not take them.
+   *
+   * The only real options are to stay here or to migrate to Apache Pekko (the
+   * Apache-2.0 fork of Akka 2.6.x). Both are decisions, not upgrades.
+   */
   def akkaPkg(name: String)     = akkaURL %% s"akka-$name" % akkaVersion
   def akkaHTTPPkg(name: String) = akkaURL %% s"akka-$name" % akkaHTTPVersion
   val akkaURL                   = "com.typesafe.akka"
-  val akkaVersion               = "2.6.20"
-  val akkaHTTPVersion           = "10.2.10"
+  val akkaVersion               = "2.6.20"  // See Note [Akka Is Frozen]
+  val akkaHTTPVersion           = "10.2.10" // See Note [Akka Is Frozen]
   val akkaMockSchedulerVersion  = "0.5.5"
   val reactiveStreamsVersion    = "1.0.3"
   val sprayJsonVersion          = "1.3.6"
