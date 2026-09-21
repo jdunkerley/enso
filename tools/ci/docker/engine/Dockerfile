@@ -1,4 +1,4 @@
-FROM ghcr.io/graalvm/jdk-community:25.0.2
+FROM ghcr.io/graalvm/jdk-community:25.0.1
 
 USER root
 
