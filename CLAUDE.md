@@ -172,6 +172,37 @@ has silently produced a wrong result here:
   sbt "scalafmtCheckAll; javafmtCheckAll; scalafmtSbtCheck"
   ```
 
+- **Running an Enso test project by hand has two traps that both produce a
+  confident, meaningless result.** Each cost a whole bisect round:
+
+  1. **The working directory must be the project root's _parent_.**
+     `EnsoContext.checkWorkingDirectory` logs a warning and then does
+     `assert false`, so with `-ea` — which the test jobs use — it is fatal, and
+     the message names a directory rather than the rule:
+
+     ```
+     AssertionError: Initializing with unexpected working directory (…/enso)
+     ```
+
+     So `cd test` first, then pass the project path.
+
+  2. **A filter argument that matches nothing still exits 0** and prints
+     `0 tests failed.` Check that tests actually ran — compare the log length
+     against an unfiltered run — before reading that as a pass.
+
+  ```bash
+  cd test && JAVA_TOOL_OPTIONS="-enableassertions" \
+    ../built-distribution/enso-engine-*/enso-*/bin/enso \
+    --no-ir-caches --run "$PWD/DuckDB_Tests"
+  ```
+
+- **`RuntimeStdlibTest` is flaky on Windows.** `should import Base modules`
+  asserts that suggestion notifications arrived; those are emitted when modules
+  are _compiled_, and `build.sbt` sets `ENSO_TEST_DISABLE_IR_CACHE=false` for
+  the integration tests, so a populated IR cache plausibly starves it. Seen
+  once, passed on re-run of the same commit. The job is skipped on `develop`, so
+  it only ever runs on PRs and there is no history to judge the rate.
+
 ## Cross-cutting gotchas
 
 - The Rust parser is the source of truth for the AST. Changing it means
