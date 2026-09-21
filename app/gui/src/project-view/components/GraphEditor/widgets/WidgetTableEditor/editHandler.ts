@@ -7,7 +7,7 @@ import { NEW_COLUMN_ID } from '@/components/GraphEditor/widgets/WidgetTableEdito
 // `import type`, not `import { type … }`: under `verbatimModuleSyntax` the latter is not erased —
 // it leaves a bare side-effect import that loads AG Grid Enterprise into the ProjectView chunk and
 // runs its LicenseManager even when we have fallen back to Community. See `agGridLicense.ts`.
-import type { CellPosition, StartEditingCellParams } from 'ag-grid-enterprise'
+import type { EditingCellPosition, StartEditingCellParams } from 'ag-grid-enterprise'
 import { computed, ref, type ShallowRef, toValue, watch } from 'vue'
 
 export interface EditedCell {
@@ -26,7 +26,7 @@ export function useTableEditHandler(
     | {
         stopEditing(cancel: boolean): void
         startEditingCell(editedCell: StartEditingCellParams): void
-        getEditingCells(): Array<CellPosition>
+        getEditingCells(): Array<EditingCellPosition>
       }
     | undefined
   >,
@@ -46,10 +46,7 @@ export function useTableEditHandler(
     const editedInGrid = api.getEditingCells()[0]
     if (cell == null || cell.rowIndex === 'header') {
       api.stopEditing(false)
-    } else if (
-      editedInGrid?.rowIndex !== cell.rowIndex ||
-      editedInGrid?.column.getColId() !== cell.colKey
-    ) {
+    } else if (editedInGrid?.rowIndex !== cell.rowIndex || editedInGrid?.colId !== cell.colKey) {
       api.startEditingCell({ rowIndex: cell.rowIndex, colKey: cell.colKey })
     }
   }

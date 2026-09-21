@@ -29,6 +29,6 @@ defineOptions({ inheritAttrs: false })
   </Suspense>
 </template>
 
-<style src="@ag-grid-community/styles/ag-grid.css" />
-<style src="@ag-grid-community/styles/ag-theme-alpine.css" />
+<style src="ag-grid-community/styles/ag-grid.css" />
+<style src="ag-grid-community/styles/ag-theme-alpine.css" />
 <style src="@/components/shared/AgGridTableView/tableViewStyle.css" />

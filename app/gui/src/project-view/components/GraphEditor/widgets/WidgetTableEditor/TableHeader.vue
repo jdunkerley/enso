@@ -117,6 +117,9 @@ function onMouseRightClick(event: MouseEvent) {
         api: props.api,
         context: props.context,
         column: props.column,
+        // Required since AG Grid v36. Null is the documented value for "not a column group", which
+        // is always the case here: this handler only runs for a column's own header menu.
+        columnGroup: null,
         defaultItems: [],
       })
     : (rawMainMenuItems ?? [])
