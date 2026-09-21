@@ -22,6 +22,7 @@ import { run, signArchives } from './tasks/signArchivesMacOs'
 
 import * as fileAssociations from './fileAssociations'
 
+import os from 'node:os'
 import path from 'node:path'
 import BUILD_INFO from './buildInfo'
 
@@ -442,6 +443,44 @@ async function dumpConfiguration(configPath: string, config: electronBuilder.Con
   await fs.writeFile(configPath, jsonConfig)
 }
 
+/**
+ * Makes a `pnpm` executable resolvable on `PATH` for child processes.
+ *
+ * Electron Builder's `node-module-collector` enumerates the dependency tree by running `pnpm`
+ * through `/bin/sh`, but this whole chain runs under `corepack pnpm`, which puts no `pnpm` on
+ * `PATH` — packaging then dies with `/bin/sh: 1: pnpm: not found`. It only started mattering with
+ * pnpm 12, whose `node_modules` layout sends the collector down the shell-out path.
+ *
+ * The shim re-invokes whichever package manager is already running us, via `npm_execpath`: up to
+ * pnpm 10 a JS entry point that needs `node`, from pnpm 12 a native binary that must be executed
+ * directly (the same split `internal/postinstall.mjs` handles). Does nothing when a real `pnpm` is
+ * already resolvable.
+ */
+async function ensurePnpmOnPath() {
+  const execPath = process.env['npm_execpath']
+  if (execPath == null) return
+  const isWindows = process.platform === 'win32'
+  const probe = childProcess.spawnSync(isWindows ? 'where' : 'which', ['pnpm'], { shell: false })
+  if (probe.status === 0) return
+
+  const shimDir = await fs.mkdtemp(path.join(os.tmpdir(), 'enso-pnpm-shim-'))
+  const runsUnderNode = /\.[cm]?js$/i.test(execPath)
+  if (isWindows) {
+    const command = runsUnderNode ? `"${process.execPath}" "${execPath}" %*` : `"${execPath}" %*`
+    await fs.writeFile(path.join(shimDir, 'pnpm.cmd'), `@echo off\r\n${command}\r\n`)
+  } else {
+    const command =
+      runsUnderNode ? `"${process.execPath}" "${execPath}" "$@"` : `"${execPath}" "$@"`
+    const shimPath = path.join(shimDir, 'pnpm')
+    await fs.writeFile(shimPath, `#!/bin/sh\nexec ${command}\n`)
+    await fs.chmod(shimPath, 0o755)
+  }
+  // `Reflect.set` for the same reason as `Reflect.deleteProperty` above: the index signature is
+  // typed read-only here.
+  Reflect.set(process.env, 'PATH', `${shimDir}${path.delimiter}${process.env['PATH'] ?? ''}`)
+  console.log(`Added a pnpm shim for Electron Builder's node module collector: ${shimDir}`)
+}
+
 /** Build the IDE package with Electron Builder. */
 export async function buildPackage(passedArgs: Arguments) {
   // `electron-builder` checks for presence of `node_modules` directory. If it is not present, it
@@ -479,6 +518,8 @@ export async function buildPackage(passedArgs: Arguments) {
   // `Reflect.deleteProperty` rather than `delete`: this project types `process.env`'s index
   // signature as read-only.
   Reflect.deleteProperty(process.env, 'COREPACK_ROOT')
+
+  await ensurePnpmOnPath()
 
   console.log('Building with configuration:', cliOpts)
   const result = await electronBuilder.build(cliOpts)
