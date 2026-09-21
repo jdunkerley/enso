@@ -23,8 +23,8 @@ function makeDeps(overrides: Partial<ClipboardDeps> = {}): ClipboardDeps {
       cutToClipboard: vi.fn(),
       copyToClipboard: vi.fn(),
       getDisplayedRowAtIndex: (rowIndex: number) => ({ data: rows[rowIndex] }),
-      getValue: (colId: string, rowNode: { data: unknown }) =>
-        (rowNode.data as Record<string, string>)[colId],
+      getCellValue: ({ rowNode, colKey }: { rowNode: { data: unknown }; colKey: string }) =>
+        (rowNode.data as Record<string, string>)[colKey],
       getColumn: (colId: string) => ({
         getColDef: () => ({
           headerName: colId.toUpperCase(),

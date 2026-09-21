@@ -271,7 +271,11 @@ function onGridReady(event: GridReadyEvent<TData>) {
 function clipboardDeps(): ClipboardDeps {
   return {
     enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
-    gridApi: gridApi.value as unknown as ClipboardDeps['gridApi'],
+    // Deliberately not an `as unknown as` cast: these structural types name the exact grid API
+    // this file depends on, and checking them against the real `GridApi` is the only thing that
+    // catches a method disappearing under us. `api.getValue` vanishing in v33 reached CI as a
+    // silently broken copy because a double cast used to sit here.
+    gridApi: gridApi.value as ClipboardDeps['gridApi'],
     rectangle,
     processCellForClipboard,
     sendToClipboard,
@@ -281,7 +285,7 @@ function clipboardDeps(): ClipboardDeps {
 function pasteClipboardDeps(): PasteDeps {
   return {
     enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
-    gridApi: gridApi.value as unknown as PasteDeps['gridApi'],
+    gridApi: gridApi.value as PasteDeps['gridApi'],
     readClipboardText: () => navigator.clipboard.readText(),
     processDataFromClipboard: (params) => props.processDataFromClipboard?.(params as any),
     parseTsvData,

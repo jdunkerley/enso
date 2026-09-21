@@ -162,6 +162,14 @@ has silently produced a wrong result here:
   Metals/IntelliJ), the YAML round-trip in `DistributionPackage.scala`, or any
   test actually running — `Test/compile` only proves test sources build. Say
   which of these a change did _not_ verify.
+- **`as unknown as` on a third-party API defeats the one check that catches an
+  upstream removal.** Where a structural type names the slice of a dependency's
+  API we depend on, cast with `as T`, never `as unknown as T` — the single cast
+  still compiles but makes the compiler verify the shape against the real type.
+  A double cast on AG Grid's `GridApi` hid `api.getValue` being removed in v33;
+  the unlicensed copy/paste path broke silently and reached CI. Note the unit
+  tests could not catch it either: they stub the grid API, so the stub simply
+  mirrored the outdated assumption and stayed green.
 - **Run the formatting job's own command after touching `project/plugins.sbt` or
   `project/build.properties`.** Neither `compile` nor `buildEngineDistribution`
   invokes `scalafmtCheck`, so a green native-image build is silent about an

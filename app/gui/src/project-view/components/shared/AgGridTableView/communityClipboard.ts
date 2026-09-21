@@ -5,13 +5,20 @@
  * same TSV-building and Enso-expression-clipboard logic already used by the licensed path —
  * that logic was never AG Grid-specific, only the *trigger* was.
  */
+
+/** The part of AG Grid's `IRowNode` this file needs. */
+export interface RowNodeLike {
+  data: unknown
+}
+
 export interface ClipboardDeps {
   enterpriseAvailable: boolean
   gridApi: {
     cutToClipboard?(): void
     copyToClipboard?(): void
-    getDisplayedRowAtIndex(rowIndex: number): { data: unknown } | undefined
-    getValue(colId: string, rowNode: { data: unknown }): unknown
+    getDisplayedRowAtIndex(rowIndex: number): RowNodeLike | undefined
+    // `getValue(colId, rowNode)` was removed in AG Grid v33; this is its replacement.
+    getCellValue(params: { rowNode: RowNodeLike; colKey: string }): unknown
     getColumn(colId: string): {
       getColDef(): {
         headerName?: string
@@ -40,7 +47,7 @@ function buildTsv(deps: ClipboardDeps): string | undefined {
   const dataRows = rect.rowIndices.map((rowIndex) => {
     const rowNode = deps.gridApi.getDisplayedRowAtIndex(rowIndex)
     return rect.colIds.map((colId) => {
-      const value = rowNode ? deps.gridApi.getValue(colId, rowNode) : undefined
+      const value = rowNode ? deps.gridApi.getCellValue({ rowNode, colKey: colId }) : undefined
       // `processCellForClipboard` already performs its own RFC-4180 quoting/escaping (see its doc
       // comment in AgGridTableView.vue) — applying `tsvEscape` again here would double-escape.
       return deps.processCellForClipboard({
