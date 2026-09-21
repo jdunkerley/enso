@@ -62,7 +62,7 @@ export interface InputProps<
 }
 
 /** Basic input component. Input component is a component that is used to get user input in a text field. */
-export const Input = forwardRef(function Input<
+export const Input = forwardRef(function InputImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, Constraint>,
   Constraint extends number | string = number | string,
@@ -194,7 +194,7 @@ export interface BasicInputProps
 }
 
 /** An input without a {@link Form.Field}. */
-export const BasicInput = forwardRef(function BasicInput(
+export const BasicInput = forwardRef(function BasicInputImpl(
   props: BasicInputProps,
   ref?: Ref<HTMLInputElement>,
 ) {

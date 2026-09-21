@@ -40,7 +40,6 @@ export interface VueComponentHandle {
 export class VueHostInstance implements VueHost {
   readonly teleportations = reactive(new Map<number | string | symbol, [Component, HTMLElement]>())
 
-  /* eslint-disable-next-line jsdoc/require-jsdoc */
   register(
     component: Component,
     element: HTMLElement,

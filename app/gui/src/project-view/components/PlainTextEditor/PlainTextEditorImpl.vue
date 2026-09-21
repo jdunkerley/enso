@@ -17,7 +17,7 @@ const {
   extensions?: Extension | undefined
   readonly?: boolean | undefined
   contentTestId?: string | undefined
-  editorReadyCallback: (view: EditorView) => void
+  editorReadyCallback?: (view: EditorView) => void
 }>()
 
 const editorRoot = useTemplateRef<ComponentInstance<typeof CodeMirrorRoot>>('editorRoot')

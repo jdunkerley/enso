@@ -14,7 +14,7 @@ export type CloseButtonProps<IconType extends string> = Omit<
 >
 
 /** A styled button with a close icon that appears on hover. */
-export const CloseButton = memo(function CloseButton<IconType extends string>(
+export const CloseButton = memo(function CloseButtonImpl<IconType extends string>(
   props: CloseButtonProps<IconType>,
 ) {
   const { getText } = useText()

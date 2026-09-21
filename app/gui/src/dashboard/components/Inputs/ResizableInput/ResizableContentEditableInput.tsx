@@ -66,7 +66,7 @@ const useStringField = Form.makeUseField<string>()
  * A resizable input that uses a content-editable div.
  * This component might be useful for a text input that needs to have highlighted content inside of it.
  */
-export const ResizableContentEditableInput = forwardRef(function ResizableContentEditableInput<
+export const ResizableContentEditableInput = forwardRef(function ResizableContentEditableInputImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
 >(

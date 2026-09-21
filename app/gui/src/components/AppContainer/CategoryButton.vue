@@ -28,7 +28,7 @@ const {
   disabled = false,
 } = defineProps<{
   category: Category
-  extended: boolean
+  extended?: boolean
   disabled?: string | false
 }>()
 

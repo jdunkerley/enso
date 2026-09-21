@@ -19,7 +19,11 @@ catalog:
   "@types/node": ^24.2.1
   vite: ^7.3.2
   vitest: ^3.2.4
-  vue: ^3.5.13
+  vue: ^3.5.43
+  # Must move with `vue`: `project-view/composables/backend.ts` augments `RefUnwrapBailTypes`
+  # from `@vue/reactivity`, so a second copy would attach the augmentation to types Vue does
+  # not use. Catalogued rather than ranged so the two cannot drift apart again.
+  "@vue/reactivity": ^3.5.43
   # HELD at 1.55.1 on purpose — do not bump without re-measuring. See #32.
   # 1.63.0 makes the three `sorting and copying` tests in tableVisualisation.spec.ts
   # roughly 3x flakier (7 failures per 3 spec runs, vs 2 on this version). Our code is
@@ -35,3 +39,117 @@ catalog:
   "@lezer/common": ^1.5.2
   "@lezer/highlight": ^1.2.3
   zod: ^3.25.49
+  tslib: ^2.8.1
+overrides:
+  tslib: "catalog:"
+  "@types/react": ^18.3.1
+  ws: ^8.18.0
+  esbuild: ^0.25.0
+  node-forge: ^1.4.0
+  fast-xml-parser: ^5.7.2
+  flatted: ^3.4.2
+  minimatch: ^10.2.5
+  glob: ^13.0.6
+  vite: ^7.3.2
+  rollup: ^4.59.0
+  postcss: ^8.5.10
+  "@lezer/lr": ^1.4.10
+  ajv@8: ^8.18.0
+  path-to-regexp: ^0.1.13
+  qs: ^6.14.2
+  uuid: ^14.0.0
+  picomatch@2: ^2.3.2
+  picomatch@4: ^4.0.4
+packageExtensions:
+  "@aws-amplify/auth":
+    dependencies:
+      "@aws-crypto/sha256-js": "*"
+  ag-grid-enterprise:
+    dependencies:
+      ag-grid-community: "*"
+  "@open-rpc/client-js":
+    dependencies:
+      events: ^3.3.0
+  react-error-boundary:
+    dependencies:
+      "@types/react": "*"
+  react-aria-components:
+    dependencies:
+      "@types/react": "*"
+  react-aria:
+    dependencies:
+      "@types/react": "*"
+  input-otp:
+    dependencies:
+      "@types/react": "*"
+  "@tanstack/react-query":
+    dependencies:
+      "@types/react": "*"
+  "@react-types/shared":
+    dependencies:
+      "@types/react": "*"
+  "@monaco-editor/react":
+    dependencies:
+      "@types/react": "*"
+  "@stripe/react-stripe-js":
+    dependencies:
+      "@types/react": "*"
+  react-toastify:
+    dependencies:
+      "@types/react": "*"
+  react-hook-form:
+    dependencies:
+      "@types/react": "*"
+  "@hookform/resolvers":
+    dependencies:
+      zod: "*"
+  "@aws-crypto/sha256-browser":
+    dependencies:
+      "@aws-sdk/util-utf8-browser": "*"
+  "@vue/compiler-core":
+    dependencies:
+      "@babel/types": "*"
+  undici-types:
+    dependencies:
+      "@types/node": "*"
+  "@vue/test-utils":
+    dependencies:
+      vue: "*"
+      "@vue/compiler-dom": "*"
+      "@vue/server-renderer": "*"
+  modern-isomorphic-ws:
+    peerDependencies:
+      "@types/ws": "*"
+  veaury:
+    peerDependencies:
+      vue: "*"
+patchedDependencies:
+  "@aws-amplify/auth": patches/@aws-amplify__auth.patch
+  app-builder-lib@26.8.1: patches/app-builder-lib@26.8.1.patch
+# pnpm 12 will not skip a dependency's build scripts silently: every package that has one must
+# be decided here, or the install fails with ERR_PNPM_IGNORED_BUILDS. Under pnpm 10 anything
+# missing from the old `onlyBuiltDependencies` was skipped without a word, so these are
+# deliberate decisions rather than migration bookkeeping. `pnpm approve-builds <pkg> '!<pkg>'`
+# maintains this map non-interactively.
+#
+# Note the key is `allowBuilds` in pnpm 12 — `onlyBuiltDependencies` and
+# `ignoredBuiltDependencies` are the pnpm 10 spelling and are silently inert here.
+allowBuilds:
+  # Its postinstall downloads the `sentry-cli` binary that `@sentry/vite-plugin` needs in order
+  # to upload sourcemaps. The plugin is only enabled when SENTRY_AUTH_TOKEN and the org/project
+  # variables are set, which happens in `release.yml` alone — so skipping this build (as pnpm 10
+  # silently did) would have broken nothing until a release, which is the worst time to find out.
+  "@sentry/cli": true
+  electron: true
+  esbuild: true
+  # Not pending on every platform, but listed so the decision travels: fsevents is macOS-only,
+  # and sharp ships prebuilt binaries for most targets.
+  fsevents: true
+  sharp: true
+  # Reached only through `electron-builder-squirrel-windows`, a peer of `app-builder-lib`.
+  # Nothing here builds a Squirrel target — the Windows target is `dir`, see
+  # `app/electron-client/electron-builder-config.ts` — so its postinstall has nothing to do.
+  electron-winstaller: false
+  # Its postinstall runs `vue-demi-switch`, which picks the shim for Vue 2 vs Vue 3. This repo is
+  # Vue 3 only, which is what the package already ships by default.
+  vue-demi: false

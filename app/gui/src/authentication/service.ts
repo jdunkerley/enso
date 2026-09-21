@@ -255,7 +255,7 @@ function setDeepLinkHandler(navigate: (url: string) => void, cognito: Ref<Cognit
       case 'auth/confirmation': {
         const verificationCode = deeplink.searchParams.get('verification_code')
 
-        let redirectUrl = ''
+        let redirectUrl: string
 
         // In case if the verifaction code is present, then we need to navigate to the confirmation
         // page, because the URL is a deep link for confirmation page and user is not yet confirmed.

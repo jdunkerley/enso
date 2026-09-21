@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /**
  * @file A dialog is an overlay shown above other content in an application.
  * Can be used to display alerts, confirmations, or other content.
@@ -30,7 +35,10 @@ export interface DialogProps
  * Can be used to display alerts, confirmations, or other content.
  */
 export const Dialog = Object.assign(
-  React.forwardRef(function Dialog(props: DialogProps, ref: React.ForwardedRef<HTMLDivElement>) {
+  React.forwardRef(function DialogImpl(
+    props: DialogProps,
+    ref: React.ForwardedRef<HTMLDivElement>,
+  ) {
     const {
       type = 'modal',
       isDismissable = true,
@@ -239,7 +247,7 @@ interface DialogBodyProps {
 }
 
 /** The internals of a dialog. Exists only as a performance optimization. */
-const DialogBody = React.memo(function DialogBody(props: DialogBodyProps) {
+const DialogBody = React.memo(function DialogBodyImpl(props: DialogBodyProps) {
   const { close, dialogId, children, measurerWrapperClassName, contentClassName, type } = props
 
   return (
@@ -272,7 +280,7 @@ interface DialogHeaderProps extends Omit<VariantProps<typeof DIALOG_STYLES>, 'sc
  * The header of a dialog.
  * @internal
  */
-const DialogHeader = React.memo(function DialogHeader(props: DialogHeaderProps) {
+const DialogHeader = React.memo(function DialogHeaderImpl(props: DialogHeaderProps) {
   const {
     closeButton,
     title,

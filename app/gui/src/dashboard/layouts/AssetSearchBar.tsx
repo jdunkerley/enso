@@ -115,7 +115,7 @@ export interface AssetSearchBarProps {
 }
 
 /** A search bar containing a text input, and a list of suggestions. */
-export const AssetSearchBar = React.memo(function AssetSearchBar(props: AssetSearchBarProps) {
+export const AssetSearchBar = React.memo(function AssetSearchBarImpl(props: AssetSearchBarProps) {
   const { backend, isCloud, query, setQuery } = props
   const { modalRef } = modalProvider.useModalRef()
   /** A cached query as of the start of tabbing. */
@@ -368,7 +368,7 @@ interface AssetSearchBarInputProps {
 }
 
 /** Search field. */
-const AssetSearchBarInput = React.memo(function AssetSearchBarInput(
+const AssetSearchBarInput = React.memo(function AssetSearchBarInputImpl(
   props: AssetSearchBarInputProps,
 ) {
   const {
@@ -425,7 +425,7 @@ interface AssetSearchBarPopoverProps {
 }
 
 /** Renders the popover containing suggestions. */
-const AssetSearchBarPopover = React.memo(function AssetSearchBarPopover(
+const AssetSearchBarPopover = React.memo(function AssetSearchBarPopoverImpl(
   props: AssetSearchBarPopoverProps,
 ) {
   const {
@@ -505,7 +505,9 @@ interface SuggestionRendererProps {
 }
 
 /** Renders a suggestion. */
-const SuggestionRenderer = React.memo(function SuggestionRenderer(props: SuggestionRendererProps) {
+const SuggestionRenderer = React.memo(function SuggestionRendererImpl(
+  props: SuggestionRendererProps,
+) {
   const {
     index,
     selectedIndex,
@@ -570,7 +572,7 @@ interface LabelsProps {
 }
 
 /** Renders labels. */
-const Labels = React.memo(function Labels(props: LabelsProps) {
+const Labels = React.memo(function LabelsImpl(props: LabelsProps) {
   const { isCloud, query, setQuery, backend, querySource } = props
 
   const { data: labels = [] } = useQuery(backendQueryOptions(backend, 'listTags', []))

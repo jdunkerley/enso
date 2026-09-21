@@ -2029,7 +2029,7 @@ export abstract class Backend {
 
   /**
    * Return details for a file.
-   * @throws An error if a non-successful status code (not 200-299) was received.
+   * @throws {Error} An error if a non-successful status code (not 200-299) was received.
    */
   async getFileDetails(
     fileId: FileId,

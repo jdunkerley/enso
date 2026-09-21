@@ -13,6 +13,11 @@
   keep the same appearance and behaviour, licensed or not — the Community
   fallback above is unaffected. Internally the IDE now uses AG Grid's own Vue
   component instead of a local copy of it.
+- [The frontend toolchain has been brought up to date][39]: pnpm 12, Vue 3.5.43
+  and ESLint 10. No user-visible behaviour changes; the build now fails loudly
+  rather than silently skipping a dependency's install scripts, which had been
+  quietly skipping the one that fetches the sourcemap-upload binary used by
+  releases.
 - The IDE now starts in a local-only mode when it has no Enso Cloud
   configuration: a non-JSON configuration response is treated as empty, Cognito
   authentication is disabled instead of initialized with blanks, and the app
@@ -45,6 +50,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [37]: https://github.com/jdunkerley/enso/pull/37
+[39]: https://github.com/jdunkerley/enso/pull/39
 
 # Enso 2026.1
 

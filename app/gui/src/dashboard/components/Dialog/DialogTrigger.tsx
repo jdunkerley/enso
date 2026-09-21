@@ -31,7 +31,7 @@ export interface DialogTriggerProps {
 }
 
 /** A DialogTrigger opens a dialog when a trigger element is pressed. */
-export const DialogTrigger = createHideableComponent(function DialogTrigger(
+export const DialogTrigger = createHideableComponent(function DialogTriggerImpl(
   props: DialogTriggerProps,
 ) {
   const { children, onOpenChange, onOpen = () => {}, onClose = () => {} } = props

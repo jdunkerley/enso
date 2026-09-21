@@ -14,6 +14,7 @@ export function mergeProps<Constraint extends object = never>() {
   return <const T extends readonly (Partial<Constraint> | null | undefined)[]>(
     ...args: T & { [K in keyof T]: Pick<T[K], keyof Constraint & keyof T[K]> }
     // This is SAFE, as `args` is an intersection of `T` and another type.
-    // eslint-disable-next-line no-restricted-syntax
+    // Load-bearing assertion; see the note in `FormProvider.tsx`.
+    // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-unnecessary-type-assertion
   ) => aria.mergeProps<Mutable<T>>(...(args as T))
 }

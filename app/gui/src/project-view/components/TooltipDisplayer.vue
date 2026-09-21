@@ -28,11 +28,10 @@ type Timeout = ReturnType<typeof setTimeout> | null
 let hideTimeout: Timeout
 let showTimeout: Timeout
 
+// Assigning to the parameter never reached the caller, so dropping it changes nothing: every
+// call site overwrites its own variable immediately afterwards.
 function resetTimeout(timeout: Timeout) {
-  if (timeout != null) {
-    clearTimeout(timeout)
-    timeout = null
-  }
+  if (timeout != null) clearTimeout(timeout)
 }
 
 watch(activeTooltip, (newValue, oldValue) => {

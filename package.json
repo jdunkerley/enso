@@ -1,18 +1,18 @@
 {
   "type": "module",
   "devDependencies": {
-    "@eslint/js": "^9.17.0",
-    "@typescript-eslint/eslint-plugin": "^8.52.0",
-    "@typescript-eslint/parser": "^8.52.0",
-    "@vue/eslint-config-typescript": "^14.6.0",
-    "eslint": "^9.26.0",
-    "eslint-plugin-jsdoc": "^50.6.1",
-    "eslint-plugin-prettier": "^5.2.1",
-    "eslint-plugin-react": "^7.37.3",
-    "eslint-plugin-react-hooks": "^5.1.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "eslint-plugin-vue": "^9.32.0",
-    "globals": "^15.14.0",
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.70.0",
+    "@typescript-eslint/parser": "^8.70.0",
+    "@vue/eslint-config-typescript": "^14.9.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-jsdoc": "^64.5.4",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "eslint-plugin-vue": "^10.11.0",
+    "globals": "^17.12.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.5.1",
     "npm-run-all": "^4.1.5",
@@ -50,142 +50,5 @@
     "*.{js,jsx,cjs,mjs,cts,mts,ts,tsx,vue,json,jsonc,md,mdx,yml,yaml,html,css,scss}": "prettier --write"
   },
   "//": "To completely ignore deep dependencies, see .pnpmfile.cjs",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "electron",
-      "esbuild",
-      "fsevents",
-      "sharp"
-    ],
-    "overrides": {
-      "tslib": "$tslib",
-      "@types/react": "^18.3.1",
-      "ws": "^8.18.0",
-      "esbuild": "^0.25.0",
-      "node-forge": "^1.4.0",
-      "fast-xml-parser": "^5.7.2",
-      "flatted": "^3.4.2",
-      "minimatch": "^10.2.5",
-      "glob": "^13.0.6",
-      "vite": "^7.3.2",
-      "rollup": "^4.59.0",
-      "postcss": "^8.5.10",
-      "@lezer/lr": "^1.4.10",
-      "ajv@8": "^8.18.0",
-      "path-to-regexp": "^0.1.13",
-      "qs": "^6.14.2",
-      "uuid": "^14.0.0",
-      "picomatch@2": "^2.3.2",
-      "picomatch@4": "^4.0.4"
-    },
-    "packageExtensions": {
-      "@aws-amplify/auth": {
-        "dependencies": {
-          "@aws-crypto/sha256-js": "*"
-        }
-      },
-      "ag-grid-enterprise": {
-        "dependencies": {
-          "ag-grid-community": "*"
-        }
-      },
-      "@open-rpc/client-js": {
-        "dependencies": {
-          "events": "^3.3.0"
-        }
-      },
-      "react-error-boundary": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "react-aria-components": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "react-aria": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "input-otp": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "@tanstack/react-query": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "@react-types/shared": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "@monaco-editor/react": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "@stripe/react-stripe-js": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "react-toastify": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "react-hook-form": {
-        "dependencies": {
-          "@types/react": "*"
-        }
-      },
-      "@hookform/resolvers": {
-        "dependencies": {
-          "zod": "*"
-        }
-      },
-      "@aws-crypto/sha256-browser": {
-        "dependencies": {
-          "@aws-sdk/util-utf8-browser": "*"
-        }
-      },
-      "@vue/compiler-core": {
-        "dependencies": {
-          "@babel/types": "*"
-        }
-      },
-      "undici-types": {
-        "dependencies": {
-          "@types/node": "*"
-        }
-      },
-      "@vue/test-utils": {
-        "dependencies": {
-          "vue": "*",
-          "@vue/compiler-dom": "*",
-          "@vue/server-renderer": "*"
-        }
-      },
-      "modern-isomorphic-ws": {
-        "peerDependencies": {
-          "@types/ws": "*"
-        }
-      },
-      "veaury": {
-        "peerDependencies": {
-          "vue": "*"
-        }
-      }
-    },
-    "patchedDependencies": {
-      "@aws-amplify/auth": "patches/@aws-amplify__auth.patch",
-      "app-builder-lib@26.8.1": "patches/app-builder-lib@26.8.1.patch"
-    }
-  },
-  "packageManager": "pnpm@10.2.1+sha512.398035c7bd696d0ba0b10a688ed558285329d27ea994804a52bad9167d8e3a72bcb993f9699585d3ca25779ac64949ef422757a6c31102c12ab932e5cbe5cc92"
+  "packageManager": "pnpm@12.5.1+sha512.e3f305bc784a2bc89f5ad3b6138889470fae8d2af5f36b61216ec91c2c3d64089775f9de38aac331044ea40f245cb0d5666392dfdf65824e1907ef6a2c62de5f"
 }

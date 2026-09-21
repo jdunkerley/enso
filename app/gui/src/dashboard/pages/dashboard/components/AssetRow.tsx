@@ -80,7 +80,7 @@ export interface AssetRowProps {
 }
 
 /** Render a real asset row. */
-export const AssetRow = React.memo(function AssetRow(props: AssetRowProps) {
+export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
   const {
     id,
     parentId,

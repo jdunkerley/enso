@@ -24,7 +24,7 @@ import { mergeProps } from './aria'
  * !!! Make sure to keep this component in sync with the upstream component.
  */
 // eslint-disable-next-line no-restricted-syntax
-export const TabPanel = createHideableComponent(function TabPanel(
+export const TabPanel = createHideableComponent(function TabPanelImpl(
   props: TabPanelProps,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

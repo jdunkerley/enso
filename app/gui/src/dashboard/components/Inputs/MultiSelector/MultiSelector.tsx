@@ -96,7 +96,7 @@ export const MULTI_SELECTOR_STYLES = tv({
 const useReadonlyArrayField = Form.makeUseField<readonly any[]>()
 
 /** A horizontal multi-selector. */
-export const MultiSelector = forwardRef(function MultiSelector<
+export const MultiSelector = forwardRef(function MultiSelectorImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, readonly T[]>,
   T,

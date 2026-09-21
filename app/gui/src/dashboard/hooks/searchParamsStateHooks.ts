@@ -36,7 +36,7 @@ export interface SearchParamsSetOptions {
 export function useSearchParamsState<T = unknown>(
   key: string,
   defaultValue: T | (() => T),
-  predicate: (unknown: unknown) => unknown is T = (unknown): unknown is T => true,
+  predicate: (unknown: unknown) => unknown is T = (_unknown): _unknown is T => true,
 ): SearchParamsStateReturnType<T> {
   const prefixedKey = `${appUtils.SEARCH_PARAMS_PREFIX}${key}`
   const [param, setParam, clearParam] = useQueryParam(prefixedKey)
@@ -48,7 +48,7 @@ export function useSearchParamsState<T = unknown>(
     const defaultValueFrom = lazyDefaultValueInitializer()
 
     return maybeValue != null ?
-        safeJsonParse.safeJsonParse(maybeValue, defaultValueFrom, (unknown): unknown is T => true)
+        safeJsonParse.safeJsonParse(maybeValue, defaultValueFrom, (_unknown): _unknown is T => true)
       : defaultValueFrom
   })()
 

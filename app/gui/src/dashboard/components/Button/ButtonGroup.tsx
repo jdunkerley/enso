@@ -67,7 +67,7 @@ export interface ButtonGroupProps
 }
 
 /** A group of buttons. */
-export const ButtonGroup = forwardRef(function ButtonGroup(
+export const ButtonGroup = forwardRef(function ButtonGroupImpl(
   props: ButtonGroupProps,
   ref: React.ForwardedRef<HTMLDivElement>,
 ) {
@@ -121,7 +121,10 @@ export const ButtonGroup = forwardRef(function ButtonGroup(
 function JoinedButtons(props: PropsWithChildren) {
   const { children } = props
 
-  return flattenChildren(children).map(
+  // `flattenChildren` is typed as returning `ReactChild` — element, string or number — but
+  // everything passed here is an element, and the mapping below reads `.key`.
+  // eslint-disable-next-line no-restricted-syntax
+  return (flattenChildren(children) as ReactElement[]).map(
     (child: ReactElement, index: number, array: ReactElement[]) => {
       if (array.length === 1) {
         return <Fragment key={child.key}>{child}</Fragment>

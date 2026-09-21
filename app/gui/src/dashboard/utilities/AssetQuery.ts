@@ -14,7 +14,7 @@ function interpolateRegex(regex: RegExp) {
   return new RegExp(regex.source.replace(/<json>/g, JSON_VALUE_REGEX), regex.flags)
 }
 
-/** Keys of an {@Link AssetQuery} which correspond to tags. */
+/** Keys of an {@link AssetQuery} which correspond to tags. */
 export type AssetQueryKey = Exclude<keyof AssetQuery & `${string}s`, 'withUpdates'>
 
 /** An {@link AssetQuery}, without the query and methods. */

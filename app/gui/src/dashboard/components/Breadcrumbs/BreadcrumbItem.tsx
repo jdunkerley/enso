@@ -56,8 +56,10 @@ export interface BreadcrumbItemRenderProps {
 
 /** Props for {@link BreadcrumbItem}. */
 export interface BreadcrumbItemProps<IconType extends string>
+  // `children` is redefined below in render-prop form, which the aria base types as plain
+  // `ReactNode`; omitting it here keeps the two from conflicting.
   extends
-    Omit<AriaBreadcrumbItemProps, 'id'>,
+    Omit<AriaBreadcrumbItemProps, 'children' | 'id'>,
     Omit<aria.LinkProps, 'children' | 'className' | 'style'>,
     TestIdProps,
     VariantProps<typeof BREADCRUMB_ITEM_STYLES> {
@@ -147,7 +149,12 @@ export function BreadcrumbItem<IconType extends string>(props: BreadcrumbItemPro
   const renderProps = { isCurrent, isDisabled } satisfies BreadcrumbItemRenderProps
 
   const ref = useRef(null)
-  const { itemProps } = useBreadcrumbItem({ elementType: 'div', ...breadcrumbItemProps }, ref)
+  // `children` last, overriding the render-prop form in `props`: `useBreadcrumbItem` requires the
+  // plain `ReactNode` aria declares, and the real children are rendered below.
+  const { itemProps } = useBreadcrumbItem(
+    { elementType: 'div', ...breadcrumbItemProps, children: null },
+    ref,
+  )
 
   const useDropResult: {
     readonly dropProps: HTMLAttributes<HTMLElement>

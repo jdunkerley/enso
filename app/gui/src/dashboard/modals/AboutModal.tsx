@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /** @file Modal for confirming delete of any type of asset. */
 import { CopyButton } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
@@ -11,7 +16,7 @@ import { forwardRef, useMemo, type ForwardedRef } from 'react'
 
 /** A modal for confirming the deletion of an asset. */
 export const AboutModal = Object.assign(
-  forwardRef(function AboutModal(_props: object, ref: ForwardedRef<ModalApi>) {
+  forwardRef(function AboutModalImpl(_props: object, ref: ForwardedRef<ModalApi>) {
     const { localBackend } = useBackends()
     const { getText } = useText()
     const { isOpen, setIsOpen } = useModalState(

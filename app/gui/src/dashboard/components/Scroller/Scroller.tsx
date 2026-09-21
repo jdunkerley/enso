@@ -119,7 +119,7 @@ export interface ScrollerProps
 }
 
 /** A component that adds scroll shadows to a container. */
-export const Scroller = forwardRef(function Scroller(
+export const Scroller = forwardRef(function ScrollerImpl(
   props: ScrollerProps,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

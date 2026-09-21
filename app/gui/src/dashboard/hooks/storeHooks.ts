@@ -141,7 +141,7 @@ function resolveAreEqual<Slice>(areEqual: AreEqual<Slice> | null | undefined) {
  * Internal hook that isolates the conditional store logic from the `useStore` hook.
  * To enable compiler optimizations for the `useStore` hook.
  * @internal
- * @throws An error if the `unsafeEnableTransition` option is changed during the component lifecycle.
+ * @throws {Error} An error if the `unsafeEnableTransition` option is changed during the component lifecycle.
  */
 function useNonCompilableConditionalStore<State, Slice>(
   store: StoreApi<State>,

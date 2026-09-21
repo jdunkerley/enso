@@ -153,7 +153,7 @@ export function depthsToStates(depths: Readonly<FormatDepths>): FormatStates {
   return mapEntries(depths, (_k, v) => v > 0)
 }
 
-/** @returns A base case for {@FormatDepths}. */
+/** @returns A base case for {@link FormatDepths}. */
 export function zeroFormatDepths(): FormatDepths {
   return {
     Emphasis: 0,

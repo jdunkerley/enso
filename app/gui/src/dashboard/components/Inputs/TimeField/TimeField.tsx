@@ -89,7 +89,7 @@ export interface TimeFieldProps<
 const useTimeValueField = Form.makeUseField<TimeValue>()
 
 /** A date picker. */
-export const TimeField = forwardRef(function TimeField<
+export const TimeField = forwardRef(function TimeFieldImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, TimeValue>,
 >(props: TimeFieldProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {

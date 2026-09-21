@@ -144,7 +144,7 @@ export class NonEmptyStack<T> {
   /** Temporary pushes the given value to the stack and calls the callback. */
   withPushed<R>(value: T, callback: (value: T) => R): { value: T; result?: R } {
     this.stack.push(value)
-    let result = undefined
+    let result: R | undefined
     try {
       result = callback(value)
     } finally {

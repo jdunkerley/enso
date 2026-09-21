@@ -93,7 +93,7 @@ export const ICON_STYLES = tv({
 
 /** Icon component that displays an icon based on different input. */
 // eslint-disable-next-line no-restricted-syntax
-export const Icon = memo(function Icon<Render = never>(props: IconProps<Render>) {
+export const Icon = memo(function IconImpl<Render = never>(props: IconProps<Render>) {
   const { className, variants = ICON_STYLES, size, testId, renderProps, color, alt } = props
 
   const styles = variants({ size, className, color })

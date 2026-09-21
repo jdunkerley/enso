@@ -231,6 +231,12 @@ const config = [
       // deliberately fallen back to Community. This rule requires the top-level `import type`
       // qualifier, which is erased. See `AgGridTableView/agGridLicense.ts`.
       '@typescript-eslint/no-import-type-side-effects': 'error',
+      // Off because it contradicts type-based props, which is how this codebase declares them.
+      // `defineProps<{ label?: string }>()` already says the prop may be absent; adding
+      // `label = undefined` to satisfy the rule restates the type and says nothing new. The
+      // genuinely useful half of this pair — `vue/no-required-prop-with-default`, which catches a
+      // prop declared required *and* given a default — stays on, and found two real cases.
+      'vue/require-default-prop': 'off',
       'vue/attribute-hyphenation': ['error', 'never'],
       'vue/v-on-event-hyphenation': ['error', 'never'],
       'vue/singleline-html-element-content-newline': 'off',
@@ -317,6 +323,17 @@ const config = [
   {
     ...reactRefresh.configs.vite,
     files: ['app/gui/src/dashboard/**/*.ts', 'app/gui/src/dashboard/**/*.tsx'],
+    rules: {
+      ...reactRefresh.configs.vite.rules,
+      // `createHideableComponent` is a local HOC (`components/aria`), so the plugin cannot know
+      // that what it returns is a component. `extraHOCs` is the rule's own mechanism for that —
+      // eslint-plugin-react-refresh 0.5 began reporting these, and naming the HOC is the fix it
+      // documents.
+      'react-refresh/only-export-components': [
+        'error',
+        { allowConstantExport: true, extraHOCs: ['createHideableComponent'] },
+      ],
+    },
   },
   {
     files: ['app/gui/src/dashboard/**/*.ts', 'app/gui/src/dashboard/**/*.tsx'],
@@ -555,6 +572,16 @@ const config = [
       'jsdoc/require-yields-check': 'error',
       'jsdoc/tag-lines': 'error',
       'jsdoc/valid-types': 'error',
+    },
+  },
+  {
+    // Node-only build scripts. They match no other block that supplies globals, so `no-undef`
+    // flags `console` and friends — visible since ESLint 10, which applies the rule more widely.
+    files: ['app/gui/scripts/*.mjs', 'app/project-manager-shim/scripts/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
     },
   },
   {

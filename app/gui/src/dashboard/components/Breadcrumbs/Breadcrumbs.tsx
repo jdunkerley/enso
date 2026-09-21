@@ -53,10 +53,15 @@ export function Breadcrumbs(props: BreadcrumbsProps) {
   const onActionStableCallback = useEventCallback(onAction)
   const onDropStableCallback = useEventCallback(onDrop)
 
+  // `flattenChildren` is typed as returning `ReactChild` — element, string or number — but
+  // everything passed here is an element, and the mapping below reads `.key`.
+  // eslint-disable-next-line no-restricted-syntax
+  const items = flattenChildren(children) as ReactElement[]
+
   return (
     <Button.GroupProvider variant="icon">
       <BreadcrumbInner {...breadcrumbsProps} className={styles.base({ className })} testId={testId}>
-        {flattenChildren(children).map((item: ReactElement, i: number, array: ReactElement[]) => (
+        {items.map((item: ReactElement, i: number, array: ReactElement[]) => (
           <Fragment key={item.key}>
             <BreadcrumbItemProvider
               isCurrent={i === array.length - 1}
@@ -105,7 +110,7 @@ interface BreadcrumbSeparatorProps<Icon extends string> {
 
 /** A separator between breadcrumb items. */
 // eslint-disable-next-line no-restricted-syntax
-const BreadcrumbSeparator = memo(function BreadcrumbSeparator<Icon extends string>(
+const BreadcrumbSeparator = memo(function BreadcrumbSeparatorImpl<Icon extends string>(
   props: BreadcrumbSeparatorProps<Icon>,
 ) {
   const { icon = 'folder_closed', className } = props

@@ -48,7 +48,14 @@ const editHandler = WidgetEditHandler.New(props, {
   cancel: () => inputComponent.value?.cancel(),
   start: () => inputComponent.value?.focus(),
   pointerdown(event) {
-    if (targetIsOutside(event, unrefElement(inputComponent))) editHandler.value.end()
+    // `$el` rather than the instance: see the note in `ComponentBrowser.vue` on `useResizeObserver`.
+    if (
+      targetIsOutside(
+        event,
+        unrefElement(() => inputComponent.value?.$el as HTMLElement),
+      )
+    )
+      editHandler.value.end()
     return false
   },
   end: () => inputComponent.value?.blur(),

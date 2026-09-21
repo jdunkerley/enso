@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /**
  * @file
  *
@@ -62,7 +67,6 @@ export type StandaloneCheckboxProps<
   FieldStateProps<AriaCheckboxProps, Schema, TFieldName, boolean> &
   FieldVariantProps
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const CHECKBOX_STYLES = tv({
   base: 'group flex gap-2 items-center cursor-pointer select-none',
   variants: {
@@ -110,7 +114,7 @@ export const CHECKBOX_STYLES = tv({
 
 /** Checkboxes allow users to select multiple items from a list of individual items, or to mark one individual item as selected. */
 export const Checkbox = Object.assign(
-  forwardRef(function Checkbox<
+  forwardRef(function CheckboxImpl<
     Schema extends TSchema,
     TFieldName extends FieldPath<Schema, boolean>,
   >(props: CheckboxProps<Schema, TFieldName>, ref: ForwardedRef<HTMLLabelElement>) {
@@ -195,7 +199,7 @@ type CheckboxInternalProps<
   name?: string
 }
 
-const CheckboxInternal = forwardRef(function CheckboxInternal<
+const CheckboxInternal = forwardRef(function CheckboxInternalImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, boolean>,
 >(props: CheckboxInternalProps<Schema, TFieldName>, ref: ForwardedRef<HTMLLabelElement>) {

@@ -76,7 +76,7 @@ export const SELECTOR_STYLES = tv({
 })
 
 /** A horizontal selector. */
-export const Selector = React.forwardRef(function Selector<
+export const Selector = React.forwardRef(function SelectorImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, T>,
   T,

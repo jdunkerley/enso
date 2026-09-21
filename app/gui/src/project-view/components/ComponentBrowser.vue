@@ -232,7 +232,10 @@ function handleDefocus(e: FocusEvent) {
 }
 
 const inputElement = ref<ComponentInstance<typeof ComponentEditor>>()
-const inputSize = useResizeObserver(inputElement, false)
+// Observe the editor's root element rather than the component instance: `@vueuse/core` types its
+// element arguments as the bare `ComponentPublicInstance`, which Vue 3.5's generated instance type
+// for a `<script setup>` component is no longer assignable to.
+const inputSize = useResizeObserver(() => inputElement.value?.$el as HTMLElement | undefined, false)
 
 const { getNodeColor } = injectNodeColors()
 const nodeColor = computed(() => {

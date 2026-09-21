@@ -11,7 +11,7 @@ import type * as types from './types'
  * Provides better error handling and form state management and better UX out of the box.
  */
 export const Form = Object.assign(
-  React.forwardRef(function Form<Schema extends components.TSchema, SubmitResult = void>(
+  React.forwardRef(function FormImpl<Schema extends components.TSchema, SubmitResult = void>(
     props: types.FormProps<Schema, SubmitResult>,
     ref: React.Ref<HTMLFormElement>,
   ) {

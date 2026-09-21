@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /** @file A menu containing a list of options. */
 import * as React from 'react'
 
@@ -15,7 +20,6 @@ import type { Placement, TestIdProps } from '../types'
 import { MenuItem } from './MenuItem'
 import { MenuTrigger } from './MenuTrigger'
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const MENU_STYLES = tv({
   base: 'flex flex-col [clip-path:inset(0_0_0_0_round_.75rem)] overflow-x-hidden',
   slots: {
@@ -23,7 +27,6 @@ export const MENU_STYLES = tv({
   },
 })
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const MENU_SECTION_STYLES = tv({
   base: 'flex flex-col',
   slots: {
@@ -31,7 +34,6 @@ export const MENU_SECTION_STYLES = tv({
   },
 })
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const MENU_SEPARATOR_STYLES = tv({
   extend: SEPARATOR_STYLES,
   base: 'my-1.5 mx-2',
@@ -83,7 +85,9 @@ interface MenuSectionStaticProps {
 //  when you can't display a menu inside a tabs component.
 // see: https://github.com/adobe/react-spectrum/issues/6885
 // eslint-disable-next-line no-restricted-syntax
-export const Menu = createHideableComponent(function Menu<T extends object>(props: MenuProps<T>) {
+export const Menu = createHideableComponent(function MenuImpl<T extends object>(
+  props: MenuProps<T>,
+) {
   const {
     variant,
     className,
@@ -167,7 +171,7 @@ export interface MenuSectionHeaderProps
 // eslint-disable-next-line no-restricted-syntax
 export const MenuSectionHeader = createLeafComponent(
   'header',
-  function MenuSectionHeader(props: MenuSectionHeaderProps) {
+  function MenuSectionHeaderImpl(props: MenuSectionHeaderProps) {
     const { className, title, variants = MENU_SECTION_STYLES, testId } = props
 
     const styles = variants()
@@ -195,7 +199,7 @@ export interface MenuSeparatorProps
 /**
  * A separator in a menu.
  */
-export const MenuSeparator = memo(function MenuSeparator(props: MenuSeparatorProps) {
+export const MenuSeparator = memo(function MenuSeparatorImpl(props: MenuSeparatorProps) {
   const { variants = MENU_SEPARATOR_STYLES, ...rest } = props
 
   return <Separator size="thin" variants={variants} {...rest} />
