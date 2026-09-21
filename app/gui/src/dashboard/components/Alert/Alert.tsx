@@ -54,7 +54,7 @@ export interface AlertProps<IconType extends string = string>
 }
 
 /** Alert component. */
-export const Alert = forwardRef(function Alert<IconType extends string = string>(
+export const Alert = forwardRef(function AlertImpl<IconType extends string = string>(
   props: AlertProps<IconType>,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

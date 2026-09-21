@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /** @file A styled button. */
 import {
   forwardRef,
@@ -34,7 +39,7 @@ const ICON_LOADER_DELAY = 150
 /** A button allows a user to perform an action, with mouse, touch, and keyboard interactions. */
 export const Button = Object.assign(
   memo(
-    forwardRef(function Button<IconType extends string>(
+    forwardRef(function ButtonImpl<IconType extends string>(
       propsReplacement: ButtonProps<IconType>,
       refReplacement: ForwardedRef<HTMLButtonElement>,
     ) {
@@ -312,7 +317,7 @@ function hasAddon(addon: ButtonContentProps['addonEnd']): boolean {
 }
 
 /** Render the content of a button. */
-const ButtonContent = memo(function ButtonContent(props: ButtonContentProps) {
+const ButtonContent = memo(function ButtonContentImpl(props: ButtonContentProps) {
   const {
     isIconOnly,
     isLoading,
@@ -369,7 +374,7 @@ interface IconProps {
 }
 
 /** Renders an icon for a button. */
-const Icon = memo(function Icon(props: IconProps) {
+const Icon = memo(function IconImpl(props: IconProps) {
   const { isLoading, loaderPosition, icon, styles, hideLoader } = props
 
   const [loaderIsVisible, setLoaderIsVisible] = useState(false)

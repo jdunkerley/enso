@@ -105,7 +105,7 @@ interface BreadcrumbSeparatorProps<Icon extends string> {
 
 /** A separator between breadcrumb items. */
 // eslint-disable-next-line no-restricted-syntax
-const BreadcrumbSeparator = memo(function BreadcrumbSeparator<Icon extends string>(
+const BreadcrumbSeparator = memo(function BreadcrumbSeparatorImpl<Icon extends string>(
   props: BreadcrumbSeparatorProps<Icon>,
 ) {
   const { icon = 'folder_closed', className } = props

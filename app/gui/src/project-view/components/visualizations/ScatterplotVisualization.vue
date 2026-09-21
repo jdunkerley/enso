@@ -359,8 +359,8 @@ watchEffect(() => (focus.value = data.value.focus))
  * than the container.
  */
 const extremesAndDeltas = computed(() => {
-  let yMin = 0
-  let yMax = 0
+  let yMin: number
+  let yMax: number
   if (data.value.is_multi_series) {
     const axis = data.value.axis
     const series = Object.keys(axis).filter((s) => s != 'x')

@@ -140,7 +140,7 @@ export interface DatePickerProps<
 const useDateValueField = Form.makeUseField<DateValue>()
 
 /** A date picker. */
-export const DatePicker = forwardRef(function DatePicker<
+export const DatePicker = forwardRef(function DatePickerImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, DateValue>,
 >(props: DatePickerProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {

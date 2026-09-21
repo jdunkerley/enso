@@ -34,7 +34,8 @@ export function PaywallButton<IconType extends string>(
       iconPosition="end"
       tooltip={getText('paywallScreenDescription', levelLabel)}
       /* This is safe because we are passing all props to the button */
-      /* eslint-disable-next-line @typescript-eslint/no-explicit-any,no-restricted-syntax */
+      /* Load-bearing assertion; see the note in `FormProvider.tsx`. */
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any,no-restricted-syntax,@typescript-eslint/no-unnecessary-type-assertion */
       {...(buttonProps as any)}
     >
       {showChildren && childrenContent}

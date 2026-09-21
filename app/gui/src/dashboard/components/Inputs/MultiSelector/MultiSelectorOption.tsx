@@ -49,7 +49,7 @@ const MULTI_SELECTOR_OPTION_STYLES = tv({
   },
 })
 
-export const MultiSelectorOption = forwardRef(function MultiSelectorOption(
+export const MultiSelectorOption = forwardRef(function MultiSelectorOptionImpl(
   props: MultiSelectorOptionProps,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /** @file Text component */
 import * as aria from '#/components/aria'
 import type { TooltipElementType } from '#/components/VisualTooltip'
@@ -32,7 +37,7 @@ export interface HeadingProps extends Omit<TextProps, 'elementType'> {
 
 /** Heading component */
 const Heading = memo(
-  React.forwardRef(function Heading(props: HeadingProps, ref: React.Ref<HTMLHeadingElement>) {
+  React.forwardRef(function HeadingImpl(props: HeadingProps, ref: React.Ref<HTMLHeadingElement>) {
     const { level = 1, ...textProps } = props
     return <Text ref={ref} elementType={`h${level}`} variant="h1" balance {...textProps} />
   }),
@@ -43,7 +48,7 @@ export interface BodyProps extends Omit<TextProps, 'elementType'> {}
 
 /** Body component */
 const Body = memo(
-  React.forwardRef(function Body(props: BodyProps, ref: React.Ref<HTMLParagraphElement>) {
+  React.forwardRef(function BodyImpl(props: BodyProps, ref: React.Ref<HTMLParagraphElement>) {
     return <Text ref={ref} variant="body" balance {...props} />
   }),
 )
@@ -60,7 +65,7 @@ function TextGroup(props: React.PropsWithChildren) {
 /** Text component that supports truncation and show a tooltip on hover when text is truncated */
 export const Text = Object.assign(
   memo(
-    React.forwardRef(function Text(props: TextProps, ref: React.Ref<HTMLSpanElement>) {
+    React.forwardRef(function TextImpl(props: TextProps, ref: React.Ref<HTMLSpanElement>) {
       const {
         className,
         variant,

@@ -69,7 +69,7 @@ const SLOT_STYLES = tv({
 })
 
 /** Accessible one-time password component with copy paste functionality. */
-export const OTPInput = forwardRef(function OTPInput<
+export const OTPInput = forwardRef(function OTPInputImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
 >(props: OtpInputProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {

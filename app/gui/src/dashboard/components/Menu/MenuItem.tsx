@@ -74,7 +74,7 @@ export interface MenuItemCustomContentProps {
 /**
  * An item within a menu that represents a single action or option.
  */
-export const MenuItem = memo(function MenuItem<T extends object, IconType extends string>(
+export const MenuItem = memo(function MenuItemImpl<T extends object, IconType extends string>(
   props: MenuItemProps<T, IconType>,
 ) {
   const { icon, shortcut, className, variants = MENU_ITEM_STYLES, testId, ...itemProps } = props
@@ -144,7 +144,7 @@ interface MenuItemIconProps<IconType extends string> extends MenuItemRenderProps
 
 /** Renders the icon for the menu item */
 
-const MenuItemIcon = memo(function MenuItemIcon<IconType extends string>(
+const MenuItemIcon = memo(function MenuItemIconImpl<IconType extends string>(
   props: MenuItemIconProps<IconType>,
 ) {
   const { icon, className, ...renderProps } = props
@@ -154,7 +154,7 @@ const MenuItemIcon = memo(function MenuItemIcon<IconType extends string>(
 
 /** Renders the selection indicator for the menu item */
 
-const SelectionIndicator = memo(function SelectionIndicator(
+const SelectionIndicator = memo(function SelectionIndicatorImpl(
   props: MenuItemRenderProps & { className?: string },
 ) {
   const { selectionMode, isSelected, className, hasSubmenu } = props
@@ -170,7 +170,7 @@ const SelectionIndicator = memo(function SelectionIndicator(
 
 /** Renders the shortcut text for the menu item */
 
-const ShortcutText = memo(function ShortcutText(props: {
+const ShortcutText = memo(function ShortcutTextImpl(props: {
   shortcut?: string | undefined
   className?: string
 }) {
@@ -189,7 +189,7 @@ const ShortcutText = memo(function ShortcutText(props: {
 
 /** Renders the submenu indicator */
 
-const SubmenuIndicator = memo(function SubmenuIndicator(props: {
+const SubmenuIndicator = memo(function SubmenuIndicatorImpl(props: {
   hasSubmenu: boolean
   className?: string
 }) {
@@ -211,7 +211,7 @@ interface MenuItemContentProps extends MenuItemRenderProps {
 /**
  * Renders the content of the menu item.
  */
-const MenuItemContent = memo(function MenuItemContent(props: MenuItemContentProps) {
+const MenuItemContent = memo(function MenuItemContentImpl(props: MenuItemContentProps) {
   const { title, description, ...renderProps } = props
 
   const titleContent = typeof title === 'function' ? title(renderProps) : title

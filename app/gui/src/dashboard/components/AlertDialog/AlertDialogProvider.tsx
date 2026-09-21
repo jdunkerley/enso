@@ -55,7 +55,7 @@ export function AlertDialogProvider(props: AlertDialogProviderProps) {
 
 /**
  * Custom hook to get the {@link AlertContext} context.
- * @throws if the hook is used outside of a {@link AlertDialogProvider}.
+ * @throws {Error} if the hook is used outside of a {@link AlertDialogProvider}.
  */
 AlertDialogProvider.useContextStrict = () => {
   const context = useContext(AlertContext)

@@ -269,9 +269,7 @@ export class ProjectManagerShimMiddleware {
         }
         default: {
           const route = requestPath.replace('/api/', '/')
-          let match: RegExpMatchArray | null = null
-
-          match = route.match(DOWNLOAD_PROJECT_REGEX)
+          const match = route.match(DOWNLOAD_PROJECT_REGEX)
           if (request.method === 'GET' && match?.groups?.['projectId'] != null) {
             const projectId = ProjectId(match.groups['projectId'])
             const projectPath = extractTypeAndPath(projectId).path

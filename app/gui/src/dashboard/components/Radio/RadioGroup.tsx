@@ -39,7 +39,7 @@ export const RADIO_GROUP_STYLES = twv.tv({
 const useStringField = Form.makeUseField<string>()
 
 /** A radio group. */
-export const RadioGroup = React.forwardRef(function RadioGroup<
+export const RadioGroup = React.forwardRef(function RadioGroupImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
 >(props: RadioGroupProps<Schema, TFieldName>, ref: React.ForwardedRef<HTMLDivElement>) {

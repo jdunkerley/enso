@@ -43,7 +43,10 @@ export interface RadioProps extends aria.RadioProps {
 
 /** A radio button. */
 export const Radio = Object.assign(
-  React.forwardRef(function Radio(props: RadioProps, ref: React.ForwardedRef<HTMLLabelElement>) {
+  React.forwardRef(function RadioImpl(
+    props: RadioProps,
+    ref: React.ForwardedRef<HTMLLabelElement>,
+  ) {
     const { children, label, className, ...ariaProps } = props
 
     const inputRef = React.useRef<HTMLInputElement>(null)
@@ -57,7 +60,6 @@ export const Radio = Object.assign(
 
     invariant(state, '<Radio /> must be used within a <RadioGroup />')
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const { isSelected, isDisabled, isPressed, inputProps, labelProps } = aria.useRadio(
       aria.mergeProps<aria.RadioProps>()(ariaProps, {
         id,
@@ -117,7 +119,6 @@ export const Radio = Object.assign(
 
     return (
       <label
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         {...aria.mergeProps<React.LabelHTMLAttributes<HTMLLabelElement>>()(hoverProps, labelProps)}
         ref={(el) => {
           mergeRefs(labelRef, ref)(el)
@@ -126,7 +127,6 @@ export const Radio = Object.assign(
       >
         <input
           {...aria.mergeProps<React.InputHTMLAttributes<HTMLInputElement>>()(
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
             inputProps,
             focusProps,
           )}

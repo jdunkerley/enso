@@ -344,7 +344,7 @@ export interface UserSession {
 
 /**
  * Parse a {@link cognito.CognitoUserSession} into a {@link UserSession}.
- * @throws If the `email` field of the payload is not a string.
+ * @throws {Error} If the `email` field of the payload is not a string.
  */
 function parseUserSession(session: cognito.CognitoUserSession): UserSession {
   const payload: Readonly<Record<string, unknown>> = session.getIdToken().payload

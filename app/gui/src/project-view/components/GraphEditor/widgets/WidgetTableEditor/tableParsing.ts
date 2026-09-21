@@ -15,7 +15,7 @@ function trimTrailingNewline(tsvData: string): string {
 
 /**
  * Parse data in TSV format (according to RFC 4180).
- * @throws if the number of columns in each row is not the same.
+ * @throws {Error} if the number of columns in each row is not the same.
  * @returns an array of rows, each row is an array of cells.
  */
 function parseTsvDataImpl(tsvData: string): string[][] {

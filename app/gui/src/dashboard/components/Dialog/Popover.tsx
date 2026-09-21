@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * These files export a compound component built with `Object.assign(Component, { Sub })`.
+ * eslint-plugin-react-refresh 0.5 cannot see through `Object.assign`, so it treats the file as
+ * exporting a non-component and flags every local component in it. There is no `extraHOCs`
+ * equivalent for this pattern. */
 /**
  * @file
  * A dialog is an overlay shown above other content in an application.
@@ -30,7 +35,6 @@ export interface PopoverProps
   readonly onClose?: (() => void) | undefined
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const POPOVER_STYLES = tv({
   base: 'shadow-xl w-full overflow-clip',
   variants: {
@@ -84,7 +88,7 @@ const SUSPENSE_LOADER_PROPS = { minHeight: 'h32' } as const
  * It can be used to display additional content or actions.
  */
 export const Popover = Object.assign(
-  React.forwardRef(function Popover(props: PopoverProps, ref: React.ForwardedRef<HTMLElement>) {
+  React.forwardRef(function PopoverImpl(props: PopoverProps, ref: React.ForwardedRef<HTMLElement>) {
     const {
       children,
       className,

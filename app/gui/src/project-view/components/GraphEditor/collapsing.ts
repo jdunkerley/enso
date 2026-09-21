@@ -54,7 +54,7 @@ interface RefactoredInfo {
 
 /**
  * Prepare the information necessary for collapsing nodes.
- * @throws errors in case of failures, but it should not happen in normal execution.
+ * @throws {Error} errors in case of failures, but it should not happen in normal execution.
  */
 export function prepareCollapsedInfo(
   selected: Set<NodeId>,

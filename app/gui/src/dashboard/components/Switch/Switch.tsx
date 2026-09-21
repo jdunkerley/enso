@@ -68,7 +68,7 @@ export const SWITCH_STYLES = tv({
 const useBooleanField = Form.makeUseField<boolean>()
 
 /** A switch allows a user to turn a setting on or off. */
-export const Switch = forwardRef(function Switch<
+export const Switch = forwardRef(function SwitchImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, boolean>,
 >(props: SwitchProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {

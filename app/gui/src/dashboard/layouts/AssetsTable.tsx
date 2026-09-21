@@ -1309,7 +1309,7 @@ interface HiddenColumnProps {
 }
 
 /** Display a button to show/hide a column. */
-const HiddenColumn = memo(function HiddenColumn(props: HiddenColumnProps) {
+const HiddenColumn = memo(function HiddenColumnImpl(props: HiddenColumnProps) {
   const { column, enabledColumns, onColumnClick } = props
 
   const { getText } = useText()

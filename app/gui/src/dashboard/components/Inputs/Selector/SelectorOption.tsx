@@ -149,7 +149,7 @@ const SELECTOR_OPTION_STYLES = tv({
 })
 
 export const SelectorOption = memo(
-  forwardRef(function SelectorOption(
+  forwardRef(function SelectorOptionImpl(
     props: SelectorOptionProps,
     ref: ForwardedRef<HTMLLabelElement>,
   ) {

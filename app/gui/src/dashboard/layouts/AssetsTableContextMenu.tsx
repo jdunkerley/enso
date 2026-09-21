@@ -40,7 +40,7 @@ export interface AssetsTableContextMenuProps {
  * A context menu for an `AssetsTable`, when no row is selected, or multiple rows
  * are selected.
  */
-export const AssetsTableContextMenu = React.forwardRef(function AssetsTableContextMenu(
+export const AssetsTableContextMenu = React.forwardRef(function AssetsTableContextMenuImpl(
   props: AssetsTableContextMenuProps,
   ref: React.ForwardedRef<ContextMenuApi>,
 ) {

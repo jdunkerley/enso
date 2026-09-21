@@ -128,7 +128,7 @@ function isAmplifyError(error: unknown): error is AmplifyError {
 /**
  * Convert the `unknown` error into an {@link AmplifyError} and returns it, or re-throws it if
  * conversion is not possible.
- * @throws If the error is not an amplify error.
+ * @throws {Error} If the error is not an amplify error.
  */
 export function intoAmplifyErrorOrThrow(error: unknown): AmplifyError {
   if (isAmplifyError(error)) {
@@ -630,7 +630,7 @@ export interface UserSession {
 
 /**
  * Parse a `CognitoUserSession` into a {@link UserSession}.
- * @throws If the `email` field of the payload is not a string.
+ * @throws {Error} If the `email` field of the payload is not a string.
  */
 async function parseUserSession(
   session: amplify.AuthSession,
@@ -671,7 +671,7 @@ async function fetchRefreshToken() {
 /**
  * Extract the refresh session endpoint URL from the JWT token payload
  * @see https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-the-access-token.html
- * @throws Error if the `iss` field of the payload is not a valid URL.
+ * @throws {Error} if the `iss` field of the payload is not a valid URL.
  */
 function extractRefreshUrlFromSession(session: amplify.AuthSession): string {
   const iss = session.tokens?.accessToken.payload.iss

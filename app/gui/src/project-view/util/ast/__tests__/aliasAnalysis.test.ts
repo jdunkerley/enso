@@ -230,7 +230,7 @@ test('Annotations parsing', () => {
       ).toBe(identifier)
     } catch (e) {
       const message = `Invalid annotation at [${range}]: ${e}`
-      throw new Error(message)
+      throw new Error(message, { cause: e })
     }
   }
 

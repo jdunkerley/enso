@@ -56,7 +56,7 @@ export interface LoaderProps extends VariantProps<typeof STYLES> {
 
 /** A full-screen loading spinner. */
 
-export const Loader = memo(function Loader(props: LoaderProps) {
+export const Loader = memo(function LoaderImpl(props: LoaderProps) {
   const {
     children,
     className,

@@ -52,7 +52,9 @@ export function useFormContext<Schema extends types.TSchema>(
     invariant(ctx, 'FormContext not found')
 
     // This is safe, as we pass the value transparently and it is typed outside
-    // eslint-disable-next-line no-restricted-syntax
+    // The assertion is load-bearing: @typescript-eslint 8.70 calls it unnecessary, but removing it
+    // fails `vue-tsc`. Trust the compiler over the rule.
+    // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-unnecessary-type-assertion
     return ctx.form as unknown as types.UseFormReturn<Schema>
   }
 }

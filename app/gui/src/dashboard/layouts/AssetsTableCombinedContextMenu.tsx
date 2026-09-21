@@ -20,41 +20,45 @@ export interface AssetsTableCombinedContextMenuProps {
   readonly doPaste: (newParentId: DirectoryId) => void
 }
 
-export const AssetsTableCombinedContextMenu = forwardRef(function AssetsTableCombinedContextMenu(
-  props: AssetsTableCombinedContextMenuProps,
-  ref: ForwardedRef<ContextMenuApi>,
-) {
-  const { currentDirectoryId, doCopy, doCut, doPaste } = props
+export const AssetsTableCombinedContextMenu = forwardRef(
+  function AssetsTableCombinedContextMenuImpl(
+    props: AssetsTableCombinedContextMenuProps,
+    ref: ForwardedRef<ContextMenuApi>,
+  ) {
+    const { currentDirectoryId, doCopy, doCut, doPaste } = props
 
-  const driveStore = useDriveStore()
+    const driveStore = useDriveStore()
 
-  const singleSelectedItemId = useStore(
-    driveStore,
-    (state) =>
-      state.selectedIds.size === 1 ? state.selectedIds[Symbol.iterator]().next().value : undefined,
-    { unsafeEnableTransition: true },
-  )
-  const contextMenuData = useStore(driveStore, (state) => state.contextMenuData)
-  const getAsset = useGetAsset()
-  const asset = singleSelectedItemId ? getAsset(singleSelectedItemId) : undefined
-  const contextMenuDataRef = useSyncRef(contextMenuData?.triggerRef.current ?? null)
+    const singleSelectedItemId = useStore(
+      driveStore,
+      (state) =>
+        state.selectedIds.size === 1 ?
+          state.selectedIds[Symbol.iterator]().next().value
+        : undefined,
+      { unsafeEnableTransition: true },
+    )
+    const contextMenuData = useStore(driveStore, (state) => state.contextMenuData)
+    const getAsset = useGetAsset()
+    const asset = singleSelectedItemId ? getAsset(singleSelectedItemId) : undefined
+    const contextMenuDataRef = useSyncRef(contextMenuData?.triggerRef.current ?? null)
 
-  return asset ?
-      <AssetContextMenu
-        ref={ref}
-        asset={asset}
-        currentDirectoryId={currentDirectoryId}
-        doCopy={doCopy}
-        doCut={doCut}
-        doPaste={doPaste}
-        triggerRef={contextMenuDataRef}
-        initialPosition={contextMenuData?.initialContextMenuPosition}
-      />
-    : <AssetsTableContextMenu
-        ref={ref}
-        currentDirectoryId={currentDirectoryId}
-        doCopy={doCopy}
-        doCut={doCut}
-        doPaste={doPaste}
-      />
-})
+    return asset ?
+        <AssetContextMenu
+          ref={ref}
+          asset={asset}
+          currentDirectoryId={currentDirectoryId}
+          doCopy={doCopy}
+          doCut={doCut}
+          doPaste={doPaste}
+          triggerRef={contextMenuDataRef}
+          initialPosition={contextMenuData?.initialContextMenuPosition}
+        />
+      : <AssetsTableContextMenu
+          ref={ref}
+          currentDirectoryId={currentDirectoryId}
+          doCopy={doCopy}
+          doCut={doCut}
+          doPaste={doPaste}
+        />
+  },
+)

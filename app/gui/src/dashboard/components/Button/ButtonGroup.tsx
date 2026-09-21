@@ -67,7 +67,7 @@ export interface ButtonGroupProps
 }
 
 /** A group of buttons. */
-export const ButtonGroup = forwardRef(function ButtonGroup(
+export const ButtonGroup = forwardRef(function ButtonGroupImpl(
   props: ButtonGroupProps,
   ref: React.ForwardedRef<HTMLDivElement>,
 ) {

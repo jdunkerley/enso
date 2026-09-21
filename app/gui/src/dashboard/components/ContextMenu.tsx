@@ -34,7 +34,7 @@ export interface ContextMenuApi {
 }
 
 /** A context menu that opens at the current mouse position. */
-export const ContextMenu = forwardRef(function ContextMenu(
+export const ContextMenu = forwardRef(function ContextMenuImpl(
   props: ContextMenuProps,
   ref: ForwardedRef<ContextMenuApi>,
 ) {

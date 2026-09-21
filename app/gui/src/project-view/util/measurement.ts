@@ -35,7 +35,7 @@ export function getTextWidthByFont(text: string | null | undefined, font: string
 /**
  * Stores loading status of queried fonts, so we can make the check synchronous and reactive.
  * This is supposed to be global, since the font loading state is scoped to the document and cannot
- * revert back to loading (assuming we don't dynamically change existing @font-face definitions to
+ * revert back to loading (assuming we don't dynamically change existing \@font-face definitions to
  * point to different URLs, which would be incredibly cursed).
  */
 const fontsLoadState = shallowReactive(new Map())

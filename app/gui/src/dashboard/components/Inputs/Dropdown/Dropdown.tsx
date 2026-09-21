@@ -142,7 +142,7 @@ interface InternalMultipleDropdownProps<T> extends InternalBaseDropdownProps<T> 
 export type DropdownProps<T> = InternalMultipleDropdownProps<T> | InternalSingleDropdownProps<T>
 
 /** A styled dropdown. */
-export const Dropdown = forwardRef(function Dropdown<T>(
+export const Dropdown = forwardRef(function DropdownImpl<T>(
   props: DropdownProps<T>,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

@@ -44,7 +44,7 @@ describe('WidgetRegistry', () => {
 
   const widgetC = makeMockWidget(
     'C',
-    defineWidget((input: WidgetInput): input is WidgetInput => true, {
+    defineWidget((_input: WidgetInput): _input is WidgetInput => true, {
       priority: 10,
       score: Score.Good,
     }),

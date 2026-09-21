@@ -101,7 +101,7 @@ export interface ComboBoxProps<Schema extends TSchema, TFieldName extends FieldP
 const useStringField = Form.makeUseField<string>()
 
 /** A combo box with a list of items that can be filtered. */
-export const ComboBox = forwardRef(function ComboBox<
+export const ComboBox = forwardRef(function ComboBoxImpl<
   Schema extends TSchema,
   TFieldName extends FieldPath<Schema, string>,
 >(props: ComboBoxProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {

@@ -56,7 +56,7 @@ export const FIELD_STYLES = tv({
 })
 
 /** Field component */
-export const Field = React.forwardRef(function Field<Schema extends types.TSchema>(
+export const Field = React.forwardRef(function FieldImpl<Schema extends types.TSchema>(
   props: FieldComponentProps<Schema>,
   ref: React.ForwardedRef<HTMLDivElement>,
 ) {

@@ -24,7 +24,7 @@ const DEBOUNCE_TIME = 16
  * Isolates the layout of the children from the rest of the page, using SVG + foreignObject hack.
  * Improves Layout recalculation performance.
  */
-export const IsolateLayout = forwardRef(function IsolateLayout(
+export const IsolateLayout = forwardRef(function IsolateLayoutImpl(
   props: IsolateLayoutProps,
   ref: ForwardedRef<HTMLDivElement>,
 ) {

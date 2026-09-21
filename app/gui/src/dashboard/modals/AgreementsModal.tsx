@@ -15,7 +15,7 @@ export interface AgreementsModalProps {
 }
 
 /** Modal for accepting the terms of service. */
-export const AgreementsModal = memo(function AgreementsModal(props: AgreementsModalProps) {
+export const AgreementsModal = memo(function AgreementsModalImpl(props: AgreementsModalProps) {
   const { agreedToTos, agreedToPrivacyPolicy, userAgreed } = props
   const { getText } = useText()
 

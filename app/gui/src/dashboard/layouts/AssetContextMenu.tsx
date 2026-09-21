@@ -66,7 +66,7 @@ export interface AssetContextMenuProps {
 }
 
 /** The context menu for an arbitrary {@link backendModule.Asset}. */
-export const AssetContextMenu = React.forwardRef(function AssetContextMenu(
+export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
   props: AssetContextMenuProps,
   ref: React.ForwardedRef<ContextMenuApi>,
 ) {

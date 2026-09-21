@@ -12,7 +12,7 @@ export interface ResizableInputProps extends aria.TextFieldProps {
 }
 
 /** A resizable input field. */
-export const ResizableInput = React.forwardRef(function ResizableInput(
+export const ResizableInput = React.forwardRef(function ResizableInputImpl(
   props: ResizableInputProps,
   ref: React.ForwardedRef<HTMLTextAreaElement>,
 ) {
