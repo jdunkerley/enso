@@ -21,6 +21,7 @@ export function applyTextEdits(content: string, edits: TextEdit[]): string {
     } catch (e) {
       throw new Error(
         `Failed to apply edit ${JSON.stringify(edit)} to content:\n${JSON.stringify(c)}\n${e}`,
+        { cause: e },
       )
     }
   }, content)

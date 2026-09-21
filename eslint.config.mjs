@@ -577,7 +577,7 @@ const config = [
   {
     // Node-only build scripts. They match no other block that supplies globals, so `no-undef`
     // flags `console` and friends — visible since ESLint 10, which applies the rule more widely.
-    files: ['app/gui/scripts/*.mjs'],
+    files: ['app/gui/scripts/*.mjs', 'app/project-manager-shim/scripts/*.js'],
     languageOptions: {
       globals: {
         ...globals.node,

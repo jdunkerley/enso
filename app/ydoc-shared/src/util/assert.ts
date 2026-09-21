@@ -30,7 +30,7 @@ export function assert(
  * @param iterable The iterable to check.
  * @param length The expected length of the iterable.
  * @param message Optional message for the assertion error.
- * @throws Error Will throw an error if the length does not match.
+ * @throws {Error} Error Will throw an error if the length does not match.
  *
  * The first five elements of the iterable will be displayed in the error message
  * if the assertion fails. If the iterable contains more than five elements,

@@ -119,7 +119,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Return a list of assets in a directory.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async listDirectory(
     query: backend.ListDirectoryRequestParams & { readonly recursive?: boolean },
@@ -263,7 +263,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Create a project.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async createProject(
     body: backend.CreateProjectRequestBody,
@@ -289,7 +289,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Close the project identified by the given project ID.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async closeProject(projectId: backend.ProjectId, title: string | null): Promise<void> {
     const { path } = backend.extractTypeAndPath(projectId)
@@ -301,13 +301,14 @@ export class LocalBackend extends backend.Backend {
         `Could not close project ${title != null ? `'${title}'` : `with ID '${projectId}'`}: ${
           tryGetMessage(error) ?? 'unknown error'
         }.`,
+        { cause: error },
       )
     }
   }
 
   /**
    * Return asset details.
-   * @throws An error if a non-successful status code (not 200-299) was received.
+   * @throws {Error} An error if a non-successful status code (not 200-299) was received.
    */
   override async getAssetDetails<Id extends backend.AssetId>(
     assetId: Id,
@@ -343,7 +344,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Returns information about the project identified by the given project ID.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async getProjectDetails(
     projectId: backend.ProjectId,
@@ -406,7 +407,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Prepare a project for execution.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async openProject(
     projectId: backend.ProjectId,
@@ -428,13 +429,14 @@ export class LocalBackend extends backend.Backend {
         `Could not open project ${title != null ? `'${title}'` : `with ID '${projectId}'`}: ${
           tryGetMessage(error) ?? 'unknown error'
         }.`,
+        { cause: error },
       )
     }
   }
 
   /**
    * Change the name of a project.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async updateProject(
     projectId: backend.ProjectId,
@@ -483,7 +485,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Delete an arbitrary asset.
-   * @throws An error if the JSON-RPC call fails.
+   * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async deleteAsset(
     assetId: backend.AssetId,
@@ -506,6 +508,7 @@ export class LocalBackend extends backend.Backend {
             `Could not delete project ${
               title != null ? `'${title}'` : `with ID '${path}'`
             }: ${tryGetMessage(error) ?? 'unknown error'}.`,
+            { cause: error },
           )
         }
       }
@@ -538,7 +541,7 @@ export class LocalBackend extends backend.Backend {
 
   /**
    * Called for any function that does not make sense in the Local Backend.
-   * @throws An error stating that the operation is intentionally unavailable on the local
+   * @throws {Error} An error stating that the operation is intentionally unavailable on the local
    * backend.
    */
   invalidOperation(): never {

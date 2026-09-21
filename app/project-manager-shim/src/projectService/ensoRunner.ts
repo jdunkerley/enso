@@ -520,7 +520,7 @@ export class EnsoRunner implements Runner {
       if (error instanceof Error) {
         throw error
       } else {
-        throw new Error(`Failed to rename project: ${error}`)
+        throw new Error(`Failed to rename project: ${error}`, { cause: error })
       }
     }
   }

@@ -223,7 +223,6 @@ export class LanguageServerSession {
     return await withContext(
       () => 'When reading initial state',
       async () => {
-        let moduleOpenPromises: Promise<Result<void>>[] = []
         const projectRoot = (await this.ls.contentRoots).find((root) => root.type === 'Project')
         if (!projectRoot) return Err('Missing project root')
         this.projectRootId = projectRoot.id
@@ -234,7 +233,7 @@ export class LanguageServerSession {
         if (!aquireResult.ok) return aquireResult
         const files = await this.scanSourceFiles()
         if (!files.ok) return files
-        moduleOpenPromises = this.indexDoc.doc.transact(
+        const moduleOpenPromises = this.indexDoc.doc.transact(
           () =>
             files.value.map((file) =>
               this.getModuleModel(pushPathSegment(file.path, file.name)).open(),

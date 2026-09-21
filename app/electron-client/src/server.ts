@@ -308,8 +308,7 @@ export class Server {
           break
         }
         default: {
-          let match: RegExpMatchArray | null = null
-          match = route.pathname.match(GET_FILE_DETAILS_REGEX)
+          let match = route.pathname.match(GET_FILE_DETAILS_REGEX)
           if (request.method === 'GET' && match?.groups?.['fileId'] != null) {
             const fileId = match.groups['fileId']
             await this.httpGetFileDetails(request, response, params, [fileId as FileId])
