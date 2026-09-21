@@ -82,7 +82,7 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn image_id(&self) -> ImageId {
-        ImageId(format!("postgres:{}", &self.version))
+        ImageId(format!("postgres:{}", self.version))
     }
 
     pub fn set_enso_test_env(&self) -> Result {

@@ -184,8 +184,8 @@ impl DeserializerBuilder {
         let constructor_args: Vec<_> =
             fields.into_iter().map(|field| field.name.as_str()).collect();
         let constructor_args = constructor_args.join(", ");
-        writeln!(body, "return new {}({});", &class.name, constructor_args).unwrap();
-        let message_ty = syntax::Type::named(format!("{}.Message", &self.support));
+        writeln!(body, "return new {}({});", class.name, constructor_args).unwrap();
+        let message_ty = syntax::Type::named(format!("{}.Message", self.support));
         let mut method = syntax::Method::new("deserialize", quote_class_type(graph, self.root));
         method.static_ = true;
         method.body = body;
@@ -230,12 +230,12 @@ impl DeserializerBuilder {
         let expr = match self.mappers.remove(&field.id()) {
             Some(mapper) => {
                 let value = self.get_temp();
-                writeln!(body, "{} {} = {};", ty_name, &value, expr).unwrap();
+                writeln!(body, "{} {} = {};", ty_name, value, expr).unwrap();
                 (mapper)(MapperInput { message, value: &value })
             }
             None => expr,
         };
-        writeln!(body, "{} {} = {};", ty_name, &field.name, expr).unwrap();
+        writeln!(body, "{} {} = {};", ty_name, field.name, expr).unwrap();
     }
 
     /// Deserialize an optional object; if it is not present, use the Java `null` value.
@@ -358,7 +358,7 @@ impl DeserializerBuilder {
             let constructor_args: Vec<_> =
                 class_fields(graph, class).into_iter().map(|field| field.name.as_str()).collect();
             let constructor_args = constructor_args.join(", ");
-            writeln!(body, "return new {}({});", &ty, constructor_args).unwrap();
+            writeln!(body, "return new {}({});", ty, constructor_args).unwrap();
             writeln!(body, "}}").unwrap();
         }
         let ty_name = quote_class_type(graph, self.root);

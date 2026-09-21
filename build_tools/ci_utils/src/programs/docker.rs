@@ -14,8 +14,7 @@ fn get_image_id_from_build_output(output: &std::process::Output) -> Result<Image
     let built_image_id = std::str::from_utf8(&output.stdout)?
         .lines()
         .inspect(|line| debug!("{}", line))
-        .filter(|line| !line.is_empty())
-        .next_back()
+        .rfind(|line| !line.is_empty())
         .with_context(|| "Docker provided no output.")?
         .split(' ')
         .next_back()

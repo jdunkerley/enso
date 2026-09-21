@@ -364,10 +364,10 @@ impl ser::SerializeStruct for &'_ mut Serializer {
     }
 
     fn end(self) -> Result<()> {
-        if let Some(ancestor) = self.parent_structs.last() {
-            if ancestor.object_depth_inside == self.object_depth {
-                self.parent_structs.pop();
-            }
+        if let Some(ancestor) = self.parent_structs.last()
+            && ancestor.object_depth_inside == self.object_depth
+        {
+            self.parent_structs.pop();
         }
         self.object_depth -= 1;
         Ok(())

@@ -44,7 +44,7 @@ fn main() {
     }
     for class in graph {
         let code = class.to_string();
-        let path = dir.join(format!("{}.java", &class.name));
+        let path = dir.join(format!("{}.java", class.name));
         std::fs::write(path, code).unwrap();
     }
 }

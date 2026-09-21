@@ -68,7 +68,7 @@ pub struct Cl;
 
 impl Program for Cl {
     type Command = Command;
-    type Version = crate::prelude::Version;
+    type Version = Version;
 
     fn executable_name(&self) -> &'static str {
         "cl"

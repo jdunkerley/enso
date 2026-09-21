@@ -602,11 +602,12 @@ impl<'s, Inner: TokenConsumer<'s>> Lexer<'s, Inner> {
     /// If the current char could start an identifier, consume it and return true; otherwise, return
     /// false.
     fn ident_start_char(&mut self) -> bool {
-        if let Some(char) = self.current_char {
-            if is_ident_char(char) && char != '\'' {
-                self.take_next();
-                return true;
-            }
+        if let Some(char) = self.current_char
+            && is_ident_char(char)
+            && char != '\''
+        {
+            self.take_next();
+            return true;
         }
         false
     }
@@ -898,12 +899,12 @@ where
         let token = self.make_token(open_quote_start, open_quote_end, token::Variant::text_start());
         self.inner.push_token(token);
         let mut initial_indent = None;
-        if text_type.expects_initial_newline() {
-            if let Some(newline) = self.line_break() {
-                self.inner.push_token(newline.with_variant(token::Variant::text_initial_newline()));
-                if self.last_spaces_visible_offset > block_indent {
-                    initial_indent = self.last_spaces_visible_offset.into();
-                }
+        if text_type.expects_initial_newline()
+            && let Some(newline) = self.line_break()
+        {
+            self.inner.push_token(newline.with_variant(token::Variant::text_initial_newline()));
+            if self.last_spaces_visible_offset > block_indent {
+                initial_indent = self.last_spaces_visible_offset.into();
             }
         }
         self.text_content(

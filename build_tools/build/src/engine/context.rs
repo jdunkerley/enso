@@ -408,16 +408,14 @@ impl RunContext {
         }
 
         match &self.config.execute_benchmarks {
-            None => (),
-            Some(benchs) => {
-                if benchs.bench_type == BenchmarkType::Enso {
-                    if self.config.check_enso_benchmarks {
-                        enso.run_benchmarks(BenchmarkOptions { dry_run: true }).await?;
-                    } else {
-                        enso.run_benchmarks(BenchmarkOptions { dry_run: false }).await?;
-                    }
+            Some(benchs) if benchs.bench_type == BenchmarkType::Enso => {
+                if self.config.check_enso_benchmarks {
+                    enso.run_benchmarks(BenchmarkOptions { dry_run: true }).await?;
+                } else {
+                    enso.run_benchmarks(BenchmarkOptions { dry_run: false }).await?;
                 }
             }
+            _ => (),
         }
 
         if is_in_env() {

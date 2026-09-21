@@ -88,7 +88,7 @@ impl<'s> From<NamedApp<'s>> for Operand<'s> {
 
 impl<'s> ApplyToOperand<'s> for NamedApp<'s> {
     fn apply_to_operand(self, operand: Option<Operand<'s>>) -> Operand<'s> {
-        let mut result = operand.unwrap().map(|func| self.apply(Tree::from(func)));
+        let mut result = operand.unwrap().map(|func| self.apply(func));
         result.call = true;
         result
     }
@@ -148,17 +148,16 @@ where
         following_spacing: Option<Spacing>,
         is_syntactic_binary_operator: bool,
     ) {
-        if let Some(last) = self.stack.last_mut() {
-            if !last.spaceproof
-                && last.inner_parens == 0
-                && last.open.is_none()
-                && following_spacing != Some(Spacing::Unspaced)
-            {
-                if is_syntactic_binary_operator {
-                    last.spaceproof = true;
-                } else {
-                    self.flush_complete(None);
-                }
+        if let Some(last) = self.stack.last_mut()
+            && !last.spaceproof
+            && last.inner_parens == 0
+            && last.open.is_none()
+            && following_spacing != Some(Spacing::Unspaced)
+        {
+            if is_syntactic_binary_operator {
+                last.spaceproof = true;
+            } else {
+                self.flush_complete(None);
             }
         }
     }
