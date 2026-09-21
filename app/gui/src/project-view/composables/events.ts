@@ -7,7 +7,7 @@ import type { KeyboardComposable } from '@/composables/keyboard'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
 import type { Opt } from '@/util/data/opt'
 import { Vec2 } from '@/util/data/vec2'
-import type { VueInstance } from '@vueuse/core'
+import type { MaybeComputedElementRef, VueInstance } from '@vueuse/core'
 import {
   computed,
   onMounted,
@@ -230,7 +230,9 @@ const sharedResizeObserver: ResizeObserver | undefined =
  * @returns Reactive value with the DOM node size.
  */
 export function useResizeObserver(
-  elementRef: Ref<Element | undefined | null | VueInstance>,
+  // A getter is accepted as well as a ref: `unrefElement` handles both, and Vue 3.5's generated
+  // component-instance types are not assignable to `@vueuse/core`'s bare `VueInstance`.
+  elementRef: MaybeComputedElementRef,
   useContentRect = true,
 ): Ref<Vec2> {
   if (!sharedResizeObserver) {
@@ -263,7 +265,9 @@ export function useResizeObserver(
         data.boundRectUsers += 1
       }
       onCleanup(() => {
-        if (elementRef.value != null) {
+        // Re-read at cleanup time, as the previous `elementRef.value` did — the argument is no
+        // longer necessarily a ref, so it cannot be dereferenced directly.
+        if (unrefElement(elementRef) != null) {
           data.refCount -= 1
           if (!useContentRect) data.boundRectUsers -= 1
           if (data.refCount === 0) observer.unobserve(element)

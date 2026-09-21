@@ -19,7 +19,7 @@ catalog:
   "@types/node": ^24.2.1
   vite: ^7.3.2
   vitest: ^3.2.4
-  vue: ^3.5.13
+  vue: ^3.5.43
   # HELD at 1.55.1 on purpose — do not bump without re-measuring. See #32.
   # 1.63.0 makes the three `sorting and copying` tests in tableVisualisation.spec.ts
   # roughly 3x flakier (7 failures per 3 spec runs, vs 2 on this version). Our code is

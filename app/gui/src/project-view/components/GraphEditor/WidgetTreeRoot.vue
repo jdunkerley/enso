@@ -11,8 +11,7 @@ import { useLayoutAnimationsState } from '@/providers/animationCounter'
 import { provideWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import type { Opt } from '@/util/data/opt'
-import { templateRef } from '@vueuse/core'
-import { computed, toRef, watch } from 'vue'
+import { computed, toRef, useTemplateRef, watch } from 'vue'
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 
 const props = defineProps<{
@@ -52,7 +51,8 @@ const anyLayoutAnimationActive = computed(
   () => layoutTransitions.active.value || layoutAnimations.anyAnimationActive,
 )
 
-const treeRoot = templateRef('treeRoot')
+// Vue 3.5 has this built in; `@vueuse/core`'s `templateRef` was removed in v15.
+const treeRoot = useTemplateRef<HTMLElement>('treeRoot')
 const rootElementWithFallback = computed(() => props.rootElement ?? treeRoot.value)
 
 const primaryApplication = computed(() => props.primaryApplication ?? emptyPrimaryApplication())
