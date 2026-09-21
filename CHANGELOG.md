@@ -9,6 +9,10 @@
   filters, multi-cell range selection with copy/cut/paste, and the cell and
   column context menus — instead of running Enterprise code unlicensed behind a
   watermark. With a licence key configured, behaviour is unchanged.
+- The table grid has been updated to AG Grid 36 (from 32). Table views keep the
+  same appearance and behaviour, licensed or not — the Community fallback above
+  is unaffected. Internally the IDE now uses AG Grid's own Vue component instead
+  of a local copy of it.
 - The IDE now starts in a local-only mode when it has no Enso Cloud
   configuration: a non-JSON configuration response is treated as empty, Cognito
   authentication is disabled instead of initialized with blanks, and the app
