@@ -14,12 +14,9 @@ export type AgGridTableViewProps<TData, TValue> = {
   textFormatOption?: TextFormatOptions
   processDataFromClipboard?: (params: ProcessDataFromClipboardParams<TData>) => string[][] | null
   datasource?: IServerSideDatasource | IDatasource | boolean
-  rowCount?: number
   isServerSideModel?: boolean
   gridIdHash?: string | null
-  getContextMenuItems?: (
-    params: GetContextMenuItemsParams,
-  ) => (MenuItemDef | string)[] | GetContextMenuItems
+  getContextMenuItems?: (params: GetContextMenuItemsParams) => (MenuItemDef | DefaultMenuItem)[]
 }
 
 /**
@@ -85,8 +82,10 @@ export const commonContextMenuActions = {
  * option — `cellClassRules` only exists on `ColDef`, verified against
  * `ComponentUtil.ALL_PROPERTIES`, which is why this used to silently do nothing).
  */
-export function buildSelectionGridOptions(enterpriseAvailable: boolean) {
-  return enterpriseAvailable ? { cellSelection: true as const } : { cellSelection: undefined }
+export function buildSelectionGridOptions(enterpriseAvailable: boolean): { cellSelection?: true } {
+  // Unlicensed omits the key rather than setting it to `undefined`: AG Grid's own prop types are
+  // `exactOptionalPropertyTypes`-strict, and off is already the default.
+  return enterpriseAvailable ? { cellSelection: true } : {}
 }
 
 /**
@@ -155,10 +154,10 @@ import type {
   CellEditingStoppedEvent,
   ColDef,
   ColGroupDef,
-  Column,
   ColumnMovedEvent,
   ColumnResizedEvent,
   ColumnVisibleEvent,
+  DefaultMenuItem,
   FirstDataRenderedEvent,
   GetContextMenuItems,
   GetContextMenuItemsParams,
@@ -192,6 +191,7 @@ import {
   type Component,
   type ComponentInstance,
 } from 'vue'
+import { AG_GRID_LOCALE_EN } from '@ag-grid-community/locale'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
 import { useCommunityCellRange } from './AgGridTableView/communityCellRange'
 import {
@@ -271,7 +271,11 @@ function onGridReady(event: GridReadyEvent<TData>) {
 function clipboardDeps(): ClipboardDeps {
   return {
     enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
-    gridApi: gridApi.value as unknown as ClipboardDeps['gridApi'],
+    // Deliberately not an `as unknown as` cast: these structural types name the exact grid API
+    // this file depends on, and checking them against the real `GridApi` is the only thing that
+    // catches a method disappearing under us. `api.getValue` vanishing in v33 reached CI as a
+    // silently broken copy because a double cast used to sit here.
+    gridApi: gridApi.value as ClipboardDeps['gridApi'],
     rectangle,
     processCellForClipboard,
     sendToClipboard,
@@ -281,7 +285,7 @@ function clipboardDeps(): ClipboardDeps {
 function pasteClipboardDeps(): PasteDeps {
   return {
     enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
-    gridApi: gridApi.value as unknown as PasteDeps['gridApi'],
+    gridApi: gridApi.value as PasteDeps['gridApi'],
     readClipboardText: () => navigator.clipboard.readText(),
     processDataFromClipboard: (params) => props.processDataFromClipboard?.(params as any),
     parseTsvData,
@@ -488,49 +492,47 @@ const contextMenuState = ref<{
   items: GridMenuItem[]
 } | null>(null)
 
+/**
+ * Resolves the items for the Community context-menu fallback.
+ *
+ * Async menu callbacks are deliberately unsupported: the fallback popup is positioned from a
+ * synchronously-read mouse position and rendered in the same tick, and nothing in this codebase
+ * returns a promise here. A promise is dropped rather than awaited, so the menu simply does not
+ * open — preferable to opening it late, detached from the click that asked for it.
+ */
 function resolveColumnOrGridContextMenuItems(
   event: CellContextMenuEvent<TData>,
-): (string | MenuItemDef)[] {
-  const colDef = event.column?.getColDef()
-  const columnItems = colDef?.contextMenuItems
-  if (columnItems != null) {
-    return typeof columnItems === 'function' ?
-        columnItems({
-          api: event.api,
-          context: event.context,
-          column: event.column as Column,
-          node: event.node ?? null,
-          value: event.value,
-          defaultItems: undefined,
-        })
-      : columnItems
-  }
-  const gridItems = props.getContextMenuItems?.({
+  domEvent: MouseEvent,
+): (DefaultMenuItem | MenuItemDef)[] {
+  // `event` became a required member of the params in AG Grid v36.
+  const params: GetContextMenuItemsParams<TData> = {
     api: event.api,
     context: event.context,
     column: event.column ?? null,
     node: event.node ?? null,
     value: event.value,
     defaultItems: undefined,
-  })
+    event: domEvent,
+  }
+  const resolve = (
+    items: GetContextMenuItems<TData> | (DefaultMenuItem | MenuItemDef)[],
+  ): (DefaultMenuItem | MenuItemDef)[] => {
+    const resolved = typeof items === 'function' ? items(params) : items
+    return resolved instanceof Promise ? [] : resolved
+  }
+
+  const columnItems = event.column?.getColDef()?.contextMenuItems
+  if (columnItems != null) return resolve(columnItems)
+  const gridItems = props.getContextMenuItems
   if (gridItems == null) return []
-  return typeof gridItems === 'function' ?
-      gridItems({
-        api: event.api,
-        context: event.context,
-        column: event.column ?? null,
-        node: event.node ?? null,
-        value: event.value,
-        defaultItems: undefined,
-      })
-    : gridItems
+  return resolve(gridItems(params))
 }
 
 function onCellContextMenu(event: CellContextMenuEvent<TData>) {
   if (AG_GRID_ENTERPRISE_AVAILABLE) return // native Enterprise context menu handles this instead
   const domEvent = event.event
   if (!(domEvent instanceof MouseEvent)) return
-  const rawItems = resolveColumnOrGridContextMenuItems(event)
+  const rawItems = resolveColumnOrGridContextMenuItems(event, domEvent)
   if (!rawItems.length) return
   // No `domEvent.preventDefault()` here: it would run too late to matter (see `stopIfPrevented`'s
   // comment above, on the synchronous `@contextmenu` handler that now does this instead).
@@ -690,7 +692,48 @@ function getRowHeight(params: RowHeightParams): number {
   return (maxReturnCharsCount + 1) * DEFAULT_ROW_HEIGHT
 }
 
-const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
+/** Drops the keys whose value is `undefined`, rather than passing them through as explicit ones. */
+function definedOnly<T extends object>(options: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>
+  }
+}
+
+/**
+ * The grid options that are only present in some configurations.
+ *
+ * Omitting a key is not the same as passing `undefined` under `exactOptionalPropertyTypes`, and
+ * AG Grid's own prop types now actually apply to these bindings — the vendored wrapper typed
+ * every prop as `any`, so a `:prop="cond ? value : undefined"` binding went unchecked. Passing
+ * them as one object keeps that distinction in one place instead of at each binding.
+ */
+const conditionalGridOptions = computed(() => ({
+  ...definedOnly({
+    singleClickEdit: props.singleClickEdit,
+    stopEditingWhenCellsLoseFocus: props.stopEditingWhenCellsLoseFocus,
+    suppressDragLeaveHidesColumns: props.suppressDragLeaveHidesColumns,
+    suppressMoveWhenColumnDragging: props.suppressMoveWhenColumnDragging,
+    processDataFromClipboard: props.processDataFromClipboard,
+    components: mappedComponents.value,
+    serverSideDatasource: serverSideDatasourceValue.value,
+    datasource: infiniteDatasourceValue.value,
+    getContextMenuItems: AG_GRID_ENTERPRISE_AVAILABLE ? props.getContextMenuItems : undefined,
+  }),
+  ...(AG_GRID_ENTERPRISE_AVAILABLE ? { allowContextMenuWithControlKey: true } : {}),
+  ...(rowModelType.value === 'clientSide' ? { getRowHeight } : { cacheBlockSize: 1000 }),
+}))
+
+// AG Grid's own Vue wrapper, rather than a vendored copy of it. The two things we used to
+// vendor it for are now first-class: every grid option is a typed prop, and `modules` selects
+// the Community or Enterprise bundle (see `./AgGridTableView/agGridModules`).
+const { AgGridVue } = await import('ag-grid-vue3')
+const { agGridModules } = await import('./AgGridTableView/agGridModules')
+
+const customLocale = {
+  ...AG_GRID_LOCALE_EN,
+  // Add any customizations to the locale here
+  loadingError: 'Error fetching data - close and reopen visualization to retry',
+}
 </script>
 
 <template>
@@ -708,15 +751,19 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
          (distribution/lib/Standard/Visualization/0.0.0-dev/src/Table/Visualization.enso) —
          nothing currently links them, so a one-sided change would silently break paging. -->
     <AgGridVue
-      v-bind="{ ...$attrs, ...buildSelectionGridOptions(AG_GRID_ENTERPRISE_AVAILABLE) }"
+      v-bind="{
+        ...$attrs,
+        ...buildSelectionGridOptions(AG_GRID_ENTERPRISE_AVAILABLE),
+        ...conditionalGridOptions,
+      }"
       ref="grid"
       :key="gridKey"
       class="ag-theme-alpine agGridTableView"
+      :modules="agGridModules"
+      :theme="'legacy'"
+      :localeText="customLocale"
       :headerHeight="26"
       :rowModelType="rowModelType"
-      :serverSideDatasource="serverSideDatasourceValue"
-      :datasource="infiniteDatasourceValue"
-      :rowCount="rowCount"
       :rowData="rowModelType === 'clientSide' ? rowData : null"
       :columnDefs="columnDefs"
       :defaultColDef="effectiveDefaultColDef"
@@ -725,16 +772,6 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
       :sendToClipboard="sendToClipboard"
       :suppressFieldDotNotation="true"
       :popupParent="popupParent"
-      :components="mappedComponents"
-      :singleClickEdit="singleClickEdit"
-      :stopEditingWhenCellsLoseFocus="stopEditingWhenCellsLoseFocus"
-      :suppressDragLeaveHidesColumns="suppressDragLeaveHidesColumns"
-      :suppressMoveWhenColumnDragging="suppressMoveWhenColumnDragging"
-      :processDataFromClipboard="processDataFromClipboard"
-      :allowContextMenuWithControlKey="AG_GRID_ENTERPRISE_AVAILABLE ? true : undefined"
-      :cacheBlockSize="rowModelType === 'clientSide' ? undefined : 1000"
-      :getContextMenuItems="AG_GRID_ENTERPRISE_AVAILABLE ? getContextMenuItems : undefined"
-      :getRowHeight="rowModelType === 'clientSide' ? getRowHeight : null"
       @cellMouseDown="onCellMouseDown"
       @cellMouseOver="onCellMouseOver($event, mouseButtonDown)"
       @gridReady="onGridReady"
@@ -762,6 +799,6 @@ const { AgGridVue } = await import('./AgGridTableView/AgGridVue')
   </div>
 </template>
 
-<style src="@ag-grid-community/styles/ag-grid.css" />
-<style src="@ag-grid-community/styles/ag-theme-alpine.css" />
+<style src="ag-grid-community/styles/ag-grid.css" />
+<style src="ag-grid-community/styles/ag-theme-alpine.css" />
 <style src="@/components/shared/AgGridTableView/tableViewStyle.css" />

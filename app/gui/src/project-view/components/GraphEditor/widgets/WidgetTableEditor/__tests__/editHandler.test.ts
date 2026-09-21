@@ -4,7 +4,7 @@ import {
 } from '$/providers/openedProjects/widgetRegistry/editHandler'
 import { InteractionHandler } from '@/providers/interactionHandler'
 import type { PortId } from '@/providers/portInfo'
-import type { CellPosition } from 'ag-grid-enterprise'
+import type { EditingCellPosition } from 'ag-grid-enterprise'
 import { expect, test, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useTableEditHandler, type EditedCell } from '../editHandler'
@@ -35,13 +35,17 @@ function fixture() {
     startEditingCell: vi.fn((cell) => {
       gridState.editedCell = cell
     }),
+    // AG Grid v33 replaced `CellPosition.column` here with `EditingCellPosition.colId`, and the
+    // composable reads `colId`. Fabricating the old shape would leave `colId` undefined, so every
+    // comparison against the currently-edited cell would differ and the already-editing no-op
+    // below would never be exercised.
     getEditingCells: vi.fn(() =>
       gridState.editedCell ?
         [
           {
             rowIndex: gridState.editedCell.rowIndex,
-            column: { getColId: () => gridState.editedCell!.colKey },
-          } as CellPosition,
+            colId: gridState.editedCell.colKey,
+          } as EditingCellPosition,
         ]
       : [],
     ),
@@ -91,8 +95,25 @@ function fixture() {
     await nextTick()
   }
 
-  return { gridState, composable, editedInGrid }
+  return { gridState, gridApi, composable, editedInGrid }
 }
+
+test('Only restarts editing in the grid when the edited cell actually changes', async () => {
+  const {
+    gridApi,
+    composable: { gridEventHandlers },
+    editedInGrid,
+  } = fixture()
+
+  // The grid started this edit itself, so syncing the composable back to it must be a no-op.
+  await editedInGrid({ colKey: 'col1', rowIndex: 0 })
+  expect(gridApi.startEditingCell).not.toHaveBeenCalled()
+
+  // Moving to a different cell must reach the grid.
+  gridEventHandlers.keydown(new KeyboardEvent('keydown', { code: 'Enter' }))
+  await nextTick()
+  expect(gridApi.startEditingCell).toHaveBeenCalledWith({ rowIndex: 1, colKey: 'col1' })
+})
 
 test.each([
   [[{ colKey: 'col1', rowIndex: 0 }]],

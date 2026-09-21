@@ -14,22 +14,20 @@ vi.mock('ag-grid-enterprise', async (importOriginal) => {
   return importOriginal()
 })
 
-describe('AgGridVue module loading (no AG Grid Enterprise license configured)', () => {
-  test('resolves its AG Grid dependency from ag-grid-community, never importing ag-grid-enterprise', async () => {
-    const { AgGridVue } = await import('../AgGridVue')
+describe('AG Grid module selection (no AG Grid Enterprise license configured)', () => {
+  test('registers the Community bundle, never importing ag-grid-enterprise', async () => {
+    const { agGridModules } = await import('../agGridModules')
 
     expect(communityImported).toHaveBeenCalled()
     expect(enterpriseImported).not.toHaveBeenCalled()
-    // Sanity check that Utils.ts's getAgGridProperties() still ran and populated props.
-    expect(AgGridVue.props).toHaveProperty('rowData')
-    expect(AgGridVue.props).toHaveProperty('columnDefs')
+    expect(agGridModules).toHaveLength(1)
   })
 })
 
-describe('AgGridVue module loading (AG Grid Enterprise license configured)', () => {
+describe('AG Grid module selection (AG Grid Enterprise license configured)', () => {
   const TEST_LICENSE_KEY = 'test-license-key'
 
-  test('resolves its AG Grid dependency from ag-grid-enterprise and registers the license key, never importing ag-grid-community', async () => {
+  test('registers the Enterprise bundle and the license key, never importing ag-grid-community', async () => {
     vi.resetModules()
     // Deterministic regardless of the real $config.AG_GRID_LICENSE_KEY in this test environment:
     // stub the flag/key module directly rather than relying on env configuration. Registered here
@@ -43,13 +41,11 @@ describe('AgGridVue module loading (AG Grid Enterprise license configured)', () 
     const { LicenseManager } = await import('ag-grid-enterprise')
     const setLicenseKeySpy = vi.spyOn(LicenseManager, 'setLicenseKey').mockImplementation(() => {})
 
-    const { AgGridVue } = await import('../AgGridVue')
+    const { agGridModules } = await import('../agGridModules')
 
     expect(enterpriseImported).toHaveBeenCalled()
     expect(communityImported).not.toHaveBeenCalled()
     expect(setLicenseKeySpy).toHaveBeenCalledWith(TEST_LICENSE_KEY)
-    // Sanity check that Utils.ts's getAgGridProperties() still ran and populated props.
-    expect(AgGridVue.props).toHaveProperty('rowData')
-    expect(AgGridVue.props).toHaveProperty('columnDefs')
+    expect(agGridModules).toHaveLength(1)
   })
 })

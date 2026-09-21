@@ -16,7 +16,7 @@ import type {
   ColDef,
   ColumnMovedEvent,
   ColumnVisibleEvent,
-  GetContextMenuItems,
+  DefaultMenuItem,
   GetContextMenuItemsParams,
   ICellRendererParams,
   IDatasource,
@@ -262,7 +262,7 @@ const getSvgTemplate = (icon: string) =>
 
 const getContextMenuItems = (
   params: GetContextMenuItemsParams,
-): (MenuItemDef | string)[] | GetContextMenuItems => {
+): (MenuItemDef | DefaultMenuItem)[] => {
   const colId = params.column ? params.column.getColId() : null
   const { rowIndex } = params.node ?? {}
 
@@ -1341,7 +1341,6 @@ config.setToolbar(
         :defaultColDef="defaultColDef"
         :textFormatOption="textFormatterSelected"
         :datasource="datasource"
-        :rowCount="allRowCount"
         :isServerSideModel="isSSRM"
         :statusBar="statusBar"
         :gridIdHash="tableVersionHash"
