@@ -1,4 +1,4 @@
-import type { IDoesFilterPassParams } from '@ag-grid-community/core'
+import type { IDoesFilterPassParams } from 'ag-grid-community'
 import { describe, expect, test, vi } from 'vitest'
 import { CommunitySetFilter, type CommunitySetFilterParams } from '../CommunitySetFilter'
 

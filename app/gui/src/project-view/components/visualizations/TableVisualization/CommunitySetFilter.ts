@@ -3,7 +3,7 @@ import type {
   IFilterComp,
   IFilterParams,
   SetFilterValuesFuncParams,
-} from '@ag-grid-community/core'
+} from 'ag-grid-community'
 
 /** `filterParams` shape this filter expects, in addition to the standard `IFilterParams`. */
 export interface CommunitySetFilterParams extends IFilterParams {
