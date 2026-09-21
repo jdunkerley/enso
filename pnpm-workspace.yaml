@@ -20,6 +20,10 @@ catalog:
   vite: ^7.3.2
   vitest: ^3.2.4
   vue: ^3.5.43
+  # Must move with `vue`: `project-view/composables/backend.ts` augments `RefUnwrapBailTypes`
+  # from `@vue/reactivity`, so a second copy would attach the augmentation to types Vue does
+  # not use. Catalogued rather than ranged so the two cannot drift apart again.
+  "@vue/reactivity": ^3.5.43
   # HELD at 1.55.1 on purpose — do not bump without re-measuring. See #32.
   # 1.63.0 makes the three `sorting and copying` tests in tableVisualisation.spec.ts
   # roughly 3x flakier (7 failures per 3 spec runs, vs 2 on this version). Our code is
