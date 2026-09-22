@@ -192,21 +192,21 @@ fn implement_constructor(graph: &TypeGraph, class: &Class) -> syntax::Method {
     let suffix = "__GeneratedArgument";
     let arguments = class_fields(graph, class)
         .into_iter()
-        .map(|field| (quote_type(graph, &field.data), format!("{}{}", &field.name, &suffix)))
+        .map(|field| (quote_type(graph, &field.data), format!("{}{}", field.name, suffix)))
         .collect();
     let mut body = vec![];
     if let Some(parent) = class.parent {
-        let suffix = |field: &Field| format!("{}{}", &field.name, &suffix);
+        let suffix = |field: &Field| format!("{}{}", field.name, suffix);
         let fields: Vec<_> = class_fields(graph, &graph[parent]).into_iter().map(suffix).collect();
         body.push(format!("super({});", fields.join(", ")));
     }
     for field in &class.fields {
         if let FieldData::Object { non_null: true, .. } = &field.data {
-            body.push(format!("java.util.Objects.requireNonNull({}{});", &field.name, &suffix));
+            body.push(format!("java.util.Objects.requireNonNull({}{});", field.name, suffix));
         }
     }
     let own_field_initializers =
-        class.fields.iter().map(|field| format!("{} = {}{};", &field.name, &field.name, &suffix));
+        class.fields.iter().map(|field| format!("{} = {}{};", field.name, field.name, suffix));
     body.extend(own_field_initializers);
     let mut method = syntax::Method::constructor(class.name.clone());
     method.arguments = arguments;
@@ -250,15 +250,15 @@ fn implement_equals(graph: &TypeGraph, class: &Class) -> syntax::Method {
     let object = "object";
     let that = "that";
     let compare =
-        |field: &Field| field.data.fmt_equals(&field.name, &format!("{that}.{}", &field.name));
+        |field: &Field| field.data.fmt_equals(&field.name, &format!("{that}.{}", field.name));
     let field_comparisons = class_fields(graph, class).into_iter().map(compare);
     let mut values = vec!["true".to_string()];
     values.extend(field_comparisons);
     let expr = values.join(" && ");
     let body = [
-        format!("if ({} == this) return true;", &object),
-        format!("if (!({} instanceof {})) return false;", &object, &class.name),
-        format!("{} {} = ({}){};", &class.name, &that, &class.name, &object),
+        format!("if ({} == this) return true;", object),
+        format!("if (!({} instanceof {})) return false;", object, class.name),
+        format!("{} {} = ({}){};", class.name, that, class.name, object),
         format!("return {expr};"),
     ];
     let return_ = FieldData::Primitive(Primitive::Bool);
@@ -322,7 +322,7 @@ fn implement_getter(graph: &TypeGraph, class: &Class, id: FieldId, name: &str) -
 fn getter(graph: &TypeGraph, field: &Field, name: &str) -> syntax::Method {
     let type_ = quote_type(graph, &field.data);
     let mut method = syntax::Method::new(name, type_);
-    method.body = format!("return {};", &field.name);
+    method.body = format!("return {};", field.name);
     method
 }
 

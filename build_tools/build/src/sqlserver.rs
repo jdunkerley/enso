@@ -82,7 +82,7 @@ pub struct Configuration {
 
 impl Configuration {
     pub fn image_id(&self) -> ImageId {
-        ImageId(format!("mcr.microsoft.com/mssql/server:{}", &self.version))
+        ImageId(format!("mcr.microsoft.com/mssql/server:{}", self.version))
     }
 
     pub fn set_enso_test_env(&self) -> Result {

@@ -12,7 +12,6 @@ use crate::paths::generated;
 
 use artifact::IsArtifact;
 use bundle::IsBundle;
-use ide_ci::cache::goodie::graalvm::Edition;
 use ide_ci::future::AsyncPolicy;
 use ide_ci::github::Repo;
 use package::IsPackage;
@@ -433,7 +432,7 @@ pub async fn deduce_graal(
     deps: &generated::RepoRootProjectDependenciesScala,
 ) -> Result<ide_ci::cache::goodie::graalvm::GraalVM> {
     let deps_content = ide_ci::fs::tokio::read_to_string(deps).await?;
-    let graal_edition = env::GRAAL_EDITION.get().map_or(Edition::default(), |e| e);
+    let graal_edition = env::GRAAL_EDITION.get().unwrap_or_default();
 
     Ok(ide_ci::cache::goodie::graalvm::GraalVM {
         graal_version: get_graal_version(&deps_content)?,

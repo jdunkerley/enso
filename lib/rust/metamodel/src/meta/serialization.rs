@@ -370,7 +370,7 @@ impl<'g> ProgramBuilder<'g> {
         }
         for (i, field) in fields.iter().enumerate() {
             self.type_(field.type_, basecase);
-            self.debug_prev(format!(".{}", &field.name));
+            self.debug_prev(format!(".{}", field.name));
             if ty.child_field == Some(i + 1) {
                 self.child(id, hierarchy, basecase)
             }

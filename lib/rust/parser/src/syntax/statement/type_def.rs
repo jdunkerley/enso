@@ -52,12 +52,11 @@ pub fn try_parse_type_def<'s>(
         let mut block = mem::take(lines).into_vec();
         items.pop();
         let lines = compound_lines(&mut block, |prefixes, mut line| {
-            if let Some(Item::Token(token)) = line.items.first_mut() {
-                if matches!(token.variant, token::Variant::Operator(_)) {
-                    let opr_ident =
-                        token::variant::Ident { is_operator_lexically: true, ..default() };
-                    token.variant = token::Variant::Ident(opr_ident);
-                }
+            if let Some(Item::Token(token)) = line.items.first_mut()
+                && matches!(token.variant, token::Variant::Operator(_))
+            {
+                let opr_ident = token::variant::Ident { is_operator_lexically: true, ..default() };
+                token.variant = token::Variant::Ident(opr_ident);
             }
             parse_type_body_statement(prefixes, line, expression_parser, args_buffer)
         });

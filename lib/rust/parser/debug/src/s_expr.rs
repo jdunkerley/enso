@@ -167,10 +167,10 @@ fn tuplify(value: Value) -> Value {
         }
         value => return value,
     };
-    if let Value::Symbol(symbol) = &car {
-        if let Some(':') = symbol.chars().next() {
-            return tuplify(cdr);
-        }
+    if let Value::Symbol(symbol) = &car
+        && let Some(':') = symbol.chars().next()
+    {
+        return tuplify(cdr);
     }
     let car = tuplify(car);
     let cdr = tuplify(cdr);

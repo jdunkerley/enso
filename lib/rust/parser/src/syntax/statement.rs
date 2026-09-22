@@ -888,51 +888,49 @@ fn find_top_level_operator(items: &[Item]) -> Result<Option<TopLevelOperator>, S
     for (i, item) in items.iter().enumerate() {
         let spacing = Spacing::of_item(item);
         let next_is_after_space = i != 0 && (after_first_space || spacing == Spacing::Spaced);
-        if let Item::Token(token) = item {
-            if !after_first_space || spacing == Spacing::Spaced {
-                match (&token.variant, spacing, candidate) {
-                    (
-                        Variant::AssignmentOperator(_) | Variant::TypeAnnotationOperator(_),
-                        Spacing::Spaced,
-                        _,
-                    ) if items
-                        .get(i + 1)
-                        .is_some_and(|item| Spacing::of_item(item) == Spacing::Unspaced) =>
-                    {
-                        return Err(SyntaxError::StmtLhsInvalidOperatorSpacing);
-                    }
-                    (Variant::AssignmentOperator(_), Spacing::Spaced, _) => {
-                        return Ok(Some(TopLevelOperator::AssignmentOperator(i)));
-                    }
-                    (
-                        Variant::AssignmentOperator(_),
-                        Spacing::Unspaced,
-                        None
-                        | Some((TopLevelOperator::TypeAnnotationOperator(_), Spacing::Unspaced)),
-                    ) => {
-                        candidate =
-                            Some((TopLevelOperator::AssignmentOperator(i), Spacing::Unspaced));
-                    }
-                    (Variant::TypeAnnotationOperator(_), spacing, None)
-                    | (
-                        Variant::TypeAnnotationOperator(_),
-                        spacing @ Spacing::Spaced,
-                        Some((_, Spacing::Unspaced)),
-                    ) => {
-                        candidate = Some((TopLevelOperator::TypeAnnotationOperator(i), spacing));
-                    }
-                    (
-                        Variant::Operator(_)
-                        | Variant::DotOperator(_)
-                        | Variant::ArrowOperator(_)
-                        | Variant::CommaOperator(_),
-                        Spacing::Spaced,
-                        Some((_, Spacing::Unspaced)),
-                    ) => {
-                        candidate = None;
-                    }
-                    _ => {}
+        if let Item::Token(token) = item
+            && (!after_first_space || spacing == Spacing::Spaced)
+        {
+            match (&token.variant, spacing, candidate) {
+                (
+                    Variant::AssignmentOperator(_) | Variant::TypeAnnotationOperator(_),
+                    Spacing::Spaced,
+                    _,
+                ) if items
+                    .get(i + 1)
+                    .is_some_and(|item| Spacing::of_item(item) == Spacing::Unspaced) =>
+                {
+                    return Err(SyntaxError::StmtLhsInvalidOperatorSpacing);
                 }
+                (Variant::AssignmentOperator(_), Spacing::Spaced, _) => {
+                    return Ok(Some(TopLevelOperator::AssignmentOperator(i)));
+                }
+                (
+                    Variant::AssignmentOperator(_),
+                    Spacing::Unspaced,
+                    None | Some((TopLevelOperator::TypeAnnotationOperator(_), Spacing::Unspaced)),
+                ) => {
+                    candidate = Some((TopLevelOperator::AssignmentOperator(i), Spacing::Unspaced));
+                }
+                (Variant::TypeAnnotationOperator(_), spacing, None)
+                | (
+                    Variant::TypeAnnotationOperator(_),
+                    spacing @ Spacing::Spaced,
+                    Some((_, Spacing::Unspaced)),
+                ) => {
+                    candidate = Some((TopLevelOperator::TypeAnnotationOperator(i), spacing));
+                }
+                (
+                    Variant::Operator(_)
+                    | Variant::DotOperator(_)
+                    | Variant::ArrowOperator(_)
+                    | Variant::CommaOperator(_),
+                    Spacing::Spaced,
+                    Some((_, Spacing::Unspaced)),
+                ) => {
+                    candidate = None;
+                }
+                _ => {}
             }
         }
         after_first_space = next_is_after_space;

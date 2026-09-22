@@ -43,34 +43,34 @@ impl std::fmt::Display for Graph {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let variant_color = "#7EA3CC";
         let primitive_attrs = vec![
-            format!("style=filled"),
+            "style=filled".to_string(),
             format!("fillcolor={:?}", "#262626"),
             format!("fontcolor={:?}", "white"),
         ];
         let enum_attrs = vec![
-            format!("style=filled"),
+            "style=filled".to_string(),
             format!("fillcolor={:?}", "#255C99"),
             format!("fontcolor={:?}", "white"),
         ];
         let variant_attrs = vec![
-            format!("style=filled"),
+            "style=filled".to_string(),
             format!("fillcolor={variant_color:?}"),
-            format!("shape=oval"),
+            "shape=oval".to_string(),
         ];
         let struct_attrs = vec![
-            format!("style=filled"),
+            "style=filled".to_string(),
             format!("fillcolor={:?}", "#B3001B"),
             format!("fontcolor={:?}", "white"),
         ];
         let abstract_struct_attrs = vec![
-            format!("style=filled"),
+            "style=filled".to_string(),
             format!("fillcolor={:?}", "#6D1321"),
             format!("fontcolor={:?}", "white"),
         ];
         let variant_edge_attrs = vec![format!("color={variant_color:?}")];
         let field_edge_attrs = vec![];
-        let optional_field_edge_attrs = vec![format!("style=dashed")];
-        let subtype_edge_attrs = vec![format!("arrowhead=dot")];
+        let optional_field_edge_attrs = vec!["style=dashed".to_string()];
+        let subtype_edge_attrs = vec!["arrowhead=dot".to_string()];
         writeln!(f, "digraph refs {{")?;
         let non_leafs: BTreeSet<_> = self.edges.iter().map(|(x, _, _)| x).cloned().collect();
         let mut pruned = BTreeSet::new();

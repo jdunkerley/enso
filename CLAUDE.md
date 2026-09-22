@@ -65,10 +65,26 @@ the CLI via `cargo run -p enso-build-cli`.
 
 ## Languages and toolchains
 
-- Rust: stable channel pinned in `rust-toolchain.toml` (currently 1.90.0) with
+- Rust: stable channel pinned in `rust-toolchain.toml` (currently 1.98.1) with
   `wasm32-unknown-unknown` target. Workspace `Cargo.toml` pins dependency
   versions — members reference them with `{ workspace = true }`. `rustfmt.toml`
-  and `clippy.toml` are repo-wide; follow them.
+  and `clippy.toml` are repo-wide; follow them. `rustfmt.toml`'s `edition` must
+  track the crates' — `cargo fmt` passes each crate's manifest edition on the
+  command line and so papers over a stale value, but a bare `rustfmt` falls back
+  to the config file and dies on anything edition-specific
+  (`let chains are only allowed in Rust 2024 or later`).
+- Rust CI gates are narrower than they look: `cargo test --workspace`,
+  `cargo fmt -- --check`, and `wasm-pack test` for the parser
+  (`wasm-checks.yml`). **There is no clippy job** — the workspace carries
+  warnings on `develop`, so a clean clippy run is a convention here, not
+  something CI will catch for you.
+- **`cargo test --workspace` has one guaranteed failure on Windows.** `ide-ci`'s
+  `programs::tar::tests::test_directory_packing` shells out to
+  `C:\Program Files\Git\usr\bin\tar.exe`, and msys `tar` reads the `C:\…`
+  destination as a remote host:
+  `/usr/bin/tar: Cannot connect to C: resolve failed`, exit 128. It is not a
+  regression — reproduce it on any toolchain before blaming a change. CI runs
+  this job on `ubuntu-latest`, where it passes.
 - Scala/Java: GraalVM-based. See `docs/infrastructure/` for `sbt`, native-image,
   dual-JVM, and GraalVM upgrade guides.
 - TypeScript: TS `catalog:` version in `pnpm-workspace.yaml`. Use
@@ -210,12 +226,34 @@ has silently produced a wrong result here:
   the integration tests, so a populated IR cache plausibly starves it. Seen
   once, passed on re-run of the same commit. The job is skipped on `develop`, so
   it only ever runs on PRs and there is no history to judge the rate.
+- **`LibraryUploadTest` fails intermittently on Windows with
+  `HTTPException: Server responded with: [java.net.ConnectException]`, and it is
+  a harness race, not your change.** `DummyRepository.startServer` decides the
+  Node `tools/simple-library-server` is ready by waiting for it to print
+  `Serving the repository` on stdout — which it does before the socket starts
+  accepting. Its `withRetries` wrapper retries the process _spawn_, not the
+  connection, so it does not cover this. The tell is that the log contains both
+  `Serving the repository … on port 47305` _and_ the `ConnectException`, and
+  that `LibraryDownloadTest` on the next port passes. Re-run the job to confirm
+  before investigating anything else; one failing test in an hour-long
+  `JVM Tests (windows)` run is the shape to look for.
 
 ## Cross-cutting gotchas
 
 - The Rust parser is the source of truth for the AST. Changing it means
   regenerating Java bindings (`lib/rust/parser/generate-java/`) and re-bundling
   WASM (`app/rust-ffi/`). The engine and IDE both consume it.
+- **Generated Java is reproducible for a given rustc, but not across rustc
+  versions — and that is expected, not a regression.** `metamodel::rust::TypeId`
+  (`lib/rust/metamodel/src/rust/mod.rs`) wraps `std::any::TypeId` and is used as
+  a `BTreeMap` key all through the codegen, so iteration order follows an opaque
+  compiler-generated hash that upstream is free to change. A toolchain bump
+  therefore permutes the order of the class declarations `generate-java` emits.
+  Before treating such a diff as a real change, check the two things that would
+  make it one: the `switch` on the serialization discriminant (identical here
+  across 1.90 → 1.98), and whether the diff is a pure permutation —
+  `sort Token.java | sha256sum` on both outputs settles it in one command. The
+  same caveat applies to anything else keyed on `TypeId`.
 - "Polyglot" has multiple meanings here: (1) GraalVM polyglot — Enso calling
   JS/Python/Java at runtime; (2) Enso Polyglot Bridge (EPB) — an internal
   sub-language for single-threaded language contexts; (3) `ydoc-server-polyglot`
