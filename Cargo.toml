@@ -71,8 +71,10 @@ tar = { version = "0.4.46" }
 # declares `bytes ^1` but calls `BytesMut::spare_capacity_mut`, which `bytes` only grew in 1.2,
 # so the resolver picks a combination that does not compile. `combine` is held at 4.6.7 in
 # `Cargo.lock`; it is not a direct dependency, so the lockfile is the only place that can
-# express it. If a future `cargo update` fails on `no method named spare_capacity_mut`, this is
-# why — re-pin with `cargo update combine --precise 4.6.7`.
+# express it. A `cargo update` that lets `combine` float again succeeds — resolution is where
+# the bad pairing is chosen, not where it is detected — and the next `cargo check` or build
+# then fails with `no method named spare_capacity_mut`. If you hit that, this is why: re-pin
+# with `cargo update combine --precise 4.6.7`.
 tokio = { version = "1.43.4", features = ["full", "tracing"] }
 tokio-stream = { version = "0.1.19", features = ["fs"] }
 tokio-util = { version = "0.7.13", features = ["full"] }
