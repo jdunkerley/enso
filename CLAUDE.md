@@ -226,6 +226,17 @@ has silently produced a wrong result here:
   the integration tests, so a populated IR cache plausibly starves it. Seen
   once, passed on re-run of the same commit. The job is skipped on `develop`, so
   it only ever runs on PRs and there is no history to judge the rate.
+- **`LibraryUploadTest` fails intermittently on Windows with
+  `HTTPException: Server responded with: [java.net.ConnectException]`, and it is
+  a harness race, not your change.** `DummyRepository.startServer` decides the
+  Node `tools/simple-library-server` is ready by waiting for it to print
+  `Serving the repository` on stdout — which it does before the socket starts
+  accepting. Its `withRetries` wrapper retries the process _spawn_, not the
+  connection, so it does not cover this. The tell is that the log contains both
+  `Serving the repository … on port 47305` _and_ the `ConnectException`, and
+  that `LibraryDownloadTest` on the next port passes. Re-run the job to confirm
+  before investigating anything else; one failing test in an hour-long
+  `JVM Tests (windows)` run is the shape to look for.
 
 ## Cross-cutting gotchas
 
