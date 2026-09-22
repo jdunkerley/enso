@@ -158,12 +158,12 @@ fn collect_messages(ast: &enso_parser::syntax::Tree, path: impl AsRef<Path>) -> 
             }
             enso_parser::syntax::tree::Variant::TextLiteral(text) => {
                 for element in &text.elements {
-                    if let enso_parser::syntax::tree::TextElement::Escape { token } = element {
-                        if token.variant.value.is_none() {
-                            let escape = token.code.to_string();
-                            let error = format!("Invalid escape sequence: {escape}");
-                            errors.borrow_mut().push((error, tree.span.clone()));
-                        }
+                    if let enso_parser::syntax::tree::TextElement::Escape { token } = element
+                        && token.variant.value.is_none()
+                    {
+                        let escape = token.code.to_string();
+                        let error = format!("Invalid escape sequence: {escape}");
+                        errors.borrow_mut().push((error, tree.span.clone()));
                     }
                 }
             }
@@ -183,7 +183,7 @@ fn collect_messages(ast: &enso_parser::syntax::Tree, path: impl AsRef<Path>) -> 
     warnings.borrow_mut().sort_unstable_by_key(|(_, span)| sort_key(span));
     let mut messages = vec![];
     for (message, span) in &*errors.borrow() {
-        messages.push(format!("E {}: {}", fmt_location(path.as_ref().display(), span), &message));
+        messages.push(format!("E {}: {}", fmt_location(path.as_ref().display(), span), message));
     }
     for (warning, span) in &*warnings.borrow() {
         messages.push(format!(

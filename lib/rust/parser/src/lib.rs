@@ -206,7 +206,7 @@ fn is_qualified_name(tree: &Tree) -> bool {
     match &tree.variant {
         Variant::Call(call) => is_qualified_name(&call.value),
         Variant::PropertyAccess(access) => match &access.lhs {
-            Some(lhs) => is_qualified_name(&lhs),
+            Some(lhs) => is_qualified_name(lhs),
             None => false,
         },
         Variant::Ident(_) => true,
@@ -315,29 +315,26 @@ fn expression_to_type(mut input: Tree<'_>) -> Tree<'_> {
                 transform_tree(body, expression_to_type)
             }
         }
-        Variant::App(ref mut app) => match &mut **app {
-            App { func, arg } => {
-                transform_tree(func, expression_to_type);
-                transform_tree(arg, expression_to_type);
+        Variant::App(ref mut app) => {
+            let App { func, arg } = &mut **app;
+            transform_tree(func, expression_to_type);
+            transform_tree(arg, expression_to_type);
+        }
+        Variant::OprApp(ref mut opr_app) => {
+            let OprApp { lhs, rhs, .. } = &mut **opr_app;
+            if let Some(lhs) = lhs.as_mut() {
+                transform_tree(lhs, expression_to_type);
             }
-        },
-        Variant::OprApp(ref mut opr_app) => match &mut **opr_app {
-            OprApp { lhs, rhs, .. } => {
-                if let Some(lhs) = lhs.as_mut() {
-                    transform_tree(lhs, expression_to_type);
-                }
-                if let Some(rhs) = rhs.as_mut() {
-                    transform_tree(rhs, expression_to_type);
-                }
+            if let Some(rhs) = rhs.as_mut() {
+                transform_tree(rhs, expression_to_type);
             }
-        },
-        Variant::Array(ref mut array) => match &mut **array {
-            Array { first, .. } => {
-                if let Some(first) = first.as_mut() {
-                    transform_tree(first, expression_to_type);
-                }
+        }
+        Variant::Array(ref mut array) => {
+            let Array { first, .. } = &mut **array;
+            if let Some(first) = first.as_mut() {
+                transform_tree(first, expression_to_type);
             }
-        },
+        }
         Variant::PropertyAccess(ref mut access) => {
             if let Some(value) = &mut access.lhs {
                 transform_tree(value, expression_to_type)

@@ -173,11 +173,11 @@ impl fmt::Display for Class {
             tokens.push("extends".to_string());
             tokens.push(parent.to_string());
         }
-        if let Some(sealed) = sealed {
-            if !sealed.is_empty() {
-                let types: Vec<_> = sealed.iter().map(|ty| ty.to_string()).collect();
-                tokens.push(format!("permits {}", types.join(", ")));
-            }
+        if let Some(sealed) = sealed
+            && !sealed.is_empty()
+        {
+            let types: Vec<_> = sealed.iter().map(|ty| ty.to_string()).collect();
+            tokens.push(format!("permits {}", types.join(", ")));
         }
         let tokens = tokens.join(" ");
         writeln!(f, "{tokens} {{")?;
@@ -209,7 +209,7 @@ impl fmt::Display for Field {
 
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", &self.class)?;
+        write!(f, "{}", self.class)?;
         if !self.params.is_empty() {
             write!(f, "<{}>", self.params.join(", "))?;
         }

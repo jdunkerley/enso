@@ -138,10 +138,10 @@ impl Edition {
 
     fn repo_for_library(&self, lib: &Library) -> Option<&Repository> {
         for repo in &self.repositories {
-            if let Some(repo_name) = &lib.repository {
-                if repo.name == *repo_name {
-                    return Some(repo);
-                }
+            if let Some(repo_name) = &lib.repository
+                && repo.name == *repo_name
+            {
+                return Some(repo);
             }
         }
         None

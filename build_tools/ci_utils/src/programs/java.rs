@@ -20,7 +20,7 @@ impl Manipulator for Classpath {
     fn apply<C: IsCommandWrapper + ?Sized>(&self, command: &mut C) {
         // Java uses same separator for classpaths entries as native PATH separator.
         let Ok(paths) = std::env::join_paths(&self.0) else {
-            panic!("Invalid character in paths: {:?}", &self.0)
+            panic!("Invalid character in paths: {:?}", self.0)
         };
         command.arg("--class-path").arg(paths);
     }

@@ -256,6 +256,7 @@ pub fn if_then_else<'s>() -> Definition<'s> {
     ("if", everything(), "then", everything(), "else", or(block(), many(not_block()))) if_body}
 }
 
+/// Standalone `else` macro definition, for an `else` without a preceding `if`.
 pub fn just_else<'s>() -> Definition<'s> {
     crate::macro_definition! {
     ("else", or(block(), many(not_block()))) else_body}
@@ -397,15 +398,15 @@ fn find_top_level_arrow(items: &[Item]) -> Option<usize> {
     let mut spaced = false;
     let mut arrow_i = None;
     for (i, item) in items.iter().enumerate() {
-        if let Item::Token(token) = item {
-            if token.is_spaced() {
-                if let Token { variant: token::Variant::ArrowOperator(_), .. } = token {
-                    arrow_i = Some(i);
-                    break;
-                }
-                if i != 0 {
-                    spaced = true;
-                }
+        if let Item::Token(token) = item
+            && token.is_spaced()
+        {
+            if let Token { variant: token::Variant::ArrowOperator(_), .. } = token {
+                arrow_i = Some(i);
+                break;
+            }
+            if i != 0 {
+                spaced = true;
             }
         }
     }

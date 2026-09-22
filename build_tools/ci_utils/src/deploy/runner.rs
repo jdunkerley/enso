@@ -53,7 +53,7 @@ impl Config {
     }
 
     pub fn registered_name(&self) -> String {
-        format!("{}-{}-{}", &self.runner.name, self.server_name, self.index)
+        format!("{}-{}-{}", self.runner.name, self.server_name, self.index)
     }
 
     pub fn register_script_call_args(

@@ -10,7 +10,7 @@ use std::borrow::Cow;
 ///   code.
 /// - Assert that the given [`Tree`] can be serialized and deserialized without error.
 fn expect_tree_representing_code(code: &str, ast: &enso_parser::syntax::Tree) {
-    assert_eq!(ast.code(), code, "{:?}", &ast);
+    assert_eq!(ast.code(), code, "{:?}", ast);
     let serialized = enso_parser::serialization::serialize_tree(ast).unwrap();
     let deserialized = enso_parser::serialization::deserialize_tree(&serialized);
     deserialized.unwrap();
@@ -34,7 +34,7 @@ fn test_module<T: AsRef<str>>(code: T, expect: lexpr::Value) {
     let code = code.as_ref();
     let ast = parse_module(code);
     let ast_repr = to_s_expr(&ast, code).to_string();
-    assert_eq!(ast_repr, expect.to_string(), "{:?}", &ast);
+    assert_eq!(ast_repr, expect.to_string(), "{:?}", ast);
 }
 
 /// Returns the S-expr representation of the given code, parsed as a complete module.

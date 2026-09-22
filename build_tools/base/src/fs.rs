@@ -208,14 +208,14 @@ pub fn copy_file_if_different(source: impl AsRef<Path>, target: impl AsRef<Path>
 /// identical to the new contents, the function will not perform a write operation. This is useful
 /// for avoiding unnecessary file changes.
 pub fn write_if_different(path: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result {
-    if let Ok(existing_metadata) = metadata(&path) {
-        if existing_metadata.len() == contents.as_ref().len() as u64 {
-            // We allow ? below. If the file exists, it should be readable - or something is wrong.
-            let existing_contents = read(&path)?;
-            if existing_contents == contents.as_ref() {
-                trace!("Contents are identical, not writing to {}.", path.as_ref().display());
-                return Ok(());
-            }
+    if let Ok(existing_metadata) = metadata(&path)
+        && existing_metadata.len() == contents.as_ref().len() as u64
+    {
+        // We allow ? below. If the file exists, it should be readable - or something is wrong.
+        let existing_contents = read(&path)?;
+        if existing_contents == contents.as_ref() {
+            trace!("Contents are identical, not writing to {}.", path.as_ref().display());
+            return Ok(());
         }
     }
     write(&path, contents)
