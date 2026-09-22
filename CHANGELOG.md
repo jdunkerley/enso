@@ -45,6 +45,9 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [Fixed a startup race in the local library repository server][41]. It
+  announced itself as ready before it began accepting connections, so a client
+  connecting in that window was refused.
 - [The Rust toolchain has been updated to 1.98.1 (from 1.90)][40]. This covers
   the parser, the WASM and JNI builds of it, and the `./run` build CLI. No
   behaviour changes — the parser produces the same AST and the same Java
@@ -53,6 +56,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[41]: https://github.com/jdunkerley/enso/pull/41
 [40]: https://github.com/jdunkerley/enso/pull/40
 [37]: https://github.com/jdunkerley/enso/pull/37
 [39]: https://github.com/jdunkerley/enso/pull/39
