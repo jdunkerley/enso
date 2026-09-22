@@ -55,7 +55,11 @@ path-absolutize = "3.1.1"
 portpicker = { version = "0.1.1" }
 regex = { version = "1.13.1" }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
-serde_yaml = { version = "0.9.16" }
+# `serde_yaml` is unmaintained — its last release is literally `0.9.34+deprecated`. `serde_norway`
+# continues the 0.9 line, so it is a drop-in for the API used here. It is aliased to the old name
+# so the existing `serde_yaml::` paths keep working; the package being pulled is what this line
+# says, not the alias.
+serde_yaml = { package = "serde_norway", version = "0.9.42" }
 sha2 = { version = "0.10.8" }
 sysinfo = { version = "0.30.7" }
 tar = { version = "0.4.46" }
@@ -112,7 +116,6 @@ lazy_static = { version = "1.5.0" }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
 owned_ttf_parser = { version = "0.15.1" }
 convert_case = { version = "0.6.0" }
-bincode = { version = "2.0.0-rc.1" }
 # Held at 1.1 — see Note [Held Back By The octocrab Fork] above.
 bytes = { version = "1.1.0" }
 console_error_panic_hook = { version = "0.1.7" }
