@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.lang.ProcessBuilder.Redirect
+import java.net.{InetSocketAddress, Socket}
 import java.nio.file.{Files, Path}
 import scala.util.Using
 import scala.util.control.NonFatal
@@ -144,8 +145,12 @@ abstract class DummyRepository(toolsRootDirectory: Path) {
   private def commandPrefix: Seq[String] =
     if (OS.isWindows) Seq("cmd.exe", "/c") else Seq.empty
 
-  private def pnpmCommand: String = if (OS.isWindows) "pnpm.cmd" else "pnpm"
-  private def nodeCommand: String = if (OS.isWindows) "node.exe" else "node"
+  // Left without an extension on Windows on purpose. These run through `commandPrefix`, so
+  // `cmd.exe` resolves them against `PATHEXT` and finds whichever form is installed. Naming
+  // `pnpm.cmd` explicitly used to break the local (non-CI) preinstall on any machine where pnpm
+  // is a native `pnpm.exe` rather than an npm/corepack shim.
+  private def pnpmCommand: String = "pnpm"
+  private def nodeCommand: String = "node"
 
   case class Server(process: WrappedProcess) extends AutoCloseable {
     override def close(): Unit = {
@@ -219,13 +224,48 @@ abstract class DummyRepository(toolsRootDirectory: Path) {
     val processBuilder = (new ProcessBuilder)
       .command(command: _*)
       .directory(serverDirectory.toFile)
-    val process = withRetries(command, processBuilder, 3)
+    val process = withRetries(command, processBuilder, port, 3)
     Server(process)
+  }
+
+  /** Blocks until the server actually accepts a connection on `port`.
+    *
+    * Waiting for the startup message alone is not enough: it tells us the
+    * process reached the point of logging, not that its listening socket is
+    * accepting, and a client that connects in between gets a
+    * `ConnectException`. Connecting over `localhost` rather than a literal
+    * address keeps this check on the same resolution path the tests use.
+    */
+  private def waitUntilAccepting(port: Int, timeoutSeconds: Int): Unit = {
+    val deadline                     = System.currentTimeMillis() + timeoutSeconds * 1000L
+    var lastError: Option[Throwable] = None
+    var accepting                    = false
+    while (!accepting && System.currentTimeMillis() < deadline) {
+      try {
+        Using.resource(new Socket()) { socket =>
+          socket.connect(new InetSocketAddress("localhost", port), 1000)
+        }
+        accepting = true
+      } catch {
+        case NonFatal(e) =>
+          lastError = Some(e)
+          Thread.sleep(50)
+      }
+    }
+
+    if (!accepting) {
+      throw new RuntimeException(
+        s"The library repository server did not start accepting connections " +
+        s"on port $port within $timeoutSeconds seconds.",
+        lastError.orNull
+      )
+    }
   }
 
   private def withRetries(
     cmd: Seq[String],
     processBuilder: ProcessBuilder,
+    port: Int,
     retriesLeft: Int
   ): WrappedProcess = {
     val rawProcess = processBuilder.start()
@@ -237,6 +277,7 @@ abstract class DummyRepository(toolsRootDirectory: Path) {
         timeoutSeconds = 15,
         process.StdOut
       )
+      waitUntilAccepting(port, timeoutSeconds = 15)
       process
     } catch {
       case NonFatal(e) =>
@@ -245,7 +286,7 @@ abstract class DummyRepository(toolsRootDirectory: Path) {
           LoggerFactory
             .getLogger(classOf[DummyRepository])
             .warn("Failed to start process: " + cmd + ". Retrying...")
-          withRetries(cmd, processBuilder, retriesLeft - 1)
+          withRetries(cmd, processBuilder, port, retriesLeft - 1)
         } else {
           throw e
         }
