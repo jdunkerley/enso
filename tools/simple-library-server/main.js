@@ -85,9 +85,12 @@ if (process.env.PORT) {
   port = process.env.PORT
   console.log(`Overriding the port to ${port} set by the PORT environment variable.`)
 }
-console.log(`Serving the repository located under ${argv.root} on port ${port}.`)
-
-const server = app.listen(port)
+// Logged from the `listening` callback, not before `listen`: test harnesses treat this line as
+// the signal that the server is ready, so emitting it earlier makes them connect to a socket that
+// is not accepting yet. See `DummyRepository.startServer`.
+const server = app.listen(port, () => {
+  console.log(`Serving the repository located under ${argv.root} on port ${port}.`)
+})
 
 function handleShutdown() {
   console.log('Received a signal - shutting down.')
