@@ -243,17 +243,26 @@ has silently produced a wrong result here:
 - The Rust parser is the source of truth for the AST. Changing it means
   regenerating Java bindings (`lib/rust/parser/generate-java/`) and re-bundling
   WASM (`app/rust-ffi/`). The engine and IDE both consume it.
-- **Generated Java is reproducible for a given rustc, but not across rustc
-  versions — and that is expected, not a regression.** `metamodel::rust::TypeId`
+- **Generated Java is reproducible for identical inputs, but its declaration
+  order is not stable across a rustc bump _or_ a dependency bump — and that is
+  expected, not a regression.** `metamodel::rust::TypeId`
   (`lib/rust/metamodel/src/rust/mod.rs`) wraps `std::any::TypeId` and is used as
   a `BTreeMap` key all through the codegen, so iteration order follows an opaque
-  compiler-generated hash that upstream is free to change. A toolchain bump
-  therefore permutes the order of the class declarations `generate-java` emits.
-  Before treating such a diff as a real change, check the two things that would
-  make it one: the `switch` on the serialization discriminant (identical here
-  across 1.90 → 1.98), and whether the diff is a pure permutation —
-  `sort Token.java | sha256sum` on both outputs settles it in one command. The
-  same caveat applies to anything else keyed on `TypeId`.
+  compiler-generated hash. That hash incorporates the defining crate's version
+  hash, which folds in its dependency versions — so bumping a crate the parser
+  depends on permutes the emitted class declarations just as a toolchain bump
+  does. Both were observed: 1.90 → 1.98 with crates fixed, and the crate sweep
+  with rustc fixed. Before treating such a diff as a real change, check the two
+  things that would make it one: the `switch` on the serialization discriminant,
+  and whether the diff is a pure permutation. One command settles the second:
+
+  ```bash
+  sort Token.java | sha256sum   # compare between the two outputs
+  ```
+
+  Belt and braces: line counts and the class set should also match. The same
+  caveat applies to anything else keyed on `TypeId`.
+
 - "Polyglot" has multiple meanings here: (1) GraalVM polyglot — Enso calling
   JS/Python/Java at runtime; (2) Enso Polyglot Bridge (EPB) — an internal
   sub-language for single-threaded language contexts; (3) `ydoc-server-polyglot`
