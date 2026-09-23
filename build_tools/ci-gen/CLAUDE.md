@@ -1,7 +1,8 @@
 # enso-build-ci-gen
 
 Binary that emits the repo's `.github/workflows/*.yml` files from the job
-definitions in `enso-build`. Serializes via `serde_yaml`.
+definitions in `enso-build`. Serializes via `serde_yaml` — the workspace alias
+for `serde_norway`.
 
 Run when:
 

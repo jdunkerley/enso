@@ -17,7 +17,12 @@ fn normalize_ident(ident: impl AsRef<str>, case: Case) -> Ident {
     let normalized_text = if base == "." {
         String::from("Paths")
     } else {
-        base.replace(['-', '.', ' '], "_").replace(['<', '>'], "")
+        // Dotfiles like `.github` would otherwise become `_github`: `convert_case` keeps a leading
+        // underscore (0.12 does; 0.6 dropped it).
+        base.replace(['-', '.', ' '], "_")
+            .replace(['<', '>'], "")
+            .trim_start_matches('_')
+            .to_owned()
     };
 
     Ident::new(&normalized_text.to_case(case), Span::call_site())
