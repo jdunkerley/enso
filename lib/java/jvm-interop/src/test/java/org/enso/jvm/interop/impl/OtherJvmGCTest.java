@@ -206,6 +206,11 @@ public class OtherJvmGCTest {
       if (globalFlush != null) {
         globalFlush.run();
       }
+      // Probing through the channel hands out a fresh handle, which pins the object in the other
+      // JVM until the proxy is collected (by the GC above) and its release is delivered (by the
+      // flushes). Only now is the object unpinned, and the next probe would pin it again - so
+      // collect here, or clearing it is left to whatever GC the allocation below happens to cause.
+      System.gc();
       alloc.add(new byte[i]);
     }
     if (expectGC) {

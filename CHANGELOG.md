@@ -48,6 +48,9 @@
 - [More Rust dependencies have been updated][49]: itertools, convert_case,
   path-absolutize, sha2, indicatif and multimap. No behaviour changes; release
   checksums are computed exactly as before.
+- [Fixed an intermittently failing JVM interop garbage-collection test][50]. It
+  only passed when an unrelated collection happened to run at the right moment,
+  so it failed at random on CI. No product code changed.
 - [The Rust platform dependencies have been updated][48]: dirs, sysinfo, windows
   and winreg. No behaviour changes. The Windows API bindings are now declared as
   Windows-only, which they always should have been (they no longer build on
@@ -71,6 +74,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [49]: https://github.com/jdunkerley/enso/pull/49
+[50]: https://github.com/jdunkerley/enso/pull/50
 [48]: https://github.com/jdunkerley/enso/pull/48
 [47]: https://github.com/jdunkerley/enso/pull/47
 [45]: https://github.com/jdunkerley/enso/pull/45
