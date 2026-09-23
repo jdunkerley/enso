@@ -45,6 +45,9 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [The Rust derive-macro dependencies have been updated][47]: syn 3, derive_more
+  2 and strum 0.28. No behaviour changes; the parser produces the same AST and
+  the same Java bindings as before.
 - [The build tooling no longer depends on the unmaintained `serde_yaml`][45]. No
   behaviour changes; the generated CI workflows are byte-identical.
 - [Rust dependencies have been brought up to date][42]. No behaviour changes;
@@ -60,6 +63,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[47]: https://github.com/jdunkerley/enso/pull/47
 [45]: https://github.com/jdunkerley/enso/pull/45
 [42]: https://github.com/jdunkerley/enso/pull/42
 [41]: https://github.com/jdunkerley/enso/pull/41
