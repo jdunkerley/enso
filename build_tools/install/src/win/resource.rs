@@ -17,7 +17,13 @@ pub fn get_binary(name: &str) -> Result<&'static [u8]> {
         Foundation::SetLastError(Foundation::WIN32_ERROR::default());
         let resource =
             LibraryLoader::FindResourceW(None, &HSTRING::from(name), crate::win::RT_RCDATA);
-        Foundation::GetLastError().with_context(|| format!("Failed to find resource: {name:?}"))?;
+        // `windows` 0.62 changed `GetLastError` to return the raw `WIN32_ERROR`; up to 0.52 the
+        // binding called `.ok()` itself and handed back a `Result`. `to_hresult().ok()` restores
+        // that — `WIN32_ERROR` no longer has an `ok()` of its own.
+        Foundation::GetLastError()
+            .to_hresult()
+            .ok()
+            .with_context(|| format!("Failed to find resource: {name:?}"))?;
         let global = LibraryLoader::LoadResource(None, resource).unwrap();
         let data = LibraryLoader::LockResource(global);
         let size = LibraryLoader::SizeofResource(None, resource);

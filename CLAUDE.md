@@ -141,7 +141,20 @@ has silently produced a wrong result here:
   invisible on Windows: `prettier-plugin-organize-imports` silently corrupts Vue
   SFCs only on Linux (#19), and the Playwright integration suite cannot run on
   native Windows at all (#21). WSL is the practical route;
-  `~/.enso-toolchain.sh` sets up Node/GraalVM/sbt/Maven/Rust there.
+  `~/.enso-toolchain.sh` sets up Node/GraalVM/sbt/Maven/Rust there. It reaches
+  the repo at `/mnt/c/...`, so **give cargo its own target directory** — sharing
+  `target/` with the Windows build means every switch re-links the whole
+  workspace, and the two hosts evict each other's artifacts:
+
+  ```bash
+  wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
+  ```
+
+  `rust-toolchain.toml` is honoured there, so the pinned version installs on
+  first use. Worth doing for any dependency touching platform surface: `nix` is
+  POSIX-only and cannot be compiled on Windows at all, while `windows`/`winreg`
+  only compile on Windows — neither half is verifiable from one host alone.
+
 - **An incremental typecheck is not a verification after a dependency change.**
   TypeScript's `*.tsbuildinfo` reports success while skipping exactly the files
   whose module resolution changed. Delete the caches first, and measure the
