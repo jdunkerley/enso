@@ -141,7 +141,9 @@ impl std::ops::Shr for Pattern {
 }
 
 /// The syntax `pattern1 | pattern2` is a shortcut for `or(pattern1, pattern2)`.
-impl BitOr for Pattern {
+// Qualified because the prelude's `derive_more::*` re-export brings a `BitOr` *derive macro* into
+// scope, which shadows the trait. The `Shr` impl above is qualified for the same reason.
+impl std::ops::BitOr for Pattern {
     type Output = Pattern;
     fn bitor(self, rhs: Pattern) -> Self::Output {
         or(self, rhs)
