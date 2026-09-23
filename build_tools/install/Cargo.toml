@@ -16,13 +16,17 @@ strum = { workspace = true }
 sysinfo = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-windows = { workspace = true }
 derive_more = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 mslnk = "0.1.8"
 native-windows-gui = { workspace = true }
 winreg = { workspace = true }
+# Windows-only, like its neighbours above. It was an unconditional dependency until the 0.62
+# bump, which was harmless only by luck: 0.62 pulls `windows-future`, which uses Windows-only
+# internals of `windows-core`/`windows-threading` without gating them, so it fails to compile for
+# other targets. Every `windows::` reference here lives in `mod win`, which is `#[cfg(windows)]`.
+windows = { workspace = true }
 
 [build-dependencies]
 embed-resource = "2.4.0"

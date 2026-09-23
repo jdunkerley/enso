@@ -26,6 +26,19 @@ pub mod shortcut;
 pub mod ui;
 pub mod uninstall;
 
+/// Build a `REG_SZ` registry value from something that renders via `Display`.
+///
+/// `winreg` 0.56 changed `ToRegValue::to_reg_value` to return `RegValue<'_>`, borrowing from the
+/// value it was built from. The string impls always produce `Cow::Owned` bytes, so the data is
+/// owned either way — but building one from a temporary `String` still fails to compile, because
+/// the *type* borrows that temporary. Detaching the bytes back into an owned `Cow` gives a value
+/// with no borrow left to outlive.
+fn owned_sz_reg_value(value: impl ToString) -> RegValue<'static> {
+    let rendered = value.to_string();
+    let RegValue { bytes, vtype } = rendered.to_reg_value();
+    RegValue { bytes: Cow::Owned(bytes.into_owned()), vtype }
+}
+
 /// Open the `HKEY_CURRENT_USER\Software\Classes` key for reading and writing.
 ///
 /// This is where the programmatic identifiers (ProgIDs) of file types and URL protocols are
@@ -124,8 +137,8 @@ impl Display for Icon {
 }
 
 impl ToRegValue for Icon {
-    fn to_reg_value(&self) -> RegValue {
-        self.to_string().to_reg_value()
+    fn to_reg_value(&self) -> RegValue<'_> {
+        owned_sz_reg_value(self)
     }
 }
 
@@ -159,8 +172,8 @@ impl Display for PlainOpenCommand {
 }
 
 impl ToRegValue for PlainOpenCommand {
-    fn to_reg_value(&self) -> RegValue {
-        self.to_string().to_reg_value()
+    fn to_reg_value(&self) -> RegValue<'_> {
+        owned_sz_reg_value(self)
     }
 }
 

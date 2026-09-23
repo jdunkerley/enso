@@ -3,6 +3,7 @@ use crate::prelude::*;
 use sysinfo::Pid;
 use sysinfo::Process;
 use sysinfo::ProcessRefreshKind;
+use sysinfo::ProcessesToUpdate;
 use sysinfo::System;
 
 /// A wrapper over [`System`] that represents information about the process hierarchy.
@@ -20,7 +21,14 @@ impl<'a> Hierarchy<'a> {
     /// The system will be used to refresh the process information.
     pub fn new(system: &'a mut System) -> Self {
         trace!("Refreshing system information.");
-        system.refresh_processes_specifics(ProcessRefreshKind::default());
+        // `remove_dead_processes: true` keeps the behaviour this had before sysinfo 0.32, when
+        // refreshing always dropped processes that had exited. The hierarchy is used to kill
+        // subtrees, so a stale entry would mean trying to signal a pid that no longer exists.
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::default(),
+        );
         let processes = system.processes();
         let mut children = HashMap::<_, HashSet<Pid>>::new();
         for (pid, process) in processes {
@@ -48,7 +56,9 @@ impl<'a> Hierarchy<'a> {
             }
         }
         if let Some(process) = self.processes.get(&pid) {
-            let name = process.name();
+            // `name()` became `&OsStr` in sysinfo 0.33; `.display()` gives back something the
+            // tracing `%` sigil can format.
+            let name = process.name().display();
             let command = process.cmd();
             trace!(%pid, %name, ?command, "Killing process.");
             if !process.kill() {

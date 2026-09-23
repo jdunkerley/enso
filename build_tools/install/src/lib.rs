@@ -113,14 +113,14 @@ pub fn is_already_running(install_dir: &Path, ignored_pids: &[Pid]) -> Result<Op
 
     // First get process list.
     let mut sys = sysinfo::System::new();
-    sys.refresh_processes();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
     for (pid, process) in sys.processes() {
         if ignored_pids.contains(pid) {
-            trace!("Process {} ({}) is ignored.", process.name(), pid);
+            trace!("Process {} ({}) is ignored.", process.name().display(), pid);
             continue;
         }
         let Some(path) = process.exe() else {
-            warn!("Process {} ({}) has no path.", process.name(), pid);
+            warn!("Process {} ({}) has no path.", process.name().display(), pid);
             continue;
         };
         let Ok(path) = path.canonicalize() else {
@@ -130,16 +130,24 @@ pub fn is_already_running(install_dir: &Path, ignored_pids: &[Pid]) -> Result<Op
 
         if path.starts_with(&install_dir) {
             offending_processes.push(process);
-            info!("Process {} ({}) is in the installation directory.", process.name(), pid);
+            info!(
+                "Process {} ({}) is in the installation directory.",
+                process.name().display(),
+                pid
+            );
         } else {
-            trace!("Process {} ({}) is not in the installation directory.", process.name(), pid);
+            trace!(
+                "Process {} ({}) is not in the installation directory.",
+                process.name().display(),
+                pid
+            );
         }
     }
 
     if !offending_processes.is_empty() {
         let processes_list = offending_processes
             .iter()
-            .map(|p| format!(" * {} (pid {})", p.name(), p.pid()))
+            .map(|p| format!(" * {} (pid {})", p.name().display(), p.pid()))
             .join("\n");
         let message = format!(
             "It seems that the application is currently running. Please close it before running the installer.\n\nThe following processes are running from the installation directory:\n{}",
