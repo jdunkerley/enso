@@ -93,7 +93,7 @@ windows = { version = "0.52.0", features = [
 ] }
 winreg = { version = "0.52.0" }
 anyhow = { version = "1.0.104" }
-derive_more = { version = "1.0", features = [
+derive_more = { version = "2.1.1", features = [
 	"index",
 	"index_mut",
 	"deref",
@@ -124,7 +124,7 @@ reqwest = { version = "0.11.27", default-features = false, features = [
 	"stream",
 ] }
 proc-macro2 = { version = "1.0.107" }
-syn = { version = "2.0", features = [
+syn = { version = "3.0.6", features = [
 	"full",
 	"extra-traits",
 	"printing",
@@ -134,7 +134,7 @@ syn = { version = "2.0", features = [
 ] }
 quote = { version = "1.0.47" }
 semver = { version = "1.0.28", features = ["serde"] }
-strum = { version = "0.26.2", features = ["derive"] }
+strum = { version = "0.28.0", features = ["derive"] }
 
 [workspace.lints]
 [workspace.lints.rust]
