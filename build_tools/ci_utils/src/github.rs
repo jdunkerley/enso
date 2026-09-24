@@ -4,6 +4,7 @@ use crate::define_env_var;
 
 use octocrab::models::repos::Asset;
 use octocrab::models::repos::Release;
+use std::sync::LazyLock;
 
 // ==============
 // === Export ===
@@ -20,11 +21,24 @@ pub use repo::RepoRef;
 /// Maximum number of items per page in the GitHub API.
 const MAX_PER_PAGE: u8 = 100;
 
+/// Root of the GitHub REST API, for building absolute request URLs ourselves.
+pub static API_URL: LazyLock<Url> =
+    LazyLock::new(|| Url::parse("https://api.github.com/").expect("The API URL is valid."));
+
 define_env_var! {
     /// GitHub Personal Access Token, used for authentication in GutHub API.
     ///
     /// Can be [created using GitHub web UI](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token).
     GITHUB_TOKEN, String;
+}
+
+/// Parse a GitHub ID, such as [`octocrab::models::RunId`], from its decimal representation.
+///
+/// Octocrab's ID newtypes do not implement `FromStr`; use this wherever one is read from text,
+/// e.g. as a `clap` value parser.
+pub fn parse_id<Id: From<u64>>(text: &str) -> Result<Id> {
+    let id = text.parse::<u64>().with_context(|| format!("Invalid GitHub ID: `{text}`."))?;
+    Ok(Id::from(id))
 }
 
 /// Tries to retrieve the GitHub Personal Access Token from the environment.
@@ -121,8 +135,7 @@ pub trait IsOrganization {
     ) -> anyhow::Result<model::RegistrationToken> {
         let name = self.name();
         let path = format!("/orgs/{name}/actions/runners/registration-token");
-        let url = octocrab.absolute_url(path)?;
-        octocrab.post(url, EMPTY_REQUEST_BODY).await.with_context(|| {
+        octocrab.post(path, EMPTY_REQUEST_BODY).await.with_context(|| {
             format!("Failed to generate runner registration token for organization {name}.")
         })
     }
@@ -190,5 +203,8 @@ pub async fn fetch_runner(octocrab: &Octocrab, os: OS, output_dir: impl AsRef<Pa
 pub fn create_client(pat: impl AsRef<str>) -> Result<reqwest::Client> {
     let mut header_map = reqwest::header::HeaderMap::new();
     header_map.append(reqwest::header::AUTHORIZATION, format!("Bearer {}", pat.as_ref()).parse()?);
-    Ok(reqwest::Client::builder().user_agent("enso-build").default_headers(header_map).build()?)
+    Ok(crate::io::web::client::builder()
+        .user_agent(crate::USER_AGENT)
+        .default_headers(header_map)
+        .build()?)
 }

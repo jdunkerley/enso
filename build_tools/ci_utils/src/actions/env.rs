@@ -108,7 +108,7 @@ define_env_var! {
 
     /// A unique number for each workflow run within a repository. This number does not change if
     /// you re-run the workflow run. For example, 1658821493.
-    GITHUB_RUN_ID, octocrab::models::RunId;
+    GITHUB_RUN_ID, GitHubId<octocrab::models::RunId>;
 
     /// A unique number for each run of a particular workflow in a repository. This number begins
     /// at 1 for the workflow's first run, and increments with each new run. This number does not

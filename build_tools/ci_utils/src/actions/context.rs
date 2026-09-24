@@ -8,7 +8,7 @@ pub struct WebhookPayload {
     pub repository: Option<models::Repository>,
     pub issue: Option<models::issues::Issue>,
     pub pull_request: Option<models::pulls::PullRequest>,
-    pub sender: Option<models::User>,
+    pub sender: Option<models::Author>,
     pub action: Option<String>,
     pub installation: Option<models::Installation>,
     pub comment: Option<models::issues::Comment>,

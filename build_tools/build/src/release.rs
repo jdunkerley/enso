@@ -190,7 +190,7 @@ pub async fn validate_release(release: github::release::Handle) -> Result {
     let manifest: manifest::Assets =
         serde_json::from_slice(&manifest).context("Failed to parse assets manifest.")?;
     for asset in manifest.assets() {
-        let response = reqwest::Client::new().get(asset.url.clone()).send().await?;
+        let response = ide_ci::io::web::client::new().get(asset.url.clone()).send().await?;
         ensure!(response.status().is_success(), "Failed to download asset: {}", asset.url);
     }
     Ok(())
@@ -279,7 +279,7 @@ pub async fn notify_cloud_about_gui(version: &Version) -> Result<Response> {
         "versionNumber": version.to_string(),
         "versionType": "Ide"
     });
-    let response = reqwest::Client::new()
+    let response = ide_ci::io::web::client::new()
         .post("https://7aqkn3tnbc.execute-api.eu-west-1.amazonaws.com/versions")
         .header("x-enso-organization-id", "org-2BqGX0q2yCdONdmx3Om1MVZzmv3")
         .header("x-enso-admin-token", ENSO_ADMIN_TOKEN.get()?)

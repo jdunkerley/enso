@@ -99,6 +99,13 @@ macro_rules! define_env_var {
             $crate::env::accessor::PathBufVariable(stringify!($name));
         $crate::define_env_var!($($tail)*);
     };
+    ($(#[$attr:meta])* $name: ident, GitHubId<$ty_name: ty>; $($tail:tt)*) => {
+        #[allow(non_upper_case_globals)]
+        $(#[$attr])*
+        pub const $name: $crate::env::accessor::GitHubIdVariable<$ty_name> =
+            $crate::env::accessor::GitHubIdVariable::new(stringify!($name));
+        $crate::define_env_var!($($tail)*);
+    };
     ($(#[$attr:meta])* $name: ident, String; $($tail:tt)*) => {
         #[allow(non_upper_case_globals)]
         $(#[$attr])*

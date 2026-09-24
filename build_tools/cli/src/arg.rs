@@ -190,7 +190,7 @@ pub struct Source<Target: IsTargetSource> {
     ///
     /// `GITHUB_TOKEN` environment variable with "repo" access is required to download CI run
     /// artifacts.
-    #[clap(id = Target::RUN_ID_NAME, long, required_if_eq(Target::SOURCE_NAME, "ci-run"), enso_env())]
+    #[clap(id = Target::RUN_ID_NAME, long, required_if_eq(Target::SOURCE_NAME, "ci-run"), enso_env(), value_parser = ide_ci::github::parse_id::<RunId>)]
     pub run_id: Option<RunId>,
 
     /// Artifact name to be used when downloading a run artifact. If not set, the default name for

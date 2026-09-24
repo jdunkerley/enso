@@ -1,1 +1,10 @@
 type-complexity-threshold = 500
+
+# `reqwest` is built without a crypto provider, so these construct clients that panic on their
+# first HTTPS request. See Note [TLS Backend] in the workspace `Cargo.toml`.
+disallowed-methods = [
+	{ path = "reqwest::Client::new", reason = "use `ide_ci::io::web::client::new`" },
+	{ path = "reqwest::Client::builder", reason = "use `ide_ci::io::web::client::builder`" },
+	{ path = "reqwest::ClientBuilder::new", reason = "use `ide_ci::io::web::client::builder`" },
+	{ path = "reqwest::get", reason = "use `ide_ci::io::web::client::new().get(..)`" },
+]

@@ -3,12 +3,11 @@
 use crate::prelude::*;
 
 use crate::cache::download::DownloadFile;
+use crate::cache::download::Fetcher;
 use crate::github;
 use crate::github::MAX_PER_PAGE;
 use crate::github::model;
 
-use headers::HeaderMap;
-use headers::HeaderValue;
 use octocrab::models::ArtifactId;
 use octocrab::models::AssetId;
 use octocrab::models::ReleaseId;
@@ -20,6 +19,8 @@ use octocrab::models::workflows::WorkflowListArtifact;
 use octocrab::params::actions::ArchiveFormat;
 use octocrab::params::repos::Reference;
 use reqwest::Response;
+use reqwest::header::HeaderMap;
+use reqwest::header::HeaderValue;
 
 /// Owned data denoting a specific GitHub repository.
 ///
@@ -203,8 +204,7 @@ impl<R: IsRepo> Handle<R> {
     pub async fn generate_runner_registration_token(&self) -> Result<model::RegistrationToken> {
         let path =
             format!("/repos/{}/{}/actions/runners/registration-token", self.owner(), self.name());
-        let url = self.octocrab.absolute_url(path)?;
-        self.octocrab.post(url, EMPTY_REQUEST_BODY).await.with_context(|| {
+        self.octocrab.post(path, EMPTY_REQUEST_BODY).await.with_context(|| {
             format!("Failed to generate a runner registration token for the {self} repository.")
         })
     }
@@ -246,7 +246,7 @@ impl<R: IsRepo> Handle<R> {
         let repo_handler = self.repos();
         let releases_handler = repo_handler.releases();
         releases_handler
-            .get_by_id(release_id)
+            .get(release_id.0)
             .await
             .with_context(|| format!("Failed to find release by id `{release_id}` in `{self}`."))
     }
@@ -337,18 +337,19 @@ impl<R: IsRepo> Handle<R> {
     /// Get information about a release asset with a given id.
     #[tracing::instrument(name="Get the asset information.", fields(self=%self), err)]
     pub async fn asset(&self, asset_id: AssetId) -> Result<Asset> {
-        self.repos().releases().get_asset(asset_id).await.with_context(|| {
+        self.repos().release_assets().get(asset_id.0).await.with_context(|| {
             format!("Failed to get the asset information for asset with ID={asset_id} in {self}.")
         })
     }
 
     /// Generate cacheable action that downloads asset with a given id.
-    pub fn download_asset_job(&self, asset_id: AssetId) -> DownloadFile {
-        let path = format!("/repos/{}/{}/releases/assets/{asset_id}", self.owner(), self.name());
-        // Unwrap will work, because we are appending relative URL constant.
-        let url = self.octocrab.absolute_url(path).unwrap();
-        DownloadFile {
-            client: self.octocrab.client.clone(),
+    pub fn download_asset_job(&self, asset_id: AssetId) -> Result<DownloadFile> {
+        let path = format!("repos/{}/{}/releases/assets/{asset_id}", self.owner(), self.name());
+        // Only the path is sent: `Fetcher::GitHub` resolves it against the client's own API base.
+        // The public host just names the cache entry.
+        let url = github::API_URL.join(&path)?;
+        Ok(DownloadFile {
+            fetcher: Fetcher::GitHub(self.octocrab.clone()),
             key: crate::cache::download::Key {
                 url,
                 additional_headers: HeaderMap::from_iter([(
@@ -356,13 +357,13 @@ impl<R: IsRepo> Handle<R> {
                     HeaderValue::from_static(mime::APPLICATION_OCTET_STREAM.as_ref()),
                 )]),
             },
-        }
+        })
     }
 
     /// Make an HTTP request to download a release asset with a given id.
     #[tracing::instrument(name="Download the asset.", fields(self=%self), err)]
     pub async fn download_asset(&self, asset_id: AssetId) -> Result<Response> {
-        self.download_asset_job(asset_id).send_request().await
+        self.download_asset_job(asset_id)?.send_request().await
     }
 
     /// Download a release asset with a given id to a file.

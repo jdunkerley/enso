@@ -5,9 +5,50 @@ use crate::global::progress_bar;
 use crate::io::web;
 
 use reqwest::Client;
+use reqwest::ClientBuilder;
 use reqwest::IntoUrl;
 use reqwest::Response;
+use std::sync::LazyLock;
 use std::time::Duration;
+
+// ====================
+// === Construction ===
+// ====================
+
+/// Start building an HTTP client that uses our TLS configuration.
+///
+/// This is the only supported way to create a [`Client`] in the build tooling; see
+/// Note [TLS Backend] in the workspace `Cargo.toml`. `reqwest` is built without a crypto provider,
+/// so a client created through [`Client::new`] or [`Client::builder`] panics on its first request.
+#[allow(clippy::disallowed_methods)] // This is the one sanctioned call site.
+pub fn builder() -> ClientBuilder {
+    Client::builder().tls_backend_preconfigured(tls_config())
+}
+
+/// Create an HTTP client with the default settings and our TLS configuration.
+pub fn new() -> Client {
+    // Building only fails on an invalid TLS configuration, which `tls_config` does not produce.
+    builder().build().expect("Failed to build the HTTP client.")
+}
+
+/// TLS configuration for all our HTTPS clients: `rustls` with the `ring` provider and the bundled
+/// Mozilla root store.
+fn tls_config() -> rustls::ClientConfig {
+    static CONFIG: LazyLock<rustls::ClientConfig> = LazyLock::new(|| {
+        let provider = Arc::new(rustls::crypto::ring::default_provider());
+        let roots = rustls::RootCertStore { roots: webpki_roots::TLS_SERVER_ROOTS.to_vec() };
+        rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .expect("The ring provider supports the default TLS versions.")
+            .with_root_certificates(roots)
+            .with_no_client_auth()
+    });
+    CONFIG.clone()
+}
+
+// ================
+// === Requests ===
+// ================
 
 pub async fn get(client: &Client, url: impl IntoUrl) -> Result<Response> {
     let url = url.into_url()?;
@@ -76,4 +117,17 @@ pub async fn download_relative(
     web::stream_to_file(response.bytes_stream(), &output_path).await?;
     debug!("Download finished: {}", output_path.display());
     Ok(output_path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `tls_backend_preconfigured` degrades to an "unknown TLS backend" when the `rustls` version
+    /// we build the configuration with differs from the one `reqwest` links, and that only shows
+    /// at `build`. Catch it here rather than on the first download.
+    #[test]
+    fn client_builds_with_our_tls_configuration() {
+        builder().build().expect("Client with our TLS configuration should build.");
+    }
 }

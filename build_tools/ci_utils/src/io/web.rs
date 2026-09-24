@@ -5,7 +5,6 @@ use crate::fs::tokio::create_parent_dir_if_missing;
 use crate::global::progress_bar;
 
 use anyhow::Context;
-use reqwest::Client;
 use reqwest::IntoUrl;
 use reqwest::RequestBuilder;
 use reqwest::Response;
@@ -18,7 +17,7 @@ use tokio::io::AsyncBufRead;
 pub mod client;
 
 pub async fn get(url: impl IntoUrl) -> Result<Response> {
-    client::get(&Client::default(), url).await
+    client::get(&client::new(), url).await
 }
 
 pub async fn handle_error_response(response: Response) -> Result<Response> {
@@ -45,7 +44,7 @@ pub async fn execute(request_builder: RequestBuilder) -> Result<Response> {
 pub async fn download_stream(
     url: impl IntoUrl,
 ) -> Result<impl Stream<Item = reqwest::Result<Bytes>>> {
-    Ok(handle_error_response(reqwest::get(url).await?).await?.bytes_stream())
+    Ok(handle_error_response(client::new().get(url).send().await?).await?.bytes_stream())
 }
 
 /// Get the the response body as a byte stream.
@@ -56,7 +55,7 @@ pub async fn download_reader(url: impl IntoUrl) -> Result<impl AsyncBufRead + Un
 
 /// Get the the response body as a byte stream.
 pub async fn download_file(url: impl IntoUrl, output: impl AsRef<Path>) -> Result {
-    stream_response_to_file(reqwest::get(url).await?, output).await
+    stream_response_to_file(client::new().get(url).send().await?, output).await
 }
 
 #[tracing::instrument(name="Streaming http response to a file.", skip(output, response), fields(

@@ -42,7 +42,7 @@ pub enum Command {
     Upload {
         #[clap(flatten)]
         params: BuildInput,
-        #[clap(long, env = *enso_build::env::ENSO_RELEASE_ID)]
+        #[clap(long, env = *enso_build::env::ENSO_RELEASE_ID, value_parser = ide_ci::github::parse_id::<ReleaseId>)]
         release_id: ReleaseId,
     },
 }

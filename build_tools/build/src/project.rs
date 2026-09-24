@@ -237,7 +237,7 @@ pub trait IsTarget: Clone + Debug + Sized + Send + Sync + 'static {
         async move {
             let ReleaseSource { asset_id, repository } = &source;
             let repository = repository.handle(&octocrab);
-            let archive_source = repository.download_asset_job(*asset_id);
+            let archive_source = repository.download_asset_job(*asset_id)?;
             let extract_job = cache::archive::ExtractedArchive {
                 archive_source,
                 path_to_extract: path_to_extract(),
