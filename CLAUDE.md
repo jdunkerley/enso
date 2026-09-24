@@ -140,14 +140,19 @@ has silently produced a wrong result here:
 - **Verify on Linux, not only on Windows.** Several classes of bug here are
   invisible on Windows: `prettier-plugin-organize-imports` silently corrupts Vue
   SFCs only on Linux (#19), and the Playwright integration suite cannot run on
-  native Windows at all (#21). WSL is the practical route;
-  `~/.enso-toolchain.sh` sets up Node/GraalVM/sbt/Maven/Rust there. It reaches
-  the repo at `/mnt/c/...`, so **give cargo its own target directory** — sharing
-  `target/` with the Windows build means every switch re-links the whole
-  workspace, and the two hosts evict each other's artifacts:
+  native Windows at all (#21). WSL is the practical route. **Source
+  `~/.enso-toolchain.sh` first** — `~/.bashrc` returns early in non-interactive
+  shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
+  picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
+  and Node versions from the checkout (`graalMavenPackagesVersion`,
+  `.node-version`), so it needs no edit when the repo bumps them; Maven, which
+  only `tools/enso4igv` uses, is not part of it. WSL reaches the repo at
+  `/mnt/c/...`, so **give cargo its own target directory** — sharing `target/`
+  with the Windows build means every switch re-links the whole workspace, and
+  the two hosts evict each other's artifacts:
 
   ```bash
-  wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
+  wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
   ```
 
   `rust-toolchain.toml` is honoured there, so the pinned version installs on
