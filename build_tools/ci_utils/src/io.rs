@@ -23,7 +23,7 @@ pub async fn read_length(mut read: impl AsyncRead + Unpin) -> Result<u64> {
 
 pub async fn download_to_dir(url: impl IntoUrl, dir: impl AsRef<Path>) -> Result<PathBuf> {
     let url = url.into_url()?;
-    let response = client::get(&default(), url.clone()).await?;
+    let response = client::get(&client::new(), url.clone()).await?;
     let filename = filename_from_response(&response)
         .map(ToOwned::to_owned)
         .or_else(|_| filename_from_url(&url))
@@ -37,7 +37,7 @@ pub async fn download_to_dir(url: impl IntoUrl, dir: impl AsRef<Path>) -> Result
 
 /// Get the full response body from URL as bytes.
 pub async fn download_all(url: impl IntoUrl) -> anyhow::Result<Bytes> {
-    client::download_all(&default(), url).await
+    client::download_all(&client::new(), url).await
 }
 
 /// Take the trailing filename from URL path.
@@ -62,7 +62,7 @@ pub async fn download_and_extract(
     url: impl IntoUrl,
     output_dir: impl AsRef<Path>,
 ) -> anyhow::Result<()> {
-    client::download_and_extract(&default(), url, output_dir).await
+    client::download_and_extract(&client::new(), url, output_dir).await
 }
 
 /// Retry a given action until it succeeds or the maximum number of attempts is reached.

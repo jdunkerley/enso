@@ -2,7 +2,6 @@ use enso_build_cli::prelude::*;
 
 use ide_ci::github::RepoRef;
 use ide_ci::github::setup_octocrab;
-use ide_ci::io::web::handle_error_response;
 
 const REPO: RepoRef = RepoRef { owner: "enso-org", name: "enso" };
 
@@ -25,10 +24,15 @@ async fn main() -> Result {
     for release in draft_releases {
         let id = release.id;
 
-        let route = format!("{}repos/{repo}/releases/{id}", octo.base_url);
+        let route = format!("/repos/{repo}/releases/{id}");
         info!("Will delete {}: {route}.", release.name.unwrap_or_default());
+        // Not `ReleasesHandler::delete`: it discards the response, so a failed delete would pass.
         let response = octo._delete(route, Option::<&()>::None).await?;
-        handle_error_response(response).await?;
+        let status = response.status();
+        if !status.is_success() {
+            let body = octo.body_to_string(response).await.unwrap_or_default();
+            bail!("Failed to delete release {id}: {status}: {body}");
+        }
     }
 
     info!("Done.");

@@ -47,7 +47,7 @@ impl Context {
             format!("Bearer {}", self.runtime_token).parse()?,
         );
 
-        Ok(ClientBuilder::new().default_headers(headers).user_agent(crate::USER_AGENT))
+        Ok(crate::io::web::client::builder().default_headers(headers).user_agent(crate::USER_AGENT))
     }
 
     pub fn json_client(&self) -> Result<Client> {

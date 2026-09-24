@@ -7,11 +7,10 @@ use crate::io::web::filename_from_response;
 use crate::io::web::handle_error_response;
 use crate::io::web::stream_response_to_file;
 
-use headers::HeaderMap;
 use reqwest::Client;
-use reqwest::ClientBuilder;
 use reqwest::IntoUrl;
 use reqwest::Response;
+use reqwest::header::HeaderMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Key {
@@ -33,7 +32,7 @@ impl DownloadFile {
     pub fn new(url: impl IntoUrl) -> Result<Self> {
         Ok(Self {
             key: Key { url: url.into_url()?, additional_headers: default() },
-            client: ClientBuilder::new().user_agent("enso-build").build()?,
+            client: crate::io::web::client::builder().user_agent("enso-build").build()?,
         })
     }
 

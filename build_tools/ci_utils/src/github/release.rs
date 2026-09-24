@@ -111,19 +111,20 @@ pub trait IsReleaseExt: IsRelease + Sync {
             release_id = self.id(),
         );
         let body = body.into();
-        let request = self
-            .octocrab()
-            .client
-            .post(&upload_url)
-            .query(&[("name", &asset_name)])
-            .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-            .header(reqwest::header::CONTENT_TYPE, content_type.to_string())
-            .header(reqwest::header::CONTENT_LENGTH, content_length)
-            .body(body);
+        // Octocrab's own `upload_asset` needs the whole body in memory; ours are installers.
+        let request = crate::github::api_client().map(|client| {
+            client
+                .post(&upload_url)
+                .query(&[("name", &asset_name)])
+                .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
+                .header(reqwest::header::CONTENT_TYPE, content_type.to_string())
+                .header(reqwest::header::CONTENT_LENGTH, content_length)
+                .body(body)
+        });
 
         async move {
             ensure!(content_length > 0, "Release asset file cannot be empty.");
-            crate::io::web::execute(request)
+            crate::io::web::execute(request?)
                 .await?
                 .json()
                 .await
@@ -229,7 +230,7 @@ pub trait IsReleaseExt: IsRelease + Sync {
             .octocrab()
             .repos(self.repo().owner(), self.repo().name())
             .releases()
-            .get_by_id(self.id())
+            .get(self.id().0)
             .await?)
     }
 
@@ -306,7 +307,7 @@ mod tests {
 
         let mut header_map = HeaderMap::new();
         header_map.append(reqwest::header::AUTHORIZATION, format!("Bearer {pat}").parse()?);
-        let client = reqwest::Client::builder()
+        let client = crate::io::web::client::builder()
             .user_agent("enso-build")
             .default_headers(header_map)
             .build()?;

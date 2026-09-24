@@ -202,6 +202,46 @@ impl<Value, Borrowed: ?Sized> Display for SimpleVariable<Value, Borrowed> {
     }
 }
 
+/// An environment variable holding a GitHub ID, such as a release or a workflow run ID.
+///
+/// Octocrab's ID newtypes convert from `u64` and implement `Display`, but not `FromStr`, so
+/// [`SimpleVariable`] cannot parse them.
+#[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, derive_more::Deref)]
+pub struct GitHubIdVariable<Id> {
+    #[deref]
+    pub name: &'static str,
+    pub phantom_data: PhantomData<Id>,
+}
+
+impl<Id> GitHubIdVariable<Id> {
+    pub const fn new(name: &'static str) -> Self {
+        Self { name, phantom_data: PhantomData }
+    }
+}
+
+impl<Id> RawVariable for GitHubIdVariable<Id> {
+    fn name(&self) -> &str {
+        self.name
+    }
+}
+
+impl<Id: From<u64> + Display> TypedVariable for GitHubIdVariable<Id> {
+    type Value = Id;
+    type Borrowed = Id;
+    fn parse(&self, value: &str) -> Result<Self::Value> {
+        crate::github::parse_id(value)
+    }
+    fn generate(&self, value: &Self::Borrowed) -> Result<String> {
+        Ok(value.to_string())
+    }
+}
+
+impl<Id> Display for GitHubIdVariable<Id> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Display, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PathLike(pub &'static str);
 

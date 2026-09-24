@@ -216,7 +216,7 @@ mod tests {
         let path = PathBuf::from("Cargo.toml");
         let artifact_path = path.file_name().unwrap(); // FIXME
 
-        let client = reqwest::ClientBuilder::new().build()?;
+        let client = crate::io::web::client::new();
         dbg!(artifact_path);
         client
             .patch(response.url)
