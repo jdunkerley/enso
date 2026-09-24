@@ -212,10 +212,15 @@ has silently produced a wrong result here:
   compile; see Note [Apache Commons On The Module Path] in
   `project/Dependencies.scala`.
 - **`std-benchmarks` does not compile without a built distribution** (its
-  annotation processor looks for `built-distribution*`), and on Windows
-  `buildEngineDistribution` fails indexing the stdlibs from a long checkout path
-  (`CreateProcess error=206`, e.g. inside `.claude/worktrees/`). Build the
-  distribution in WSL from a short path.
+  annotation processor looks for `built-distribution*`). Building one in WSL
+  from a clone on the Linux filesystem is much faster than through `/mnt/c`.
+- **Standard library indexing passes its JVM arguments through a `java @file`**
+  (Note [Standard Library Indexing Uses An Argument File] in
+  `project/DistributionPackage.scala`). Inline, the module paths alone came to
+  ~28K characters from `C:\Repos\Enso\ide` and grow ~140 characters per
+  character of checkout path, so a slightly deeper checkout broke Windows'
+  32,767-character limit (`CreateProcess error=206`). Keep any new process that
+  takes the engine's module path on an argument file too.
 - **`as unknown as` on a third-party API defeats the one check that catches an
   upstream removal.** Where a structural type names the slice of a dependency's
   API we depend on, cast with `as T`, never `as unknown as T` — the single cast
