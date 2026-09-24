@@ -45,6 +45,10 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [Building the engine on Windows no longer fails from a deeply nested
+  checkout][54]. Indexing the standard libraries passed so many file paths to
+  Java that the command line exceeded Windows' length limit. A build that fails
+  while indexing no longer leaves the next build skipping the indexes silently.
 - [The developer documentation is no longer published from this repository][53].
   Its workflow could only publish to the upstream project's site, so every run
   failed.
@@ -76,6 +80,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[54]: https://github.com/jdunkerley/enso/pull/54
 [53]: https://github.com/jdunkerley/enso/pull/53
 [50]: https://github.com/jdunkerley/enso/pull/50
 [49]: https://github.com/jdunkerley/enso/pull/49

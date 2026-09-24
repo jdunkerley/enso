@@ -10,7 +10,8 @@ import scala.sys.process._
 import org.enso.build.WithDebugCommand
 
 import java.io.File
-import java.nio.file.Paths
+import java.nio.charset.Charset
+import java.nio.file.{Files, Paths}
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.javaapi.CollectionConverters.asJava
 import scala.util.Try
@@ -225,7 +226,8 @@ object DistributionPackage {
     log: Logger,
     env: Map[String, String] = Map.empty
   ): Unit = {
-    val modifiedLibs: ArrayBuffer[File] = ArrayBuffer()
+    val modifiedLibs: ArrayBuffer[File]         = ArrayBuffer()
+    val modifiedCaches: ArrayBuffer[CacheStore] = ArrayBuffer()
     for (libNamespace <- libRoot.listFiles()) {
       for (libName <- libNamespace.listFiles()) {
         val libRootDir = libName / stdLibVersion
@@ -237,19 +239,29 @@ object DistributionPackage {
         Tracked.diffInputs(cache, FileInfo.lastModified)(trackedFiles) { diff =>
           if (diff.modified.nonEmpty) {
             modifiedLibs.append(libRootDir)
+            modifiedCaches.append(cache)
           }
         }
       }
     }
 
     if (modifiedLibs.nonEmpty) {
-      invokeIndexStdLibs(
-        libRootDirs  = modifiedLibs,
-        javaOpts     = javaOpts,
-        libsToUpload = libsToUpload,
-        log          = log,
-        env          = env
-      )
+      try {
+        invokeIndexStdLibs(
+          libRootDirs  = modifiedLibs,
+          javaOpts     = javaOpts,
+          libsToUpload = libsToUpload,
+          log          = log,
+          env          = env
+        )
+      } catch {
+        case e: Throwable =>
+          // `Tracked.diffInputs` has already recorded these libraries as
+          // up to date. Forget that, so that the next run indexes them again
+          // instead of silently skipping them.
+          modifiedCaches.foreach(_.delete())
+          throw e
+      }
     }
   }
 
@@ -276,13 +288,83 @@ object DistributionPackage {
     log.info(s"Generating indexes for libraries [$libNames]")
     val javaCommand = javaExecutable()
 
-    val command = Seq(
-      javaCommand
-    ) ++ javaOpts ++ Seq(
+    val javaArgs = javaOpts ++ Seq(
       "--no-compile-dependencies",
       "--compile"
     ) ++ libPaths
-    log.debug(command.mkString(" "))
+    // See Note [Standard Library Indexing Uses An Argument File]
+    val argFile = writeJavaArgumentFile(javaArgs)
+    try {
+      val command = Seq(javaCommand, "@" + argFile.getAbsolutePath)
+      log.debug((javaCommand +: javaArgs).mkString(" "))
+      log.debug(
+        s"Arguments passed via argument file $argFile; command line is " +
+        s"${command.mkString(" ").length} chars instead of " +
+        s"${(javaCommand +: javaArgs).mkString(" ").length}."
+      )
+      runIndexStdLibs(command, libRootDirs, libNames, libsToUpload, log, env)
+    } finally {
+      argFile.delete()
+    }
+  }
+
+  /* Note [Standard Library Indexing Uses An Argument File]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The indexing JVM gets `engine-runner / Runtime / javaOptions`, whose two
+   * `--module-path` values list every Coursier-cache jar and every jar built in
+   * this checkout by absolute path. Passed on the command line, that was ~28,100
+   * chars from a checkout at `C:\Repos\Enso\ide` - and the checkout path occurs
+   * 140 times, so each extra character of it costs 140 more (33,971 chars from a
+   * git worktree 42 chars deeper). Windows caps a command line at 32,767 chars,
+   * so a checkout path only ~33 chars longer failed with `CreateProcess
+   * error=206, The filename or extension is too long`, and every new dependency
+   * (or a longer user name, via the Coursier cache) eats into that headroom.
+   *
+   * `java @file` (JDK 9+) reads the arguments from a file instead, keeping the
+   * command line short regardless of path lengths. Do not inline the arguments
+   * back onto the command line.
+   */
+
+  /** Writes `args` to a temporary `java` launcher argument file, one quoted
+    * argument per line. The caller is responsible for deleting the file.
+    */
+  private def writeJavaArgumentFile(args: Seq[String]): File = {
+    val argFile = File.createTempFile("enso-index-stdlibs-", ".args")
+    argFile.deleteOnExit()
+    val content = args
+      .map(quoteJavaArgumentFileArg)
+      .mkString("", System.lineSeparator(), System.lineSeparator())
+    // The launcher reads the file as raw bytes in the platform encoding.
+    val charset = Option(System.getProperty("native.encoding"))
+      .flatMap(name => Try(Charset.forName(name)).toOption)
+      .getOrElse(Charset.defaultCharset())
+    Files.write(argFile.toPath, content.getBytes(charset))
+    argFile
+  }
+
+  /** Quotes an argument for a `java` launcher argument file.
+    *
+    * Inside quotes the launcher treats backslash as an escape character, so
+    * backslashes (Windows paths) and quotes must be escaped; quoting keeps
+    * whitespace (e.g. `Program Files`) and a leading `#` (a comment) literal.
+    */
+  private def quoteJavaArgumentFileArg(arg: String): String = {
+    val escaped = arg
+      .replace("\\", "\\\\")
+      .replace("\"", "\\\"")
+      .replace("\n", "\\n")
+      .replace("\r", "\\r")
+    "\"" + escaped + "\""
+  }
+
+  private def runIndexStdLibs(
+    command: Seq[String],
+    libRootDirs: Seq[File],
+    libNames: String,
+    libsToUpload: Seq[String],
+    log: Logger,
+    env: Map[String, String]
+  ): Unit = {
     val allEnv1 = mapAppend(
       env,
       "NO_COLOR" -> "true"
