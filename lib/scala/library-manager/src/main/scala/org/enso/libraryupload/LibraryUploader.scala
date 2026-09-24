@@ -26,6 +26,20 @@ import scala.util.{Failure, Success, Try, Using}
 class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
   private lazy val logger = Logger[LibraryUploader]
 
+  /** Files at the library root that are not packed into [[mainArchiveName]].
+    *
+    * The config and manifest are uploaded separately. A previous archive is
+    * excluded because [[createMainArchive]] writes it inside the directory it
+    * packs, so it is still there on a rebuild: packing it would nest the old
+    * archive in the new one and, as it is overwritten while being read, fail
+    * with "Request to write ... bytes exceeds size in header".
+    */
+  private val filesToIgnoreInArchive = Seq(
+    Package.configFileName,
+    LibraryManifest.filename,
+    mainArchiveName
+  )
+
   /** Uploads a library to a repository.
     *
     * @param projectRoot path to the library project root
@@ -49,12 +63,7 @@ class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
           s"string."
         )
       }
-      val uri = buildUploadUri(uploadUrl, pkg.libraryName, version)
-
-      val filesToIgnoreInArchive = Seq(
-        Package.configFileName,
-        LibraryManifest.filename
-      )
+      val uri         = buildUploadUri(uploadUrl, pkg.libraryName, version)
       val archivePath = tmpDir / mainArchiveName
       val compressing =
         createMainArchive(projectRoot, filesToIgnoreInArchive, archivePath)
@@ -135,10 +144,6 @@ class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
     projectRoot: Path,
     progressReporter: ProgressReporter
   ): Unit = {
-    val filesToIgnoreInArchive = Seq(
-      Package.configFileName,
-      LibraryManifest.filename
-    )
     val archivePath = projectRoot / mainArchiveName
     val compressing =
       createMainArchive(projectRoot, filesToIgnoreInArchive, archivePath)

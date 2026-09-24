@@ -39,6 +39,8 @@ class LibraryUploadTest
         namespace = libraryName.namespace,
         version   = libraryVersion.toString
       )
+      // Left over from compiling the library: it must not be uploaded.
+      Files.writeString(projectRoot.resolve("main.tgz"), "stale archive")
 
       emptyRepository.withServer(port, repoRoot, uploads = true) {
         val uploadUrl = s"http://localhost:$port/upload"
@@ -88,6 +90,9 @@ class LibraryUploadTest
           val sources = pkg.listSources()
           sources should have size 1
           sources.head.file.getName shouldEqual "Main.enso"
+          Files.exists(
+            installedRoot.location.resolve("main.tgz")
+          ) shouldBe false
         }
 
       }
