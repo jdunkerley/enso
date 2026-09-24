@@ -59,7 +59,9 @@ native-windows-gui = { version = "1.0.13" }
 #   `rustls-no-provider` leaves the choice to us: clients must be built with
 #   `ide_ci::io::web::client::builder`, which supplies a `ring` + `webpki-roots` configuration.
 #   A client built any other way (`reqwest::Client::new`, `reqwest::get`, ...) panics on first
-#   use with "No rustls crypto provider"; `clippy.toml` disallows those constructors.
+#   use with "No rustls crypto provider". `clippy.toml` disallows those constructors, but CI runs
+#   no clippy and clippy cannot express `Client::default()`, so the `ide-ci` test
+#   `reqwest_clients` scans the sources for them instead.
 octocrab = { version = "0.54.2", default-features = false, features = [
 	"default-client",
 	"follow-redirect",

@@ -345,6 +345,8 @@ impl<R: IsRepo> Handle<R> {
     /// Generate cacheable action that downloads asset with a given id.
     pub fn download_asset_job(&self, asset_id: AssetId) -> Result<DownloadFile> {
         let path = format!("repos/{}/{}/releases/assets/{asset_id}", self.owner(), self.name());
+        // Only the path is sent: `Fetcher::GitHub` resolves it against the client's own API base.
+        // The public host just names the cache entry.
         let url = github::API_URL.join(&path)?;
         Ok(DownloadFile {
             fetcher: Fetcher::GitHub(self.octocrab.clone()),

@@ -28,8 +28,10 @@ pub enum Fetcher {
     /// A plain HTTP client.
     Http(Client),
     /// A GitHub API client, for endpoints that need whatever authentication it was configured
-    /// with. Its redirect policy drops credentials on a cross-origin redirect, so release assets
-    /// served from GitHub's CDN do not receive the token.
+    /// with. Only the key URL's path and query are sent, so the request goes to the client's own
+    /// API base (e.g. GitHub Enterprise or a mock server), not to the host in the key. Its
+    /// redirect policy drops credentials on a cross-origin redirect, so release assets served
+    /// from GitHub's CDN do not receive the token.
     GitHub(Octocrab),
 }
 
@@ -60,8 +62,14 @@ impl DownloadFile {
             }
             Fetcher::GitHub(octocrab) => {
                 let octocrab = octocrab.clone();
+                // Relative, so that octocrab resolves it against its own API base.
+                let route = match url.query() {
+                    Some(query) => format!("{}?{query}", url.path()),
+                    None => url.path().to_owned(),
+                };
                 async move {
-                    let response = octocrab._get_with_headers(url.as_str(), Some(headers)).await?;
+                    let response =
+                        octocrab._get_with_headers(route.as_str(), Some(headers)).await?;
                     // Hand back the same response type as the plain client, so that callers can
                     // stream, name and check it identically.
                     Ok(Response::from(response.map(reqwest::Body::wrap)))
@@ -176,6 +184,24 @@ mod tests {
         let response =
             github_download(&api, format!("{}/asset", api.uri()))?.send_request().await?;
         assert_eq!(filename_from_response(&response)?, Path::new("enso.zip"));
+        assert_eq!(response.bytes().await?.as_ref(), b"payload");
+        Ok(())
+    }
+
+    /// The key is built from the public API URL, but a client configured with another API base
+    /// (GitHub Enterprise, or a mock) must be asked, not `api.github.com`.
+    #[tokio::test]
+    async fn github_download_goes_to_the_clients_api_base() -> Result {
+        let api = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/repos/enso-org/enso/releases/assets/1"))
+            .and(header("authorization", "Bearer secret"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"payload".to_vec()))
+            .expect(1)
+            .mount(&api)
+            .await;
+        let url = "https://api.github.com/repos/enso-org/enso/releases/assets/1".to_owned();
+        let response = github_download(&api, url)?.send_request().await?;
         assert_eq!(response.bytes().await?.as_ref(), b"payload");
         Ok(())
     }
