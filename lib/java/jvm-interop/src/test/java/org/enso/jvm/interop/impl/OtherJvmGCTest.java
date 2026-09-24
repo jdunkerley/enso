@@ -122,6 +122,14 @@ public class OtherJvmGCTest {
       return ref.get();
     }
 
+    /**
+     * Unlike {@link #toObj()}, answers without sending {@code Obj} across the channel, so asking
+     * does not hand out a new handle that pins it in this JVM.
+     */
+    public final boolean isCleared() {
+      return ref.get() == null;
+    }
+
     public final void flush() {}
 
     @Override
@@ -145,7 +153,14 @@ public class OtherJvmGCTest {
   public void testGCBehavior() throws Exception {
     var gcClass = loadOtherJvmClass(OtherJvmGCTest.class.getName());
     var holdValue = assertHolderHolds(gcClass);
-    assertGC("Now it the objValue shall be GCed", true, holdValue, "toObj", "flush");
+    // Probe with isCleared(), not toObj(): sending Obj across the channel hands out a fresh handle
+    // that pins it again, so it could only be collected by a GC that happened to run between the
+    // release of one handle and the next probe (#22).
+    assertGC(
+        "Now it the objValue shall be GCed",
+        true,
+        () -> holdValue.invokeMember("isCleared").asBoolean() ? null : holdValue,
+        () -> holdValue.invokeMember("flush"));
   }
 
   private Value assertHolderHolds(Value gcClass) {
