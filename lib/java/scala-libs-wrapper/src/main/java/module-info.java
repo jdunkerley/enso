@@ -5,7 +5,7 @@ module org.enso.scala.wrapper {
 
   exports org.enso.scala.wrapper;
 
-  // "org.typelevel" % ("cats-core_" + scalaVer) % "2.10.0",
+  // "org.typelevel" % ("cats-core_" + scalaVer) % catsVersion,
   exports cats;
   exports cats.arrow;
   exports cats.compat;
@@ -16,7 +16,7 @@ module org.enso.scala.wrapper {
   exports cats.instances.symbol;
   exports cats.syntax;
 
-  // "org.typelevel" % ("cats-kernel_" + scalaVer) % "2.10.0",
+  // "org.typelevel" % ("cats-kernel_" + scalaVer) % catsVersion,
   exports cats.kernel;
   exports cats.kernel.compat;
   exports cats.kernel.instances;
@@ -77,10 +77,10 @@ module org.enso.scala.wrapper {
   // "io.circe" % ("circe-jawn_" + scalaVer) % circeVersion,
   exports io.circe.jawn;
 
-  // "org.typelevel" % ("jawn-parser_" + scalaVer) % "1.5.1",
+  // "org.typelevel" % ("jawn-parser_" + scalaVer) % jawnParserVersion,
   exports org.typelevel.jawn;
 
-  // "com.chuusai" % ("shapeless_" + scalaVer) % "2.3.10",
+  // "com.chuusai" % ("shapeless_" + scalaVer) % shapelessVersion,
   exports shapeless;
   exports shapeless.ops;
   exports shapeless.ops.record;
