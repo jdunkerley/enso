@@ -81,25 +81,9 @@ serde_yaml = { package = "serde_norway", version = "0.9.42" }
 sha2 = { version = "0.11.0" }
 sysinfo = { version = "0.39.6" }
 tar = { version = "0.4.46" }
-# Note [Held Back By The octocrab Fork]
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# `tokio` 1.44+, `tokio-util` 0.7.14+ and `bytes` 1.2+ cannot be resolved while the `octocrab`
-# git dependency below stays on the `enso-org` fork: it pulls `hyperx 1.4`, which requires
-# `bytes >=1.0.0, <1.2.0`, and `tokio` 1.44 needs `bytes ^1.2.1`. These three are therefore at
-# the newest versions that resolve, not the newest that exist. Dropping the fork unblocks all
-# three at once — see the `octocrab` note in enso#24.
-#
-# The cap also reaches transitive crates that cargo cannot see it through: `combine` 4.6.8
-# declares `bytes ^1` but calls `BytesMut::spare_capacity_mut`, which `bytes` only grew in 1.2,
-# so the resolver picks a combination that does not compile. `combine` is held at 4.6.7 in
-# `Cargo.lock`; it is not a direct dependency, so the lockfile is the only place that can
-# express it. A `cargo update` that lets `combine` float again succeeds — resolution is where
-# the bad pairing is chosen, not where it is detected — and the next `cargo check` or build
-# then fails with `no method named spare_capacity_mut`. If you hit that, this is why: re-pin
-# with `cargo update combine --precise 4.6.7`.
-tokio = { version = "1.43.4", features = ["full", "tracing"] }
+tokio = { version = "1.53.1", features = ["full", "tracing"] }
 tokio-stream = { version = "0.1.19", features = ["fs"] }
-tokio-util = { version = "0.7.13", features = ["full"] }
+tokio-util = { version = "0.7.19", features = ["full"] }
 tracing = { version = "0.1.44" }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 walkdir = { version = "2.5.0" }
@@ -133,8 +117,7 @@ itertools = { version = "0.15.0" }
 lazy_static = { version = "1.5.0" }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
 convert_case = { version = "0.12.0" }
-# Held at 1.1 — see Note [Held Back By The octocrab Fork] above.
-bytes = { version = "1.1.0" }
+bytes = { version = "1.12.1" }
 console_error_panic_hook = { version = "0.1.7" }
 # See Note [TLS Backend] above.
 #

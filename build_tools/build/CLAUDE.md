@@ -31,7 +31,9 @@ Each module handles one artifact family or one integration:
 
 ## Dependency choices
 
-- `octocrab` (forked in `[workspace.dependencies]`) for GitHub API.
+- `octocrab` (crates.io) for GitHub API. Its raw `_get`/`_post`/`_delete`
+  responses are `Ok` whatever the HTTP status — check it yourself. Streaming
+  uploads/downloads use `ide_ci::github::api_client` instead.
 - `handlebars` for templated text output.
 - `aws-sdk-*` and `aws-config` (pinned to 0.21 / 0.51) — don't bump without
   coordinating with the installer code.

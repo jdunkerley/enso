@@ -5,7 +5,11 @@ thing" helpers:
 
 - Processes (command building, output capture, logging).
 - Filesystem (path normalization, zip/tar, symlinks, `fs_extra`).
-- HTTP (`reqwest`) and GitHub (`octocrab`).
+- HTTP (`reqwest`) and GitHub (`octocrab`). Build every `reqwest::Client` with
+  `io::web::client::builder()`/`new()`: reqwest has no crypto provider of its
+  own here, so `Client::new()`/`reqwest::get` panic. See Note [TLS Backend] in
+  the workspace `Cargo.toml`. Read-only live checks:
+  `cargo test -p ide-ci --test github_live_api -- --ignored`.
 - Archive formats (`zip`, `tar`, `flate2`).
 - Path-system quirks (`path-slash`, `path-absolutize`).
 - Process inspection (`sysinfo`, `dependency_runner`).

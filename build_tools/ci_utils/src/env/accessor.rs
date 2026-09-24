@@ -301,3 +301,21 @@ impl TypedVariable for Separated {
         Ok(value.join(self.separator))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use octocrab::models::RunId;
+
+    #[test]
+    fn github_id_variable_round_trips() -> Result {
+        let variable = GitHubIdVariable::<RunId>::new("GITHUB_RUN_ID");
+        let id = variable.parse("31007732004")?;
+        assert_eq!(id, RunId(31007732004));
+        assert_eq!(variable.generate(&id)?, "31007732004");
+        assert!(variable.parse("not-a-number").is_err());
+        assert!(variable.parse("-1").is_err());
+        Ok(())
+    }
+}
