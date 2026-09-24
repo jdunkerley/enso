@@ -48,6 +48,10 @@
 - [The developer documentation is no longer published from this repository][53].
   Its workflow could only publish to the upstream project's site, so every run
   failed.
+- [Building the engine on Windows no longer fails from a deeply nested
+  checkout][54]. Indexing the standard libraries passed so many file paths to
+  Java that the command line exceeded Windows' length limit. A build that fails
+  while indexing no longer leaves the next build skipping the indexes silently.
 - [Fixed an intermittently failing JVM interop garbage-collection test][50]. It
   only passed when an unrelated collection happened to run at the right moment,
   so it failed at random on CI. No product code changed.
@@ -77,6 +81,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [53]: https://github.com/jdunkerley/enso/pull/53
+[54]: https://github.com/jdunkerley/enso/pull/54
 [50]: https://github.com/jdunkerley/enso/pull/50
 [49]: https://github.com/jdunkerley/enso/pull/49
 [48]: https://github.com/jdunkerley/enso/pull/48
