@@ -45,6 +45,9 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [Rebuilding the engine no longer fails, or ships a corrupted archive, when
+  Standard.Image is re-indexed][56]. The library's source archive used to pack
+  the previous copy of itself.
 - [Building the engine on Windows no longer fails from a deeply nested
   checkout][54]. Indexing the standard libraries passed so many file paths to
   Java that the command line exceeded Windows' length limit. A build that fails
@@ -88,6 +91,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[56]: https://github.com/jdunkerley/enso/pull/56
 [54]: https://github.com/jdunkerley/enso/pull/54
 [53]: https://github.com/jdunkerley/enso/pull/53
 [52]: https://github.com/jdunkerley/enso/pull/52
