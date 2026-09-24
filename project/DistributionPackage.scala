@@ -226,7 +226,8 @@ object DistributionPackage {
     log: Logger,
     env: Map[String, String] = Map.empty
   ): Unit = {
-    val modifiedLibs: ArrayBuffer[File] = ArrayBuffer()
+    val modifiedLibs: ArrayBuffer[File]         = ArrayBuffer()
+    val modifiedCaches: ArrayBuffer[CacheStore] = ArrayBuffer()
     for (libNamespace <- libRoot.listFiles()) {
       for (libName <- libNamespace.listFiles()) {
         val libRootDir = libName / stdLibVersion
@@ -238,19 +239,29 @@ object DistributionPackage {
         Tracked.diffInputs(cache, FileInfo.lastModified)(trackedFiles) { diff =>
           if (diff.modified.nonEmpty) {
             modifiedLibs.append(libRootDir)
+            modifiedCaches.append(cache)
           }
         }
       }
     }
 
     if (modifiedLibs.nonEmpty) {
-      invokeIndexStdLibs(
-        libRootDirs  = modifiedLibs,
-        javaOpts     = javaOpts,
-        libsToUpload = libsToUpload,
-        log          = log,
-        env          = env
-      )
+      try {
+        invokeIndexStdLibs(
+          libRootDirs  = modifiedLibs,
+          javaOpts     = javaOpts,
+          libsToUpload = libsToUpload,
+          log          = log,
+          env          = env
+        )
+      } catch {
+        case e: Throwable =>
+          // `Tracked.diffInputs` has already recorded these libraries as
+          // up to date. Forget that, so that the next run indexes them again
+          // instead of silently skipping them.
+          modifiedCaches.foreach(_.delete())
+          throw e
+      }
     }
   }
 
