@@ -15,10 +15,11 @@ proxy is serialized, executed on the other side, and its result sent back.
   `OtherJvmRef.flushQueue` sends `OtherJvmMessage.GC(id)` — on the _next_
   message sent, not immediately.
 
-Consequence for tests: probing whether a remote object is still alive by calling
-into it pins it again. `OtherJvmGCTest.assertGC` therefore collects _after_ the
-flush, in the window where no handle pins the object; without that it depended
-on an incidental GC and failed at random (#22).
+Consequence for tests: probing whether a remote object is still alive by
+fetching it pins it again with a new handle. Ask a question whose answer is a
+primitive instead (`OtherJvmGCTest`'s `Holder.isCleared()`). Probing with
+`toObj()` left the test dependent on an incidental GC landing between a release
+and the next probe, and it failed at random (#22).
 
 ## Testing
 
