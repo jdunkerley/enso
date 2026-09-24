@@ -124,10 +124,11 @@ object Dependencies {
   val akkaVersion               = "2.6.20"  // See Note [Akka Is Frozen]
   val akkaHTTPVersion           = "10.2.10" // See Note [Akka Is Frozen]
   val akkaMockSchedulerVersion  = "0.5.5"
-  val reactiveStreamsVersion    = "1.0.3"
-  val sprayJsonVersion          = "1.3.6"
-  val logbackClassicVersion     = "1.3.7"
-  val javaDiffVersion           = "4.12"
+  // Held at 1.0.3: 1.0.4 relicensed reactive-streams from CC0 to MIT-0.
+  val reactiveStreamsVersion = "1.0.3"
+  val sprayJsonVersion       = "1.3.6"
+  val logbackClassicVersion  = "1.3.7"
+  val javaDiffVersion        = "4.17"
   val logbackPkg = Seq(
     "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
     "ch.qos.logback" % "logback-core"    % logbackClassicVersion
@@ -147,27 +148,70 @@ object Dependencies {
 
   // === Cats ===================================================================
 
-  val catsVersion       = "2.10.0"
-  val jawnParserVersion = "1.5.1"
+  val catsVersion = "2.13.0"
+  // Not a direct dependency: pinned to what `circe-jawn` resolves, because the
+  // JPMS wrappers in build.sbt look the jar up by exact version.
+  val jawnParserVersion = "1.6.0"
 
   // === Circe ==================================================================
 
-  val circeVersion              = "0.14.7"
-  val circeGenericExtrasVersion = "0.14.3"
+  /* Note [Scala Libraries Capped By scala-library]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Scala 2.13 is only backwards binary compatible, so sbt (SIP-51) refuses to
+   * resolve a library that was built against a newer scala-library than
+   * `scalacVersion`. Several libraries below are therefore held at the newest
+   * release built against scala-library <= `scalacVersion`, not their latest.
+   * Bumping `scalacVersion` lifts the cap; re-check these when it moves:
+   * circe (0.14.16 needs 2.13.18), jawn-parser (1.7.0), pureconfig (0.17.10),
+   * jsoniter-scala (2.38.5+), scalacheck (1.20.0), decline (2.6.1+),
+   * diffson (4.7.0+), zio (2.1.24+).
+   */
+  val circeVersion              = "0.14.15"
+  val circeGenericExtrasVersion = "0.14.4"
   val circe = Seq("circe-core", "circe-generic", "circe-parser")
     .map("io.circe" %% _ % circeVersion)
   val snakeyamlVersion = "2.3"
 
   // === Commons ================================================================
 
+  /* Note [Apache Commons On The Module Path]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The engine runs on the module path. Newer Apache Commons releases replace
+   * their automatic module with a real `module-info`, which is not a drop-in
+   * change here, so commons-lang3, commons-io, commons-compress and commons-cli
+   * are each held on their last automatic-module release:
+   * - commons-lang3 3.14.0+ and commons-compress 1.24.0+ `requires java.desktop`,
+   *   which the engine deliberately stays off (see the POI and JNA copies in
+   *   `lib/java`).
+   * - commons-io 2.14.0+ only requires `java.base`, but as an explicit module
+   *   it is no longer readable by modules that use it without
+   *   `requires org.apache.commons.io`. Scala sources compile anyway (scalac
+   *   does not check module readability) and then fail at run time:
+   *   `org.enso.distribution` does exactly this (`IllegalAccessError` in
+   *   `LibraryUploadTest`).
+   * - commons-cli 1.6.0+ renames the module from `commons.cli` to
+   *   `org.apache.commons.cli`, which `engine-runner`, `engine-runner-common`
+   *   and `language-server` require by the old name.
+   * commons-compress is not a drop-in bump even past that: 1.25.0 made
+   * `ArchiveInputStream` generic (breaks `lib/scala/downloader`), and 1.26.0+
+   * add commons-io, commons-lang3 and commons-codec as runtime dependencies.
+   * 1.26.0 fixes CVE-2024-25710 and CVE-2024-26308, so that move is worth doing
+   * as its own change.
+   */
+  // commons-lang3, commons-io, commons-compress and commons-cli are held:
+  // see Note [Apache Commons On The Module Path].
   val commonsCollectionsVersion = "4.4"
-  val commonsLangVersion        = "3.12.0"
-  val commonsIoVersion          = "2.12.0"
-  val commonsTextVersion        = "1.10.0"
+  val commonsLangVersion        = "3.13.0"
+  val commonsIoVersion          = "2.13.0"
+  val commonsTextVersion        = "1.15.0"
   val commonsMathVersion        = "3.6.1"
   val commonsCompressVersion    = "1.23.0"
-  val commonsEmailVersion       = "1.5"
-  val commonsCliVersion         = "1.5.0"
+  // Held at 1.5: 1.6.0 swaps its mail implementation from
+  // `com.sun.mail:javax.mail` to `com.sun.mail:jakarta.mail`, a different
+  // artifact under a different licence, so it needs a legal review of its own
+  // rather than a version bump.
+  val commonsEmailVersion = "1.5"
+  val commonsCliVersion   = "1.5.0"
   val commons = Seq(
     "org.apache.commons" % "commons-collections4" % commonsCollectionsVersion,
     "org.apache.commons" % "commons-lang3"        % commonsLangVersion,
@@ -232,16 +276,16 @@ object Dependencies {
 
   // === JAXB ================================================================
 
-  val jaxbVersion = "4.0.0"
+  val jaxbVersion = "4.0.5"
   val jaxb = Seq(
     "jakarta.xml.bind" % "jakarta.xml.bind-api" % jaxbVersion % Benchmark,
     "com.sun.xml.bind" % "jaxb-impl"            % jaxbVersion % Benchmark
   )
-  val jaActivationVersion = "2.1.0"
+  val jaActivationVersion = "2.1.4"
 
   // === JMH ====================================================================
 
-  val jmhVersion = "1.36"
+  val jmhVersion = "1.37"
   val jmh = Seq(
     "org.openjdk.jmh" % "jmh-core"                 % jmhVersion % Benchmark,
     "org.openjdk.jmh" % "jmh-generator-annprocess" % jmhVersion % Benchmark
@@ -255,16 +299,24 @@ object Dependencies {
     "org.scala-lang" % "scala-library" % scalacVersion
   )
   val scalaParserCombinatorsVersion = "1.1.2"
-  val scalaJavaCompatVersion        = "1.0.0"
-  val scalaCollectionCompatVersion  = "2.8.1"
+  // Held: this is Akka's own dependency (1.0.0), and Akka is frozen - see
+  // Note [Akka Is Frozen].
+  val scalaJavaCompatVersion       = "1.0.0"
+  val scalaCollectionCompatVersion = "2.14.0"
 
   // === std-lib ================================================================
 
   // Has to match Truffle's ANTLR dependency version to avoid spurious warnings in Native Image
-  val antlrVersion            = "4.12.0"
-  val awsJavaSdkV1Version     = "1.12.480"
-  val awsJavaSdkV2Version     = "2.25.40"
-  val icuVersion              = "73.1"
+  val antlrVersion        = "4.12.0"
+  val awsJavaSdkV1Version = "1.12.480"
+  val awsJavaSdkV2Version = "2.25.40"
+  // Held on the 73.x line: ICU 74 relicensed icu4j from the ICU licence to
+  // Unicode-3.0, so moving past it is a legal review, not a version bump.
+  val icuVersion = "73.2"
+  // Held, together with `xmlbeansVersion`: `lib/java/poi-wrapper` shadows five
+  // POI classes with modified copies of their 5.2.3 sources (to avoid a
+  // dependency on `java.desktop`). A newer POI needs those copies re-derived
+  // from its own sources first, otherwise old code runs against new internals.
   val poiOoxmlVersion         = "5.2.3"
   val redshiftVersion         = "2.2.2"
   val univocityParsersVersion = "2.9.1"
@@ -273,9 +325,22 @@ object Dependencies {
 
   // === ZIO ====================================================================
 
-  val zioVersion             = "2.0.14"
-  val zioInteropCatsVersion  = "23.0.0.6"
-  val zioIzumiReflectVersion = "2.3.8"
+  /* Note [ZIO Is Held On 2.0.x]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * ZIO 2.1 is not a drop-in bump here. It pulls in `scala-collection-compat`
+   * and izumi-reflect 3, and zio-interop-cats 23.0.0.7+ adds
+   * `zio-interop-tracer`. `zio-wrapper` assembles all of ZIO's transitive
+   * dependencies into one JPMS module with a hand-written `module-info.java`,
+   * and `engine-runner` depends on `scala-collection-compat` directly, so the
+   * move needs its own module-layout and native-image verification.
+   *
+   * `zioIzumiReflectVersion` must stay equal to the izumi-reflect that
+   * `zioVersion` itself depends on: `zio-wrapper` bundles this version, while
+   * the engine's legal review sees the one ZIO resolves.
+   */
+  val zioVersion             = "2.0.22"   // See Note [ZIO Is Held On 2.0.x]
+  val zioInteropCatsVersion  = "23.0.0.6" // See Note [ZIO Is Held On 2.0.x]
+  val zioIzumiReflectVersion = "2.3.8"    // See Note [ZIO Is Held On 2.0.x]
   val zio = Seq(
     "dev.zio" %% "zio"              % zioVersion,
     "dev.zio" %% "zio-interop-cats" % zioInteropCatsVersion
@@ -302,14 +367,27 @@ object Dependencies {
   ) ++ jlineNative
 
   // === Google =================================================================
-  val googleApiClientVersion         = "2.7.1"
-  val googleApiServicesSheetsVersion = "v4-rev20250106-2.0.0"
+
+  /* Note [Google Libraries Move With gRPC]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `std-google`'s libraries share one gax / google-http-client / gRPC /
+   * protobuf tree, so they cannot move independently of `grpcVersion` and
+   * `googleProtobufVersion`:
+   * - google-analytics-admin 0.69.0+ and -data 0.70.0+ need a newer gRPC than
+   *   `grpcVersion`, and admin 0.93.0+ / data 0.94.0+ need protobuf 4.
+   * - google-api-client 2.8.0+ moves google-http-client to 2.x, while the
+   *   analytics libraries' gax still expects 1.x.
+   * The sheets client and google-api-client 2.7.2 stay on google-http-client
+   * 1.x, so they are current; the rest waits for the gRPC/protobuf upgrade.
+   */
+  val googleApiClientVersion         = "2.7.2"
+  val googleApiServicesSheetsVersion = "v4-rev20260610-2.0.0"
   val googleAnalyticsAdminVersion    = "0.66.0"
   val googleAnalyticsDataVersion     = "0.67.0"
   val grpcVersion                    = "1.69.0"
 
   // === SLF4J ==================================================================
-  val slf4jVersion = "2.0.16"
+  val slf4jVersion = "2.0.20"
   val slf4jApi = Seq(
     "org.slf4j" % "slf4j-api" % slf4jVersion
   )
@@ -318,48 +396,64 @@ object Dependencies {
 
   // === Other ==================================================================
 
-  val declineVersion             = "2.4.1"
-  val diffsonVersion             = "4.4.0"
-  val directoryWatcherVersion    = "0.18.0"
-  val flatbuffersVersion         = "24.3.25"
-  val guavaVersion               = "32.0.0-jre"
-  val jgitVersion                = "6.7.0.202309050840-r"
-  val kindProjectorVersion       = "0.13.3"
-  val mockitoScalaVersion        = "1.17.14"
-  val mockitoJavaVersion         = "5.20.0"
-  val newtypeVersion             = "0.4.4"
-  val pprintVersion              = "0.8.1"
-  val pureconfigVersion          = "0.17.4"
-  val scalacheckVersion          = "1.18.1"
-  val scalacticVersion           = "3.2.19"
-  val scalaLoggingVersion        = "3.9.4"
-  val scalameterVersion          = "0.19"
-  val scalatestVersion           = "3.2.19"
-  val sqliteVersion              = "3.46.1.0"
-  val tikaVersion                = "2.4.1"
-  val typesafeConfigVersion      = "1.4.2"
-  val junitVersion               = "4.13.2"
-  val junitIfVersion             = "0.13.2"
-  val hamcrestVersion            = "1.3"
-  val netbeansApiVersion         = "RELEASE180"
-  val opencvVersion              = "4.7.0-0"
-  val fansiVersion               = "0.4.0"
-  val httpComponentsVersion      = "4.4.1"
-  val apacheArrowVersion         = "14.0.1"
-  val `snowflakeJDBCVersion`     = "4.0.1"
-  val mssqlserverJDBCVersion     = "13.2.1.jre11"
-  val azureIdentityVersion       = "1.16.1"
-  val azureResourceVersion       = "2.50.0"
-  val azureBlobStorageVersion    = "12.30.0"
-  val jsoniterVersion            = "2.28.5"
+  // decline, diffson, pureconfig, scalacheck and jsoniter-scala below:
+  // see Note [Scala Libraries Capped By scala-library].
+  val declineVersion          = "2.6.0"
+  val diffsonVersion          = "4.6.1"
+  val directoryWatcherVersion = "0.18.0"
+  val flatbuffersVersion      = "24.3.25"
+  val guavaVersion            = "32.0.0-jre"
+  val jgitVersion             = "6.7.0.202309050840-r"
+  val kindProjectorVersion    = "0.13.3"
+  val mockitoScalaVersion     = "1.17.14"
+  val mockitoJavaVersion      = "5.24.0"
+  val newtypeVersion          = "0.4.4"
+  val pprintVersion           = "0.8.1"
+  val pureconfigVersion       = "0.17.9"
+  val scalacheckVersion       = "1.19.0"
+  val scalacticVersion        = "3.2.20"
+  val scalaLoggingVersion     = "3.9.6"
+  val scalameterVersion       = "0.21"
+  val scalatestVersion        = "3.2.20"
+  val sqliteVersion           = "3.46.1.0"
+  val tikaVersion             = "2.4.1"
+  val typesafeConfigVersion   = "1.4.9"
+  val junitVersion            = "4.13.2"
+  val junitIfVersion          = "0.13.3"
+  val hamcrestVersion         = "1.3"
+  val netbeansApiVersion      = "RELEASE180"
+  val opencvVersion           = "4.9.0-0"
+  val fansiVersion            = "0.5.1"
+  // httpclient and httpcore are versioned separately upstream (4.5.x / 4.4.x).
+  val httpClientVersion      = "4.5.14"
+  val httpCoreVersion        = "4.4.16"
+  val apacheArrowVersion     = "14.0.1"
+  val `snowflakeJDBCVersion` = "4.0.1"
+  val mssqlserverJDBCVersion = "13.2.1.jre11"
+  // The Azure SDK is held: its newer releases move Netty to 4.1.137 and
+  // netty-tcnative to 2.0.81, while `nettyTransportEpollVersion` and
+  // `nettyTcNativeBorringSSL` pin the native Netty wrappers `std-microsoft`
+  // ships. Azure moves together with those pins.
+  val azureIdentityVersion    = "1.16.1"
+  val azureResourceVersion    = "2.50.0"
+  val azureBlobStorageVersion = "12.30.0"
+  val jsoniterVersion         = "2.38.4"
+  // Held: `lib/java/jna-wrapper` shadows `com.sun.jna.Native` with a modified
+  // copy of its 5.14.0 source (to avoid `java.desktop`). A newer JNA needs that
+  // copy re-derived first, otherwise the old `Native` runs against newer JNA.
   val jnaVersion                 = "5.14.0"
   val googleProtobufVersion      = "3.25.1"
-  val shapelessVersion           = "2.3.10"
+  val shapelessVersion           = "2.3.13"
   val postgresVersion            = "42.4.0"
   val duckdbVersion              = "1.4.4.0"
   val h2Version                  = "2.3.232"
-  val jimFsVersion               = "1.3.0"
+  val jimFsVersion               = "1.3.2"
   val nettyTcNativeBorringSSL    = "2.0.74.Final"
   val nettyTransportEpollVersion = "4.1.118.Final"
-  val zstdVersion                = "1.5.6-5"
+  // Not free to move: must equal the zstd-jni that `snowflake-jdbc-thin`
+  // resolves. `std-snowflake` ships `zstd-jni-wrapper`'s repackaged copy at
+  // this version, while its legal review follows the version snowflake-jdbc
+  // resolves; bumping this alone ships a zstd-jni the notices do not describe.
+  // Moves with `snowflakeJDBCVersion`.
+  val zstdVersion = "1.5.6-5"
 }

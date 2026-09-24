@@ -2,8 +2,8 @@ module org.enso.zio.wrapper {
   requires scala.library;
   requires org.enso.scala.wrapper;
 
-  // dev.zio:zio_2.13:2.0.14
-  // dev.zio:zio-internal-macros_2.13:2.0.14
+  // dev.zio:zio_2.13:2.0.22
+  // dev.zio:zio-internal-macros_2.13:2.0.22
   exports zio;
   exports zio.internal;
   exports zio.internal.macros;
@@ -13,7 +13,7 @@ module org.enso.zio.wrapper {
   exports zio.metrics.jvm;
   exports zio.stm;
 
-  // dev.zio:zio-0stacktracer_2.13:2.0.14
+  // dev.zio:zio-stacktracer_2.13:2.0.22
   exports zio.internal.stacktracer;
   exports zio.stacktracer;
 

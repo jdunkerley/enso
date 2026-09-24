@@ -140,14 +140,19 @@ has silently produced a wrong result here:
 - **Verify on Linux, not only on Windows.** Several classes of bug here are
   invisible on Windows: `prettier-plugin-organize-imports` silently corrupts Vue
   SFCs only on Linux (#19), and the Playwright integration suite cannot run on
-  native Windows at all (#21). WSL is the practical route;
-  `~/.enso-toolchain.sh` sets up Node/GraalVM/sbt/Maven/Rust there. It reaches
-  the repo at `/mnt/c/...`, so **give cargo its own target directory** — sharing
-  `target/` with the Windows build means every switch re-links the whole
-  workspace, and the two hosts evict each other's artifacts:
+  native Windows at all (#21). WSL is the practical route. **Source
+  `~/.enso-toolchain.sh` first** — `~/.bashrc` returns early in non-interactive
+  shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
+  picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
+  and Node versions from the checkout (`graalMavenPackagesVersion`,
+  `.node-version`), so it needs no edit when the repo bumps them; Maven, which
+  only `tools/enso4igv` uses, is not part of it. WSL reaches the repo at
+  `/mnt/c/...`, so **give cargo its own target directory** — sharing `target/`
+  with the Windows build means every switch re-links the whole workspace, and
+  the two hosts evict each other's artifacts:
 
   ```bash
-  wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
+  wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide && export CARGO_TARGET_DIR=$HOME/enso-target && cargo test --workspace'
   ```
 
   `rust-toolchain.toml` is honoured there, so the pinned version installs on
@@ -191,6 +196,26 @@ has silently produced a wrong result here:
   Metals/IntelliJ), the YAML round-trip in `DistributionPackage.scala`, or any
   test actually running — `Test/compile` only proves test sources build. Say
   which of these a change did _not_ verify.
+- **After changing a Maven version, sbt may keep resolving the old one.** A
+  project's `update` cache is keyed on its own `libraryDependencies`, not on
+  what its `dependsOn` projects pull in, so a project that only gets a library
+  transitively can keep the previous jar (seen: `runtime-integration-tests` kept
+  `commons-io` 2.22.0 after the pin moved to 2.13.0). Delete every
+  `target/**/update_cache_*` directory before trusting a run. Also check logs
+  for `[JPMSUtils/...] Not all modules ... were found`: it is only logged, but
+  means a wrapper's exact-version lookup no longer matches resolution.
+- **A dependency that turns from an automatic module into an explicit one can
+  pass `compile` and fail at run time.** scalac does not check JPMS readability,
+  so Scala code using a library its `module-info` does not `requires` compiles
+  and then throws `IllegalAccessError` in tests. Check a bumped jar's
+  `module-info` (`requires`, and the module name) before trusting a green
+  compile; see Note [Apache Commons On The Module Path] in
+  `project/Dependencies.scala`.
+- **`std-benchmarks` does not compile without a built distribution** (its
+  annotation processor looks for `built-distribution*`), and on Windows
+  `buildEngineDistribution` fails indexing the stdlibs from a long checkout path
+  (`CreateProcess error=206`, e.g. inside `.claude/worktrees/`). Build the
+  distribution in WSL from a short path.
 - **`as unknown as` on a third-party API defeats the one check that catches an
   upstream removal.** Where a structural type names the slice of a dependency's
   API we depend on, cast with `as T`, never `as unknown as T` — the single cast

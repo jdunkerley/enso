@@ -148,10 +148,10 @@ public class NativeLibraryFinderTest {
             sb.append("  os.arch: ")
                 .append(System.getProperty("os.arch"))
                 .append(System.lineSeparator());
-            var mappedLibName = System.mapLibraryName("opencv_java470");
+            var mappedLibName = System.mapLibraryName("opencv_java490");
             sb.append("  Mapped library name: ")
                 .append(System.lineSeparator())
-                .append("      " + System.mapLibraryName("opencv_java470"))
+                .append("      " + System.mapLibraryName("opencv_java490"))
                 .append(System.lineSeparator())
                 .append("      " + System.mapLibraryName("tableauhyperapi"))
                 .append(System.lineSeparator());

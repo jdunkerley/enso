@@ -1,0 +1,7 @@
+OpenCV 4.9.0 still bundles libpng (its png_* routines are in the native
+libraries), but the libpng copyright string is no longer embedded in them,
+so the notice kept for 4.7.0-0 is carried over here:
+Copyright (c) 2018-2019 Cosmin Truta
+Copyright (c) 1998-2002,2004,2006-2018 Glenn Randers-Pehrson
+Copyright (c) 1996-1997 Andreas Dilger
+Copyright (c) 1995-1996 Guy Eric Schalnat, Group 42, Inc.
