@@ -275,7 +275,7 @@ jobs:
       - name: Install wasm-bindgen-cli
         uses: taiki-e/install-action@v2
         with:
-          tool: wasm-bindgen-cli@0.2.100
+          tool: wasm-bindgen-cli@0.2.128
       - name: Derive GUI version
         run: echo "ENSO_IDE_VERSION=$(date -u '+%Y.%-m.%-d')-dev" >> "$GITHUB_ENV"
         shell: bash

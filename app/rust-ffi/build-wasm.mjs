@@ -37,7 +37,7 @@ if (!process.env.ENSO_FORCE_WASM_BUILD && isUpToDate(stampFile, inputHash, expec
 
 // MUST match the `wasm-bindgen` crate pin in `Cargo.toml` — a mismatched CLI
 // emits bindings against an incompatible ABI and breaks the GUI build.
-const WASM_BINDGEN_VERSION = '0.2.100'
+const WASM_BINDGEN_VERSION = '0.2.128'
 const WASM_TARGET = 'wasm32-unknown-unknown'
 
 const cargoBin = join(process.env.CARGO_HOME ?? join(homedir(), '.cargo'), 'bin')

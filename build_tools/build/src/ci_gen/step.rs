@@ -203,7 +203,7 @@ pub fn install_wasm_bindgen() -> Step {
         uses: Some("taiki-e/install-action@v2".into()),
         ..default()
     }
-    .with_custom_argument("tool", "wasm-bindgen-cli@0.2.100")
+    .with_custom_argument("tool", "wasm-bindgen-cli@0.2.128")
 }
 
 /// Uploads [`WASM_ARTIFACTS_NAME`] from the current checkout.
