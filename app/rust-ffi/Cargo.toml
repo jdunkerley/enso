@@ -9,9 +9,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 enso-parser = { path = "../../lib/rust/parser" }
-# This must exactly match our `rules_rust_wasm_bindgen` toolchain; wasm-bindgen patch updates can change the version
-# number of an internal format, leading to incompatibility between some patch releases that causes GUI build to fail.
-wasm-bindgen = { version = "=0.2.100", default-features = false }
+# Exact pin: this must match the `wasm-bindgen-cli` that generates the JS bindings, or the CLI refuses
+# to process the module (wasm-bindgen patch releases can change the version of an internal format).
+# The CLI version is duplicated in `build-wasm.mjs` (`WASM_BINDGEN_VERSION`),
+# `build_tools/build/src/ci_gen/step.rs` (`install_wasm_bindgen`, which generates
+# `.github/workflows/ide-packaging.yml`) and `.github/workflows/gui-checks.yml`; move all of them together.
+wasm-bindgen = { version = "=0.2.128", default-features = false }
 serde_json = { workspace = true }
 console_error_panic_hook = { workspace = true }
 

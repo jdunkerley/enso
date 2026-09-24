@@ -6,11 +6,21 @@ JavaScript. Built as a `cdylib` + `rlib`. Output is consumed by
 
 ## Gotcha: wasm-bindgen version pinning
 
-`wasm-bindgen = "=0.2.100"` is an **exact** pin. It must match
+`wasm-bindgen = "=0.2.128"` is an **exact** pin. It must match
 `WASM_BINDGEN_VERSION` in `build-wasm.mjs` — the `wasm-bindgen` CLI that
 generates the JS bindings. Patch-release bumps can change an internal format and
 break the GUI build, so keep the two in lockstep and **never bump this with `~`
 or `^`**.
+
+CI installs the same CLI from a prebuilt binary, so the version is also written
+in `build_tools/build/src/ci_gen/step.rs` (`install_wasm_bindgen`; regenerate
+`.github/workflows/ide-packaging.yml` with `cargo run -p enso-build-ci-gen`) and
+in the hand-maintained `.github/workflows/gui-checks.yml`. `git grep` the old
+version before pushing a bump. The pin also constrains every other crate in the
+workspace that depends on `wasm-bindgen`, including wasm32-only dependencies of
+native crates (`reqwest` → `wasm-streams`), because Cargo resolves
+target-specific dependencies for all targets — a stale pin blocks unrelated
+upgrades.
 
 ## Build
 
