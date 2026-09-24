@@ -1654,13 +1654,13 @@ lazy val `json-rpc-server` = project
       "io.circe"                   %% "circe-literal"   % circeVersion,
       "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
       akkaTestkit                   % Test,
-      "org.scalatest"              %% "scalatest"       % scalatestVersion      % Test,
-      "junit"                       % "junit"           % junitVersion          % Test,
-      "com.github.sbt"              % "junit-interface" % junitIfVersion        % Test,
-      "org.apache.httpcomponents"   % "httpclient"      % httpComponentsVersion % Test,
-      "org.apache.httpcomponents"   % "httpcore"        % httpComponentsVersion % Test,
-      "commons-io"                  % "commons-io"      % commonsIoVersion      % Test,
-      "org.gnieh"                  %% "diffson-circe"   % diffsonVersion        % Test
+      "org.scalatest"              %% "scalatest"       % scalatestVersion  % Test,
+      "junit"                       % "junit"           % junitVersion      % Test,
+      "com.github.sbt"              % "junit-interface" % junitIfVersion    % Test,
+      "org.apache.httpcomponents"   % "httpclient"      % httpClientVersion % Test,
+      "org.apache.httpcomponents"   % "httpcore"        % httpCoreVersion   % Test,
+      "commons-io"                  % "commons-io"      % commonsIoVersion  % Test,
+      "org.gnieh"                  %% "diffson-circe"   % diffsonVersion    % Test
     ),
     Compile / moduleDependencies ++= slf4jApi,
     Compile / internalModuleDependencies := Seq(
@@ -6509,7 +6509,7 @@ lazy val `http-test-helper` = project
     Compile / run / mainClass := Some("org.enso.shttp.HTTPTestHelperServer"),
     libraryDependencies ++= Seq(
       "org.apache.commons"         % "commons-text"     % commonsTextVersion,
-      "org.apache.httpcomponents"  % "httpclient"       % httpComponentsVersion,
+      "org.apache.httpcomponents"  % "httpclient"       % httpClientVersion,
       "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion
     ),
     assembly / assemblyMergeStrategy := {

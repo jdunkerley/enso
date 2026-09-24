@@ -594,7 +594,8 @@ object DistributionPackage {
     if (!runnerJar.exists()) {
       throw new IllegalStateException("Cannot find " + runnerJar)
     }
-    val slf4jJar = root / "component" / "slf4j-api-2.0.16.jar"
+    val slf4jJar =
+      root / "component" / s"slf4j-api-${Dependencies.slf4jVersion}.jar"
     if (!slf4jJar.exists()) {
       throw new IllegalStateException("Cannot find " + slf4jJar)
     }
