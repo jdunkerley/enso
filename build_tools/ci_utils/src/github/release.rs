@@ -93,6 +93,36 @@ pub trait IsRelease: Debug {
     fn octocrab(&self) -> &Octocrab;
 }
 
+/// Stream a release asset to `upload_url` through `octocrab`, returning the checked response.
+///
+/// Octocrab's own `upload_asset` needs the whole body in memory, and ours are installers. Sending
+/// the streamed request through the same client keeps whatever authentication it was configured
+/// with.
+fn post_asset(
+    octocrab: Octocrab,
+    upload_url: &str,
+    asset_name: &str,
+    content_type: Mime,
+    content_length: u64,
+    body: Body,
+) -> BoxFuture<'static, Result<reqwest::Response>> {
+    let request = Url::parse_with_params(upload_url, [("name", asset_name)])
+        .map_err(anyhow::Error::from)
+        .and_then(|url| {
+            Ok(http::Request::post(url.as_str())
+                .header(http::header::ACCEPT, "application/vnd.github.v3+json")
+                .header(http::header::CONTENT_TYPE, content_type.to_string())
+                .header(http::header::CONTENT_LENGTH, content_length)
+                .body(octocrab::OctoBody::new(body))?)
+        });
+    async move {
+        let response = octocrab.execute(request?).await?;
+        crate::io::web::handle_error_response(reqwest::Response::from(response.map(Body::wrap)))
+            .await
+    }
+    .boxed()
+}
+
 /// Information about release that we can provide from the [`IsRelease`] trait.
 #[async_trait]
 pub trait IsReleaseExt: IsRelease + Sync {
@@ -110,21 +140,17 @@ pub trait IsReleaseExt: IsRelease + Sync {
             repo = self.repo(),
             release_id = self.id(),
         );
-        let body = body.into();
-        // Octocrab's own `upload_asset` needs the whole body in memory; ours are installers.
-        let request = crate::github::api_client().map(|client| {
-            client
-                .post(&upload_url)
-                .query(&[("name", &asset_name)])
-                .header(reqwest::header::ACCEPT, "application/vnd.github.v3+json")
-                .header(reqwest::header::CONTENT_TYPE, content_type.to_string())
-                .header(reqwest::header::CONTENT_LENGTH, content_length)
-                .body(body)
-        });
-
+        let response = post_asset(
+            self.octocrab().clone(),
+            &upload_url,
+            &asset_name,
+            content_type.clone(),
+            content_length,
+            body.into(),
+        );
         async move {
             ensure!(content_length > 0, "Release asset file cannot be empty.");
-            crate::io::web::execute(request?)
+            response
                 .await?
                 .json()
                 .await
@@ -343,5 +369,57 @@ mod tests {
         // debug!("{}", response.text().await?);
         response.error_for_status()?;
         Ok(())
+    }
+
+    /// Upload a streamed body to a mock server standing in for `uploads.github.com`.
+    async fn upload_against(status: u16, content: &[u8]) -> Result<reqwest::Response> {
+        use wiremock::Mock;
+        use wiremock::MockServer;
+        use wiremock::ResponseTemplate;
+        use wiremock::matchers::body_bytes;
+        use wiremock::matchers::header;
+        use wiremock::matchers::method;
+        use wiremock::matchers::path;
+        use wiremock::matchers::query_param;
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/repos/enso-org/enso/releases/1/assets"))
+            .and(query_param("name", "enso.exe"))
+            .and(header("authorization", "Bearer secret"))
+            .and(header("content-length", content.len().to_string().as_str()))
+            .and(body_bytes(content.to_vec()))
+            .respond_with(ResponseTemplate::new(status).set_body_string(r#"{"message":"Nope"}"#))
+            .expect(1)
+            .mount(&server)
+            .await;
+        // Deliberately not the token in the environment: the upload must use the client's own.
+        // Octocrab only attaches it for its API and upload hosts (by default `api.github.com` and
+        // `uploads.github.com`), so the mock stands in as the upload host.
+        let octocrab = Octocrab::builder()
+            .upload_uri(server.uri())?
+            .personal_token("secret".to_string())
+            .build()?;
+        let url = format!("{}/repos/enso-org/enso/releases/1/assets", server.uri());
+        let chunks: Vec<std::io::Result<Bytes>> =
+            content.chunks(4).map(|chunk| Ok(Bytes::copy_from_slice(chunk))).collect();
+        let body = Body::wrap_stream(futures::stream::iter(chunks));
+        let length = content.len() as u64;
+        post_asset(octocrab, &url, "enso.exe", mime::APPLICATION_OCTET_STREAM, length, body).await
+    }
+
+    #[tokio::test]
+    async fn asset_upload_streams_with_the_clients_authentication() -> Result {
+        let response = upload_against(201, b"installer bytes").await?;
+        assert_eq!(response.status(), 201);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn failed_asset_upload_is_an_error() {
+        let error = upload_against(422, b"installer bytes").await.expect_err("Upload should fail.");
+        let message = format!("{error:#}");
+        assert!(message.contains("422"), "{message}");
+        assert!(message.contains("Nope"), "{message}");
     }
 }

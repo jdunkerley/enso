@@ -21,7 +21,7 @@ pub use repo::RepoRef;
 /// Maximum number of items per page in the GitHub API.
 const MAX_PER_PAGE: u8 = 100;
 
-/// Root of the GitHub REST API, for requests made without octocrab. See [`api_client`].
+/// Root of the GitHub REST API, for building absolute request URLs ourselves.
 pub static API_URL: LazyLock<Url> =
     LazyLock::new(|| Url::parse("https://api.github.com/").expect("The API URL is valid."));
 
@@ -207,16 +207,4 @@ pub fn create_client(pat: impl AsRef<str>) -> Result<reqwest::Client> {
         .user_agent(crate::USER_AGENT)
         .default_headers(header_map)
         .build()?)
-}
-
-/// HTTP client for the GitHub requests that octocrab cannot make for us.
-///
-/// Octocrab only takes request bodies in memory and does not expose its HTTP client, so streaming
-/// release-asset uploads and downloads go through this client instead. It authenticates with the
-/// same token [`setup_octocrab`] uses, if there is one, and is anonymous otherwise.
-pub fn api_client() -> Result<reqwest::Client> {
-    match retrieve_github_access_token() {
-        Ok(token) => create_client(token),
-        Err(_) => Ok(crate::io::web::client::builder().user_agent(crate::USER_AGENT).build()?),
-    }
 }

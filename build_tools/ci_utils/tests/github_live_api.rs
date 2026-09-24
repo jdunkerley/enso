@@ -133,8 +133,16 @@ async fn workflow_artifact_is_found_and_downloaded() -> Result {
         println!("Skipping: artifact downloads need GITHUB_TOKEN.");
         return Ok(());
     }
-    let run_id = std::env::var("ENSO_LIVE_TEST_RUN_ID").unwrap_or("31007732004".into());
-    let name = std::env::var("ENSO_LIVE_TEST_ARTIFACT").unwrap_or("Edition File".into());
+    // No default: workflow artifacts expire, so any hard-coded run would eventually fail here
+    // rather than skip.
+    let (Ok(run_id), Ok(name)) =
+        (std::env::var("ENSO_LIVE_TEST_RUN_ID"), std::env::var("ENSO_LIVE_TEST_ARTIFACT"))
+    else {
+        println!(
+            "Skipping: set ENSO_LIVE_TEST_RUN_ID and ENSO_LIVE_TEST_ARTIFACT to a current run."
+        );
+        return Ok(());
+    };
     let run_id = octocrab::models::RunId(run_id.parse()?);
 
     let octocrab = setup_octocrab().await?;

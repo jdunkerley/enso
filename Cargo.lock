@@ -2519,6 +2519,7 @@ dependencies = [
  "futures",
  "futures-util",
  "glob",
+ "http 1.5.0",
  "http-serde",
  "indicatif",
  "itertools",

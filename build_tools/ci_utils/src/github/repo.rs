@@ -3,6 +3,7 @@
 use crate::prelude::*;
 
 use crate::cache::download::DownloadFile;
+use crate::cache::download::Fetcher;
 use crate::github;
 use crate::github::MAX_PER_PAGE;
 use crate::github::model;
@@ -346,7 +347,7 @@ impl<R: IsRepo> Handle<R> {
         let path = format!("repos/{}/{}/releases/assets/{asset_id}", self.owner(), self.name());
         let url = github::API_URL.join(&path)?;
         Ok(DownloadFile {
-            client: github::api_client()?,
+            fetcher: Fetcher::GitHub(self.octocrab.clone()),
             key: crate::cache::download::Key {
                 url,
                 additional_headers: HeaderMap::from_iter([(
