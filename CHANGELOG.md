@@ -48,6 +48,10 @@
 - [Rebuilding the engine no longer fails, or ships a corrupted archive, when
   Standard.Image is re-indexed][56]. The library's source archive used to pack
   the previous copy of itself.
+- [The Rust-to-WebAssembly bindings used for the parser have been updated
+  (wasm-bindgen 0.2.128), and the build tooling's HTTP client with them (reqwest
+  0.13.5)][57]. No behaviour changes: the parser behaves the same in the IDE,
+  and downloads use the same TLS setup as before.
 - [Building the engine on Windows no longer fails from a deeply nested
   checkout][54]. Indexing the standard libraries passed so many file paths to
   Java that the command line exceeded Windows' length limit. A build that fails
@@ -97,6 +101,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [56]: https://github.com/jdunkerley/enso/pull/56
+[57]: https://github.com/jdunkerley/enso/pull/57
 [54]: https://github.com/jdunkerley/enso/pull/54
 [53]: https://github.com/jdunkerley/enso/pull/53
 [52]: https://github.com/jdunkerley/enso/pull/52
