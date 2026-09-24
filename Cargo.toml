@@ -41,15 +41,15 @@ clap = { version = "4.6.7", features = [
 derive-where = "1.7.0"
 dirs = { version = "7.0.0" }
 flate2 = { version = "1.1.10" }
-indicatif = { version = "0.17.7", features = ["tokio"] }
+indicatif = { version = "0.18.6", features = ["tokio"] }
 mime = "0.3.17"
 new_mime_guess = "4.0.4"
-multimap = { version = "0.9.1" }
+multimap = { version = "0.10.1" }
 native-windows-gui = { version = "1.0.13" }
 octocrab = { git = "https://github.com/enso-org/octocrab", default-features = false, features = [
 	"rustls",
 ] }
-path-absolutize = "3.1.1"
+path-absolutize = "4.0.1"
 portpicker = { version = "0.1.1" }
 regex = { version = "1.13.1" }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
@@ -58,7 +58,7 @@ serde = { version = "1.0.229", features = ["derive", "rc"] }
 # so the existing `serde_yaml::` paths keep working; the package being pulled is what this line
 # says, not the alias.
 serde_yaml = { package = "serde_norway", version = "0.9.42" }
-sha2 = { version = "0.10.8" }
+sha2 = { version = "0.11.0" }
 sysinfo = { version = "0.39.6" }
 tar = { version = "0.4.46" }
 # Note [Held Back By The octocrab Fork]
@@ -109,11 +109,10 @@ futures = { version = "0.3.34", default-features = false, features = [
 	"executor",
 ] }
 futures-util = { version = "0.3.34", default-features = false }
-itertools = { version = "0.12.1" }
+itertools = { version = "0.15.0" }
 lazy_static = { version = "1.5.0" }
 serde_json = { version = "1.0.151", features = ["raw_value"] }
-owned_ttf_parser = { version = "0.15.1" }
-convert_case = { version = "0.6.0" }
+convert_case = { version = "0.12.0" }
 # Held at 1.1 — see Note [Held Back By The octocrab Fork] above.
 bytes = { version = "1.1.0" }
 console_error_panic_hook = { version = "0.1.7" }

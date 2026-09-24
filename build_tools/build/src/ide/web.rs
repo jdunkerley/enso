@@ -104,9 +104,17 @@ pub fn unpacked_dir(output_path: impl AsRef<Path>, os: OS, arch: Arch) -> PathBu
 pub fn store_sha256_checksum(file: impl AsRef<Path>, checksum_file: impl AsRef<Path>) -> Result {
     let mut hasher = sha2::Sha256::new();
     let mut file = ide_ci::fs::open(&file)?;
-    std::io::copy(&mut file, &mut hasher)?;
-    let hash = hasher.finalize();
-    ide_ci::fs::write(&checksum_file, format!("{hash:x}"))?;
+    // `sha2` 0.11 dropped its `io::Write` impl, so stream the file by hand.
+    let mut buffer = vec![0; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    let hash: String = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect();
+    ide_ci::fs::write(&checksum_file, hash)?;
     Ok(())
 }
 
@@ -280,6 +288,32 @@ impl IdeDesktop {
             };
             enso_install_config::bundler::bundle(config).await?;
             store_sha256_checksum(&ide_artifacts.image, &ide_artifacts.image_checksum)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// FIPS 180-2 test vectors. The million-byte input spans several reads of the buffer.
+    #[test]
+    fn sha256_checksum_matches_known_vectors() -> Result {
+        let dir = tempfile::tempdir()?;
+        let cases = [
+            (b"abc".to_vec(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+            (
+                vec![b'a'; 1_000_000],
+                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+            ),
+        ];
+        for (input, expected) in cases {
+            let file = dir.path().join("input");
+            let checksum = dir.path().join("checksum");
+            ide_ci::fs::write(&file, &input)?;
+            store_sha256_checksum(&file, &checksum)?;
+            assert_eq!(ide_ci::fs::read_to_string(&checksum)?, expected);
         }
         Ok(())
     }
