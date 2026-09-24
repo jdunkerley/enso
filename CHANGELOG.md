@@ -60,6 +60,11 @@
   explaining why. The third-party notices shipped with the engine, launcher and
   standard libraries have been brought up to date, including the Scala 2.13.17
   notices.
+- [The build tooling now uses the maintained GitHub API client][51]. It no
+  longer depends on an unmaintained fork, which had been holding back the async
+  runtime and HTTP libraries; those have been updated too. No behaviour changes:
+  downloads, release uploads and workflow dispatches work as before, over the
+  same TLS setup, and a failed workflow dispatch is still reported as an error.
 - [Fixed an intermittently failing JVM interop garbage-collection test][50]. It
   only passed when an unrelated collection happened to run at the right moment,
   so it failed at random on CI. No product code changed.
@@ -91,6 +96,7 @@
 [54]: https://github.com/jdunkerley/enso/pull/54
 [53]: https://github.com/jdunkerley/enso/pull/53
 [52]: https://github.com/jdunkerley/enso/pull/52
+[51]: https://github.com/jdunkerley/enso/pull/51
 [50]: https://github.com/jdunkerley/enso/pull/50
 [49]: https://github.com/jdunkerley/enso/pull/49
 [48]: https://github.com/jdunkerley/enso/pull/48
