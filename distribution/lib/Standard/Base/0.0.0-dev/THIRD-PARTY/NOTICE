@@ -18,7 +18,7 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'icu4j', licensed under the Unicode/ICU License, is distributed with the Base.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `com.ibm.icu.icu4j-73.1`.
+Copyright notices related to this dependency can be found in the directory `com.ibm.icu.icu4j-73.2`.
 
 
 'polyglot', licensed under the Universal Permissive License, Version 1.0, is distributed with the Base.
@@ -36,7 +36,7 @@ The license file can be found at `licenses/Universal_Permissive_License__Version
 Copyright notices related to this dependency can be found in the directory `org.graalvm.sdk.word-25.0.1`.
 
 
-'slf4j-api', licensed under the MIT License, is distributed with the Base.
+'slf4j-api', licensed under the MIT, is distributed with the Base.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.slf4j.slf4j-api-2.0.16`.
+Copyright notices related to this dependency can be found in the directory `org.slf4j.slf4j-api-2.0.20`.
 

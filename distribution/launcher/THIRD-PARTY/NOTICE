@@ -28,17 +28,17 @@ Copyright notices related to this dependency can be found in the directory `ch.q
 
 'shapeless_2.13', licensed under the Apache 2, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.chuusai.shapeless_2.13-2.3.10`.
+Copyright notices related to this dependency can be found in the directory `com.chuusai.shapeless_2.13-2.3.13`.
 
 
 'jsoniter-scala-core_2.13', licensed under the MIT License, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `com.github.plokhotnyuk.jsoniter-scala.jsoniter-scala-core_2.13-2.28.5`.
+Copyright notices related to this dependency can be found in the directory `com.github.plokhotnyuk.jsoniter-scala.jsoniter-scala-core_2.13-2.38.4`.
 
 
 'jsoniter-scala-macros_2.13', licensed under the MIT License, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `com.github.plokhotnyuk.jsoniter-scala.jsoniter-scala-macros_2.13-2.28.5`.
+Copyright notices related to this dependency can be found in the directory `com.github.plokhotnyuk.jsoniter-scala.jsoniter-scala-macros_2.13-2.38.4`.
 
 
 'akka-actor_2.13', licensed under the Apache-2.0, is distributed with the launcher.
@@ -53,42 +53,42 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'config', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.typesafe.config-1.4.2`.
+Copyright notices related to this dependency can be found in the directory `com.typesafe.config-1.4.9`.
 
 
 'scala-logging_2.13', licensed under the Apache 2.0 License, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.typesafe.scala-logging.scala-logging_2.13-3.9.4`.
+Copyright notices related to this dependency can be found in the directory `com.typesafe.scala-logging.scala-logging_2.13-3.9.6`.
 
 
 'commons-io', licensed under the Apache-2.0, is distributed with the launcher.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `commons-io.commons-io-2.12.0`.
+Copyright notices related to this dependency can be found in the directory `commons-io.commons-io-2.13.0`.
 
 
 'circe-core_2.13', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.circe.circe-core_2.13-0.14.7`.
+Copyright notices related to this dependency can be found in the directory `io.circe.circe-core_2.13-0.14.15`.
 
 
 'circe-generic_2.13', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.circe.circe-generic_2.13-0.14.7`.
+Copyright notices related to this dependency can be found in the directory `io.circe.circe-generic_2.13-0.14.15`.
 
 
 'circe-jawn_2.13', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.circe.circe-jawn_2.13-0.14.7`.
+Copyright notices related to this dependency can be found in the directory `io.circe.circe-jawn_2.13-0.14.15`.
 
 
 'circe-numbers_2.13', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.circe.circe-numbers_2.13-0.14.7`.
+Copyright notices related to this dependency can be found in the directory `io.circe.circe-numbers_2.13-0.14.15`.
 
 
 'circe-parser_2.13', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.circe.circe-parser_2.13-0.14.7`.
+Copyright notices related to this dependency can be found in the directory `io.circe.circe-parser_2.13-0.14.15`.
 
 
 'commons-compress', licensed under the Apache-2.0, is distributed with the launcher.
@@ -108,32 +108,32 @@ Copyright notices related to this dependency can be found in the directory `org.
 
 'scala-library', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `org.scala-lang.scala-library-2.13.15`.
+Copyright notices related to this dependency can be found in the directory `org.scala-lang.scala-library-2.13.17`.
 
 
 'scala-reflect', licensed under the Apache-2.0, is distributed with the launcher.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `org.scala-lang.scala-reflect-2.13.15`.
+Copyright notices related to this dependency can be found in the directory `org.scala-lang.scala-reflect-2.13.17`.
 
 
-'slf4j-api', licensed under the MIT License, is distributed with the launcher.
+'slf4j-api', licensed under the MIT, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.slf4j.slf4j-api-2.0.16`.
+Copyright notices related to this dependency can be found in the directory `org.slf4j.slf4j-api-2.0.20`.
 
 
 'cats-core_2.13', licensed under the MIT, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.typelevel.cats-core_2.13-2.10.0`.
+Copyright notices related to this dependency can be found in the directory `org.typelevel.cats-core_2.13-2.13.0`.
 
 
 'cats-kernel_2.13', licensed under the MIT, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.typelevel.cats-kernel_2.13-2.10.0`.
+Copyright notices related to this dependency can be found in the directory `org.typelevel.cats-kernel_2.13-2.13.0`.
 
 
 'jawn-parser_2.13', licensed under the MIT, is distributed with the launcher.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.typelevel.jawn-parser_2.13-1.5.1`.
+Copyright notices related to this dependency can be found in the directory `org.typelevel.jawn-parser_2.13-1.6.0`.
 
 
 'snakeyaml', licensed under the Apache License, Version 2.0, is distributed with the launcher.
