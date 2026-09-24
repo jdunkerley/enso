@@ -48,6 +48,14 @@
 - [The developer documentation is no longer published from this repository][53].
   Its workflow could only publish to the upstream project's site, so every run
   failed.
+- [Routine library updates for the engine][52]: circe, cats, ZIO 2.0.22,
+  Typesafe Config, SLF4J, OpenCV 4.9 and around twenty smaller libraries, within
+  their current release lines. No behaviour changes. Libraries whose newer
+  releases change licence, JPMS module layout or API (Apache Commons, ICU, POI,
+  JNA, the Azure and Google Analytics SDKs) are held, each with a note
+  explaining why. The third-party notices shipped with the engine, launcher and
+  standard libraries have been brought up to date, including the Scala 2.13.17
+  notices.
 - [Fixed an intermittently failing JVM interop garbage-collection test][50]. It
   only passed when an unrelated collection happened to run at the right moment,
   so it failed at random on CI. No product code changed.
@@ -77,6 +85,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [53]: https://github.com/jdunkerley/enso/pull/53
+[52]: https://github.com/jdunkerley/enso/pull/52
 [50]: https://github.com/jdunkerley/enso/pull/50
 [49]: https://github.com/jdunkerley/enso/pull/49
 [48]: https://github.com/jdunkerley/enso/pull/48
