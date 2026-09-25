@@ -254,7 +254,11 @@ warning is new and should be fixed rather than ignored:
   example a `provided` library shipped through a JAR wrapper that should be a
   component too). If the component really ships nothing third-party, or ships
   only unmanaged files described by `files-add`, list it with the reason in the
-  distribution's `components-without-dependencies` file.
+  distribution's `components-without-dependencies` file. The list is checked
+  both ways: a listed component that does resolve third-party modules, or a
+  listed name that is not a component of the distribution, is an error. The list
+  is also part of `report-state`'s input hash, so re-run `gatherLicenses` after
+  editing it.
 
 #### Updating Dependencies
 

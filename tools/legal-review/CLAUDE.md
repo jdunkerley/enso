@@ -20,8 +20,11 @@ Review configuration for the third-party notices shipped with each distribution
   lines for sbt projects of the distribution that legitimately resolve no
   third-party module (`std-generic-jdbc`; `std-tableau`, whose Hyper API jar is
   an unmanaged download described by `files-add`; `std-duckdb`, which ships its
-  driver through `duckdb-wrapper`). An unlisted empty component is a warning,
-  and so is a listed one that is not empty.
+  driver through `duckdb-wrapper`). An unlisted empty component is a warning. A
+  listed component that is not empty, or a listed name that is not a component
+  of the distribution, is an error, so `verifyLicensePackages` fails until the
+  list is fixed. The list is part of `report-state`'s input hash: editing it
+  means re-running `gatherLicenses`.
 
 ## Bumping a dependency
 

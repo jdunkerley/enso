@@ -107,9 +107,12 @@ object SbtLicenses {
             s"as expected: $reason"
           )
           Seq()
+        // A stale list entry is a wrong review configuration, not a noisy
+        // dependency, so it is an error: `report-state` counts only errors,
+        // and a warning would let `verifyLicensePackages` pass with it.
         case Some(_) =>
           Seq(
-            Diagnostic.Warning(
+            Diagnostic.Error(
               s"Component ${component.name} is listed as having no " +
               s"third-party dependencies, but it has " +
               s"${thirdParty.map(_.module).mkString(", ")}. Remove it from " +
@@ -128,11 +131,12 @@ object SbtLicenses {
 
     // An entry for a component that is no longer part of the distribution
     // (renamed or removed) is never visited above, so check for it separately.
+    // An error for the same reason as a listed component with dependencies.
     val componentNames = components.map(_.name).toSet
-    val unknownEntryWarnings = for {
+    val unknownEntryErrors = for {
       name <- expectedEmptyComponents.keys.toSeq.sorted
       if !componentNames.contains(name)
-    } yield Diagnostic.Warning(
+    } yield Diagnostic.Error(
       s"Component $name is listed as having no third-party dependencies, but " +
       s"it is not a component of this distribution. Remove it from the list."
     )
@@ -140,7 +144,7 @@ object SbtLicenses {
     (
       keptDeps,
       missingWarnings ++ unexpectedWarnings ++ emptinessDiagnostics ++
-      unknownEntryWarnings
+      unknownEntryErrors
     )
   }
 

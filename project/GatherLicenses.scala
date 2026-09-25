@@ -200,7 +200,9 @@ object GatherLicenses {
 
         if (reviewState.warningsCount > 0) {
           warnAndThrow(
-            s"Report for the $name has ${reviewState.warningsCount} warnings."
+            // `warningsCount` counts fatal errors: warnings are not stored.
+            s"Report for the $name has ${reviewState.warningsCount} fatal " +
+            s"errors - run `gatherLicenses` to see them."
           )
         }
 
@@ -315,8 +317,10 @@ object GatherLicenses {
     * listed is reported as a warning, because it usually means that what it
     * ships is invisible to the review (for example a library that it depends
     * on as `provided` and ships through a JAR wrapper that is not a component
-    * of the distribution). A listed component that does have dependencies is
-    * reported as well, so that the list cannot go stale.
+    * of the distribution). A listed component that does have dependencies, or
+    * a listed name that is not a component of the distribution, is an error,
+    * so that the list cannot go stale; and the list is part of the input hash
+    * in `report-state`, so editing it requires regenerating the report.
     */
   val componentsWithoutDependenciesFileName = "components-without-dependencies"
 
