@@ -3,20 +3,15 @@ Copyright 2020 - 2026 New Byte Order sp. z o. o.
 
 'checker-qual', licensed under the The MIT License, is distributed with the Database.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `org.checkerframework.checker-qual-3.5.0`.
+Copyright notices related to this dependency can be found in the directory `org.checkerframework.checker-qual-3.55.1`.
 
 
 'postgresql', licensed under the BSD-2-Clause, is distributed with the Database.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `org.postgresql.postgresql-42.4.0`.
-
-
-'slf4j-api', licensed under the MIT License, is distributed with the Database.
-The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.slf4j.slf4j-api-1.7.36`.
+Copyright notices related to this dependency can be found in the directory `org.postgresql.postgresql-42.7.13`.
 
 
 'sqlite-jdbc', licensed under the The Apache Software License, Version 2.0, is distributed with the Database.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `org.xerial.sqlite-jdbc-3.46.1.0`.
+Copyright notices related to this dependency can be found in the directory `org.xerial.sqlite-jdbc-3.53.4.0`.
 

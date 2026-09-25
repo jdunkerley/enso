@@ -213,7 +213,7 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'mssql-jdbc', licensed under the MIT License, is distributed with the Microsoft.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `com.microsoft.sqlserver.mssql-jdbc-13.2.1.jre11`.
+Copyright notices related to this dependency can be found in the directory `com.microsoft.sqlserver.mssql-jdbc-13.6.0.jre11`.
 
 
 'netty-buffer', licensed under the Apache License, Version 2.0, is distributed with the Microsoft.

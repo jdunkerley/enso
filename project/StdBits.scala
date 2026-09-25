@@ -223,14 +223,24 @@ object StdBits {
     val nativeLibsStore =
       cacheStoreFactory.make("std-bits-native-libs")
     val nativeLibsOutputDir = polyglotLibDir
+    // Track the library files themselves, not their directories: a directory's
+    // hash does not change when a library inside it is replaced, so a bumped
+    // dependency would otherwise keep shipping the previous version's natives.
+    val nativeLibFiles = extractedNativeLibDirs
+      .filter(_.exists())
+      .flatMap(dir => listRecursively(dir).map(file => (dir, file)))
     Tracked.diffInputs(nativeLibsStore, FileInfo.hash)(
-      Set(nativeLibsOutputDir) ++ extractedNativeLibDirs.toSet
+      nativeLibFiles.map(_._2).toSet
     ) { report =>
       logger.debug("nativeLibsReport: " + report)
       val reportChanged = report.modified.nonEmpty ||
         report.removed.nonEmpty ||
         report.added.nonEmpty
-      val shouldCopy = !nativeLibsOutputDir.exists() || reportChanged
+      val outputMissing = nativeLibFiles.exists { case (dir, file) =>
+        !(nativeLibsOutputDir / IO.relativize(dir, file).get).exists()
+      }
+      val shouldCopy =
+        !nativeLibsOutputDir.exists() || reportChanged || outputMissing
       if (shouldCopy) {
         // Delete and recreate the output dir, just to be sure
         IO.delete(nativeLibsOutputDir)

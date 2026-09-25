@@ -1,77 +1,152 @@
 package org.duckdb;
 
-import java.io.File;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
 import java.sql.SQLException;
 import java.util.Properties;
 
 /**
- * A version of org.duckdb.DuckDBNative (v1.4.0.0) that attempts to first load a shared library from a name.
- * If the library is not present on the shared library path, or has a malformed name, a fallback is used to
- * infer it via a constructed file path.
+ * A copy of org.duckdb.DuckDBNative from duckdb_jdbc 1.5.5.1 (`Dependencies.duckdbVersion`) whose
+ * static initializer first tries to load the shared library by name, so that the library Enso
+ * extracts into `polyglot/lib` is found through the class loader (and in Native Image). Only if
+ * that fails does it fall back to upstream's own loading (a library bundled in the jar, then one
+ * next to the jar).
+ *
+ * <p>Everything below the static initializer is upstream's code, unchanged. The `native` method
+ * declarations must match the JNI library shipped in the same duckdb_jdbc jar exactly: re-derive
+ * this file from the new version's sources whenever `duckdbVersion` moves.
  */
 final class DuckDBNative {
-    static {
-        var libName = "duckdb_java";
-        try {
-            System.loadLibrary(libName);
-        } catch (Throwable ex) {
-            // Fallback to using a fixed path to load a native library
-            try {
-                String os_name = "";
-                String os_arch;
-                String os_name_detect = System.getProperty("os.name").toLowerCase().trim();
-                String os_arch_detect = System.getProperty("os.arch").toLowerCase().trim();
-                switch (os_arch_detect) {
-                    case "x86_64":
-                    case "amd64":
-                        os_arch = "amd64";
-                        break;
-                    case "aarch64":
-                    case "arm64":
-                        os_arch = "arm64";
-                        break;
-                    case "i386":
-                        os_arch = "i386";
-                        break;
-                    default:
-                        throw new IllegalStateException("Unsupported system architecture");
-                }
-                if (os_name_detect.startsWith("windows")) {
-                    os_name = "windows";
-                } else if (os_name_detect.startsWith("mac")) {
-                    os_name = "osx";
-                    os_arch = "universal";
-                } else if (os_name_detect.startsWith("linux")) {
-                    os_name = "linux";
-                }
-                String lib_res_name = "/libduckdb_java.so"
-                        + "_" + os_name + "_" + os_arch;
 
-                Path lib_file = Files.createTempFile("libduckdb_java", ".so");
-                URL lib_res = DuckDBNative.class.getResource(lib_res_name);
-                if (lib_res == null) {
-                    System.load(Paths.get("build/debug", lib_res_name).normalize().toAbsolutePath().toString());
-                } else {
-                    try (final InputStream lib_res_input_stream = lib_res.openStream()) {
-                        Files.copy(lib_res_input_stream, lib_file, StandardCopyOption.REPLACE_EXISTING);
-                    }
-                    new File(lib_file.toString()).deleteOnExit();
-                    System.load(lib_file.toAbsolutePath().toString());
-                }
-            } catch (IOException e) {
+    private static final String ARCH_X86_64 = "amd64";
+    private static final String ARCH_AARCH64 = "arm64";
+    private static final String ARCH_UNIVERSAL = "universal";
+
+    private static final String OS_WINDOWS = "windows";
+    private static final String OS_MACOS = "osx";
+    private static final String OS_LINUX = "linux";
+
+    static {
+        try {
+            System.loadLibrary("duckdb_java");
+        } catch (Throwable byName) {
+            try {
+                loadNativeLibrary();
+            } catch (Exception e) {
+                e.addSuppressed(byName);
                 throw new RuntimeException(e);
             }
         }
     }
+
+    private static void loadNativeLibrary() throws Exception {
+        String libName = nativeLibName();
+        URL libRes = DuckDBNative.class.getResource("/" + libName);
+
+        // The current JAR has a native library bundled, in this case we unpack and load it.
+        // There is no fallback if the unpacking or loading fails. We expect that only
+        // the '-nolib' JAR can be used with an external native lib
+        if (null != libRes) {
+            unpackAndLoad(libRes);
+            return;
+        }
+
+        // There is no native library inside the JAR file, so we try to load it by name
+        try {
+            System.loadLibrary("duckdb_java");
+        } catch (UnsatisfiedLinkError e) {
+            // Native library cannot be loaded by name using ordinary JVM mechanisms, we try to load it directly
+            // from FS - from the same directory where the current JAR resides
+            try {
+                loadFromCurrentJarDir(libName);
+            } catch (Throwable t) {
+                e.printStackTrace();
+                throw new IllegalStateException(t);
+            }
+        }
+    }
+
+    private static String cpuArch() {
+        String prop = System.getProperty("os.arch").toLowerCase().trim();
+        switch (prop) {
+        case "x86_64":
+        case "amd64":
+            return ARCH_X86_64;
+        case "aarch64":
+        case "arm64":
+            return ARCH_AARCH64;
+        default:
+            return prop.replaceAll("[^a-z0-9_\\-.]", "");
+        }
+    }
+
+    static String osName() {
+        String prop = System.getProperty("os.name").toLowerCase().trim();
+        if (prop.startsWith("windows")) {
+            return OS_WINDOWS;
+        } else if (prop.startsWith("mac")) {
+            return OS_MACOS;
+        } else if (prop.startsWith("linux")) {
+            return OS_LINUX;
+        } else {
+            return prop.replaceAll("[^a-z0-9_\\-.]", "");
+        }
+    }
+
+    static String nativeLibName() {
+        String os = osName();
+        final String arch;
+        if (OS_MACOS.equals(os)) {
+            arch = ARCH_UNIVERSAL;
+        } else {
+            arch = cpuArch();
+        }
+        return "libduckdb_java.so_" + os + "_" + arch;
+    }
+
+    static Path currentJarDir() throws Exception {
+        ProtectionDomain pd = DuckDBNative.class.getProtectionDomain();
+        CodeSource cs = pd.getCodeSource();
+        URL loc = cs.getLocation();
+        URI uri = loc.toURI();
+        Path jarPath = Paths.get(uri);
+        Path dirPath = jarPath.getParent();
+        return dirPath.toRealPath();
+    }
+
+    private static void unpackAndLoad(URL nativeLibRes) throws IOException {
+        Path tmpFile = Files.createTempFile("libduckdb_java", ".so");
+        try (InputStream is = nativeLibRes.openStream()) {
+            Files.copy(is, tmpFile, REPLACE_EXISTING);
+        }
+        tmpFile.toFile().deleteOnExit();
+        // Harmless on the officially supported platforms but required on some other.
+        tmpFile.toFile().setExecutable(true);
+        System.load(tmpFile.toAbsolutePath().toString());
+    }
+
+    private static void loadFromCurrentJarDir(String libName) throws Exception {
+        Path dir = currentJarDir();
+        Path libPath = dir.resolve(libName);
+        if (Files.exists(libPath)) {
+            System.load(libPath.toAbsolutePath().toString());
+        } else {
+            throw new FileNotFoundException("DuckDB JNI library not found, path: '" + libPath.toAbsolutePath() + "'");
+        }
+    }
+
     // We use zero-length ByteBuffer-s as a hacky but cheap way to pass C++ pointers
     // back and forth
 
@@ -81,7 +156,8 @@ final class DuckDBNative {
      */
 
     // results ConnectionHolder reference object
-    static native ByteBuffer duckdb_jdbc_startup(byte[] path, boolean read_only, Properties props) throws SQLException;
+    static native ByteBuffer duckdb_jdbc_startup(byte[] path, boolean read_only, Properties props,
+                                                 boolean cache_instance) throws SQLException;
 
     // returns conn_ref connection reference object
     static native ByteBuffer duckdb_jdbc_connect(ByteBuffer conn_ref) throws SQLException;
@@ -89,6 +165,9 @@ final class DuckDBNative {
     static native ByteBuffer duckdb_jdbc_create_db_ref(ByteBuffer conn_ref) throws SQLException;
 
     static native void duckdb_jdbc_destroy_db_ref(ByteBuffer db_ref) throws SQLException;
+
+    /** Returns the native address of the underlying DuckDB instance as a stable identity key. */
+    static native long duckdb_jdbc_db_address(ByteBuffer conn_ref) throws SQLException;
 
     static native void duckdb_jdbc_set_auto_commit(ByteBuffer conn_ref, boolean auto_commit) throws SQLException;
 
@@ -116,9 +195,20 @@ final class DuckDBNative {
     // returns res_ref result reference object
     static native ByteBuffer duckdb_jdbc_execute(ByteBuffer stmt_ref, Object[] params) throws SQLException;
 
+    static native ByteBuffer duckdb_jdbc_execute_capi(ByteBuffer stmt_ref, Object[] params) throws SQLException;
+
+    static native ByteBuffer duckdb_jdbc_pending_query(ByteBuffer conn_ref, byte[] query) throws SQLException;
+
+    static native ByteBuffer duckdb_jdbc_execute_pending(ByteBuffer pending_ref) throws SQLException;
+
+    static native void duckdb_jdbc_release_pending(ByteBuffer pending_ref) throws SQLException;
+
     static native void duckdb_jdbc_free_result(ByteBuffer res_ref);
 
     static native DuckDBVector[] duckdb_jdbc_fetch(ByteBuffer res_ref, ByteBuffer conn_ref) throws SQLException;
+
+    static native String[] duckdb_jdbc_cast_result_to_strings(ByteBuffer res_ref, ByteBuffer conn_ref, long col_idx)
+        throws SQLException;
 
     static native int duckdb_jdbc_fetch_size();
 
@@ -127,7 +217,7 @@ final class DuckDBNative {
     static native void duckdb_jdbc_arrow_register(ByteBuffer conn_ref, long arrow_array_stream_pointer, byte[] name);
 
     static native ByteBuffer duckdb_jdbc_create_appender(ByteBuffer conn_ref, byte[] schema_name, byte[] table_name)
-            throws SQLException;
+        throws SQLException;
 
     static native void duckdb_jdbc_appender_begin_row(ByteBuffer appender_ref) throws SQLException;
 
@@ -162,7 +252,7 @@ final class DuckDBNative {
     static native void duckdb_jdbc_appender_append_timestamp(ByteBuffer appender_ref, long value) throws SQLException;
 
     static native void duckdb_jdbc_appender_append_decimal(ByteBuffer appender_ref, BigDecimal value)
-            throws SQLException;
+        throws SQLException;
 
     static native void duckdb_jdbc_appender_append_null(ByteBuffer appender_ref) throws SQLException;
 
@@ -170,7 +260,7 @@ final class DuckDBNative {
 
     protected static native String duckdb_jdbc_get_profiling_information(ByteBuffer conn_ref,
                                                                          ProfilerPrintFormat format)
-            throws SQLException;
+        throws SQLException;
 
     public static void duckdb_jdbc_create_extension_type(DuckDBConnection conn) throws SQLException {
         duckdb_jdbc_create_extension_type(conn.connRef);
