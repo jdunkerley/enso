@@ -110,11 +110,21 @@
   behaviour changes — the parser produces the same AST and the same Java
   bindings as before.
 
+#### Enso Standard Library
+
+- [Database drivers updated][59]: PostgreSQL 42.7.13, SQLite 3.53.4, DuckDB
+  1.5.5.1 and Microsoft SQL Server 13.6.0 (from 42.4.0, 3.46.1, 1.4.4 and
+  13.2.1); H2, used only by the Generic JDBC tests, moves to 2.5.250. The
+  Database, DuckDB and Microsoft test suites pass unchanged against real
+  PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
+  unchanged.
+
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [61]: https://github.com/jdunkerley/enso/pull/61
 [60]: https://github.com/jdunkerley/enso/pull/60
+[59]: https://github.com/jdunkerley/enso/pull/59
 [57]: https://github.com/jdunkerley/enso/pull/57
 [56]: https://github.com/jdunkerley/enso/pull/56
 [54]: https://github.com/jdunkerley/enso/pull/54
