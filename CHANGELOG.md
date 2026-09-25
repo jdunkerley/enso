@@ -45,6 +45,13 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [Security updates for libraries shipped with the engine, the launcher and
+  Standard.Base][60]: logback 1.6.4, JGit 7.8, Bouncy Castle 1.86, Jackson
+  2.22.3, protobuf-java 4.36.2 and SnakeYAML 2.7. The previous versions had
+  published vulnerabilities, including one in the log deserialization the engine
+  uses to send its logs to a logging server. `Json.parse` error messages now
+  report the position of the offending character, or the start of an
+  unrecognized token, instead of the position just after it.
 - [The Rust-to-WebAssembly bindings used for the parser have been updated
   (wasm-bindgen 0.2.128), and the build tooling's HTTP client with them (reqwest
   0.13.5)][57]. No behaviour changes: the parser behaves the same in the IDE,
@@ -100,6 +107,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[60]: https://github.com/jdunkerley/enso/pull/60
 [57]: https://github.com/jdunkerley/enso/pull/57
 [56]: https://github.com/jdunkerley/enso/pull/56
 [54]: https://github.com/jdunkerley/enso/pull/54
