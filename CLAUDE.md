@@ -263,12 +263,6 @@ has silently produced a wrong result here:
     --no-ir-caches --run "$PWD/DuckDB_Tests"
   ```
 
-- **`RuntimeStdlibTest` is flaky on Windows.** `should import Base modules`
-  asserts that suggestion notifications arrived; those are emitted when modules
-  are _compiled_, and `build.sbt` sets `ENSO_TEST_DISABLE_IR_CACHE=false` for
-  the integration tests, so a populated IR cache plausibly starves it. Seen
-  once, passed on re-run of the same commit. The job is skipped on `develop`, so
-  it only ever runs on PRs and there is no history to judge the rate.
 - **`LibraryUploadTest` fails intermittently on Windows with
   `HTTPException: Server responded with: [java.net.ConnectException]`, and it is
   a harness race, not your change.** `DummyRepository.startServer` decides the
