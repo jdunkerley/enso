@@ -23,7 +23,9 @@ Review configuration for the third-party notices shipped with each distribution
    `Found legal review configuration for package X, but no such dependency ...
 Perhaps the version was changed to Y`. `git mv` the directory to the new
    name — only in the distributions that report it (a distribution that still
-   resolves the old version keeps the old directory).
+   resolves the old version keeps the old directory). The failed run has
+   usually created the new directory already, and `git mv old new` then nests
+   `old` inside it: check with `ls new` and move the files up.
 2. Re-run. Remaining errors are entries that disappeared (`contains entry ...
 but no such entry has been detected`) and new, unreviewed copyrights/files.
    Carry the old decision over (a year bump in an ignored line stays ignored).
@@ -48,12 +50,17 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   `zioIzumiReflectVersion`, `std-snowflake` bundles `zstdVersion` via
   `zstd-jni-wrapper`. Moving such a pin without the library that resolves it
   makes the notices describe a different jar from the one shipped.
-- Generated licence files keep the CRLF line endings they have inside the
-  upstream jars, and `report-state`'s output hash is taken over those raw
-  bytes. If git normalizes them on commit (`core.autocrlf=input`, the default
-  on this Windows setup), a fresh checkout no longer matches and
-  `verifyLicensePackages` fails with `has different content than expected`.
-  Stage the notices byte-for-byte:
-  `git -c core.autocrlf=false add distribution/**/THIRD-PARTY`, and check with
+- Generated licence files are not byte-identical across hosts, and
+  `report-state`'s output hash is taken over their raw bytes. Files found by
+  the GitHub heuristic (`files-keep` entries like
+  `/<org>/<repo>/blob/<branch>/LICENSE`) are downloaded through
+  `scala.sys.process` (`GithubHeuristic.scala`), which rejoins lines with the
+  host's line separator: CRLF on Windows, LF on Linux. The committed notices
+  were generated on Windows, so regenerating them in WSL rewrites ~14 of them
+  (SparseBitSet, yxdb, zstd-jni, grpc, jsoniter…) and every affected
+  `report-state`, even on an unchanged `develop`. **Run `gatherLicenses` on
+  Windows.** Git must not normalize them either (`core.autocrlf=input`, the
+  default on this Windows setup): stage the notices byte-for-byte with
+  `git -c core.autocrlf=false add distribution/**/THIRD-PARTY`. Then check with
   `verifyLicensePackages` on a fresh Linux checkout, not the working tree that
   generated them.

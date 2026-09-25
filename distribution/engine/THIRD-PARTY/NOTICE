@@ -1,14 +1,14 @@
 Enso
 Copyright 2020 - 2026 New Byte Order sp. z o. o.
 
-'logback-classic', licensed under the GNU Lesser General Public License, is distributed with the engine.
+'logback-classic', licensed under the LGPL-2.1-only, is distributed with the engine.
 The license file can be found at `licenses/GNU_Lesser_General_Public_License`.
-Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-classic-1.3.7`.
+Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-classic-1.6.4`.
 
 
-'logback-core', licensed under the GNU Lesser General Public License, is distributed with the engine.
+'logback-core', licensed under the LGPL-2.1-only, is distributed with the engine.
 The license file can be found at `licenses/GNU_Lesser_General_Public_License`.
-Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-core-1.3.7`.
+Copyright notices related to this dependency can be found in the directory `ch.qos.logback.logback-core-1.6.4`.
 
 
 'shapeless_2.13', licensed under the Apache 2, is distributed with the engine.
@@ -133,7 +133,7 @@ Copyright notices related to this dependency can be found in the directory `comm
 
 'commons-codec', licensed under the Apache-2.0, is distributed with the engine.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.16.0`.
+Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.22.1`.
 
 
 'commons-io', licensed under the Apache-2.0, is distributed with the engine.
@@ -408,22 +408,22 @@ Copyright notices related to this dependency can be found in the directory `org.
 
 'bcpkix-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcpkix-jdk18on-1.78.1`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcpkix-jdk18on-1.86`.
 
 
 'bcprov-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcprov-jdk18on-1.78.1`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcprov-jdk18on-1.86`.
 
 
 'bcutil-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
-Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcutil-jdk18on-1.78.1`.
+Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcutil-jdk18on-1.86`.
 
 
-'org.eclipse.jgit', licensed under the Eclipse Distribution License (New BSD License), is distributed with the engine.
-The license file can be found at `licenses/Eclipse_Distribution_License_(New_BSD_License)`.
-Copyright notices related to this dependency can be found in the directory `org.eclipse.jgit.org.eclipse.jgit-6.7.0.202309050840-r`.
+'org.eclipse.jgit', licensed under the BSD-3-Clause, is distributed with the engine.
+The license file can be found at `licenses/BSD-3-Clause`.
+Copyright notices related to this dependency can be found in the directory `org.eclipse.jgit.org.eclipse.jgit-7.8.0.202609011348-r`.
 
 
 'js-language', licensed under the MIT License, is distributed with the engine.
@@ -628,5 +628,5 @@ Copyright notices related to this dependency can be found in the directory `org.
 
 'snakeyaml', licensed under the Apache License, Version 2.0, is distributed with the engine.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `org.yaml.snakeyaml-2.3`.
+Copyright notices related to this dependency can be found in the directory `org.yaml.snakeyaml-2.7`.
 
