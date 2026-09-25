@@ -21,6 +21,7 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.concurrent.BlockingDeque;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -246,6 +247,11 @@ public final class DeferredProcessingSocketAppender extends AppenderBase<ILoggin
       } catch (Throwable t) {
         addInfo(peerId + "failed serialization: ", t);
         var loggingEvent = new LoggingEvent();
+        // Since logback 1.5 an event without a LoggerContext has no MDC adapter
+        // to fall back on, and serializing it would throw again. It must be a
+        // HashMap: the receiving HardenedLoggingEventInputStream refuses the
+        // serial form of `Map.of()` (java.util.CollSer) and drops the connection.
+        loggingEvent.setMDCPropertyMap(new HashMap<>());
         loggingEvent.setLevel(Level.ERROR);
         if (t.getStackTrace().length > 0) {
           var name = t.getStackTrace()[0].getClassName();

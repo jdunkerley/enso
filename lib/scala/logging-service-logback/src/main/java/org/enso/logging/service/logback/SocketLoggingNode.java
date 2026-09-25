@@ -67,7 +67,8 @@ public class SocketLoggingNode implements Runnable {
     state = State.RUNNING;
     try {
       hardenedLoggingEventInputStream =
-          new HardenedLoggingEventInputStream(new BufferedInputStream(socket.getInputStream()));
+          new HardenedLoggingEventInputStream(
+              context, new BufferedInputStream(socket.getInputStream()));
     } catch (Exception e) {
       logger.error("Could not open ObjectInputStream to " + socket, e);
       state = State.CLOSED;
@@ -102,6 +103,9 @@ public class SocketLoggingNode implements Runnable {
           throw e;
         } catch (Throwable e) {
           var loggingEvent = new LoggingEvent();
+          // Since logback 1.5 an event without a LoggerContext has no MDC
+          // adapter to fall back on, so appenders reading the MDC would throw.
+          loggingEvent.setMDCPropertyMap(localMdc != null ? localMdc : Map.of());
           loggingEvent.setLevel(Level.ERROR);
           if (e.getStackTrace().length > 0) {
             var name = e.getStackTrace()[0].getClassName();

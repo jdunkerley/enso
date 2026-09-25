@@ -1,5 +1,8 @@
 module org.enso.akka.wrapper {
-  requires protobuf.java;
+  // protobuf-java has declared `Automatic-Module-Name: com.google.protobuf`
+  // since 3.25.4 and 4.26.0; before that its module name came from the jar
+  // name (`protobuf.java`).
+  requires com.google.protobuf;
   requires scala.library;
   requires org.reactivestreams;
   // For sun.misc.Unsafe - from akka.util.Unsafe

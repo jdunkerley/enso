@@ -166,9 +166,9 @@ object GraalVM {
     Seq(
       "org.graalvm.python"   % "python-language"    % version,
       "org.graalvm.python"   % "python-resources"   % version,
-      "org.bouncycastle"     % "bcutil-jdk18on"     % "1.78.1",
-      "org.bouncycastle"     % "bcpkix-jdk18on"     % "1.78.1",
-      "org.bouncycastle"     % "bcprov-jdk18on"     % "1.78.1",
+      "org.bouncycastle"     % "bcutil-jdk18on"     % Dependencies.bouncyCastleVersion,
+      "org.bouncycastle"     % "bcpkix-jdk18on"     % Dependencies.bouncyCastleVersion,
+      "org.bouncycastle"     % "bcprov-jdk18on"     % Dependencies.bouncyCastleVersion,
       "org.graalvm.llvm"     % "llvm-api"           % version,
       "org.graalvm.truffle"  % "truffle-nfi"        % version,
       "org.graalvm.truffle"  % "truffle-nfi-panama" % version,

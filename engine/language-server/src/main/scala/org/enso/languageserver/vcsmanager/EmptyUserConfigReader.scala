@@ -7,6 +7,7 @@ import org.eclipse.jgit.util.{FS, SystemReader}
 
 import java.io.File
 import java.nio.file.Files
+import java.time.{Instant, ZoneId, ZoneOffset}
 
 /** Config reader that ignores gitconfig file in user's home directory.
   */
@@ -46,12 +47,27 @@ final class EmptyUserConfigReader extends SystemReader {
     new EmptyConfig(parent, fs)
 
   /** @inheritdoc */
+  override def now(): Instant =
+    proxy.now()
+
+  /** @inheritdoc */
+  override def getTimeZoneAt(when: Instant): ZoneOffset =
+    proxy.getTimeZoneAt(when)
+
+  /** @inheritdoc */
+  override def getTimeZoneId: ZoneId =
+    proxy.getTimeZoneId
+
+  // Deprecated in JGit 7.1 in favour of `now` and `getTimeZoneAt`, but still
+  // abstract, so they are implemented through their replacements.
+
+  /** @inheritdoc */
   override def getCurrentTime: Long =
-    proxy.getCurrentTime
+    now().toEpochMilli
 
   /** @inheritdoc */
   override def getTimezone(when: Long): Int =
-    proxy.getTimezone(when)
+    getTimeZoneAt(Instant.ofEpochMilli(when)).getTotalSeconds / 60
 }
 
 object EmptyUserConfigReader {
