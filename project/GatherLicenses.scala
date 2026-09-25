@@ -69,10 +69,12 @@ object GatherLicenses {
         s" ${projectNames.mkString(", ")}"
       )
       val distributionRoot = configRoot / distribution.artifactName
+      val expectedEmptyComponents =
+        readComponentsWithoutDependencies(distributionRoot)
       val (sbtInfo, sbtDiagnostics) =
         SbtLicenses.analyze(
           distribution.sbtComponents,
-          readComponentsWithoutDependencies(distributionRoot),
+          expectedEmptyComponents,
           log
         )
 
@@ -133,6 +135,7 @@ object GatherLicenses {
       ReportState.write(
         distributionRoot / stateFileName,
         distribution,
+        expectedEmptyComponents,
         errors.size
       )
       log.info(s"Re-generated distribution notices at `$packagePath`.")
@@ -181,13 +184,17 @@ object GatherLicenses {
     ReportState.read(distributionConfig / stateFileName, log) match {
       case Some(reviewState) =>
         val currentInputHash =
-          ReportState.computeInputHash(distributionDescription)
+          ReportState.computeInputHash(
+            distributionDescription,
+            readComponentsWithoutDependencies(distributionConfig)
+          )
         if (currentInputHash != reviewState.inputHash) {
           log.info("Input hash computed from build.sbt: " + currentInputHash)
           log.info("Input hash stored in metadata: " + reviewState.inputHash)
           warnAndThrow(
             s"Report for the $name is not up to date - " +
-            s"it seems that some dependencies were added or removed."
+            s"it seems that some dependencies were added or removed, or its " +
+            s"`$componentsWithoutDependenciesFileName` list changed."
           )
         }
 

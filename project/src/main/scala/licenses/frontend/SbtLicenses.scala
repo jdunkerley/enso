@@ -126,7 +126,22 @@ object SbtLicenses {
       }
     }
 
-    (keptDeps, missingWarnings ++ unexpectedWarnings ++ emptinessDiagnostics)
+    // An entry for a component that is no longer part of the distribution
+    // (renamed or removed) is never visited above, so check for it separately.
+    val componentNames = components.map(_.name).toSet
+    val unknownEntryWarnings = for {
+      name <- expectedEmptyComponents.keys.toSeq.sorted
+      if !componentNames.contains(name)
+    } yield Diagnostic.Warning(
+      s"Component $name is listed as having no third-party dependencies, but " +
+      s"it is not a component of this distribution. Remove it from the list."
+    )
+
+    (
+      keptDeps,
+      missingWarnings ++ unexpectedWarnings ++ emptinessDiagnostics ++
+      unknownEntryWarnings
+    )
   }
 
   /** Creates a [[SourceAccess]] instance that unpacks the source files from a
