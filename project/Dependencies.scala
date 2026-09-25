@@ -462,10 +462,10 @@ object Dependencies {
   // Held: `lib/java/jna-wrapper` shadows `com.sun.jna.Native` with a modified
   // copy of its 5.14.0 source (to avoid `java.desktop`). A newer JNA needs that
   // copy re-derived first, otherwise the old `Native` runs against newer JNA.
-  val jnaVersion                 = "5.14.0"
-  val googleProtobufVersion      = "4.36.2" // See Note [Engine protobuf-java]
-  val shapelessVersion           = "2.3.13"
-  val postgresVersion            = "42.7.13"
+  val jnaVersion            = "5.14.0"
+  val googleProtobufVersion = "4.36.2" // See Note [Engine protobuf-java]
+  val shapelessVersion      = "2.3.13"
+  val postgresVersion       = "42.7.13"
   // Not a one-line bump: `lib/java/duckdb-wrapper` replaces `org.duckdb.DuckDBNative`
   // with a copy of this version's source, whose `native` declarations must match the
   // JNI library in this jar, and the JNI lookups that library makes on load are listed
