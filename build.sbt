@@ -3972,7 +3972,11 @@ lazy val `engine-runner` = project
               // See https://github.com/HarrDevY/native-register-bouncy-castle
               "org.bouncycastle.jcajce.provider.drbg.DRBG$Default",
               "org.bouncycastle.jcajce.provider.drbg.DRBG$NonceAndIV",
-              "org.duckdb"
+              "org.duckdb",
+              // pgjdbc 42.6+ holds a java.lang.ref.Cleaner in a static field
+              // (org.postgresql.util.LazyCleanerImpl), which cannot live in the
+              // image heap.
+              "org.postgresql"
             ),
             initializeAtBuildtime = NativeImage.defaultBuildTimeInitClasses ++
               Seq(
