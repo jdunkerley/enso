@@ -45,6 +45,12 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [The Azure libraries used by Standard.Microsoft have been updated][61]
+  (azure-identity 1.18.6, azure-storage-blob 12.35.1, azure-resourcemanager
+  2.64.0), with their Netty and Reactor dependencies. The native TLS library
+  bundled with Standard.Microsoft is now actually used: with the older Netty it
+  failed to load (checked on Linux), so connections silently fell back to Java's
+  built-in TLS.
 - [Security updates for libraries shipped with the engine, the launcher and
   Standard.Base][60]: logback 1.6.4, JGit 7.8, Bouncy Castle 1.86, Jackson
   2.22.3, protobuf-java 4.36.2 and SnakeYAML 2.7. The previous versions had
@@ -107,6 +113,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[61]: https://github.com/jdunkerley/enso/pull/61
 [60]: https://github.com/jdunkerley/enso/pull/60
 [57]: https://github.com/jdunkerley/enso/pull/57
 [56]: https://github.com/jdunkerley/enso/pull/56
