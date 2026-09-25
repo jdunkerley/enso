@@ -383,15 +383,28 @@ object Dependencies {
   /* Note [Google Libraries Move With gRPC]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    * `std-google`'s libraries share one gax / google-http-client / gRPC /
-   * protobuf tree, so they cannot move independently of `grpcVersion` (the
-   * protobuf they ship is whatever they resolve; see
-   * Note [Engine protobuf-java]):
-   * - google-analytics-admin 0.69.0+ and -data 0.70.0+ need a newer gRPC than
-   *   `grpcVersion`, and admin 0.93.0+ / data 0.94.0+ need protobuf 4.
-   * - google-api-client 2.8.0+ moves google-http-client to 2.x, while the
-   *   analytics libraries' gax still expects 1.x.
-   * The sheets client and google-api-client 2.7.2 stay on google-http-client
-   * 1.x, so they are current; the rest waits for the gRPC/protobuf upgrade.
+   * protobuf tree. The analytics clients decide it: gax-grpc resolves every
+   * `io.grpc` artifact at one version, and protobuf-java at whatever their
+   * generated code was built for (4.x since admin 0.93.0 / data 0.94.0).
+   * - `grpcVersion` must equal the gRPC the analytics clients resolve, not the
+   *   latest: it pins `grpc-netty-shaded` (and `grpc-wrapper`'s natives), and a
+   *   newer one drags part of the gRPC tree up with it (grpc-api, -core, -util)
+   *   while the rest stays behind. gRPC artifacts must share one version.
+   * - The protobuf `std-google` ships in its `polyglot/java` is the one the
+   *   analytics clients resolve, not `googleProtobufVersion`: that is the
+   *   engine's and does not pin it (see Note [Engine protobuf-java]), so the
+   *   two may differ.
+   * - The Google BOM these clients import lifts conscrypt to 2.6.2, but
+   *   `conscrypt-wrapper` (shared with `std-snowflake`) ships 2.5.2's natives,
+   *   and grpc-alts, conscrypt's only user here, itself declares 2.5.2. So
+   *   `std-google` holds conscrypt at `conscryptVersion`.
+   * google-api-client 2.8.0+ moved google-http-client to 2.x; the analytics
+   * clients use 2.x as well now, so they move together.
+   * The licence review resolves dependencies through Ivy, which (unlike the
+   * Coursier resolution that decides what ships) no longer sees
+   * javax.annotation-api via api-common 2.69. `std-google` declares it
+   * directly at `javaxAnnotationApiVersion`, which must equal what api-common
+   * resolves, so the notices keep covering the jar that ships.
    */
 
   /* Note [Engine protobuf-java]
@@ -402,11 +415,16 @@ object Dependencies {
    * nothing in `std-google`. 4.x declares `Automatic-Module-Name:
    * com.google.protobuf`, which is the name `akka-wrapper` requires.
    */
-  val googleApiClientVersion         = "2.7.2"
+  val googleApiClientVersion         = "2.9.1"
   val googleApiServicesSheetsVersion = "v4-rev20260610-2.0.0"
-  val googleAnalyticsAdminVersion    = "0.66.0"
-  val googleAnalyticsDataVersion     = "0.67.0"
-  val grpcVersion                    = "1.69.0"
+  val googleAnalyticsAdminVersion    = "0.108.0"
+  val googleAnalyticsDataVersion     = "0.109.0"
+  val grpcVersion                    = "1.83.0"
+  // Shared by `std-google`, `std-snowflake` and `conscrypt-wrapper`, which
+  // ships this version's natives. See Note [Google Libraries Move With gRPC].
+  val conscryptVersion = "2.5.2"
+  // See Note [Google Libraries Move With gRPC].
+  val javaxAnnotationApiVersion = "1.3.2"
 
   // === SLF4J ==================================================================
   val slf4jVersion = "2.0.20"
