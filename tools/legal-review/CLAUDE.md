@@ -67,3 +67,11 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   with `git -c core.autocrlf=false add tools/legal-review` too. Then check
   with `verifyLicensePackages` on a fresh Linux checkout, not the working tree
   that generated them.
+- `gatherLicenses` **deletes** a config directory it cannot pair with a resolved
+  package (`Review.warnAboutMissingDependencies`, reported only as a warning),
+  on the assumption that the dependency was dropped. Pairing is by name prefix;
+  it used to require a unique match, so a bump of a family with shared prefixes
+  (`azure-resourcemanager-*`, `netty-codec-http` vs `netty-codec`) deleted
+  valid configs. It now takes the longest match. After any run, check
+  `git status tools/legal-review` for deletions you did not intend and restore
+  them with `git checkout` before renaming.

@@ -452,13 +452,12 @@ object Dependencies {
   val apacheArrowVersion     = "14.0.1"
   val `snowflakeJDBCVersion` = "4.0.1"
   val mssqlserverJDBCVersion = "13.2.1.jre11"
-  // The Azure SDK is held: its newer releases move Netty to 4.1.137 and
-  // netty-tcnative to 2.0.81, while `nettyTransportEpollVersion` and
-  // `nettyTcNativeBorringSSL` pin the native Netty wrappers `std-microsoft`
-  // ships. Azure moves together with those pins.
-  val azureIdentityVersion    = "1.16.1"
-  val azureResourceVersion    = "2.50.0"
-  val azureBlobStorageVersion = "12.30.0"
+  // The Azure SDK brings its own Netty classes; `std-microsoft` pairs them with
+  // the netty-tcnative natives from `nettyTcNativeBorringSSL`, which must not be
+  // newer than Azure's netty-tcnative-classes. See Note [Netty Native Libraries].
+  val azureIdentityVersion    = "1.18.6"
+  val azureResourceVersion    = "2.64.0"
+  val azureBlobStorageVersion = "12.35.1"
   val jsoniterVersion         = "2.38.4"
   // Held: `lib/java/jna-wrapper` shadows `com.sun.jna.Native` with a modified
   // copy of its 5.14.0 source (to avoid `java.desktop`). A newer JNA needs that
@@ -472,10 +471,42 @@ object Dependencies {
   val jimFsVersion               = "1.3.2"
   val nettyTcNativeBorringSSL    = "2.0.74.Final"
   val nettyTransportEpollVersion = "4.1.118.Final"
+  // ^ These two and the one below are Netty native-library pins, and all three
+  // are held: see Note [Netty Native Libraries] below.
+  val nettyResolverDnsNativeMacosVersion = "4.1.118.Final"
   // Not free to move: must equal the zstd-jni that `snowflake-jdbc-thin`
   // resolves. `std-snowflake` ships `zstd-jni-wrapper`'s repackaged copy at
   // this version, while its legal review follows the version snowflake-jdbc
   // resolves; bumping this alone ships a zstd-jni the notices do not describe.
   // Moves with `snowflakeJDBCVersion`.
   val zstdVersion = "1.5.6-5"
+
+  /* Note [Netty Native Libraries]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `netty-tc-native-wrapper`, `netty-epoll-native-wrapper` and
+   * `netty-resolver-dns-native-macos-wrapper` extract only the JNI libraries
+   * from these three versions. The Java classes that load them come
+   * from whatever the consuming libraries resolve: Snowflake JDBC for
+   * `std-snowflake` (netty 4.1.127, netty-tcnative-classes 2.0.74) and the
+   * Azure SDK for `std-microsoft` (netty 4.1.137, 2.0.81 at the Azure pins). So
+   * these are not free to move to their latest; checked on Linux x86_64 with
+   * `OpenSsl.isAvailable()` / `Epoll.isAvailable()`, natives loaded from
+   * `java.library.path` as the standard library loads them:
+   * - A netty-tcnative native newer than the classes fails to load, and netty
+   *   silently falls back to the JDK's TLS: 2.0.81 and 2.0.84 natives fail with
+   *   2.0.74 classes. Older natives load: 2.0.74 works with 2.0.81 classes. So
+   *   this must not exceed the oldest consumer (Snowflake, 2.0.74).
+   * - The epoll native is meant for `std-snowflake` only, but currently ships
+   *   nothing: `netty-epoll-native-wrapper` extracts from the classifier-less
+   *   `netty-transport-native-epoll` jar, and the `.so` is only in its
+   *   `linux-x86_64` classifier jar, so Snowflake falls back to NIO. Fixing
+   *   that belongs with the Snowflake JDBC bump (#58). When it is fixed: 4.2.x
+   *   natives fail with Snowflake's 4.1.127 classes, while 4.1.118 and 4.1.137
+   *   load; match the 4.1.x that Snowflake resolves.
+   * - The macOS DNS-resolver native (`nettyResolverDnsNativeMacosVersion`) is
+   *   shipped by both. Its classes are netty-resolver-dns-classes-macos at
+   *   4.1.127 (Snowflake) and 4.1.135 (Azure), so on the evidence above it must
+   *   not be newer than 4.1.127. It is untested: the natives are macOS-only.
+   * Neither consumer uses Netty 4.2 yet. Move these with `snowflakeJDBCVersion`.
+   */
 }
