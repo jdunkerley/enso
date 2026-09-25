@@ -460,6 +460,10 @@
             "int",
             "boolean[]"
           ]
+        },
+        {
+          "name": "retainConstlenData",
+          "parameterTypes": []
         }
       ]
     },
