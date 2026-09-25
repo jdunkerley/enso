@@ -3,12 +3,12 @@ Copyright 2020 - 2026 New Byte Order sp. z o. o.
 
 'google-analytics-admin', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.analytics.google-analytics-admin-0.66.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.analytics.google-analytics-admin-0.108.0`.
 
 
 'google-analytics-data', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.analytics.google-analytics-data-0.67.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.analytics.google-analytics-data-0.109.0`.
 
 
 'annotations', licensed under the Apache 2.0, is distributed with the Google.
@@ -18,52 +18,52 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'google-api-client', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api-client.google-api-client-2.7.2`.
+Copyright notices related to this dependency can be found in the directory `com.google.api-client.google-api-client-2.9.1`.
 
 
 'api-common', licensed under the BSD-3-Clause, is distributed with the Google.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `com.google.api.api-common-2.42.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.api-common-2.69.0`.
 
 
 'gax', licensed under the BSD-3-Clause, is distributed with the Google.
 The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `com.google.api.gax-2.59.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.gax-2.86.0`.
 
 
 'gax-grpc', licensed under the BSD-3-Clause, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.gax-grpc-2.59.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.gax-grpc-2.86.0`.
 
 
 'gax-httpjson', licensed under the BSD-3-Clause, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.gax-httpjson-2.59.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.gax-httpjson-2.86.0`.
 
 
 'proto-google-analytics-admin-v1alpha', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-admin-v1alpha-0.66.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-admin-v1alpha-0.108.0`.
 
 
 'proto-google-analytics-admin-v1beta', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-admin-v1beta-0.66.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-admin-v1beta-0.108.0`.
 
 
 'proto-google-analytics-data-v1alpha', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-data-v1alpha-0.67.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-data-v1alpha-0.109.0`.
 
 
 'proto-google-analytics-data-v1beta', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-data-v1beta-0.67.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-analytics-data-v1beta-0.109.0`.
 
 
 'proto-google-common-protos', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-common-protos-2.50.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.api.grpc.proto-google-common-protos-2.77.0`.
 
 
 'google-api-services-sheets', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
@@ -73,12 +73,12 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'google-auth-library-credentials', licensed under the BSD New license, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.auth.google-auth-library-credentials-1.30.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.auth.google-auth-library-credentials-1.53.0`.
 
 
 'google-auth-library-oauth2-http', licensed under the BSD New license, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.auth.google-auth-library-oauth2-http-1.30.1`.
+Copyright notices related to this dependency can be found in the directory `com.google.auth.google-auth-library-oauth2-http-1.53.0`.
 
 
 'auto-value-annotations', licensed under the Apache 2.0, is distributed with the Google.
@@ -88,42 +88,42 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'gson', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.code.gson.gson-2.11.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.code.gson.gson-2.14.0`.
 
 
 'error_prone_annotations', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.errorprone.error_prone_annotations-2.36.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.errorprone.error_prone_annotations-2.50.0`.
 
 
-'failureaccess', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
+'failureaccess', licensed under the Apache License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.guava.failureaccess-1.0.2`.
+Copyright notices related to this dependency can be found in the directory `com.google.guava.failureaccess-1.0.3`.
 
 
 'guava', licensed under the Apache License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.guava.guava-33.4.0-jre`.
+Copyright notices related to this dependency can be found in the directory `com.google.guava.guava-33.6.0-jre`.
 
 
 'google-http-client', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-1.45.3`.
+Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-2.2.0`.
 
 
 'google-http-client-apache-v2', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-apache-v2-1.45.2`.
+Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-apache-v2-2.0.0`.
 
 
 'google-http-client-gson', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-gson-1.45.3`.
+Copyright notices related to this dependency can be found in the directory `com.google.http-client.google-http-client-gson-2.2.0`.
 
 
 'j2objc-annotations', licensed under the Apache License, Version 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.google.j2objc.j2objc-annotations-3.0.0`.
+Copyright notices related to this dependency can be found in the directory `com.google.j2objc.j2objc-annotations-3.1`.
 
 
 'google-oauth-client', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
@@ -133,22 +133,22 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'protobuf-java', licensed under the BSD-3-Clause, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-3.25.5`.
+Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-4.33.6`.
 
 
 'protobuf-java-util', licensed under the BSD-3-Clause, is distributed with the Google.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-util-3.25.5`.
+Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-util-4.33.6`.
 
 
 're2j', licensed under the Go License, is distributed with the Google.
 The license file can be found at `licenses/Go_License`.
-Copyright notices related to this dependency can be found in the directory `com.google.re2j.re2j-1.7`.
+Copyright notices related to this dependency can be found in the directory `com.google.re2j.re2j-1.8`.
 
 
 'commons-codec', licensed under the Apache-2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.17.1`.
+Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.18.0`.
 
 
 'commons-logging', licensed under the The Apache Software License, Version 2.0, is distributed with the Google.
@@ -156,74 +156,84 @@ The license information can be found along with the copyright notices.
 Copyright notices related to this dependency can be found in the directory `commons-logging.commons-logging-1.2`.
 
 
+'common', licensed under the Apache License, Version 2.0, is distributed with the Google.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `dev.cel.common-0.13.0`.
+
+
+'protobuf', licensed under the Apache License, Version 2.0, is distributed with the Google.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `dev.cel.protobuf-0.13.0`.
+
+
+'runtime', licensed under the Apache License, Version 2.0, is distributed with the Google.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `dev.cel.runtime-0.13.0`.
+
+
 'grpc-alts', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-alts-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-alts-1.83.0`.
 
 
 'grpc-api', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-api-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-api-1.83.0`.
 
 
 'grpc-auth', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-auth-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-auth-1.83.0`.
 
 
 'grpc-context', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-context-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-context-1.83.0`.
 
 
 'grpc-core', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-core-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-core-1.83.0`.
 
 
 'grpc-googleapis', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-googleapis-1.69.0`.
-
-
-'grpc-grpclb', licensed under the Apache 2.0, is distributed with the Google.
-The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-grpclb-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-googleapis-1.83.0`.
 
 
 'grpc-inprocess', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-inprocess-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-inprocess-1.83.0`.
 
 
 'grpc-netty-shaded', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-netty-shaded-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-netty-shaded-1.83.0`.
 
 
 'grpc-protobuf', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-1.83.0`.
 
 
 'grpc-protobuf-lite', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-lite-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-lite-1.83.0`.
 
 
 'grpc-services', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-services-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-services-1.83.0`.
 
 
 'grpc-stub', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-stub-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-stub-1.83.0`.
 
 
 'grpc-util', licensed under the Apache 2.0, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-util-1.69.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-util-1.83.0`.
 
 
 'opencensus-api', licensed under the The Apache License, Version 2.0, is distributed with the Google.
@@ -256,19 +266,24 @@ The license file can be found at `licenses/APACHE2.0`.
 Copyright notices related to this dependency can be found in the directory `org.apache.httpcomponents.httpcore-4.4.16`.
 
 
-'checker-qual', licensed under the The MIT License, is distributed with the Google.
-The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `org.checkerframework.checker-qual-3.48.3`.
-
-
 'animal-sniffer-annotations', licensed under the MIT license, is distributed with the Google.
 The license file can be found at `licenses/MIT`.
-Copyright notices related to this dependency can be found in the directory `org.codehaus.mojo.animal-sniffer-annotations-1.24`.
+Copyright notices related to this dependency can be found in the directory `org.codehaus.mojo.animal-sniffer-annotations-1.27`.
 
 
 'conscrypt-openjdk-uber', licensed under the Apache 2, is distributed with the Google.
 The license file can be found at `licenses/APACHE2.0`.
 Copyright notices related to this dependency can be found in the directory `org.conscrypt.conscrypt-openjdk-uber-2.5.2`.
+
+
+'jspecify', licensed under the The Apache License, Version 2.0, is distributed with the Google.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `org.jspecify.jspecify-1.0.0`.
+
+
+'threeten-extra', licensed under the BSD 3-clause, is distributed with the Google.
+The license file can be found at `licenses/BSD-3-Clause`.
+Copyright notices related to this dependency can be found in the directory `org.threeten.threeten-extra-1.8.0`.
 
 
 'threetenbp', licensed under the BSD-3-Clause, is distributed with the Google.
