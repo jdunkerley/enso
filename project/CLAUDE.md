@@ -21,8 +21,11 @@ Every non-trivial build concern the engine has lives here as a Scala file.
 - `Distribution.scala` + `DistributionPackage.scala` — Produces the engine
   distribution directory layout (matches `distribution/`).
 - `Editions.scala` — Edition-manifest generation.
-- `GatherLicenses.scala` — Drives `sbt-license-report` and the legal-review
-  checks.
+- `GatherLicenses.scala` — Drives the legal-review report and checks
+  (`gatherLicenses`, `verifyLicensePackages`); the dependency list comes from
+  each project's coursier `update` report (`src/main/scala/licenses/`, see
+  `tools/legal-review/CLAUDE.md`). `sbt-license-report` only supplies its
+  licence types and settings.
 - `IRCaches.scala` — Compiles IR caches that ship with the stdlib for fast
   startup.
 - `EnsoLint.scala` — Project-wide lint rules invoked as an SBT task.

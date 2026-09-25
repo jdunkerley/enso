@@ -16,6 +16,12 @@ Review configuration for the third-party notices shipped with each distribution
   `MIT License` to `MIT`) needs a new entry even though nothing changed legally.
 - `<distribution>/report-state` — input hash, output hash, error count. Written
   by `gatherLicenses`, checked by `verifyLicensePackages`. Never edit by hand.
+- `<distribution>/components-without-dependencies` — `<component>: <reason>`
+  lines for sbt projects of the distribution that legitimately resolve no
+  third-party module (`std-generic-jdbc`; `std-tableau`, whose Hyper API jar is
+  an unmanaged download described by `files-add`; `std-duckdb`, which ships its
+  driver through `duckdb-wrapper`). An unlisted empty component is a warning,
+  and so is a listed one that is not empty.
 
 ## Bumping a dependency
 
@@ -42,14 +48,36 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
 - `verifyLicensePackages` only runs in `release.yml`, so nothing on a PR catches
   a stale review. It had been failing since the Scala 2.13.17 bump until #25's
   batch 4 caught it up.
-- Compare against a baseline: run `gatherLicenses` on `develop` first and keep
-  its warning list. Several distributions carry permanent warnings (empty
-  reports, missing sources) that are not yours.
-- The review follows the resolved dependency graph of the distribution's sbt
-  projects, which is not always what ships: `zio-wrapper` bundles
-  `zioIzumiReflectVersion`, `std-snowflake` bundles `zstdVersion` via
-  `zstd-jni-wrapper`. Moving such a pin without the library that resolves it
-  makes the notices describe a different jar from the one shipped.
+- `gatherLicenses` on `develop` is expected to print **no** warnings. A warning
+  is therefore yours; still compare with a baseline run on `develop` before
+  chasing it.
+- The review reads the same coursier `update` report the build ships from
+  (`project/src/main/scala/licenses/frontend/ResolvedDependencies.scala`, Note
+  [Licence Review Follows The Shipped Resolution]). Until #PRNUM it read
+  `sbt-license-report`'s separate Ivy resolution, which ignores BOMs imported
+  in a dependency's `<dependencyManagement>`: Snowflake's notices described
+  gRPC 1.67.1 and protobuf 3.25.5 while 1.77.0 and 4.28.2 shipped. Modules that
+  resolve to no artifact (a BOM or parent POM declared as a dependency, like
+  `software.amazon.awssdk:bom` and `org.apache.logging.log4j:log4j`) are
+  skipped and logged at info level.
+- A JAR wrapper that a library ships but does not resolve itself (it is
+  `provided`, or it has its own dependency list) must be a component of the
+  distribution in `GatherLicenses.distributions` (`build.sbt`), or its contents
+  are missing from the notices: DuckDB (`duckdb-wrapper`), JNA in Microsoft
+  (`jna-wrapper`) and `grpc-xds` in Snowflake (`snowflake-jdbc-thin-wrapper`)
+  were missing until #PRNUM. Still not covered: a wrapper that repackages a jar
+  pinned to a _different_ version from the one the library's graph resolves.
+  Microsoft ships the tcnative natives of `netty-tc-native-wrapper`
+  (`nettyTcNativeBorringSSL`, 2.0.74) but its graph, and so its notices, has
+  `netty-tcnative-boringssl-static` 2.0.81; `zio-wrapper` bundles
+  `zioIzumiReflectVersion` whatever the engine resolves. Moving such a pin
+  without the library that resolves it widens the gap.
+- DuckDB's native library statically links the libraries DuckDB vendors. Their
+  licence files are in
+  `DuckDB/org.duckdb.duckdb_jdbc-<version>/files-add`, fetched from
+  `duckdb/duckdb` at the core version that duckdb-java embeds (its
+  `DUCKDB_VERSION`), and must be refreshed on every DuckDB bump, including the
+  list itself (`src/duckdb/third_party/` of duckdb-java).
 - Generated licence files are not byte-identical across hosts, and
   `report-state`'s output hash is taken over their raw bytes. Files found by
   the GitHub heuristic (`files-keep` entries like

@@ -336,6 +336,11 @@ The license file can be found at `licenses/APACHE2.0`.
 Copyright notices related to this dependency can be found in the directory `io.projectreactor.reactor-core-3.7.19`.
 
 
+'jna', licensed under the Apache-2.0, is distributed with the Microsoft.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `net.java.dev.jna.jna-5.14.0`.
+
+
 'reactive-streams', licensed under the MIT-0, is distributed with the Microsoft.
 The license file can be found at `licenses/MIT-0`.
 Copyright notices related to this dependency can be found in the directory `org.reactivestreams.reactive-streams-1.0.4`.

@@ -87,7 +87,7 @@ object ReportState {
     for (sbtComponent <- sbtComponents) {
       digest.update(sbtComponent.name.getBytes)
       val dependencies =
-        sbtComponent.licenseReport.licenses.sortBy(_.module.toString)
+        sbtComponent.dependencies.dependencies.sortBy(_.module.toString)
       for (
         dep <- dependencies.filter(d => DependencyFilter.shouldKeep(d.module))
       ) {

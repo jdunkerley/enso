@@ -1,0 +1,2 @@
+# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
+std-generic-jdbc: depends only on the GraalVM polyglot API, which the runtime provides, and on other standard libraries; it ships nothing but its own std-generic-jdbc.jar.

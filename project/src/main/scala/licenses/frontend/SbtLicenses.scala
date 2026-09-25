@@ -1,20 +1,15 @@
 package src.main.scala.licenses.frontend
 
 import java.nio.file.Path
-import sbtlicensereport.license.{DepLicense, DepModuleInfo}
-import org.apache.ivy.core.resolve.IvyNode
 import sbt.Compile
 import sbt.internal.util.ManagedLogger
 import sbt.io.IO
-import sbt.librarymanagement.ConfigRef
 import src.main.scala.licenses.report.Diagnostic
 import src.main.scala.licenses.{
   DependencyInformation,
   SBTDistributionComponent,
   SourceAccess
 }
-
-import scala.collection.JavaConverters._
 
 /** Defines the algorithm for discovering dependency metadata.
   */
@@ -29,6 +24,9 @@ object SbtLicenses {
     * runtime, so we do not distribute them. One exception is the launcher which
     * does distribute the provided SubstrateVM dependencies as part of it being
     * compiled with the SVM. But that has to be handled independently anyway.
+    * Another is a JAR wrapper that a standard library depends on as `provided`
+    * and then ships itself; such a wrapper is listed as a component of the
+    * distribution.
     */
   val relevantConfigurations = Seq(Compile)
 
@@ -37,99 +35,99 @@ object SbtLicenses {
     *
     * @param components description of SBT components included in the
     *                   distribution
-    * @param log logger to use when resolving dependencies
+    * @param expectedEmptyComponents names of components that are known to have
+    *                                no third-party dependencies, with the
+    *                                reason
+    * @param log logger to use
     * @return a sequence of collected dependency information and a sequence of
     *         encountered warnings
     */
   def analyze(
     components: Seq[SBTDistributionComponent],
+    expectedEmptyComponents: Map[String, String],
     log: ManagedLogger
   ): (Seq[DependencyInformation], Seq[Diagnostic]) = {
-    val results: Seq[(Seq[Dependency], Vector[Path], Seq[Diagnostic])] =
-      components.map { component =>
-        val report = component.licenseReport.orig
-        val ivyDeps =
-          report.getDependencies.asScala.map(_.asInstanceOf[IvyNode])
-        val sourceSuffix = "-sources.jar"
-        val sourceArtifacts = component.classifiedArtifactsReport
-          .select((configRef: ConfigRef) =>
-            relevantConfigurations.map(_.name).contains(configRef.name)
-          )
-          .map(_.toPath)
-          .filter(_.getFileName.toString.endsWith(sourceSuffix))
-        val deps = for {
-          dep <- component.licenseReport.licenses
-          depNode =
-            ivyDeps
-              .find(ivyDep => safeModuleInfo(ivyDep) == Some(dep.module))
-              .getOrElse(
-                throw new RuntimeException(
-                  s"Could not find Ivy node for resolved module ${dep.module}."
-                )
-              )
-        } yield {
-          val sources = sourceArtifacts.filter { src =>
-            val fileName = src.getFileName.toString
-            // Checking only the major version is a heuristic
-            // Ignoring the version used to include too much: `http-auth` would also match sources of other package: `http-auth-spi`
-            // However, exact version matches are too strict
-            // (possibly because Maven resolves the versions based on the full dependency tree, possibly replacing the dependency?),
-            // and resulted in missing sources. Major version match is a compromise between these two.
-            val majorVersion   = dep.module.version.takeWhile(_ != '.')
-            val expectedPrefix = dep.module.name + "-" + majorVersion
-            fileName.stripSuffix(sourceSuffix).startsWith(expectedPrefix)
-          }
-          Dependency(dep, depNode, sources)
+    val distinctDependencies =
+      components
+        .flatMap(_.dependencies.dependencies)
+        .groupBy(_.module)
+        .toSeq
+        .sortBy(_._1.toString)
+        .map { case (_, same) =>
+          same.head.copy(sources = same.flatMap(_.sources).distinct)
         }
 
-        val diagnostics =
-          if (component.licenseReport.licenses.isEmpty)
-            Seq(
-              Diagnostic.Warning(
-                s"License report for component ${component.name} is empty."
-              )
-            )
-          else Seq()
-
-        (deps, sourceArtifacts, diagnostics)
-      }
-
-    val distinctDependencies =
-      results.flatMap(_._1).groupBy(_.depLicense.module).map(_._2.head).toSeq
-    val distinctSources = results.flatMap(_._2).distinct
-
-    val wrappedDeps =
+    val relevantDeps =
       for (dependency <- distinctDependencies)
         yield DependencyInformation(
-          moduleInfo = dependency.depLicense.module,
-          license    = dependency.depLicense.license,
-          sources    = findSources(dependency),
-          url        = tryFindingUrl(dependency)
+          moduleInfo = dependency.module,
+          license    = dependency.license,
+          sources    = dependency.sources.map(createSourceAccessFromJAR),
+          url        = dependency.homepage
         )
-    val relevantDeps = wrappedDeps.filter(DependencyFilter.shouldKeep)
+    val keptDeps = relevantDeps.filter(DependencyFilter.shouldKeep)
+
+    for {
+      module <- components
+        .flatMap(_.dependencies.modulesWithoutArtifacts)
+        .filter(DependencyFilter.shouldKeep)
+        .distinct
+        .sortBy(_.toString)
+    } log.info(
+      s"$module resolves to no artifact (a BOM or a parent POM declared as a " +
+      s"dependency), so nothing of it is shipped; it is not part of the report."
+    )
 
     val missingWarnings = for {
-      dep <- relevantDeps
+      dep <- keptDeps
       if dep.sources.isEmpty
     } yield Diagnostic.Warning(s"Could not find sources for ${dep.moduleInfo}")
+
+    // A source unmatched within one component may belong to a module that
+    // another component of the same distribution resolves.
     val unexpectedWarnings = for {
-      source <- distinctSources
-      if !distinctDependencies.exists(_.sourcesJARPaths.contains(source))
+      source <- components
+        .flatMap(_.dependencies.unmatchedSources)
+        .distinct
+      if !distinctDependencies.exists(_.sources.contains(source))
     } yield Diagnostic.Warning(
       s"Found a source $source that does not belong to any known " +
       s"dependencies, perhaps the algorithm needs updating?"
     )
-    val reportsWarnings = results.flatMap(_._3)
 
-    (relevantDeps, missingWarnings ++ unexpectedWarnings ++ reportsWarnings)
+    val emptinessDiagnostics = components.flatMap { component =>
+      val thirdParty =
+        component.dependencies.dependencies.filter(dep =>
+          DependencyFilter.shouldKeep(dep.module)
+        )
+      expectedEmptyComponents.get(component.name) match {
+        case Some(reason) if thirdParty.isEmpty =>
+          log.info(
+            s"Component ${component.name} has no third-party dependencies, " +
+            s"as expected: $reason"
+          )
+          Seq()
+        case Some(_) =>
+          Seq(
+            Diagnostic.Warning(
+              s"Component ${component.name} is listed as having no " +
+              s"third-party dependencies, but it has " +
+              s"${thirdParty.map(_.module).mkString(", ")}. Remove it from " +
+              s"the list."
+            )
+          )
+        case None if thirdParty.isEmpty =>
+          Seq(
+            Diagnostic.Warning(
+              s"License report for component ${component.name} is empty."
+            )
+          )
+        case None => Seq()
+      }
+    }
+
+    (keptDeps, missingWarnings ++ unexpectedWarnings ++ emptinessDiagnostics)
   }
-
-  /** Returns a project URL if it is defined for the dependency or None.
-    */
-  private def tryFindingUrl(dependency: Dependency): Option[String] =
-    Option(dependency.ivyNode.getDescriptor).flatMap(descriptor =>
-      Option(descriptor.getHomePage)
-    )
 
   /** Creates a [[SourceAccess]] instance that unpacks the source files from a
     * JAR archive into a temporary directory.
@@ -156,35 +154,4 @@ object SbtLicenses {
   private def jarFileNameFilter(name: String): Boolean = {
     !name.startsWith("/")
   }
-
-  /** Returns a sequence of [[SourceAccess]] instances that give access to any
-    * sources JARs that are available with the dependency.
-    */
-  private def findSources(dependency: Dependency): Seq[SourceAccess] =
-    dependency.sourcesJARPaths.map(createSourceAccessFromJAR)
-
-  /** Wraps information related to a dependency.
-    *
-    * @param depLicense information on the license
-    * @param ivyNode Ivy node that can be used to find metadata
-    * @param sourcesJARPaths paths to JARs containing dependency's sources
-    */
-  case class Dependency(
-    depLicense: DepLicense,
-    ivyNode: IvyNode,
-    sourcesJARPaths: Seq[Path]
-  )
-
-  /** Returns [[DepModuleInfo]] for an [[IvyNode]] if it is defined, or None.
-    */
-  def safeModuleInfo(dep: IvyNode): Option[DepModuleInfo] =
-    for {
-      moduleId       <- Option(dep.getModuleId)
-      moduleRevision <- Option(dep.getModuleRevision)
-      revisionId     <- Option(moduleRevision.getId)
-    } yield DepModuleInfo(
-      moduleId.getOrganisation,
-      moduleId.getName,
-      revisionId.getRevision
-    )
 }

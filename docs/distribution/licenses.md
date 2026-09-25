@@ -42,10 +42,20 @@ distributions (`launcher` and `engine`), as well as distributions for many of
 the major components of the standard library.
 
 Another relevant setting is `GatherLicenses.licenseConfigurations` which defines
-which `ivy` configurations are considered to search for dependencies. Currently
-it is set to only consider `compile` dependencies, as dependencies for
-`provided`, `test` or `benchmark` are not distributed and there are no
-`assembly`-specific dependencies.
+which configurations are considered to search for dependencies. Currently it is
+set to only consider `compile` dependencies, as dependencies for `provided`,
+`test` or `benchmark` are not distributed and there are no `assembly`-specific
+dependencies. A project that a standard library depends on as `provided` but
+ships anyway (the JAR wrappers, such as `duckdb-wrapper` or `jna-wrapper`) must
+therefore be listed as a component of the distribution itself.
+
+The dependencies are read from sbt's own `update` report - the same resolution
+that decides which JARs are shipped - and their sources from
+`updateClassifiers`. (`sbt-license-report`, which the task used to take them
+from, resolves the project again with Ivy, which ignores BOMs imported by a
+dependency's POM and so described different versions from the ones shipped.) A
+module that resolves to no artifact, such as a BOM declared as a dependency,
+ships nothing and is left out.
 
 `GatherLicenses.configurationRoot` specifies where the review tool will look for
 the files specifying review state and `GatherLicenses.distributionRoot`
@@ -229,22 +239,22 @@ dependencies whose legal-review configurations contains a license file in
 
 #### Warnings
 
-All warnings should be carefully reviewed and most of them will fail the CI.
-However, there are some warnings that may be ignored.
+All warnings should be carefully reviewed. A clean run prints none, so any
+warning is new and should be fixed rather than ignored:
 
-Below we list the warnings that show up currently and their explanations:
-
-- `Could not find sources for com.google.guava # listenablefuture # 9999.0-empty-to-avoid-conflict-with-guava`
-  - This warning is due to the fact that this is a dummy artifact that does not
-    contain any sources. We added a special note in its legal config that refers
-    to the original `guava` module, so the warning can be safely discarded.
-- `Found a source .../.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/modules/scala-collection-compat_2.13/2.1.1/scala-collection-compat_2.13-2.1.1-sources.jar that does not belong to any known dependencies, perhaps the algorithm needs updating?`
-  - This is a bit unexpected - the engine does depend on
-    `scala-collection-compat # 2.0.0` (used by `slick`), but here for some
-    reason we find sources for version `2.1.1` (the sources for `2.0.0` are
-    available too). We could not figure out this issue for now, but it is not a
-    problem for the legal review, because the engine distribution does include
-    all necessary information for the version it actually uses (`2.0.0`).
+- `Could not find sources for ...` - the module publishes no `-sources` JAR.
+  Provide its licence and notices through `files-add` / `copyright-add`. (The
+  empty `com.google.guava # listenablefuture # 9999.0-...` placeholder is
+  filtered out in `DependencyFilter`.)
+- `Found a source ... that does not belong to any known dependencies` - the
+  `updateClassifiers` resolution disagrees with `update`; this should not
+  happen, since both are the same coursier resolution.
+- `License report for component ... is empty.` - the component resolves no
+  third-party module. Usually what it ships is invisible to the review (for
+  example a `provided` library shipped through a JAR wrapper that should be a
+  component too). If the component really ships nothing third-party, or ships
+  only unmanaged files described by `files-add`, list it with the reason in the
+  distribution's `components-without-dependencies` file.
 
 #### Updating Dependencies
 
@@ -281,8 +291,11 @@ The subdirectory for each artifact may contain the following entries:
   the files should be named with the normalized license name and they should
   contain a path to that license's file (the path should be relative to the
   repository root)
-- `.report.state` - an automatically generated file that can be used to check if
+- `report-state` - an automatically generated file that can be used to check if
   the report is up-to-date
+- `components-without-dependencies` - lines of the form `<component>: <reason>`
+  naming the sbt projects of the distribution that are expected to resolve no
+  third-party dependency (see [Warnings](#warnings))
 - and for each dependency, a subdirectory named as its `packageName` with
   following entries:
   - `files-add` - directory that may contain additional files that should be
