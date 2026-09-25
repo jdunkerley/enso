@@ -471,7 +471,9 @@ object Dependencies {
   val jimFsVersion               = "1.3.2"
   val nettyTcNativeBorringSSL    = "2.0.74.Final"
   val nettyTransportEpollVersion = "4.1.118.Final"
-  // ^ Both Netty native pins are held: see Note [Netty Native Libraries] below.
+  // ^ These two and the one below are Netty native-library pins, and all three
+  // are held: see Note [Netty Native Libraries] below.
+  val nettyResolverDnsNativeMacosVersion = "4.1.118.Final"
   // Not free to move: must equal the zstd-jni that `snowflake-jdbc-thin`
   // resolves. `std-snowflake` ships `zstd-jni-wrapper`'s repackaged copy at
   // this version, while its legal review follows the version snowflake-jdbc
@@ -481,8 +483,9 @@ object Dependencies {
 
   /* Note [Netty Native Libraries]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * `netty-tc-native-wrapper` and `netty-epoll-native-wrapper` extract only the
-   * JNI libraries from these two versions. The Java classes that load them come
+   * `netty-tc-native-wrapper`, `netty-epoll-native-wrapper` and
+   * `netty-resolver-dns-native-macos-wrapper` extract only the JNI libraries
+   * from these three versions. The Java classes that load them come
    * from whatever the consuming libraries resolve: Snowflake JDBC for
    * `std-snowflake` (netty 4.1.127, netty-tcnative-classes 2.0.74) and the
    * Azure SDK for `std-microsoft` (netty 4.1.137, 2.0.81 at the Azure pins). So
@@ -500,6 +503,10 @@ object Dependencies {
    *   that belongs with the Snowflake JDBC bump (#58). When it is fixed: 4.2.x
    *   natives fail with Snowflake's 4.1.127 classes, while 4.1.118 and 4.1.137
    *   load; match the 4.1.x that Snowflake resolves.
+   * - The macOS DNS-resolver native (`nettyResolverDnsNativeMacosVersion`) is
+   *   shipped by both. Its classes are netty-resolver-dns-classes-macos at
+   *   4.1.127 (Snowflake) and 4.1.135 (Azure), so on the evidence above it must
+   *   not be newer than 4.1.127. It is untested: the natives are macOS-only.
    * Neither consumer uses Netty 4.2 yet. Move these with `snowflakeJDBCVersion`.
    */
 }
