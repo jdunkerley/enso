@@ -437,7 +437,7 @@ object Dependencies {
   val scalaLoggingVersion     = "3.9.6"
   val scalameterVersion       = "0.21"
   val scalatestVersion        = "3.2.20"
-  val sqliteVersion           = "3.46.1.0"
+  val sqliteVersion           = "3.53.4.0"
   val tikaVersion             = "2.4.1"
   val typesafeConfigVersion   = "1.4.9"
   val junitVersion            = "4.13.2"
@@ -451,7 +451,7 @@ object Dependencies {
   val httpCoreVersion        = "4.4.16"
   val apacheArrowVersion     = "14.0.1"
   val `snowflakeJDBCVersion` = "4.0.1"
-  val mssqlserverJDBCVersion = "13.2.1.jre11"
+  val mssqlserverJDBCVersion = "13.6.0.jre11"
   // The Azure SDK brings its own Netty classes; `std-microsoft` pairs them with
   // the netty-tcnative natives from `nettyTcNativeBorringSSL`, which must not be
   // newer than Azure's netty-tcnative-classes. See Note [Netty Native Libraries].
@@ -465,9 +465,14 @@ object Dependencies {
   val jnaVersion                 = "5.14.0"
   val googleProtobufVersion      = "4.36.2" // See Note [Engine protobuf-java]
   val shapelessVersion           = "2.3.13"
-  val postgresVersion            = "42.4.0"
-  val duckdbVersion              = "1.4.4.0"
-  val h2Version                  = "2.3.232"
+  val postgresVersion            = "42.7.13"
+  // Not a one-line bump: `lib/java/duckdb-wrapper` replaces `org.duckdb.DuckDBNative`
+  // with a copy of this version's source, whose `native` declarations must match the
+  // JNI library in this jar, and the JNI lookups that library makes on load are listed
+  // for Native Image in std-bits/duckdb's `reachability-metadata.json`. Re-derive both
+  // from the new version's sources (`src/jni/refs.cpp`) when this moves.
+  val duckdbVersion              = "1.5.5.1"
+  val h2Version                  = "2.5.250"
   val jimFsVersion               = "1.3.2"
   val nettyTcNativeBorringSSL    = "2.0.74.Final"
   val nettyTransportEpollVersion = "4.1.118.Final"

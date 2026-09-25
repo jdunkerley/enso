@@ -157,9 +157,10 @@
     },
     {
       "type": "java.nio.ByteOrder",
-      "fields": [
+      "methods": [
         {
-          "name": "LITTLE_ENDIAN"
+          "name": "nativeOrder",
+          "parameterTypes": []
         }
       ]
     },
@@ -326,6 +327,23 @@
         {
           "name": "upper"
         }
+      ],
+      "methods": [
+        {
+          "name": "toBigDecimal",
+          "parameterTypes": [
+            "long",
+            "long",
+            "int"
+          ]
+        },
+        {
+          "name": "toBigInteger",
+          "parameterTypes": [
+            "long",
+            "long"
+          ]
+        }
       ]
     },
     {
@@ -347,6 +365,19 @@
       ]
     },
     {
+      "type": "org.duckdb.DuckDBScalarFunctionWrapper",
+      "methods": [
+        {
+          "name": "execute",
+          "parameterTypes": [
+            "java.nio.ByteBuffer",
+            "java.nio.ByteBuffer",
+            "java.nio.ByteBuffer"
+          ]
+        }
+      ]
+    },
+    {
       "type": "org.duckdb.DuckDBStruct",
       "methods": [
         {
@@ -356,6 +387,36 @@
             "org.duckdb.DuckDBVector[]",
             "int",
             "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "org.duckdb.DuckDBTableFunctionWrapper",
+      "methods": [
+        {
+          "name": "executeBind",
+          "parameterTypes": [
+            "java.nio.ByteBuffer"
+          ]
+        },
+        {
+          "name": "executeFunction",
+          "parameterTypes": [
+            "java.nio.ByteBuffer",
+            "java.nio.ByteBuffer"
+          ]
+        },
+        {
+          "name": "executeGlobalInit",
+          "parameterTypes": [
+            "java.nio.ByteBuffer"
+          ]
+        },
+        {
+          "name": "executeLocalInit",
+          "parameterTypes": [
+            "java.nio.ByteBuffer"
           ]
         }
       ]
