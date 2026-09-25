@@ -53,7 +53,7 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   chasing it.
 - The review reads the same coursier `update` report the build ships from
   (`project/src/main/scala/licenses/frontend/ResolvedDependencies.scala`, Note
-  [Licence Review Follows The Shipped Resolution]). Until #PRNUM it read
+  [Licence Review Follows The Shipped Resolution]). Until #64 it read
   `sbt-license-report`'s separate Ivy resolution, which ignores BOMs imported
   in a dependency's `<dependencyManagement>`: Snowflake's notices described
   gRPC 1.67.1 and protobuf 3.25.5 while 1.77.0 and 4.28.2 shipped. Modules that
@@ -65,7 +65,7 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   distribution in `GatherLicenses.distributions` (`build.sbt`), or its contents
   are missing from the notices: DuckDB (`duckdb-wrapper`), JNA in Microsoft
   (`jna-wrapper`) and `grpc-xds` in Snowflake (`snowflake-jdbc-thin-wrapper`)
-  were missing until #PRNUM. Still not covered: a wrapper that repackages a jar
+  were missing until #64. Still not covered: a wrapper that repackages a jar
   pinned to a _different_ version from the one the library's graph resolves.
   Microsoft ships the tcnative natives of `netty-tc-native-wrapper`
   (`nettyTcNativeBorringSSL`, 2.0.74) but its graph, and so its notices, has
