@@ -45,6 +45,9 @@
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
+- [The Google Analytics and Google Sheets libraries used by Standard.Google have
+  been updated][62], together with the gRPC and Protocol Buffers libraries they
+  use to talk to Google (gRPC 1.83, protobuf 4).
 - [The Azure libraries used by Standard.Microsoft have been updated][61]
   (azure-identity 1.18.6, azure-storage-blob 12.35.1, azure-resourcemanager
   2.64.0), with their Netty and Reactor dependencies. The native TLS library
@@ -122,6 +125,7 @@
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
+[62]: https://github.com/jdunkerley/enso/pull/62
 [61]: https://github.com/jdunkerley/enso/pull/61
 [60]: https://github.com/jdunkerley/enso/pull/60
 [59]: https://github.com/jdunkerley/enso/pull/59
