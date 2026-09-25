@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.util.UUID;
 import org.enso.logging.config.BaseConfig;
 import org.enso.logging.service.LoggingService;
+import org.slf4j.MDC;
 import org.slf4j.event.Level;
 
 class LoggingServer extends LoggingService<URI> {
@@ -21,6 +22,11 @@ class LoggingServer extends LoggingService<URI> {
 
   public URI start(Level level, Path path, String prefix, BaseConfig config) {
     var lc = new LoggerContext();
+    // Since logback 1.5 each context carries its own MDC adapter, which SLF4J's
+    // provider installs only on the default context. Without one, any event
+    // logged through this context fails as soon as an appender reads the MDC.
+    // Share the global adapter, which is what every context used before 1.5.
+    lc.setMDCAdapter(MDC.getMDCAdapter());
 
     try {
       var setup = LogbackSetup.forContext(lc, config);

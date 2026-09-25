@@ -127,7 +127,7 @@ object Dependencies {
   // Held at 1.0.3: 1.0.4 relicensed reactive-streams from CC0 to MIT-0.
   val reactiveStreamsVersion = "1.0.3"
   val sprayJsonVersion       = "1.3.6"
-  val logbackClassicVersion  = "1.3.7"
+  val logbackClassicVersion  = "1.6.4"
   val javaDiffVersion        = "4.17"
   val logbackPkg = Seq(
     "ch.qos.logback" % "logback-classic" % logbackClassicVersion,
@@ -170,7 +170,7 @@ object Dependencies {
   val circeGenericExtrasVersion = "0.14.4"
   val circe = Seq("circe-core", "circe-generic", "circe-parser")
     .map("io.circe" %% _ % circeVersion)
-  val snakeyamlVersion = "2.3"
+  val snakeyamlVersion = "2.7"
 
   // === Commons ================================================================
 
@@ -272,7 +272,17 @@ object Dependencies {
 
   // === Jackson ================================================================
 
-  val jacksonVersion = "2.15.2"
+  val jacksonVersion = "2.22.3"
+  // Since 2.20, jackson-annotations is versioned by minor only ("2.22", no
+  // patch), so it cannot share `jacksonVersion`. Keep it on the same minor.
+  val jacksonAnnotationsVersion = "2.22"
+
+  // === Guava ==================================================================
+
+  // `guavaVersion` itself is under "Other". Guava is an explicit JPMS module
+  // that `requires transitive` failureaccess, so `interpreter-dsl` puts both on
+  // its module path; this must equal the failureaccess `guavaVersion` depends on.
+  val guavaFailureAccessVersion = "1.0.3"
 
   // === JAXB ================================================================
 
@@ -348,7 +358,9 @@ object Dependencies {
 
   // === Bouncy Castle ==========================================================
 
-  val bouncyCastleVersion = "1.78.1"
+  // Also GraalPy's dependency: `GraalVM.pythonPkgs` ships these jars at this
+  // version in the engine distribution, so the two must not drift apart.
+  val bouncyCastleVersion = "1.86"
   val bouncyCastle = Seq(
     "org.bouncycastle" % "bcutil-jdk18on" % bouncyCastleVersion,
     "org.bouncycastle" % "bcpkix-jdk18on" % bouncyCastleVersion,
@@ -371,14 +383,24 @@ object Dependencies {
   /* Note [Google Libraries Move With gRPC]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    * `std-google`'s libraries share one gax / google-http-client / gRPC /
-   * protobuf tree, so they cannot move independently of `grpcVersion` and
-   * `googleProtobufVersion`:
+   * protobuf tree, so they cannot move independently of `grpcVersion` (the
+   * protobuf they ship is whatever they resolve; see
+   * Note [Engine protobuf-java]):
    * - google-analytics-admin 0.69.0+ and -data 0.70.0+ need a newer gRPC than
    *   `grpcVersion`, and admin 0.93.0+ / data 0.94.0+ need protobuf 4.
    * - google-api-client 2.8.0+ moves google-http-client to 2.x, while the
    *   analytics libraries' gax still expects 1.x.
    * The sheets client and google-api-client 2.7.2 stay on google-http-client
    * 1.x, so they are current; the rest waits for the gRPC/protobuf upgrade.
+   */
+
+  /* Note [Engine protobuf-java]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `googleProtobufVersion` is the protobuf-java the engine ships in
+   * `component/`, as a module `akka-wrapper` requires. Nothing in the engine
+   * uses it (Akka's own protobuf is shaded into akka-protobuf-v3), and it pins
+   * nothing in `std-google`. 4.x declares `Automatic-Module-Name:
+   * com.google.protobuf`, which is the name `akka-wrapper` requires.
    */
   val googleApiClientVersion         = "2.7.2"
   val googleApiServicesSheetsVersion = "v4-rev20260610-2.0.0"
@@ -402,8 +424,8 @@ object Dependencies {
   val diffsonVersion          = "4.6.1"
   val directoryWatcherVersion = "0.18.0"
   val flatbuffersVersion      = "24.3.25"
-  val guavaVersion            = "32.0.0-jre"
-  val jgitVersion             = "6.7.0.202309050840-r"
+  val guavaVersion            = "33.7.1-jre"
+  val jgitVersion             = "7.8.0.202609011348-r"
   val kindProjectorVersion    = "0.13.3"
   val mockitoScalaVersion     = "1.17.14"
   val mockitoJavaVersion      = "5.24.0"
@@ -442,7 +464,7 @@ object Dependencies {
   // copy of its 5.14.0 source (to avoid `java.desktop`). A newer JNA needs that
   // copy re-derived first, otherwise the old `Native` runs against newer JNA.
   val jnaVersion                 = "5.14.0"
-  val googleProtobufVersion      = "3.25.1"
+  val googleProtobufVersion      = "4.36.2" // See Note [Engine protobuf-java]
   val shapelessVersion           = "2.3.13"
   val postgresVersion            = "42.4.0"
   val duckdbVersion              = "1.4.4.0"

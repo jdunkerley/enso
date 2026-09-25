@@ -1082,13 +1082,13 @@ lazy val `logging-service-telemetry` = project
     commands += WithDebugCommand.withDebug,
     Test / fork := true,
     libraryDependencies ++= slf4jApi ++ Seq(
-      "org.netbeans.api"           % "org-openide-util-lookup" % netbeansApiVersion % "provided",
-      "junit"                      % "junit"                   % junitVersion       % Test,
-      "com.github.sbt"             % "junit-interface"         % junitIfVersion     % Test,
-      "org.hamcrest"               % "hamcrest-all"            % hamcrestVersion    % Test,
-      "com.fasterxml.jackson.core" % "jackson-core"            % jacksonVersion     % Test,
-      "com.fasterxml.jackson.core" % "jackson-annotations"     % jacksonVersion     % Test,
-      "com.fasterxml.jackson.core" % "jackson-databind"        % jacksonVersion     % Test
+      "org.netbeans.api"           % "org-openide-util-lookup" % netbeansApiVersion        % "provided",
+      "junit"                      % "junit"                   % junitVersion              % Test,
+      "com.github.sbt"             % "junit-interface"         % junitIfVersion            % Test,
+      "org.hamcrest"               % "hamcrest-all"            % hamcrestVersion           % Test,
+      "com.fasterxml.jackson.core" % "jackson-core"            % jacksonVersion            % Test,
+      "com.fasterxml.jackson.core" % "jackson-annotations"     % jacksonAnnotationsVersion % Test,
+      "com.fasterxml.jackson.core" % "jackson-databind"        % jacksonVersion            % Test
     ),
     Compile / moduleDependencies ++= logbackPkg ++ slf4jApi ++ Seq(
       "org.netbeans.api" % "org-openide-util-lookup" % netbeansApiVersion
@@ -1976,7 +1976,9 @@ lazy val `interpreter-dsl` = (project in file("lib/java/interpreter-dsl"))
     Compile / moduleDependencies ++= Seq(
       "org.apache.commons" % "commons-lang3"           % commonsLangVersion,
       "org.netbeans.api"   % "org-openide-util-lookup" % netbeansApiVersion,
-      "com.google.guava"   % "guava"                   % guavaVersion
+      "com.google.guava"   % "guava"                   % guavaVersion,
+      // guava `requires transitive` it, so it must be on the module path too.
+      "com.google.guava" % "failureaccess" % guavaFailureAccessVersion
     )
   )
 
@@ -2801,7 +2803,7 @@ lazy val `runtime-integration-tests` =
         "com.github.sbt"             % "junit-interface"              % junitIfVersion            % Test,
         "org.hamcrest"               % "hamcrest-all"                 % hamcrestVersion           % Test,
         "com.fasterxml.jackson.core" % "jackson-core"                 % jacksonVersion            % Test,
-        "com.fasterxml.jackson.core" % "jackson-annotations"          % jacksonVersion            % Test,
+        "com.fasterxml.jackson.core" % "jackson-annotations"          % jacksonAnnotationsVersion % Test,
         "com.fasterxml.jackson.core" % "jackson-databind"             % jacksonVersion            % Test,
         "org.yaml"                   % "snakeyaml"                    % snakeyamlVersion
       ),

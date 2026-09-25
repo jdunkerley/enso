@@ -64,12 +64,14 @@ add_specs suite_builder =
                 JS_Object.from_pairs [["foo", "bar"], ["baz", ["foo", "x", False]], ["y", y_v]]
 
         group_builder.specify "should report meaningful parsing errors" <|
+            # Positions are Jackson's: the offending character, or the start of
+            # an unrecognized token (Jackson 2.21+; before that, its end).
             "".should_fail_parsing_with "Empty string is not valid JSON."
-            "foo".should_fail_parsing_with "Unrecognized token 'foo': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false') at position [line: 1, column: 4]"
-            "[,]".should_fail_parsing_with "Unexpected character (',' (code 44)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false') at position [line: 1, column: 3]"
-            "{,}".should_fail_parsing_with "Unexpected character (',' (code 44)): was expecting double-quote to start field name at position [line: 1, column: 3]"
+            "foo".should_fail_parsing_with "Unrecognized token 'foo': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false') at position [line: 1, column: 1]"
+            "[,]".should_fail_parsing_with "Unexpected character (',' (code 44)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false') at position [line: 1, column: 2]"
+            "{,}".should_fail_parsing_with "Unexpected character (',' (code 44)): was expecting double-quote to start field name at position [line: 1, column: 2]"
             deep_err = '{ "foo": "bar", "baz": ["foo", "x"", false], "y": {"z": null, "w": null} }'
-            deep_err.should_fail_parsing_with 'Unexpected character (\'\"\' (code 34)): was expecting comma to separate Array entries at position [line: 1, column: 36]'
+            deep_err.should_fail_parsing_with 'Unexpected character (\'\"\' (code 34)): was expecting comma to separate Array entries at position [line: 1, column: 35]'
             "123 4".should_parse_as 123 # Jackson parser assumes this is "correct"
 
         group_builder.specify "should be able to deserialize using into via conversion" <|
