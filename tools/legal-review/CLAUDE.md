@@ -61,6 +61,9 @@ but no such entry has been detected`) and new, unreviewed copyrights/files.
   `report-state`, even on an unchanged `develop`. **Run `gatherLicenses` on
   Windows.** Git must not normalize them either (`core.autocrlf=input`, the
   default on this Windows setup): stage the notices byte-for-byte with
-  `git -c core.autocrlf=false add distribution/**/THIRD-PARTY`. Then check with
-  `verifyLicensePackages` on a fresh Linux checkout, not the working tree that
-  generated them.
+  `git -c core.autocrlf=false add distribution/**/THIRD-PARTY`. The same goes
+  for the review config here: some `files-add/*` and `copyright-add` files are
+  CRLF in git and feed `report-state`'s input hash, so stage renamed configs
+  with `git -c core.autocrlf=false add tools/legal-review` too. Then check
+  with `verifyLicensePackages` on a fresh Linux checkout, not the working tree
+  that generated them.
