@@ -110,8 +110,11 @@ case class Review(root: File, dependencySummary: DependencySummary) {
       val matchingPackages = knownPackages.filter(other =>
         packageNameFromConfig.startsWith(other.packageNameWithoutVersion + "-")
       )
+      // Prefer the longest name: `azure-resourcemanager-compute-2.50.0` also
+      // starts with `azure-resourcemanager-`, and `netty-codec-http-…` with
+      // `netty-codec-`. Treating such a config as unmatched deletes it below.
       val maybeMatchingPackage: Option[DependencyInformation] =
-        if (matchingPackages.length == 1) Some(matchingPackages.head) else None
+        matchingPackages.sortBy(-_.packageNameWithoutVersion.length).headOption
 
       maybeMatchingPackage match {
         case Some(matchingPackage) =>
