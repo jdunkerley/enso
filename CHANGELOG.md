@@ -47,6 +47,9 @@
   the libraries built into its native code, Standard.Microsoft credits JNA, and
   Standard.Snowflake names the gRPC, Protocol Buffers and Commons Codec versions
   it actually bundles (it listed older ones) and credits gRPC xDS.
+- [Fixed an intermittent failure in the engine's standard library import test on
+  Windows CI][65]: it now also waits for the project's code-completion data,
+  which can arrive after execution has finished.
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
@@ -132,6 +135,7 @@
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33
 [62]: https://github.com/jdunkerley/enso/pull/62
+[65]: https://github.com/jdunkerley/enso/pull/65
 [61]: https://github.com/jdunkerley/enso/pull/61
 [60]: https://github.com/jdunkerley/enso/pull/60
 [59]: https://github.com/jdunkerley/enso/pull/59
