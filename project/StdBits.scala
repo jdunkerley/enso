@@ -9,6 +9,7 @@ import java.io.{File, IOException}
 import java.nio.file.{Files, Path}
 import java.util.Locale
 import scala.jdk.CollectionConverters.asScalaBufferConverter
+import scala.util.Using
 
 object StdBits {
 
@@ -262,15 +263,20 @@ object StdBits {
     }
   }
 
+  /** Lists all regular files under `dir`, recursively.
+    *
+    * `Files.walk` holds open directory handles until its stream is closed, so
+    * the list is materialised inside `Using.resource`; a leaked handle can stop
+    * Windows from deleting or re-extracting the directory in a later build.
+    */
   private def listRecursively(
     dir: File
   ): Seq[File] = {
-    Files
-      .walk(dir.toPath)
-      .toList
-      .asScala
-      .map(_.toFile)
-      .filter(_.isFile)
+    Using.resource(Files.walk(dir.toPath)) { stream =>
+      stream.toList.asScala.toList
+        .map(_.toFile)
+        .filter(_.isFile)
+    }
   }
 
   /** Inspired by `org.enso.pkg.NativeLibraryFinder`

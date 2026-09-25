@@ -5492,9 +5492,11 @@ lazy val `grpc-wrapper` = project
         "META-INF/LICENSE.txt"                  -> CopyToOutputJar,
         "META-INF/NOTICE.txt"                   -> CopyToOutputJar,
         "META-INF/io.netty.versions.properties" -> CopyToOutputJar,
-        "META-INF/services/**"                  -> CopyToOutputJar,
-        "META-INF/license/**"                   -> CopyToOutputJar,
-        "io/**/*.class"                         -> CopyToOutputJar
+        // Renamed with the shaded package in newer gRPC releases.
+        "META-INF/io.grpc.netty.shaded.io.netty.versions.properties" -> CopyToOutputJar,
+        "META-INF/services/**"                                       -> CopyToOutputJar,
+        "META-INF/license/**"                                        -> CopyToOutputJar,
+        "io/**/*.class"                                              -> CopyToOutputJar
       )
     )
   )
@@ -5602,7 +5604,7 @@ lazy val `snowflake-jdbc-thin-wrapper` = project
       ignoreDependencyIncludeTransitive = Some(s"grpc-netty-shaded-1.77.0"),
       ignoreDependenciesByModuleID = Some(
         Seq(
-          "org.conscrypt"    % "conscrypt-openjdk-uber" % "2.5.2",
+          "org.conscrypt"    % "conscrypt-openjdk-uber" % conscryptVersion,
           "com.github.luben" % "zstd-jni"               % zstdVersion
         )
       ),
@@ -5621,9 +5623,9 @@ lazy val `conscrypt-wrapper` = project
   .enablePlugins(JarExtractPlugin)
   .settings(
     libraryDependencies := Seq(
-      "org.conscrypt" % "conscrypt-openjdk-uber" % "2.5.2"
+      "org.conscrypt" % "conscrypt-openjdk-uber" % conscryptVersion
     ),
-    inputJar := "org.conscrypt" % "conscrypt-openjdk-uber" % "2.5.2",
+    inputJar := "org.conscrypt" % "conscrypt-openjdk-uber" % conscryptVersion,
     jarExtractor := JarExtractor(
       Map(
         "META-INF/native/libconscrypt_openjdk_jni-linux-x86_64.so" -> PolyglotLib(
@@ -5790,8 +5792,12 @@ lazy val `std-google` = project
       "com.google.apis"       % "google-api-services-sheets" % googleApiServicesSheetsVersion exclude ("com.google.code.findbugs", "jsr305"),
       "com.google.analytics"  % "google-analytics-admin"     % googleAnalyticsAdminVersion exclude ("com.google.code.findbugs", "jsr305") exclude ("io.grpc", "grpc-xds"),
       "com.google.analytics"  % "google-analytics-data"      % googleAnalyticsDataVersion exclude ("com.google.code.findbugs", "jsr305") exclude ("io.grpc", "grpc-xds"),
-      "io.grpc"               % "grpc-netty-shaded"          % grpcVersion exclude ("com.google.code.findbugs", "jsr305")
+      "io.grpc"               % "grpc-netty-shaded"          % grpcVersion exclude ("com.google.code.findbugs", "jsr305"),
+      // See Note [Google Libraries Move With gRPC].
+      "javax.annotation" % "javax.annotation-api" % javaxAnnotationApiVersion
     ),
+    // See Note [Google Libraries Move With gRPC].
+    dependencyOverrides += "org.conscrypt" % "conscrypt-openjdk-uber" % conscryptVersion,
     // Extract native libraries from grpc-netty-shaded-***.jar, and put them under
     // Standard/Google/polyglot/lib directory. The minimized jar will
     // be put under Standard/Google/polyglot/java directory.
@@ -5808,7 +5814,7 @@ lazy val `std-google` = project
             Some(s"grpc-netty-shaded-${grpcVersion}"),
           ignoreDependenciesByModuleID = Some(
             Seq(
-              "org.conscrypt" % "conscrypt-openjdk-uber" % "2.5.2"
+              "org.conscrypt" % "conscrypt-openjdk-uber" % conscryptVersion
             )
           ),
           libraryUpdates     = (Compile / update).value,
@@ -5967,7 +5973,7 @@ lazy val `std-snowflake` = project
           ignoreDependenciesByModuleID = Some(
             Seq(
               "net.snowflake"    % "snowflake-jdbc-thin"    % snowflakeJDBCVersion,
-              "org.conscrypt"    % "conscrypt-openjdk-uber" % "2.5.2",
+              "org.conscrypt"    % "conscrypt-openjdk-uber" % conscryptVersion,
               "com.github.luben" % "zstd-jni"               % zstdVersion,
               "io.grpc"          % "grpc-netty-shaded"      % "1.77.0"
             )
