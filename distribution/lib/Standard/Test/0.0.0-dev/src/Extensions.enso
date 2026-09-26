@@ -309,7 +309,13 @@ Number.should_equal self that epsilon=0 = Frame_Hider.hide <|
     case matches of
         True -> Spec_Result.Success
         False ->
-            msg = self.to_text + " did not equal " + that.to_text + " (at " + Frame_Hider.get_top_stack_frame + ")."
+            ## A Float and a Decimal (or an Integer and a Float) can print
+               identically, so name the types when they differ.
+            self_type = Meta.type_of self
+            that_type = Meta.type_of that
+            types = if self_type == that_type then "" else
+                " (" + self_type.to_text + " vs " + that_type.to_text + ")"
+            msg = self.to_text + " did not equal " + that.to_text + types + " (at " + Frame_Hider.get_top_stack_frame + ")."
             Test.fail msg
 
 ## Asserts that `self` is within `epsilon` from `that`.

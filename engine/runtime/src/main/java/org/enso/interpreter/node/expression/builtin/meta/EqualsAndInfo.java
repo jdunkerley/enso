@@ -1,23 +1,32 @@
 package org.enso.interpreter.node.expression.builtin.meta;
 
-import com.oracle.truffle.api.Assumption;
 import com.oracle.truffle.api.CompilerDirectives;
-import com.oracle.truffle.api.Truffle;
 import org.enso.interpreter.runtime.data.hash.EnsoHashMap;
 
-/** Holds result of equality check with addtional information about warnings. */
+/**
+ * Holds result of equality check with addtional information about warnings.
+ *
+ * <p>Note [Equality Result Does Not Speculate]. The answer {@link #isTrue()} gives must depend only
+ * on this object. It used to depend on a global {@code Assumption} as well - "no equality has ever
+ * produced warnings", under which {@code isTrue()} was {@code this == TRUE} - and the
+ * {@link #valueOf(boolean, EnsoHashMap) warnings-carrying} instance invalidated that assumption as
+ * it was created. That is only correct if every compiled body that folded the assumption as valid
+ * stops running before it can see such an instance. In the native image that did not always hold:
+ * compiled code kept taking the {@code this == TRUE} branch after the assumption was invalid, so
+ * every {@code ==} whose result carried a warning answered {@code False} for the rest of the
+ * process - e.g. {@code 12.1 == (Decimal.from 12.1)}, whose Float-to-Decimal conversion attaches
+ * {@code Loss_Of_Numeric_Precision} (issue #55). Reading the field is as cheap as the identity
+ * check, so there is nothing to speculate on.
+ */
 public final class EqualsAndInfo {
-  private static final Assumption NO_WARNINGS =
-      Truffle.getRuntime().createAssumption("No equals with warnings");
-
   /** {@code isTrue()} without any warnings */
   static final EqualsAndInfo TRUE = new EqualsAndInfo(true, null);
 
   /** {@code !isTrue()} value without any warnings */
   static final EqualsAndInfo FALSE = new EqualsAndInfo(false, null);
 
-  private boolean equals;
-  private EnsoHashMap warnings;
+  private final boolean equals;
+  private final EnsoHashMap warnings;
 
   private EqualsAndInfo(boolean equals, EnsoHashMap warnings) {
     this.equals = equals;
@@ -25,17 +34,12 @@ public final class EqualsAndInfo {
   }
 
   /**
-   * Checks whether the value of the result is {@code true}. Optimizes the check if no warnings were
-   * yet used in the equality check.
+   * Checks whether the value of the result is {@code true}.
    *
    * @return value of {@code result}
    */
   public final boolean isTrue() {
-    if (NO_WARNINGS.isValid()) {
-      return this == TRUE;
-    } else {
-      return equals;
-    }
+    return equals;
   }
 
   /**
@@ -44,11 +48,7 @@ public final class EqualsAndInfo {
    * @return {@code null} if there are no warnings, or the warnings
    */
   final EnsoHashMap getWarnings() {
-    if (NO_WARNINGS.isValid()) {
-      return null;
-    } else {
-      return warnings;
-    }
+    return warnings;
   }
 
   /**
@@ -62,8 +62,7 @@ public final class EqualsAndInfo {
   }
 
   /**
-   * Converts {@code result} and {@code warnings} into instance of this class. Speculates on {@code
-   * warnings} being {@code null}.
+   * Converts {@code result} and {@code warnings} into instance of this class.
    *
    * @param result result of {@code ==} operation.
    * @param warnings associated warnings or {@code null}
@@ -73,7 +72,6 @@ public final class EqualsAndInfo {
     if (warnings == null) {
       return result ? TRUE : FALSE;
     } else {
-      NO_WARNINGS.invalidate("Found equals with warnings");
       return new EqualsAndInfo(result, warnings);
     }
   }
@@ -81,6 +79,6 @@ public final class EqualsAndInfo {
   @Override
   @CompilerDirectives.TruffleBoundary
   public String toString() {
-    return "EqualsAndInfo{" + "equals=" + equals + ", hasWarnings=" + (getWarnings() != null) + '}';
+    return "EqualsAndInfo{" + "equals=" + equals + ", hasWarnings=" + (warnings != null) + '}';
   }
 }
