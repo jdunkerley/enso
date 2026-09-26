@@ -14,7 +14,7 @@ import { injectKeyboard } from '@/providers/keyboard'
 import { injectWidgetTree } from '@/providers/widgetTree'
 import { Ast } from '@/util/ast'
 import { unwrapGroups } from '@/util/ast/abstract'
-import { displayedIconOf, useDisplayedIcon } from '@/util/getIconName'
+import { selfAccessChainIcon, useDisplayedIcon } from '@/util/getIconName'
 import { computed, toRef } from 'vue'
 
 const props = defineProps(widgetProps(widgetDefinition))
@@ -23,22 +23,12 @@ const graph = useGraphStore()
 const tree = injectWidgetTree()
 
 const baseIcon = computed(() => {
-  const callInfo = functionInfo?.callInfo
-  const nodeId = tree.externalId != null ? asNodeId(tree.externalId) : undefined
   // The cached icon is the one `iconOfNode` computed (from the node's main suggestion), while this
   // widget derives its icon from `callInfo`; the two may briefly differ here until the node is
   // recomputed. While the node's suggestion entry is pending, `callInfo` is missing and the cached
-  // icon is preferred to one derived from the output type.
-  const cachedIcon = nodeId && graph.db.nodeIdToNode.get(nodeId)?.cachedAppearance?.icon
-  const suggestionPending =
-    nodeId != null ? graph.db.isNodeSuggestionPending(nodeId) : !graph.db.suggestionsLoaded
-  return displayedIconOf(
-    callInfo?.suggestion,
-    callInfo?.methodCall.methodPointer,
-    functionInfo?.outputType,
-    cachedIcon || undefined,
-    { preferFallbackOverType: suggestionPending },
-  )
+  // icon is preferred to one derived from the output type. See `selfAccessChainIcon`.
+  const nodeId = tree.externalId != null ? asNodeId(tree.externalId) : undefined
+  return selfAccessChainIcon(graph.db, nodeId, functionInfo?.callInfo, functionInfo?.outputType)
 })
 const { displayedIcon } = useDisplayedIcon(graph.db, toRef(tree, 'externalId'), baseIcon)
 

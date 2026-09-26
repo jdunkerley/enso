@@ -189,6 +189,19 @@ Accepted consequences:
   at all), the node keeps its cached appearance for the whole session, and
   nothing is written for it. Without a cache, it shows the type-derived colour
   and icon as before.
+- **Accepted known limitation: private methods, conversions and modules.** The
+  engine emits no suggestions for these (`SuggestionBuilder.scala` filters out
+  `isPrivate` methods, conversions and modules), so a node calling one of them
+  is pending forever — `isNodeSuggestionPending` never turns false for it.
+  Consequence 1: such a node is never cached (§4 condition 5), so every time the
+  project is opened it shows no-type grey, then its type colour, and never a
+  group colour. Consequence 2: because nothing is written for a pending node,
+  the cache is never cleared on edit either. A node edited from a public call
+  (with a cache already written) to a private helper keeps that old cached
+  colour and icon permanently, across reopens, even though it now renders from
+  its type. A possible future mitigation, not implemented here: clear the node's
+  `cachedAppearance` when its call changes, or key the cache to the method
+  pointer so a different call cannot inherit it.
 
 ### 4. Writing: when and how
 
