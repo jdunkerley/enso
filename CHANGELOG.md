@@ -42,6 +42,12 @@
 
 #### Enso Language & Runtime
 
+- [Fixed `==` sometimes answering `False` for equal values in the native
+  engine][66]. When a comparison attached a warning - for example comparing a
+  Float with an equal Decimal, which attaches `Loss_Of_Numeric_Precision` - the
+  native (non-JVM) engine could report the two values as unequal, and keep doing
+  so for the rest of the session. Anything built on `==`, such as `contains`,
+  filters and dictionary lookups, could be affected. JVM mode was not affected.
 - [Fixed an intermittent failure in the engine's standard library import test on
   Windows CI][65]: it now also waits for the project's code-completion data,
   which can arrive after execution has finished.
@@ -130,6 +136,7 @@
   PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
   unchanged.
 
+[66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
 [14980]: https://github.com/enso-org/enso/pull/14980
