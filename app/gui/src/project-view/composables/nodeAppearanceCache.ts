@@ -21,8 +21,9 @@ export interface AppearanceInput {
 }
 
 /**
- * The appearance to save for a node, or `undefined` if nothing should be written: the node is not
- * a computed component, its colour is not known from current data, or nothing has changed.
+ * The appearance this client computes for a node, or `undefined` if it has none to save: the node
+ * is not a computed component, or its colour is not known from current data. Whether to write it
+ * is decided by {@link appearanceToWrite}.
  */
 export function appearanceToCache(input: AppearanceInput): CachedAppearance | undefined {
   if (input.type !== 'component' || input.pending) return undefined
@@ -39,11 +40,40 @@ export function appearanceToCache(input: AppearanceInput): CachedAppearance | un
     if (!color || sanitizeCachedAppearance({ color })?.color !== color) return undefined
   }
   const icon = input.icon === DEFAULT_ICON ? undefined : input.icon
-  if (input.stored?.color === color && input.stored?.icon === icon) return undefined
   return {
     ...(color != null ? { color } : {}),
     ...(icon != null ? { icon } : {}),
   }
+}
+
+function sameAppearance(a: CachedAppearance | undefined, b: CachedAppearance | undefined) {
+  return a?.color === b?.color && a?.icon === b?.icon
+}
+
+/**
+ * Whether to write `computed`, the appearance this client has just computed for a node: returns it
+ * if so, `undefined` if not. `lastComputed` is what this client computed for the node before
+ * (`undefined` on its first computation), `stored` what the metadata holds now.
+ *
+ * It is written only if it differs from `stored` and is either this client's first computation or
+ * a change from its last one. A change in `stored` alone never causes a write: clients may
+ * legitimately compute different appearances (execution mode, library versions, colour formats),
+ * and if each rewrote the other's value they would do so forever. The last writer wins instead.
+ */
+export function appearanceToWrite(
+  computed: CachedAppearance,
+  lastComputed: CachedAppearance | undefined,
+  stored: CachedAppearance | undefined,
+): CachedAppearance | undefined {
+  if (sameAppearance(computed, stored)) return undefined
+  if (lastComputed != null && sameAppearance(computed, lastComputed)) return undefined
+  return computed
+}
+
+interface ComputedAppearance {
+  id: NodeId
+  computed: CachedAppearance
+  stored: CachedAppearance | undefined
 }
 
 /**
@@ -51,16 +81,18 @@ export function appearanceToCache(input: AppearanceInput): CachedAppearance | un
  * the next time the project is opened, nodes can be shown in their colours before they are
  * recomputed. Changes seen together are written in one batch, off the undo stack.
  *
- * `ready` must stay false until library groups are loaded; otherwise a group-coloured node would
- * be cached with its type colour first and rewritten moments later.
+ * `ready` must stay false until the suggestion database is loaded; otherwise a group-coloured node
+ * would be cached with its type colour first and rewritten moments later.
  */
 export function useNodeAppearanceCache(
   graph: GraphStore,
   getNodeColor: (id: NodeId) => string | undefined,
   ready: () => boolean,
 ) {
-  const writes = computed(() => {
-    const result = new Map<NodeId, CachedAppearance>()
+  /** What this client last computed for each node; see {@link appearanceToWrite}. */
+  const lastComputed = new Map<NodeId, CachedAppearance>()
+  const appearances = computed(() => {
+    const result: ComputedAppearance[] = []
     if (!ready()) return result
     const db = graph.db
     for (const [id, node] of db.nodeIdToNode.entries()) {
@@ -69,7 +101,7 @@ export function useNodeAppearanceCache(
       const pending = payload === 'Unknown' || payload === 'Pending'
       if (pending) continue
       const colorSource = db.getNodeColorSource(id)
-      const update = appearanceToCache({
+      const appearance = appearanceToCache({
         type: node.type,
         pending,
         hasColorOverride: node.colorOverride != null,
@@ -79,14 +111,23 @@ export function useNodeAppearanceCache(
         icon: iconOfNode(id, db, { useCachedIcon: false }),
         stored: node.cachedAppearance,
       })
-      if (update) result.set(id, update)
+      if (appearance) result.push({ id, computed: appearance, stored: node.cachedAppearance })
     }
     return result
   })
   watch(
-    writes,
+    appearances,
     (appearances) => {
-      if (appearances.size > 0) graph.setNodeCachedAppearances(appearances)
+      for (const id of lastComputed.keys()) {
+        if (!graph.db.nodeIdToNode.has(id)) lastComputed.delete(id)
+      }
+      const writes = new Map<NodeId, CachedAppearance>()
+      for (const { id, computed, stored } of appearances) {
+        const write = appearanceToWrite(computed, lastComputed.get(id), stored)
+        lastComputed.set(id, computed)
+        if (write) writes.set(id, write)
+      }
+      if (writes.size > 0) graph.setNodeCachedAppearances(writes)
     },
     { flush: 'post' },
   )
