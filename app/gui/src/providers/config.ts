@@ -50,6 +50,15 @@ function createConfigStore() {
       }
       return REMOTE_CONFIG_SCHEMA.parse(body)
     },
+    // The configuration is fixed for the session: Cognito is set up from it once and never again.
+    // Re-fetching it in the background (the defaults do so on every window focus and reconnect)
+    // only flips a local-only session out of local-only mode while the fetch is in flight, which
+    // signs the user out and closes the open project. It is still fetched once on every start,
+    // even when a copy was restored from the persisted query cache.
+    staleTime: Infinity,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   watchEffect(() => {

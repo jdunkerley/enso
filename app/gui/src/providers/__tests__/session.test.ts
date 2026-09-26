@@ -8,8 +8,11 @@ import type {
   UserSession,
 } from '$/authentication/cognito'
 import { AuthEvent } from '$/authentication/listen'
-import { withSetup } from '@/util/testing'
+import { useAuthDisabled } from '$/authentication/service'
+import type { RemoteConfig } from '$/providers/config'
+import { appWithSetup, withSetup } from '@/util/testing'
 import * as vueQuery from '@tanstack/vue-query'
+import { flushPromises } from '@vue/test-utils'
 import { NotAuthorizedError } from 'enso-common/src/services/Backend'
 import { HttpClient } from 'enso-common/src/services/HttpClient'
 import { createDeferred } from 'enso-common/src/utilities/async'
@@ -17,7 +20,7 @@ import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
 import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { Result } from 'ts-results'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { createSessionStore, makeOfflineSession, USER_SESSION_QUERY_KEY } from '../session'
 
 function createUserSession(): UserSession {
@@ -133,6 +136,52 @@ describe('SessionProvider', () => {
       expect(httpClient.setSessionToken).not.toBeCalled()
       expect(session.isAuthDisabled).toBe(true)
     }))
+
+  it('keeps the local stand-in session while a failed remote configuration is re-fetched', async () => {
+    /** Let the session query re-run, if anything invalidated it. */
+    const settle = async () => {
+      await flushPromises()
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    }
+    // Local-only mode: the remote configuration failed to load, so there is no Cognito client.
+    const config = reactive({
+      remoteConfig: undefined as RemoteConfig | undefined,
+      isError: true,
+      isFetching: false,
+    })
+    const errors: unknown[] = []
+    const [session, app] = appWithSetup(() =>
+      createSessionStore(
+        undefined,
+        registerAuthEventListener,
+        new HttpClient(),
+        undefined,
+        undefined,
+        undefined,
+        useAuthDisabled(config, ref(undefined)),
+      ),
+    )
+    app.config.errorHandler = (error) => void errors.push(error)
+    const offlineEmail = makeOfflineSession().email
+    await expect.poll(() => session.session?.email).toBe(offlineEmail)
+
+    // A background re-fetch of the configuration (e.g. on window focus): TanStack Query clears
+    // the error of a query with no data while it fetches.
+    config.isError = false
+    config.isFetching = true
+    await settle()
+    expect(errors).toEqual([])
+    expect(session.session?.email).toBe(offlineEmail)
+
+    // The re-fetch fails again.
+    config.isFetching = false
+    config.isError = true
+    await settle()
+    expect(session.session?.email).toBe(offlineEmail)
+    expect(session.isAuthDisabled).toBe(true)
+    expect(errors).toEqual([])
+    app.unmount()
+  })
 
   it('Should set the access token on the HTTP client', () =>
     withSetup(async () => {
