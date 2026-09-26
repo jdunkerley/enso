@@ -62,6 +62,8 @@
 - [The Google Analytics and Google Sheets libraries used by Standard.Google have
   been updated][62], together with the gRPC and Protocol Buffers libraries they
   use to talk to Google (gRPC 1.83, protobuf 4).
+- [`run.cmd`, the Windows build-script entry point, works again][70]. It failed
+  with "`)` was unexpected at this time" before running any command.
 - [The Azure libraries used by Standard.Microsoft have been updated][61]
   (azure-identity 1.18.6, azure-storage-blob 12.35.1, azure-resourcemanager
   2.64.0), with their Netty and Reactor dependencies. The native TLS library
@@ -145,6 +147,7 @@
   unchanged.
 
 [69]: https://github.com/jdunkerley/enso/pull/69
+[70]: https://github.com/jdunkerley/enso/pull/70
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
