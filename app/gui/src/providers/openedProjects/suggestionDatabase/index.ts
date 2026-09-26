@@ -228,6 +228,8 @@ export interface GroupInfo {
 
 class Synchronizer {
   queue: AsyncQueue<{ currentVersion: number }>
+  /** Resolves once the initial suggestion database has been loaded (which implies groups were). */
+  initialized: Promise<unknown>
 
   constructor(
     projectStore: ProjectStore,
@@ -245,6 +247,7 @@ class Synchronizer {
       return Synchronizer.loadDatabase(entries, lsRpc, await updateProcessor)
     })
 
+    this.initialized = initState
     this.queue = new AsyncQueue(initState)
   }
 
@@ -343,14 +346,12 @@ export function createSuggestionDbStore(
 ) {
   const entries = new SuggestionDb()
   const groups = ref<GroupInfo[]>([])
-  const groupsLoaded = ref(false)
 
   const updateProcessor = loadGroups(
     projectStore.lsRpcConnection,
     projectStore.firstExecution,
   ).then((loadedGroups) => {
     groups.value = loadedGroups
-    groupsLoaded.value = true
     return new SuggestionUpdateProcessor(loadedGroups, projectNames)
   })
 
@@ -367,10 +368,13 @@ export function createSuggestionDbStore(
   }
 
   const _synchronizer = new Synchronizer(projectStore, entries, updateProcessor)
+  /** Whether the initial suggestion database (and so the component groups) has been loaded. */
+  const loaded = ref(false)
+  _synchronizer.initialized.then(() => (loaded.value = true))
   return proxyRefs({
     entries: markRaw(entries),
     groups: readonly(groups),
-    groupsLoaded: readonly(groupsLoaded),
+    loaded: readonly(loaded),
     _synchronizer,
     mockSuggestion,
   })

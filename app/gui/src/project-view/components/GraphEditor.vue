@@ -737,7 +737,7 @@ const { getNodeColor } = provideNodeColors(graphStore, (variable) =>
 
 // === Node Appearance Cache ===
 
-useNodeAppearanceCache(graphStore, getNodeColor, () => suggestionDb.groupsLoaded)
+useNodeAppearanceCache(graphStore, getNodeColor, () => suggestionDb.loaded)
 
 const contextMenuActions: DisplayableActionName[] = [
   'graph.navigateUp',
