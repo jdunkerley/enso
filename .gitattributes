@@ -1,3 +1,5 @@
 *.enso text eol=lf
 *.png binary
 CHANGELOG.md merge=union
+# cmd.exe can mis-resolve `goto` labels in LF-only batch files, and `run.cmd` uses them.
+/run.cmd text eol=crlf
