@@ -130,6 +130,7 @@ function mockGraphDbWithAiNode() {
     prefixes: { enableRecording: undefined },
     primaryApplication: { function: null, accessChain: null, selfArgument: null },
     colorOverride: undefined,
+    cachedAppearance: undefined,
     conditionalPorts: new Set(),
     outerAst: aiAssignment,
     pattern: aiAssignment.pattern,

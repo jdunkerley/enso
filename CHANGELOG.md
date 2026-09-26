@@ -39,6 +39,10 @@
   with the reason shown as a hint on the entry. Existing AI nodes can be edited
   by reopening the Component Browser on them — the prior prompt is sent back to
   the agent so the function definition is rewritten in place.
+- [Components keep their colour and icon while a workflow is loading][71],
+  instead of showing grey with the Enso logo until they are computed. Each
+  component's last known colour and icon are saved with the workflow and shown,
+  faded, until the component has been computed again.
 
 #### Enso Language & Runtime
 
@@ -148,6 +152,7 @@
 
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
+[71]: https://github.com/jdunkerley/enso/pull/71
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

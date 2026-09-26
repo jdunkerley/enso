@@ -44,7 +44,7 @@ import {
   type ShallowReactive,
   type ShallowRef,
 } from 'vue'
-import { normalizePosition } from 'ydoc-shared/ast'
+import { normalizePosition, type CachedAppearance } from 'ydoc-shared/ast'
 import type { ExpressionUpdate } from 'ydoc-shared/languageServerTypes'
 import { reachable } from 'ydoc-shared/util/data/graph'
 import type { ExternalId, VisualizationMetadata } from 'ydoc-shared/yjsModel'
@@ -209,6 +209,7 @@ export function createGraphStore(
     toRef(suggestionDb, 'groups'),
     proj.computedValueRegistry,
     projectNames,
+    toRef(suggestionDb, 'loaded'),
   )
   const portInstances = shallowReactive(new Map<PortId, Set<PortViewInstance>>())
   const editedNodeInfo = ref<NodeEditInfo>()
@@ -410,6 +411,18 @@ export function createGraphStore(
 
   function getNodeColorOverride(node: NodeId) {
     return db.nodeIdToNode.get(node)?.colorOverride ?? undefined
+  }
+
+  /**
+   * Save nodes' computed appearance in their metadata. This is derived data, so it is written off
+   * the undo stack.
+   */
+  function setNodeCachedAppearances(appearances: ReadonlyMap<NodeId, CachedAppearance>) {
+    module.batchEdits(() => {
+      for (const [nodeId, appearance] of appearances) {
+        module.mutableNodeMetadata(db.idFromExternal(nodeId))?.set('cachedAppearance', appearance)
+      }
+    }, 'local:derivedMetadata')
   }
 
   function setNodeVisualization(nodeId: NodeId, update: Partial<VisualizationMetadata>) {
@@ -711,6 +724,7 @@ export function createGraphStore(
     ensureCorrectNodeOrder,
     overrideNodeColor,
     getNodeColorOverride,
+    setNodeCachedAppearances,
     setNodeContent,
     setNodePosition,
     setNodeHeight,

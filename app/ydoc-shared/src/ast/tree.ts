@@ -132,11 +132,22 @@ export interface MetadataFields {
   externalId: ExternalId
   widget: Y.Map<unknown>
 }
+/**
+ * A node's last computed appearance, saved so that it can be shown before the node is
+ * recomputed after the project is opened.
+ */
+export interface CachedAppearance {
+  /** A resolved CSS colour, never a `var(--…)` reference. */
+  color?: string
+  /** An icon name. */
+  icon?: string
+}
 export interface NodeMetadataFields {
   position?: NodePositionMetadata | undefined
   visualization?: VisualizationMetadata | undefined
   colorOverride?: string | undefined
   displayMode?: 'expanded' | 'collapsed' | undefined
+  cachedAppearance?: CachedAppearance | undefined
 }
 
 const nodeMetadataKeys = allKeys<NodeMetadataFields>({
@@ -144,6 +155,7 @@ const nodeMetadataKeys = allKeys<NodeMetadataFields>({
   visualization: null,
   colorOverride: null,
   displayMode: null,
+  cachedAppearance: null,
 })
 export type NodeMetadata = FixedMapView<NodeMetadataFields & MetadataFields>
 export type MutableNodeMetadata = FixedMap<NodeMetadataFields & MetadataFields>

@@ -22,6 +22,12 @@ const visualizationMetadata = z
   })
   .passthrough()
 
+const cachedAppearance = z.object({
+  color: z.string().max(64).optional(),
+  icon: z.string().max(64).optional(),
+})
+
+export type NodeMetadata = z.infer<typeof nodeMetadata>
 const nodeMetadata = z
   .object({
     position: z.object({ vector }).catch((ctx) => {
@@ -31,6 +37,8 @@ const nodeMetadata = z
     visualization: visualizationMetadata.optional().catch(() => undefined),
     colorOverride: z.string().optional(),
     displayMode: z.enum(['expanded', 'collapsed']).optional(),
+    // A cache: a malformed value drops only this field, never the whole node record.
+    cachedAppearance: cachedAppearance.optional().catch(() => undefined),
   })
   .passthrough()
 

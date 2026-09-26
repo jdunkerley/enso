@@ -36,19 +36,43 @@ export function useNodeColors(graphStore: GraphStore, getCssValue: (variable: st
   return { getNodeColor, getNodeColors }
 }
 
-/** Compute node color based on the node type, group, and type name. */
+/** Where a node's displayed colour comes from. */
+export type NodeColorSource = 'override' | 'fixed' | 'group' | 'type' | 'cached' | 'none'
+
+/** A node's displayed colour (a CSS colour or `var(…)` reference) and where it comes from. */
+export interface NodeColorInfo {
+  color: string
+  source: NodeColorSource
+}
+
+/**
+ * Compute node color based on the node type, group, and type name. The cached colour, saved from
+ * an earlier session, is used only while none of those is known yet.
+ *
+ * With `preferCacheOverType`, the node's group may just not be known yet, so a colour derived
+ * from its type is only provisional: the cached colour (which is the group colour, if the node has
+ * one) is preferred to it then, so the node does not flash to its type colour and back.
+ */
 export function computeNodeColor(
   getType: () => NodeType,
   getGroup: () => GroupInfo | undefined,
   getTypeName: () => ProjectPath | undefined,
-) {
-  if (getType() === 'output') return 'var(--output-node-color)'
-  if (getType() === 'input') return 'var(--output-node-color)'
+  getCachedColor: () => string | undefined = () => undefined,
+  preferCacheOverType: () => boolean = () => false,
+): NodeColorInfo {
+  if (getType() === 'output') return { color: 'var(--output-node-color)', source: 'fixed' }
+  if (getType() === 'input') return { color: 'var(--output-node-color)', source: 'fixed' }
   const group = getGroup()
-  if (group) return groupColorStyle(group)
+  if (group) return { color: groupColorStyle(group), source: 'group' }
+  if (preferCacheOverType()) {
+    const cachedColor = getCachedColor()
+    if (cachedColor) return { color: cachedColor, source: 'cached' }
+  }
   const typeName = getTypeName()
-  if (typeName) return colorFromString(typeName.key())
-  return 'var(--node-color-no-type)'
+  if (typeName) return { color: colorFromString(typeName.key()), source: 'type' }
+  const cachedColor = getCachedColor()
+  if (cachedColor) return { color: cachedColor, source: 'cached' }
+  return { color: 'var(--node-color-no-type)', source: 'none' }
 }
 
 /** TODO: Add docs */

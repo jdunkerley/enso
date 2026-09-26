@@ -199,7 +199,12 @@ export const localUserActionOrigins = [
   'local:userAction:CommentEditor',
 ] as const
 export type LocalUserActionOrigin = (typeof localUserActionOrigins)[number]
-export type Origin = LocalUserActionOrigin | 'remote' | 'local:autoLayout'
+/**
+ * `'local:autoLayout'` and `'local:derivedMetadata'` are local changes the user did not make
+ * directly (node placement, cached node appearance). They are not user actions, so the undo
+ * manager does not track them.
+ */
+export type Origin = LocalUserActionOrigin | 'remote' | 'local:autoLayout' | 'local:derivedMetadata'
 /** Locally-originated changes not otherwise specified. */
 export const defaultLocalOrigin: LocalUserActionOrigin = 'local:userAction'
 /** TODO: Add docs */
@@ -211,6 +216,7 @@ export function isLocalUserActionOrigin(origin: string): origin is LocalUserActi
 export function tryAsOrigin(origin: string): Origin | undefined {
   if (isLocalUserActionOrigin(origin)) return origin
   if (origin === 'local:autoLayout') return origin
+  if (origin === 'local:derivedMetadata') return origin
   if (origin === 'remote') return origin
 }
 

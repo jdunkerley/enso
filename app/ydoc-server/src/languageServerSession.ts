@@ -25,7 +25,6 @@ import {
   DistributedProject,
   IdMap,
   ModuleDoc,
-  visMetadataEquals,
   type ExternalId,
   type Uuid,
 } from 'ydoc-shared/yjsModel'
@@ -33,9 +32,9 @@ import * as Y from 'yjs'
 import {
   applyDiffAsTextEdits,
   applyDocumentUpdates,
+  applyNodeMetadataFromFile,
   getIdMapToPersist,
   prettyPrintDiff,
-  translateVisualizationFromFile,
 } from './edits'
 import * as fileFormat from './fileFormat'
 import { deserializeIdMap, idMapToArray, serializeIdMap } from './serialization'
@@ -711,18 +710,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
             continue
           }
           const metadata = syncModule.getVersion(ast).mutableNodeMetadata()
-          const oldPos = metadata.get('position')
-          const newPos = { x: meta.position.vector[0], y: -meta.position.vector[1] }
-          if (oldPos?.x !== newPos.x || oldPos?.y !== newPos.y) metadata.set('position', newPos)
-          const oldVis = metadata.get('visualization')
-          const newVis = meta.visualization && translateVisualizationFromFile(meta.visualization)
-          if (!visMetadataEquals(newVis, oldVis)) metadata.set('visualization', newVis)
-          const oldColorOverride = metadata.get('colorOverride')
-          const newColorOverride = meta.colorOverride
-          if (oldColorOverride !== newColorOverride) metadata.set('colorOverride', newColorOverride)
-          const oldDisplayMode = metadata.get('displayMode')
-          const newDisplayMode = meta.displayMode
-          if (oldDisplayMode !== newDisplayMode) metadata.set('displayMode', newDisplayMode)
+          applyNodeMetadataFromFile(metadata, meta)
         }
         for (const [id, meta] of widgetMeta) {
           if (typeof id !== 'string') continue
