@@ -16,12 +16,17 @@ import {
   resumeShallowReactivity,
   syncSetDiff,
 } from '$/utils/reactivity'
-import { computeNodeColor } from '@/composables/nodeColors'
+import {
+  computeNodeColor,
+  type NodeColorInfo,
+  type NodeColorSource,
+} from '@/composables/nodeColors'
 import { Ast } from '@/util/ast'
 import type { AstId, NodeMetadata } from '@/util/ast/abstract'
 import { isAstId, MutableModule } from '@/util/ast/abstract'
 import { analyzeBindings, type BindingInfo } from '@/util/ast/bindings'
 import { inputNodeFromAst, nodeFromAst, nodeRootExpr } from '@/util/ast/node'
+import { sanitizeCachedAppearance, type ValidCachedAppearance } from '@/util/cachedAppearance'
 import { arrayEquals, tryGetIndex } from '@/util/data/array'
 import { recordEqual } from '@/util/data/object'
 import { Vec2 } from '@/util/data/vec2'
@@ -78,7 +83,31 @@ export class GraphDb {
     private readonly groups: Ref<DeepReadonly<GroupInfo[]>>,
     private readonly valuesRegistry: ComputedValueRegistry,
     private readonly projectNames: ProjectNameStore,
+    private readonly suggestionsLoadedRef: Readonly<Ref<boolean>>,
   ) {}
+
+  /** Whether the suggestion database has finished its initial load. */
+  get suggestionsLoaded(): boolean {
+    return this.suggestionsLoadedRef.value
+  }
+
+  /**
+   * Whether the node's main suggestion entry may just not be known yet: the suggestion database
+   * has not finished its initial load, or the node's value is a method call whose entry it does not
+   * contain. The latter lasts until the engine sends the entry: libraries' suggestions are loaded
+   * in the background and arrive as updates, well after the initial load.
+   *
+   * Meanwhile the node's group is unknown too, so a colour or icon derived from the node's type is
+   * provisional, and the appearance cached from an earlier session is preferred to it. If the
+   * entry never arrives (e.g. the method has no suggestion), the node stays pending.
+   */
+  isNodeSuggestionPending(id: NodeId): boolean {
+    if (!this.suggestionsLoaded) return true
+    const node = this.nodeIdToNode.get(id)
+    if (node == null) return false
+    const method = this.getExpressionInfo(node.innerExpr.id)?.methodCall?.methodPointer
+    return method != null && this.getNodeMainSuggestion(id) == null
+  }
 
   private nodeIdToPatternExprIds = new ReactiveIndex(this.nodeIdToNode, (id, entry) => {
     const exprs: AstId[] = []
@@ -148,12 +177,14 @@ export class GraphDb {
     return this.suggestionDb.get(suggestionId)
   }
 
-  nodeColor = new ReactiveMapping(this.nodeIdToNode, (id, entry) => {
-    if (entry.colorOverride != null) return entry.colorOverride
+  nodeColor = new ReactiveMapping(this.nodeIdToNode, (id, entry): NodeColorInfo => {
+    if (entry.colorOverride != null) return { color: entry.colorOverride, source: 'override' }
     return computeNodeColor(
       () => entry.type,
       () => tryGetIndex(this.groups.value, this.getNodeMainSuggestion(id)?.groupIndex),
       () => this.getExpressionInfo(id)?.typeInfo?.primaryType,
+      () => entry.cachedAppearance?.color,
+      () => this.isNodeSuggestionPending(id),
     )
   })
 
@@ -260,9 +291,14 @@ export class GraphDb {
     return { methodCall, methodCallSource: id, suggestion }
   }
 
-  /** TODO: Add docs */
+  /** The CSS colour (or `var(…)` reference) the node is displayed with. */
   getNodeColorStyle(id: NodeId): string {
-    return this.nodeColor.lookup(id) ?? 'var(--node-color-no-type)'
+    return this.nodeColor.lookup(id)?.color ?? 'var(--node-color-no-type)'
+  }
+
+  /** Where the node's displayed colour comes from. */
+  getNodeColorSource(id: NodeId): NodeColorSource {
+    return this.nodeColor.lookup(id)?.source ?? 'none'
   }
 
   /** TODO: Add docs */
@@ -372,6 +408,7 @@ export class GraphDb {
         vis: nodeMeta.get('visualization'),
         colorOverride: nodeMeta.get('colorOverride'),
         isExpanded: (nodeMeta.get('displayMode') ?? 'expanded') === 'expanded',
+        cachedAppearance: sanitizeCachedAppearance(nodeMeta.get('cachedAppearance')),
       }
       this.nodeIdToNode.set(nodeId, {
         ...newNode,
@@ -480,6 +517,9 @@ export class GraphDb {
     if (changes.has('colorOverride')) {
       node.colorOverride = changes.get('colorOverride')
     }
+    if (changes.has('cachedAppearance')) {
+      node.cachedAppearance = sanitizeCachedAppearance(changes.get('cachedAppearance'))
+    }
     const newDisplayMode = changes.get('displayMode')
     if (newDisplayMode) {
       node.isExpanded = newDisplayMode === 'expanded'
@@ -580,8 +620,10 @@ export class GraphDb {
     registry = ComputedValueRegistry.Mock(),
     db = new SuggestionDb(),
     projectNames = mockProjectNameStore(),
+    suggestionsLoaded: Readonly<Ref<boolean>> = ref(true),
+    groups: DeepReadonly<GroupInfo[]> = [],
   ): GraphDb {
-    return new GraphDb(db, ref([]), registry, projectNames)
+    return new GraphDb(db, ref(groups), registry, projectNames, suggestionsLoaded)
   }
 
   /** TODO: Add docs */
@@ -600,6 +642,7 @@ export class GraphDb {
       prefixes: { enableRecording: undefined },
       primaryApplication: { function: null, accessChain: null, selfArgument: null },
       colorOverride: undefined,
+      cachedAppearance: undefined,
       conditionalPorts: new Set(),
       outerAst,
       pattern,
@@ -726,6 +769,7 @@ export interface NodeDataFromMetadata {
   vis: Opt<VisualizationMetadata>
   colorOverride: Opt<string>
   isExpanded: boolean
+  cachedAppearance: ValidCachedAppearance | undefined
 }
 
 export type Node = NodeDataFromAst &

@@ -229,7 +229,7 @@ export function updateAiNode(options: UpdateAiNodeOptions): Result {
 
   // Preserve every metadata field from the old expression. `setExpression` would otherwise
   // attach `newCallAst` with its empty metadata, losing the user's visualization choice,
-  // color override, expand/collapse state, and any per-widget configuration.
+  // color override, expand/collapse state, cached appearance, and any per-widget configuration.
   const oldCallExpr = assignment.expression
   const oldNodeMeta = oldCallExpr.nodeMetadata
   newCallAst.setNodeMetadata({
@@ -237,6 +237,7 @@ export function updateAiNode(options: UpdateAiNodeOptions): Result {
     visualization: oldNodeMeta.get('visualization'),
     colorOverride: oldNodeMeta.get('colorOverride'),
     displayMode: oldNodeMeta.get('displayMode'),
+    cachedAppearance: oldNodeMeta.get('cachedAppearance'),
   })
   for (const [widgetKey, widgetMeta] of oldCallExpr.widgetsMetadata()) {
     newCallAst.setWidgetMetadata(widgetKey, widgetMeta)
