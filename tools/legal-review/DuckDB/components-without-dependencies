@@ -1,0 +1,2 @@
+# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
+std-duckdb: depends on duckdb_jdbc only as provided; the driver is shipped through, and described by, the duckdb-wrapper component.

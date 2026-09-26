@@ -72,9 +72,20 @@ object ReportState {
 
   /** Computes a hash of the [[DistributionDescription]] used as input to the
     * license gathering process.
+    *
+    * @param expectedEmptyComponents the distribution's list of components
+    *                                expected to have no third-party
+    *                                dependencies. It decides whether an empty
+    *                                component is a warning, so it is a review
+    *                                input too: editing it must invalidate the
+    *                                stored state, or a warning could be
+    *                                accepted without regenerating the report.
+    *                                An empty list adds nothing to the hash, so
+    *                                distributions without one keep their hash.
     */
   def computeInputHash(
-    distributionDescription: DistributionDescription
+    distributionDescription: DistributionDescription,
+    expectedEmptyComponents: Map[String, String]
   ): String = {
     val DistributionDescription(
       artifactName,
@@ -87,13 +98,16 @@ object ReportState {
     for (sbtComponent <- sbtComponents) {
       digest.update(sbtComponent.name.getBytes)
       val dependencies =
-        sbtComponent.licenseReport.licenses.sortBy(_.module.toString)
+        sbtComponent.dependencies.dependencies.sortBy(_.module.toString)
       for (
         dep <- dependencies.filter(d => DependencyFilter.shouldKeep(d.module))
       ) {
         digest.update(dep.module.toString.getBytes)
         digest.update(dep.license.name.getBytes)
       }
+    }
+    for ((component, reason) <- expectedEmptyComponents.toSeq.sorted) {
+      digest.update(s"expected-empty:$component:$reason".getBytes)
     }
     hexString(digest.digest())
   }
@@ -129,15 +143,20 @@ object ReportState {
     * @param distributionDescription description of the distribution, used to
     *                                compute the input hash and locate the
     *                                generated output
+    * @param expectedEmptyComponents the distribution's list of components
+    *                                expected to have no third-party
+    *                                dependencies, see [[computeInputHash]]
     * @param warningsCount amount of warnings present in the current report
     */
   def write(
     file: File,
     distributionDescription: DistributionDescription,
+    expectedEmptyComponents: Map[String, String],
     warningsCount: Int
   ): Unit = {
     val state = ReportState(
-      inputHash = computeInputHash(distributionDescription),
+      inputHash =
+        computeInputHash(distributionDescription, expectedEmptyComponents),
       outputHash =
         computeOutputHash(distributionDescription.packageDestination),
       warningsCount = warningsCount

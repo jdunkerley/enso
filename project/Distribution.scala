@@ -3,13 +3,13 @@ import sbtlicensereport.SbtLicenseReport.autoImportImpl.{
   licenseOverrides,
   licenseSelection
 }
-import sbtlicensereport.license
-import sbt.Keys.{ivyModule, streams, update, updateClassifiers}
-import sbt.{File, Keys, Project}
+import sbt.Keys.{update, updateClassifiers}
+import sbt.{File, Project}
 import src.main.scala.licenses.{
   DistributionDescription,
   SBTDistributionComponent
 }
+import src.main.scala.licenses.frontend.ResolvedDependencies
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
@@ -34,7 +34,8 @@ object Distribution {
   /** Implementation of the [[sbtProjects]] macro.
     *
     * It triggers execution of the tasks that are used to get information from
-    * SBT on each project.
+    * SBT on each project. See Note [Licence Review Follows The Shipped
+    * Resolution] for why this reads `update` rather than `sbt-license-report`.
     */
   def sbtProjectsImpl(c: blackbox.Context)(
     projects: c.Expr[Project]*
@@ -43,32 +44,15 @@ object Distribution {
     val gathered = {
       projects.map(p =>
         reify {
-          val deliberatelyTriggerAndIgnore = (p.splice / update).value
-
-          val configs      = GatherLicenses.licenseConfigurations.value
-          val ivyMod       = (p.splice / ivyModule).value
-          val ivyNode      = ivyMod.scalaModuleInfo
-          val overrides    = (p.splice / licenseOverrides).value.lift
-          val organization = (p.splice / Keys.organization).value
-          val name         = (p.splice / Keys.name).value
-          val version      = (p.splice / Keys.version).value
-          val originatingModule =
-            license.DepModuleInfo(organization, name, version)
-          val depExclusions = (p.splice / licenseDepExclusions).value.lift
-          val report = license.LicenseReport.makeReport(
-            ivyMod,
-            configs,
-            (p.splice / licenseSelection).value,
-            overrides,
-            depExclusions,
-            originatingModule,
-            (p.splice / streams).value.log
+          val dependencies = ResolvedDependencies.collect(
+            update           = (p.splice / update).value,
+            classified       = (p.splice / updateClassifiers).value,
+            configurations   = GatherLicenses.licenseConfigurations.value,
+            licenseSelection = (p.splice / licenseSelection).value,
+            overrides        = (p.splice / licenseOverrides).value.lift,
+            exclusions       = (p.splice / licenseDepExclusions).value.lift
           )
-          SBTDistributionComponent(
-            p.splice.id,
-            report,
-            (p.splice / updateClassifiers).value
-          )
+          SBTDistributionComponent(p.splice.id, dependencies)
         }
       )
     }

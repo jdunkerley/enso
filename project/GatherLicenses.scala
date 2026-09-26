@@ -1,7 +1,6 @@
 import sbt.Keys._
 import sbt._
 import complete.DefaultParsers._
-import org.apache.ivy.core.resolve.IvyNode
 import src.main.scala.licenses.backend.{
   CombinedBackend,
   GatherCopyrights,
@@ -16,7 +15,6 @@ import src.main.scala.licenses.{
   ReviewedSummary
 }
 
-import scala.collection.JavaConverters._
 import scala.sys.process._
 
 /** The task and configuration for automatically gathering license information.
@@ -70,8 +68,15 @@ object GatherLicenses {
         s"It consists of the following sbt project roots:" +
         s" ${projectNames.mkString(", ")}"
       )
+      val distributionRoot = configRoot / distribution.artifactName
+      val expectedEmptyComponents =
+        readComponentsWithoutDependencies(distributionRoot)
       val (sbtInfo, sbtDiagnostics) =
-        SbtLicenses.analyze(distribution.sbtComponents, log)
+        SbtLicenses.analyze(
+          distribution.sbtComponents,
+          expectedEmptyComponents,
+          log
+        )
 
       val allInfo = sbtInfo // TODO [RW] add Rust frontend result here (#1187)
 
@@ -93,7 +98,6 @@ object GatherLicenses {
       val forSummary            = processed.map(t => (t._1, t._2))
       val processingDiagnostics = processed.flatMap(_._3)
       val summary               = DependencySummary(forSummary)
-      val distributionRoot      = configRoot / distribution.artifactName
       val WithDiagnostics(processedSummary, summaryDiagnostics) =
         Review(distributionRoot, summary).run()
       val allDiagnostics =
@@ -131,6 +135,7 @@ object GatherLicenses {
       ReportState.write(
         distributionRoot / stateFileName,
         distribution,
+        expectedEmptyComponents,
         errors.size
       )
       log.info(s"Re-generated distribution notices at `$packagePath`.")
@@ -179,19 +184,25 @@ object GatherLicenses {
     ReportState.read(distributionConfig / stateFileName, log) match {
       case Some(reviewState) =>
         val currentInputHash =
-          ReportState.computeInputHash(distributionDescription)
+          ReportState.computeInputHash(
+            distributionDescription,
+            readComponentsWithoutDependencies(distributionConfig)
+          )
         if (currentInputHash != reviewState.inputHash) {
           log.info("Input hash computed from build.sbt: " + currentInputHash)
           log.info("Input hash stored in metadata: " + reviewState.inputHash)
           warnAndThrow(
             s"Report for the $name is not up to date - " +
-            s"it seems that some dependencies were added or removed."
+            s"it seems that some dependencies were added or removed, or its " +
+            s"`$componentsWithoutDependenciesFileName` list changed."
           )
         }
 
         if (reviewState.warningsCount > 0) {
           warnAndThrow(
-            s"Report for the $name has ${reviewState.warningsCount} warnings."
+            // `warningsCount` counts fatal errors: warnings are not stored.
+            s"Report for the $name has ${reviewState.warningsCount} fatal " +
+            s"errors - run `gatherLicenses` to see them."
           )
         }
 
@@ -298,8 +309,49 @@ object GatherLicenses {
       .exitValue()
   }
 
-  /** A task that prints which sub-projects use a dependency and what
-    * dependencies use it (so that one can track where dependencies come from).
+  /** Name of the file, in a distribution's review configuration, that lists
+    * the components which are expected to have no third-party dependencies.
+    *
+    * Each line is `<component>: <reason>`; blank lines and lines starting with
+    * `#` are ignored. A component with no third-party dependencies that is not
+    * listed is reported as a warning, because it usually means that what it
+    * ships is invisible to the review (for example a library that it depends
+    * on as `provided` and ships through a JAR wrapper that is not a component
+    * of the distribution). A listed component that does have dependencies, or
+    * a listed name that is not a component of the distribution, is an error,
+    * so that the list cannot go stale; and the list is part of the input hash
+    * in `report-state`, so editing it requires regenerating the report.
+    */
+  val componentsWithoutDependenciesFileName = "components-without-dependencies"
+
+  private def readComponentsWithoutDependencies(
+    distributionRoot: File
+  ): Map[String, String] = {
+    val file = distributionRoot / componentsWithoutDependenciesFileName
+    if (!file.exists()) Map()
+    else
+      IO.readLines(file)
+        .map(_.trim)
+        .filter(line => line.nonEmpty && !line.startsWith("#"))
+        .map { line =>
+          line.split(":", 2) match {
+            case Array(component, reason) if reason.trim.nonEmpty =>
+              component.trim -> reason.trim
+            case _ =>
+              throw new IllegalArgumentException(
+                s"Malformed line in $file: `$line`. " +
+                "Expected `<component>: <reason>`."
+              )
+          }
+        }
+        .toMap
+  }
+
+  /** A task that prints which sub-projects of which distributions resolve a
+    * dependency, to help track down where a dependency comes from.
+    *
+    * sbt's built-in `<project>/dependencyTree` shows which of the project's
+    * dependencies pulls it in.
     */
   lazy val analyzeDependency = Def.inputTask {
     val args: Seq[String]      = spaceDelimited("<arg>").parsed
@@ -308,27 +360,14 @@ object GatherLicenses {
     for (arg <- args) {
       for (distribution <- evaluatedDistributions) {
         for (sbtComponent <- distribution.sbtComponents) {
-          val ivyDeps =
-            sbtComponent.licenseReport.orig.getDependencies.asScala
-              .map(_.asInstanceOf[IvyNode])
-          for (dep <- sbtComponent.licenseReport.licenses) {
+          for (dep <- sbtComponent.dependencies.dependencies) {
             if (dep.module.name.contains(arg)) {
-              val module = dep.module
               log.info(
-                s"${distribution.artifactName} distribution, project ${sbtComponent.name} " +
-                s"contains $module"
+                s"${distribution.artifactName} distribution, project " +
+                s"${sbtComponent.name} contains ${dep.module}; run " +
+                s"`${sbtComponent.name}/dependencyTree` to see what depends " +
+                s"on it."
               )
-              val node = ivyDeps.find(n =>
-                SbtLicenses.safeModuleInfo(n) == Some(dep.module)
-              )
-              node match {
-                case None =>
-                  log.warn(s"IvyNode for $module not found.")
-                case Some(ivyNode) =>
-                  val callers =
-                    ivyNode.getAllCallers.toSeq.map(_.toString).distinct
-                  log.info(s"Callers: $callers")
-              }
             }
           }
         }

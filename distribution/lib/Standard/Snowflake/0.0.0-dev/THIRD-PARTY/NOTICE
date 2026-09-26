@@ -258,12 +258,12 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'protobuf-java', licensed under the BSD-3-Clause, is distributed with the Snowflake.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-3.25.5`.
+Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-4.28.2`.
 
 
 'protobuf-java-util', licensed under the BSD-3-Clause, is distributed with the Snowflake.
 The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-util-3.25.5`.
+Copyright notices related to this dependency can be found in the directory `com.google.protobuf.protobuf-java-util-4.28.2`.
 
 
 're2j', licensed under the Go License, is distributed with the Snowflake.
@@ -303,7 +303,7 @@ Copyright notices related to this dependency can be found in the directory `com.
 
 'commons-codec', licensed under the Apache-2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.17.0`.
+Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.17.1`.
 
 
 'commons-io', licensed under the Apache-2.0, is distributed with the Snowflake.
@@ -318,82 +318,87 @@ Copyright notices related to this dependency can be found in the directory `comm
 
 'grpc-alts', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-alts-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-alts-1.77.0`.
 
 
 'grpc-api', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-api-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-api-1.77.0`.
 
 
 'grpc-auth', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-auth-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-auth-1.77.0`.
 
 
 'grpc-context', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-context-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-context-1.77.0`.
 
 
 'grpc-core', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-core-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-core-1.77.0`.
 
 
 'grpc-googleapis', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-googleapis-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-googleapis-1.77.0`.
 
 
 'grpc-grpclb', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-grpclb-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-grpclb-1.77.0`.
 
 
 'grpc-inprocess', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-inprocess-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-inprocess-1.77.0`.
 
 
 'grpc-netty-shaded', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-netty-shaded-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-netty-shaded-1.77.0`.
 
 
 'grpc-opentelemetry', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-opentelemetry-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-opentelemetry-1.77.0`.
 
 
 'grpc-protobuf', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-1.77.0`.
 
 
 'grpc-protobuf-lite', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-lite-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-protobuf-lite-1.77.0`.
 
 
 'grpc-rls', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-rls-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-rls-1.77.0`.
 
 
 'grpc-services', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-services-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-services-1.77.0`.
 
 
 'grpc-stub', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-stub-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-stub-1.77.0`.
 
 
 'grpc-util', licensed under the Apache 2.0, is distributed with the Snowflake.
 The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-util-1.67.1`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-util-1.77.0`.
+
+
+'grpc-xds', licensed under the Apache 2.0, is distributed with the Snowflake.
+The license file can be found at `licenses/APACHE2.0`.
+Copyright notices related to this dependency can be found in the directory `io.grpc.grpc-xds-1.77.0`.
 
 
 'netty-buffer', licensed under the Apache License, Version 2.0, is distributed with the Snowflake.

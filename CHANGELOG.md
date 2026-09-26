@@ -42,6 +42,11 @@
 
 #### Enso Language & Runtime
 
+- [The third-party notices shipped with the standard libraries now describe
+  exactly the libraries that ship][64]. Standard.DuckDB now credits DuckDB and
+  the libraries built into its native code, Standard.Microsoft credits JNA, and
+  Standard.Snowflake names the gRPC, Protocol Buffers and Commons Codec versions
+  it actually bundles (it listed older ones) and credits gRPC xDS.
 - [Extending `Boolean`, `Nothing`, `Text` via extension methods][14980]
 - [Avoid exposing `Runtime.current_execution_environment` & co.][14989]
 - [Engine toolchain: Scala 2.13.17 and the sbt plugin set][33]
@@ -122,6 +127,7 @@
   PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
   unchanged.
 
+[64]: https://github.com/jdunkerley/enso/pull/64
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989
 [33]: https://github.com/jdunkerley/enso/pull/33

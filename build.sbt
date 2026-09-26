@@ -123,13 +123,22 @@ GatherLicenses.distributions := Seq(
   makeStdLibDistribution("Database", Distribution.sbtProjects(`std-database`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
+  // A JAR wrapper whose output a library ships (`extraJars`,
+  // `dependenciesOfWrappers`) must be a component when the library does not
+  // itself resolve what the wrapper packages - typically because it depends on
+  // it as `provided`. Otherwise the notices silently leave it out.
   makeStdLibDistribution(
     "Snowflake",
-    Distribution.sbtProjects(`std-snowflake`)
+    // The wrapper's dependencies are shipped as they are
+    // (`dependenciesOfWrappers`), and they are not `std-snowflake`'s:
+    // `grpc-xds` is excluded there but not in the wrapper.
+    Distribution.sbtProjects(`std-snowflake`, `snowflake-jdbc-thin-wrapper`)
   ),
   makeStdLibDistribution(
     "Microsoft",
-    Distribution.sbtProjects(`std-microsoft`)
+    // JNA is `provided` to `std-microsoft` and shipped through
+    // `jna-wrapper-extracted`.
+    Distribution.sbtProjects(`std-microsoft`, `jna-wrapper`)
   ),
   makeStdLibDistribution(
     "Tableau",
@@ -141,7 +150,9 @@ GatherLicenses.distributions := Seq(
   ),
   makeStdLibDistribution(
     "DuckDB",
-    Distribution.sbtProjects(`std-duckdb`)
+    // `duckdb_jdbc` is `provided` to `std-duckdb` and shipped through
+    // `duckdb-wrapper`.
+    Distribution.sbtProjects(`std-duckdb`, `duckdb-wrapper`)
   )
 )
 
@@ -5951,11 +5962,11 @@ lazy val `std-snowflake` = project
       .value,
     Compile / packageBin / artifactPath :=
       `std-snowflake-polyglot-root` / "std-snowflake.jar",
-    // `snowflake-jdbc-thin` dependency is added only to be excluded during repackaging.
-    // It's not a bug — it's a way to make our licensing extraction tool pick up all the necessary
-    // dependencies.
-    // The actual artifact (without native libs) and all its transitive dependencies are then
-    // included via the re-packaging done in `snowflake-jdbc-thin-wrapper`.
+    // `snowflake-jdbc-thin` itself is excluded during repackaging below; the dependency is here so
+    // that its transitive dependencies are resolved, and shipped, from this project.
+    // The actual artifact (without native libs) and the wrapper's own dependencies are then
+    // included via the re-packaging done in `snowflake-jdbc-thin-wrapper`, which is why the
+    // wrapper is also a component of the Snowflake licence review (`GatherLicenses.distributions`).
     libraryDependencies += "net.snowflake" % "snowflake-jdbc-thin" % snowflakeJDBCVersion exclude ("io.grpc", "grpc-xds"),
     Compile / packageBin := {
       val logger            = streams.value.log

@@ -1,0 +1,2 @@
+# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
+std-tableau: its one library, tableauhyperapi.jar and its native library, is an unmanaged download from Tableau that dependency resolution cannot see; it is described by files-add/COPYRIGHT-HYPERAPI. JNA is covered by the jna-wrapper component.

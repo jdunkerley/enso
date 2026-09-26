@@ -1,0 +1,12 @@
+Copyright 2018-2025 Stichting DuckDB Foundation
+
+The DuckDB native library shipped with this driver statically includes the
+third-party libraries that DuckDB vendors (under `third_party/` and
+`extension/icu/third_party/` of https://github.com/duckdb/duckdb at v1.5.5,
+the version that duckdb-java v1.5.5.1 embeds). Their licences and notices are
+included in this directory as `third_party-<name>-LICENSE`,
+`third_party-tdigest-NOTICES` and `extension-icu-LICENSE`. The vendored Apache
+Thrift sources are licensed under the Apache License 2.0, whose text is in
+`third_party-parquet-LICENSE`; the Apache Thrift notice is in
+`third_party-thrift-NOTICE`.
+
