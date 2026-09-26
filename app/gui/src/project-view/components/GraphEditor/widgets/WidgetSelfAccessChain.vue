@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useGraphStore } from '$/components/WithCurrentProject.vue'
+import { asNodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import {
   Score,
   WidgetInput,
@@ -23,10 +24,13 @@ const tree = injectWidgetTree()
 
 const baseIcon = computed(() => {
   const callInfo = functionInfo?.callInfo
+  const nodeId = tree.externalId != null ? asNodeId(tree.externalId) : undefined
+  const cachedIcon = nodeId && graph.db.nodeIdToNode.get(nodeId)?.cachedAppearance?.icon
   return displayedIconOf(
     callInfo?.suggestion,
     callInfo?.methodCall.methodPointer,
     functionInfo?.outputType,
+    cachedIcon || undefined,
   )
 })
 const { displayedIcon } = useDisplayedIcon(graph.db, toRef(tree, 'externalId'), baseIcon)

@@ -44,33 +44,45 @@ export function suggestionEntryToIcon(entry: SuggestionEntry) {
   return DEFAULT_ICON
 }
 
-/** Returns an icon for a suggestion entry or method call. */
+/**
+ * Returns an icon for a suggestion entry or method call. `fallback` is used when neither says
+ * anything (e.g. the icon saved from an earlier session, before the node is recomputed).
+ */
 export function displayedIconOf(
   entry?: SuggestionEntry,
   methodCall?: MethodPointer,
   actualType?: ProjectPath,
+  fallback: Icon = DEFAULT_ICON,
 ): Icon {
   if (entry) {
     return suggestionEntryToIcon(entry)
   } else if (!methodCall?.name && actualType) {
     return typeNameToIcon(actualType)
   } else {
-    return DEFAULT_ICON
+    return fallback
   }
 }
 
-/** Returns the icon to show on a component. */
-export function iconOfNode(node: NodeId, graphDb: GraphDb) {
+/**
+ * Returns the icon to show on a component. With `useCachedIcon: false` the icon saved from an
+ * earlier session is ignored, giving the icon computed from current data alone.
+ */
+export function iconOfNode(
+  node: NodeId,
+  graphDb: GraphDb,
+  { useCachedIcon = true }: { useCachedIcon?: boolean } = {},
+) {
   const expressionInfo = graphDb.getExpressionInfo(node)
   const suggestionEntry = graphDb.getNodeMainSuggestion(node)
-  const nodeType = graphDb.nodeIdToNode.get(node)?.type
-  switch (nodeType) {
+  const nodeData = graphDb.nodeIdToNode.get(node)
+  switch (nodeData?.type) {
     default:
     case 'component':
       return displayedIconOf(
         suggestionEntry,
         expressionInfo?.methodCall?.methodPointer,
         expressionInfo?.typeInfo?.primaryType,
+        useCachedIcon ? nodeData?.cachedAppearance?.icon : undefined,
       )
     case 'output':
       return 'data_output'
