@@ -40,6 +40,7 @@ import TopBar from '@/components/TopBar.vue'
 import { builtinWidgets } from '@/components/widgets'
 import { useDoubleClick } from '@/composables/doubleClick'
 import { unrefElement, useEventConditional } from '@/composables/events'
+import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
 import { registerHandlers, toggledAction, type DisplayableActionName } from '@/providers/action'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
@@ -730,9 +731,13 @@ async function handleFileDrop(event: DragEvent) {
 
 // === Color Picker ===
 
-provideNodeColors(graphStore, (variable) =>
+const { getNodeColor } = provideNodeColors(graphStore, (variable) =>
   viewportElem.value ? getComputedStyle(viewportElem.value).getPropertyValue(variable) : '',
 )
+
+// === Node Appearance Cache ===
+
+useNodeAppearanceCache(graphStore, getNodeColor, () => suggestionDb.groupsLoaded)
 
 const contextMenuActions: DisplayableActionName[] = [
   'graph.navigateUp',

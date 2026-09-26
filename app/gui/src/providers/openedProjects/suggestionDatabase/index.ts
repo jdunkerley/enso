@@ -343,12 +343,14 @@ export function createSuggestionDbStore(
 ) {
   const entries = new SuggestionDb()
   const groups = ref<GroupInfo[]>([])
+  const groupsLoaded = ref(false)
 
   const updateProcessor = loadGroups(
     projectStore.lsRpcConnection,
     projectStore.firstExecution,
   ).then((loadedGroups) => {
     groups.value = loadedGroups
+    groupsLoaded.value = true
     return new SuggestionUpdateProcessor(loadedGroups, projectNames)
   })
 
@@ -368,6 +370,7 @@ export function createSuggestionDbStore(
   return proxyRefs({
     entries: markRaw(entries),
     groups: readonly(groups),
+    groupsLoaded: readonly(groupsLoaded),
     _synchronizer,
     mockSuggestion,
   })
