@@ -10,7 +10,7 @@ import * as z from 'zod'
 
 const HTTP_STATUS_BAD_REQUEST = 400
 
-/** When this app run started: a configuration fetched before it came from a previous run. */
+/** The time this app run started. A configuration fetched before this time belongs to a previous run. */
 const SESSION_START = Date.now()
 
 const REMOTE_CONFIG_SCHEMA = z.object({
