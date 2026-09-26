@@ -44,12 +44,13 @@ public class ClientBuilder {
   /**
    * Checks if the default credential is available.
    *
-   * <p>Uses a fresh chain, so that the check neither sees credentials cached by an earlier client
-   * nor closes the shared chain the clients use.
+   * <p>Resolves through the same shared chain that {@code AWS_Credential.Default} clients use, so
+   * the answer matches what those clients will get (including anything that chain has cached). It
+   * must not close that chain.
    */
   public static boolean isDefaultCredentialAvailable() {
-    try (var provider = DefaultCredentialsProvider.builder().build()) {
-      provider.resolveCredentials();
+    try {
+      sharedDefaultProvider.resolveCredentials();
       return true;
     } catch (SdkClientException e) {
       return false;
