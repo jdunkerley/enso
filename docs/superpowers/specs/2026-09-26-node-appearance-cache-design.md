@@ -159,6 +159,14 @@ passes `toRef(suggestionDb, 'loaded')` to its constructor (`GraphDb.Mock`
 defaults it to loaded). Once loaded, the precedence above the bold paragraph
 applies unchanged.
 
+Accepted consequence: the cached appearance is never cleared on edit, only
+overwritten by the writer once `loaded` is true. So a node edited before then
+keeps its old cached colour and icon until the database loads. `loaded` only
+becomes true after a _completed_ first execution. In a session where that never
+happens (e.g. only `executionFailed` arrives), the node stays that way for the
+whole session. That is harmless: group and entry data are unknowable then
+anyway, and nothing is written, because the writer waits for the same flag.
+
 ### 4. Writing: when and how
 
 A GUI composable, `useNodeAppearanceCache` (mounted once by the graph editor,
