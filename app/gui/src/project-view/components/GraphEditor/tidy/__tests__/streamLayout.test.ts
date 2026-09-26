@@ -378,11 +378,45 @@ describe('crossing pass', () => {
     expect(again).toEqual(once)
   })
 
-  test('is idempotent on a wide random DAG needing more than a handful of rounds to settle', () => {
-    // Found by searching seeds for this generator: untangling this particular DAG takes more
-    // adjacent-swap rounds than a small fixed round limit allows. A capped pass would return a
-    // layout that is not yet a local optimum, so running it again would keep moving things —
-    // that must not happen.
+  test('is idempotent on a wide graph that needs more than a handful of rounds to settle', () => {
+    // Roots L, A, B1..B6, X, left to right; each Bi has one child Bic. m (self A) also takes X; n
+    // (self L) also takes A. X→m runs all the way back to A's column, crossing every Bi→Bic once
+    // (6 crossings to start: X→m's segment moves monotonically from X's column to A's column, so
+    // it must cross each Bi→Bic's vertical segment along the way). Untangling that takes more
+    // adjacent-swap rounds than a small fixed round limit allows — this must still reach a stable,
+    // idempotent layout, not stop partway through.
+    const bs: LayoutComponent<string>[] = []
+    for (let i = 1; i <= 6; i++) {
+      bs.push(comp(`B${i}`, 400 + (i - 1) * 200, 0))
+      bs.push(comp(`B${i}c`, 400 + (i - 1) * 200, 80, [`B${i}`]))
+    }
+    const input = withOrder([
+      comp('L', 0, 0),
+      comp('A', 200, 0),
+      ...bs,
+      comp('X', 1600, 0),
+      comp('m', 1600, 300, ['A', 'X']),
+      comp('n', 0, 300, ['L', 'A']),
+    ])
+    const forest = buildForest(input)
+    const before = countCrossings(
+      input,
+      placeColumns(forest, forest.initialOrder, SPACING),
+      forest.inputs,
+    )
+    expect(before).toBe(6)
+    const once = streamLayout(input, SPACING)
+    const again = streamLayout(
+      input.map((c) => ({ ...c, position: once.get(c.id)! })),
+      SPACING,
+    )
+    expect(again).toEqual(once)
+  })
+
+  test('is idempotent on a random DAG (regression guard for the old column-interleaving bug)', () => {
+    // This fixture settles in 2 rounds, so it doesn't exercise the round cap; it's kept only as a
+    // regression guard for the earlier bug where a parent's branch columns were reserved before
+    // recursing into its main child, which could break idempotence independently of rounds.
     const input = randomDag(mulberry32(21), 30, 2)
     const once = streamLayout(input, SPACING)
     const again = streamLayout(

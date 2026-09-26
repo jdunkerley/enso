@@ -165,6 +165,7 @@ export function placeColumns<Id>(
   forest: StreamForest<Id>,
   order: ColumnOrder<Id>,
   spacing: LayoutSpacing,
+  top?: ReadonlyMap<Id, number>,
 ): Map<Id, Vec2> {
   const column = new Map<Id, number>()
   let nextColumn = 0
@@ -185,11 +186,13 @@ export function placeColumns<Id>(
     x += w + spacing.horizontal
   }
 
-  const top = rowTops(forest, spacing)
+  // Rows never depend on column order, so a caller placing many candidate column orders in a row
+  // (the crossing pass) can compute this once and pass it in, rather than have every call redo it.
+  const rows = top ?? rowTops(forest, spacing)
   const result = new Map<Id, Vec2>()
   for (const [id, col] of column) {
     const c = forest.byId.get(id)!
-    result.set(id, new Vec2(columnX[col]! + (widths[col]! - c.size.x) / 2, top.get(id)!))
+    result.set(id, new Vec2(columnX[col]! + (widths[col]! - c.size.x) / 2, rows.get(id)!))
   }
   return result
 }
@@ -365,28 +368,46 @@ function touchingEdges<Id>(
 }
 
 /**
- * Number of crossings that touch `touching` — pairs where at least one edge is in it — restricted
- * to pairs whose rows overlap (`neighbors`). Given the same `touching` set (the edges incident to
- * the two subtrees a candidate swap would move), calling this once against the positions before
- * the swap and once against the positions after gives the exact change in the total crossing
- * count: every other edge's segment is unchanged by the swap, so only these pairs can change.
- * Cost scales with the size of `touching`, not with the whole graph.
+ * A memoised lookup of every edge's segment under whichever positions `current()` returns right
+ * now, valid for as long as that stays the same object. The crossing pass calls `current()`
+ * before evaluating each candidate swap, so a whole round of swap attempts that all still share
+ * the layout's last-accepted positions reuse the same cached segments, computed at most once each.
+ */
+function segmentCache<Id>(
+  edges: readonly Edge<Id>[],
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  current: () => ReadonlyMap<Id, Vec2>,
+): (i: number) => Segment | undefined {
+  let forPositions: ReadonlyMap<Id, Vec2> | undefined
+  let cache: (Segment | undefined)[] = []
+  return (i: number) => {
+    const positions = current()
+    if (positions !== forPositions) {
+      forPositions = positions
+      cache = new Array(edges.length)
+    }
+    const cached = cache[i]
+    if (cached != null) return cached
+    const s = segmentOf(byId, positions, edges[i]!)
+    if (s != null) cache[i] = s
+    return s
+  }
+}
+
+/**
+ * Number of crossings among `touching` — pairs where at least one edge is in it — restricted to
+ * pairs whose rows overlap (`neighbors`), reading each edge's segment from `segmentAt`. Given the
+ * same `touching` set (the edges incident to the two subtrees a candidate swap would move), calling
+ * this once with a lookup for the positions before the swap and once for after gives the exact
+ * change in the total crossing count: every other edge's segment is unchanged by the swap, so only
+ * these pairs can change. Cost scales with the size of `touching`, not with the whole graph.
  */
 function crossingsTouching<Id>(
   edges: readonly Edge<Id>[],
   neighbors: readonly (readonly number[])[],
   touching: ReadonlySet<number>,
-  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
-  positions: ReadonlyMap<Id, Vec2>,
+  segmentAt: (i: number) => Segment | undefined,
 ): number {
-  const segments = new Map<number, Segment>()
-  const segmentAt = (i: number): Segment | undefined => {
-    const cached = segments.get(i)
-    if (cached != null) return cached
-    const s = segmentOf(byId, positions, edges[i]!)
-    if (s != null) segments.set(i, s)
-    return s
-  }
   let crossings = 0
   for (const i of touching) {
     for (const j of neighbors[i] ?? []) {
@@ -399,6 +420,33 @@ function crossingsTouching<Id>(
       const s2 = segmentAt(j)
       if (s1 == null || s2 == null) continue
       if (segmentsCross(s1, s2)) crossings++
+    }
+  }
+  return crossings
+}
+
+/**
+ * Number of crossings among every edge, restricted to pairs whose rows overlap (`neighbors`).
+ * Equivalent to `countCrossings` on the same edge set, but reuses the precomputed y-overlap index
+ * instead of testing every pair, so it is cheap to call again after a swap that moves too much of
+ * the graph for `crossingsTouching`'s incremental scoring to be worth it.
+ */
+function crossingsAll<Id>(
+  edges: readonly Edge<Id>[],
+  neighbors: readonly (readonly number[])[],
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  positions: ReadonlyMap<Id, Vec2>,
+): number {
+  const segments = edges.map((e) => segmentOf(byId, positions, e))
+  let crossings = 0
+  for (let i = 0; i < edges.length; i++) {
+    const si = segments[i]
+    if (si == null) continue
+    for (const j of neighbors[i] ?? []) {
+      if (j <= i) continue
+      const sj = segments[j]
+      if (sj == null || sharesEndpoint(edges[i]!, edges[j]!)) continue
+      if (segmentsCross(si, sj)) crossings++
     }
   }
   return crossings
@@ -453,33 +501,61 @@ export function streamLayout<Id>(
   // does — so it is safe, and enough, to compute this once.
   const subtreeOf = subtreeIndex(forest)
   // Rows, and so which edges could possibly cross at all, never depend on column order — compute
-  // both once and reuse them for every candidate swap instead of rescanning the whole graph.
+  // all of this once and reuse it for every candidate swap instead of rescanning the whole graph.
   const top = rowTops(forest, spacing)
   const neighbors = yOverlapNeighbors(edges, forest.byId, top)
   const incident = incidentEdges(edges)
 
-  let positions = placeColumns(forest, order, spacing)
-  let best = countCrossings(components, positions, forest.inputs)
+  let positions = placeColumns(forest, order, spacing, top)
+  let best = crossingsAll(edges, neighbors, forest.byId, positions)
+  // Segments for the current (last-accepted) positions, memoised: a whole round of swap attempts
+  // shares these positions until one is accepted, so this computes each edge's segment at most
+  // once per accepted swap rather than once per candidate.
+  const stableSegmentAt = segmentCache(edges, forest.byId, () => positions)
   // One optimisation pass over column order only: keep an adjacent swap iff it strictly reduces
   // crossings, so ties keep the user's order and a tidied graph stays unchanged. Runs to a local
   // optimum — crossings is a non-negative integer that strictly drops on every kept swap, so this
   // always terminates — rather than a fixed number of rounds, so the result really is stable.
   //
   // A swap never moves a component's row, only its column, and only within the two swapped
-  // subtrees; every other position is unchanged. `crossingsTouching` uses that: it re-scores only
-  // the edges touching those two subtrees against the old and new positions, instead of
-  // recounting every pair in the whole graph for every candidate swap.
+  // subtrees; every other position is unchanged. For a small pair of subtrees, `crossingsTouching`
+  // re-scores only the edges touching them, once against the positions before the swap and once
+  // after, instead of recounting the whole graph — and even for the "after" positions, only the
+  // touching edges' segments actually differ from `stableSegmentAt`, so those are the only ones
+  // computed fresh. But on a widely-branching tree a swap near the root can move most of the
+  // graph, at which point the two partial counts (plus the bookkeeping to find what they touch)
+  // cost more than one `crossingsAll` on the result — so past a certain number of touched edges,
+  // this falls back to that instead. The cutoff (empirically tuned, not half the edge count: with
+  // parents spread uniformly across the graph rather than clustered locally, most edges end up
+  // sharing a row, so `crossingsTouching`'s cost stops scaling down long before touching reaches
+  // half of them) is well below the point the two approaches cost the same.
   while (best > 0) {
     let improved = false
     for (const group of groups) {
       for (let i = 0; i + 1 < group.length; i++) {
-        const movedIds = new Set([...subtreeOf(group[i]!), ...subtreeOf(group[i + 1]!)])
+        const movedIds = new Set(subtreeOf(group[i]!))
+        for (const id of subtreeOf(group[i + 1]!)) movedIds.add(id)
         const touching = touchingEdges(incident, movedIds)
-        const before = crossingsTouching(edges, neighbors, touching, forest.byId, positions)
+        const useFullCount = touching.size > 40 // tuned against the adversarial uniform-parent benchmark
+        const before =
+          useFullCount ? 0 : crossingsTouching(edges, neighbors, touching, stableSegmentAt)
         ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
-        const candidate = placeColumns(forest, order, spacing)
-        const after = crossingsTouching(edges, neighbors, touching, forest.byId, candidate)
-        const crossings = best - before + after
+        const candidate = placeColumns(forest, order, spacing, top)
+        let crossings: number
+        if (useFullCount) {
+          crossings = crossingsAll(edges, neighbors, forest.byId, candidate)
+        } else {
+          const fresh = new Map<number, Segment>()
+          const afterSegmentAt = (idx: number): Segment | undefined => {
+            if (!touching.has(idx)) return stableSegmentAt(idx)
+            const cached = fresh.get(idx)
+            if (cached != null) return cached
+            const s = segmentOf(forest.byId, candidate, edges[idx]!)
+            if (s != null) fresh.set(idx, s)
+            return s
+          }
+          crossings = best - before + crossingsTouching(edges, neighbors, touching, afterSegmentAt)
+        }
         if (crossings < best) {
           best = crossings
           positions = candidate

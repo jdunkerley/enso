@@ -64,3 +64,52 @@ describe('streamLayout performance', () => {
     },
   )
 })
+
+/**
+ * A random LCG, matching the exact one used to probe this module in review: each node picks its
+ * self (and, with probability `p2`, one more) input uniformly from *every* earlier node, not a
+ * recent window. That gives a shallow, wide tree — unlike `randomDag` above, not representative of
+ * a real dataflow graph, but a harder case for the crossing pass: with parents spread uniformly
+ * over the whole node range, one swap's two subtrees can between them touch most of the graph's
+ * edges, and its rows end up far less spread out, so many more edge pairs share a row than in a
+ * graph with real locality.
+ */
+function uniformParentDag(seed: number, n: number, p2: number): LayoutComponent<string>[] {
+  let state = seed
+  const rand = () => (state = (state * 1103515245 + 12345) % 2147483648) / 2147483648
+  const nodes: LayoutComponent<string>[] = []
+  for (let i = 0; i < n; i++) {
+    const inputs: string[] = []
+    if (i > 0 && rand() < 0.85) inputs.push(`c${Math.floor(rand() * i)}`)
+    if (i > 0 && rand() < p2) inputs.push(`c${Math.floor(rand() * i)}`)
+    nodes.push({
+      id: `c${i}`,
+      position: new Vec2(rand() * 5000, rand() * 5000),
+      size: new Vec2(80 + rand() * 200, 32),
+      inputs,
+      selfSource: inputs[0],
+      order: i,
+    })
+  }
+  return nodes
+}
+
+describe('streamLayout performance (uniform-parent, adversarial)', () => {
+  let input: LayoutComponent<string>[] = []
+
+  for (const seed of [1, 2, 3, 4, 5]) {
+    bench(
+      `streamLayout on a uniform-parent DAG, seed ${seed} (300 components, ~400 edges)`,
+      () => {
+        streamLayout(input, SPACING)
+      },
+      {
+        setup: () => {
+          input = uniformParentDag(seed, 300, 0.5)
+        },
+        warmupIterations: 5,
+        iterations: 10,
+      },
+    )
+  }
+})
