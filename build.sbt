@@ -5931,6 +5931,12 @@ lazy val `std-aws` = project
       "software.amazon.awssdk" % "ssooidc"            % awsJavaSdkV2Version,
       "software.amazon.awssdk" % "sts"                % awsJavaSdkV2Version
     ),
+    // The SDK's default sync HTTP client since 2.45.x; it cannot initialise in
+    // the engine. See Note [AWS SDK Uses The Apache HttpClient 4 Client].
+    excludeDependencies += ExclusionRule(
+      "software.amazon.awssdk",
+      "apache5-client"
+    ),
     Compile / packageBin := {
       val stdAwsJar         = (Compile / packageBin).value
       val cacheStoreFactory = streams.value.cacheStoreFactory

@@ -331,7 +331,7 @@ object Dependencies {
   // POI classes with modified copies of their 5.2.3 sources (to avoid a
   // dependency on `java.desktop`). A newer POI needs those copies re-derived
   // from its own sources first, otherwise old code runs against new internals.
-  val poiOoxmlVersion         = "5.2.3"
+  val poiOoxmlVersion = "5.2.3"
   // See Note [Redshift Driver Declares Its AWS SDK As Optional].
   val redshiftVersion         = "2.2.9"
   val univocityParsersVersion = "2.9.1"
@@ -356,16 +356,32 @@ object Dependencies {
    * The driver also uses `software.amazon.awssdk.http.apache` (the Apache
    * HttpClient 4 client) directly, on every IAM connection
    * (`IamHelper.setBuilderConfiguration`), without declaring it at all. It
-   * used to arrive with the service modules; since the SDK made
-   * `apache5-client` their default (during 2.45.x) they no longer bring it, so
-   * `apache-client` is declared too. `std-aws`'s own S3 and SES clients do not
-   * choose an HTTP client and get the SDK's highest-priority one,
-   * `apache5-client`.
+   * used to arrive with the service modules, which no longer bring it - see
+   * Note [AWS SDK Uses The Apache HttpClient 4 Client] - so `apache-client`
+   * is declared too.
    *
    * All of these are loaded lazily, so a missing module fails a connection
    * with `NoClassDefFoundError`, never the build. Re-check the driver's POM
    * and its `software/amazon/awssdk` references whenever `redshiftVersion` or
    * `awsJavaSdkV2Version` moves.
+   */
+
+  /* Note [AWS SDK Uses The Apache HttpClient 4 Client]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * During 2.45.x the SDK's service modules switched their runtime HTTP client
+   * from `apache-client` (Apache HttpClient 4) to `apache5-client` (HttpClient
+   * 5), and a client that is not given one explicitly picks the
+   * highest-priority implementation on the class path, which is now
+   * `apache5-client`. That cannot initialise in the engine: HttpClient 5's
+   * `DefaultHttpClientConnectionOperator` links against `jdk.net.Sockets`, and
+   * the `jdk.net` module is not in the engine's boot layer, so every S3 call
+   * panics with `NoClassDefFoundError: jdk/net/Sockets`. `std-aws` therefore
+   * excludes `apache5-client` and declares `apache-client`, which leaves the
+   * HttpClient 4 client as the only - and so the default - implementation, as
+   * it was before. That covers the clients `std-aws` builds (S3, SES) and the
+   * ones the SDK builds internally (STS for assume-role profiles, SSO, the
+   * Redshift driver's clients). Revisit when `jdk.net` is available to
+   * standard libraries or `apache-client` is retired.
    */
 
   // === ZIO ====================================================================
