@@ -114,8 +114,10 @@ exactly when the cache is needed.
 The server-side schema is deliberately loose (strings, bounded length). The GUI
 validates before use and ignores an invalid value for that node only:
 
-- `color`: must parse with `culori` (already used by `util/colors.ts`) and be
-  supported by the browser (`cssSupported`).
+- `color`: must parse with `culori` (already used by `util/colors.ts`). This
+  also rejects anything that is not a single colour value (e.g.
+  `red; background: url(…)`), and unlike `CSS.supports` it behaves the same in
+  unit tests as in the browser.
 - `icon`: must satisfy `isIconName` and must not be `'$evaluating'`.
 
 ### 3. Reading: fallbacks
