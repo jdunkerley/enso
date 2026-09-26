@@ -43,6 +43,10 @@
   instead of showing grey with the Enso logo until they are computed. Each
   component's last known colour and icon are saved with the workflow and shown,
   faded, until the component has been computed again.
+- [The IDE no longer closes the open project and blanks its window after sitting
+  idle][72] when running without Enso Cloud. Returning to the window, or the
+  network reconnecting, used to re-check the Enso Cloud configuration, and while
+  that check was under way the IDE briefly treated the local user as signed out.
 
 #### Enso Language & Runtime
 
@@ -153,6 +157,7 @@
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
+[72]: https://github.com/jdunkerley/enso/pull/72
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

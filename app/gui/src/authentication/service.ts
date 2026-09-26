@@ -14,7 +14,7 @@ import { Amplify } from 'aws-amplify'
 import type * as saveAccessTokenModule from 'enso-common/src/accessToken'
 import * as common from 'enso-common/src/constants'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed, toRef, toValue, type Ref } from 'vue'
+import { computed, toRef, toValue, type ComputedRef, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 /**
@@ -141,20 +141,44 @@ export function useInitAuthService(): AuthService {
     }
   })
 
-  // The remote configuration has settled (either loaded or failed) but carries no usable Cognito
-  // configuration: authentication cannot run and the app falls back to a local-only mode.
-  const authDisabled = computed(
-    () =>
-      (config.remoteConfig !== undefined || config.isError) &&
-      !config.isFetching &&
-      amplifyConfig.value == null,
-  )
+  const authDisabled = useAuthDisabled(config, amplifyConfig)
 
   if (detect.isOnElectron()) {
     setDeepLinkHandler((url) => void router.push(url), cognito)
   }
 
   return { cognito, authDisabled, registerAuthEventListener: listen.registerAuthEventListener }
+}
+
+/** The parts of the remote configuration's fetch state that decide {@link useAuthDisabled}. */
+export interface RemoteConfigState {
+  readonly remoteConfig: RemoteConfig | undefined
+  readonly isError: boolean
+  readonly isFetching: boolean
+}
+
+/**
+ * Whether authentication is disabled: the remote configuration has settled (either loaded or
+ * failed) but carries no usable Cognito configuration, so authentication cannot run and the app
+ * falls back to a local-only mode.
+ *
+ * Once `true`, it stays `true` for the rest of the session. The remote configuration cannot change
+ * within a session (see `cognito` in {@link useInitAuthService}), and a re-fetch of it passes
+ * through states that look unsettled (`isFetching`, and a cleared error for a query that has no
+ * data). Following those would briefly re-enable authentication with no Cognito client, which
+ * signs the local user out, closes the open project and blanks the window.
+ */
+export function useAuthDisabled(
+  config: RemoteConfigState,
+  amplifyConfig: ToValue<AmplifyConfig | undefined>,
+): ComputedRef<boolean> {
+  return computed(
+    (wasDisabled) =>
+      wasDisabled === true ||
+      ((config.remoteConfig !== undefined || config.isError) &&
+        !config.isFetching &&
+        toValue(amplifyConfig) == null),
+  )
 }
 
 /** Return the appropriate Amplify configuration for the current platform. */
