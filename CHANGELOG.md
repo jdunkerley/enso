@@ -42,6 +42,9 @@
 
 #### Enso Language & Runtime
 
+- [Fixed an intermittent failure in the engine's standard library import test on
+  Windows CI][65]: it now also waits for the project's code-completion data,
+  which can arrive after execution has finished.
 - [The third-party notices shipped with the standard libraries now describe
   exactly the libraries that ship][64]. Standard.DuckDB now credits DuckDB and
   the libraries built into its native code, Standard.Microsoft credits JNA, and
@@ -127,6 +130,7 @@
   PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
   unchanged.
 
+[65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
 [14980]: https://github.com/enso-org/enso/pull/14980
 [14989]: https://github.com/enso-org/enso/pull/14989

@@ -103,28 +103,29 @@ class RuntimeStdlibTest
       Iterator.continually(receive).take(n).flatten.toList
     }
 
+    /** Receives messages until every one of `conditions` has been satisfied by
+      * at least one received message, in any order, or until no message
+      * arrives within `timeout` seconds.
+      *
+      * @return all the messages received, in arrival order
+      */
     def receiveAllUntil(
-      msgs: Seq[Api.Response],
+      conditions: Seq[Api.Response => Boolean],
       timeout: Long
     ): List[Api.Response] = {
-      val toSee                          = collection.mutable.ArrayBuffer.from(msgs)
-      var lastSeen: Option[Api.Response] = None
-      val receivedUntil = Iterator
-        .continually(receive(timeout))
-        .takeWhile {
-          case Some(received) =>
-            val found = msgs.contains(received)
-            if (found) {
-              lastSeen = Some(received)
-              toSee.subtractOne(received)
-            }
-            !(found && toSee.isEmpty)
+      val pending  = mutable.ArrayBuffer.from(conditions)
+      val received = mutable.ListBuffer[Api.Response]()
+      var timedOut = false
+      while (pending.nonEmpty && !timedOut) {
+        receive(timeout) match {
+          case Some(response) =>
+            received += response
+            pending.filterInPlace(condition => !condition(response))
           case None =>
-            false
+            timedOut = true
         }
-        .flatten
-        .toList
-      receivedUntil :++ lastSeen
+      }
+      received.toList
     }
 
     def consumeOut: List[String] = {
@@ -225,9 +226,30 @@ class RuntimeStdlibTest
         )
       )
     )
+    // The suggestions for `Main` are sent by an `AnalyzeModuleJob`, which
+    // `EnsureCompiledJob` hands to the background job pool. It runs
+    // concurrently with the `ExecuteJob` that sends `ExecutionComplete`, so
+    // nothing orders the two: wait for both rather than stopping at
+    // `ExecutionComplete`. The standard library's own suggestions come from
+    // further background jobs and are not waited for.
     val responses =
       context.receiveAllUntil(
-        Seq(context.executionComplete(contextId)),
+        Seq(
+          _ == context.executionComplete(contextId),
+          {
+            case Api.Response(
+                  None,
+                  Api.SuggestionsDatabaseModuleUpdateNotification(
+                    `moduleName`,
+                    _,
+                    _,
+                    _
+                  )
+                ) =>
+              true
+            case _ => false
+          }
+        ),
         timeout = 180
       )
     // sanity check
@@ -263,7 +285,12 @@ class RuntimeStdlibTest
           }
         }
     }
-    suggestions.isEmpty shouldBe false
+    withClue(
+      s"No suggestions update for $moduleName. Received: " +
+      responses.map(_.payload.getClass.getSimpleName).mkString(", ")
+    ) {
+      suggestions.isEmpty shouldBe false
+    }
 
     // check that types are qualified
     if (errors.nonEmpty) {
