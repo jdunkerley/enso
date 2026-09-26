@@ -6,17 +6,17 @@ import org.enso.interpreter.runtime.data.hash.EnsoHashMap;
 /**
  * Holds result of equality check with addtional information about warnings.
  *
- * <p>Note [Equality Result Does Not Speculate]. The answer {@link #isTrue()} gives must depend only
- * on this object. It used to depend on a global {@code Assumption} as well - "no equality has ever
- * produced warnings", under which {@code isTrue()} was {@code this == TRUE} - and the
- * {@link #valueOf(boolean, EnsoHashMap) warnings-carrying} instance invalidated that assumption as
- * it was created. That is only correct if every compiled body that folded the assumption as valid
- * stops running before it can see such an instance. In the native image that did not always hold:
- * compiled code kept taking the {@code this == TRUE} branch after the assumption was invalid, so
- * every {@code ==} whose result carried a warning answered {@code False} for the rest of the
- * process - e.g. {@code 12.1 == (Decimal.from 12.1)}, whose Float-to-Decimal conversion attaches
- * {@code Loss_Of_Numeric_Precision} (issue #55). Reading the field is as cheap as the identity
- * check, so there is nothing to speculate on.
+ * <p>Note [Equality Result Does Not Speculate]. What {@link #isTrue()} answers must depend on this
+ * object only. It used to consult a global {@code Assumption} as well ("no equality has produced
+ * warnings yet"): while that held, {@code isTrue()} was {@code this == TRUE}, and creating a
+ * warnings-carrying instance invalidated it. That is only sound if every compiled body that folded
+ * the assumption is invalidated along with it. In the native image (where this class is initialised
+ * at image build time) it was not: code compiled at run time kept treating the assumption as valid
+ * after it had been invalidated - no dependent code was invalidated with it - so a
+ * warnings-carrying {@code True} reaching such code read as {@code False}. That is how {@code 12.1
+ * == (Decimal.from 12.1)}, whose Float-to-Decimal conversion attaches {@code
+ * Loss_Of_Numeric_Precision}, came out {@code False} in {@code Decimal_Spec} now and then (issue
+ * #55). Reading the field costs no more than the identity check did.
  */
 public final class EqualsAndInfo {
   /** {@code isTrue()} without any warnings */
