@@ -30,6 +30,7 @@ import { useGraphEditorClipboard } from '@/components/GraphEditor/graphClipboard
 import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { selectionActionHandlers } from '@/components/GraphEditor/selectionActions'
 import { createSelectionAlignmentHandlers } from '@/components/GraphEditor/selectionAlignment'
+import { useGraphTidy } from '@/components/GraphEditor/tidy/useGraphTidy'
 import { useGraphEditorToasts } from '@/components/GraphEditor/toasts'
 import { uploadedExpression, Uploader } from '@/components/GraphEditor/upload'
 import GraphMissingView from '@/components/GraphMissingView.vue'
@@ -230,6 +231,7 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 // === Action Handlers ===
 
 const showCodeEditor = ref(false)
+const graphTidy = useGraphTidy(graphStore, module)
 
 const actionHandlers = registerHandlers({
   'graphEditor.showHelp': {
@@ -269,6 +271,10 @@ const actionHandlers = registerHandlers({
   },
   'graph.fitAll': {
     action: zoomToSelected,
+  },
+  'components.tidyUp': {
+    enabled: () => graphStore.db.nodeIdToNode.size >= 2,
+    action: () => graphTidy.tidy([...nodeSelection.selected]),
   },
   'graph.zoomIn': {
     action: () => graphNavigator.stepZoom(+1),
@@ -748,6 +754,7 @@ const contextMenuActions: DisplayableActionName[] = [
   'graph.redo',
   'graph.addComponent',
   'graph.fitAll',
+  'components.tidyUp',
   'graph.pasteNode',
   'graph.toggleCodeEditor',
   'graph.toggleDocumentationEditor',

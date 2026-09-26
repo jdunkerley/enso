@@ -76,6 +76,7 @@ export const graphBindings = defineKeybinds('graph-editor', {
   'component.enterNode': ['Mod+E'],
   'graph.navigateUp': ['Mod+Shift+E'],
   'components.pickColorMulti': ['Mod+Shift+C'],
+  'components.tidyUp': ['Mod+Shift+L'],
   'graph.openDocumentation': ['F1'],
   'graph.deleteSelectedEdge': ['Delete', 'Backspace'],
 })
