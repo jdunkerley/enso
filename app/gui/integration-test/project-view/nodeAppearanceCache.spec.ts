@@ -15,15 +15,21 @@ async function nodeColor(node: ReturnType<typeof locate.graphNodeByBinding>) {
  */
 async function resolvedNodeColor(node: ReturnType<typeof locate.graphNodeByBinding>) {
   const raw = await nodeColor(node)
-  const varMatch = raw && /^var\((--[\w-]+)\)$/.exec(raw)
-  if (!varMatch) return raw
+  const varName = raw && /^var\((--[\w-]+)\)$/.exec(raw)?.[1]
+  if (!varName) return raw
   return await node.evaluate(
     (el, varName) => getComputedStyle(el).getPropertyValue(varName).trim(),
-    varMatch[1],
+    varName,
   )
 }
 
-test('a pending node shows the colour cached from its last computation', async ({
+/** The name of the icon shown on the node, from its `<use href="…#name">` (see `svgUseHref`). */
+async function nodeIcon(node: ReturnType<typeof locate.graphNodeByBinding>) {
+  const href = await locate.graphNodeIcon(node).locator('use').getAttribute('href')
+  return href?.split('#').pop()
+}
+
+test('a pending node shows the colour and icon cached from its last computation', async ({
   editorPage,
   page,
 }) => {
@@ -34,6 +40,8 @@ test('a pending node shows the colour cached from its last computation', async (
   // Never computed: pending, no-type colour.
   await expect(ten).toHaveClass(/pending/)
   expect(await nodeColor(ten)).toBe('var(--node-color-no-type)')
+  // Nothing cached yet: `five` shows the default icon.
+  await expect.poll(() => nodeIcon(five)).toBe('enso_logo')
 
   // Computed with a known method call, so it gets a library group's colour, which is then
   // cached. (A type update is not used here: `ComputedValueRegistry` never clears a node's
@@ -53,15 +61,20 @@ test('a pending node shows the colour cached from its last computation', async (
   const computedColor = await resolvedNodeColor(five)
   expect(computedColor).toBeDefined()
   expect(computedColor).not.toBe('var(--node-color-no-type)')
+  // The method's suggestion entry gives the node its icon (`data_input` for `Data.read`).
+  await expect.poll(() => nodeIcon(five)).toBe('data_input')
 
   // The method call is no longer reported (e.g. the node is about to be re-evaluated): with no
   // group or type known, the cached colour is already shown here, before the node is even
   // pending.
   await mockExpressionUpdate(page, 'five', { type: [], payload: { type: 'Value' } })
+  await expect(five).not.toHaveClass(/pending/)
   await expect.poll(() => resolvedNodeColor(five)).toBe(computedColor)
+  await expect.poll(() => nodeIcon(five)).toBe('data_input')
 
   // Pending again with no group or type info: the cached colour is shown, faded by `.pending`.
   await mockExpressionUpdate(page, 'five', { type: [], payload: { type: 'Pending' } })
   await expect(five).toHaveClass(/pending/)
   await expect.poll(() => resolvedNodeColor(five)).toBe(computedColor)
+  await expect.poll(() => nodeIcon(five)).toBe('data_input')
 })
