@@ -122,6 +122,10 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
      parent's current x continues the parent's column. Ties go to code order.
    - Every other child starts a new column to the right, in the children's
      current left-to-right order.
+   - Each subtree's columns stay **contiguous**. A branch gets its column only
+     after the main child's whole subtree has been assigned, so a split within a
+     split nests inside its own stream and never interleaves with a sibling's
+     columns. A plain tree (no merges) therefore has no crossing edges.
    - Independent trees are placed side by side in the current left-to-right
      order of their roots.
    - Each column is as wide as its widest component, plus the horizontal gap.
@@ -137,7 +141,11 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
      edges strictly decreases**.
    - An edge is modelled as a straight segment from the source's bottom centre
      to the target's top centre.
-   - Repeat until no swap helps, capped at a fixed number of rounds.
+   - Repeat until a full round finds no improving swap. There is no round cap.
+     The pass always terminates, because the crossing count is a non-negative
+     integer that strictly drops in every improving round. A cap could stop it
+     before it reaches a local optimum, and then a second Tidy up would move
+     things again.
    - Ties keep the user's order. So an already-tidy graph is unchanged, and Tidy
      up is **idempotent**.
 5. **Anchoring.** Translate the result so its bounding box's top-left equals the
@@ -154,9 +162,13 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
 - **Cycles:** dataflow within a function is acyclic. If a cycle ever appeared
   (e.g. in broken code), the layout breaks it by treating the
   later-in-code-order edge as absent, rather than looping.
-- **Performance:** layout is linear. Crossing counting is O(E²) per evaluated
-  swap, and the number of swaps is capped, which is fine for a few hundred
-  components. It runs synchronously.
+- **Performance:** layout is linear. Counting crossings is the expensive part,
+  since pairs of edges are compared on every swap tried. It is pruned so that
+  only edges whose vertical extents overlap are compared, or only edges touched
+  by the swap are recounted. The target is under 200 ms for 300 components and
+  about 400 edges, checked with a vitest bench. It runs synchronously.
+- **Crossings count the layout's own edges:** the same de-duplicated, cycle-free
+  inputs the layout uses.
 - **Undo and collaboration:** one batched user edit, synced like any position
   change.
 
