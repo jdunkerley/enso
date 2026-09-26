@@ -1,6 +1,12 @@
 import { Vec2 } from '@/util/data/vec2'
 import { describe, expect, test } from 'vitest'
-import { countCrossings, streamLayout, type LayoutComponent } from '../streamLayout'
+import {
+  buildForest,
+  countCrossings,
+  placeColumns,
+  streamLayout,
+  type LayoutComponent,
+} from '../streamLayout'
 
 const SPACING = { horizontal: 40, vertical: 40 }
 const SIZE = new Vec2(100, 32)
@@ -163,5 +169,50 @@ describe('streamLayout', () => {
     ])
     const pos = new Map(cs.map((c) => [c.id, c.position]))
     expect(countCrossings(cs, pos)).toBe(1)
+  })
+})
+
+describe('crossing pass', () => {
+  test('swaps independent streams when that removes a crossing', () => {
+    // Roots A, B, C left to right. m (in C's column, self = C) also takes A as an input, so the
+    // edge A→m spans column B and crosses B→b2. Swapping A and B removes the crossing.
+    // Hand-checked: before, A→m runs (50,32)→(330,72) and meets B→b2 (x=190, y 32..72) at y≈52.
+    const input = withOrder([
+      comp('A', 0, 0),
+      comp('B', 300, 0),
+      comp('b2', 300, 80, ['B']),
+      comp('C', 600, 0),
+      comp('m', 600, 300, ['C', 'A']),
+    ])
+    const forest = buildForest(input)
+    expect(countCrossings(input, placeColumns(forest, forest.initialOrder, SPACING))).toBe(1)
+    const pos = streamLayout(input, SPACING)
+    expect(countCrossings(input, pos)).toBe(0)
+  })
+
+  test('keeps the current order when swapping does not strictly reduce crossings', () => {
+    const input = withOrder([comp('A', 0, 0), comp('B', 300, 0), comp('C', 600, 0)])
+    const pos = streamLayout(input, SPACING)
+    expect(pos.get('A')!.x).toBeLessThan(pos.get('B')!.x)
+    expect(pos.get('B')!.x).toBeLessThan(pos.get('C')!.x)
+  })
+
+  test('reorders branch columns of one parent to remove a crossing', () => {
+    // p splits into b1 (left) and b2 (right) besides its main child m. b1 feeds a component that
+    // sits right of b2's column... construct so the current branch order crosses.
+    const input = withOrder([
+      comp('p', 0, 0),
+      comp('m', 0, 80, ['p']),
+      comp('b1', 200, 80, ['p']),
+      comp('b2', 400, 80, ['p']),
+      comp('z', 200, 300, ['b2', 'm']),
+      comp('w', 400, 300, ['b1']),
+    ])
+    const before = (() => {
+      const f = buildForest(input)
+      return countCrossings(input, placeColumns(f, f.initialOrder, SPACING))
+    })()
+    const pos = streamLayout(input, SPACING)
+    expect(countCrossings(input, pos)).toBeLessThan(before)
   })
 })

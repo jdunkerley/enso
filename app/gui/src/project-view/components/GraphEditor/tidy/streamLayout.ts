@@ -245,6 +245,9 @@ function anchor<Id>(
   return result
 }
 
+/** Rounds of adjacent-swap optimisation the crossing pass runs before giving up. */
+export const MAX_CROSSING_ROUNDS = 4
+
 /** Lay out `components` as a top-to-bottom flow of straight columns; returns new top-left positions. */
 export function streamLayout<Id>(
   components: readonly LayoutComponent<Id>[],
@@ -252,5 +255,29 @@ export function streamLayout<Id>(
 ): Map<Id, Vec2> {
   if (components.length === 0) return new Map()
   const forest = buildForest(components)
-  return anchor(components, placeColumns(forest, forest.initialOrder, spacing))
+  const order: ColumnOrder<Id> = {
+    roots: [...forest.initialOrder.roots],
+    branches: new Map([...forest.initialOrder.branches].map(([k, v]) => [k, [...v]])),
+  }
+  const groups: Id[][] = [order.roots, ...order.branches.values()].filter((g) => g.length > 1)
+  let best = countCrossings(components, placeColumns(forest, order, spacing))
+  // One optimisation pass over column order only: keep an adjacent swap iff it strictly reduces
+  // crossings, so ties keep the user's order and a tidied graph stays unchanged.
+  for (let round = 0; round < MAX_CROSSING_ROUNDS && best > 0; round++) {
+    let improved = false
+    for (const group of groups) {
+      for (let i = 0; i + 1 < group.length; i++) {
+        ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
+        const crossings = countCrossings(components, placeColumns(forest, order, spacing))
+        if (crossings < best) {
+          best = crossings
+          improved = true
+        } else {
+          ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
+        }
+      }
+    }
+    if (!improved) break
+  }
+  return anchor(components, placeColumns(forest, order, spacing))
 }
