@@ -1,5 +1,5 @@
 import { expect, test } from 'integration-test/base'
-import { mockExpressionUpdate } from './expressionUpdates'
+import { mockExpressionUpdate, mockMethodCallInfo } from './expressionUpdates'
 import * as locate from './locate'
 
 async function nodeColor(node: ReturnType<typeof locate.graphNodeByBinding>) {
@@ -19,20 +19,33 @@ test('a pending node shows the colour cached from its last computation', async (
   await expect(ten).toHaveClass(/pending/)
   expect(await nodeColor(ten)).toBe('var(--node-color-no-type)')
 
-  // Computed with a type: gets the type's colour, which is then cached.
-  await mockExpressionUpdate(page, 'five', {
-    type: ['Standard.Base.Data.Numbers.Integer'],
+  // Computed with a known method call, so it gets a library group's colour, which is then
+  // cached. (A type update is not used here: `ComputedValueRegistry` never clears a `typeInfo`
+  // once set for an expression - see `updateInfo` in `computedValueRegistry.ts` - so a node whose
+  // colour comes from its *type* can never be driven back to "unknown" within one session. A
+  // `methodCall`, and therefore a *group* colour, does not have that restriction: it is cleared by
+  // any non-pending update that omits it.)
+  await mockMethodCallInfo(page, 'five', {
+    methodPointer: {
+      module: 'Standard.Base.Data',
+      definedOnType: 'Standard.Base.Data',
+      name: 'read',
+    },
+    notAppliedArguments: [],
   })
   await expect(five).not.toHaveClass(/pending/)
   const computedColor = await nodeColor(five)
   expect(computedColor).toBeDefined()
   expect(computedColor).not.toBe('var(--node-color-no-type)')
 
-  // Pending again with no type info: the cached colour is shown, faded by `.pending`.
-  await mockExpressionUpdate(page, 'five', {
-    type: [],
-    payload: { type: 'Pending' },
-  })
+  // The method call is no longer reported (e.g. the node is about to be re-evaluated): with no
+  // group or type known, the cached colour is already shown here, before the node is even
+  // pending.
+  await mockExpressionUpdate(page, 'five', { type: [], payload: { type: 'Value' } })
+  await expect.poll(() => nodeColor(five)).toBe(computedColor)
+
+  // Pending again with no group or type info: the cached colour is shown, faded by `.pending`.
+  await mockExpressionUpdate(page, 'five', { type: [], payload: { type: 'Pending' } })
   await expect(five).toHaveClass(/pending/)
   await expect.poll(() => nodeColor(five)).toBe(computedColor)
 })
