@@ -36,6 +36,20 @@ const serializeBoxes = (map: Map<string, Box>) => JSON.stringify([...map])
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 
+/**
+ * Assert that `child` continues `parent`'s column: same centre x, top strictly below the
+ * parent's bottom.
+ *
+ * `toBeCloseTo(x, 0)` (tolerance 0.5px) is the suite's usual precision for a screen-space centre
+ * match (see `aligningNodes.spec.ts`); it's enough here too, because the layout places these two
+ * centres at the exact same *scene* x, so any screen-space gap is only floating-point/zoom-
+ * transform rounding, not a real layout discrepancy.
+ */
+function expectContinuesColumn(child: Box, parent: Box) {
+  expect(child.x + child.width / 2).toBeCloseTo(parent.x + parent.width / 2, 0)
+  expect(child.y).toBeGreaterThan(parent.y + parent.height)
+}
+
 test('Tidy up lays out the graph in columns without overlaps, and undo restores it', async ({
   editorPage,
   page,
@@ -54,8 +68,7 @@ test('Tidy up lays out the graph in columns without overlaps, and undo restores 
   // actual layout output rather than assumed.
   const data = after.get('data')!
   const aggregated = after.get('aggregated')!
-  expect(Math.abs(aggregated.x + aggregated.width / 2 - (data.x + data.width / 2))).toBeLessThan(2)
-  expect(aggregated.y).toBeGreaterThan(data.y + data.height)
+  expectContinuesColumn(aggregated, data)
 
   // No two components overlap.
   const list = [...after.values()]
@@ -93,11 +106,20 @@ test('with a selection only the selected components move; the button sits in the
   const iconHref = await tidyButton.locator('svg use').getAttribute('href')
 
   await tidyButton.click()
-  await expect
-    .poll(async () => JSON.stringify((await boxes(page)).get('sum')))
-    .not.toBe(JSON.stringify(before.get('sum')))
-
+  await expect.poll(async () => serializeBoxes(await boxes(page))).not.toBe(serializeBoxes(before))
   const after = await boxes(page)
+
+  // `sum = five + ten + twenty`, so `five` is `sum`'s first (self) input -- and, with only
+  // `{five, sum}` selected, its only *in-scope* input, since `ten` and `twenty` are excluded from
+  // the selection. Checking just "`sum` moved" wouldn't catch a scoped tidy that silently dropped
+  // `five` from the scope (it could still reposition `sum` alone against no inputs), and checking
+  // just "`five` moved" could fail legitimately, since `five` may already sit at the in-scope
+  // anchor's top-left corner and have nowhere to move. Asserting the layout rule itself -- `sum`
+  // continues `five`'s column -- proves both components were actually laid out together.
+  const five = after.get('five')!
+  const sum = after.get('sum')!
+  expectContinuesColumn(sum, five)
+
   for (const [name, box] of before) {
     if (name === 'five' || name === 'sum') continue
     expect(after.get(name)).toEqual(box)
