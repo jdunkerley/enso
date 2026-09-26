@@ -1,6 +1,7 @@
 import type { GraphStore, NodeId } from '$/providers/openedProjects/graph'
 import type { NodeType } from '$/providers/openedProjects/graph/graphDatabase'
 import type { NodeColorSource } from '@/composables/nodeColors'
+import { sanitizeCachedAppearance } from '@/util/cachedAppearance'
 import { DEFAULT_ICON, iconOfNode } from '@/util/getIconName'
 import { computed, watch } from 'vue'
 import type { CachedAppearance } from 'ydoc-shared/ast'
@@ -32,7 +33,10 @@ export function appearanceToCache(input: AppearanceInput): CachedAppearance | un
   } else {
     if (input.colorSource !== 'group' && input.colorSource !== 'type') return undefined
     color = input.resolvedColor?.trim()
-    if (!color) return undefined
+    // Only store what the reader (`sanitizeCachedAppearance`) will accept back — otherwise a
+    // colour it rejects would be sanitized away on read and recomputed as still-different on
+    // every reactive pass, writing forever.
+    if (!color || sanitizeCachedAppearance({ color })?.color !== color) return undefined
   }
   const icon = input.icon === DEFAULT_ICON ? undefined : input.icon
   if (input.stored?.color === color && input.stored?.icon === icon) return undefined

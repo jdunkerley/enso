@@ -115,3 +115,25 @@ test('with a colour override and the default icon, nothing is written', () => {
     }),
   ).toBeUndefined()
 })
+
+test('a group colour the sanitizer rejects is not cached', () => {
+  expect(
+    appearanceToCache({
+      ...computedNode,
+      colorSource: 'group',
+      resolvedColor: 'hsl(200 50% 40%)',
+      icon: 'table',
+    }),
+  ).toBeUndefined()
+})
+
+test('a type colour the sanitizer rejects is not cached', () => {
+  expect(
+    appearanceToCache({
+      ...computedNode,
+      colorSource: 'type',
+      resolvedColor: 'hsl(200 50% 40%)',
+      icon: 'table',
+    }),
+  ).toBeUndefined()
+})
