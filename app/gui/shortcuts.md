@@ -44,10 +44,11 @@ Shortcuts are designed to work well with both the mouse and the touchpad.
 
 #### Component Layout
 
-| Shortcut                                   | Action                                                                 |
-| ------------------------------------------ | ---------------------------------------------------------------------- |
-| <kbd>LMB</kbd> drag non-selected component | Move the component to new position (dragging do not modify selection). |
-| <kbd>LMB</kbd> drag selected component     | Move all selected components the component to new positions.           |
+| Shortcut                                          | Action                                                                                                 |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| <kbd>LMB</kbd> drag non-selected component        | Move the component to new position (dragging do not modify selection).                                 |
+| <kbd>LMB</kbd> drag selected component            | Move all selected components the component to new positions.                                           |
+| <kbd>Meta</kbd> + <kbd>Shift</kbd> + <kbd>L</kbd> | Tidy up: arrange the selection (if more than one component is selected), or the whole graph otherwise. |
 
 #### Component Selection
 

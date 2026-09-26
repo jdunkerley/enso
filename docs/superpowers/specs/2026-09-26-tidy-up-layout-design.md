@@ -67,6 +67,10 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
 
 1. **`streamLayout.ts`: a pure function.** It has no Vue, store or Yjs
    dependencies.
+   - The action handler itself lives in `GraphEditor.vue`, not in a selection
+     component: Tidy up is both whole-graph and selection-scoped, and
+     `GraphEditor.vue` is the one place that sees both the graph store and the
+     current selection.
    - **Input:**
      - `components`: each has an `id`, a `size` (`Vec2`: width × height), a
        current `position` (`Vec2`, top-left), a `selfSource?` (the id of the
@@ -167,6 +171,15 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
   only edges whose vertical extents overlap are compared, or only edges touched
   by the swap are recounted. The target is under 200 ms for 300 components and
   about 400 edges, checked with a vitest bench. It runs synchronously.
+  - **Time budget.** The crossing-minimisation pass carries a wall-clock budget
+    (`CROSSING_PASS_BUDGET_MS`, 300 ms, using `performance.now()`, injectable
+    for tests). On realistic graphs this never matters — they finish in
+    milliseconds. On a pathological graph (e.g. an adversarial, uniformly random
+    parent assignment rather than the local structure real code has), the pass
+    can otherwise run for seconds; past the budget it stops and keeps the best
+    order found so far, which is always a valid, non-overlapping layout, and
+    warns once via `console.warn`. Idempotence — see "Stable order" above — can
+    be lost only in that case; a second Tidy up may move things further.
 - **Crossings count the layout's own edges:** the same de-duplicated, cycle-free
   inputs the layout uses.
 - **Undo and collaboration:** one batched user edit, synced like any position

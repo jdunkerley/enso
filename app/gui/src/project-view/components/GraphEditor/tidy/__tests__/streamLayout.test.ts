@@ -1,5 +1,5 @@
 import { Vec2 } from '@/util/data/vec2'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import {
   buildForest,
   countCrossings,
@@ -424,5 +424,42 @@ describe('crossing pass', () => {
       SPACING,
     )
     expect(again).toEqual(once)
+  })
+
+  test('a time budget stops the pass early, keeping a valid layout, and warns once', () => {
+    // Same fixture as "reorders branch columns...": one crossing, fixable by swapping b1 and b2.
+    const input = withOrder([
+      comp('p', 0, 0),
+      comp('m', 0, 80, ['p']),
+      comp('b1', 200, 80, ['p']),
+      comp('b2', 400, 80, ['p']),
+      comp('z', 200, 300, ['b2', 'm']),
+      comp('w', 400, 300, ['b1']),
+    ])
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      // The deadline is set from the first call; every later call reports it as already passed, so
+      // the pass must stop before trying (let alone accepting) a single swap.
+      let calls = 0
+      const now = () => (calls++ === 0 ? 0 : Number.POSITIVE_INFINITY)
+
+      const pos = streamLayout(input, SPACING, { now })
+
+      // The crossing the pass would normally fix is still there: the budget really did stop it
+      // before any swap, not just cut a round short after some progress.
+      expect(countCrossings(input, pos)).toBe(1)
+      // It's still a valid (non-overlapping) layout — the un-optimised column order is one placeColumns
+      // always produces, never a partial or corrupt one.
+      for (let i = 0; i < input.length; i++) {
+        for (let j = i + 1; j < input.length; j++) {
+          const a = input[i]!
+          const b = input[j]!
+          expect(rectsOverlap(pos.get(a.id)!, a.size, pos.get(b.id)!, b.size)).toBe(false)
+        }
+      }
+      expect(warn).toHaveBeenCalledTimes(1)
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

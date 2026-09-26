@@ -73,7 +73,7 @@ const spacingActions: DisplayableActionName[] = [
             <ActionButton action="components.alignTop" @click="alignmentMenuOpen = false" />
             <ActionButton action="components.alignBottom" @click="alignmentMenuOpen = false" />
           </div>
-          <div class="alignmentMenuRow tidy">
+          <div class="alignmentMenuRow">
             <ActionButton action="components.tidyUp" @click="alignmentMenuOpen = false" />
           </div>
         </MenuPanel>

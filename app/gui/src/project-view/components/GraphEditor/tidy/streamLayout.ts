@@ -165,7 +165,21 @@ export function placeColumns<Id>(
   forest: StreamForest<Id>,
   order: ColumnOrder<Id>,
   spacing: LayoutSpacing,
-  top?: ReadonlyMap<Id, number>,
+): Map<Id, Vec2> {
+  return placeColumnsAtRows(forest, order, spacing, rowTops(forest, spacing))
+}
+
+/**
+ * `placeColumns`, but with every component's row (top y) precomputed, since rows never depend on
+ * column order: a caller placing many candidate column orders in a row (the crossing pass) can
+ * compute them once and reuse them, rather than have every call redo it. Kept internal, unlike
+ * `placeColumns`, so a caller can't pass rows that don't cover every id in `order`.
+ */
+function placeColumnsAtRows<Id>(
+  forest: StreamForest<Id>,
+  order: ColumnOrder<Id>,
+  spacing: LayoutSpacing,
+  rows: ReadonlyMap<Id, number>,
 ): Map<Id, Vec2> {
   const column = new Map<Id, number>()
   let nextColumn = 0
@@ -186,9 +200,6 @@ export function placeColumns<Id>(
     x += w + spacing.horizontal
   }
 
-  // Rows never depend on column order, so a caller placing many candidate column orders in a row
-  // (the crossing pass) can compute this once and pass it in, rather than have every call redo it.
-  const rows = top ?? rowTops(forest, spacing)
   const result = new Map<Id, Vec2>()
   for (const [id, col] of column) {
     const c = forest.byId.get(id)!
@@ -484,10 +495,24 @@ function subtreeIndex<Id>(forest: StreamForest<Id>): (id: Id) => ReadonlySet<Id>
   return subtreeOf
 }
 
+/** Options for {@link streamLayout}. */
+export interface StreamLayoutOptions {
+  /** Clock for the crossing pass's time budget. Injectable so a test can force it to expire. */
+  readonly now?: () => number
+}
+
+/**
+ * The crossing pass's wall-clock budget. On a pathological graph the pass can take many rounds of
+ * adjacent swaps to settle; past this many milliseconds it stops and keeps the best order found so
+ * far rather than let a single Tidy up run indefinitely.
+ */
+const CROSSING_PASS_BUDGET_MS = 300
+
 /** Lay out `components` as a top-to-bottom flow of straight columns; returns new top-left positions. */
 export function streamLayout<Id>(
   components: readonly LayoutComponent<Id>[],
   spacing: LayoutSpacing,
+  options: StreamLayoutOptions = {},
 ): Map<Id, Vec2> {
   if (components.length === 0) return new Map()
   const forest = buildForest(components)
@@ -506,7 +531,7 @@ export function streamLayout<Id>(
   const neighbors = yOverlapNeighbors(edges, forest.byId, top)
   const incident = incidentEdges(edges)
 
-  let positions = placeColumns(forest, order, spacing, top)
+  let positions = placeColumnsAtRows(forest, order, spacing, top)
   let best = crossingsAll(edges, neighbors, forest.byId, positions)
   // Segments for the current (last-accepted) positions, memoised: a whole round of swap attempts
   // shares these positions until one is accepted, so this computes each edge's segment at most
@@ -525,14 +550,28 @@ export function streamLayout<Id>(
   // computed fresh. But on a widely-branching tree a swap near the root can move most of the
   // graph, at which point the two partial counts (plus the bookkeeping to find what they touch)
   // cost more than one `crossingsAll` on the result — so past a certain number of touched edges,
-  // this falls back to that instead. The cutoff (empirically tuned, not half the edge count: with
+  // this falls back to that instead. The cutoff was tuned empirically against
+  // `streamLayout.bench.ts`'s uniform-parent benchmark, not chosen as half the edge count: with
   // parents spread uniformly across the graph rather than clustered locally, most edges end up
   // sharing a row, so `crossingsTouching`'s cost stops scaling down long before touching reaches
-  // half of them) is well below the point the two approaches cost the same.
-  while (best > 0) {
+  // half of them. The cutoff is well below the point the two approaches cost the same.
+  //
+  // Pathological inputs (see the same bench) can still take rounds of adjacent swaps to settle, so
+  // the pass carries a wall-clock budget: once `CROSSING_PASS_BUDGET_MS` has elapsed, it stops and
+  // keeps the best order found so far, which is always a valid, non-overlapping layout — every
+  // accepted swap already placed one. This can only cost idempotence on the pathological graphs
+  // that hit the budget in the first place; every case fast enough to finish keeps the guarantee.
+  const now = options.now ?? (() => performance.now())
+  const deadline = now() + CROSSING_PASS_BUDGET_MS
+  let timedOut = false
+  while (best > 0 && !timedOut) {
     let improved = false
     for (const group of groups) {
       for (let i = 0; i + 1 < group.length; i++) {
+        if (now() >= deadline) {
+          timedOut = true
+          break
+        }
         const movedIds = new Set(subtreeOf(group[i]!))
         for (const id of subtreeOf(group[i + 1]!)) movedIds.add(id)
         const touching = touchingEdges(incident, movedIds)
@@ -540,7 +579,7 @@ export function streamLayout<Id>(
         const before =
           useFullCount ? 0 : crossingsTouching(edges, neighbors, touching, stableSegmentAt)
         ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
-        const candidate = placeColumns(forest, order, spacing, top)
+        const candidate = placeColumnsAtRows(forest, order, spacing, top)
         let crossings: number
         if (useFullCount) {
           crossings = crossingsAll(edges, neighbors, forest.byId, candidate)
@@ -564,8 +603,15 @@ export function streamLayout<Id>(
           ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
         }
       }
+      if (timedOut) break
     }
     if (!improved) break
+  }
+  if (timedOut) {
+    console.warn(
+      'Tidy up: the crossing-minimisation pass hit its time budget and stopped early; layout ' +
+        'quality may be reduced. Running Tidy up again may move things further.',
+    )
   }
   return anchor(components, positions)
 }

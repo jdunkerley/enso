@@ -11,14 +11,39 @@ import theme from '@/util/theme'
 import type { Ref } from 'vue'
 import { streamLayout, type LayoutComponent } from './streamLayout'
 
-/** Build the layout model for the components in `scope` (the whole graph when undefined). */
+/**
+ * Build the layout model for the components in `scope` (the whole graph when undefined).
+ *
+ * `pickInCodeOrder`, as exposed by the graph store, orders body statements by their line; it
+ * doesn't cover function arguments, so those are ordered separately, by argument index, ahead of
+ * the body. Every component's `order` field ends up reflecting this real code order, rather than
+ * `db.nodeIdToNode`'s insertion order — which is stable only until a node added later happens to
+ * sit on an earlier line, e.g. one inserted mid-function.
+ */
 export function buildTidyModel(
   db: GraphDb,
   scope: ReadonlySet<NodeId> | undefined,
   sizeOf: (id: NodeId) => Vec2 | undefined,
   defaultSize: Vec2,
+  pickInCodeOrder: (ids: Set<NodeId>) => readonly NodeId[],
 ): LayoutComponent<NodeId>[] {
-  const ids = [...db.nodeIdToNode.keys()].filter((id) => scope == null || scope.has(id))
+  const inScopeUnordered = [...db.nodeIdToNode.keys()].filter(
+    (id) => scope == null || scope.has(id),
+  )
+  const isInput = (id: NodeId) => db.nodeIdToNode.get(id)!.type === 'input'
+  const [inputIds, bodyIds] = [
+    inScopeUnordered.filter(isInput),
+    inScopeUnordered.filter((id) => !isInput(id)),
+  ]
+  inputIds.sort(
+    (a, b) => (db.nodeIdToNode.get(a)!.argIndex ?? 0) - (db.nodeIdToNode.get(b)!.argIndex ?? 0),
+  )
+  const orderedBody = pickInCodeOrder(new Set(bodyIds))
+  // Every body id is expected back, just reordered; if one isn't (the db and the executed method's
+  // AST momentarily disagree on the function body), keep it rather than silently drop a component.
+  const orderedBodySet = new Set(orderedBody)
+  const missing = bodyIds.filter((id) => !orderedBodySet.has(id))
+  const ids = [...inputIds, ...orderedBody, ...missing]
   const inScope = new Set(ids)
 
   // Each input's position within its target's inner expression, for stable argument order.
@@ -71,6 +96,7 @@ export function useGraphTidy(graphStore: GraphStore, module: Ref<ModuleStore>) {
       scope,
       (id) => graphStore.visibleArea(id)?.size,
       defaultSize,
+      graphStore.pickInCodeOrder,
     ).filter((c) => Number.isFinite(c.position.x) && Number.isFinite(c.position.y))
     if (model.length < 2) return
     const positions = streamLayout(model, {
