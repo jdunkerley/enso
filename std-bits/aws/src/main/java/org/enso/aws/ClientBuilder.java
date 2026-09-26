@@ -21,6 +21,17 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.ses.SesClient;
 
 public class ClientBuilder {
+  /**
+   * The AWS default credential chain shared by every client built here, so that credentials it
+   * resolves (e.g. from SSO or the instance metadata service) are cached across clients. It is
+   * never closed: the clients do not close a provider they were given.
+   *
+   * <p>This is what the deprecated {@code DefaultCredentialsProvider.create()} singleton used to
+   * provide, except that no other code can close it.
+   */
+  private static final DefaultCredentialsProvider sharedDefaultProvider =
+      DefaultCredentialsProvider.builder().build();
+
   private static AwsCredential defaultCredentialOverride = null;
   private final AwsCredential awsCredential;
   private final AWSRegion awsRegion;
@@ -30,9 +41,14 @@ public class ClientBuilder {
     this.awsRegion = awsRegion;
   }
 
-  /** Checks if the default credential is available. */
+  /**
+   * Checks if the default credential is available.
+   *
+   * <p>Uses a fresh chain, so that the check neither sees credentials cached by an earlier client
+   * nor closes the shared chain the clients use.
+   */
   public static boolean isDefaultCredentialAvailable() {
-    try (var provider = DefaultCredentialsProvider.create()) {
+    try (var provider = DefaultCredentialsProvider.builder().build()) {
       provider.resolveCredentials();
       return true;
     } catch (SdkClientException e) {
@@ -142,11 +158,10 @@ public class ClientBuilder {
     AwsCredential override = defaultCredentialOverride;
     if (override != null) {
       return AwsCredentialsProviderChain.builder()
-          .credentialsProviders(
-              new EnsoOverrideCredentialProvider(override), DefaultCredentialsProvider.create())
+          .credentialsProviders(new EnsoOverrideCredentialProvider(override), sharedDefaultProvider)
           .build();
     } else {
-      return DefaultCredentialsProvider.create();
+      return sharedDefaultProvider;
     }
   }
 

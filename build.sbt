@@ -5915,18 +5915,21 @@ lazy val `std-aws` = project
       .value,
     Compile / packageBin / artifactPath :=
       `std-aws-polyglot-root` / "std-aws.jar",
+    // `apache-client`, `auth`, `redshift`, `redshiftserverless` and `sts` are
+    // the Redshift driver's IAM dependencies, which it does not bring itself:
+    // see Note [Redshift Driver Declares Its AWS SDK As Optional].
     libraryDependencies ++= Seq(
-      "com.amazon.redshift"    % "redshift-jdbc42"       % redshiftVersion,
-      "com.amazonaws"          % "aws-java-sdk-core"     % awsJavaSdkV1Version,
-      "com.amazonaws"          % "aws-java-sdk-redshift" % awsJavaSdkV1Version,
-      "com.amazonaws"          % "aws-java-sdk-sts"      % awsJavaSdkV1Version,
-      "software.amazon.awssdk" % "auth"                  % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "bom"                   % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "redshift"              % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "s3"                    % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "ses"                   % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "sso"                   % awsJavaSdkV2Version,
-      "software.amazon.awssdk" % "ssooidc"               % awsJavaSdkV2Version
+      "com.amazon.redshift"    % "redshift-jdbc42"    % redshiftVersion,
+      "software.amazon.awssdk" % "apache-client"      % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "auth"               % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "bom"                % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "redshift"           % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "redshiftserverless" % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "s3"                 % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "ses"                % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "sso"                % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "ssooidc"            % awsJavaSdkV2Version,
+      "software.amazon.awssdk" % "sts"                % awsJavaSdkV2Version
     ),
     Compile / packageBin := {
       val stdAwsJar         = (Compile / packageBin).value
