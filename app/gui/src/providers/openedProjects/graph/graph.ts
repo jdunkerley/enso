@@ -209,6 +209,7 @@ export function createGraphStore(
     toRef(suggestionDb, 'groups'),
     proj.computedValueRegistry,
     projectNames,
+    toRef(suggestionDb, 'loaded'),
   )
   const portInstances = shallowReactive(new Map<PortId, Set<PortViewInstance>>())
   const editedNodeInfo = ref<NodeEditInfo>()

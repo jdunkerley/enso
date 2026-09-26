@@ -83,7 +83,17 @@ export class GraphDb {
     private readonly groups: Ref<DeepReadonly<GroupInfo[]>>,
     private readonly valuesRegistry: ComputedValueRegistry,
     private readonly projectNames: ProjectNameStore,
+    private readonly suggestionsLoadedRef: Readonly<Ref<boolean>>,
   ) {}
+
+  /**
+   * Whether the suggestion database has finished its initial load. Until then, a missing
+   * suggestion entry (and so group) may just not be known yet, so data derived from a node's type
+   * is provisional, and the appearance cached from an earlier session is preferred to it.
+   */
+  get suggestionsLoaded(): boolean {
+    return this.suggestionsLoadedRef.value
+  }
 
   private nodeIdToPatternExprIds = new ReactiveIndex(this.nodeIdToNode, (id, entry) => {
     const exprs: AstId[] = []
@@ -160,6 +170,7 @@ export class GraphDb {
       () => tryGetIndex(this.groups.value, this.getNodeMainSuggestion(id)?.groupIndex),
       () => this.getExpressionInfo(id)?.typeInfo?.primaryType,
       () => entry.cachedAppearance?.color,
+      () => this.suggestionsLoaded,
     )
   })
 
@@ -595,8 +606,9 @@ export class GraphDb {
     registry = ComputedValueRegistry.Mock(),
     db = new SuggestionDb(),
     projectNames = mockProjectNameStore(),
+    suggestionsLoaded: Readonly<Ref<boolean>> = ref(true),
   ): GraphDb {
-    return new GraphDb(db, ref([]), registry, projectNames)
+    return new GraphDb(db, ref([]), registry, projectNames, suggestionsLoaded)
   }
 
   /** TODO: Add docs */

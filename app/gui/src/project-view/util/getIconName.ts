@@ -47,25 +47,33 @@ export function suggestionEntryToIcon(entry: SuggestionEntry) {
 /**
  * Returns an icon for a suggestion entry or method call. `fallback` is used when neither says
  * anything (e.g. the icon saved from an earlier session, before the node is recomputed).
+ *
+ * With `preferFallbackOverType`, a given `fallback` is also preferred to an icon derived from
+ * `actualType`: used while the suggestion database is still loading, when the missing `entry`
+ * may just not be known yet.
  */
 export function displayedIconOf(
   entry?: SuggestionEntry,
   methodCall?: MethodPointer,
   actualType?: ProjectPath,
-  fallback: Icon = DEFAULT_ICON,
+  fallback?: Icon,
+  { preferFallbackOverType = false }: { preferFallbackOverType?: boolean } = {},
 ): Icon {
   if (entry) {
     return suggestionEntryToIcon(entry)
+  } else if (preferFallbackOverType && fallback) {
+    return fallback
   } else if (!methodCall?.name && actualType) {
     return typeNameToIcon(actualType)
   } else {
-    return fallback
+    return fallback ?? DEFAULT_ICON
   }
 }
 
 /**
  * Returns the icon to show on a component. With `useCachedIcon: false` the icon saved from an
- * earlier session is ignored, giving the icon computed from current data alone.
+ * earlier session is ignored, giving the icon computed from current data alone. Otherwise, until
+ * the suggestion database has loaded, the cached icon is preferred to one derived from the type.
  */
 export function iconOfNode(
   node: NodeId,
@@ -83,6 +91,7 @@ export function iconOfNode(
         expressionInfo?.methodCall?.methodPointer,
         expressionInfo?.typeInfo?.primaryType,
         useCachedIcon ? nodeData?.cachedAppearance?.icon : undefined,
+        { preferFallbackOverType: !graphDb.suggestionsLoaded },
       )
     case 'output':
       return 'data_output'

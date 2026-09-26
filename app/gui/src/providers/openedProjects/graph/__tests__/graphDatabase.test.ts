@@ -1,9 +1,15 @@
-import { asNodeId, GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
+import { asNodeId, GraphDb, type NodeId } from '$/providers/openedProjects/graph/graphDatabase'
+import {
+  ComputedValueRegistry,
+  TypeInfo,
+} from '$/providers/openedProjects/project/computedValueRegistry'
+import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
 import { assert, assertDefined } from '@/util/assert'
 import { Ast } from '@/util/ast'
+import { stdPath } from '@/util/projectPath'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { expect, test } from 'vitest'
-import { watchEffect } from 'vue'
+import { ref, watchEffect } from 'vue'
 import type { AstId } from 'ydoc-shared/ast'
 import { SourceRange } from 'ydoc-shared/util/data/text'
 import { IdMap, type ExternalId } from 'ydoc-shared/yjsModel'
@@ -117,4 +123,24 @@ test('Reading graph from definition', () => {
   expect(Array.from(db.nodeDependents.lookup(asNodeId(eid('node3Content'))))).toEqual([
     eid('output'),
   ])
+})
+
+test('A typed node shows its cached colour until suggestions are loaded', () => {
+  const id = '3d0e9b96-3ca0-4c35-a820-7d3a1649de55' as NodeId
+  const registry = ComputedValueRegistry.Mock()
+  registry.db.set(id, {
+    typeInfo: TypeInfo.fromParsedTypes([stdPath('Standard.Base.Data.Numbers.Integer')], [])!,
+    methodCall: undefined,
+    payload: { type: 'Value' },
+    profilingInfo: [],
+    evaluationId: 1,
+  })
+  const suggestionsLoaded = ref(false)
+  const db = GraphDb.Mock(registry, new SuggestionDb(), undefined, suggestionsLoaded)
+  db.mockNode('node1', id)
+  db.nodeIdToNode.get(id)!.cachedAppearance = { color: '#4a7fb0' }
+  expect(db.getNodeColorSource(id)).toBe('cached')
+  expect(db.getNodeColorStyle(id)).toBe('#4a7fb0')
+  suggestionsLoaded.value = true
+  expect(db.getNodeColorSource(id)).toBe('type')
 })

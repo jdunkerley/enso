@@ -136,6 +136,29 @@ validates before use and ignores an invalid value for that node only:
 Once real data arrives, the computed colour/icon win by the existing precedence,
 so a stale cache is visible only until the node is recomputed.
 
+**Until the suggestion database has loaded, the cache also outranks the type.**
+Expression updates (with `typeInfo` and `methodCall`) arrive with the first
+execution, but the suggestion database is only fetched after that execution
+completes (and after the groups). In that window a computed node has a type but
+no suggestion entry, so neither its group colour nor its entry icon can be known
+yet; the type colour, and the type-derived icon (usually `DEFAULT_ICON`), are
+only provisional. Showing them made nodes flash from the cached appearance to
+the type colour and Enso logo and back, once the database loaded. So, while
+`suggestionDb.loaded` is false:
+
+- **Colour:** override → fixed → group → **cached** → type → cached → no-type
+  grey. The source is reported as `'cached'`, so the writer (which only writes
+  `'group'` and `'type'` sources, and waits for `loaded` anyway) skips it.
+- **Icon:** with no suggestion entry, the cached icon (when there is one) is
+  preferred to the type-derived icon, on both render paths (`iconOfNode` and
+  `WidgetSelfAccessChain`), via `displayedIconOf`'s `preferFallbackOverType`
+  option.
+
+`GraphDb` learns the flag the same way it learns `groups`: the graph store
+passes `toRef(suggestionDb, 'loaded')` to its constructor (`GraphDb.Mock`
+defaults it to loaded). Once loaded, the precedence above the bold paragraph
+applies unchanged.
+
 ### 4. Writing: when and how
 
 A GUI composable, `useNodeAppearanceCache` (mounted once by the graph editor,
