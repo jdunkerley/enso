@@ -40,7 +40,7 @@ export interface ColumnOrder<Id> {
 /** The acyclic stream structure derived from the components. */
 export interface StreamForest<Id> {
   readonly byId: ReadonlyMap<Id, LayoutComponent<Id>>
-  /** Inputs actually used, after breaking any cycle. */
+  /** Inputs actually used: de-duplicated, self-edges dropped, and any cycle broken. */
   readonly inputs: ReadonlyMap<Id, readonly Id[]>
   /** The child continuing each component's column, if it has children. */
   readonly mainChild: ReadonlyMap<Id, Id>
@@ -53,6 +53,15 @@ export interface StreamForest<Id> {
 const centreX = <Id>(c: LayoutComponent<Id>) => c.position.x + c.size.x / 2
 const byPosition = <Id>(a: LayoutComponent<Id>, b: LayoutComponent<Id>) =>
   centreX(a) - centreX(b) || a.order - b.order
+
+/** Every map here is keyed by component id, so ids must be unique. */
+function assertUniqueIds<Id>(components: readonly LayoutComponent<Id>[]): void {
+  const seen = new Set<Id>()
+  for (const c of components) {
+    if (seen.has(c.id)) throw new Error(`streamLayout: duplicate component id ${String(c.id)}`)
+    seen.add(c.id)
+  }
+}
 
 /** Kahn's algorithm; returns undefined if `inputs` contains a cycle. */
 function topologicalOrder<Id>(
@@ -77,12 +86,21 @@ function topologicalOrder<Id>(
   return result.length === components.length ? result : undefined
 }
 
-/** Build the stream forest: acyclic inputs, parents, the column-continuing child, and initial order. */
-export function buildForest<Id>(components: readonly LayoutComponent<Id>[]): StreamForest<Id> {
-  const byId = new Map(components.map((c) => [c.id, c]))
-  let inputs = new Map(
+/** De-duplicated, self-edge-free inputs for every component, from its raw `inputs`. */
+function cleanInputs<Id>(
+  components: readonly LayoutComponent<Id>[],
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+): Map<Id, Id[]> {
+  return new Map(
     components.map((c) => [c.id, [...new Set(c.inputs)].filter((i) => byId.has(i) && i !== c.id)]),
   )
+}
+
+/** Build the stream forest: acyclic inputs, parents, the column-continuing child, and initial order. */
+export function buildForest<Id>(components: readonly LayoutComponent<Id>[]): StreamForest<Id> {
+  assertUniqueIds(components)
+  const byId = new Map(components.map((c) => [c.id, c]))
+  let inputs = cleanInputs(components, byId)
   let topological = topologicalOrder(components, inputs)
   if (topological == null) {
     // A cycle (only possible in broken code): drop every edge from a later-in-code-order source.
@@ -135,7 +153,14 @@ export function buildForest<Id>(components: readonly LayoutComponent<Id>[]): Str
   }
 }
 
-/** Positions for a given column order, before anchoring (top-left of the result is (0, 0)). */
+/**
+ * Positions for a given column order, before anchoring (top-left of the result is (0, 0)).
+ *
+ * Assigns each subtree's columns contiguously: a component's main child continues its column, and
+ * only once that whole subtree's columns are assigned do the component's branches each open their
+ * own new column, in `order`'s current left-to-right sequence. A subtree's columns therefore
+ * always form one contiguous block, wherever it sits among its siblings.
+ */
 export function placeColumns<Id>(
   forest: StreamForest<Id>,
   order: ColumnOrder<Id>,
@@ -145,10 +170,9 @@ export function placeColumns<Id>(
   let nextColumn = 0
   const assign = (id: Id, col: number) => {
     column.set(id, col)
-    const branchCols = (order.branches.get(id) ?? []).map(() => nextColumn++)
     const main = forest.mainChild.get(id)
     if (main != null) assign(main, col)
-    ;(order.branches.get(id) ?? []).forEach((b, i) => assign(b, branchCols[i]!))
+    for (const b of order.branches.get(id) ?? []) assign(b, nextColumn++)
   }
   for (const root of order.roots) assign(root, nextColumn++)
 
@@ -161,6 +185,20 @@ export function placeColumns<Id>(
     x += w + spacing.horizontal
   }
 
+  const top = rowTops(forest, spacing)
+  const result = new Map<Id, Vec2>()
+  for (const [id, col] of column) {
+    const c = forest.byId.get(id)!
+    result.set(id, new Vec2(columnX[col]! + (widths[col]! - c.size.x) / 2, top.get(id)!))
+  }
+  return result
+}
+
+/**
+ * Every component's row (top y), packed per column. Column order never affects this: it depends
+ * only on the forest's dependency structure, so it can be computed once and reused.
+ */
+function rowTops<Id>(forest: StreamForest<Id>, spacing: LayoutSpacing): Map<Id, number> {
   const top = new Map<Id, number>()
   for (const id of forest.topological) {
     const ins = forest.inputs.get(id)!
@@ -171,60 +209,196 @@ export function placeColumns<Id>(
       : Math.max(...ins.map((i) => top.get(i)! + forest.byId.get(i)!.size.y)) + spacing.vertical,
     )
   }
-
-  const result = new Map<Id, Vec2>()
-  for (const [id, col] of column) {
-    const c = forest.byId.get(id)!
-    result.set(id, new Vec2(columnX[col]! + (widths[col]! - c.size.x) / 2, top.get(id)!))
-  }
-  return result
+  return top
 }
 
-/** Number of pairs of edges that cross, modelling each edge as a segment from the source's bottom centre to the target's top centre. */
+/** A dependency edge: `from` feeds `to`. */
+interface Edge<Id> {
+  readonly from: Id
+  readonly to: Id
+}
+
+/** A straight line from the source's bottom centre to the target's top centre. */
+interface Segment {
+  readonly x1: number
+  readonly y1: number
+  readonly x2: number
+  readonly y2: number
+}
+
+const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
+  Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax))
+
+/** Whether segments `a` and `b`, which share no endpoint, cross. */
+function segmentsCross(a: Segment, b: Segment): boolean {
+  // Disjoint bounding boxes can't intersect; this rejects most non-crossing pairs cheaply.
+  if (
+    Math.max(a.x1, a.x2) < Math.min(b.x1, b.x2) ||
+    Math.max(b.x1, b.x2) < Math.min(a.x1, a.x2) ||
+    Math.max(a.y1, a.y2) < Math.min(b.y1, b.y2) ||
+    Math.max(b.y1, b.y2) < Math.min(a.y1, a.y2)
+  )
+    return false
+  const d1 = orient(a.x1, a.y1, a.x2, a.y2, b.x1, b.y1)
+  const d2 = orient(a.x1, a.y1, a.x2, a.y2, b.x2, b.y2)
+  const d3 = orient(b.x1, b.y1, b.x2, b.y2, a.x1, a.y1)
+  const d4 = orient(b.x1, b.y1, b.x2, b.y2, a.x2, a.y2)
+  return d1 * d2 < 0 && d3 * d4 < 0
+}
+
+const sharesEndpoint = <Id>(a: Edge<Id>, b: Edge<Id>) =>
+  a.from === b.from || a.from === b.to || a.to === b.from || a.to === b.to
+
+/** The layout's edges: cleaned inputs (de-duplicated, no self-edges) for every component. */
+function edgesOf<Id>(
+  components: readonly LayoutComponent<Id>[],
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  inputs?: ReadonlyMap<Id, readonly Id[]>,
+): Edge<Id>[] {
+  const table = inputs ?? cleanInputs(components, byId)
+  const edges: Edge<Id>[] = []
+  for (const c of components)
+    for (const from of table.get(c.id) ?? []) edges.push({ from, to: c.id })
+  return edges
+}
+
+function segmentOf<Id>(
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  positions: ReadonlyMap<Id, Vec2>,
+  edge: Edge<Id>,
+): Segment | undefined {
+  const src = byId.get(edge.from)
+  const dst = byId.get(edge.to)
+  const sp = positions.get(edge.from)
+  const tp = positions.get(edge.to)
+  if (src == null || dst == null || sp == null || tp == null) return undefined
+  return {
+    x1: sp.x + src.size.x / 2,
+    y1: sp.y + src.size.y,
+    x2: tp.x + dst.size.x / 2,
+    y2: tp.y,
+  }
+}
+
+/**
+ * Number of pairs of edges that cross, modelling each edge as a segment from the source's bottom
+ * centre to the target's top centre.
+ *
+ * `inputs`, if given, is the cleaned input list to read edges from (as `StreamForest.inputs`);
+ * without it, every component's own `inputs` are cleaned the same way (de-duplicated, self-edges
+ * dropped) before use.
+ */
 export function countCrossings<Id>(
   components: readonly LayoutComponent<Id>[],
   positions: ReadonlyMap<Id, Vec2>,
+  inputs?: ReadonlyMap<Id, readonly Id[]>,
 ): number {
   const byId = new Map(components.map((c) => [c.id, c]))
-  type Segment = {
-    from: Id
-    to: Id
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-  }
-  const segments: Segment[] = []
-  for (const c of components) {
-    const tp = positions.get(c.id)
-    if (tp == null) continue
-    for (const i of c.inputs) {
-      const src = byId.get(i)
-      const sp = positions.get(i)
-      if (src == null || sp == null) continue
-      segments.push({
-        from: i,
-        to: c.id,
-        x1: sp.x + src.size.x / 2,
-        y1: sp.y + src.size.y,
-        x2: tp.x + c.size.x / 2,
-        y2: tp.y,
-      })
+  const edges = edgesOf(components, byId, inputs)
+  const segments = edges.map((e) => segmentOf(byId, positions, e))
+  let crossings = 0
+  for (let i = 0; i < edges.length; i++) {
+    const si = segments[i]
+    if (si == null) continue
+    for (let j = i + 1; j < edges.length; j++) {
+      const sj = segments[j]
+      if (sj == null || sharesEndpoint(edges[i]!, edges[j]!)) continue
+      if (segmentsCross(si, sj)) crossings++
     }
   }
-  const orient = (ax: number, ay: number, bx: number, by: number, cx: number, cy: number) =>
-    Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax))
+  return crossings
+}
+
+/**
+ * For every edge, the indices of the other edges whose y-range overlaps it (a straight segment
+ * can only cross another that spans some of the same vertical range). Rows never depend on column
+ * order, so this is fixed for the whole crossing pass and only needs computing once, however many
+ * candidate swaps are tried.
+ */
+function yOverlapNeighbors<Id>(
+  edges: readonly Edge<Id>[],
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  top: ReadonlyMap<Id, number>,
+): number[][] {
+  const range = edges.map((e) => {
+    const y1 = top.get(e.from)! + byId.get(e.from)!.size.y
+    const y2 = top.get(e.to)!
+    return y1 < y2 ? [y1, y2] : [y2, y1]
+  })
+  const byMin = edges.map((_, i) => i).sort((a, b) => range[a]![0]! - range[b]![0]!)
+  const neighbors: number[][] = edges.map(() => [])
+  const active: number[] = []
+  for (const i of byMin) {
+    for (let k = active.length - 1; k >= 0; k--) {
+      if (range[active[k]!]![1]! < range[i]![0]!) active.splice(k, 1)
+    }
+    for (const j of active) {
+      neighbors[i]!.push(j)
+      neighbors[j]!.push(i)
+    }
+    active.push(i)
+  }
+  return neighbors
+}
+
+/** For every component id, the indices of the edges it is an endpoint of. */
+function incidentEdges<Id>(edges: readonly Edge<Id>[]): Map<Id, number[]> {
+  const incident = new Map<Id, number[]>()
+  edges.forEach((e, i) => {
+    for (const id of [e.from, e.to]) {
+      const list = incident.get(id)
+      if (list != null) list.push(i)
+      else incident.set(id, [i])
+    }
+  })
+  return incident
+}
+
+/** Indices of the edges with an endpoint in `movedIds` (looked up via `incident`, not scanned for). */
+function touchingEdges<Id>(
+  incident: ReadonlyMap<Id, readonly number[]>,
+  movedIds: ReadonlySet<Id>,
+): ReadonlySet<number> {
+  const touching = new Set<number>()
+  for (const id of movedIds) for (const idx of incident.get(id) ?? []) touching.add(idx)
+  return touching
+}
+
+/**
+ * Number of crossings that touch `touching` — pairs where at least one edge is in it — restricted
+ * to pairs whose rows overlap (`neighbors`). Given the same `touching` set (the edges incident to
+ * the two subtrees a candidate swap would move), calling this once against the positions before
+ * the swap and once against the positions after gives the exact change in the total crossing
+ * count: every other edge's segment is unchanged by the swap, so only these pairs can change.
+ * Cost scales with the size of `touching`, not with the whole graph.
+ */
+function crossingsTouching<Id>(
+  edges: readonly Edge<Id>[],
+  neighbors: readonly (readonly number[])[],
+  touching: ReadonlySet<number>,
+  byId: ReadonlyMap<Id, LayoutComponent<Id>>,
+  positions: ReadonlyMap<Id, Vec2>,
+): number {
+  const segments = new Map<number, Segment>()
+  const segmentAt = (i: number): Segment | undefined => {
+    const cached = segments.get(i)
+    if (cached != null) return cached
+    const s = segmentOf(byId, positions, edges[i]!)
+    if (s != null) segments.set(i, s)
+    return s
+  }
   let crossings = 0
-  for (let i = 0; i < segments.length; i++) {
-    for (let j = i + 1; j < segments.length; j++) {
-      const s = segments[i]!
-      const t = segments[j]!
-      if (s.from === t.from || s.from === t.to || s.to === t.from || s.to === t.to) continue
-      const d1 = orient(s.x1, s.y1, s.x2, s.y2, t.x1, t.y1)
-      const d2 = orient(s.x1, s.y1, s.x2, s.y2, t.x2, t.y2)
-      const d3 = orient(t.x1, t.y1, t.x2, t.y2, s.x1, s.y1)
-      const d4 = orient(t.x1, t.y1, t.x2, t.y2, s.x2, s.y2)
-      if (d1 * d2 < 0 && d3 * d4 < 0) crossings++
+  for (const i of touching) {
+    for (const j of neighbors[i] ?? []) {
+      // Each touching↔touching pair is visited from both sides; count it once, when i < j.
+      if (touching.has(j) && i >= j) continue
+      const e1 = edges[i]!
+      const e2 = edges[j]!
+      if (sharesEndpoint(e1, e2)) continue
+      const s1 = segmentAt(i)
+      const s2 = segmentAt(j)
+      if (s1 == null || s2 == null) continue
+      if (segmentsCross(s1, s2)) crossings++
     }
   }
   return crossings
@@ -245,8 +419,22 @@ function anchor<Id>(
   return result
 }
 
-/** Rounds of adjacent-swap optimisation the crossing pass runs before giving up. */
-export const MAX_CROSSING_ROUNDS = 4
+/** Every id's subtree: itself, its main child's whole subtree, and every branch's whole subtree. */
+function subtreeIndex<Id>(forest: StreamForest<Id>): (id: Id) => ReadonlySet<Id> {
+  const cache = new Map<Id, ReadonlySet<Id>>()
+  const subtreeOf = (id: Id): ReadonlySet<Id> => {
+    const cached = cache.get(id)
+    if (cached != null) return cached
+    const set = new Set<Id>([id])
+    const main = forest.mainChild.get(id)
+    if (main != null) for (const m of subtreeOf(main)) set.add(m)
+    for (const b of forest.initialOrder.branches.get(id) ?? [])
+      for (const d of subtreeOf(b)) set.add(d)
+    cache.set(id, set)
+    return set
+  }
+  return subtreeOf
+}
 
 /** Lay out `components` as a top-to-bottom flow of straight columns; returns new top-left positions. */
 export function streamLayout<Id>(
@@ -260,17 +448,41 @@ export function streamLayout<Id>(
     branches: new Map([...forest.initialOrder.branches].map(([k, v]) => [k, [...v]])),
   }
   const groups: Id[][] = [order.roots, ...order.branches.values()].filter((g) => g.length > 1)
-  let best = countCrossings(components, placeColumns(forest, order, spacing))
+  const edges = edgesOf(components, forest.byId, forest.inputs)
+  // Membership of a subtree never changes as the pass permutes `order` — only sibling order
+  // does — so it is safe, and enough, to compute this once.
+  const subtreeOf = subtreeIndex(forest)
+  // Rows, and so which edges could possibly cross at all, never depend on column order — compute
+  // both once and reuse them for every candidate swap instead of rescanning the whole graph.
+  const top = rowTops(forest, spacing)
+  const neighbors = yOverlapNeighbors(edges, forest.byId, top)
+  const incident = incidentEdges(edges)
+
+  let positions = placeColumns(forest, order, spacing)
+  let best = countCrossings(components, positions, forest.inputs)
   // One optimisation pass over column order only: keep an adjacent swap iff it strictly reduces
-  // crossings, so ties keep the user's order and a tidied graph stays unchanged.
-  for (let round = 0; round < MAX_CROSSING_ROUNDS && best > 0; round++) {
+  // crossings, so ties keep the user's order and a tidied graph stays unchanged. Runs to a local
+  // optimum — crossings is a non-negative integer that strictly drops on every kept swap, so this
+  // always terminates — rather than a fixed number of rounds, so the result really is stable.
+  //
+  // A swap never moves a component's row, only its column, and only within the two swapped
+  // subtrees; every other position is unchanged. `crossingsTouching` uses that: it re-scores only
+  // the edges touching those two subtrees against the old and new positions, instead of
+  // recounting every pair in the whole graph for every candidate swap.
+  while (best > 0) {
     let improved = false
     for (const group of groups) {
       for (let i = 0; i + 1 < group.length; i++) {
+        const movedIds = new Set([...subtreeOf(group[i]!), ...subtreeOf(group[i + 1]!)])
+        const touching = touchingEdges(incident, movedIds)
+        const before = crossingsTouching(edges, neighbors, touching, forest.byId, positions)
         ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
-        const crossings = countCrossings(components, placeColumns(forest, order, spacing))
+        const candidate = placeColumns(forest, order, spacing)
+        const after = crossingsTouching(edges, neighbors, touching, forest.byId, candidate)
+        const crossings = best - before + after
         if (crossings < best) {
           best = crossings
+          positions = candidate
           improved = true
         } else {
           ;[group[i], group[i + 1]] = [group[i + 1]!, group[i]!]
@@ -279,5 +491,5 @@ export function streamLayout<Id>(
     }
     if (!improved) break
   }
-  return anchor(components, placeColumns(forest, order, spacing))
+  return anchor(components, positions)
 }

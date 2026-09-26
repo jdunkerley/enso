@@ -38,6 +38,59 @@ function centreX(pos: Map<string, Vec2>, id: string, width = SIZE.x) {
   return pos.get(id)!.x + width / 2
 }
 
+/** A small, fast seeded PRNG (mulberry32), for reproducible random fixtures. */
+function mulberry32(seed: number): () => number {
+  let state = seed
+  return () => {
+    state |= 0
+    state = (state + 0x6d2b79f5) | 0
+    let t = Math.imul(state ^ (state >>> 15), 1 | state)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** A random tree (no merges): each node but the first takes a random earlier node as its one input. */
+function randomTree(rand: () => number, n: number): LayoutComponent<string>[] {
+  const nodes: LayoutComponent<string>[] = [comp('n0', rand() * 2000, 0)]
+  for (let i = 1; i < n; i++) {
+    const parent = Math.floor(rand() * i)
+    nodes.push(comp(`n${i}`, rand() * 2000, i * 90, [`n${parent}`]))
+  }
+  return withOrder(nodes)
+}
+
+/** A random DAG: each node takes a random earlier node as its self input, plus a few extra earlier inputs (merges). */
+function randomDag(
+  rand: () => number,
+  n: number,
+  extraEdgesPerNode = 1,
+): LayoutComponent<string>[] {
+  const nodes: LayoutComponent<string>[] = [comp('n0', rand() * 3000, 0)]
+  for (let i = 1; i < n; i++) {
+    const self = Math.floor(rand() * i)
+    const inputs = [`n${self}`]
+    for (let e = 0; e < extraEdgesPerNode; e++) {
+      if (i > 1 && rand() < 0.5) {
+        const extra = Math.floor(rand() * i)
+        if (extra !== self) inputs.push(`n${extra}`)
+      }
+    }
+    nodes.push(comp(`n${i}`, rand() * 3000, i * 90, inputs))
+  }
+  return withOrder(nodes)
+}
+
+/** Whether two axis-aligned rectangles (top-left + size) overlap. */
+function rectsOverlap(aPos: Vec2, aSize: Vec2, bPos: Vec2, bSize: Vec2): boolean {
+  return (
+    aPos.x < bPos.x + bSize.x &&
+    bPos.x < aPos.x + aSize.x &&
+    aPos.y < bPos.y + bSize.y &&
+    bPos.y < aPos.y + aSize.y
+  )
+}
+
 describe('streamLayout', () => {
   test('a straight chain forms one column, packed with the vertical gap', () => {
     const pos = streamLayout(
@@ -79,6 +132,18 @@ describe('streamLayout', () => {
     expect(centreX(pos, 'join')).toBe(centreX(pos, 'left'))
     const r3Bottom = pos.get('r3')!.y + SIZE.y
     expect(pos.get('join')!.y).toBe(r3Bottom + SPACING.vertical)
+  })
+
+  test('a merge whose self input sits to the right of its other input still follows the self column', () => {
+    const pos = streamLayout(
+      withOrder([
+        comp('left', 0, 0),
+        comp('right', 300, 0),
+        comp('join', 100, 100, ['left', 'right'], { self: 'right' }),
+      ]),
+      SPACING,
+    )
+    expect(centreX(pos, 'join')).toBe(centreX(pos, 'right'))
   })
 
   test('without a self input a component follows its first input', () => {
@@ -137,6 +202,19 @@ describe('streamLayout', () => {
     expect(pos.get('b')).toEqual(new Vec2(1000, 2072))
   })
 
+  test('anchoring uses the current bounding box even when the min x and min y come from different components', () => {
+    const pos = streamLayout(
+      withOrder([
+        comp('a', 500, 100, [], { size: new Vec2(50, 20) }),
+        comp('b', 100, 900, [], { size: new Vec2(50, 20) }),
+      ]),
+      SPACING,
+    )
+    // a has the original min y (100); b has the original min x (100).
+    expect(Math.min(...[...pos.values()].map((p) => p.x))).toBe(100)
+    expect(Math.min(...[...pos.values()].map((p) => p.y))).toBe(100)
+  })
+
   test('tidying a tidied layout changes nothing', () => {
     const input = withOrder([
       comp('d', 0, 0),
@@ -159,6 +237,11 @@ describe('streamLayout', () => {
     expect(pos.get('a')!.y).toBeLessThan(pos.get('b')!.y)
   })
 
+  test('duplicate ids are rejected with a clear error', () => {
+    const input = withOrder([comp('a', 0, 0), comp('a', 300, 0)])
+    expect(() => streamLayout(input, SPACING)).toThrow(/duplicate/i)
+  })
+
   test('countCrossings counts a crossing pair of edges', () => {
     // a→d and b→c cross: a (left top) → d (right bottom), b (right top) → c (left bottom).
     const cs = withOrder([
@@ -169,6 +252,56 @@ describe('streamLayout', () => {
     ])
     const pos = new Map(cs.map((c) => [c.id, c.position]))
     expect(countCrossings(cs, pos)).toBe(1)
+  })
+
+  test('countCrossings does not double-count a duplicate input', () => {
+    // Same crossing as above, but c lists b twice: the duplicate must not be counted as a second edge.
+    const cs = withOrder([
+      comp('a', 0, 0),
+      comp('b', 200, 0),
+      comp('c', 0, 200, ['b', 'b']),
+      comp('d', 200, 200, ['a']),
+    ])
+    const pos = new Map(cs.map((c) => [c.id, c.position]))
+    expect(countCrossings(cs, pos)).toBe(1)
+  })
+
+  test('nested splits keep each subtree’s columns contiguous, so a plain tree never crosses', () => {
+    // p’s main child m continues p’s column; p’s branch b opens a new column. m itself splits
+    // into main child m2 and branch mb. mb’s column must stay inside m’s own block, next to m and
+    // m2, rather than being pushed out past b’s column.
+    const input = withOrder([
+      comp('p', 0, 0),
+      comp('m', 0, 80, ['p']),
+      comp('b', 300, 80, ['p']),
+      comp('m2', 0, 160, ['m']),
+      comp('mb', 150, 160, ['m']),
+      comp('b2', 300, 160, ['b']),
+    ])
+    const pos = streamLayout(input, SPACING)
+    expect(countCrossings(input, pos)).toBe(0)
+  })
+
+  test('random trees (no merges) always give zero crossings', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const input = randomTree(mulberry32(seed), 30)
+      const pos = streamLayout(input, SPACING)
+      expect(countCrossings(input, pos)).toBe(0)
+    }
+  })
+
+  test('no two components overlap, across several random DAGs', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const input = randomDag(mulberry32(seed), 40)
+      const pos = streamLayout(input, SPACING)
+      for (let i = 0; i < input.length; i++) {
+        for (let j = i + 1; j < input.length; j++) {
+          const a = input[i]!
+          const b = input[j]!
+          expect(rectsOverlap(pos.get(a.id)!, a.size, pos.get(b.id)!, b.size)).toBe(false)
+        }
+      }
+    }
   })
 })
 
@@ -191,15 +324,28 @@ describe('crossing pass', () => {
   })
 
   test('keeps the current order when swapping does not strictly reduce crossings', () => {
-    const input = withOrder([comp('A', 0, 0), comp('B', 300, 0), comp('C', 600, 0)])
+    // A symmetric "bowtie": m (self P) also takes Q, n (self Q) also takes P. Q→m and P→n cross
+    // once; swapping P and Q just mirrors the same picture, so the crossing count is unchanged
+    // and the original left-to-right order must be kept.
+    const input = withOrder([
+      comp('P', 0, 0),
+      comp('Q', 300, 0),
+      comp('m', 0, 200, ['P', 'Q']),
+      comp('n', 300, 200, ['Q', 'P']),
+    ])
+    const forest = buildForest(input)
+    const before = countCrossings(input, placeColumns(forest, forest.initialOrder, SPACING))
+    expect(before).toBe(1)
     const pos = streamLayout(input, SPACING)
-    expect(pos.get('A')!.x).toBeLessThan(pos.get('B')!.x)
-    expect(pos.get('B')!.x).toBeLessThan(pos.get('C')!.x)
+    expect(countCrossings(input, pos)).toBe(1)
+    expect(pos.get('P')!.x).toBeLessThan(pos.get('Q')!.x)
   })
 
   test('reorders branch columns of one parent to remove a crossing', () => {
-    // p splits into b1 (left) and b2 (right) besides its main child m. b1 feeds a component that
-    // sits right of b2's column... construct so the current branch order crosses.
+    // p's main child m continues its column; branches b1, b2 open columns in that order. z, fed
+    // by [b2, m], and w, fed by [b1], sit in the next row: m→z crosses b1→w because b1's column
+    // sits between m's and b2's. Swapping b1 and b2 puts z's column right next to m's, removing
+    // the crossing.
     const input = withOrder([
       comp('p', 0, 0),
       comp('m', 0, 80, ['p']),
@@ -208,11 +354,41 @@ describe('crossing pass', () => {
       comp('z', 200, 300, ['b2', 'm']),
       comp('w', 400, 300, ['b1']),
     ])
-    const before = (() => {
-      const f = buildForest(input)
-      return countCrossings(input, placeColumns(f, f.initialOrder, SPACING))
-    })()
+    const forest = buildForest(input)
+    const before = countCrossings(input, placeColumns(forest, forest.initialOrder, SPACING))
+    expect(before).toBe(1)
     const pos = streamLayout(input, SPACING)
-    expect(countCrossings(input, pos)).toBeLessThan(before)
+    expect(countCrossings(input, pos)).toBe(0)
+    expect(pos.get('b2')!.x).toBeLessThan(pos.get('b1')!.x)
+  })
+
+  test('tidying a tidied layout changes nothing, even when the crossing pass swapped something', () => {
+    const input = withOrder([
+      comp('A', 0, 0),
+      comp('B', 300, 0),
+      comp('b2', 300, 80, ['B']),
+      comp('C', 600, 0),
+      comp('m', 600, 300, ['C', 'A']),
+    ])
+    const once = streamLayout(input, SPACING)
+    const again = streamLayout(
+      input.map((c) => ({ ...c, position: once.get(c.id)! })),
+      SPACING,
+    )
+    expect(again).toEqual(once)
+  })
+
+  test('is idempotent on a wide random DAG needing more than a handful of rounds to settle', () => {
+    // Found by searching seeds for this generator: untangling this particular DAG takes more
+    // adjacent-swap rounds than a small fixed round limit allows. A capped pass would return a
+    // layout that is not yet a local optimum, so running it again would keep moving things —
+    // that must not happen.
+    const input = randomDag(mulberry32(21), 30, 2)
+    const once = streamLayout(input, SPACING)
+    const again = streamLayout(
+      input.map((c) => ({ ...c, position: once.get(c.id)! })),
+      SPACING,
+    )
+    expect(again).toEqual(once)
   })
 })
