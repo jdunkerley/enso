@@ -173,6 +173,9 @@ Rules:
   fields explicitly). Harmless: it is a cache and is rewritten on the next
   computation by a new IDE.
 - The Rust parser, the JNI bindings and the engine ignore the IDE metadata.
+- The ydoc-server runs inside the project's engine, so a project pinned to an
+  older engine keeps the cache only in the session's Yjs document and never
+  persists it. Harmless: nothing is written to the file, so there is no churn.
 
 ## Testing
 

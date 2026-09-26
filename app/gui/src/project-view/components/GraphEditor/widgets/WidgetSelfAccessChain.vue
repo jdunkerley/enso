@@ -25,6 +25,9 @@ const tree = injectWidgetTree()
 const baseIcon = computed(() => {
   const callInfo = functionInfo?.callInfo
   const nodeId = tree.externalId != null ? asNodeId(tree.externalId) : undefined
+  // The cached icon is the one `iconOfNode` computed (from the node's main suggestion), while this
+  // widget derives its icon from `callInfo`; the two may briefly differ here until the node is
+  // recomputed.
   const cachedIcon = nodeId && graph.db.nodeIdToNode.get(nodeId)?.cachedAppearance?.icon
   return displayedIconOf(
     callInfo?.suggestion,
