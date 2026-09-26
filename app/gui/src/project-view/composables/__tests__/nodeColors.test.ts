@@ -62,22 +62,7 @@ test('without a cache the no-type colour is used', () => {
   })
 })
 
-test('until suggestions are loaded, the cache beats the type', () => {
-  expect(
-    computeNodeColor(
-      () => 'component',
-      none,
-      () => typeName,
-      cached,
-      () => false,
-    ),
-  ).toEqual({
-    color: '#4a7fb0',
-    source: 'cached',
-  })
-})
-
-test('once suggestions are loaded, the type beats the cache', () => {
+test('when the cache is preferred, it beats the type', () => {
   expect(
     computeNodeColor(
       () => 'component',
@@ -87,32 +72,47 @@ test('once suggestions are loaded, the type beats the cache', () => {
       () => true,
     ),
   ).toEqual({
+    color: '#4a7fb0',
+    source: 'cached',
+  })
+})
+
+test('otherwise, the type beats the cache', () => {
+  expect(
+    computeNodeColor(
+      () => 'component',
+      none,
+      () => typeName,
+      cached,
+      () => false,
+    ),
+  ).toEqual({
     color: colorFromString(typeName.key()),
     source: 'type',
   })
 })
 
-test('until suggestions are loaded, without a cache the type is used', () => {
+test('when the cache is preferred but absent, the type is used', () => {
   expect(
     computeNodeColor(
       () => 'component',
       none,
       () => typeName,
       none,
-      () => false,
+      () => true,
     ).source,
   ).toBe('type')
 })
 
-test('a group colour wins whether or not suggestions are loaded', () => {
-  for (const loaded of [false, true]) {
+test('a group colour wins whether or not the cache is preferred', () => {
+  for (const preferCache of [false, true]) {
     expect(
       computeNodeColor(
         () => 'component',
         () => group,
         () => typeName,
         cached,
-        () => loaded,
+        () => preferCache,
       ).source,
     ).toBe('group')
   }

@@ -4,11 +4,13 @@ import {
   TypeInfo,
 } from '$/providers/openedProjects/project/computedValueRegistry'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
+import { entryMethodPointer } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { makeMethod } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { DEFAULT_ICON, displayedIconOf, iconOfNode } from '@/util/getIconName'
 import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import { expect, test } from 'vitest'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 
 const textType = ProjectPath.create(
   'Standard.Base' as QualifiedName,
@@ -38,19 +40,19 @@ test('iconOfNode shows the cached icon, unless asked for the icon from current d
   expect(iconOfNode(id, db, { useCachedIcon: false })).toBe(DEFAULT_ICON)
 })
 
-test('until suggestions are loaded, the cached icon beats a known type', () => {
+test('while the entry may be pending, the cached icon beats a known type', () => {
   expect(
     displayedIconOf(undefined, undefined, textType, 'table', { preferFallbackOverType: true }),
   ).toBe('table')
 })
 
-test('until suggestions are loaded, without a cached icon the type is used', () => {
+test('while the entry may be pending, without a cached icon the type is used', () => {
   expect(
     displayedIconOf(undefined, undefined, textType, undefined, { preferFallbackOverType: true }),
   ).toBe('text_input')
 })
 
-test('once suggestions are loaded, a known type beats the cached icon', () => {
+test('otherwise, a known type beats the cached icon', () => {
   expect(
     displayedIconOf(undefined, undefined, textType, 'table', { preferFallbackOverType: false }),
   ).toBe('text_input')
@@ -75,4 +77,31 @@ test('iconOfNode prefers the cached icon to the type until suggestions are loade
   expect(iconOfNode(id, db, { useCachedIcon: false })).toBe('text_input')
   suggestionsLoaded.value = true
   expect(iconOfNode(id, db)).toBe('text_input')
+})
+
+test('iconOfNode prefers the cached icon until the node method call has a suggestion entry', async () => {
+  const id = '3d0e9b96-3ca0-4c35-a820-7d3a1649de55' as NodeId
+  const method = makeMethod('Standard.Base.Data.Text.Text.to_case', { icon: 'text' })
+  const methodPointer = entryMethodPointer(method)!
+  const registry = ComputedValueRegistry.Mock()
+  const suggestionDb = new SuggestionDb()
+  const db = GraphDb.Mock(registry, suggestionDb)
+  const node = db.mockNode('node1', id)
+  db.updateExternalIds(node.outerAst)
+  const info = {
+    typeInfo: TypeInfo.fromParsedTypes([textType], [])!,
+    methodCall: { methodPointer, notAppliedArguments: [] },
+    payload: { type: 'Value' } as const,
+    profilingInfo: [],
+    evaluationId: 1,
+  }
+  // The node's own id and its inner expression's are the same expression in a real graph.
+  registry.db.set(id, info)
+  registry.db.set(node.innerExpr.externalId, info)
+  db.nodeIdToNode.get(id)!.cachedAppearance = { icon: 'table' }
+  expect(iconOfNode(id, db)).toBe('table')
+  suggestionDb.set(1, method)
+  // The suggestion database indexes a new entry on the next tick.
+  await nextTick()
+  expect(iconOfNode(id, db)).toBe('text')
 })

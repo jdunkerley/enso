@@ -86,13 +86,27 @@ export class GraphDb {
     private readonly suggestionsLoadedRef: Readonly<Ref<boolean>>,
   ) {}
 
-  /**
-   * Whether the suggestion database has finished its initial load. Until then, a missing
-   * suggestion entry (and so group) may just not be known yet, so data derived from a node's type
-   * is provisional, and the appearance cached from an earlier session is preferred to it.
-   */
+  /** Whether the suggestion database has finished its initial load. */
   get suggestionsLoaded(): boolean {
     return this.suggestionsLoadedRef.value
+  }
+
+  /**
+   * Whether the node's main suggestion entry may just not be known yet: the suggestion database
+   * has not finished its initial load, or the node's value is a method call whose entry it does not
+   * contain. The latter lasts until the engine sends the entry: libraries' suggestions are loaded
+   * in the background and arrive as updates, well after the initial load.
+   *
+   * Meanwhile the node's group is unknown too, so a colour or icon derived from the node's type is
+   * provisional, and the appearance cached from an earlier session is preferred to it. If the
+   * entry never arrives (e.g. the method has no suggestion), the node stays pending.
+   */
+  isNodeSuggestionPending(id: NodeId): boolean {
+    if (!this.suggestionsLoaded) return true
+    const node = this.nodeIdToNode.get(id)
+    if (node == null) return false
+    const method = this.getExpressionInfo(node.innerExpr.id)?.methodCall?.methodPointer
+    return method != null && this.getNodeMainSuggestion(id) == null
   }
 
   private nodeIdToPatternExprIds = new ReactiveIndex(this.nodeIdToNode, (id, entry) => {
@@ -170,7 +184,7 @@ export class GraphDb {
       () => tryGetIndex(this.groups.value, this.getNodeMainSuggestion(id)?.groupIndex),
       () => this.getExpressionInfo(id)?.typeInfo?.primaryType,
       () => entry.cachedAppearance?.color,
-      () => this.suggestionsLoaded,
+      () => this.isNodeSuggestionPending(id),
     )
   })
 
@@ -607,8 +621,9 @@ export class GraphDb {
     db = new SuggestionDb(),
     projectNames = mockProjectNameStore(),
     suggestionsLoaded: Readonly<Ref<boolean>> = ref(true),
+    groups: DeepReadonly<GroupInfo[]> = [],
   ): GraphDb {
-    return new GraphDb(db, ref([]), registry, projectNames, suggestionsLoaded)
+    return new GraphDb(db, ref(groups), registry, projectNames, suggestionsLoaded)
   }
 
   /** TODO: Add docs */

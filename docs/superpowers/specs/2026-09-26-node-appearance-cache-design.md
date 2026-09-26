@@ -136,36 +136,59 @@ validates before use and ignores an invalid value for that node only:
 Once real data arrives, the computed colour/icon win by the existing precedence,
 so a stale cache is visible only until the node is recomputed.
 
-**Until the suggestion database has loaded, the cache also outranks the type.**
-Expression updates (with `typeInfo` and `methodCall`) arrive with the first
-execution, but the suggestion database is only fetched after that execution
-completes (and after the groups). In that window a computed node has a type but
-no suggestion entry, so neither its group colour nor its entry icon can be known
+**While a node's suggestion entry is pending, the cache also outranks the
+type.** Expression updates (with `typeInfo` and `methodCall`) arrive with the
+first execution, but suggestion entries arrive later, in two stages:
+
+1. The suggestion database snapshot is only fetched after the first execution
+   completes (and after the groups); `suggestionDb.loaded` then becomes true.
+2. Even then, a library's suggestions may still be missing: the engine
+   deserializes them in a background job (`DeserializeLibrarySuggestionsJob`,
+   started from `InvalidateModulesIndexCommand`), and sends them afterwards as
+   `suggestionsDatabaseUpdate` notifications, which the GUI applies as they
+   come.
+
+In that window a computed node has a type, and often a `methodCall`, but no
+suggestion entry, so neither its group colour nor its entry icon can be known
 yet; the type colour, and the type-derived icon (usually `DEFAULT_ICON`), are
 only provisional. Showing them made nodes flash from the cached appearance to
-the type colour and Enso logo and back, once the database loaded. So, while
-`suggestionDb.loaded` is false:
+the type colour and Enso logo, and back once the entry arrived.
+
+So `GraphDb.isNodeSuggestionPending(id)` defines the node's entry as **pending**
+when `suggestionDb.loaded` is false, or when the node's expression info has a
+`methodCall` whose entry `getNodeMainSuggestion` cannot find. It is reactive: it
+reads the expression info and the suggestion database, so it turns false as soon
+as the entry arrives. While it is true:
 
 - **Colour:** override → fixed → group → **cached** → type → cached → no-type
-  grey. The source is reported as `'cached'`, so the writer (which only writes
-  `'group'` and `'type'` sources, and waits for `loaded` anyway) skips it.
+  grey. The source is reported as `'cached'`, so the writer skips it.
 - **Icon:** with no suggestion entry, the cached icon (when there is one) is
   preferred to the type-derived icon, on both render paths (`iconOfNode` and
   `WidgetSelfAccessChain`), via `displayedIconOf`'s `preferFallbackOverType`
   option.
+- **Writing:** nothing is written for the node, even without a cache (see §4):
+  otherwise a node would first be cached with its type colour, then rewritten
+  with its group colour moments later, on every open.
 
-`GraphDb` learns the flag the same way it learns `groups`: the graph store
-passes `toRef(suggestionDb, 'loaded')` to its constructor (`GraphDb.Mock`
-defaults it to loaded). Once loaded, the precedence above the bold paragraph
-applies unchanged.
+`GraphDb` learns the `loaded` flag the same way it learns `groups`: the graph
+store passes `toRef(suggestionDb, 'loaded')` to its constructor (`GraphDb.Mock`
+defaults it to loaded). A node without a `methodCall` is never pending once
+`loaded` is true, so the precedence above the bold paragraph applies to it
+unchanged, as it does to any node whose entry is known.
 
-Accepted consequence: the cached appearance is never cleared on edit, only
-overwritten by the writer once `loaded` is true. So a node edited before then
-keeps its old cached colour and icon until the database loads. `loaded` only
-becomes true after a _completed_ first execution. In a session where that never
-happens (e.g. only `executionFailed` arrives), the node stays that way for the
-whole session. That is harmless: group and entry data are unknowable then
-anyway, and nothing is written, because the writer waits for the same flag.
+Accepted consequences:
+
+- The cached appearance is never cleared on edit, only overwritten by the writer
+  once the entry is no longer pending. So a node edited before then keeps its
+  old cached colour and icon until then. `loaded` only becomes true after a
+  _completed_ first execution. In a session where that never happens (e.g. only
+  `executionFailed` arrives), the node stays that way for the whole session.
+  That is harmless: group and entry data are unknowable then anyway, and nothing
+  is written.
+- If a method's entry never arrives (for example, the method has no suggestion
+  at all), the node keeps its cached appearance for the whole session, and
+  nothing is written for it. Without a cache, it shows the type-derived colour
+  and icon as before.
 
 ### 4. Writing: when and how
 
@@ -181,6 +204,10 @@ and writes `cachedAppearance` when **all** of these hold:
 3. Its colour came from a group or a type — never from the cached fallback or
    the no-type grey (that would just echo the cache back).
 4. The resolved colour or the icon differs from what is stored.
+5. The node's suggestion entry is not pending
+   (`GraphDb.isNodeSuggestionPending`, §3): a library's entries can arrive well
+   after the first execution, so condition 1 alone does not rule out the same
+   churn.
 
 Rules:
 
@@ -222,11 +249,15 @@ Rules:
 - `computeNodeColor`: precedence including the new fallback (none of this is
   tested today).
 - `displayedIconOf` / `iconOfNode`: cached icon used only when nothing better is
-  known; `'$evaluating'` and non-icon names rejected.
+  known, or while the suggestion entry is pending; `'$evaluating'` and non-icon
+  names rejected.
+- `GraphDb.isNodeSuggestionPending`: pending before `loaded`, and for a node
+  whose `methodCall` has no entry yet; the colour is the cached one then, and
+  the group or type colour once the entry is added.
 - `useNodeAppearanceCache`: writes once conditions are met; no write while
-  pending, before groups load, when unchanged, or for input/output nodes; no
-  colour for overridden nodes; writes use `'local:derivedMetadata'` and do not
-  create undo entries.
+  pending, before groups load, while the suggestion entry is pending, when
+  unchanged, or for input/output nodes; no colour for overridden nodes; writes
+  use `'local:derivedMetadata'` and do not create undo entries.
 
 **Integration (Playwright, `app/gui/integration-test/project-view/`):** open the
 mock project (`integration-test/mock/project/src/Main.enso`) whose metadata

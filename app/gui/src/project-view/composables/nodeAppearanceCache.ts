@@ -11,6 +11,12 @@ export interface AppearanceInput {
   type: NodeType
   /** Whether the node is waiting for its value (`Unknown` or `Pending` payload). */
   pending: boolean
+  /**
+   * Whether the node's suggestion entry may just not be known yet
+   * (`GraphDb.isNodeSuggestionPending`): its colour and icon are then derived from its type alone,
+   * and would be rewritten once the entry arrives.
+   */
+  suggestionPending: boolean
   hasColorOverride: boolean
   colorSource: NodeColorSource
   /** The displayed colour with any `var(--…)` resolved; `undefined` if it could not be resolved. */
@@ -26,7 +32,7 @@ export interface AppearanceInput {
  * is decided by {@link appearanceToWrite}.
  */
 export function appearanceToCache(input: AppearanceInput): CachedAppearance | undefined {
-  if (input.type !== 'component' || input.pending) return undefined
+  if (input.type !== 'component' || input.pending || input.suggestionPending) return undefined
   let color: string | undefined
   if (input.hasColorOverride) {
     // The override is saved separately and always wins; keep whatever colour was cached before.
@@ -104,6 +110,7 @@ export function useNodeAppearanceCache(
       const appearance = appearanceToCache({
         type: node.type,
         pending,
+        suggestionPending: db.isNodeSuggestionPending(id),
         hasColorOverride: node.colorOverride != null,
         colorSource,
         resolvedColor:

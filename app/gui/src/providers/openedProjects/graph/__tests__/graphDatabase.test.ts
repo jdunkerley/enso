@@ -4,12 +4,18 @@ import {
   TypeInfo,
 } from '$/providers/openedProjects/project/computedValueRegistry'
 import { SuggestionDb } from '$/providers/openedProjects/suggestionDatabase'
+import {
+  entryMethodPointer,
+  type SuggestionEntry,
+} from '$/providers/openedProjects/suggestionDatabase/entry'
+import { makeMethod } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
 import { assert, assertDefined } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { stdPath } from '@/util/projectPath'
+import type { QualifiedName } from '@/util/qualifiedName'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { expect, test } from 'vitest'
-import { ref, watchEffect } from 'vue'
+import { nextTick, ref, watchEffect } from 'vue'
 import type { AstId } from 'ydoc-shared/ast'
 import { SourceRange } from 'ydoc-shared/util/data/text'
 import { IdMap, type ExternalId } from 'ydoc-shared/yjsModel'
@@ -125,22 +131,94 @@ test('Reading graph from definition', () => {
   ])
 })
 
-test('A typed node shows its cached colour until suggestions are loaded', () => {
+const CACHED_COLOR = '#4a7fb0'
+
+/**
+ * A computed node of type `Integer` with a cached colour, in a {@link GraphDb} whose suggestion
+ * database has the mock groups. With `method`, the node's value is a call of that method, which
+ * the suggestion database does not know yet.
+ */
+function setUpTypedNode({
+  suggestionsLoaded,
+  method,
+}: {
+  suggestionsLoaded: boolean
+  method?: SuggestionEntry
+}) {
   const id = '3d0e9b96-3ca0-4c35-a820-7d3a1649de55' as NodeId
   const registry = ComputedValueRegistry.Mock()
-  registry.db.set(id, {
+  const suggestionDb = new SuggestionDb()
+  const loaded = ref(suggestionsLoaded)
+  const groups = [
+    { name: 'MockGroup1', project: 'Standard.Base' as QualifiedName, color: '#ff0000' },
+  ]
+  const db = GraphDb.Mock(registry, suggestionDb, undefined, loaded, groups)
+  const node = db.mockNode('node1', id)
+  db.updateExternalIds(node.outerAst)
+  const methodPointer = entryMethodPointer(method)
+  const info = {
     typeInfo: TypeInfo.fromParsedTypes([stdPath('Standard.Base.Data.Numbers.Integer')], [])!,
-    methodCall: undefined,
-    payload: { type: 'Value' },
+    methodCall: methodPointer && { methodPointer, notAppliedArguments: [] },
+    payload: { type: 'Value' } as const,
     profilingInfo: [],
     evaluationId: 1,
-  })
-  const suggestionsLoaded = ref(false)
-  const db = GraphDb.Mock(registry, new SuggestionDb(), undefined, suggestionsLoaded)
-  db.mockNode('node1', id)
-  db.nodeIdToNode.get(id)!.cachedAppearance = { color: '#4a7fb0' }
+  }
+  // The node's own id and its inner expression's are the same expression in a real graph.
+  registry.db.set(id, info)
+  registry.db.set(node.innerExpr.externalId, info)
+  db.nodeIdToNode.get(id)!.cachedAppearance = { color: CACHED_COLOR }
+  return { id, db, suggestionDb, loaded }
+}
+
+test('A typed node shows its cached colour until suggestions are loaded', () => {
+  const { id, db, loaded } = setUpTypedNode({ suggestionsLoaded: false })
   expect(db.getNodeColorSource(id)).toBe('cached')
-  expect(db.getNodeColorStyle(id)).toBe('#4a7fb0')
-  suggestionsLoaded.value = true
+  expect(db.getNodeColorStyle(id)).toBe(CACHED_COLOR)
+  expect(db.isNodeSuggestionPending(id)).toBe(true)
+  loaded.value = true
   expect(db.getNodeColorSource(id)).toBe('type')
+  expect(db.isNodeSuggestionPending(id)).toBe(false)
+})
+
+test('A method call node shows its cached colour until its suggestion entry arrives', async () => {
+  const method = makeMethod('Standard.Base.Data.Numbers.Integer.abs', {
+    group: 'Standard.Base.MockGroup1',
+  })
+  const { id, db, suggestionDb } = setUpTypedNode({ suggestionsLoaded: true, method })
+  expect(db.getNodeColorSource(id)).toBe('cached')
+  expect(db.getNodeColorStyle(id)).toBe(CACHED_COLOR)
+  expect(db.isNodeSuggestionPending(id)).toBe(true)
+  suggestionDb.set(1, method)
+  // The suggestion database indexes a new entry on the next tick.
+  await nextTick()
+  expect(db.getNodeColorSource(id)).toBe('group')
+  expect(db.isNodeSuggestionPending(id)).toBe(false)
+})
+
+test('A method call node without a group gets its type colour once its entry arrives', async () => {
+  const method = makeMethod('Standard.Base.Data.Numbers.Integer.abs')
+  const { id, db, suggestionDb } = setUpTypedNode({ suggestionsLoaded: true, method })
+  expect(db.getNodeColorSource(id)).toBe('cached')
+  suggestionDb.set(1, method)
+  // The suggestion database indexes a new entry on the next tick.
+  await nextTick()
+  expect(db.getNodeColorSource(id)).toBe('type')
+})
+
+test('A method call node whose entry is known is not pending', async () => {
+  const method = makeMethod('Standard.Base.Data.Numbers.Integer.abs', {
+    group: 'Standard.Base.MockGroup1',
+  })
+  const { id, db, suggestionDb } = setUpTypedNode({ suggestionsLoaded: true, method })
+  suggestionDb.set(1, method)
+  // The suggestion database indexes a new entry on the next tick.
+  await nextTick()
+  expect(db.getNodeColorSource(id)).toBe('group')
+  expect(db.isNodeSuggestionPending(id)).toBe(false)
+})
+
+test('Once suggestions are loaded, the type of a node without a method call beats the cache', () => {
+  const { id, db } = setUpTypedNode({ suggestionsLoaded: true })
+  expect(db.getNodeColorSource(id)).toBe('type')
+  expect(db.isNodeSuggestionPending(id)).toBe(false)
 })

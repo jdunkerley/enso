@@ -131,9 +131,10 @@ export function makeStaticMethod(
 interface DocOptions {
   aliases?: string[]
   group?: string
+  icon?: string
 }
-function makeDocumentation({ aliases, group }: DocOptions): string {
-  return frontmatter({ aliases, group })
+function makeDocumentation({ aliases, group, icon }: DocOptions): string {
+  return frontmatter({ aliases, group, ...(icon != null ? { icon } : {}) })
 }
 
 /** Mock a module method suggestion entry. */

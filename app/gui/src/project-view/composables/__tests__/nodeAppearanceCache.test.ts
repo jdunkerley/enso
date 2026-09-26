@@ -9,6 +9,7 @@ import { expect, test } from 'vitest'
 const computedNode: AppearanceInput = {
   type: 'component',
   pending: false,
+  suggestionPending: false,
   hasColorOverride: false,
   colorSource: 'type',
   resolvedColor: 'oklch(0.464 0.14 123)',
@@ -45,6 +46,14 @@ test.each(['input', 'output'] as const)('%s nodes are never cached', (type) => {
 
 test('pending nodes are not cached', () => {
   expect(appearanceToCache({ ...computedNode, pending: true })).toBeUndefined()
+})
+
+test('a node whose suggestion entry has not arrived yet is not cached', () => {
+  // Until then, its colour and icon come from its type alone, and would be rewritten moments later.
+  expect(appearanceToCache({ ...computedNode, suggestionPending: true })).toBeUndefined()
+  expect(
+    appearanceToCache({ ...computedNode, hasColorOverride: true, suggestionPending: true }),
+  ).toBeUndefined()
 })
 
 test.each(['cached', 'none', 'fixed'] as const)(

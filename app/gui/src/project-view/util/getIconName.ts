@@ -49,8 +49,8 @@ export function suggestionEntryToIcon(entry: SuggestionEntry) {
  * anything (e.g. the icon saved from an earlier session, before the node is recomputed).
  *
  * With `preferFallbackOverType`, a given `fallback` is also preferred to an icon derived from
- * `actualType`: used while the suggestion database is still loading, when the missing `entry`
- * may just not be known yet.
+ * `actualType`: used while the node's suggestion entry may be pending (see
+ * `GraphDb.isNodeSuggestionPending`), when the missing `entry` may just not be known yet.
  */
 export function displayedIconOf(
   entry?: SuggestionEntry,
@@ -72,8 +72,8 @@ export function displayedIconOf(
 
 /**
  * Returns the icon to show on a component. With `useCachedIcon: false` the icon saved from an
- * earlier session is ignored, giving the icon computed from current data alone. Otherwise, until
- * the suggestion database has loaded, the cached icon is preferred to one derived from the type.
+ * earlier session is ignored, giving the icon computed from current data alone. Otherwise, while
+ * the node's suggestion entry is pending, the cached icon is preferred to one derived from the type.
  */
 export function iconOfNode(
   node: NodeId,
@@ -91,7 +91,7 @@ export function iconOfNode(
         expressionInfo?.methodCall?.methodPointer,
         expressionInfo?.typeInfo?.primaryType,
         useCachedIcon ? nodeData?.cachedAppearance?.icon : undefined,
-        { preferFallbackOverType: !graphDb.suggestionsLoaded },
+        { preferFallbackOverType: graphDb.isNodeSuggestionPending(node) },
       )
     case 'output':
       return 'data_output'

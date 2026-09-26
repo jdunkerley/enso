@@ -49,7 +49,7 @@ export interface NodeColorInfo {
  * Compute node color based on the node type, group, and type name. The cached colour, saved from
  * an earlier session, is used only while none of those is known yet.
  *
- * Until the suggestion database has loaded, a node's group cannot be known, so a colour derived
+ * With `preferCacheOverType`, the node's group may just not be known yet, so a colour derived
  * from its type is only provisional: the cached colour (which is the group colour, if the node has
  * one) is preferred to it then, so the node does not flash to its type colour and back.
  */
@@ -58,13 +58,13 @@ export function computeNodeColor(
   getGroup: () => GroupInfo | undefined,
   getTypeName: () => ProjectPath | undefined,
   getCachedColor: () => string | undefined = () => undefined,
-  suggestionsLoaded: () => boolean = () => true,
+  preferCacheOverType: () => boolean = () => false,
 ): NodeColorInfo {
   if (getType() === 'output') return { color: 'var(--output-node-color)', source: 'fixed' }
   if (getType() === 'input') return { color: 'var(--output-node-color)', source: 'fixed' }
   const group = getGroup()
   if (group) return { color: groupColorStyle(group), source: 'group' }
-  if (!suggestionsLoaded()) {
+  if (preferCacheOverType()) {
     const cachedColor = getCachedColor()
     if (cachedColor) return { color: cachedColor, source: 'cached' }
   }
