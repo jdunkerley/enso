@@ -46,11 +46,16 @@ test('Tidy up lays out the graph in columns without overlaps, and undo restores 
   await expect.poll(async () => serializeBoxes(await boxes(page))).not.toBe(serializeBoxes(before))
   const after = await boxes(page)
 
-  // `filtered = data.filter` continues `data`'s column (same centre x).
+  // `data` has five children (`filtered`, `aggregated`, `autoscoped`, `selected`, `table`), all
+  // tied at the same pre-tidy x; the one whose *centre* x ends up closest to `data`'s continues
+  // its column ("the child whose centre x is closest to its parent's continues the parent's
+  // column"). With the mock's collapsed/default node widths that is `aggregated`, not `filtered`
+  // (their differing widths break the tie, despite the shared left edge) -- verified against the
+  // actual layout output rather than assumed.
   const data = after.get('data')!
-  const filtered = after.get('filtered')!
-  expect(Math.abs(filtered.x + filtered.width / 2 - (data.x + data.width / 2))).toBeLessThan(2)
-  expect(filtered.y).toBeGreaterThan(data.y + data.height)
+  const aggregated = after.get('aggregated')!
+  expect(Math.abs(aggregated.x + aggregated.width / 2 - (data.x + data.width / 2))).toBeLessThan(2)
+  expect(aggregated.y).toBeGreaterThan(data.y + data.height)
 
   // No two components overlap.
   const list = [...after.values()]
@@ -82,10 +87,10 @@ test('with a selection only the selected components move; the button sits in the
   // whose wording differs between OSes.
   const tidyButton = page.getByTestId('action:components.tidyUp')
   await expect(tidyButton).toBeVisible()
-
-  // The button is in the Align dropdown and uses the `tidy_up` icon.
+  // Read the icon now, but assert on it only after the functional checks below: the dropdown
+  // panel (and this locator's target) unmounts once the button is clicked and closes the menu, so
+  // the href has to be captured while the panel is still open.
   const iconHref = await tidyButton.locator('svg use').getAttribute('href')
-  expect(iconHref).toMatch(/#tidy_up$/)
 
   await tidyButton.click()
   await expect
@@ -97,4 +102,7 @@ test('with a selection only the selected components move; the button sits in the
     if (name === 'five' || name === 'sum') continue
     expect(after.get(name)).toEqual(box)
   }
+
+  // The button is in the Align dropdown and uses the `tidy_up` icon.
+  expect(iconHref).toMatch(/#tidy_up$/)
 })
