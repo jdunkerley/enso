@@ -22,6 +22,7 @@ import type { AstId, NodeMetadata } from '@/util/ast/abstract'
 import { isAstId, MutableModule } from '@/util/ast/abstract'
 import { analyzeBindings, type BindingInfo } from '@/util/ast/bindings'
 import { inputNodeFromAst, nodeFromAst, nodeRootExpr } from '@/util/ast/node'
+import { sanitizeCachedAppearance, type ValidCachedAppearance } from '@/util/cachedAppearance'
 import { arrayEquals, tryGetIndex } from '@/util/data/array'
 import { recordEqual } from '@/util/data/object'
 import { Vec2 } from '@/util/data/vec2'
@@ -372,6 +373,7 @@ export class GraphDb {
         vis: nodeMeta.get('visualization'),
         colorOverride: nodeMeta.get('colorOverride'),
         isExpanded: (nodeMeta.get('displayMode') ?? 'expanded') === 'expanded',
+        cachedAppearance: sanitizeCachedAppearance(nodeMeta.get('cachedAppearance')),
       }
       this.nodeIdToNode.set(nodeId, {
         ...newNode,
@@ -479,6 +481,9 @@ export class GraphDb {
     }
     if (changes.has('colorOverride')) {
       node.colorOverride = changes.get('colorOverride')
+    }
+    if (changes.has('cachedAppearance')) {
+      node.cachedAppearance = sanitizeCachedAppearance(changes.get('cachedAppearance'))
     }
     const newDisplayMode = changes.get('displayMode')
     if (newDisplayMode) {
@@ -600,6 +605,7 @@ export class GraphDb {
       prefixes: { enableRecording: undefined },
       primaryApplication: { function: null, accessChain: null, selfArgument: null },
       colorOverride: undefined,
+      cachedAppearance: undefined,
       conditionalPorts: new Set(),
       outerAst,
       pattern,
@@ -726,6 +732,7 @@ export interface NodeDataFromMetadata {
   vis: Opt<VisualizationMetadata>
   colorOverride: Opt<string>
   isExpanded: boolean
+  cachedAppearance: ValidCachedAppearance | undefined
 }
 
 export type Node = NodeDataFromAst &
