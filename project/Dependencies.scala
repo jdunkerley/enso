@@ -317,9 +317,13 @@ object Dependencies {
   // === std-lib ================================================================
 
   // Has to match Truffle's ANTLR dependency version to avoid spurious warnings in Native Image
-  val antlrVersion        = "4.12.0"
-  val awsJavaSdkV1Version = "1.12.480"
-  val awsJavaSdkV2Version = "2.25.40"
+  val antlrVersion = "4.12.0"
+  // `std-aws` uses AWS SDK for Java v2 only; every v2 artifact moves with this
+  // (and the `bom` imported at the same version). v1 reached end of support in
+  // December 2025 and is no longer shipped: it was only ever declared for the
+  // Redshift driver, which dropped it in 2.2.0 - see
+  // Note [Redshift Driver Declares Its AWS SDK As Optional].
+  val awsJavaSdkV2Version = "2.55.6"
   // Held on the 73.x line: ICU 74 relicensed icu4j from the ICU licence to
   // Unicode-3.0, so moving past it is a legal review, not a version bump.
   val icuVersion = "73.2"
@@ -327,11 +331,58 @@ object Dependencies {
   // POI classes with modified copies of their 5.2.3 sources (to avoid a
   // dependency on `java.desktop`). A newer POI needs those copies re-derived
   // from its own sources first, otherwise old code runs against new internals.
-  val poiOoxmlVersion         = "5.2.3"
-  val redshiftVersion         = "2.2.2"
+  val poiOoxmlVersion = "5.2.3"
+  // See Note [Redshift Driver Declares Its AWS SDK As Optional].
+  val redshiftVersion         = "2.2.9"
   val univocityParsersVersion = "2.9.1"
   val xmlbeansVersion         = "5.1.1"
   val tableauVersion          = "0.0.19691.r2d7e5bc8"
+
+  /* Note [Redshift Driver Declares Its AWS SDK As Optional]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `redshift-jdbc42` declares the AWS SDK modules of its IAM authentication
+   * (`jdbc:redshift:iam://`, which `Redshift_Details` uses for every
+   * `AWS_Credential`) as `<optional>` dependencies, so none of them is
+   * resolved transitively and `std-aws` has to declare them itself. Since
+   * driver 2.2.0 they are AWS SDK v2 - `auth`, `redshift`, `redshiftserverless`
+   * and `sts` - which resolve here at `awsJavaSdkV2Version` rather than the
+   * driver's own 2.31.x. Up to 2.1.x they were the v1
+   * `aws-java-sdk-{core,redshift,redshiftserverless,sts}`, which is why v1
+   * was declared here; nothing else used it, and the declaration outlived the
+   * move to driver 2.2 unused. `sts` is what v2's `ProfileCredentialsProvider`
+   * loads reflectively for a profile with `role_arn`, and `IamHelper` builds a
+   * `redshiftserverless` client for a Redshift Serverless endpoint.
+   *
+   * The driver also uses `software.amazon.awssdk.http.apache` (the Apache
+   * HttpClient 4 client) directly, on every IAM connection
+   * (`IamHelper.setBuilderConfiguration`), without declaring it at all. It
+   * used to arrive with the service modules, which no longer bring it - see
+   * Note [AWS SDK Uses The Apache HttpClient 4 Client] - so `apache-client`
+   * is declared too.
+   *
+   * All of these are loaded lazily, so a missing module fails a connection
+   * with `NoClassDefFoundError`, never the build. Re-check the driver's POM
+   * and its `software/amazon/awssdk` references whenever `redshiftVersion` or
+   * `awsJavaSdkV2Version` moves.
+   */
+
+  /* Note [AWS SDK Uses The Apache HttpClient 4 Client]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * During 2.45.x the SDK's service modules switched their runtime HTTP client
+   * from `apache-client` (Apache HttpClient 4) to `apache5-client` (HttpClient
+   * 5), and a client that is not given one explicitly picks the
+   * highest-priority implementation on the class path, which is now
+   * `apache5-client`. That cannot initialise in the engine: HttpClient 5's
+   * `DefaultHttpClientConnectionOperator` links against `jdk.net.Sockets`, and
+   * the `jdk.net` module is not in the engine's boot layer, so every S3 call
+   * panics with `NoClassDefFoundError: jdk/net/Sockets`. `std-aws` therefore
+   * excludes `apache5-client` and declares `apache-client`, which leaves the
+   * HttpClient 4 client as the only - and so the default - implementation, as
+   * it was before. That covers the clients `std-aws` builds (S3, SES) and the
+   * ones the SDK builds internally (STS for assume-role profiles, SSO, the
+   * Redshift driver's clients). Revisit when `jdk.net` is available to
+   * standard libraries or `apache-client` is retired.
+   */
 
   // === ZIO ====================================================================
 

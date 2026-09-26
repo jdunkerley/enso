@@ -129,6 +129,14 @@
 
 #### Enso Standard Library
 
+- [AWS libraries updated][69]: `Standard.AWS` no longer ships the AWS SDK for
+  Java v1, which reached end of support in December 2025; the AWS SDK for Java
+  v2 moves to 2.55.6 (from 2.25.40) and the Redshift JDBC driver to 2.2.9 (from
+  2.2.2). `AWS_Credential.Profile` can now use a profile that assumes a role
+  (`role_arn`), and Redshift connections using AWS credentials no longer fail
+  with a missing-class error for a Redshift Serverless endpoint or an
+  assume-role profile. The standard `AWS_ENDPOINT_URL` environment variable is
+  now honoured, and newer AWS regions are listed.
 - [Database drivers updated][59]: PostgreSQL 42.7.13, SQLite 3.53.4, DuckDB
   1.5.5.1 and Microsoft SQL Server 13.6.0 (from 42.4.0, 3.46.1, 1.4.4 and
   13.2.1); H2, used only by the Generic JDBC tests, moves to 2.5.250. The
@@ -136,6 +144,7 @@
   PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
   unchanged.
 
+[69]: https://github.com/jdunkerley/enso/pull/69
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

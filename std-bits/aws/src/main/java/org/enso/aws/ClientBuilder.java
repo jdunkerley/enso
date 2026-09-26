@@ -21,6 +21,17 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.ses.SesClient;
 
 public class ClientBuilder {
+  /**
+   * The AWS default credential chain shared by every client built here, so that credentials it
+   * resolves (e.g. from SSO or the instance metadata service) are cached across clients. It is
+   * never closed: the clients do not close a provider they were given.
+   *
+   * <p>This is what the deprecated {@code DefaultCredentialsProvider.create()} singleton used to
+   * provide, except that no other code can close it.
+   */
+  private static final DefaultCredentialsProvider sharedDefaultProvider =
+      DefaultCredentialsProvider.builder().build();
+
   private static AwsCredential defaultCredentialOverride = null;
   private final AwsCredential awsCredential;
   private final AWSRegion awsRegion;
@@ -30,10 +41,16 @@ public class ClientBuilder {
     this.awsRegion = awsRegion;
   }
 
-  /** Checks if the default credential is available. */
+  /**
+   * Checks if the default credential is available.
+   *
+   * <p>Resolves through the same shared chain that {@code AWS_Credential.Default} clients use, so
+   * the answer matches what those clients will get (including anything that chain has cached). It
+   * must not close that chain.
+   */
   public static boolean isDefaultCredentialAvailable() {
-    try (var provider = DefaultCredentialsProvider.create()) {
-      provider.resolveCredentials();
+    try {
+      sharedDefaultProvider.resolveCredentials();
       return true;
     } catch (SdkClientException e) {
       return false;
@@ -142,11 +159,10 @@ public class ClientBuilder {
     AwsCredential override = defaultCredentialOverride;
     if (override != null) {
       return AwsCredentialsProviderChain.builder()
-          .credentialsProviders(
-              new EnsoOverrideCredentialProvider(override), DefaultCredentialsProvider.create())
+          .credentialsProviders(new EnsoOverrideCredentialProvider(override), sharedDefaultProvider)
           .build();
     } else {
-      return DefaultCredentialsProvider.create();
+      return sharedDefaultProvider;
     }
   }
 
