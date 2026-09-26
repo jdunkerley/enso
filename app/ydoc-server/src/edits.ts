@@ -8,7 +8,12 @@ import * as Ast from 'ydoc-shared/ast'
 import type { EnsoFileParts } from 'ydoc-shared/ensoFile'
 import type { TextEdit } from 'ydoc-shared/languageServerTypes'
 import { assert } from 'ydoc-shared/util/assert'
-import { IdMap, ModuleDoc, type VisualizationMetadata } from 'ydoc-shared/yjsModel'
+import {
+  IdMap,
+  ModuleDoc,
+  visMetadataEquals,
+  type VisualizationMetadata,
+} from 'ydoc-shared/yjsModel'
 import * as fileFormat from './fileFormat'
 
 /**
@@ -79,19 +84,8 @@ export function applyDocumentUpdates(
       import: {}, // "import" is required by older versions (even though they don't use it)
     }
     Ast.visitRecursive(root, (ast) => {
-      let pos = ast.nodeMetadata.get('position')
-      const vis = ast.nodeMetadata.get('visualization')
-      const colorOverride = ast.nodeMetadata.get('colorOverride')
-      const displayMode = ast.nodeMetadata.get('displayMode')
-      if (vis && !pos) pos = { x: 0, y: 0 }
-      if (pos) {
-        newMetadata!.node[ast.externalId] = {
-          position: { vector: [Math.round(pos.x), Math.round(-pos.y)] },
-          visualization: vis && translateVisualizationToFile(vis),
-          colorOverride,
-          displayMode,
-        }
-      }
+      const nodeEntry = nodeMetadataToFile(ast.nodeMetadata)
+      if (nodeEntry) newMetadata!.node[ast.externalId] = nodeEntry
       const widgets = ast.widgetsMetadata()
       if (!widgets.entries().next().done) {
         if (newMetadata!.widget == null) newMetadata!.widget = {}
@@ -111,6 +105,61 @@ export function applyDocumentUpdates(
   }
 
   return { newCode, newIdMap, newPersistedIdMap, newMetadata }
+}
+
+/** Copy a cached appearance, omitting absent fields so they are not written as keys. */
+function copyCachedAppearance(
+  cached: { readonly color?: string | undefined; readonly icon?: string | undefined } | undefined,
+): Ast.CachedAppearance | undefined {
+  if (cached?.color == null && cached?.icon == null) return undefined
+  return {
+    ...(cached.color != null ? { color: cached.color } : {}),
+    ...(cached.icon != null ? { icon: cached.icon } : {}),
+  }
+}
+
+/**
+ * The file representation of a node's metadata, or `undefined` if the node has nothing to save.
+ * Only nodes with a position (or a visualization, which implies one) are saved.
+ */
+export function nodeMetadataToFile(
+  metadata: Ast.NodeMetadata,
+): fileFormat.NodeMetadata | undefined {
+  let pos = metadata.get('position')
+  const vis = metadata.get('visualization')
+  if (vis && !pos) pos = { x: 0, y: 0 }
+  if (!pos) return undefined
+  // Key order is part of the file format: new keys go last so existing files keep their bytes.
+  return {
+    position: { vector: [Math.round(pos.x), Math.round(-pos.y)] },
+    visualization: vis && translateVisualizationToFile(vis),
+    colorOverride: metadata.get('colorOverride'),
+    displayMode: metadata.get('displayMode'),
+    cachedAppearance: copyCachedAppearance(metadata.get('cachedAppearance')),
+  }
+}
+
+/** Update a node's Yjs metadata from its file representation, setting only fields that differ. */
+export function applyNodeMetadataFromFile(
+  metadata: Ast.MutableNodeMetadata,
+  meta: fileFormat.NodeMetadata,
+) {
+  const oldPos = metadata.get('position')
+  const newPos = { x: meta.position.vector[0], y: -meta.position.vector[1] }
+  if (oldPos?.x !== newPos.x || oldPos?.y !== newPos.y) metadata.set('position', newPos)
+  const oldVis = metadata.get('visualization')
+  const newVis = meta.visualization && translateVisualizationFromFile(meta.visualization)
+  if (!visMetadataEquals(newVis, oldVis)) metadata.set('visualization', newVis)
+  const oldColorOverride = metadata.get('colorOverride')
+  const newColorOverride = meta.colorOverride
+  if (oldColorOverride !== newColorOverride) metadata.set('colorOverride', newColorOverride)
+  const oldDisplayMode = metadata.get('displayMode')
+  const newDisplayMode = meta.displayMode
+  if (oldDisplayMode !== newDisplayMode) metadata.set('displayMode', newDisplayMode)
+  const oldCached = metadata.get('cachedAppearance')
+  const newCached = copyCachedAppearance(meta.cachedAppearance)
+  if (oldCached?.color !== newCached?.color || oldCached?.icon !== newCached?.icon)
+    metadata.set('cachedAppearance', newCached)
 }
 
 /**
