@@ -81,6 +81,26 @@ describe('useAuthDisabled', () => {
     expect(authDisabled.value).toBe(true)
   })
 
+  it('ignores a Cognito configuration that arrives after authentication was disabled', () => {
+    // Deliberate: the Cognito client and the session are not rebuilt within a session, so a late
+    // configuration only takes effect on the next start.
+    const config = pendingConfig()
+    const amplifyConfig = ref<AmplifyConfig | undefined>(undefined)
+    const authDisabled = useAuthDisabled(config, amplifyConfig)
+    config.isFetching = false
+    config.isError = true
+    expect(authDisabled.value).toBe(true)
+
+    startRefetch(config)
+    config.remoteConfig = {
+      ENSO_IDE_COGNITO_USER_POOL_ID: 'pool',
+      ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: 'client',
+    }
+    amplifyConfig.value = fakeAmplifyConfig()
+    config.isFetching = false
+    expect(authDisabled.value).toBe(true)
+  })
+
   it('stays false when the remote configuration provides Cognito, even while re-fetching', () => {
     const config = pendingConfig()
     const amplifyConfig = ref<AmplifyConfig | undefined>(undefined)

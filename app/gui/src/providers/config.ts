@@ -10,6 +10,9 @@ import * as z from 'zod'
 
 const HTTP_STATUS_BAD_REQUEST = 400
 
+/** When this app run started: a configuration fetched before it came from a previous run. */
+const SESSION_START = Date.now()
+
 const REMOTE_CONFIG_SCHEMA = z.object({
   ENSO_IDE_ENVIRONMENT: z.optional(z.string()),
   ENSO_IDE_API_URL: z.optional(z.string()),
@@ -53,10 +56,10 @@ function createConfigStore() {
     // The configuration is fixed for the session: Cognito is set up from it once and never again.
     // Re-fetching it in the background (the defaults do so on every window focus and reconnect)
     // only flips a local-only session out of local-only mode while the fetch is in flight, which
-    // signs the user out and closes the open project. It is still fetched once on every start,
-    // even when a copy was restored from the persisted query cache.
-    staleTime: Infinity,
-    refetchOnMount: 'always',
+    // signs the user out and closes the open project. So a configuration fetched during this run
+    // never goes stale, while one restored from the persisted query cache (written by a previous
+    // run) is stale at once, and is therefore re-fetched once on start.
+    staleTime: (query) => (query.state.dataUpdatedAt < SESSION_START ? 0 : Infinity),
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   })
