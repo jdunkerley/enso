@@ -16,7 +16,11 @@ import {
   resumeShallowReactivity,
   syncSetDiff,
 } from '$/utils/reactivity'
-import { computeNodeColor } from '@/composables/nodeColors'
+import {
+  computeNodeColor,
+  type NodeColorInfo,
+  type NodeColorSource,
+} from '@/composables/nodeColors'
 import { Ast } from '@/util/ast'
 import type { AstId, NodeMetadata } from '@/util/ast/abstract'
 import { isAstId, MutableModule } from '@/util/ast/abstract'
@@ -149,12 +153,13 @@ export class GraphDb {
     return this.suggestionDb.get(suggestionId)
   }
 
-  nodeColor = new ReactiveMapping(this.nodeIdToNode, (id, entry) => {
-    if (entry.colorOverride != null) return entry.colorOverride
+  nodeColor = new ReactiveMapping(this.nodeIdToNode, (id, entry): NodeColorInfo => {
+    if (entry.colorOverride != null) return { color: entry.colorOverride, source: 'override' }
     return computeNodeColor(
       () => entry.type,
       () => tryGetIndex(this.groups.value, this.getNodeMainSuggestion(id)?.groupIndex),
       () => this.getExpressionInfo(id)?.typeInfo?.primaryType,
+      () => entry.cachedAppearance?.color,
     )
   })
 
@@ -261,9 +266,14 @@ export class GraphDb {
     return { methodCall, methodCallSource: id, suggestion }
   }
 
-  /** TODO: Add docs */
+  /** The CSS colour (or `var(…)` reference) the node is displayed with. */
   getNodeColorStyle(id: NodeId): string {
-    return this.nodeColor.lookup(id) ?? 'var(--node-color-no-type)'
+    return this.nodeColor.lookup(id)?.color ?? 'var(--node-color-no-type)'
+  }
+
+  /** Where the node's displayed colour comes from. */
+  getNodeColorSource(id: NodeId): NodeColorSource {
+    return this.nodeColor.lookup(id)?.source ?? 'none'
   }
 
   /** TODO: Add docs */
