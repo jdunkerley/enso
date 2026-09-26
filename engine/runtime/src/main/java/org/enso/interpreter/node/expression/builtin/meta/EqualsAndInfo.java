@@ -4,7 +4,7 @@ import com.oracle.truffle.api.CompilerDirectives;
 import org.enso.interpreter.runtime.data.hash.EnsoHashMap;
 
 /**
- * Holds result of equality check with addtional information about warnings.
+ * Holds result of equality check with additional information about warnings.
  *
  * <p>Note [Equality Result Does Not Speculate]. What {@link #isTrue()} answers must depend on this
  * object only. It used to consult a global {@code Assumption} as well ("no equality has produced
