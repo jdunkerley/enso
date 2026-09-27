@@ -29,7 +29,7 @@ type YXDB_Format
     YXDB_Format
 
     ## ---
-       icon: Spatial
+       icon: spatial
        ---
        Converts an Spatial Object to a GeoJSON representation.
 
@@ -42,7 +42,7 @@ type YXDB_Format
         YXDBReader.spatialObjectToGeoJSON spatial_object
 
     ## ---
-       icon: Spatial
+       icon: spatial
        ---
        Converts a column of Spatial Objects to a GeoJSON representation.
 

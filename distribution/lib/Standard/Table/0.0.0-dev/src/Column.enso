@@ -1547,7 +1547,7 @@ type Column
 
     ## ---
        group: Standard.Base.DateTime
-       icon: date_and_time
+       icon: datetime
        ---
        Gets the day of the year as a number (1 - 366) from the date stored in the
        column.
@@ -1559,7 +1559,7 @@ type Column
     ## ---
        aliases: [weekday]
        group: Standard.Base.DateTime
-       icon: date_and_time
+       icon: datetime
        ---
        Gets the weekday as a number (1 - 7) from the date stored in the column.
        Monday is 1, Tuesday is 2, ..., Sunday is 7.
@@ -1861,7 +1861,7 @@ type Column
     ## ---
        aliases: [to_json]
        group: Standard.Base.Conversions
-       icon: conversion
+       icon: convert
        ---
        Converts a column into a JSON string representation of its values.
     json_stringify self -> Column & Any =

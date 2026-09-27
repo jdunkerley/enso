@@ -125,7 +125,7 @@ type Project_Description
         JS_Object.from_pairs [["type", "Project_Description"], ["name", self.name], ["namespace", self.namespace]]
 
 ## ---
-   icon: enso_icon
+   icon: enso_logo
    ---
    Returns the Enso project description for the project that the engine was
    executed with, i.e., the project that contains the `main` method, or throws

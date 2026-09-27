@@ -52,6 +52,11 @@
   column and separate streams side by side. Use the button next to the Align
   menu when several components are selected, the graph's context menu, or
   <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>. A single undo reverts it.
+- [Restoring an asset version now shows its own icon instead of the "history"
+  circular-arrow icon][116]. `icons.svg` defined the `restore` and
+  `graph_editor` symbols twice each; since `<use href="#id">` silently resolves
+  to the first match, the second drawing of each was dead. The icon generator
+  now fails with a clear error if a `<symbol>` id is ever duplicated again.
 
 #### Enso Language & Runtime
 
@@ -158,7 +163,15 @@
   Database, DuckDB and Microsoft test suites pass unchanged against real
   PostgreSQL and SQL Server servers. Snowflake and Redshift drivers are
   unchanged.
+- [A handful of documented functions that showed the Enso logo instead of their
+  own icon now show the right one][116]: their documentation named icons that
+  don't exist (`conversion`, `date_and_time`, `Spatial`, `dice`, `enso_icon`),
+  which silently fell back to the logo. They're corrected to the equivalent
+  existing icons (`convert`, `datetime`, `spatial`, `random`, `enso_logo`
+  respectively). Strava's `stats` function keeps its own `statistics` tag, which
+  now has a real bar-chart icon rather than falling back to the logo too.
 
+[116]: https://github.com/jdunkerley/enso/pull/116
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71

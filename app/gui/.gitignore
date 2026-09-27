@@ -29,6 +29,9 @@ blob-report/
 playwright/
 
 src/project-view/util/iconMetadata/*
+# ...except the hand-written cross-check test, not generated code.
+!src/project-view/util/iconMetadata/__tests__
+!src/project-view/util/iconMetadata/__tests__/**
 src/project-view/stores/visualization/metadata.json
 
 # Files that used to be generated recently, but no longer are

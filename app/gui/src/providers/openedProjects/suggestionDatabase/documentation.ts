@@ -10,6 +10,17 @@ import type { DeepReadonly } from 'vue'
 import { prerenderMarkdown } from 'ydoc-shared/ast/documentation'
 import { ensoMarkdownParser } from 'ydoc-shared/ast/ensoMarkdown'
 
+/** Icon names already warned about via {@link warnUnknownIconNameOnce}, so each logs once. */
+const warnedUnknownIconNames = new Set<string>()
+
+/** In dev builds, log a warning the first time an unrecognized `icon:` doc tag is seen. */
+function warnUnknownIconNameOnce(iconName: string) {
+  DEV: if (!warnedUnknownIconNames.has(iconName)) {
+    warnedUnknownIconNames.add(iconName)
+    console.warn(`Unknown icon name in documentation: "${iconName}"`)
+  }
+}
+
 export interface DocumentationData {
   documentation: string
   documentationSummary: string | undefined
@@ -73,11 +84,13 @@ export function documentationData(
   const suggestedRank = metadata?.suggested
 
   const groupIndex = groupName && project ? getGroupIndex(groupName, project, groups) : undefined
+  const knownIconName = iconName != null && isIconName(iconName) ? iconName : undefined
+  if (iconName != null && knownIconName == null) warnUnknownIconNameOnce(iconName)
 
   return {
     documentation: prerendered,
     documentationSummary: summary,
-    iconName: iconName != null && isIconName(iconName) ? iconName : undefined,
+    iconName: knownIconName,
     groupIndex,
     aliasesAndMacros: [...aliases, ...macros.map((macro) => macro.description)].sort(),
     macros: macros.reduce(
