@@ -44,6 +44,16 @@ jobs:
             .github/workflows/engine-checks-optional.yml
             .github/workflows/engine-checks.yml
             .github/workflows/engine-pull-request.yml
+          # Agent notes are never read by the build or the tests. Those under `distribution/` are
+          # deliberately NOT ignored: they ship with the standard library, and the IDE's assistant
+          # reads them at run time.
+          files_ignore: |
+            build_tools/**/CLAUDE.md
+            engine/**/CLAUDE.md
+            lib/**/CLAUDE.md
+            project/**/CLAUDE.md
+            std-bits/**/CLAUDE.md
+            test/**/CLAUDE.md
       - name: List all changed files
         env:
           ALL_CHANGED_FILES: ${{ steps.engine-changed-files.outputs.all_changed_files }}

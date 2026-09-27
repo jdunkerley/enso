@@ -135,6 +135,12 @@ has silently produced a wrong result here:
   with a matching link definition, where `NNN` is the PR number. Write it for
   someone reading release notes, not for a reviewer reading the diff.
 
+- **PR CI skips the GUI checks and IDE packaging when nothing they depend on
+  changed** (see the `*-changed-files.yml` workflows). Markdown-only changes
+  skip both, except under `distribution/`: that whole tree ships in the IDE
+  bundle, so any change there, docs included, still packages. Changes only to
+  GUI tests or their configuration run the GUI checks but skip packaging. Add
+  the `CI: Build IDE` label to force both.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules

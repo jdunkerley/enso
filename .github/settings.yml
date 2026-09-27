@@ -95,6 +95,9 @@ labels:
   - name: "CI: Clean build required"
     color: "#ffffff"
     description: CI runners will be cleaned before and after this PR is built.
+  - name: "CI: Build IDE"
+    color: "#ffffff"
+    description: Run the IDE build and packaging jobs even if no IDE files changed.
 
   - name: "Difficulty: Beginner"
     color: "#d1e9c4"
