@@ -153,10 +153,14 @@ scaled by 4/3 on export.
 
 Minimum feature 2px, minimum gap 1.5px at 16px. An icon that can appear in the
 component browser's group list is rendered at **12px** (`ComponentList.vue`) and
-must survive that too.
+must survive that too. A 2px stroke stays crisp at 1x only when centred on a
+whole pixel, so stroke centres go on integers and fill edges on integers.
 
-_Today:_ `space_zero` has 0.33px gaps and renders as a solid block; `tidy_up`'s
-boxes fill in.
+One deliberate exception: `space_zero` ("no spacing") draws two lines 1px apart,
+because a touching pair is what it depicts.
+
+_Today:_ `space_zero` had 0.33px gaps and rendered as a solid block, and
+`tidy_up`'s boxes filled in; both were redrawn in #98. Others remain (`union`).
 
 ### Naming
 
@@ -192,21 +196,26 @@ lighter than its neighbours), and legibility (the 3x1.5px box interiors fill in
 at 16px). It also cannot simply be re-stroked at 2px, because the interiors
 would vanish.
 
-So it is drawn **filled**: three solid blocks at the family keyline, with a 2px
-connector. Filled blocks carry the same visual mass as a 2px stroke, keep the
-"arrange into columns" meaning, and survive 12px:
+So it is drawn **filled**: three solid 6x4 blocks in two left-aligned columns
+(as Tidy up lays components out), joined by 2px connectors. Filled blocks carry
+the same visual mass as a 2px stroke, keep the "arrange into columns" meaning,
+and survive 12px. Every edge sits on a whole pixel, the 2px strokes are centred
+on whole pixels, and every gap is at least 2px, so it stays crisp at 1x:
 
 ```svg
 <symbol id="tidy_up" viewBox="0 0 16 16" width="16" height="16" fill="none">
-  <rect x="2.5" y="2.5" width="5" height="4" rx="1" fill="currentColor"/>
-  <rect x="2.5" y="9.5" width="5" height="4" rx="1" fill="currentColor"/>
-  <rect x="8.5" y="6" width="5" height="4" rx="1" fill="currentColor"/>
-  <path d="M5 6.5V9.5M7.5 4.5H9.5C10.6 4.5 11 5 11 6" stroke="currentColor"
+  <rect x="1" y="1" width="6" height="4" rx="1" fill="currentColor"/>
+  <rect x="1" y="11" width="6" height="4" rx="1" fill="currentColor"/>
+  <rect x="9" y="6" width="6" height="4" rx="1" fill="currentColor"/>
+  <path d="M4 5V11M7 3H11C11.55 3 12 3.45 12 4V6" stroke="currentColor"
     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </symbol>
 ```
 
-The redraw lands in [#98](https://github.com/jdunkerley/enso/issues/98).
+A first sketch used half-pixel blocks with a connector 0.5px from a block: it
+blurred at 1x and broke the gap rule. Check a candidate rasterised at 1x, not
+only at 2x, before choosing it. Redrawn in
+[#98](https://github.com/jdunkerley/enso/issues/98).
 
 ## Exporting from Figma
 
