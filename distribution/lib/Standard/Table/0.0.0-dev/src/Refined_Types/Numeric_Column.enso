@@ -43,7 +43,7 @@ type Numeric_Column
 
     ## ---
        group: Standard.Base.Random
-       icon: dice
+       icon: random
        ---
        Creates a column with random numbers between the specified range.
 

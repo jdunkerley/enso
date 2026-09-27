@@ -4,6 +4,25 @@ console.info('Reading icons from "./src/project-view/assets/icons.svg"...')
 const icons = await fs.readFile('./src/project-view/assets/icons.svg', { encoding: 'utf-8' })
 const iconNames = icons.match(/(?<=<symbol id=")[^"]+/gm) ?? []
 
+const seen = new Set()
+const duplicates = new Set()
+for (const name of iconNames) {
+  if (seen.has(name)) {
+    duplicates.add(name)
+  } else {
+    seen.add(name)
+  }
+}
+if (duplicates.size > 0) {
+  console.error(
+    `Duplicate <symbol id="..."> found in icons.svg: ${[...duplicates].join(', ')}. ` +
+      `Each icon id must be unique — <use href="#id"> silently resolves to the first ` +
+      `matching element, so a later duplicate is dead and can shadow the intended icon. ` +
+      `Remove or rename the duplicate <symbol> before regenerating.`,
+  )
+  process.exit(1)
+}
+
 await fs.mkdir('./src/project-view/util/iconMetadata', { recursive: true })
 
 // All generated files MUST follow Prettier formatting.

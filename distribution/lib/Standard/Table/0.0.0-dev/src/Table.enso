@@ -1680,7 +1680,7 @@ type Table
 
     ## ---
        group: Standard.Base.Conversions
-       icon: conversion
+       icon: convert
        ---
        Parses a column containing JSON strings into a column of the corresponding
        data.
@@ -1805,7 +1805,7 @@ type Table
     ## ---
        aliases: [to_json]
        group: Standard.Base.Conversions
-       icon: conversion
+       icon: convert
        ---
        Converts a column into a JSON string representation of its values.
     @columns (Widget_Helpers.make_column_name_multi_selector add_regex=True add_by_type=True)
