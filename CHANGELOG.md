@@ -59,6 +59,7 @@
   now fails with a clear error if a `<symbol>` id is ever duplicated again.
 - [Fixed several font issues][NNN]: the SQL and GeoMap visualizations now render
 - [Fixed several font issues][NNN]. The SQL and GeoMap visualizations now render
+- [Fixed several font issues][117]. The SQL and GeoMap visualizations now render
   their monospace text in the actual bundled monospace font instead of silently
   falling back to the browser default; scatterplot and histogram axis labels are
   now measured with the font they actually render in, so long labels no longer
@@ -185,7 +186,7 @@
 [71]: https://github.com/jdunkerley/enso/pull/71
 [72]: https://github.com/jdunkerley/enso/pull/72
 [74]: https://github.com/jdunkerley/enso/pull/74
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[117]: https://github.com/jdunkerley/enso/pull/117
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
