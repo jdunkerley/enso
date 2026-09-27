@@ -22,3 +22,7 @@ Our configuration and documentation also has style guides:
 
 - [Markdown](./markdown.md)
 - [YAML](./yaml.md)
+
+The IDE's icons have a drawing guide:
+
+- [Icons](./icons.md)
