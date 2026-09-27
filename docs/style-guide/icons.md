@@ -175,9 +175,13 @@ _Today:_ 38 ids break this.
 
 Every new symbol is referenced by a caller or a standard library `icon:` tag in
 the same pull request, and ids are unique (the icon generator fails on a
-duplicate). An unused icon is dead weight in every page load.
+duplicate). An unused icon is dead weight in every page load. Before deleting
+one, search the standard library for its quoted name as well: a widget can name
+an icon in a `Choice.Option ... icon="join_inner"` argument, not only in a doc
+tag.
 
-_Today:_ 71 unused symbols, to be removed.
+_Today:_ none known; 65 unused symbols were removed after this guide was
+written.
 
 ## Worked example: `tidy_up`
 
