@@ -114,14 +114,27 @@ has silently produced a wrong result here:
 
 ## Conventions worth knowing up front
 
-- **Always add a `CHANGELOG.md` entry.** Every PR gets one — the `Changelog` CI
-  job fails otherwise, and reaching for the `CI: No changelog needed` label
-  should be the rare exception, not the reflex. Add it to the `# Next Release`
-  section under the right heading (`#### Enso IDE`,
-  `#### Enso Language & Runtime`, `#### Enso Standard Library`), in the existing
-  `- [Description][NNN]` form with a matching link definition, where `NNN` is
-  the PR number. Write it for someone reading release notes, not for a reviewer
-  reading the diff.
+- **A `CHANGELOG.md` entry is for features and visible style changes only.** The
+  `Changelog` CI job fails a PR that has neither an entry nor the
+  `CI: No changelog needed` label, so every PR takes exactly one of the two:
+  - **Entry:** a new feature, or a change users can see or feel (a redrawn icon,
+    a new font, a changed default).
+  - **Label instead:** a bug fix; a design doc, spec or other documentation; and
+    anything completely invisible to users (refactors, tests, CI, tooling,
+    dead-code removal, dependency bumps that change no behaviour).
+
+  Every entry lands on the same few lines of `CHANGELOG.md`, so each one makes
+  the next PR to merge conflict, and a rebase re-runs its whole CI. Keeping
+  entries to what a release-notes reader needs keeps that rare. Add the label
+  when opening the PR: labelling re-runs only the `Changelog` workflow (a
+  two-minute build-script job, then the check), not the full CI. When in doubt
+  about visibility, ask. `docs/distribution/nightly.md` states the same rule;
+  keep the two in step. An entry goes in the `# Next Release` section under the
+  right heading (`#### Enso IDE`, `#### Enso Language & Runtime`,
+  `#### Enso Standard Library`), in the existing `- [Description][NNN]` form
+  with a matching link definition, where `NNN` is the PR number. Write it for
+  someone reading release notes, not for a reviewer reading the diff.
+
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules
