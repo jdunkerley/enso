@@ -12,6 +12,10 @@ on:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.ide-changed-files.outputs.any_changed }}
 
+# The build and packaging plumbing of the IDE: the build script (`./run`, `build_tools/`), the
+# toolchains, the dependency manifests and the workflows. GUI sources are covered by
+# `gui-changed-files.yml` and the bundled engine by `engine-changed-files.yml`. Markdown is ignored:
+# nothing on this list reads a `.md` file while building or packaging the IDE.
 jobs:
   ide-changed-files:
     runs-on: ubuntu-latest
@@ -28,10 +32,29 @@ jobs:
         uses: step-security/changed-files@v45
         with:
           files: |
-            app/ide-desktop/**
+            app/electron-client/**
+            build_tools/**
+            .cargo/**
+            Cargo.lock
+            Cargo.toml
+            rust-toolchain.toml
             package.json
             pnpm-lock.yaml
-            .github/workflows/ide*
+            pnpm-workspace.yaml
+            .npmrc
+            .pnpmfile.cjs
+            .node-version
+            tsconfig.json
+            build-config.yaml
+            build.sbt
+            .jvmopts
+            git-clean.mjs
+            run
+            run.cmd
+            run.ps1
+            .github/**
+          files_ignore: |
+            **/*.md
       - name: List all changed files
         env:
           ALL_CHANGED_FILES: ${{ steps.ide-changed-files.outputs.all_changed_files }}
