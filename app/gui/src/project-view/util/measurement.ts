@@ -6,17 +6,53 @@ function getMeasureContext() {
 }
 
 /**
+ * A literal copy of the `--font-sans` custom property's value (`base.css`, also redeclared on
+ * visualization hosts in `VisualizationHost.vue`), for use where the custom property itself
+ * cannot be resolved (e.g. before CSS has loaded, or in a test environment without a stylesheet).
+ */
+const FALLBACK_SANS_FONT_FAMILY =
+  "'M PLUS 1', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif"
+
+/**
+ * Resolve the default sans-serif font family for text measurement: the `--font-sans` custom
+ * property (the bundled M PLUS 1 font), read from the document root at call time. Canvas
+ * `context.font` cannot itself resolve a `var()`, so this must be resolved before use. Falls back
+ * to a literal copy of that property's value if it isn't set.
+ */
+function defaultSansFontFamily(): string {
+  const resolved = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue('--font-sans')
+    .trim()
+  return resolved || FALLBACK_SANS_FONT_FAMILY
+}
+
+/**
+ * Get the CSS `font` shorthand for an element's *computed* style, suitable for passing to
+ * `getTextWidthByFont`/canvas `context.font`.
+ *
+ * Built from the individual longhands (`font-style`, `font-variant`, `font-weight`, `font-size`,
+ * `font-family`) rather than reading `CSSStyleDeclaration.font` directly: that shorthand is
+ * allowed to serialize to `''` for some elements (observed for SVG `<text>` in some engines) even
+ * though the longhands are populated, which would otherwise make `getTextWidthByFont` silently
+ * measure at width 0.
+ */
+export function getComputedFont(element: Element): string {
+  const style = window.getComputedStyle(element)
+  return `${style.fontStyle} ${style.fontVariant} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+}
+
+/**
  * Helper function to get text width. Accepts font size and family only. For a more precise
  * control, use `getTextWidthByFont`.
  *
- * The default family mirrors the `--font-sans` custom property set on visualization hosts
- * (`VisualizationHost.vue`), i.e. the bundled M PLUS 1 font, since that is what actually
- * renders unless a caller overrides `fontFamily`.
+ * The default family is the real sans stack (`--font-sans`, i.e. the bundled M PLUS 1 font),
+ * since that is what actually renders unless a caller overrides `fontFamily`.
  */
 export function getTextWidthBySizeAndFamily(
   text: string | null | undefined,
   fontSize = '11.5px',
-  fontFamily = "'M PLUS 1', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif",
+  fontFamily = defaultSansFontFamily(),
 ) {
   return getTextWidthByFont(text, `${fontSize} ${fontFamily}`)
 }

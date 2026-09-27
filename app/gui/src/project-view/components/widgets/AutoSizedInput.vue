@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useAutoBlur } from '@/util/autoBlur'
-import { getTextWidthByFont } from '@/util/measurement'
+import { getComputedFont, getTextWidthByFont } from '@/util/measurement'
 import { computed, ref, type StyleValue } from 'vue'
 
 const model = defineModel<string>({ default: '' })
@@ -21,11 +21,7 @@ function onFocus() {
   inputNode.value?.select()
 }
 
-const cssFont = computed(() => {
-  if (inputNode.value == null) return ''
-  const style = window.getComputedStyle(inputNode.value)
-  return style.font
-})
+const cssFont = computed(() => (inputNode.value == null ? '' : getComputedFont(inputNode.value)))
 
 // Add some extra spacing to allow the text caret to show at the end of input.
 const ADDED_WIDTH_PX = 2

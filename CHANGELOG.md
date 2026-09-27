@@ -58,6 +58,7 @@
   to the first match, the second drawing of each was dead. The icon generator
   now fails with a clear error if a `<symbol>` id is ever duplicated again.
 - [Fixed several font issues][NNN]: the SQL and GeoMap visualizations now render
+- [Fixed several font issues][NNN]. The SQL and GeoMap visualizations now render
   their monospace text in the actual bundled monospace font instead of silently
   falling back to the browser default; scatterplot and histogram axis labels are
   now measured with the font they actually render in, so long labels no longer

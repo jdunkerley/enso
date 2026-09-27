@@ -5,7 +5,7 @@ import { Ast } from '@/util/ast'
 import { tryNumberToEnso } from '@/util/ast/abstract'
 import { Pattern } from '@/util/ast/match'
 import { partition } from '@/util/data/array'
-import { getTextWidthByFont } from '@/util/measurement'
+import { getComputedFont, getTextWidthByFont } from '@/util/measurement'
 import { defineKeybinds } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
 import type { ToolbarItem } from './toolbar'
@@ -307,9 +307,10 @@ const yTicks = computed(() => boxHeight.value / 20)
 // Read the computed font of the (always-rendered) y-axis label element, so measurement uses
 // whatever font actually renders instead of a literal that can go stale (see `AutoSizedInput.vue`
 // for the same pattern). Both axis labels share the same font, as neither sets its own.
-const labelFont = computed(() =>
-  yLabelNode.value ? window.getComputedStyle(yLabelNode.value).font : '',
-)
+// This only re-evaluates when `yLabelNode` itself changes (i.e. on mount), not on every render:
+// that's fine, since the label's font isn't theme-dependent, and a font that loads later is
+// already handled by `getTextWidthByFont`'s own `document.fonts` tracking.
+const labelFont = computed(() => (yLabelNode.value ? getComputedFont(yLabelNode.value) : ''))
 const xLabelLeft = computed(
   () =>
     margin.value.left +
