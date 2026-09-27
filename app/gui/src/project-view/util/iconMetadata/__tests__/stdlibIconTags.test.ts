@@ -12,6 +12,11 @@ const standardLibDir = path.resolve(__dirname, '../../../../../../../distributio
 // `icon:` token but appear inline, with other content on the same line.
 const ICON_TAG_RE = /^\s*icon:\s*(\S+)\s*$/
 
+// Matches a widget argument such as `Choice.Option "..Inner" "..Inner" icon="join_inner"`, which
+// names an icon from code rather than documentation. Several may appear on one line. Enso text may
+// be single- or double-quoted, and spaces around `=` are allowed.
+const ICON_ARGUMENT_RE = /\bicon\s*=\s*(["'])([^"']+)\1/g
+
 /** Recursively collect every `*.enso` file under `dir`. */
 function collectEnsoFiles(dir: string): string[] {
   return fs
@@ -20,24 +25,27 @@ function collectEnsoFiles(dir: string): string[] {
     .map((entry) => path.join(dir, entry))
 }
 
-describe('stdlib `icon:` doc tags', () => {
+describe('stdlib icon names', () => {
   const hasStandardLib = fs.existsSync(standardLibDir)
 
-  test.runIf(hasStandardLib)('every icon: tag names an icon that exists in icons.svg', () => {
+  test.runIf(hasStandardLib)('every icon: tag and icon="..." names an icon in icons.svg', () => {
     const iconNameSet = new Set<string>(iconNames)
     const failures: string[] = []
     let tagCount = 0
+    let argumentCount = 0
 
     for (const file of collectEnsoFiles(standardLibDir)) {
       const lines = fs.readFileSync(file, { encoding: 'utf-8' }).split('\n')
       lines.forEach((line, index) => {
-        const match = ICON_TAG_RE.exec(line)
-        if (match == null) return
-        tagCount++
-        const name = match[1]!
-        if (!iconNameSet.has(name)) {
-          const relativePath = path.relative(standardLibDir, file).replaceAll('\\', '/')
-          failures.push(`${relativePath}:${index + 1} ${name}`)
+        const tag = ICON_TAG_RE.exec(line)?.[1]
+        const argumentNames = Array.from(line.matchAll(ICON_ARGUMENT_RE), (match) => match[2]!)
+        if (tag != null) tagCount++
+        argumentCount += argumentNames.length
+        for (const name of [...(tag != null ? [tag] : []), ...argumentNames]) {
+          if (!iconNameSet.has(name)) {
+            const relativePath = path.relative(standardLibDir, file).replaceAll('\\', '/')
+            failures.push(`${relativePath}:${index + 1} ${name}`)
+          }
         }
       })
     }
@@ -46,6 +54,9 @@ describe('stdlib `icon:` doc tags', () => {
     // or a `readdirSync` quirk in CI) and the test passing without having checked anything. The
     // stdlib currently has ~1,700-1,900 `icon:` tags; 1000 is a comfortable floor below that.
     expect(tagCount).toBeGreaterThan(1000)
+    // The same guard for `icon="..."` arguments, which the doc tags would otherwise swamp: the six
+    // `join_*` options in `Join_Kind.enso` are the known uses today.
+    expect(argumentCount).toBeGreaterThanOrEqual(6)
     expect(failures).toEqual([])
   })
 
