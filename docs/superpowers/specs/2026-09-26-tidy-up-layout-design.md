@@ -34,8 +34,8 @@ selected components, as a clean top-to-bottom flow:
 - **Approach A:** a custom Enso-specific stream layout with **no new
   dependency**, plus **one crossing-minimisation pass**. The alternatives
   researched are recorded below.
-- **Name, place, icon and binding:** "Tidy up", shown **with the align tools**,
-  with a **new icon**, bound to `Mod+Shift+L`, which is free in
+- **Name, place, icon and binding:** "Tidy up", shown **next to the align
+  tools**, with a **new icon**, bound to `Mod+Shift+L`, which is free in
   `project-view/bindings.ts`.
 
 **Explicit non-goals:**
@@ -91,10 +91,10 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
    - **Sizes:** `graphStore.visibleArea(id)`, which includes an open
      visualization. An unmeasured component falls back to the theme's default
      node size.
-3. **The `components.tidyUp` action.** It sits **with the align tools**:
-   - **Align dropdown in `SelectionMenu.vue`:** a new third row, below the
-     horizontal and vertical align rows, containing the Tidy up button
-     (selection scope).
+3. **The `components.tidyUp` action.** It sits **next to the align tools**:
+   - **`SelectionMenu.vue`:** a standalone button, directly after the Align
+     dropdown and before the Spacing dropdown — a sibling in the selection menu
+     bar, not a row inside the Align dropdown's panel (selection scope).
    - **`alignmentMenuActions` in `GraphNode.vue`:** the component context menu's
      align group, so it is reachable wherever the align tools are.
    - **Graph (background) context menu in `GraphEditor.vue`** (whole-graph
@@ -122,10 +122,11 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
    order; otherwise none, which makes it a **root**. `Data.read …`, literals and
    function-argument input nodes are roots.
 2. **Columns.** Walk each tree from its root.
-   - Of a component's children, the one whose current x is closest to the
-     parent's current x continues the parent's column. Ties go to code order.
+   - Of a component's children, the one whose current **left x** is closest to
+     the parent's current left x continues the parent's column. Ties go to code
+     order.
    - Every other child starts a new column to the right, in the children's
-     current left-to-right order.
+     current left-to-right order (also decided by left x, ties to code order).
    - Each subtree's columns stay **contiguous**. A branch gets its column only
      after the main child's whole subtree has been assigned, so a split within a
      split nests inside its own stream and never interleaves with a sibling's
@@ -133,7 +134,8 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
    - Independent trees are placed side by side in the current left-to-right
      order of their roots.
    - Each column is as wide as its widest component, plus the horizontal gap.
-     Components are centred in their column.
+     Components are **left-aligned** in their column, because the self input —
+     the edge that continues a column — is always the leftmost port.
 3. **Rows (compact).** Visit components in dependency order. Each component's
    top is `max(bottom of every in-scope input) + vertical gap`, so a merge
    always sits below all the streams feeding it. Roots start at the top.
@@ -144,7 +146,9 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
      Recompute the positions, and **keep the swap only if the number of crossing
      edges strictly decreases**.
    - An edge is modelled as a straight segment from the source's bottom centre
-     to the target's top centre.
+     to the target's top centre — kept centre-to-centre even though components
+     are left-aligned, since this only scores column _order_, not where an edge
+     is actually drawn.
    - Repeat until a full round finds no improving swap. There is no round cap.
      The pass always terminates, because the crossing count is a non-negative
      integer that strictly drops in every improving round. A cap could stop it
@@ -212,8 +216,8 @@ on the mock graph:
 - no two components overlap;
 - Ctrl+Z restores the original positions;
 - with a selection, only selected components move;
-- the Tidy up button is in the selection's align dropdown, with the `tidy_up`
-  icon.
+- the Tidy up button sits in the selection menu next to the Align dropdown, not
+  inside it, with the `tidy_up` icon.
 
 ## Files expected to change
 
@@ -223,8 +227,8 @@ on the mock graph:
 - **Changed:**
   - `project-view/assets/icons.svg` (new `tidy_up` symbol) and the regenerated
     `util/iconMetadata/iconName.ts`;
-  - `project-view/components/SelectionMenu.vue` (align dropdown row) and the
-    `alignmentMenuActions` in `GraphNode.vue`;
+  - `project-view/components/SelectionMenu.vue` (standalone button next to the
+    Align dropdown) and the `alignmentMenuActions` in `GraphNode.vue`;
   - the action registry and selection actions
     (`project-view/components/GraphEditor/selectionActions.ts`,
     `project-view/providers/action.ts`);

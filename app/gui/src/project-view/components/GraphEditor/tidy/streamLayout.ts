@@ -50,9 +50,9 @@ export interface StreamForest<Id> {
   readonly initialOrder: ColumnOrder<Id>
 }
 
-const centreX = <Id>(c: LayoutComponent<Id>) => c.position.x + c.size.x / 2
+const leftX = <Id>(c: LayoutComponent<Id>) => c.position.x
 const byPosition = <Id>(a: LayoutComponent<Id>, b: LayoutComponent<Id>) =>
-  centreX(a) - centreX(b) || a.order - b.order
+  leftX(a) - leftX(b) || a.order - b.order
 
 /** Every map here is keyed by component id, so ids must be unique. */
 function assertUniqueIds<Id>(components: readonly LayoutComponent<Id>[]): void {
@@ -126,9 +126,9 @@ export function buildForest<Id>(components: readonly LayoutComponent<Id>[]): Str
   const mainChild = new Map<Id, Id>()
   const branches = new Map<Id, Id[]>()
   for (const [p, kids] of children) {
-    const px = centreX(byId.get(p)!)
+    const px = leftX(byId.get(p)!)
     const main = [...kids].sort(
-      (a, b) => Math.abs(centreX(a) - px) - Math.abs(centreX(b) - px) || a.order - b.order,
+      (a, b) => Math.abs(leftX(a) - px) - Math.abs(leftX(b) - px) || a.order - b.order,
     )[0]!
     mainChild.set(p, main.id)
     branches.set(
@@ -202,8 +202,9 @@ function placeColumnsAtRows<Id>(
 
   const result = new Map<Id, Vec2>()
   for (const [id, col] of column) {
-    const c = forest.byId.get(id)!
-    result.set(id, new Vec2(columnX[col]! + (widths[col]! - c.size.x) / 2, rows.get(id)!))
+    // Left-aligned: a component sits at its column's left edge, since the self input — the
+    // continuing edge into the column — is always the leftmost port.
+    result.set(id, new Vec2(columnX[col]!, rows.get(id)!))
   }
   return result
 }
@@ -232,7 +233,12 @@ interface Edge<Id> {
   readonly to: Id
 }
 
-/** A straight line from the source's bottom centre to the target's top centre. */
+/**
+ * A straight line from the source's bottom centre to the target's top centre. This stays
+ * centre-to-centre even though components are left-aligned in their column: it is only a
+ * heuristic for scoring *column order* in the crossing pass, not a claim about where an edge is
+ * actually drawn, so it doesn't need to track the real left-aligned positions.
+ */
 interface Segment {
   readonly x1: number
   readonly y1: number

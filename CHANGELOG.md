@@ -49,9 +49,9 @@
   that check was under way the IDE briefly treated the local user as signed out.
 - [Tidy up lays out the graph, or the selected components, as a clean
   top-to-bottom flow][74], with each chain of components in its own straight
-  column and separate streams side by side. It is in the Align menu, the graph's
-  context menu, and on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>, and a
-  single undo reverts it.
+  column and separate streams side by side. It sits next to the Align menu, the
+  graph's context menu, and on <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>,
+  and a single undo reverts it.
 
 #### Enso Language & Runtime
 

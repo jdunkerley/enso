@@ -34,8 +34,8 @@ function withOrder(components: LayoutComponent<string>[]) {
   return components.map((c, i) => ({ ...c, order: i }))
 }
 
-function centreX(pos: Map<string, Vec2>, id: string, width = SIZE.x) {
-  return pos.get(id)!.x + width / 2
+function leftX(pos: Map<string, Vec2>, id: string) {
+  return pos.get(id)!.x
 }
 
 /** A small, fast seeded PRNG (mulberry32), for reproducible random fixtures. */
@@ -112,9 +112,9 @@ describe('streamLayout', () => {
       ]),
       SPACING,
     )
-    expect(centreX(pos, 'below')).toBe(centreX(pos, 'p'))
-    expect(centreX(pos, 'mid')).toBeGreaterThan(centreX(pos, 'below'))
-    expect(centreX(pos, 'far')).toBeGreaterThan(centreX(pos, 'mid'))
+    expect(leftX(pos, 'below')).toBe(leftX(pos, 'p'))
+    expect(leftX(pos, 'mid')).toBeGreaterThan(leftX(pos, 'below'))
+    expect(leftX(pos, 'far')).toBeGreaterThan(leftX(pos, 'mid'))
     expect(pos.get('mid')!.x - pos.get('below')!.x).toBe(SIZE.x + SPACING.horizontal)
   })
 
@@ -129,7 +129,7 @@ describe('streamLayout', () => {
       ]),
       SPACING,
     )
-    expect(centreX(pos, 'join')).toBe(centreX(pos, 'left'))
+    expect(leftX(pos, 'join')).toBe(leftX(pos, 'left'))
     const r3Bottom = pos.get('r3')!.y + SIZE.y
     expect(pos.get('join')!.y).toBe(r3Bottom + SPACING.vertical)
   })
@@ -143,7 +143,7 @@ describe('streamLayout', () => {
       ]),
       SPACING,
     )
-    expect(centreX(pos, 'join')).toBe(centreX(pos, 'right'))
+    expect(leftX(pos, 'join')).toBe(leftX(pos, 'right'))
   })
 
   test('without a self input a component follows its first input', () => {
@@ -155,7 +155,7 @@ describe('streamLayout', () => {
       ]),
       SPACING,
     )
-    expect(centreX(pos, 'f')).toBe(centreX(pos, 'b'))
+    expect(leftX(pos, 'f')).toBe(leftX(pos, 'b'))
   })
 
   test('independent streams keep their left-to-right order', () => {
@@ -167,15 +167,34 @@ describe('streamLayout', () => {
     expect(pos.get('mid')!.x).toBeLessThan(pos.get('right')!.x)
   })
 
-  test('columns are as wide as their widest component and components are centred', () => {
+  test('columns are as wide as their widest component and components are left-aligned', () => {
     const wide = new Vec2(300, 32)
     const pos = streamLayout(
       withOrder([comp('a', 0, 0), comp('b', 0, 80, ['a'], { size: wide }), comp('other', 900, 0)]),
       SPACING,
     )
+    // The narrow component ('a') and the wide one ('b') share the column's left edge.
     expect(pos.get('b')!.x).toBe(0)
-    expect(pos.get('a')!.x).toBe((300 - SIZE.x) / 2)
+    expect(pos.get('a')!.x).toBe(0)
     expect(pos.get('other')!.x).toBe(300 + SPACING.horizontal)
+  })
+
+  test('the column-continuing child is chosen by left x, not centre x', () => {
+    // p is narrow, at x=0. a is wide, also at x=0: its left edge matches p's exactly, but its
+    // centre (150) is far from p's centre (50). b is narrow, at x=40: its centre (90) is closer to
+    // p's centre (50) than a's is, but its left edge (40) is farther from p's (0) than a's. Left x
+    // must win: a continues p's column, not b.
+    const wide = new Vec2(300, 32)
+    const pos = streamLayout(
+      withOrder([
+        comp('p', 0, 0),
+        comp('a', 0, 80, ['p'], { size: wide }),
+        comp('b', 40, 80, ['p']),
+      ]),
+      SPACING,
+    )
+    expect(pos.get('a')!.x).toBe(pos.get('p')!.x)
+    expect(pos.get('b')!.x).toBe(300 + SPACING.horizontal)
   })
 
   test('a tall component pushes only its own column down', () => {

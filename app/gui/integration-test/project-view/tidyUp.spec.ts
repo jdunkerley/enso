@@ -37,16 +37,16 @@ const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height
 
 /**
- * Assert that `child` continues `parent`'s column: same centre x, top strictly below the
- * parent's bottom.
+ * Assert that `child` continues `parent`'s column: same left x, top strictly below the parent's
+ * bottom.
  *
- * `toBeCloseTo(x, 0)` (tolerance 0.5px) is the suite's usual precision for a screen-space centre
- * match (see `aligningNodes.spec.ts`); it's enough here too, because the layout places these two
- * centres at the exact same *scene* x, so any screen-space gap is only floating-point/zoom-
- * transform rounding, not a real layout discrepancy.
+ * `toBeCloseTo(x, 0)` (tolerance 0.5px) is the suite's usual precision for a screen-space match
+ * (see `aligningNodes.spec.ts`); it's enough here too, because the layout places these two left
+ * edges at the exact same *scene* x, so any screen-space gap is only floating-point/zoom-transform
+ * rounding, not a real layout discrepancy.
  */
 function expectContinuesColumn(child: Box, parent: Box) {
-  expect(child.x + child.width / 2).toBeCloseTo(parent.x + parent.width / 2, 0)
+  expect(child.x).toBeCloseTo(parent.x, 0)
   expect(child.y).toBeGreaterThan(parent.y + parent.height)
 }
 
@@ -61,14 +61,12 @@ test('Tidy up lays out the graph in columns without overlaps, and undo restores 
   const after = await boxes(page)
 
   // `data` has five children (`filtered`, `aggregated`, `autoscoped`, `selected`, `table`), all
-  // tied at the same pre-tidy x; the one whose *centre* x ends up closest to `data`'s continues
-  // its column ("the child whose centre x is closest to its parent's continues the parent's
-  // column"). With the mock's collapsed/default node widths that is `aggregated`, not `filtered`
-  // (their differing widths break the tie, despite the shared left edge) -- verified against the
-  // actual layout output rather than assumed.
+  // tied at the same pre-tidy left x -- an exact tie, so the one continuing `data`'s column is
+  // decided by code order ("ties go to code order"). `filtered` is the first of them -- verified
+  // against the actual layout output rather than assumed.
   const data = after.get('data')!
-  const aggregated = after.get('aggregated')!
-  expectContinuesColumn(aggregated, data)
+  const filtered = after.get('filtered')!
+  expectContinuesColumn(filtered, data)
 
   // No two components overlap.
   const list = [...after.values()]
@@ -79,7 +77,7 @@ test('Tidy up lays out the graph in columns without overlaps, and undo restores 
   await expect.poll(async () => serializeBoxes(await boxes(page))).toBe(serializeBoxes(before))
 })
 
-test('with a selection only the selected components move; the button sits in the Align menu', async ({
+test('with a selection only the selected components move; the button sits next to the Align dropdown, not inside it', async ({
   editorPage,
   page,
 }) => {
@@ -90,20 +88,27 @@ test('with a selection only the selected components move; the button sits in the
   await page.waitForTimeout(300)
   await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'sum')).click({ modifiers: ['Shift'] })
 
+  // Use the OS-independent `data-testid` hook rather than an exact accessible-name match: the
+  // button's accessible name includes the shortcut suffix (e.g. "Tidy Up (Ctrl + Shift + L)"),
+  // whose wording differs between OSes. It sits directly in the selection menu now, so it's found
+  // -- and clickable -- without opening the Align dropdown at all.
+  const tidyButton = page.getByTestId('action:components.tidyUp')
+  await expect(tidyButton).toBeVisible()
+  const iconHref = await tidyButton.locator('svg use').getAttribute('href')
+
   // The Align dropdown trigger has no native `title` attribute; `MenuButton` renders the
   // `DropdownMenu`'s `title` prop as `aria-label` instead, so it is exposed as an accessible
   // label rather than a browser tooltip.
   await page.getByLabel('Align', { exact: true }).click()
-
-  // Use the OS-independent `data-testid` hook rather than an exact accessible-name match: the
-  // button's accessible name includes the shortcut suffix (e.g. "Tidy Up (Ctrl + Shift + L)"),
-  // whose wording differs between OSes.
-  const tidyButton = page.getByTestId('action:components.tidyUp')
-  await expect(tidyButton).toBeVisible()
-  // Read the icon now, but assert on it only after the functional checks below: the dropdown
-  // panel (and this locator's target) unmounts once the button is clicked and closes the menu, so
-  // the href has to be captured while the panel is still open.
-  const iconHref = await tidyButton.locator('svg use').getAttribute('href')
+  // The dropdown's panel is teleported out of the DOM subtree of its trigger, so it's identified
+  // by its own class (`alignmentMenu`, set in `SelectionMenu.vue`) rather than by nesting under
+  // the trigger. Confirm the button isn't inside it.
+  const alignPanel = page.locator('.alignmentMenu')
+  await expect(alignPanel).toBeVisible()
+  await expect(alignPanel.getByTestId('action:components.tidyUp')).toHaveCount(0)
+  // Close the dropdown again (clicking its trigger toggles it) before clicking the button below.
+  await page.getByLabel('Align', { exact: true }).click()
+  await expect(alignPanel).toBeHidden()
 
   await tidyButton.click()
   await expect.poll(async () => serializeBoxes(await boxes(page))).not.toBe(serializeBoxes(before))
@@ -125,6 +130,6 @@ test('with a selection only the selected components move; the button sits in the
     expect(after.get(name)).toEqual(box)
   }
 
-  // The button is in the Align dropdown and uses the `tidy_up` icon.
+  // The button uses the `tidy_up` icon (confirmed above to not be inside the Align dropdown).
   expect(iconHref).toMatch(/#tidy_up$/)
 })

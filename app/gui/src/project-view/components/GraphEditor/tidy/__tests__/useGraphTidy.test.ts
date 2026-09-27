@@ -250,10 +250,11 @@ test('useGraphTidy: tidies only the selection when more than one node is selecte
   expect(setNodePosition).toHaveBeenCalledTimes(2)
 })
 
-test('useGraphTidy: writes real column positions — the child continuing a column shares its parent’s centre x and sits below it', () => {
+test('useGraphTidy: writes real column positions — the child continuing a column shares its parent’s left x and sits below it', () => {
   const { db, func, nodeId } = setUpDb()
   const { graphStore, module, setNodePosition } = setUpStores(db, func)
-  // Every component gets the same fixed size, so "same centre x" reduces to "same x".
+  // Components are left-aligned in their column, so this holds regardless of size; a fixed size
+  // for every component just keeps the fixture simple.
   const size = new Vec2(100, 32)
   vi.spyOn(graphStore, 'visibleArea').mockReturnValue({ size } as any)
 
