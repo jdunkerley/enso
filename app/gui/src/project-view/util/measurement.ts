@@ -5,11 +5,18 @@ function getMeasureContext() {
   return (_measureContext ??= document.createElement('canvas').getContext('2d')!)
 }
 
-/** Helper function to get text width. Accepts font size and family only. For a more precise control, use `getTextWidthByFont`. */
+/**
+ * Helper function to get text width. Accepts font size and family only. For a more precise
+ * control, use `getTextWidthByFont`.
+ *
+ * The default family mirrors the `--font-sans` custom property set on visualization hosts
+ * (`VisualizationHost.vue`), i.e. the bundled M PLUS 1 font, since that is what actually
+ * renders unless a caller overrides `fontFamily`.
+ */
 export function getTextWidthBySizeAndFamily(
   text: string | null | undefined,
   fontSize = '11.5px',
-  fontFamily = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif",
+  fontFamily = "'M PLUS 1', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif",
 ) {
   return getTextWidthByFont(text, `${fontSize} ${fontFamily}`)
 }

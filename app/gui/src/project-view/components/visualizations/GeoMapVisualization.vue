@@ -359,7 +359,7 @@ config.setToolbarOverlay(true)
     font-size: 12px;
     border-radius: 14px;
     border-top-left-radius: 2px;
-    font-family: DejaVuSansMonoBook, sans-serif;
+    font-family: var(--font-mono);
     color: rgba(0, 0, 0, 0.8);
     border: 1px solid rgb(200, 210, 210);
     /* This is required for it to show above Mapbox's information button.*/

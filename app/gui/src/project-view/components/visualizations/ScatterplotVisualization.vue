@@ -5,7 +5,7 @@ import { Ast } from '@/util/ast'
 import { tryNumberToEnso } from '@/util/ast/abstract'
 import { Pattern } from '@/util/ast/match'
 import { partition } from '@/util/data/array'
-import { getTextWidthBySizeAndFamily } from '@/util/measurement'
+import { getTextWidthByFont } from '@/util/measurement'
 import { defineKeybinds } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
 import type { ToolbarItem } from './toolbar'
@@ -127,7 +127,9 @@ const props = defineProps<{ data: Partial<Data> | number[] }>()
 
 const config = useVisualizationConfig()
 
-const LABEL_FONT_STYLE = '10px DejaVuSansMonoBook'
+// Font size for the multi-series legend labels (distinct from the axis labels, which are
+// measured with their actual rendered font — see `labelFont` below).
+const LEGEND_LABEL_FONT_SIZE_PX = '10px'
 const POINT_LABEL_PADDING_X_PX = 7
 const POINT_LABEL_PADDING_Y_PX = 2
 const ANIMATION_DURATION_MS = 400
@@ -231,6 +233,11 @@ const yAxisNode = ref<SVGGElement>()
 const zoomNode = ref<SVGGElement>()
 const brushNode = ref<SVGGElement>()
 const legendNode = ref<SVGGElement>()
+// The y-axis label is always rendered (unlike the x-axis label, which is conditional), so it is
+// used as the source of the computed font for measuring both axis labels. This mirrors
+// `AutoSizedInput.vue`, reading the font the label actually renders with instead of guessing at
+// a literal font string that can drift from the CSS.
+const yLabelNode = ref<SVGTextElement>()
 
 const d3Points = computed(() => d3.select(pointsNode.value))
 const d3XAxis = computed(() => d3.select(xAxisNode.value))
@@ -297,17 +304,21 @@ const xTicks = computed(() => {
 })
 
 const yTicks = computed(() => boxHeight.value / 20)
+// Read the computed font of the (always-rendered) y-axis label element, so measurement uses
+// whatever font actually renders instead of a literal that can go stale (see `AutoSizedInput.vue`
+// for the same pattern). Both axis labels share the same font, as neither sets its own.
+const labelFont = computed(() =>
+  yLabelNode.value ? window.getComputedStyle(yLabelNode.value).font : '',
+)
 const xLabelLeft = computed(
   () =>
     margin.value.left +
     boxWidth.value / 2 -
-    getTextWidthBySizeAndFamily(data.value.axis.x.label, LABEL_FONT_STYLE) / 2,
+    getTextWidthByFont(data.value.axis.x.label, labelFont.value) / 2,
 )
 const xLabelTop = computed(() => boxHeight.value + margin.value.top + 20)
 const yLabelLeft = computed(
-  () =>
-    -boxHeight.value / 2 +
-    getTextWidthBySizeAndFamily(data.value.axis.y.label, LABEL_FONT_STYLE) / 2,
+  () => -boxHeight.value / 2 + getTextWidthByFont(data.value.axis.y.label, labelFont.value) / 2,
 )
 const yLabelTop = computed(() => -margin.value.left + 15)
 const xTickFormat = computed(() => {
@@ -803,7 +814,7 @@ watchPostEffect(() => {
         enter
           .append('text')
           .attr('y', 10)
-          .style('font-size', LABEL_FONT_STYLE)
+          .style('font-size', LEGEND_LABEL_FONT_SIZE_PX)
           .attr('alignment-baseline', 'middle'),
       )
       .attr('x', (d, i) => 100 + i * 120)
@@ -959,6 +970,7 @@ config.setToolbar(useScatterplotVizToolbar())
           v-text="data.axis.x.label"
         ></text>
         <text
+          ref="yLabelNode"
           class="label label-y"
           text-anchor="end"
           :x="yLabelLeft"
