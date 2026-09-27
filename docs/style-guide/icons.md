@@ -93,8 +93,9 @@ filled icon, such as a clock's hands. No other widths.
 2px is the established weight (39 icons) and matches the visual mass of the
 filled icons; 1.5px strokes look anaemic beside them.
 
-_Today:_ 18 icons: 15 use other widths (1.33, 2.5, 3, ...) and 3 are 1.5px line
-icons with no filled shape (`help`, `navigate_breadcrumb`, `tidy_up`).
+_Today:_ 13 icons: most use other widths (1.33, 2.5, 3, ...), and `help` and
+`navigate_breadcrumb` are 1.5px line icons with no filled shape. (`tidy_up` was
+one until #98 redrew it.)
 
 ### Caps and joins
 
