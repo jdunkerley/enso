@@ -96,6 +96,11 @@ const displayableActions = {
     icon: 'align_center',
     description: 'Center',
   },
+  'components.tidyUp': {
+    icon: 'tidy_up',
+    description: 'Tidy Up',
+    shortcut: graphBindings.bindings['components.tidyUp'],
+  },
   'components.spaceVertical': {
     icon: 'space_default',
     description: 'Default Spacing',

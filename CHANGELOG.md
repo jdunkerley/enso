@@ -47,6 +47,11 @@
   idle][72] when running without Enso Cloud. Returning to the window, or the
   network reconnecting, used to re-check the Enso Cloud configuration, and while
   that check was under way the IDE briefly treated the local user as signed out.
+- [Tidy up lays out the graph, or the selected components, as a clean
+  top-to-bottom flow][74], with each chain of components in its own straight
+  column and separate streams side by side. Use the button next to the Align
+  menu when several components are selected, the graph's context menu, or
+  <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>. A single undo reverts it.
 
 #### Enso Language & Runtime
 
@@ -158,6 +163,7 @@
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
 [72]: https://github.com/jdunkerley/enso/pull/72
+[74]: https://github.com/jdunkerley/enso/pull/74
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

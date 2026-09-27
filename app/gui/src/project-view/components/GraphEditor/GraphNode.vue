@@ -457,6 +457,7 @@ const alignmentMenuActions: DisplayableActionName[] = [
   'components.alignRight',
   'components.alignTop',
   'components.alignBottom',
+  'components.tidyUp',
 ]
 
 const spacingMenuActions: DisplayableActionName[] = [

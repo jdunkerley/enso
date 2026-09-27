@@ -1,3 +1,4 @@
+import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/parseWithSpans'
 import { asNodeId, GraphDb, type NodeId } from '$/providers/openedProjects/graph/graphDatabase'
 import {
   ComputedValueRegistry,
@@ -9,44 +10,14 @@ import {
   type SuggestionEntry,
 } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { makeMethod } from '$/providers/openedProjects/suggestionDatabase/mockSuggestion'
-import { assert, assertDefined } from '@/util/assert'
+import { assert } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import { stdPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { expect, test } from 'vitest'
 import { nextTick, ref, watchEffect } from 'vue'
-import type { AstId } from 'ydoc-shared/ast'
 import { SourceRange } from 'ydoc-shared/util/data/text'
-import { IdMap, type ExternalId } from 'ydoc-shared/yjsModel'
-
-/** TODO: Add docs */
-export function parseWithSpans<T extends Record<string, SourceRange>>(code: string, spans: T) {
-  const nameToEid = new Map<keyof T, ExternalId>()
-  const eid = (name: keyof T) => nameToEid.get(name)!
-
-  const idMap = IdMap.Mock()
-  let nextIndex = 0
-  for (const name in spans) {
-    const span = spans[name]!
-    assertDefined(span)
-    const indexStr = `${nextIndex++}`
-    const eid =
-      idMap.getIfExist(span) ??
-      (('00000000-0000-0000-0000-000000000000'.slice(0, -indexStr.length) + indexStr) as ExternalId)
-    nameToEid.set(name, eid)
-    idMap.insertKnownId(span, eid)
-  }
-
-  const { root: ast, getSpan } = Ast.parseUpdatingIdMap(code, idMap)
-  const idFromExternal = new Map<ExternalId, AstId>()
-  Ast.visitRecursive(ast, (ast) => {
-    idFromExternal.set(ast.externalId, ast.id)
-  })
-  const id = (name: keyof T) => idFromExternal.get(eid(name))!
-
-  return { ast, id, eid, getSpan }
-}
 
 test('Reading graph from definition', () => {
   const code = `function a =

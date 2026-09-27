@@ -76,6 +76,7 @@ const spacingActions: DisplayableActionName[] = [
         </MenuPanel>
       </template>
     </DropdownMenu>
+    <ActionButton action="components.tidyUp" />
     <DropdownMenu
       v-model:open="spacingMenuOpen"
       placement="bottom-start"
