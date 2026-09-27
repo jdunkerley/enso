@@ -66,10 +66,6 @@
   sit off-centre; the IDE no longer fetches M PLUS 1 from Google Fonts at
   startup, relying solely on the bundled copy; and the bundled DejaVu Sans Mono
   and M PLUS 1 fonts now ship with their licence notices.
-- [The IDE's icons now have a written drawing guide][118]
-  (`docs/style-guide/icons.md`), and the GUI's unit tests check every icon
-  against its mechanical rules, so new icons match the set. No icon changes yet;
-  the existing ones are being brought into line in follow-up work.
 
 #### Enso Language & Runtime
 
@@ -185,7 +181,6 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [116]: https://github.com/jdunkerley/enso/pull/116
-[118]: https://github.com/jdunkerley/enso/pull/118
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
