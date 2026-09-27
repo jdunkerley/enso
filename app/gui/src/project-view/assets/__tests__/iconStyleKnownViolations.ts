@@ -29,19 +29,22 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'sort_filter_reset',
     'star',
   ],
-  // stroke width 2 (1.5 only for a detail inside a filled icon) (15)
+  // stroke width 2 (1.5 only for a detail inside a filled icon) (18)
   strokeWidth: [
     'camera',
     'document',
     'drop_files',
+    'help',
     'info',
     'join2-1',
     'local_scope',
     'local_scope2',
+    'navigate_breadcrumb',
     'properties',
     'schedule',
     'sessions',
     'text_input',
+    'tidy_up',
     'transform2',
     'transform4',
     'union',

@@ -51,7 +51,7 @@ reviewer's job.
 ## The rules
 
 Each rule notes how the set stood when this guide was written (September 2026,
-265 icons); the check's lists hold the current offenders.
+266 icons); the check's lists hold the current offenders.
 
 ### Canvas
 
@@ -93,7 +93,8 @@ filled icon, such as a clock's hands. No other widths.
 2px is the established weight (39 icons) and matches the visual mass of the
 filled icons; 1.5px strokes look anaemic beside them.
 
-_Today:_ 15 icons use other widths (1.33, 2.5, 3, ...).
+_Today:_ 18 icons: 15 use other widths (1.33, 2.5, 3, ...) and 3 are 1.5px line
+icons with no filled shape (`help`, `navigate_breadcrumb`, `tidy_up`).
 
 ### Caps and joins
 
@@ -131,10 +132,11 @@ clip paths, plus a hard-coded orange `star`.
 
 ### Structure
 
-No `transform`, `clip-path`, `mask`, `filter`, `<defs>`, gradients or `id`s
-inside a symbol. Flatten on export. Ids inside a symbol share one document with
-every other icon and collide; transforms and clips are export residue that make
-an icon hard to edit.
+No `transform`, `clip-path`, `mask`, `filter`, `style`, `<defs>`, gradients or
+`id`s inside a symbol (set properties as attributes, where the check can see
+them). Flatten on export. Ids inside a symbol share one document with every
+other icon and collide; transforms and clips are export residue that make an
+icon hard to edit.
 
 _Today:_ 19 icons, mostly with Figma ids such as `clip0_1514_223`.
 

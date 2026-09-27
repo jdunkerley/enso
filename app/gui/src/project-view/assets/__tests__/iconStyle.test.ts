@@ -21,7 +21,10 @@ const SVG_NAMESPACE_ELEMENTS_BANNED = [
   'pattern',
   'filter',
 ]
-const ATTRIBUTES_BANNED = ['transform', 'clip-path', 'mask', 'filter']
+// `style` is banned outright: it can carry any of the properties the other rules read from
+// presentation attributes (`style="fill:#f00"`), which would let them slip past those checks.
+const ATTRIBUTES_BANNED = ['transform', 'clip-path', 'mask', 'filter', 'style']
+const FILLABLE_SHAPES = ['path', 'rect', 'circle', 'ellipse', 'polygon']
 const COLOUR_ATTRIBUTES = ['fill', 'stroke', 'stop-color', 'color']
 const OPACITY_ATTRIBUTES = ['opacity', 'fill-opacity', 'stroke-opacity']
 const GEOMETRY_ATTRIBUTES = [
@@ -58,6 +61,12 @@ function inherited(el: Element, attr: string): string | null {
 
 const descendants = (symbol: Element) => Array.from(symbol.querySelectorAll('*'))
 
+/** Whether the symbol draws a filled shape. SVG's initial `fill` is black, so unset means filled. */
+const hasFilledShape = (symbol: Element) =>
+  descendants(symbol).some(
+    (el) => FILLABLE_SHAPES.includes(el.tagName) && (inherited(el, 'fill') ?? 'black') !== 'none',
+  )
+
 /** Each rule returns true when the symbol breaks it. */
 const RULES: Record<StyleRule, (symbol: Element) => boolean> = {
   canvas: (s) =>
@@ -72,13 +81,15 @@ const RULES: Record<StyleRule, (symbol: Element) => boolean> = {
         return value != null && value !== 'none' && value !== 'currentColor'
       }),
     ),
-  strokeWidth: (s) =>
-    descendants(s).some((el) => {
+  // 2px, or 1.5px for a detail inside a filled icon (such as a clock's hands).
+  strokeWidth: (s) => {
+    const allowed = hasFilledShape(s) ? ['2', '1.5'] : ['2']
+    return descendants(s).some((el) => {
       const stroke = inherited(el, 'stroke')
       if (stroke == null || stroke === 'none') return false
-      const width = inherited(el, 'stroke-width')
-      return width !== '2' && width !== '1.5'
-    }),
+      return !allowed.includes(inherited(el, 'stroke-width') ?? '1')
+    })
+  },
   strokeEnds: (s) =>
     descendants(s).some((el) => {
       const stroke = inherited(el, 'stroke')
@@ -95,6 +106,7 @@ const RULES: Record<StyleRule, (symbol: Element) => boolean> = {
       }),
     ),
   structure: (s) =>
+    ATTRIBUTES_BANNED.some((attr) => s.hasAttribute(attr)) ||
     descendants(s).some(
       (el) =>
         SVG_NAMESPACE_ELEMENTS_BANNED.includes(el.tagName) ||
