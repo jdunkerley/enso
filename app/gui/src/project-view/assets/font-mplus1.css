@@ -1,4 +1,8 @@
 @font-face {
   font-family: "M PLUS 1";
   src: url("/font-mplus1/MPLUS1[wght].ttf");
+  /* Variable font (`wght` axis 100-900, per its `fvar` table); without a weight range this
+     descriptor defaults to "normal" (400) and the face only matches font-weight: 400 requests,
+     so `font-weight: 300`/`500`/`600`/`700` etc. can't reach the other instances at all. */
+  font-weight: 100 900;
 }

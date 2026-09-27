@@ -57,6 +57,15 @@
   `graph_editor` symbols twice each; since `<use href="#id">` silently resolves
   to the first match, the second drawing of each was dead. The icon generator
   now fails with a clear error if a `<symbol>` id is ever duplicated again.
+- [Fixed several font issues][NNN]: the SQL and GeoMap visualizations now render
+- [Fixed several font issues][NNN]. The SQL and GeoMap visualizations now render
+- [Fixed several font issues][117]. The SQL and GeoMap visualizations now render
+  their monospace text in the actual bundled monospace font instead of silently
+  falling back to the browser default; scatterplot and histogram axis labels are
+  now measured with the font they actually render in, so long labels no longer
+  sit off-centre; the IDE no longer fetches M PLUS 1 from Google Fonts at
+  startup, relying solely on the bundled copy; and the bundled DejaVu Sans Mono
+  and M PLUS 1 fonts now ship with their licence notices.
 
 #### Enso Language & Runtime
 
@@ -177,6 +186,7 @@
 [71]: https://github.com/jdunkerley/enso/pull/71
 [72]: https://github.com/jdunkerley/enso/pull/72
 [74]: https://github.com/jdunkerley/enso/pull/74
+[117]: https://github.com/jdunkerley/enso/pull/117
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

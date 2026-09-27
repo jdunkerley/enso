@@ -192,7 +192,7 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
 }
 
 :deep(.tooltip) {
-  font-family: DejaVuSansMonoBook, sans-serif;
+  font-family: var(--font-mono);
   font-size: 12px;
   opacity: 0;
   transition: opacity 0.2s;

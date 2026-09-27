@@ -1,6 +1,6 @@
 <script lang="ts">
 import { useEvent } from '@/composables/events'
-import { getTextWidthBySizeAndFamily } from '@/util/measurement'
+import { getComputedFont, getTextWidthByFont } from '@/util/measurement'
 import { defineKeybinds } from '@/util/shortcuts'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import { computed, ref, watch, watchEffect, watchPostEffect } from 'vue'
@@ -250,12 +250,16 @@ const height = computed(() => config.size.y)
 const boxWidth = computed(() => Math.max(0, width.value - margin.value.left - margin.value.right))
 const boxHeight = computed(() => Math.max(0, height.value - margin.value.top - margin.value.bottom))
 const xLabelTop = computed(() => boxHeight.value + margin.value.bottom - AXIS_LABEL_HEIGHT / 2)
+// The axis labels set no font of their own, so they render in the container's computed font
+// (`VisualizationHost.vue`'s 11.5px/500 sans). Measure with that rather than a literal, which
+// would miss the weight; see `ScatterplotVisualization.vue` for the same pattern.
+const labelFont = computed(() => (containerNode.value ? getComputedFont(containerNode.value) : ''))
 const xLabelLeft = computed(
-  () => boxWidth.value / 2 + getTextWidthBySizeAndFamily(axis.value.x?.label) / 2,
+  () => boxWidth.value / 2 + getTextWidthByFont(axis.value.x?.label, labelFont.value) / 2,
 )
 const yLabelTop = computed(() => -margin.value.left + AXIS_LABEL_HEIGHT)
 const yLabelLeft = computed(
-  () => -boxHeight.value / 2 + getTextWidthBySizeAndFamily(axis.value.y?.label) / 2,
+  () => -boxHeight.value / 2 + getTextWidthByFont(axis.value.y?.label, labelFont.value) / 2,
 )
 
 let startX = 0
