@@ -66,6 +66,10 @@
   sit off-centre; the IDE no longer fetches M PLUS 1 from Google Fonts at
   startup, relying solely on the bundled copy; and the bundled DejaVu Sans Mono
   and M PLUS 1 fonts now ship with their licence notices.
+- [The Tidy up and spacing icons are easier to read][122]. Tidy up is now three
+  solid blocks in columns, matching the weight of the align icons beside it, and
+  the "no spacing" and "tight" spacing icons no longer blur into solid blocks on
+  standard-resolution screens.
 
 #### Enso Language & Runtime
 
@@ -187,6 +191,7 @@
 [72]: https://github.com/jdunkerley/enso/pull/72
 [74]: https://github.com/jdunkerley/enso/pull/74
 [117]: https://github.com/jdunkerley/enso/pull/117
+[122]: https://github.com/jdunkerley/enso/pull/122
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
