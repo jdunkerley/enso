@@ -1,4 +1,4 @@
-import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/graphDatabase.test'
+import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/parseWithSpans'
 import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
 import { TypeInfo } from '$/providers/openedProjects/project/computedValueRegistry'
 import type { NodeVisualizationConfiguration } from '$/providers/openedProjects/project/executionContext'

@@ -543,7 +543,10 @@ export function streamLayout<Id>(
   // always terminates — rather than a fixed number of rounds, so the result really is stable.
   //
   // A swap never moves a component's row, only its column, and only within the two swapped
-  // subtrees; every other position is unchanged. For a small pair of subtrees, `crossingsTouching`
+  // subtrees; every other position is unchanged. That holds even when the two subtrees have
+  // different widths: they are adjacent, contiguous blocks of columns, so swapping them only
+  // reorders columns inside the span they already share. Its total width, and so the x of every
+  // column after it, is the same either way. For a small pair of subtrees, `crossingsTouching`
   // re-scores only the edges touching them, once against the positions before the swap and once
   // after, instead of recounting the whole graph — and even for the "after" positions, only the
   // touching edges' segments actually differ from `stableSegmentAt`, so those are the only ones

@@ -616,6 +616,27 @@ git commit -m "Tidy up: stream layout (forest, columns, compact rows, anchoring)
 
 ### Task 2: The crossing pass
 
+> **Superseded in implementation — do not re-apply this task's round cap.**
+> Review found three flaws in the design this task describes:
+>
+> - `MAX_CROSSING_ROUNDS` breaks idempotence. A capped pass can stop before a
+>   local optimum, so a second Tidy up moves things again.
+> - Pre-allocating branch columns in `placeColumns` interleaves nested splits.
+> - A full recount per swap is too slow at 300 components.
+>
+> The shipped `streamLayout.ts` differs in four ways:
+>
+> - It has **no round cap**. The pass loops until a full round finds no strict
+>   improvement.
+> - It keeps each subtree's columns **contiguous**.
+> - It scores swaps **incrementally**, recounting only the edges touching the
+>   two swapped subtrees.
+> - A **300 ms wall-clock budget** (`CROSSING_PASS_BUDGET_MS`) guards
+>   pathological graphs.
+>
+> The spec (§2 and §3) records the final design. The steps below are kept as the
+> historical record of the original plan.
+
 **Files:**
 
 - Modify: `app/gui/src/project-view/components/GraphEditor/tidy/streamLayout.ts`

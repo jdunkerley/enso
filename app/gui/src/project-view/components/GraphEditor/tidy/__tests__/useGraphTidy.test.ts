@@ -1,5 +1,5 @@
 import type { GraphStore } from '$/providers/openedProjects/graph'
-import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/graphDatabase.test'
+import { parseWithSpans } from '$/providers/openedProjects/graph/__tests__/parseWithSpans'
 import {
   GraphDb,
   nodeIdFromOuterAst,
