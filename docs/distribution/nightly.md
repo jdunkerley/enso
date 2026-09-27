@@ -71,17 +71,19 @@ the file to learn more.
 
 ## Changelog
 
-Each PR should update the first, `Enso Next`, section in `CHANGELOG.md`. These
-changes will be later moved to the specific section for the full release. This
-section is also used to fill the release notes for the nightly builds.
+PRs that add a feature or make a change users can see add an entry to the first,
+`Next Release`, section in `CHANGELOG.md`. These changes will be later moved to
+the specific section for the full release. This section is also used to fill the
+release notes for the nightly builds.
 
-Most PRs should update the release notes, so there is a PR check that ensures
-the file was modified. However, in some situations there is no need to update
-the notes. In such case `CI: No changelog needed` label should be added to the
-PR, so the check is skipped.
+Every other PR (bug fixes, documentation and design docs, and changes invisible
+to users such as tests, tooling or refactors) takes the
+`CI: No changelog needed` label instead. A PR check fails when a PR has neither
+an entry nor the label. `CLAUDE.md` ("Conventions worth knowing up front") has
+the full rule.
 
 The changelog should keep consistent formatting:
 
 - each version should be delimited by a top-level section (`#` in Markdown),
-- the first section should always be called `Enso Next`,
+- the first section should always be called `Next Release`,
 - all subsequent sections should be called `Enso <version> (<date>)`.

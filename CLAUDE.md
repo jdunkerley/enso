@@ -126,8 +126,10 @@ has silently produced a wrong result here:
   Every entry lands on the same few lines of `CHANGELOG.md`, so each one makes
   the next PR to merge conflict, and a rebase re-runs its whole CI. Keeping
   entries to what a release-notes reader needs keeps that rare. Add the label
-  when opening the PR: labelling re-runs only the `Changelog` job. When in doubt
-  about visibility, ask. An entry goes in the `# Next Release` section under the
+  when opening the PR: labelling re-runs only the `Changelog` workflow (a
+  two-minute build-script job, then the check), not the full CI. When in doubt
+  about visibility, ask. `docs/distribution/nightly.md` states the same rule;
+  keep the two in step. An entry goes in the `# Next Release` section under the
   right heading (`#### Enso IDE`, `#### Enso Language & Runtime`,
   `#### Enso Standard Library`), in the existing `- [Description][NNN]` form
   with a matching link definition, where `NNN` is the PR number. Write it for
