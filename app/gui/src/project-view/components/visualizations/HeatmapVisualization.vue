@@ -218,6 +218,8 @@ watchPostEffect(() => {
 
 .label {
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
   font-size: 10px;
 }
 

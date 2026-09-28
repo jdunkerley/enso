@@ -38,5 +38,7 @@ const { syncExt, setText } = useStringSync()
 
 .usage {
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
 }
 </style>

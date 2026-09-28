@@ -23,8 +23,15 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   directory must also be listed in `build_tools/build/paths.yaml`.
 - `font-monaspace.css` / `public/font-monaspace/` — Monaspace Neon and Radon
   (variable woff2, v1.400, unmodified upstream files; see the README there).
-  Vendored by #109 but not referenced by any stylesheet yet, so no preload in
-  `index.html` yet either — `--font-mono` switches to Neon in #110, which adds
-  the preload then.
+  `--font-mono` switches to Neon only under the `enableMonaspaceCodeFont`
+  feature flag (the `:root.monaspaceCodeFont` block in `base.css`; the class and
+  the face's early load come from `src/providers/codeFont.ts`, since
+  `index.html` cannot preload conditionally). #113 removes the flag.
+- Ligatures on `--font-mono` text go through `--font-mono-variant-ligatures` /
+  `--font-mono-feature-settings` (the code editor, and anything editable) and
+  their `-readonly` variants (docs code, tables, visualizations), which the
+  "Code ligatures" setting (`:root.codeLigatures`) switches. A new `--font-mono`
+  consumer should set one pair; Monaspace's coding ligatures must stay off
+  wherever there is a caret.
 - `icon-*.svg`, `icons/` — standalone images imported directly by components,
   not part of the sprite.

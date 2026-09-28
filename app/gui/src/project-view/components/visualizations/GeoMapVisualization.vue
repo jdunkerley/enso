@@ -360,6 +360,8 @@ config.setToolbarOverlay(true)
     border-radius: 14px;
     border-top-left-radius: 2px;
     font-family: var(--font-mono);
+    font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+    font-feature-settings: var(--font-mono-readonly-feature-settings);
     color: rgba(0, 0, 0, 0.8);
     border: 1px solid rgb(200, 210, 210);
     /* This is required for it to show above Mapbox's information button.*/

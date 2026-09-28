@@ -157,6 +157,8 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
 
 :deep(.sql) {
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
   font-size: 12px;
   margin-left: 7px;
   margin-top: 5px;
@@ -193,6 +195,8 @@ function renderRegularInterpolation(value: unknown, fgColor: RGBA, bgColor: RGBA
 
 :deep(.tooltip) {
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
   font-size: 12px;
   opacity: 0;
   transition: opacity 0.2s;

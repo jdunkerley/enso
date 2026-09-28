@@ -106,6 +106,14 @@
   typeface as the rest of the IDE][NNN], instead of three custom variants of it.
   Text looks almost the same, with slightly different spacing around dots,
   hyphens and commas, and the IDE download is about 1.3 MB smaller.
+- [A new "Code ligatures" setting][NNN], under Settings → Appearance, and a
+  preview of Monaspace Neon as the code font. The setting (off by default) joins
+  operators such as `->` and `>=` into single symbols in documentation code,
+  tables and visualizations; the code editor keeps them as separate characters.
+  The new font is behind the `enableMonaspaceCodeFont` feature flag, off by
+  default: with it on, the code editor, documentation code, tables and
+  visualizations use Monaspace Neon, and the code editor's text grows from 12 to
+  13 px. Node text is unchanged.
 
 #### Enso Language & Runtime
 

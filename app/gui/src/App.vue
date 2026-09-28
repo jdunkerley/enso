@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useCodeFontRootClasses } from '$/providers/codeFont'
 import { ContextsForReactProvider } from '$/providers/react/globalProvider'
 import ReactRoot from '$/ReactRoot'
 import { appOpenCloseCallback } from '$/utils/analytics'
@@ -23,6 +24,7 @@ import LoadingScreen from './components/LoadingScreen.vue'
 // const LoadingScreen = reactComponent(LoadingScreenReact)
 
 const classSet = provideAppClassSet()
+useCodeFontRootClasses()
 const appTooltips = provideTooltipRegistry()
 
 const ReactRootWrapper = reactComponent(ReactRoot)

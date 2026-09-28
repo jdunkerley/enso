@@ -28,6 +28,16 @@
   );
   --ag-header-background-color: var(--color-visualization-bg);
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
+
+  /* Cells being edited (`WidgetTableEditor`) are not read-only code: keep them free of coding
+     ligatures, as in the code editor. */
+  & input,
+  & textarea {
+    font-variant-ligatures: var(--font-mono-variant-ligatures);
+    font-feature-settings: var(--font-mono-feature-settings);
+  }
 
   .ag-header {
     background: linear-gradient(

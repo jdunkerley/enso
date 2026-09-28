@@ -32,6 +32,11 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   unsafeDarkTheme: z.boolean(),
   apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
+  /**
+   * Use Monaspace Neon for `--font-mono` (the code editor, docs code, tables and visualizations),
+   * with a 13px code editor. Off until the maintainer's hands-on sign-off; #113 removes the flag.
+   */
+  enableMonaspaceCodeFont: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -69,6 +74,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         unsafeDarkTheme: false,
         apiKeyLimit: 5,
         debugHoverAreas: false,
+        enableMonaspaceCodeFont: false,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))

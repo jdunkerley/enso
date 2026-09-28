@@ -277,6 +277,8 @@ defineExpose({
 .monospace {
   /*noinspection CssNoGenericFontName*/
   font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
 }
 
 .url {

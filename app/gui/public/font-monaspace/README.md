@@ -54,12 +54,12 @@ the `.woff2` files.
 
 ## Status
 
-Added by #109 to vendor the files only — nothing in the GUI references
-`"Monaspace Neon"` or `"Monaspace Radon"` yet (see
-`src/project-view/assets/font-monaspace.css`), so there is no preload link in
-`index.html` yet either: preloading an unused font would cost first-load time
-for nothing. #110 switches `--font-mono` to Monaspace Neon and adds the preload
-at that point; #111 is expected to use Monaspace Radon for comments.
+Added by #109. Since #110, Monaspace Neon is `--font-mono` under the
+`enableMonaspaceCodeFont` feature flag (off by default), and
+`src/providers/codeFont.ts` starts loading it at app start-up while the flag is
+on; a `<link rel="preload">` in `index.html` would fetch it for everyone, flag
+or not. #113 removes the flag and moves the preload to `index.html`. Monaspace
+Radon is not referenced yet; #111 is expected to use it for comments.
 
 ## Upgrading
 

@@ -42,6 +42,7 @@ import { normalizePath } from 'enso-common/src/utilities/file'
 import type { HTMLInputAutoCompleteAttribute, HTMLInputTypeAttribute, ReactNode } from 'react'
 import * as z from 'zod'
 import ActivityLogSettingsSection from './ActivityLogSettingsSection'
+import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection'
 import DeleteUserAccountSettingsSection from './DeleteUserAccountSettingsSection'
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection'
 import MembersSettingsSection from './MembersSettingsSection'
@@ -512,6 +513,23 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
       },
     ],
   },
+  [SettingsTabType.appearance]: {
+    nameId: 'appearanceSettingsTab',
+    settingsTab: SettingsTabType.appearance,
+    icon: 'paint_palette',
+    sections: [
+      {
+        nameId: 'codeSettingsSection',
+        entries: [
+          {
+            type: 'custom',
+            aliasesId: 'codeLigaturesSettingsCustomEntryAliases',
+            render: () => <CodeLigaturesSettingsSection />,
+          },
+        ],
+      },
+    ],
+  },
   [SettingsTabType.keyboardShortcuts]: {
     nameId: 'keyboardShortcutsSettingsTab',
     settingsTab: SettingsTabType.keyboardShortcuts,
@@ -619,7 +637,10 @@ export const SETTINGS_DATA: SettingsData = [
   },
   {
     nameId: 'lookAndFeelSettingsTabSection',
-    tabs: [SETTINGS_TAB_DATA[SettingsTabType.keyboardShortcuts]],
+    tabs: [
+      SETTINGS_TAB_DATA[SettingsTabType.appearance],
+      SETTINGS_TAB_DATA[SettingsTabType.keyboardShortcuts],
+    ],
   },
   {
     nameId: 'securitySettingsTabSection',
