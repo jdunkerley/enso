@@ -77,6 +77,11 @@
   metadata category has its own icon instead of reusing "information"; and the
   documentation, find, join, union, root and workflow icons, which were drawn
   entirely in a faint shade, now have a solid shape.
+- [Icons are a more even size][125]. Over eighty icons that filled their whole
+  square, such as delete, folder and the zoom buttons, now leave the same small
+  margin as the rest, so toolbars no longer have some icons looking bigger than
+  their neighbours. Menus and breadcrumbs share one chevron, and the graph
+  editor icon now shows a small graph.
 
 #### Enso Language & Runtime
 
@@ -201,6 +206,7 @@
 [122]: https://github.com/jdunkerley/enso/pull/122
 [123]: https://github.com/jdunkerley/enso/pull/123
 [124]: https://github.com/jdunkerley/enso/pull/124
+[125]: https://github.com/jdunkerley/enso/pull/125
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
