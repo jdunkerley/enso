@@ -1,0 +1,33 @@
+/* Variable fonts (`wght`/`wdth`/`slnt` axes, per their `fvar` tables); the full upstream
+   files are unmodified and unsubset (see `public/font-monaspace/README.md`). Neither face is
+   referenced by any stylesheet yet (#109 only vendors the files; #110 wires up Neon as
+   `--font-mono`, #111 is expected to use Radon for comments), so there is no preload link in
+   `index.html` yet either — preloading a font nothing uses would only cost first-load time.
+
+   `font-style: oblique 0deg 11deg` covers the `slnt` axis's -11..0: CSS oblique angles are
+   positive when leaning clockwise, OpenType `slnt` values negative, and browsers map one to
+   the other (CSS Fonts 4, `font-style` descriptor). */
+
+@font-face {
+  font-family: "Monaspace Neon";
+  src:
+    url("/font-monaspace/MonaspaceNeonVar.woff2") format("woff2")
+      tech(variations),
+    url("/font-monaspace/MonaspaceNeonVar.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-stretch: 100% 125%;
+  font-style: oblique 0deg 11deg;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Monaspace Radon";
+  src:
+    url("/font-monaspace/MonaspaceRadonVar.woff2") format("woff2")
+      tech(variations),
+    url("/font-monaspace/MonaspaceRadonVar.woff2") format("woff2-variations");
+  font-weight: 200 800;
+  font-stretch: 100% 125%;
+  font-style: oblique 0deg 11deg;
+  font-display: block;
+}

@@ -21,5 +21,10 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   every face a `font-display` (`block` for M PLUS 1, which drives text
   measurement and is preloaded from `index.html`). A renamed or added font
   directory must also be listed in `build_tools/build/paths.yaml`.
+- `font-monaspace.css` / `public/font-monaspace/` — Monaspace Neon and Radon
+  (variable woff2, v1.400, unmodified upstream files; see the README there).
+  Vendored by #109 but not referenced by any stylesheet yet, so no preload in
+  `index.html` yet either — `--font-mono` switches to Neon in #110, which adds
+  the preload then.
 - `icon-*.svg`, `icons/` — standalone images imported directly by components,
   not part of the sprite.
