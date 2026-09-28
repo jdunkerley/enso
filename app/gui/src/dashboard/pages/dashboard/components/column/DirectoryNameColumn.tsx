@@ -76,7 +76,7 @@ export default function DirectoryNameColumn(props: DirectoryNameColumnProps) {
         data-testid="asset-row-name"
         editable={isEditingName}
         className={twMerge(
-          'cursor-pointer bg-transparent font-naming',
+          'cursor-pointer bg-transparent',
           isEditingName ? 'cursor-text' : 'cursor-pointer',
         )}
         schema={() =>

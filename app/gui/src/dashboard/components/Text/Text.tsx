@@ -69,7 +69,6 @@ export const Text = Object.assign(
       const {
         className,
         variant,
-        font,
         italic,
         weight,
         nowrap,
@@ -98,7 +97,6 @@ export const Text = Object.assign(
 
       const textClasses = TEXT_STYLE({
         variant,
-        font,
         weight,
         transform,
         monospace,

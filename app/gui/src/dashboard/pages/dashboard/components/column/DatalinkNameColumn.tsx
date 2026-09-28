@@ -73,7 +73,7 @@ export default function DatalinkNameColumn(props: DatalinkNameColumnProps) {
             siblings: getAssetChildren(item.parentId),
           })
         }
-        className="grow bg-transparent font-naming"
+        className="grow bg-transparent"
       >
         {item.title}
       </EditableSpan>

@@ -22,13 +22,11 @@
       dist/:
       playwright-report/: # Test results for the GUI that we want to keep as artifacts.
       public/:
-        font-enso/:
         font-mplus1/:
         font-dejavu/:
       src/:
         project-view/:
           assets/:
-            font-enso.css:
             font-mplus1.css:
             font-dejavu.css:
     ide-desktop/:

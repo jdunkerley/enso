@@ -16,10 +16,6 @@ export const TEXT_STYLE = tv({
       inherit: 'text-inherit',
       current: 'text-current',
     },
-    font: {
-      default: '',
-      naming: 'font-naming',
-    },
     // We use custom padding for the text variants to make sure the text is aligned with the grid.
     // `leading` is also adjusted to make sure the text is aligned with the grid.
     // `leading` should always be after the text size to make sure it is not stripped by `twMerge`.
@@ -96,7 +92,6 @@ export const TEXT_STYLE = tv({
   },
   defaultVariants: {
     variant: 'body',
-    font: 'default',
     weight: 'default',
     transform: 'none',
     color: 'primary',
