@@ -160,7 +160,7 @@ defineExpose({
         <span class="groupEntryLabel">
           {{ group.name }}{{ group.displayedNumber ? ` (${group.displayedNumber})` : '' }}
         </span>
-        <SvgIcon v-if="selected" class="groupEntryIcon" name="folder_closed" />
+        <SvgIcon v-if="selected" class="groupEntryIcon" name="chevron_right" />
       </div>
     </VirtualizedList>
     <div class="rightPane">

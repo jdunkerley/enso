@@ -41,7 +41,7 @@ function shrinkFactor(index: number): number {
     </div>
     <TransitionGroup name="breadcrumbs">
       <template v-for="(breadcrumb, index) in props.breadcrumbs" :key="[index, breadcrumb.label]">
-        <SvgIcon v-if="index > 0" name="navigate_breadcrumb" />
+        <SvgIcon v-if="index > 0" name="chevron_right" />
         <Breadcrumb
           :text="breadcrumb.label"
           :icon="index === props.breadcrumbs.length - 1 ? props.icon : undefined"

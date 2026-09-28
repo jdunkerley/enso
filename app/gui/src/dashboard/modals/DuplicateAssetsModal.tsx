@@ -422,7 +422,7 @@ function ResolveDuplicationsModalInner(props: ResolveDuplicationsProps) {
               </Button>
 
               <Menu.Trigger>
-                <Button variant="outline" icon="folder_opened" />
+                <Button variant="outline" icon="chevron_down" />
 
                 <Menu>
                   <Menu.Item

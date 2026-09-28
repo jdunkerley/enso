@@ -252,7 +252,7 @@ function UserGroupRow(props: UserGroupRowProps) {
               {getText('manageUsers')}
             </Button>
             <Menu.Trigger>
-              <Button icon="folder_opened" iconPosition="end" variant="outline" />
+              <Button icon="chevron_down" iconPosition="end" variant="outline" />
               <Menu>
                 <Menu.Item
                   icon="trash"

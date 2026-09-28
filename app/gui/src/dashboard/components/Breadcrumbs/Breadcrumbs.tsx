@@ -113,7 +113,7 @@ interface BreadcrumbSeparatorProps<Icon extends string> {
 const BreadcrumbSeparator = memo(function BreadcrumbSeparatorImpl<Icon extends string>(
   props: BreadcrumbSeparatorProps<Icon>,
 ) {
-  const { icon = 'folder_closed', className } = props
+  const { icon = 'chevron_right', className } = props
 
   return <Icon className={className} icon={icon} />
 }) as <Icon extends string>(props: BreadcrumbSeparatorProps<Icon>) => ReactElement

@@ -21,7 +21,7 @@ const displayedStack = computed(() => ['Cloud', ...directoryStack])
     <div class="breadcrumbs">
       <TransitionGroup>
         <template v-for="(directory, index) in displayedStack" :key="`${index}:${directory}`">
-          <SvgIcon v-if="index > 0" name="navigate_breadcrumb" />
+          <SvgIcon v-if="index > 0" name="chevron_right" />
           <div
             class="clickable"
             :class="{ nonInteractive: index === displayedStack.length - 1 }"
