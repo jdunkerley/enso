@@ -1,10 +1,9 @@
 /** @file A tray for displaying notifications. */
-import InboxIcon from '#/assets/inbox.svg'
 import { Button } from '#/components/Button'
 import { Popover } from '#/components/Dialog'
+import { Icon } from '#/components/Icon'
 import { Result } from '#/components/Result'
 import { StatusBadge } from '#/components/StatusBadge'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import { DialogTrigger, GridList, GridListItem } from '#/components/aria'
 import { useText } from '$/providers/react'
@@ -41,7 +40,7 @@ export function NotificationTray() {
         aria-label={getText('notifications')}
         icon={
           <StatusBadge color="danger" hidden={!hasUnreadNotifications}>
-            <SvgMask className="size-4" src={InboxIcon} />
+            <Icon icon="inbox" className="size-4" />
           </StatusBadge>
         }
       />

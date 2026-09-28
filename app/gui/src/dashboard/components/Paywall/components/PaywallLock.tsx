@@ -1,6 +1,5 @@
 /** @file A lock icon with a label indicating the paywall level required to access a feature. */
-import LockIcon from '#/assets/lock.svg'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 import { getFeatureConfiguration, type PaywallFeatureName } from '$/composables/paywall'
 import { useText } from '$/providers/react'
@@ -22,7 +21,7 @@ export function PaywallLock(props: PaywallLockProps) {
 
   return (
     <div className={tw.twMerge('flex w-full items-center gap-1', className)}>
-      <SvgMask src={LockIcon} className="-mt-0.5 h-4 w-4" />
+      <Icon icon="lock" className="-mt-0.5 h-4 w-4" />
       <Text variant="subtitle">{getText('paywallAvailabilityLevel', levelLabel)}</Text>
     </div>
   )

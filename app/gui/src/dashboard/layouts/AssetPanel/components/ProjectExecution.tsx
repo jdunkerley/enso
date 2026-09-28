@@ -1,6 +1,4 @@
 /** @file Displays information describing a specific version of an asset. */
-import LogsIcon from '#/assets/logs.svg'
-import RepeatIcon from '#/assets/repeat.svg'
 import { Button } from '#/components/Button'
 import { IconDisplay } from '#/components/IconDisplay'
 import { Menu } from '#/components/Menu'
@@ -191,7 +189,7 @@ export function ProjectExecution(props: ProjectExecutionProps) {
         >
           {session && (
             <Button
-              icon={LogsIcon}
+              icon="log"
               onPress={() => {
                 container.openProjectLogTab(session.projectSessionId, item.title)
               }}
@@ -206,7 +204,7 @@ export function ProjectExecution(props: ProjectExecutionProps) {
 
             <Menu>
               <Menu.Item
-                icon="trash2"
+                icon="trash"
                 onAction={() => {
                   setModal(
                     <ConfirmDeleteModal
@@ -243,7 +241,7 @@ export function ProjectExecution(props: ProjectExecutionProps) {
           )}
           <IconDisplay
             variant="outline"
-            icon={RepeatIcon}
+            icon="repeat"
             tooltip={repeatIntervalLabel}
             tooltipPlacement="left"
             className={styles.info()}

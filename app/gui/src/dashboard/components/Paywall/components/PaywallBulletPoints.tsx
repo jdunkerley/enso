@@ -1,6 +1,5 @@
 /** @file A list of bullet points for a paywall. */
-import Check from '#/assets/check_mark.svg'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 import { twMerge } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
@@ -31,7 +30,7 @@ export function PaywallBulletPoints(props: PaywallBulletPointsProps) {
             <div className="m-0 flex">
               <div className="m-0 flex">
                 <span className="mt-1 flex aspect-square h-4 flex-none place-items-center justify-center rounded-full bg-green/30">
-                  <SvgMask src={Check} className="text-green" />
+                  <Icon icon="check" size="small" className="text-green" />
                 </span>
               </div>
             </div>

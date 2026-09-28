@@ -1,6 +1,4 @@
 /** @file A button that copies text to the clipboard. */
-import Error from '#/assets/cross.svg'
-import Done from '#/assets/tick.svg'
 import type { SvgUseIcon } from '#/components/types'
 import { useCopy } from '#/hooks/copyHooks'
 import { useText } from '$/providers/react'
@@ -36,8 +34,8 @@ export function CopyButton<IconType extends string>(props: CopyButtonProps<IconT
   const {
     variant = 'icon',
     copyIcon = 'duplicate',
-    successIcon = Done,
-    errorIcon = Error,
+    successIcon = 'check',
+    errorIcon = 'close',
     copyText,
     onCopy,
     ...buttonProps

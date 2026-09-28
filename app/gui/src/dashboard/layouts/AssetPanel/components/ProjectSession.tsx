@@ -1,5 +1,4 @@
 /** @file Displays information describing a specific version of an asset. */
-import LogsIcon from '#/assets/logs.svg'
 import { Button } from '#/components/Button'
 import { useText } from '$/providers/react'
 import { useContainerData } from '$/providers/react/container'
@@ -37,7 +36,7 @@ export function ProjectSession(props: ProjectSessionProps) {
         <Button
           variant="icon"
           isActive
-          icon={LogsIcon}
+          icon="log"
           aria-label={getText('showLogs')}
           onPress={() => {
             container.openProjectLogTab(projectSession.projectSessionId, project.title)

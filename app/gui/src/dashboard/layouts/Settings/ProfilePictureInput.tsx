@@ -1,5 +1,4 @@
 /** @file The input for viewing and changing the user's profile picture. */
-import DefaultUserIcon from '#/assets/default_user.svg'
 import * as aria from '#/components/aria'
 import { Form } from '#/components/Form'
 import { HiddenFile } from '#/components/Inputs/HiddenFile'
@@ -47,7 +46,7 @@ export default function ProfilePictureInput(props: ProfilePictureInputProps) {
           )}
 
           <ProfilePicture
-            picture={user?.profilePicture ?? DefaultUserIcon}
+            picture={user?.profilePicture}
             name={user?.name ?? ''}
             size="large"
             className="pointer-events-none h-full w-full"

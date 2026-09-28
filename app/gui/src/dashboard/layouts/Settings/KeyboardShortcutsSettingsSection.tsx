@@ -1,8 +1,4 @@
 /** @file Settings tab for viewing and editing keyboard shortcuts. */
-import BlankIcon from '#/assets/blank.svg'
-import CrossIcon from '#/assets/cross.svg'
-import Plus2Icon from '#/assets/plus2.svg'
-import ReloadIcon from '#/assets/reload.svg'
 import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { Icon } from '#/components/Icon'
@@ -81,7 +77,7 @@ export default function KeyboardShortcutsSettingsSection() {
                     className="flex h-row items-center rounded-l-full bg-clip-padding pl-cell-x pr-1.5"
                     style={{ color: info.color }}
                   >
-                    <Icon icon={info.icon ?? BlankIcon} className="size-4" />
+                    <Icon icon={info.icon ?? <span />} className="size-4" />
                   </td>
                   <td className="border-l-2 border-r-2 border-transparent bg-clip-padding px-cell-x">
                     {name}
@@ -99,7 +95,7 @@ export default function KeyboardShortcutsSettingsSection() {
                             size="medium"
                             aria-label={getText('removeShortcut')}
                             tooltipPlacement="top left"
-                            icon={CrossIcon}
+                            icon="close"
                             showIconOnHover
                             onPress={() => {
                               inputBindings.delete(action, binding)
@@ -116,7 +112,7 @@ export default function KeyboardShortcutsSettingsSection() {
                             size="medium"
                             aria-label={getText('addShortcut')}
                             tooltipPlacement="top left"
-                            icon={Plus2Icon}
+                            icon="add"
                             showIconOnHover
                           />
                           <CaptureKeyboardShortcutModal
@@ -133,7 +129,7 @@ export default function KeyboardShortcutsSettingsSection() {
                           size="medium"
                           aria-label={getText('resetShortcut')}
                           tooltipPlacement="top left"
-                          icon={ReloadIcon}
+                          icon="refresh"
                           showIconOnHover
                           onPress={() => {
                             inputBindings.reset(action)

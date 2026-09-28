@@ -1,5 +1,6 @@
 /** @file A styled button representing a tab on a sidebar. */
 import { Button, type ButtonProps } from '#/components/Button'
+import type { SvgUseIcon } from '#/components/types'
 import { tv } from '#/utilities/tailwindVariants'
 
 const SIDEBAR_TAB_BUTTON_STYLES = tv({
@@ -16,7 +17,7 @@ export interface SidebarTabButtonProps {
   readonly autoFocus?: boolean
   /** When `true`, the button is not faded out even when not hovered. */
   readonly isActive?: boolean
-  readonly icon: string
+  readonly icon: SvgUseIcon
   readonly label: string
   readonly onPress: ButtonProps<string>['onPress']
 }

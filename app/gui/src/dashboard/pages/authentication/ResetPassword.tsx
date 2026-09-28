@@ -2,8 +2,6 @@
  * @file Container responsible for rendering and interactions in second half of forgot password
  * flow.
  */
-import GoBackIcon from '#/assets/go_back.svg'
-import LockIcon from '#/assets/lock.svg'
 import { Button } from '#/components/Button'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
@@ -90,7 +88,7 @@ export default function ResetPassword() {
       footer={
         <Link
           to={`${LOGIN_PATH}?${new URLSearchParams({ email: defaultEmail ?? '' }).toString()}`}
-          icon={GoBackIcon}
+          icon="navigate_back"
           text={getText('goBackToLogin')}
         />
       }
@@ -141,7 +139,7 @@ export default function ResetPassword() {
             name="newPassword"
             label={getText('newPasswordLabel')}
             autoComplete="new-password"
-            icon={LockIcon}
+            icon="lock"
             placeholder={getText('newPasswordPlaceholder')}
             description={getText('passwordValidationMessage')}
           />
@@ -152,7 +150,7 @@ export default function ResetPassword() {
             name="confirmNewPassword"
             label={getText('confirmNewPasswordLabel')}
             autoComplete="new-password"
-            icon={LockIcon}
+            icon="lock"
             placeholder={getText('confirmNewPasswordPlaceholder')}
           />
 

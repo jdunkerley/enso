@@ -3,8 +3,9 @@ import * as React from 'react'
 import * as toastify from 'react-toastify'
 
 import * as aria from '#/components/aria'
+import { Icon } from '#/components/Icon'
 import FocusRing from '#/components/styled/FocusRing'
-import SvgMask from '#/components/SvgMask'
+import type { SvgUseIcon } from '#/components/types'
 import { mergeRefs } from '#/utilities/mergeRefs'
 import { useText } from '$/providers/react'
 
@@ -13,7 +14,7 @@ export interface LinkProps {
   readonly onPress?: () => void
   readonly openInBrowser?: boolean
   readonly to: string
-  readonly icon: string
+  readonly icon: SvgUseIcon
   readonly text: string
 }
 
@@ -42,7 +43,7 @@ function Link(props: LinkProps, ref: React.ForwardedRef<HTMLAnchorElement>) {
           onPress?.()
         }}
       >
-        <SvgMask src={icon} />
+        <Icon icon={icon} />
         {text}
       </aria.Link>
     </FocusRing>

@@ -1,6 +1,4 @@
 /** @file A text `<span>` which turns into an `input` when desired. */
-import CrossIcon from '#/assets/cross.svg'
-import TickIcon from '#/assets/tick.svg'
 import { useInteractOutside } from '#/components/aria'
 import { Button } from '#/components/Button'
 import { Form } from '#/components/Form'
@@ -136,7 +134,7 @@ function EditForm(props: EditFormProps) {
               <Form.Submit
                 size="medium"
                 variant="icon"
-                icon={TickIcon}
+                icon="check"
                 aria-label={getText('confirmEdit')}
                 children={null}
               />
@@ -145,7 +143,7 @@ function EditForm(props: EditFormProps) {
             <Button
               size="medium"
               variant="icon"
-              icon={CrossIcon}
+              icon="close"
               aria-label={getText('cancelEdit')}
               onPress={onCancel}
               children={null}

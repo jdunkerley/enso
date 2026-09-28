@@ -1,5 +1,4 @@
 /** @file A styled button that shows that a feature is behind a paywall. */
-import PaywallBlocked from '#/assets/lock.svg'
 import { Button, type ButtonProps } from '#/components/Button'
 import { getFeatureConfiguration, type PaywallFeatureName } from '$/composables/paywall'
 import { useText } from '$/providers/react'
@@ -30,7 +29,7 @@ export function PaywallButton<IconType extends string>(
     <Button
       variant="primary"
       size="medium"
-      icon={showIcon ? PaywallBlocked : null}
+      icon={showIcon ? 'lock' : null}
       iconPosition="end"
       tooltip={getText('paywallScreenDescription', levelLabel)}
       /* This is safe because we are passing all props to the button */

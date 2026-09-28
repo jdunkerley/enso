@@ -1,8 +1,6 @@
 /** @file A calendar showing executions of a project. */
 import { useState } from 'react'
 
-import CalendarIcon from '#/assets/calendar_repeat_outline.svg'
-import ArrowIcon from '#/assets/folder_arrow.svg'
 import {
   Calendar,
   CalendarCell,
@@ -196,9 +194,9 @@ function ProjectExecutionsCalendarInternal(props: ProjectExecutionsCalendarInter
             {...renderProps.field}
           >
             <header className={styles.calendarHeader()}>
-              <Button variant="icon" slot="previous" icon={ArrowIcon} className="rotate-180" />
+              <Button variant="icon" slot="previous" icon="chevron_right" className="rotate-180" />
               <Heading className={styles.calendarHeading()} />
-              <Button variant="icon" slot="next" icon={ArrowIcon} />
+              <Button variant="icon" slot="next" icon="chevron_right" />
             </header>
             <CalendarGrid className={styles.calendarGrid()}>
               <CalendarGridHeader className={styles.calendarGridHeader()}>
@@ -233,7 +231,7 @@ function ProjectExecutionsCalendarInternal(props: ProjectExecutionsCalendarInter
                             size="xxsmall"
                             variant="custom"
                             className="disabled:cursor-unset disabled:opacity-100"
-                            icon={CalendarIcon}
+                            icon="schedule"
                           >
                             {todaysExecutions.length}
                           </Button>

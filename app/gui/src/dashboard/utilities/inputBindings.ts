@@ -75,7 +75,7 @@ export interface KeybindsWithMetadata<Category extends string> {
   readonly bindings: readonly [] | readonly string[]
   readonly category: Category
   readonly description?: string
-  readonly icon?: string
+  readonly icon?: Icon
   readonly color?: string
   /** Defaults to `true`. */
   readonly rebindable?: boolean

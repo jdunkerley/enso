@@ -1,5 +1,4 @@
 /** @file A date picker. */
-import CrossIcon from '#/assets/cross.svg'
 import {
   TimeField as AriaTimeField,
   DateInput,
@@ -185,7 +184,7 @@ function TimeFieldResetButton(props: TimeFieldResetButtonProps) {
       slot={null}
       variant="icon"
       aria-label={getText('reset')}
-      icon={CrossIcon}
+      icon="close"
       className={className ?? ''}
       onPress={() => {
         state?.setValue(null)

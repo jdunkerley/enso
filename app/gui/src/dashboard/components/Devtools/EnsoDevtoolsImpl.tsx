@@ -1,5 +1,4 @@
 /** @file A list of toggles for paywall features. */
-import CrossIcon from '#/assets/cross.svg'
 import { Button, CopyButton, type ButtonProps } from '#/components/Button'
 import { Dialog, Popover, POPOVER_STYLES } from '#/components/Dialog'
 import { Form } from '#/components/Form'
@@ -54,7 +53,7 @@ function DeveloperOverrideEntry(props: DeveloperOverrideEntryProps) {
     <div className="flex items-center gap-2">
       <Button
         variant="icon"
-        icon={CrossIcon}
+        icon="close"
         aria-label={getText('reset')}
         tooltipPlacement="right"
         onPress={reset}
@@ -649,7 +648,7 @@ export function EnsoDevtools() {
                   <Button
                     isDisabled={localStorageState[key] == null}
                     aria-label={getText('delete')}
-                    icon={CrossIcon}
+                    icon="close"
                     onPress={() => {
                       localStorage.delete(key)
                     }}

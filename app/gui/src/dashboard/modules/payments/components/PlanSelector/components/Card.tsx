@@ -1,9 +1,7 @@
 /** @file A card representing a plan. */
-import Check from '#/assets/check_mark.svg'
-import OpenInNewTabIcon from '#/assets/open.svg'
 import { Button } from '#/components/Button'
+import { Icon } from '#/components/Icon'
 import { Separator } from '#/components/Separator'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import type { SubscribeButtonProps } from '#/modules/payments/components/PlanSelector/components/SubscribeButton'
 import { SubscribeButton } from '#/modules/payments/components/PlanSelector/components/SubscribeButton'
@@ -199,7 +197,7 @@ export function Card(props: CardProps) {
             {features.map((feature, index) => (
               <li key={index} className="flex items-center gap-1">
                 <span className="-mb-[1px] flex h-4 w-4 flex-none place-items-center rounded-full bg-green/30">
-                  <SvgMask src={Check} className="text-green" />
+                  <Icon icon="check" size="small" className="text-green" />
                 </span>
 
                 <Text variant="body" weight="medium" disableLineHeightCompensation>
@@ -217,7 +215,7 @@ export function Card(props: CardProps) {
             variant="link"
             href={`${$config.HOST}/pricing`}
             target="_blank"
-            icon={OpenInNewTabIcon}
+            icon="open"
             iconPosition="end"
             size="medium"
           >

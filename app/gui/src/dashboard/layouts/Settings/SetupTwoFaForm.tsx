@@ -3,8 +3,6 @@
  *
  * 2FA Setup Settings Section. Allows users to setup, disable, and change their 2FA method.
  */
-import ShieldCheck from '#/assets/shield_check.svg'
-import ShieldCrossed from '#/assets/shield_crossed.svg'
 import { Alert } from '#/components/Alert'
 import { Button } from '#/components/Button'
 import { CopyBlock } from '#/components/CopyBlock'
@@ -51,7 +49,7 @@ export function SetupTwoFaForm() {
   if (MFAEnabled) {
     return (
       <div className="flex w-full flex-col gap-4">
-        <Alert variant="neutral" icon={ShieldCheck}>
+        <Alert variant="neutral" icon="shield_check">
           <Text.Group>
             <Text variant="subtitle" weight="bold">
               {getText('2FAEnabled')}
@@ -70,7 +68,7 @@ export function SetupTwoFaForm() {
           </Text>
 
           <Dialog.Trigger>
-            <Button variant="delete" className="self-start" icon={ShieldCrossed}>
+            <Button variant="delete" className="self-start" icon="shield_crossed">
               {getText('disable2FA')}
             </Button>
 
@@ -168,7 +166,7 @@ function TwoFa() {
           {(display) =>
             display === 'QR' && (
               <>
-                <Alert key="alert" variant="neutral" icon={ShieldCheck}>
+                <Alert key="alert" variant="neutral" icon="shield_check">
                   <Text.Group>
                     <Text variant="subtitle" weight="bold">
                       {getText('scanQR')}
@@ -196,7 +194,7 @@ function TwoFa() {
           {(display) =>
             display === 'Text' && (
               <>
-                <Alert key="alert" variant="neutral" icon={ShieldCheck}>
+                <Alert key="alert" variant="neutral" icon="shield_check">
                   <Text.Group>
                     <Text variant="subtitle" weight="bold">
                       {getText('copyLink')}

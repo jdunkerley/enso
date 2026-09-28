@@ -1,6 +1,4 @@
 /** @file Check the version. */
-import NewTabIcon from '#/assets/new_tab.svg'
-import SnoozeIcon from '#/assets/snooze.svg'
 import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { Stepper } from '#/components/Stepper'
@@ -177,7 +175,7 @@ export default function VersionChecker() {
                     variant="link"
                     href={htmlUrl}
                     target="_blank"
-                    icon={NewTabIcon}
+                    icon="open"
                     iconPosition="end"
                   >
                     {getText('changeLog')}
@@ -198,7 +196,7 @@ export default function VersionChecker() {
                   variant="outline"
                   fullWidth
                   onPress={remindLater}
-                  icon={SnoozeIcon}
+                  icon="time"
                   iconPosition="end"
                 >
                   {getText('remindMeLater')}

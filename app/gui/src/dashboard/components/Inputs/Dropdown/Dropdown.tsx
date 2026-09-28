@@ -1,8 +1,6 @@
 /** @file A styled dropdown. */
 import { forwardRef, useEffect, useRef, useState, type ForwardedRef, type ReactNode } from 'react'
 
-import CheckMarkIcon from '#/assets/check_mark.svg'
-import ArrowIcon from '#/assets/folder_arrow.svg'
 import {
   FieldError,
   ListBox,
@@ -12,8 +10,8 @@ import {
   useFocusWithin,
   type InputProps,
 } from '#/components/aria'
+import { Icon } from '#/components/Icon'
 import FocusRing from '#/components/styled/FocusRing'
-import SvgMask from '#/components/SvgMask'
 import { useSyncRef } from '#/hooks/syncRefHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
 import { tv, type VariantProps } from '#/utilities/tailwindVariants'
@@ -284,8 +282,8 @@ export const Dropdown = forwardRef(function DropdownImpl<T>(
                     textValue={typeof item === 'string' ? item : `${i}`}
                     className={styles.optionsItem()}
                   >
-                    <SvgMask
-                      src={CheckMarkIcon}
+                    <Icon
+                      icon="check"
                       className={styles.icon({
                         className: selectedIndices.includes(i) ? '' : 'invisible',
                       })}
@@ -298,7 +296,7 @@ export const Dropdown = forwardRef(function DropdownImpl<T>(
           </div>
         </div>
         <div className={styles.input()}>
-          <SvgMask src={ArrowIcon} className={styles.dropdownArrow()} />
+          <Icon icon="chevron_right" className={styles.dropdownArrow()} />
           <div className={styles.inputDisplay()}>
             {isMouseFocused && !multiple ?
               '\u00a0'
@@ -313,7 +311,7 @@ export const Dropdown = forwardRef(function DropdownImpl<T>(
         <div className={styles.hiddenOptions()}>
           {items.map((item, i) => (
             <div key={i} className={styles.hiddenOption()}>
-              <SvgMask src={CheckMarkIcon} />
+              <Icon icon="check" />
               <Child item={item} />
             </div>
           ))}

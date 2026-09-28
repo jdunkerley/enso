@@ -1,11 +1,9 @@
 /** @file Catches errors in child components. */
-import Offline from '#/assets/offline_filled.svg'
 import { Alert } from '#/components/Alert'
 import { Button, ButtonGroup } from '#/components/Button'
 import { Icon } from '#/components/Icon'
 import { Result, type ResultProps } from '#/components/Result'
 import { Separator } from '#/components/Separator'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import type { SvgUseIcon } from '#/components/types'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
@@ -139,7 +137,7 @@ export function ErrorDisplay(props: ErrorDisplayProps): React.JSX.Element {
     subtitle ??
     (isOfflineError ? getText('offlineErrorMessage') : getText('arbitraryErrorSubtitle'))
   const finalStatus =
-    status ?? (isOfflineError ? <SvgMask src={Offline} className="aspect-square w-6" /> : 'error')
+    status ?? (isOfflineError ? <Icon icon="cloud_offline" className="mx-1" /> : 'error')
 
   const defaultRender = (
     <Result

@@ -95,6 +95,12 @@
   workflow saved by an earlier version, a few components (those that parse text,
   for one) may show a default icon while the workflow loads, until they are
   computed again.
+- [The dashboard's icons now match the rest of the IDE][NNN]. The project
+  browser, settings, sign-in pages and menus draw their icons from the same set
+  as the graph editor, so an action shows the same icon wherever it appears: the
+  close, check and lock icons, the chevrons in menus and dropdowns, and the run
+  and stop buttons on projects all match. The offline, notifications,
+  two-factor, repeat and keyboard-key icons have been redrawn in the same style.
 
 #### Enso Language & Runtime
 

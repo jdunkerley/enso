@@ -1,7 +1,4 @@
 /** @file Registration container responsible for rendering and interactions in sign up flow. */
-import AtIcon from '#/assets/at.svg'
-import GoBackIcon from '#/assets/go_back.svg'
-import LockIcon from '#/assets/lock.svg'
 import { Alert } from '#/components/Alert'
 import { Button } from '#/components/Button'
 import { Checkbox } from '#/components/Checkbox'
@@ -117,7 +114,7 @@ export default function Registration(props: RegistrationProps) {
           {(email) => (
             <Link
               to={LOGIN_PATH + `?${new URLSearchParams({ email }).toString()}`}
-              icon={GoBackIcon}
+              icon="navigate_back"
               text={getText('alreadyHaveAnAccount')}
             />
           )}
@@ -144,7 +141,7 @@ export default function Registration(props: RegistrationProps) {
                       label={getText('emailLabel')}
                       type="email"
                       autoComplete="email"
-                      icon={AtIcon}
+                      icon="at"
                       placeholder={getText('emailPlaceholder')}
                     />
 
@@ -155,7 +152,7 @@ export default function Registration(props: RegistrationProps) {
                       name="password"
                       label={getText('passwordLabel')}
                       autoComplete="new-password"
-                      icon={LockIcon}
+                      icon="lock"
                       placeholder={getText('passwordPlaceholder')}
                       description={getText('passwordValidationMessage')}
                     />
@@ -167,7 +164,7 @@ export default function Registration(props: RegistrationProps) {
                       name="confirmPassword"
                       label={getText('confirmPasswordLabel')}
                       autoComplete="new-password"
-                      icon={LockIcon}
+                      icon="lock"
                       placeholder={getText('confirmPasswordPlaceholder')}
                     />
 

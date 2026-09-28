@@ -1,10 +1,5 @@
 /** @file A visual representation of a keyboard shortcut. */
-import CommandKeyIcon from '#/assets/command_key.svg'
-import CtrlKeyIcon from '#/assets/ctrl_key.svg'
-import OptionKeyIcon from '#/assets/option_key.svg'
-import ShiftKeyIcon from '#/assets/shift_key.svg'
-import WindowsKeyIcon from '#/assets/windows_key.svg'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 import type { DashboardBindingKey } from '#/configurations/inputBindings'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
@@ -17,10 +12,8 @@ import type * as text from 'enso-common/src/text'
 import * as detect from 'enso-common/src/utilities/detect'
 import * as React from 'react'
 
-/** The size (both width and height) of key icons. */
-const ICON_SIZE_PX = '1.5cap'
-
-const ICON_STYLE = { width: ICON_SIZE_PX, height: ICON_SIZE_PX, marginTop: '0.1cap' }
+/** The size (both width and height) and offset of key icons. */
+const ICON_CLASS_NAME = 'h-[1.5cap] w-[1.5cap] mt-[0.1cap]'
 
 /** Props for values of {@link MODIFIER_JSX}. */
 interface InternalModifierProps {
@@ -37,13 +30,13 @@ const MODIFIER_JSX: Readonly<
   // The names are intentionally not in `camelCase`, as they are case-sensitive.
   /* eslint-disable @typescript-eslint/naming-convention */
   [detect.Platform.macOS]: {
-    Meta: () => <SvgMask style={ICON_STYLE} key="Meta" src={CommandKeyIcon} />,
-    Shift: () => <SvgMask style={ICON_STYLE} key="Shift" src={ShiftKeyIcon} />,
-    Alt: () => <SvgMask style={ICON_STYLE} key="Alt" src={OptionKeyIcon} />,
-    Ctrl: () => <SvgMask style={ICON_STYLE} key="Ctrl" src={CtrlKeyIcon} />,
+    Meta: () => <Icon className={ICON_CLASS_NAME} key="Meta" icon="keyboard_command" />,
+    Shift: () => <Icon className={ICON_CLASS_NAME} key="Shift" icon="keyboard_shift" />,
+    Alt: () => <Icon className={ICON_CLASS_NAME} key="Alt" icon="keyboard_option" />,
+    Ctrl: () => <Icon className={ICON_CLASS_NAME} key="Ctrl" icon="chevron_up" />,
   },
   [detect.Platform.windows]: {
-    Meta: () => <SvgMask style={ICON_STYLE} key="Meta" src={WindowsKeyIcon} />,
+    Meta: () => <Icon className={ICON_CLASS_NAME} key="Meta" icon="keyboard_windows" />,
   },
   [detect.Platform.linux]: {
     Meta: (props) => (

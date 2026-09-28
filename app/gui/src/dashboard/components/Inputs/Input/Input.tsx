@@ -9,9 +9,9 @@ import {
   type FieldVariantProps,
   type TSchema,
 } from '#/components/Form'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
-import type { TestIdProps } from '#/components/types'
+import type { SvgUseIcon, TestIdProps } from '#/components/types'
 import { useAutoFocus } from '#/hooks/autoFocusHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
 import type { ExtractFunction, VariantProps } from '#/utilities/tailwindVariants'
@@ -55,7 +55,7 @@ export interface InputProps<
   readonly addonEnd?: ReactNode
   readonly placeholder?: string | undefined
   /** The icon to display in the input. */
-  readonly icon?: ReactElement | string | null
+  readonly icon?: ReactElement | SvgUseIcon | null
   readonly variants?: ExtractFunction<typeof INPUT_STYLES> | undefined
   readonly fieldVariants?: FieldComponentProps<Schema>['variants']
   readonly fieldClassName?: string | undefined
@@ -186,7 +186,7 @@ export interface BasicInputProps
   readonly addonEnd?: ReactNode | undefined
   readonly placeholder?: string | undefined
   /** The icon to display in the input. */
-  readonly icon?: ReactElement | string | null | undefined
+  readonly icon?: ReactElement | SvgUseIcon | null | undefined
   readonly isInvalid?: boolean | undefined
   readonly isDisabled?: boolean | undefined
   readonly variants?: ExtractFunction<typeof INPUT_STYLES> | undefined
@@ -259,7 +259,7 @@ export const BasicInput = forwardRef(function BasicInputImpl(
         )}
 
         {icon != null &&
-          (typeof icon === 'string' ? <SvgMask src={icon} className={classes.icon()} /> : icon)}
+          (typeof icon === 'string' ? <Icon icon={icon} className={classes.icon()} /> : icon)}
 
         <div className={classes.inputContainer()}>
           <aria.Input
