@@ -1,5 +1,4 @@
 /** @file Table displaying a list of projects. */
-import DropFilesImage from '#/assets/drop_files.svg'
 import { FileTrigger, mergeProps } from '#/components/aria'
 import { Button } from '#/components/Button'
 import type { ContextMenuApi } from '#/components/ContextMenu'
@@ -140,6 +139,56 @@ LocalStorage.registerKey('enabledColumns', {
  * Tailwind styling.
  */
 const ROW_HEIGHT_PX = 36
+
+/**
+ * The picture in the empty drop zone. It is drawn inline in `currentColor` rather than taken from
+ * the icon sprite, because it is a 186px illustration, not a 16px icon.
+ */
+const DROP_FILES_IMAGE = (
+  <svg width="186" height="186" viewBox="0 0 186 186" fill="none" aria-hidden>
+    <path
+      d="M35.857 96.4941C35.2422 92.8346 38.0633 89.5 41.7741 89.5H144.226C147.937 89.5 150.758 92.8346 150.143 96.4941L141.995 144.994C141.51 147.884 139.008 150 136.078 150H49.9221C46.992 150 44.4905 147.884 44.005 144.994L35.857 96.4941Z"
+      fill="currentColor"
+      fillOpacity="0.3"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M53 35C53 33.8954 53.8954 33 55 33H120.086L133 45.9142V61V89.5H53V35Z"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M44 59C44 55.6863 46.6863 53 50 53H53V89.5H44V59Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M142 67C142 63.6863 139.314 61 136 61H133V89H142V67Z"
+      fill="currentColor"
+      fillOpacity="0.8"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path d="M93 111V127M85 119H101" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path
+      d="M93 43.5V73.5M93 73.5L103.5 63.5M93 73.5L82.5 63.5"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    />
+    <circle
+      cx="93"
+      cy="93"
+      r="92"
+      stroke="currentColor"
+      strokeOpacity="0.5"
+      strokeWidth="2"
+      strokeDasharray="4 4"
+    />
+  </svg>
+)
 
 /** Information related to a drag selection. */
 interface DragSelectionInfo {
@@ -1194,7 +1243,7 @@ function AssetsTable(props: AssetsTableProps) {
             <Button
               size="custom"
               variant="custom"
-              icon={DropFilesImage}
+              icon={DROP_FILES_IMAGE}
               className="rounded-2xl"
               contentClassName="h-[186px] flex flex-col items-center gap-3 text-primary/30 transition-colors duration-200 hover:text-primary/50"
             >

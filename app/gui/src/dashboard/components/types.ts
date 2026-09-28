@@ -10,29 +10,20 @@ export interface TestIdProps {
   readonly testId?: string | undefined
 }
 
-/** Any icon. */
-export type IconProp<Icon extends string = string, Render = never> =
-  IconPropSvgUse<Render> | LegacyIconProp<Icon, Render>
-
-/** The possible return values for a legacy icon. */
-export type LegacyAvailableIconReturn<Icon extends string> =
-  LegacyIcon<Icon> | ReactElement | false | null | undefined
-
-/** The possible return values for a legacy icon. */
-export type AvailableIconReturn = ReactElement | SvgUseIcon | false | null | undefined
-
 /**
- * Any legacy icon.
- * @deprecated Prefer defined keys over importing from `#/assets/*.svg`.
+ * Any icon: an `icons.svg` name or an element.
+ *
+ * `_Icon` is vestigial: it used to widen the prop to the URLs of standalone SVG files, and is
+ * kept only so that the components which thread it through (`ButtonProps<IconType>`, ...) need no
+ * change.
  */
-export type LegacyIconProp<Icon extends string, Render> =
-  LegacyAvailableIconReturn<Icon> | ((render: Render) => LegacyAvailableIconReturn<Icon>)
+export type IconProp<_Icon extends string = string, Render = never> = IconPropSvgUse<Render>
+
+/** The possible return values for an icon. */
+export type AvailableIconReturn = ReactElement | SvgUseIcon | false | null | undefined
 
 /** Generic type for imported from figma icons. */
 export type IconPropSvgUse<Render> = AvailableIconReturn | ((render: Render) => AvailableIconReturn)
-
-/** @deprecated */
-export type LegacyIcon<T extends string> = Exclude<T, PossibleIcon> & {}
 
 /** Any icon imported from Figma. */
 export type SvgUseIcon = PossibleIcon

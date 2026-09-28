@@ -1,7 +1,7 @@
 /** @file Step component. */
-import DoneIcon from '#/assets/check_mark.svg'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
+import type { SvgUseIcon } from '#/components/types'
 import { tv } from '#/utilities/tailwindVariants'
 import * as React from 'react'
 import type { RenderStepProps } from './types'
@@ -12,8 +12,8 @@ type StepProp<T> = T | ((props: RenderStepProps) => T)
 /** Props for {@link Step} component. */
 export interface StepProps extends RenderStepProps {
   readonly className?: StepProp<string | null | undefined>
-  readonly icon?: StepProp<React.ReactElement | string | null | undefined>
-  readonly completeIcon?: StepProp<React.ReactElement | string | null | undefined>
+  readonly icon?: StepProp<React.ReactElement | SvgUseIcon | null | undefined>
+  readonly completeIcon?: StepProp<React.ReactElement | SvgUseIcon | null | undefined>
   readonly title?: StepProp<React.ReactElement | string | null | undefined>
   readonly description?: StepProp<React.ReactElement | string | null | undefined>
   readonly children?: StepProp<React.ReactNode>
@@ -63,7 +63,7 @@ export function Step(props: StepProps) {
         {index + 1}
       </Text>
     ),
-    completeIcon = DoneIcon,
+    completeIcon = 'check',
   } = props
 
   const renderStepProps = {
@@ -109,7 +109,7 @@ export function Step(props: StepProps) {
           if (renderIconElement == null) {
             return null
           } else if (typeof renderIconElement === 'string') {
-            return <SvgMask src={renderIconElement} />
+            return <Icon icon={renderIconElement} />
           } else {
             return renderIconElement
           }

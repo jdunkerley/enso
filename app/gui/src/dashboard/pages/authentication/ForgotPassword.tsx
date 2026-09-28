@@ -2,8 +2,6 @@
  * @file Container responsible for rendering and interactions in first half of forgot password
  * flow.
  */
-import AtIcon from '#/assets/at.svg'
-import GoBackIcon from '#/assets/go_back.svg'
 import { Button } from '#/components/Button'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
@@ -36,7 +34,7 @@ export default function ForgotPassword() {
       footer={
         <Link
           to={`${LOGIN_PATH}?${new URLSearchParams({ email: emailInput }).toString()}`}
-          icon={GoBackIcon}
+          icon="navigate_back"
           text={getText('goBackToLogin')}
         />
       }
@@ -67,7 +65,7 @@ export default function ForgotPassword() {
         label={getText('emailLabel')}
         type="email"
         autoComplete="email"
-        icon={AtIcon}
+        icon="at"
         placeholder={getText('emailPlaceholder')}
         defaultValue={initialEmail ?? undefined}
         onChange={(event) => {

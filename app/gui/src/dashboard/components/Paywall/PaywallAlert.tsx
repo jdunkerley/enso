@@ -1,8 +1,7 @@
 /** @file A paywall alert. */
-import LockIcon from '#/assets/lock.svg'
 import { Alert, type AlertProps } from '#/components/Alert'
+import { Icon } from '#/components/Icon'
 import * as paywall from '#/components/Paywall'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import type { PaywallFeatureName } from '$/composables/paywall'
 import * as React from 'react'
@@ -38,7 +37,7 @@ export function PaywallAlert<IconType extends string>(
       {...alertProps}
     >
       <div className="flex items-center gap-2">
-        <SvgMask src={LockIcon} className="h-5 w-5 flex-none text-primary" />
+        <Icon icon="lock" className="h-5 w-5 flex-none text-primary" />
 
         <Text>
           {label}{' '}

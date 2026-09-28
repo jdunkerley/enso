@@ -1,12 +1,10 @@
 /** @file An item within a menu that represents a single action or option. */
-import ArrowRight from '#/assets/expand_arrow_right.svg'
 import { tv, type VariantProps } from '#/utilities/tailwindVariants'
 import { memo, type ReactElement, type ReactNode } from 'react'
 import type { MenuItemProps as AriaMenuItemProps, MenuItemRenderProps } from 'react-aria-components'
 import { MenuItem as AriaMenuItem, Keyboard } from 'react-aria-components'
 import { Check } from '../Check'
 import { Icon } from '../Icon'
-import SvgMask from '../SvgMask'
 import { Text, TEXT_STYLE } from '../Text'
 import type { IconProp, TestIdProps } from '../types'
 
@@ -197,7 +195,7 @@ const SubmenuIndicator = memo(function SubmenuIndicatorImpl(props: {
 
   if (!hasSubmenu) return null
 
-  return <SvgMask src={ArrowRight} className={className} />
+  return <Icon icon="chevron_right" className={className} />
 })
 
 /**

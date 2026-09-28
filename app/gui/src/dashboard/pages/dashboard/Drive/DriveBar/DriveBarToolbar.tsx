@@ -2,7 +2,6 @@
  * @file Header menubar for the directory listing, containing information about
  * the current directory and some configuration options.
  */
-import Plus2Icon from '#/assets/plus2.svg'
 import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { ErrorBoundary, InlineErrorDisplay } from '#/components/ErrorBoundary'
@@ -210,7 +209,7 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
             buttonVariants={{ isDisabled: shouldBeDisabled }}
             {...createAssetsVisualTooltip.targetProps}
           >
-            <Button variant="accent" icon={Plus2Icon} loaderPosition="icon" onPress={newProject}>
+            <Button variant="accent" icon="add" loaderPosition="icon" onPress={newProject}>
               {getText('newEmptyProject')}
             </Button>
 

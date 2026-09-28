@@ -19,6 +19,7 @@ import * as aria from '#/components/aria'
 import { Icon as IconComponent } from '#/components/Icon'
 import { StatelessSpinner } from '#/components/StatelessSpinner'
 import { Tooltip, TooltipTrigger } from '#/components/Tooltip'
+import type { SvgUseIcon } from '#/components/types'
 import { useVisualTooltip } from '#/components/VisualTooltip'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { isExternalLink } from '#/utilities/url'
@@ -43,7 +44,6 @@ export const Button = Object.assign(
       propsReplacement: ButtonProps<IconType>,
       refReplacement: ForwardedRef<HTMLButtonElement>,
     ) {
-      // @ts-expect-error ts errors are expected here because we are merging props with different types
       // eslint-disable-next-line prefer-const
       let [props, ref] = useContextProps(propsReplacement, refReplacement, ButtonContext)
       props = useMergedButtonStyles(props)
@@ -304,7 +304,7 @@ interface ButtonContentProps {
   readonly isIconOnly: boolean
   readonly isLoading: boolean
   readonly loaderPosition: 'full' | 'icon'
-  readonly icon: ReactElement | string | null | undefined
+  readonly icon: ReactElement | SvgUseIcon | null | undefined
   readonly styles: ReturnType<typeof BUTTON_STYLES>
   readonly children: ReactNode
   readonly addonStart?: ReactElement | string | false | null | undefined
@@ -368,7 +368,7 @@ const ButtonContent = memo(function ButtonContentImpl(props: ButtonContentProps)
 interface IconProps {
   readonly isLoading: boolean
   readonly loaderPosition: 'full' | 'icon'
-  readonly icon: ReactElement | string | null | undefined
+  readonly icon: ReactElement | SvgUseIcon | null | undefined
   readonly styles: ReturnType<typeof BUTTON_STYLES>
   readonly hideLoader: boolean
 }

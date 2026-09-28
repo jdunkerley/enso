@@ -1,12 +1,11 @@
 /** @file An entry in a menu. */
-import BlankIcon from '#/assets/blank.svg'
-import LockIcon from '#/assets/lock.svg'
 import * as aria from '#/components/aria'
 import { useDialogContext } from '#/components/Dialog'
 import { Icon } from '#/components/Icon'
 import { PaywallDialog } from '#/components/Paywall'
 import FocusRing from '#/components/styled/FocusRing'
 import { Text, type TextProps } from '#/components/Text'
+import type { SvgUseIcon } from '#/components/types'
 import { useVisualTooltip } from '#/components/VisualTooltip'
 import type * as inputBindings from '#/configurations/inputBindings'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
@@ -44,7 +43,7 @@ export function actionToTextId(action: inputBindings.DashboardBindingKey): text.
 
 /** Props for a {@link MenuEntry}. */
 export interface MenuEntryProps extends tailwindVariants.VariantProps<typeof MENU_ENTRY_VARIANTS> {
-  readonly icon?: string | undefined
+  readonly icon?: SvgUseIcon | undefined
   readonly picture?: JSX.Element
   readonly action: inputBindings.DashboardBindingKey
   /** Overrides the text for the menu entry. */
@@ -80,7 +79,7 @@ export default function MenuEntry(props: MenuEntryProps) {
   } = props
 
   const { getText } = useText()
-  const icon = isUnderPaywall ? LockIcon : iconRaw
+  const icon = isUnderPaywall ? 'lock' : iconRaw
   const tooltipValue = isUnderPaywall ? getText('upgradeToUseCloud') : tooltipValueRaw
 
   const dialogContext = useDialogContext()
@@ -135,7 +134,8 @@ export default function MenuEntry(props: MenuEntryProps) {
             >
               {picture === undefined && (
                 <Icon
-                  icon={icon ?? info.icon ?? BlankIcon}
+                  // An empty placeholder keeps the labels of entries without an icon aligned.
+                  icon={icon ?? info.icon ?? <span />}
                   className={info.color != null ? undefined : 'text-primary'}
                 />
               )}

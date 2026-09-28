@@ -1,8 +1,7 @@
 /** @file Restore an account that has been deleted. */
-import UntrashIcon from '#/assets/untrash.svg'
 import * as aria from '#/components/aria'
 import { Button } from '#/components/Button'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { LOGIN_PATH } from '$/appUtils'
 import { useAuth, useRouter, useSession, useText } from '$/providers/react'
 
@@ -16,11 +15,7 @@ export default function RestoreAccount() {
   return (
     <div className="flex h-full w-full overflow-auto">
       <div className="flex min-h-96 w-full flex-col items-center justify-center">
-        <SvgMask
-          src={UntrashIcon}
-          className="bg-icon-selected mb-4 aspect-square h-12"
-          color={''}
-        />
+        <Icon icon="untrash" className="mb-4 h-12 w-12" />
         <aria.Heading level={1} className="mb-4 text-3xl">
           {getText('restoreAccount')}
         </aria.Heading>

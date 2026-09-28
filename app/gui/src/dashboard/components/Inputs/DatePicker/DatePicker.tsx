@@ -1,6 +1,4 @@
 /** @file A date picker. */
-import CrossIcon from '#/assets/cross.svg'
-import ArrowIcon from '#/assets/folder_arrow.svg'
 import {
   DatePicker as AriaDatePicker,
   Calendar,
@@ -223,7 +221,7 @@ export const DatePicker = forwardRef(function DatePickerImpl<
                   }
                 </DateInput>
               </I18nProvider>
-              <Button variant="icon" icon={ArrowIcon} className={styles.calendarButton()} />
+              <Button variant="icon" icon="chevron_right" className={styles.calendarButton()} />
               {!noResetButton && <DatePickerResetButton className={styles.resetButton()} />}
             </Group>
             {props.description != null && <Text slot="description" />}
@@ -234,11 +232,11 @@ export const DatePicker = forwardRef(function DatePickerImpl<
                     <Button
                       variant="icon"
                       slot="previous"
-                      icon={ArrowIcon}
+                      icon="chevron_right"
                       className="rotate-180"
                     />
                     <Heading className={styles.calendarHeading()} />
-                    <Button variant="icon" slot="next" icon={ArrowIcon} />
+                    <Button variant="icon" slot="next" icon="chevron_right" />
                   </header>
                   <CalendarGrid className={styles.calendarGrid()}>
                     {noCalendarHeader ?
@@ -279,7 +277,7 @@ function DatePickerResetButton(props: DatePickerResetButtonProps) {
       slot={null}
       variant="icon"
       aria-label={getText('reset')}
-      icon={CrossIcon}
+      icon="close"
       className={className ?? ''}
       onPress={() => {
         state?.setValue(null)

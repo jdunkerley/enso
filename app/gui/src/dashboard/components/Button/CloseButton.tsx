@@ -1,5 +1,4 @@
 /** @file A button for closing a modal. */
-import DismissIcon from '#/assets/dismiss.svg'
 import { twMerge } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
@@ -21,7 +20,7 @@ export const CloseButton = memo(function CloseButtonImpl<IconType extends string
 
   const {
     className,
-    icon = DismissIcon,
+    icon = 'close',
     tooltip = false,
     'aria-label': ariaLabel = getText('closeModalShortcut'),
     testId,

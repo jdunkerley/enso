@@ -1,10 +1,9 @@
 /** @file A toolbar containing chat and the user menu. */
-import Offline from '#/assets/offline_filled.svg'
 import { Button } from '#/components/Button'
 import { Dialog, Popover } from '#/components/Dialog'
+import { Icon } from '#/components/Icon'
 import { ProfilePicture } from '#/components/ProfilePicture'
 import { ProgressBar } from '#/components/ProgressBar'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import { VisualTooltip } from '#/components/VisualTooltip'
 import { backendQueryOptions } from '#/hooks/backendHooks'
@@ -69,7 +68,7 @@ export function UserBar(props: UserBarProps) {
       <div className="flex h-full shrink-0 cursor-default items-center gap-user-bar pl-icons-x">
         {isOffline && (
           <div className="mr-2 flex items-center gap-2">
-            <SvgMask src={Offline} className="aspect-square w-4 flex-none" />
+            <Icon icon="cloud_offline" />
             <Text tooltip={getText('offlineToastMessage')} tooltipDisplay="always">
               {getText('youAreOffline')}
             </Text>

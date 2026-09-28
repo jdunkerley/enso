@@ -1,9 +1,8 @@
 /** @file The directory header bar and directory item listing. */
-import Offline from '#/assets/offline_filled.svg'
 import { Button } from '#/components/Button'
 import { ErrorBoundary } from '#/components/ErrorBoundary'
+import { Icon } from '#/components/Icon'
 import * as result from '#/components/Result'
-import SvgMask from '#/components/SvgMask'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useLocalStorageState } from '#/hooks/localStoreState'
 import * as offlineHooks from '#/hooks/offlineHooks'
@@ -230,7 +229,7 @@ function OfflineMessage(props: OfflineMessageProps) {
 
   return (
     <result.Result
-      status={<SvgMask src={Offline} className="aspect-square h-6" />}
+      status={<Icon icon="cloud_offline" size="xlarge" />}
       className="my-12"
       centered="horizontal"
       title={getText('cloudUnavailableOffline')}

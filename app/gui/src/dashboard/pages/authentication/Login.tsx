@@ -1,7 +1,4 @@
 /** @file Login component responsible for rendering and interactions in sign in flow. */
-import AtIcon from '#/assets/at.svg'
-import CreateAccountIcon from '#/assets/create_account.svg'
-import LockIcon from '#/assets/lock.svg'
 import { Button } from '#/components/Button'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
@@ -117,7 +114,7 @@ export default function Login() {
           {(email) => (
             <Link
               to={`${REGISTRATION_PATH}?${new URLSearchParams({ email }).toString()}`}
-              icon={CreateAccountIcon}
+              icon="create_account"
               text={getText('dontHaveAnAccount')}
             />
           )}
@@ -166,7 +163,7 @@ export default function Login() {
                   label={getText('email')}
                   type="email"
                   autoComplete="email"
-                  icon={AtIcon}
+                  icon="at"
                   placeholder={getText('emailPlaceholder')}
                 />
 
@@ -178,7 +175,7 @@ export default function Login() {
                     name="password"
                     label={getText('password')}
                     autoComplete="current-password"
-                    icon={LockIcon}
+                    icon="lock"
                     placeholder={getText('passwordPlaceholder')}
                   />
 

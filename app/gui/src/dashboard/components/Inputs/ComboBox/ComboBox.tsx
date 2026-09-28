@@ -1,6 +1,4 @@
 /** @file A combo box with a list of items that can be filtered. */
-import CrossIcon from '#/assets/cross.svg'
-import ArrowIcon from '#/assets/folder_arrow.svg'
 import {
   ComboBox as AriaComboBox,
   ComboBoxStateContext,
@@ -192,7 +190,7 @@ export const ComboBox = forwardRef(function ComboBoxImpl<
             }}
           >
             <div ref={popoverTriggerRef} className={styles.inputContainer()}>
-              <Button variant="icon" icon={ArrowIcon} className="rotate-90" />
+              <Button variant="icon" icon="chevron_right" className="rotate-90" />
               <BasicInput
                 name={name}
                 placeholder={placeholder}
@@ -284,7 +282,7 @@ function ComboBoxResetButton(props: ComboBoxResetButtonProps) {
       slot={null}
       variant="icon"
       aria-label={getText('reset')}
-      icon={CrossIcon}
+      icon="close"
       className={className ?? ''}
       onPress={() => {
         state?.setInputValue('')

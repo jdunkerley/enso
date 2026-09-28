@@ -1,7 +1,6 @@
 /** @file The icon and name of a {@link SecretAsset}. */
-import KeyIcon from '#/assets/key.svg'
 import EditableSpan from '#/components/EditableSpan'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { backendMutationOptions, useRenameAsset } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
@@ -82,7 +81,7 @@ export default function SecretNameColumn(props: SecretNameColumnProps) {
         }
       }}
     >
-      <SvgMask src={KeyIcon} className="m-name-column-icon size-4" />
+      <Icon icon="key" className="m-name-column-icon size-4" />
       <EditableSpan
         data-testid="asset-row-name"
         editable={isEditingName}

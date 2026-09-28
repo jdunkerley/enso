@@ -1,9 +1,7 @@
 /** @file A column displaying the path of the asset. */
-import FolderArrowIcon from '#/assets/folder_arrow.svg'
 import { Button } from '#/components/Button'
 import { Popover } from '#/components/Dialog'
 import { Icon } from '#/components/Icon'
-import SvgMask from '#/components/SvgMask'
 import { Text } from '#/components/Text'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { parseDirectoriesPath } from '#/layouts/Drive/Categories/parseDirectoriesPath'
@@ -77,7 +75,7 @@ export function PathColumn(props: AssetColumnProps) {
         <Button variant="ghost-fading" size="xsmall">
           <div className="flex items-center gap-2">
             <Icon className="h-3 w-3" icon={firstItemInPath.icon} />
-            <Icon className="h-3 w-3" icon={FolderArrowIcon} />
+            <Icon className="h-3 w-3" icon="chevron_right" />
             <Icon className="h-3 w-3" icon={lastItemInPath.icon} />
 
             <Text color="custom" truncate="1" className="max-w-48">
@@ -104,7 +102,7 @@ export function PathColumn(props: AssetColumnProps) {
                 />
 
                 {index < finalPath.length - 1 && (
-                  <SvgMask src={FolderArrowIcon} className="h-4 w-4 text-primary" />
+                  <Icon icon="chevron_right" className="h-4 w-4 text-primary" />
                 )}
               </Fragment>
             ))}

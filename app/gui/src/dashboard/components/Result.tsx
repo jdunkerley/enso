@@ -1,11 +1,9 @@
 /** @file Display the result of an operation. */
-import Success from '#/assets/check_mark.svg'
-import Error from '#/assets/cross.svg'
-import type { TestIdProps } from '#/components/types'
+import type { SvgUseIcon, TestIdProps } from '#/components/types'
 import { tv, type VariantProps } from '#/utilities/tailwindVariants'
 import type { JSX, PropsWithChildren, ReactElement } from 'react'
+import { Icon } from './Icon'
 import { Loader } from './Loader'
-import SvgMask from './SvgMask'
 import { Text } from './Text'
 
 const INFO_ICON = (
@@ -26,8 +24,8 @@ const STATUS_ICON_MAP: Readonly<Record<Status, StatusIcon>> = {
     colorClassName: 'text-primary',
     bgClassName: 'bg-primary/15',
   },
-  error: { icon: Error, colorClassName: 'text-red-500', bgClassName: 'bg-red-500' },
-  success: { icon: Success, colorClassName: 'text-green-500', bgClassName: 'bg-green' },
+  error: { icon: 'close', colorClassName: 'text-red-500', bgClassName: 'bg-red-500' },
+  success: { icon: 'check', colorClassName: 'text-green-500', bgClassName: 'bg-green' },
   // pending is the same as loading. Used for mutations.
   pending: {
     icon: <Loader minHeight="h8" />,
@@ -70,7 +68,7 @@ export type Status = 'error' | 'idle' | 'info' | 'loading' | 'pending' | 'succes
 
 /** The corresponding icon and color for each status. */
 interface StatusIcon {
-  readonly icon: ReactElement | string
+  readonly icon: ReactElement | SvgUseIcon
   readonly colorClassName: string
   readonly bgClassName: string
 }
@@ -86,7 +84,7 @@ export interface ResultProps
    * @default 'success'
    */
   readonly status?: ReactElement | Status
-  readonly icon?: string | false
+  readonly icon?: SvgUseIcon | false
 }
 
 /** Display the result of an operation. */
@@ -105,8 +103,8 @@ export function Result(props: ResultProps) {
           {statusIcon != null ?
             <div className={classes.statusIcon({ className: statusIcon.bgClassName })}>
               {typeof statusIcon.icon === 'string' ?
-                <SvgMask
-                  src={icon ?? statusIcon.icon}
+                <Icon
+                  icon={icon ?? statusIcon.icon}
                   className={classes.icon({ className: statusIcon.colorClassName })}
                 />
               : statusIcon.icon}

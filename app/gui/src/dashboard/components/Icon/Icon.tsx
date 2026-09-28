@@ -3,39 +3,20 @@
  *
  * Icon component that displays an icon based on different input.
  */
-import type {
-  AvailableIconReturn,
-  IconProp,
-  IconPropSvgUse,
-  LegacyAvailableIconReturn,
-  LegacyIconProp,
-  TestIdProps,
-} from '#/components/types'
+import type { AvailableIconReturn, IconProp, IconPropSvgUse, TestIdProps } from '#/components/types'
 import { tv, type VariantProps } from '#/utilities/tailwindVariants'
-import { isIconName, type Icon as PossibleIcon } from '@/util/iconMetadata/iconName'
+import type { Icon as PossibleIcon } from '@/util/iconMetadata/iconName'
 import { svgUseHref } from '@/util/icons'
 import { memo } from 'react'
-import SvgMask from '../SvgMask'
 
 /** Props for {@link Icon}. */
-export type IconProps<Render = never> = BaseIconProps<Render> &
-  (LegacyIconProps<string, Render> | SvgUseIconProps<Render>)
+export type IconProps<Render = never> = BaseIconProps<Render> & SvgUseIconProps<Render>
 
 /** Base props for all icon types. */
 interface BaseIconProps<Render = never> extends VariantProps<typeof ICON_STYLES>, TestIdProps {
   readonly className?: string | undefined
   readonly renderProps?: Render
   readonly alt?: string | undefined
-}
-
-/**
- * @deprecated Prefer defined keys over importing from `#/assets/*.svg
- */
-export interface LegacyIconProps<
-  Icon extends string,
-  Render = never,
-> extends BaseIconProps<Render> {
-  readonly icon: LegacyIconProp<Icon, Render>
 }
 
 /** Generic type for icons imported from Figma. */
@@ -132,11 +113,7 @@ function IconInternal<Render = never>(props: IconInternalProps<Render>) {
   }
 
   if (typeof renderedIcon === 'string') {
-    if (isIconName(renderedIcon)) {
-      return <SvgUse icon={renderedIcon} testId={testId} className={className} alt={alt} />
-    }
-
-    return <SvgMask src={renderedIcon} className={className} testId={testId} alt={alt} />
+    return <SvgUse icon={renderedIcon} testId={testId} className={className} alt={alt} />
   }
 
   return (
@@ -185,6 +162,6 @@ export function SvgUse(props: SvgUseProps) {
 export function renderIcon<Icon extends string, Render>(
   icon: IconProp<Icon, Render>,
   renderProps: Render,
-): AvailableIconReturn | LegacyAvailableIconReturn<Icon> {
+): AvailableIconReturn {
   return typeof icon === 'function' ? icon(renderProps) : icon
 }

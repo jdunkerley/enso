@@ -1,5 +1,4 @@
 /** @file Components for column cells. */
-import DotsIcon from '#/assets/dots.svg'
 import { Button } from '#/components/Button'
 import { Dialog, Popover } from '#/components/Dialog'
 import { Text } from '#/components/Text'
@@ -110,7 +109,7 @@ export function LabelsColumn(props: AssetColumnProps) {
             <Button
               variant="icon"
               showIconOnHover
-              icon={DotsIcon}
+              icon="menu_dots"
               tooltip={getText('showAllLabels')}
             />
             <Popover

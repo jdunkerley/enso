@@ -1,5 +1,4 @@
 /** @file Displays a few details of an asset. */
-import BreadcrumbArrowIcon from '#/assets/breadcrumb_arrow.svg'
 import { Text } from '#/components/Text'
 import AssetIcon from '#/pages/dashboard/components/AssetIcon'
 import * as tailwindMerge from '#/utilities/tailwindMerge'
@@ -41,7 +40,12 @@ export default function AssetSummary(props: AssetSummaryProps) {
 
             {newName != null && (
               <>
-                <img src={BreadcrumbArrowIcon} />
+                <Icon
+                  icon="arrow_right_head_only"
+                  color="muted"
+                  // The glyph is 6x8 inside a 16x16 box; trim the box to the old 6x8 image.
+                  className="-mx-[5px] -my-1 inline-block align-middle"
+                />
                 {newName}
               </>
             )}

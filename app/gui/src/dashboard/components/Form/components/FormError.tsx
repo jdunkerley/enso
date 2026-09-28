@@ -1,5 +1,4 @@
 /** @file Form error component. */
-import Offline from '#/assets/offline_filled.svg'
 import { Alert, type AlertProps } from '#/components/Alert'
 import { Text } from '#/components/Text'
 import { useFormError, type UseFormErrorProps } from './useFormError'
@@ -22,7 +21,7 @@ export function FormError(props: FormErrorProps) {
       {errors.map((error) => {
         const testId = `form-submit-${error.type}`
         const finalVariant = error.type === 'offline' ? 'outline' : variant
-        const icon = error.type === 'offline' ? Offline : null
+        const icon = error.type === 'offline' ? 'cloud_offline' : null
 
         return (
           <Alert

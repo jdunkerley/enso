@@ -3,8 +3,7 @@
  *
  * Features list for a plan, rendered as a list of checkmarks with text
  */
-import Check from '#/assets/check_mark.svg'
-import SvgMask from '#/components/SvgMask'
+import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 
 /** Props for the PlanFeatures component */
@@ -21,7 +20,7 @@ export function PlanFeatures(props: PlanFeaturesProps) {
       {features.map((feature, index) => (
         <li key={index} className="flex items-center gap-1">
           <span className="-mb-[1.5px] flex h-4 w-4 flex-none place-items-center rounded-full bg-green/30">
-            <SvgMask src={Check} className="text-green" />
+            <Icon icon="check" className="text-green" />
           </span>
 
           <Text variant="body" weight="medium" disableLineHeightCompensation>

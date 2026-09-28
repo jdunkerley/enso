@@ -1,6 +1,4 @@
 /** @file An interactive button indicating the status of a project. */
-import PlayIcon from '#/assets/play.svg'
-import StopIcon from '#/assets/stop.svg'
 import { Button } from '#/components/Button'
 import { Spinner } from '#/components/Spinner'
 import { StatelessSpinner, type SpinnerState } from '#/components/StatelessSpinner'
@@ -132,7 +130,7 @@ export default function ProjectIcon(props: ProjectIconProps) {
             variant="icon"
             extraClickZone="xsmall"
             isDisabled={isDisabled || isOtherUserUsingProject}
-            icon={StopIcon}
+            icon="workflow_stop"
             aria-label={getTooltip(getText('stopExecution'))}
             tooltipPlacement="left"
             className={twJoin(isRunningInBackground && 'text-green')}
@@ -157,7 +155,7 @@ export default function ProjectIcon(props: ProjectIconProps) {
               variant="icon"
               extraClickZone="xsmall"
               isDisabled={isDisabled || isOtherUserUsingProject}
-              icon={StopIcon}
+              icon="workflow_stop"
               aria-label={getTooltip(getText('stopExecution'))}
               tooltipPlacement="left"
               className={twJoin(isRunningInBackground && 'text-green')}
@@ -179,7 +177,7 @@ export default function ProjectIcon(props: ProjectIconProps) {
         <Button
           size="large"
           variant="icon"
-          icon={PlayIcon}
+          icon="workflow_play"
           aria-label={getTooltip(getText('openInEditor'))}
           tooltipPlacement="left"
           extraClickZone="xsmall"

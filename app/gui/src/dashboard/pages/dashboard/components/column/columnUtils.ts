@@ -28,7 +28,7 @@ export const DEFAULT_ENABLED_COLUMNS: ReadonlySet<Column> = new Set([
   Column.createdBy,
 ])
 
-export const COLUMN_ICONS: Readonly<Record<Column, SvgUseIcon | (string & {})>> = {
+export const COLUMN_ICONS: Readonly<Record<Column, SvgUseIcon>> = {
   /* The file column does not have an icon, however this does not matter as it is not
    * collapsible. */
   [Column.name]: 'ghost',
