@@ -71,9 +71,6 @@ export default {
         'black-a50': 'rgb(0 0 0 / 50%)',
         'gray-350': '#b7bcc5',
       },
-      fontFamily: {
-        naming: ['"Enso Naming"', '"Enso"', '"M PLUS 1"'],
-      },
       fontSize: {
         '2xs': '10.5px',
         xs: '11.5px',

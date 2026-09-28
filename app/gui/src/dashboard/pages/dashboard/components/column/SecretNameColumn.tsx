@@ -85,7 +85,7 @@ export default function SecretNameColumn(props: SecretNameColumnProps) {
       <EditableSpan
         data-testid="asset-row-name"
         editable={isEditingName}
-        className="grow bg-transparent font-naming"
+        className="grow bg-transparent"
         onSubmit={doRename}
         onCancel={() => {
           setIsEditing(false)

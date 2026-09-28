@@ -101,6 +101,10 @@
   close, check and lock icons, the chevrons in menus and dropdowns, and the run
   and stop buttons on projects all match. The offline, notifications,
   two-factor, repeat and keyboard-key icons have been redrawn in the same style.
+- [The project browser, settings and sign-in pages now use the same M PLUS 1
+  typeface as the rest of the IDE][NNN], instead of three custom variants of it.
+  Text looks almost the same, with slightly different spacing around dots,
+  hyphens and commas, and the IDE download is about 1.3 MB smaller.
 
 #### Enso Language & Runtime
 
@@ -229,6 +233,7 @@
 [126]: https://github.com/jdunkerley/enso/pull/126
 [127]: https://github.com/jdunkerley/enso/pull/127
 [128]: https://github.com/jdunkerley/enso/pull/128
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

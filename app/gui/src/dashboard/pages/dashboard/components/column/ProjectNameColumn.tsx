@@ -89,7 +89,7 @@ export default function ProjectNameColumn(props: ProjectNameColumnProps) {
         data-testid="asset-row-name"
         editable={isEditingName}
         className={twMerge(
-          'grow bg-transparent font-naming',
+          'grow bg-transparent',
           canExecute && !isOtherUserUsingProject && 'cursor-pointer',
           isEditingName && 'cursor-text',
         )}

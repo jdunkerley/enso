@@ -57,7 +57,7 @@ export default function FileNameColumn(props: FileNameColumnProps) {
       <EditableSpan
         data-testid="asset-row-name"
         editable={isEditingName}
-        className="grow bg-transparent font-naming"
+        className="grow bg-transparent"
         onSubmit={doRename}
         onCancel={() => {
           setIsEditing(false)
