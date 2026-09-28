@@ -17,8 +17,8 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
   canvas: [],
   // currentColor only; `*_color` brand marks are exempt (0)
   colour: [],
-  // stroke width 2 (1.5 only for a detail inside a filled icon) (7)
-  strokeWidth: ['document', 'help', 'join2-1', 'properties', 'schedule', 'sessions', 'versions'],
+  // stroke width 2 (1.5 only for a detail inside a filled icon) (3)
+  strokeWidth: ['join2-1', 'sessions', 'versions'],
   // round caps and round joins on every stroke (0)
   strokeEnds: [],
   // one secondary tone, opacity 0.3 (1)
