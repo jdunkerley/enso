@@ -57,8 +57,6 @@
   `graph_editor` symbols twice each; since `<use href="#id">` silently resolves
   to the first match, the second drawing of each was dead. The icon generator
   now fails with a clear error if a `<symbol>` id is ever duplicated again.
-- [Fixed several font issues][NNN]: the SQL and GeoMap visualizations now render
-- [Fixed several font issues][NNN]. The SQL and GeoMap visualizations now render
 - [Fixed several font issues][117]. The SQL and GeoMap visualizations now render
   their monospace text in the actual bundled monospace font instead of silently
   falling back to the browser default; scatterplot and histogram axis labels are
@@ -70,6 +68,10 @@
   solid blocks in columns, matching the weight of the align icons beside it, and
   the "no spacing" and "tight" spacing icons no longer blur into solid blocks on
   standard-resolution screens.
+- [Icons look more consistent with each other][123]. Line icons now all have
+  rounded ends and corners, two-tone icons use a single, lighter shade for their
+  background shape, and a few odd line weights have been evened out. Nothing has
+  been redrawn: every icon keeps its shape.
 
 #### Enso Language & Runtime
 
@@ -192,6 +194,7 @@
 [74]: https://github.com/jdunkerley/enso/pull/74
 [117]: https://github.com/jdunkerley/enso/pull/117
 [122]: https://github.com/jdunkerley/enso/pull/122
+[123]: https://github.com/jdunkerley/enso/pull/123
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
