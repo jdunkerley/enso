@@ -6,7 +6,9 @@
  * it on Ubuntu. Regenerate them in WSL or on Linux with `--update-snapshots` when a change to the
  * code font's rendering is intended, and check the new images by eye before committing them.
  */
+import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
+import type { MockLocalApi } from 'integration-test/mock/localApi'
 import { createTableNode } from './actions'
 import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
@@ -153,9 +155,8 @@ const TABLE_SAMPLE = [
   ['illi', 'a != b', '55555', '100'],
 ]
 
-// Deliberately not tagged `@ag-grid`: the licensed project would need its own baseline, and the
-// grid's cells render the same in both modes.
-test('Table visualization uses Monaspace Neon', async ({ editorPage, page, localApi }) => {
+/** Open the `aggregated` node's table visualization, full screen, showing {@link TABLE_SAMPLE}. */
+async function openSampleTable(editorPage: EditorPageActions, page: Page, localApi: MockLocalApi) {
   await localApi.updateVisualization(
     'Standard.Visualization.Table.Visualization.prepare_visualization',
     {
@@ -179,6 +180,13 @@ test('Table visualization uses Monaspace Neon', async ({ editorPage, page, local
   await expect.poll(async () => (await tableVisualization.boundingBox())?.width).toBe(1920)
   await expect(tableVisualization).toContainText('55555')
   await expectMonaspaceLoaded(page)
+  return tableVisualization
+}
+
+// Deliberately not tagged `@ag-grid`: the licensed project would need its own baseline, and the
+// grid's cells render the same in both modes.
+test('Table visualization uses Monaspace Neon', async ({ editorPage, page, localApi }) => {
+  const tableVisualization = await openSampleTable(editorPage, page, localApi)
 
   await expect(tableVisualization.locator('.ag-theme-alpine').first()).toHaveCSS(
     'font-family',
@@ -190,7 +198,8 @@ test('Table visualization uses Monaspace Neon', async ({ editorPage, page, local
   })
 })
 
-test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
+/** Replace the documentation with inline and fenced code samples; returns the docs and code lines. */
+async function fillDocsWithSample(editorPage: EditorPageActions, page: Page) {
   await editorPage.toggleDocsAssetPanel()
   const docsContent = page.getByTestId('documentation-editor-content')
   await expect(docsContent.locator('.cm-line')).toExist()
@@ -209,6 +218,11 @@ test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
 
   const code = docsContent.locator('.cm-line').filter({ hasText: 'mlmlml' })
   await expect(code).toHaveCount(3)
+  return { docsContent, code }
+}
+
+test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
+  const { docsContent, code } = await fillDocsWithSample(editorPage, page)
   await expect(docsContent.getByText(SAMPLE_COMMENT)).toHaveCSS('font-family', /^"Monaspace Neon"/)
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await expect(page).toHaveScreenshot('docs-code.png', {
@@ -247,6 +261,56 @@ test('Table editor widget uses Monaspace Neon', async ({ editorPage, page }) => 
   // Inset past the rounded corners, where the node's colour shows through and varies.
   const box = (await widget.boundingBox())!
   await expect(page).toHaveScreenshot('table-editor-widget.png', {
-    clip: { x: box.x + 8, y: box.y, width: box.width - 16, height: box.height - 8 },
+    clip: { x: box.x + 8, y: box.y + 8, width: box.width - 16, height: box.height - 16 },
   })
+})
+
+const CODING_SETS = '"ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09"'
+
+test('"Code ligatures" applies to read-only code, and not to the code editor', async ({
+  editorPage,
+  page,
+  localApi,
+}) => {
+  const { docsContent, code } = await fillDocsWithSample(editorPage, page)
+  const docsCode = docsContent.getByText(SAMPLE_COMMENT)
+  await expect(docsCode).toHaveCSS('font-feature-settings', 'normal')
+
+  // Turn the setting on from the dashboard's Settings page while the project stays open.
+  await page.keyboard.press('ControlOrMeta+,')
+  await page.getByRole('button', { name: 'Appearance' }).getByText('Appearance').click()
+  await page.getByText('Code ligatures', { exact: true }).click()
+  await page.getByTestId('project-view-tab-button').click()
+  await expect(docsContent).toBeVisible()
+
+  await expect(docsCode).toHaveCSS('font-feature-settings', CODING_SETS)
+  await page.addStyleTag({ content: SCREENSHOT_STYLE })
+  // The panels may still be settling after the tab switch: wait until the text stops moving.
+  let clip = boundingClip(await textBoxes(code))
+  await expect
+    .poll(async () => {
+      const previous = clip
+      clip = boundingClip(await textBoxes(code))
+      return JSON.stringify(clip) === JSON.stringify(previous)
+    })
+    .toBe(true)
+  await expect(page).toHaveScreenshot('docs-code-ligatures.png', { clip })
+
+  const tableVisualization = await openSampleTable(editorPage, page, localApi)
+  await expect(tableVisualization.locator('.ag-cell', { hasText: 'a -> b' })).toHaveCSS(
+    'font-feature-settings',
+    CODING_SETS,
+  )
+
+  await page.keyboard.press(`ControlOrMeta+\``)
+  await expect(locate.codeEditor(page).locator('.cm-scroller')).toHaveCSS(
+    'font-feature-settings',
+    'normal',
+  )
+
+  // The setting survives a reload.
+  await page.reload()
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.classList.contains('codeLigatures')))
+    .toBe(true)
 })
