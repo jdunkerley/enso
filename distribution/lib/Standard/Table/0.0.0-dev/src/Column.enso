@@ -2169,7 +2169,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the value contained in this column at the given index.
 
@@ -2193,7 +2193,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the value contained in this column at the given index.
 
@@ -2373,7 +2373,7 @@ type Column
     ## ---
        aliases: [first, head, keep, last, limit, sample, slice, tail, top]
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Creates a new Column with the specified range of rows from the input
        Column.
@@ -2413,7 +2413,7 @@ type Column
     ## ---
        aliases: [remove, skip]
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Creates a new Column from the input with the specified range of rows
        removed.
@@ -2434,7 +2434,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the first element in the column, if it exists.
        If the column is empty, this method will return a dataflow error

@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg">
-  <symbol id="3_dot_menu" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="menu_dots" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M1.33 4C1.33 3.63 1.63 3.33 2 3.33H14C14.37 3.33 14.67 3.63 14.67 4C14.67 4.37 14.37 4.67 14 4.67H2C1.63 4.67 1.33 4.37 1.33 4ZM1.33 8C1.33 7.63 1.63 7.33 2 7.33H14C14.37 7.33 14.67 7.63 14.67 8C14.67 8.37 14.37 8.67 14 8.67H2C1.63 8.67 1.33 8.37 1.33 8ZM1.33 12C1.33 11.63 1.63 11.33 2 11.33H14C14.37 11.33 14.67 11.63 14.67 12C14.67 12.37 14.37 12.67 14 12.67H2C1.63 12.67 1.33 12.37 1.33 12Z" fill="currentColor"></path>
   </symbol>
 
@@ -113,7 +113,7 @@
     <path d="M12.77 2.39C13.23 1.94 13.96 1.94 14.42 2.39C14.87 2.84 14.87 3.58 14.42 4.04L8.24 10.21L6.59 8.57L12.77 2.39Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="bullet-list" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="list_bullet" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M4 2.67C2.9 2.67 2 3.56 2 4.67 2 5.77 2.9 6.67 4 6.67 5.1 6.67 6 5.77 6 4.67 6 3.56 5.1 2.67 4 2.67ZM8.67 4C8.3 4 8 4.3 8 4.67 8 5.03 8.3 5.33 8.67 5.33H13.33C13.7 5.33 14 5.03 14 4.67 14 4.3 13.7 4 13.33 4H8.67ZM4 9.33C2.9 9.33 2 10.23 2 11.33 2 12.44 2.9 13.33 4 13.33 5.1 13.33 6 12.44 6 11.33 6 10.23 5.1 9.33 4 9.33ZM8.67 10.67C8.3 10.67 8 10.97 8 11.33 8 11.7 8.3 12 8.67 12H13.33C13.7 12 14 11.7 14 11.33 14 10.97 13.7 10.67 13.33 10.67H8.67Z" fill="currentColor"></path>
   </symbol>
 
@@ -458,12 +458,12 @@
   </symbol>
 
 
-  <symbol id="home2" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="home" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M8 4L13 8V14C13 14.55 12.55 15 12 15H9.5V12.5C9.5 11.67 8.83 11 8 11C7.17 11 6.5 11.67 6.5 12.5V15H4C3.45 15 3 14.55 3 14V8L8 4Z" fill="currentColor"/>
     <path d="M2 8L8 3L14 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
-  <symbol id="icon/lock" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="lock" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M5 7V5.5A3 3 0 0 1 11 5.5V7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <path fill-rule="evenodd" d="M4 7H12C13.1 7 14 7.9 14 9V13C14 14.1 13.1 15 12 15H4C2.9 15 2 14.1 2 13V9C2 7.9 2.9 7 4 7ZM7 10H9V13H7V10Z" fill="currentColor"/>
   </symbol>
@@ -561,13 +561,13 @@
 
 
 
-  <symbol id="local_scope2" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="local_scope" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <circle opacity="0.3" cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
     <circle cx="8" cy="8" r="3" fill="currentColor"/>
   </symbol>
 
 
-  <symbol id="local_scope4" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="select_cell" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path opacity="0.3" d="M1 1H5V5H1V1ZM6 1H10V5H6V1ZM11 1H15V5H11V1ZM1 6H5V10H1V6ZM11 6H15V10H11V6ZM1 11H5V15H1V11ZM6 11H10V15H6V11ZM11 11H15V15H11V11Z" fill="currentColor"/>
     <path d="M6 6H10V10H6V6Z" fill="currentColor"/>
   </symbol>
@@ -656,7 +656,7 @@
     <path d="M2 14L14 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
-  <symbol id="numbered-list" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="list_numbered" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M4.35 2.43C4.55 2.55 4.67 2.77 4.67 3V6.33C4.67 6.7 4.37 7 4 7C3.63 7 3.33 6.7 3.33 6.33V4.08L2.96 4.26C2.64 4.43 2.24 4.29 2.07 3.96C1.91 3.64 2.04 3.24 2.37 3.07L3.7 2.4C3.91 2.3 4.15 2.31 4.35 2.43ZM8 4C7.63 4 7.33 4.3 7.33 4.67C7.33 5.03 7.63 5.33 8 5.33H13.33C13.7 5.33 14 5.03 14 4.67C14 4.3 13.7 4 13.33 4H8ZM8 10.67C7.63 10.67 7.33 10.97 7.33 11.33C7.33 11.7 7.63 12 8 12H13.33C13.7 12 14 11.7 14 11.33C14 10.97 13.7 10.67 13.33 10.67H8Z" fill="currentColor"></path>
     <path d="M3.24 10.53L3.24 10.53L3.24 10.53L3.24 10.53L3.24 10.53C2.94 10.75 2.53 10.7 2.3 10.41C2.08 10.11 2.14 9.7 2.43 9.47L2.47 9.44C2.49 9.43 2.51 9.41 2.54 9.39C2.61 9.35 2.7 9.29 2.81 9.24C3.02 9.13 3.36 9 3.74 9C4.62 9 5.33 9.71 5.33 10.59C5.33 11.1 5.11 11.49 4.84 11.79C4.64 12.01 4.39 12.19 4.18 12.33H4.83C5.2 12.33 5.5 12.63 5.5 13C5.5 13.37 5.2 13.67 4.83 13.67H2.67C2.3 13.67 2 13.37 2 13C2 12.5 2.26 12.13 2.52 11.89C2.74 11.68 3.01 11.5 3.23 11.36L3.3 11.31C3.56 11.15 3.74 11.02 3.86 10.88C3.97 10.77 4 10.68 4 10.59C4 10.45 3.88 10.33 3.74 10.33C3.65 10.33 3.53 10.37 3.41 10.43C3.35 10.46 3.3 10.49 3.27 10.51C3.26 10.52 3.25 10.52 3.24 10.53Z" fill="currentColor"></path>
   </symbol>
@@ -697,7 +697,7 @@
 
 
 
-  <symbol id="parse3" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="parse" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <rect opacity="0.3" fill="currentColor" x="1" y="1" width="9" height="14" rx="2"/>
     <path fill="currentColor" d="M3 3H6V5H3V3ZM3 7H12V5L15 8L12 11V9H3V7ZM3 11H7V13H3V11Z"/>
   </symbol>
@@ -708,7 +708,7 @@
     <path d="M8 5.5C8.55 5.5 9 5.95 9 6.5V8.5H7V6.5C7 5.95 7.45 5.5 8 5.5ZM10.5 8.5 8 11.5 5.5 8.5H10.5Z" fill="currentColor"></path>
   </symbol>
 
-  <symbol id="path2" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="path" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M4.26 4.5C3.97 5.02 3.4 5.38 2.75 5.38C1.79 5.38 1 4.59 1 3.63C1 2.66 1.79 1.88 2.75 1.88C3.4 1.88 3.97 2.23 4.26 2.75H9.75C10.56 2.75 11.34 3.07 11.91 3.65C12.49 4.22 12.81 5 12.81 5.81C12.81 6.63 12.49 7.41 11.91 7.97C11.34 8.55 10.56 8.88 9.75 8.88H7.13C6.4 8.88 5.81 9.46 5.81 10.19C5.81 10.91 6.4 11.5 7.13 11.5H11.74C12.03 10.98 12.6 10.63 13.25 10.63C14.21 10.63 15 11.41 15 12.38C15 13.34 14.21 14.13 13.25 14.13C12.6 14.13 12.03 13.77 11.74 13.25H7.13C6.31 13.25 5.53 12.93 4.96 12.35C4.39 11.78 4.06 11 4.06 10.19C4.06 9.37 4.39 8.59 4.96 8.03C5.53 7.45 6.31 7.13 7.13 7.13H9.75C10.48 7.13 11.06 6.54 11.06 5.81C11.06 5.09 10.48 4.5 9.75 4.5H4.26Z" fill="currentColor"/>
   </symbol>
 
@@ -911,7 +911,7 @@
   </symbol>
 
 
-  <symbol id="text3" viewBox="0 0 16 16" width="16" height="16" fill="none">
+  <symbol id="text_char" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.67C2 2.3 2.3 2 2.67 2H13.33C13.7 2 14 2.3 14 2.67V4C14 4.37 13.7 4.67 13.33 4.67C12.97 4.67 12.67 4.37 12.67 4V3.33H8.67V12.67H9.33C9.7 12.67 10 12.97 10 13.33C10 13.7 9.7 14 9.33 14H6.67C6.3 14 6 13.7 6 13.33C6 12.97 6.3 12.67 6.67 12.67H7.33V3.33H3.33V4C3.33 4.37 3.03 4.67 2.67 4.67C2.3 4.67 2 4.37 2 4V2.67Z" fill="currentColor"></path>
   </symbol>
 

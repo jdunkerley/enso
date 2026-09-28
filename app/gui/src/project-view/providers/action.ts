@@ -323,11 +323,11 @@ const displayableActions = {
     shortcut: documentationEditorFormatBindings.bindings['documentationEditor.paragraph'],
   },
   'documentationEditor.list': {
-    icon: 'bullet-list',
+    icon: 'list_bullet',
     description: 'List',
   },
   'documentationEditor.numberedList': {
-    icon: 'numbered-list',
+    icon: 'list_numbered',
     description: 'Numbered List',
   },
   'documentationEditor.quote': {

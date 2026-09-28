@@ -149,7 +149,7 @@ type Date_Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the first element that is included within the range or `Nothing`
        if the range is empty.
@@ -158,7 +158,7 @@ type Date_Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the second element that is included within the range or `Nothing`
        if the range has less than 2 element
@@ -192,7 +192,7 @@ type Date_Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the range at a specified index (0-based).
 
@@ -219,7 +219,7 @@ type Date_Range
         self.get index (Error.throw (Index_Out_Of_Bounds.Error index self.length))
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the range at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.

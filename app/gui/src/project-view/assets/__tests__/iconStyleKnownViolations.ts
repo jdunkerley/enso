@@ -27,17 +27,6 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
   structure: [],
   // at most 2 decimals (0)
   coordinates: [],
-  // snake_case, no iteration numbers, no paths (10)
-  naming: [
-    '3_dot_menu',
-    'bullet-list',
-    'home2',
-    'icon/lock',
-    'local_scope2',
-    'local_scope4',
-    'numbered-list',
-    'parse3',
-    'path2',
-    'text3',
-  ],
+  // snake_case, no iteration numbers, no paths (0)
+  naming: [],
 }

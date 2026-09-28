@@ -223,7 +223,7 @@ type Dictionary key value
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets the value associated with `key` in this dictionary, or throws a
        `No_Such_Key.Error` if `key` is not present.
@@ -245,7 +245,7 @@ type Dictionary key value
     at self key = self.get key (Error.throw (No_Such_Key.Error self key))
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets the value associated with `key` in this dictionary, or returns
        `if_missing` if it isn't present.

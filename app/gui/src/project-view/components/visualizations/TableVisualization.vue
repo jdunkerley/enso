@@ -269,7 +269,7 @@ const getContextMenuItems = (
   const actions = [
     { name: 'Get Column', action: 'at', colId, icon: 'select_column' },
     { name: 'Get Row', action: 'get_row', rowIndex, icon: 'select_row' },
-    { name: 'Get Value', action: 'get_value', colId, rowIndex, icon: 'local_scope4' },
+    { name: 'Get Value', action: 'get_value', colId, rowIndex, icon: 'select_cell' },
   ]
 
   const createMenuItem = ({ name, action, colId, rowIndex, icon }: (typeof actions)[number]) => ({
@@ -729,7 +729,7 @@ function addRowIndex(data: object[]): object[] {
 function getValueTypeIcon(valueType: string) {
   switch (valueType) {
     case 'Char':
-      return 'text3'
+      return 'text_char'
     case 'Boolean':
       return 'check'
     case 'Integer':

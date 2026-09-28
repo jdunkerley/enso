@@ -40,7 +40,7 @@ const isDropdownOpened = ref(false)
         data-testid="more-button"
         class="slotW More"
       >
-        <template #button><SvgIcon name="3_dot_menu" class="moreIcon" /></template>
+        <template #button><SvgIcon name="menu_dots" class="moreIcon" /></template>
         <template #menu>
           <ActionMenu
             data-testid="component-menu-more-entries"

@@ -77,7 +77,7 @@ type Pair
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the pair at a specified index (0-based).
 
@@ -91,7 +91,7 @@ type Pair
         self.get index (Error.throw (Index_Out_Of_Bounds.Error index 2))
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the pair at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.

@@ -439,7 +439,7 @@ type Table
     ## ---
        aliases: [cell value, get cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets a value from the table.
 
@@ -479,7 +479,7 @@ type Table
     ## ---
        aliases: [first cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets the top left value from the table.
     first_value self -> Any ! Index_Out_Of_Bounds =
@@ -488,7 +488,7 @@ type Table
     ## ---
        aliases: [last cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets the bottom right value from the table.
     last_value self -> Any ! Index_Out_Of_Bounds =

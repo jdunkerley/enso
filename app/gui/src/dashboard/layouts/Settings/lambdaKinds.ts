@@ -119,9 +119,9 @@ export const SELECTABLE_LAMBDA_KINDS = LAMBDA_KINDS.filter(
 )
 
 export const EVENT_TYPE_ICON: Record<LambdaKind, SvgUseIcon> = {
-  'POST /auth': 'icon/lock',
-  'GET /organizations/me': 'home2',
-  'PATCH /organizations/me': 'home2',
+  'POST /auth': 'lock',
+  'GET /organizations/me': 'home',
+  'PATCH /organizations/me': 'home',
   'PUT /organizations/me/picture': 'image',
   'POST /logs': 'log',
   'GET /invitations': 'email',
@@ -152,7 +152,7 @@ export const EVENT_TYPE_ICON: Record<LambdaKind, SvgUseIcon> = {
   'PATCH /assets/{ASSET_ID}/touch': 'document',
   'GET /assets/{ASSET_ID}/versions': 'undo',
   'POST /assets/{ASSET_ID}/versions/restore': 'redo',
-  'POST /permissions': 'icon/lock',
+  'POST /permissions': 'lock',
   'POST /projects': 'graph_add',
   'GET /projects/{PROJECT_ID}': 'graph',
   'PUT /projects/{PROJECT_ID}': 'graph',
@@ -192,7 +192,7 @@ export const EVENT_TYPE_ICON: Record<LambdaKind, SvgUseIcon> = {
   'POST /configurations': 'connector_add',
   'GET /configurations': 'connector',
   'GET /configurations/{CONFIGURATION_ID}': 'connector',
-  'GET /path/resolve': 'path2',
+  'GET /path/resolve': 'path',
 }
 
 export const EVENT_TYPE_NAME_ID: Record<LambdaKind, TextId & `${string}LogEvent`> = {
