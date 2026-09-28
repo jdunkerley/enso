@@ -59,7 +59,8 @@ Each rule notes how the set stood when this guide was written (September 2026,
 Icons are rendered at 16px almost everywhere (`SvgIcon.vue`), so drawing at any
 other size means every icon gets scaled.
 
-_Today:_ all but `expanded_node` (16x14).
+_Today:_ all of them (`expanded_node`, the last 16x14 icon, was redrawn in
+#103).
 
 ### Live area (_review_)
 
@@ -69,7 +70,10 @@ deliberately "big" glyphs such as `add` and `minus` may run edge to edge, and
 never one that shares a toolbar with keyline icons: a full-bleed `trash` beside
 the keyline `align_left` reads about 25% larger.
 
-_Today:_ two grids are in use; about 40 full-bleed icons are to be redrawn.
+_Today:_ 83 edge-to-edge icons were fitted to the keyline in #103. About 30
+remain, left for later: brand marks, thin-line drawings awaiting the weight
+fixes, and the component browser's category icons, which need redrawing as a
+family.
 
 ### Drawing style (_review_)
 

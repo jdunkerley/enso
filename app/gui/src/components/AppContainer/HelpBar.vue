@@ -12,7 +12,7 @@ import SvgIcon from '@/components/SvgIcon.vue'
     <div class="communityGroup">
       <ActionButton class="helpButton" action="help.community" :label="UseActionDescription" />
       <DropdownMenu class="helpButton" :showArrow="false">
-        <template #button><SvgIcon name="folder_opened" /></template>
+        <template #button><SvgIcon name="chevron_down" /></template>
         <template #menu>
           <ActionMenu
             :actions="[

@@ -361,7 +361,7 @@ export function AssetVersion(props: AssetVersionProps) {
         )}
 
         <Menu.Trigger>
-          <Button icon="folder_opened" iconPosition="end" variant="outline">
+          <Button icon="chevron_down" iconPosition="end" variant="outline">
             {!isProject && getText('actions')}
           </Button>
 

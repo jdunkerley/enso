@@ -200,7 +200,7 @@ export function ProjectExecution(props: ProjectExecutionProps) {
             </Button>
           )}
           <Menu.Trigger>
-            <Button icon="folder_opened" iconPosition="end" variant="outline">
+            <Button icon="chevron_down" iconPosition="end" variant="outline">
               {!session && getText('actions')}
             </Button>
 

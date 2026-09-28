@@ -36,7 +36,7 @@ async function renameBreadcrumb(index: number, newName: string) {
       <template v-for="(breadcrumb, index) in stackNavigator.breadcrumbLabels.value" :key="index">
         <SvgButton
           v-if="index > 0"
-          name="navigate_breadcrumb"
+          name="chevron_right"
           :disabled="!breadcrumb.active"
           :class="{ nonInteractive: breadcrumb.isCurrentTop }"
           class="arrow"
