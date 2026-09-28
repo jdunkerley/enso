@@ -21,7 +21,7 @@ export interface ContextualHelpProps
 export function ContextualHelp(props: ContextualHelpProps) {
   const { placement, testId, defaultOpen, isOpen, onOpenChange, variant = 'help', children } = props
 
-  const icon: SvgUseIcon = variant === 'help' ? 'help' : 'metadata'
+  const icon: SvgUseIcon = variant === 'help' ? 'help' : 'info'
 
   return (
     <Popover.Trigger defaultOpen={defaultOpen} isOpen={isOpen} onOpenChange={onOpenChange}>

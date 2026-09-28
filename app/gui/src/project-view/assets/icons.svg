@@ -156,7 +156,7 @@
   </symbol>
 
   <symbol id="close" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M10 6L6 10M10 10L6 6M14 8C14 11.31 11.31 14 8 14C4.69 14 2 11.31 2 8C2 4.69 4.69 2 8 2C11.31 2 14 4.69 14 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
 
@@ -239,12 +239,11 @@
   </symbol>
 
   <symbol id="copy" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect opacity="0.3" y="4" width="12" height="12" rx="2" fill="currentColor"></rect>
-    <rect x="5" y="1" width="10" height="10" rx="1" stroke="currentColor" stroke-width="2" stroke-dasharray="2 6" stroke-linecap="round" stroke-linejoin="round" stroke-dashoffset="-1"></rect>
+    <path d="M10 10V14H2V6H6M6 10H14V2H6V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
   <symbol id="copy2" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M10 10V14H2V6H6M6 10H14V2H6V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M10 10V14H2V6H6M6 10H14V2H6V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
   <symbol id="copy_as_path" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -296,9 +295,8 @@
   </symbol>
 
   <symbol id="docs" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <g opacity="0.6">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M2.04 0.96H14.04V2.96H2.04V0.96ZM2.04 4.96H10.04V6.96H2.04V4.96ZM12.04 8.96H4.04V10.96H12.04V8.96ZM2.04 12.96H14.04V14.96H2.04V12.96Z" fill="currentColor"></path>
-    </g>
+    <path d="M1 4C1 3.45 1.45 3 2 3C4 3 5.5 3.5 7 4.5V14C5.5 13 4 12.5 2 12.5C1.45 12.5 1 12.05 1 11.5V4Z" fill="currentColor"/>
+    <path opacity="0.3" d="M15 4C15 3.45 14.55 3 14 3C12 3 10.5 3.5 9 4.5V14C10.5 13 12 12.5 14 12.5C14.55 12.5 15 12.05 15 11.5V4Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="document" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -358,9 +356,8 @@
   </symbol>
 
   <symbol id="find" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <g opacity="0.8">
-      <path d="M6.5 0C10.09 0 13 2.91 13 6.5C13 7.75 12.64 8.92 12.03 9.91L15.56 13.44C16.15 14.02 16.15 14.97 15.56 15.56C14.97 16.15 14.02 16.15 13.44 15.56L9.91 12.03C8.92 12.65 7.75 13 6.5 13C2.91 13 0 10.09 0 6.5C0 2.91 2.91 0 6.5 0ZM6.5 2C4.01 2 2 4.01 2 6.5C2 8.99 4.01 11 6.5 11C8.99 11 11 8.99 11 6.5C11 4.01 8.99 2 6.5 2Z" fill="currentColor"></path>
-    </g>
+    <path fill-rule="evenodd" d="M6.5 1A5.5 5.5 0 1 0 6.5 12A5.5 5.5 0 1 0 6.5 1ZM6.5 3A3.5 3.5 0 1 1 6.5 10A3.5 3.5 0 1 1 6.5 3Z" fill="currentColor"/>
+    <path d="M9.29 10.71L10.71 9.29L14.71 13.29A1 1 0 0 1 13.29 14.71Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="folder" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -494,8 +491,7 @@
 
 
   <symbol id="info" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M7.17 7.33H8L8 10.83M14.17 8C14.17 11.41 11.41 14.17 8 14.17C4.59 14.17 1.83 11.41 1.83 8C1.83 4.59 4.59 1.83 8 1.83C11.41 1.83 14.17 4.59 14.17 8Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
-    <path d="M7.67 5.33C7.67 5.15 7.82 5 8 5C8.18 5 8.33 5.15 8.33 5.33C8.33 5.52 8.18 5.67 8 5.67C7.82 5.67 7.67 5.52 7.67 5.33Z" fill="currentColor" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path fill-rule="evenodd" d="M8 1A7 7 0 1 0 8 15A7 7 0 1 0 8 1ZM7 3H9V5H7V3ZM7 7H9V13H7V7Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="input_number" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -508,8 +504,10 @@
   </symbol>
 
   <symbol id="join" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <circle opacity="0.7" cx="5.5" cy="7.5" r="5.5" fill="currentColor"></circle>
-    <circle opacity="0.7" cx="10.5" cy="7.5" r="5.5" fill="currentColor"></circle>
+    <rect x="1" y="2" width="4" height="4" rx="1" fill="currentColor"/>
+    <rect x="1" y="10" width="4" height="4" rx="1" fill="currentColor"/>
+    <rect x="11" y="6" width="4" height="4" rx="1" fill="currentColor"/>
+    <path d="M5 4H7C7.55 4 8 4.45 8 5V11C8 11.55 7.55 12 7 12H5M8 8H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
 
@@ -640,8 +638,8 @@
   </symbol>
 
   <symbol id="metadata" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M7.33 6.33C6.78 6.33 6.33 6.78 6.33 7.33 6.33 7.77 6.61 8.14 7 8.28V10.67C7 11.22 7.45 11.67 8 11.67 8.55 11.67 9 11.22 9 10.67V7.33C9 6.78 8.55 6.33 8 6.33H7.33ZM7.17 5.33C7.17 4.87 7.54 4.5 8 4.5 8.46 4.5 8.83 4.87 8.83 5.33 8.83 5.79 8.46 6.17 8 6.17 7.54 6.17 7.17 5.79 7.17 5.33Z" fill="currentColor"></path>
-    <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1C4.13 1 1 4.13 1 8C1 11.87 4.13 15 8 15C11.87 15 15 11.87 15 8C15 4.13 11.87 1 8 1ZM3 8C3 5.24 5.24 3 8 3C10.76 3 13 5.24 13 8C13 10.76 10.76 13 8 13C5.24 13 3 10.76 3 8Z" fill="currentColor"></path>
+    <rect opacity="0.3" x="1" y="1" width="14" height="14" rx="2" fill="currentColor"/>
+    <path d="M3 3H5V5H3V3ZM7 3H13V5H7V3ZM3 7H5V9H3V7ZM7 7H13V9H7V7ZM3 11H5V13H3V11ZM7 11H13V13H7V11Z" fill="currentColor"/>
   </symbol>
 
 
@@ -819,10 +817,8 @@
   </symbol>
 
   <symbol id="root" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <g opacity="0.7">
-      <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></circle>
-      <circle cx="8" cy="8" r="3" fill="currentColor"></circle>
-    </g>
+    <path fill-rule="evenodd" d="M8 1A7 7 0 1 0 8 15A7 7 0 1 0 8 1ZM8 3A5 5 0 1 1 8 13A5 5 0 1 1 8 3Z" fill="currentColor"/>
+    <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
   </symbol>
 
   <symbol id="row_add" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -935,8 +931,7 @@
   </symbol>
 
   <symbol id="tab_close" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M4.23 5.17L10.83 11.77L11.77 10.83L5.17 4.23L4.23 5.17Z" fill="currentColor"></path>
-    <path d="M10.83 4.23L4.23 10.83L5.17 11.77L11.77 5.17L10.83 4.23Z" fill="currentColor"></path>
+    <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
   <symbol id="table" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -1028,15 +1023,11 @@
   </symbol>
 
   <symbol id="union" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <g opacity="0.56">
-      <rect x="2.5" width="3" height="3" fill="currentColor"></rect>
-      <rect x="2.5" y="13" width="3" height="3" fill="currentColor"></rect>
-      <rect x="6.5" width="3" height="3" fill="currentColor"></rect>
-      <rect x="6.5" y="13" width="3" height="3" fill="currentColor"></rect>
-      <rect x="10.5" width="3" height="3" fill="currentColor"></rect>
-      <rect x="10.5" y="13" width="3" height="3" fill="currentColor"></rect>
-      <path d="M8 5V11M5 8H11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-    </g>
+    <rect x="3" y="1" width="4" height="3" rx="1" fill="currentColor"/>
+    <rect x="9" y="1" width="4" height="3" rx="1" fill="currentColor"/>
+    <rect opacity="0.3" x="3" y="12" width="4" height="3" rx="1" fill="currentColor"/>
+    <rect opacity="0.3" x="9" y="12" width="4" height="3" rx="1" fill="currentColor"/>
+    <path d="M7 6H9V7H10V9H9V10H7V9H6V7H7V6Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="unstable" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -1064,7 +1055,7 @@
   </symbol>
 
   <symbol id="workflow_play" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path opacity="0.75" d="M4.48 3.22L11.52 7.13C12.21 7.51 12.21 8.49 11.52 8.87L4.48 12.78C3.82 13.15 3 12.66 3 11.9L3 4.1C3 3.34 3.82 2.85 4.48 3.22Z" fill="currentColor"></path>
+    <path d="M5.52 2.91L12.57 7.14Q14 8 12.57 8.86L5.52 13.09Q4 14 4 12.23V3.77Q4 2 5.52 2.91Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="zoom" viewBox="0 0 16 16" width="16" height="16" fill="none">
