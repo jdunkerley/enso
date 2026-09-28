@@ -82,6 +82,11 @@
   margin as the rest, so toolbars no longer have some icons looking bigger than
   their neighbours. Menus and breadcrumbs share one chevron, and the graph
   editor icon now shows a small graph.
+- [Thin and faint icons have been redrawn][126]. Icons such as document,
+  properties, schedule and the heading buttons now use the same line weight as
+  the rest, help matches the information icon, and the component browser's
+  category icons (convert, parse, random and others) are clearer at their small
+  size.
 
 #### Enso Language & Runtime
 
@@ -207,6 +212,7 @@
 [123]: https://github.com/jdunkerley/enso/pull/123
 [124]: https://github.com/jdunkerley/enso/pull/124
 [125]: https://github.com/jdunkerley/enso/pull/125
+[126]: https://github.com/jdunkerley/enso/pull/126
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
