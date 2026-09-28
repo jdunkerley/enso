@@ -20,10 +20,13 @@ const SAMPLE_COMMENT = '# Code font sample: mlmlml iiii -> >= |>'
 /** The same in code, so that the characters fall into separately highlighted tokens. */
 const SAMPLE_CODE = 'mlmlml iiii = iiii.map (x -> x >= 1) |> mlmlml'
 
-/** Hide what blinks or depends on focus, and what shows the graph through the editor's backdrop. */
+/**
+ * Hide what blinks or depends on focus, and what shows the graph through the editor's backdrop.
+ * Injected with `addStyleTag`: this Playwright version has no `style` option for `toHaveScreenshot`.
+ */
 const SCREENSHOT_STYLE = `
   .cm-cursorLayer, .cm-selectionLayer { visibility: hidden !important; }
-  .cm-editor { backdrop-filter: none !important; background-color: white !important; }
+  .CodeEditor .cm-editor { backdrop-filter: none !important; background-color: white !important; }
 `
 
 async function expectMonaspaceLoaded(page: Page) {
@@ -33,19 +36,40 @@ async function expectMonaspaceLoaded(page: Page) {
   await page.evaluate(() => document.fonts.ready)
 }
 
-/** The smallest rectangle containing all the given elements, for a screenshot `clip`. */
-async function boundingClip(locators: Locator[], margin = 4) {
-  const boxes = await Promise.all(locators.map((l) => l.boundingBox()))
-  const x = Math.min(...boxes.map((b) => b!.x)) - margin
-  const y = Math.min(...boxes.map((b) => b!.y)) - margin
-  const right = Math.max(...boxes.map((b) => b!.x + b!.width)) + margin
-  const bottom = Math.max(...boxes.map((b) => b!.y + b!.height)) + margin
-  return {
-    x: Math.floor(x),
-    y: Math.floor(y),
-    width: Math.ceil(right - x),
-    height: Math.ceil(bottom - y),
-  }
+interface Box {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** The smallest whole-pixel rectangle containing all the given boxes, for a screenshot `clip`. */
+function boundingClip(boxes: Box[], margin = 4): Box {
+  const x = Math.floor(Math.min(...boxes.map((b) => b.x)) - margin)
+  const y = Math.floor(Math.min(...boxes.map((b) => b.y)) - margin)
+  const right = Math.ceil(Math.max(...boxes.map((b) => b.x + b.width)) + margin)
+  const bottom = Math.ceil(Math.max(...boxes.map((b) => b.y + b.height)) + margin)
+  return { x, y, width: right - x, height: bottom - y }
+}
+
+/** The boxes of the elements themselves. */
+async function elementBoxes(locator: Locator): Promise<Box[]> {
+  return Promise.all((await locator.all()).map(async (l) => (await l.boundingBox())!))
+}
+
+/**
+ * The boxes of the text in the given elements. A `.cm-line` is as wide as the editor's longest
+ * line; its text is what the screenshot needs.
+ */
+async function textBoxes(locator: Locator): Promise<Box[]> {
+  return locator.evaluateAll((elements) =>
+    elements.map((element) => {
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      const { x, y, width, height } = range.getBoundingClientRect()
+      return { x, y, width, height }
+    }),
+  )
 }
 
 async function openCodeEditorWithSample(page: Page) {
@@ -62,6 +86,8 @@ async function openCodeEditorWithSample(page: Page) {
   const commentLine = codeEditor.locator('.cm-line', { hasText: SAMPLE_COMMENT })
   const codeLine = codeEditor.locator('.cm-line', { hasText: SAMPLE_CODE })
   await commentLine.scrollIntoViewIfNeeded()
+  // Scrolling a line into view may scroll sideways too: every line is as wide as the longest one.
+  await codeEditor.locator('.cm-scroller').evaluate((scroller) => (scroller.scrollLeft = 0))
   await expect(commentLine).toBeVisible()
   await expect(codeLine).toBeVisible()
   await expectMonaspaceLoaded(page)
@@ -77,9 +103,9 @@ test('Code editor uses Monaspace Neon at 13px, without ligatures', async ({ edit
   await expect(scroller).toHaveCSS('font-size', '13px')
   await expect(scroller).toHaveCSS('font-feature-settings', 'normal')
 
+  await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await expect(page).toHaveScreenshot('code-editor.png', {
-    clip: await boundingClip([commentLine, codeLine]),
-    style: SCREENSHOT_STYLE,
+    clip: boundingClip([...(await textBoxes(commentLine)), ...(await textBoxes(codeLine))]),
   })
 })
 
@@ -111,24 +137,53 @@ test('Code editor caret lands between `-` and `>`', async ({ editorPage, page })
   expect(Math.abs(cursorX - arrowGreaterX)).toBeLessThanOrEqual(1)
 })
 
-// Deliberately not tagged `@ag-grid`: the licensed project would need its own baseline, and
-// the grid's cells render the same in both modes.
-test('Table visualization uses Monaspace Neon', async ({ editorPage, page }) => {
+/**
+ * Table cells with the samples, numbers of several widths (to show column alignment) and Enso
+ * operators that coding ligatures would join.
+ */
+const TABLE_SAMPLE = [
+  ['mlmlml', 'a -> b', '1', '12.5'],
+  ['iiii', 'x >= 1', '22', '0.25'],
+  ['wmwm', 'x |> f', '333', '1250'],
+  ['lili', 'a == b', '4444', '-3.75'],
+  ['illi', 'a != b', '55555', '100'],
+]
+
+// Deliberately not tagged `@ag-grid`: the licensed project would need its own baseline, and the
+// grid's cells render the same in both modes.
+test('Table visualization uses Monaspace Neon', async ({ editorPage, page, localApi }) => {
+  await localApi.updateVisualization(
+    'Standard.Visualization.Table.Visualization.prepare_visualization',
+    {
+      type: 'Matrix',
+      // eslint-disable-next-line camelcase
+      column_count: TABLE_SAMPLE[0]!.length,
+      // eslint-disable-next-line camelcase
+      all_rows_count: TABLE_SAMPLE.length,
+      json: TABLE_SAMPLE,
+    },
+  )
   await editorPage.mockExpressionUpdate('aggregated', { type: ['Standard.Table.Table.Table'] })
-  await locate.graphNodeByBinding(page, 'aggregated').click()
+  const aggregatedNode = locate.graphNodeByBinding(page, 'aggregated')
+  await aggregatedNode.click()
   await editorPage.press('Space')
   const tableVisualization = locate.tableVisualization(page)
   await expect(tableVisualization).toExist()
-  await expect(tableVisualization).toContainText('10 rows.')
-  await expect(tableVisualization).toContainText('3,0')
+  await expect(tableVisualization).toContainText('mlmlml')
+  // Full screen, so that every column fits without scrolling.
+  await locate.enterFullscreenButton(aggregatedNode).click()
+  await expect.poll(async () => (await tableVisualization.boundingBox())?.width).toBe(1920)
+  await expect(tableVisualization).toContainText('55555')
   await expectMonaspaceLoaded(page)
 
-  const grid = tableVisualization.locator('.ag-root-wrapper')
   await expect(tableVisualization.locator('.ag-theme-alpine').first()).toHaveCSS(
     'font-family',
     /^"Monaspace Neon"/,
   )
-  await expect(grid).toHaveScreenshot('table-visualization.png')
+  const cells = tableVisualization.locator('.ag-header-cell, .ag-cell')
+  await expect(page).toHaveScreenshot('table-visualization.png', {
+    clip: boundingClip(await elementBoxes(cells), 0),
+  })
 })
 
 test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
@@ -151,8 +206,8 @@ test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
   const code = docsContent.locator('.cm-line').filter({ hasText: 'mlmlml' })
   await expect(code).toHaveCount(3)
   await expect(docsContent.getByText(SAMPLE_COMMENT)).toHaveCSS('font-family', /^"Monaspace Neon"/)
+  await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await expect(page).toHaveScreenshot('docs-code.png', {
-    clip: await boundingClip(await code.all()),
-    style: SCREENSHOT_STYLE,
+    clip: boundingClip(await textBoxes(code)),
   })
 })
