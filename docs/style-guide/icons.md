@@ -93,9 +93,10 @@ filled icon, such as a clock's hands. No other widths.
 2px is the established weight (39 icons) and matches the visual mass of the
 filled icons; 1.5px strokes look anaemic beside them.
 
-_Today:_ 13 icons: most use other widths (1.33, 2.5, 3, ...), and `help` and
-`navigate_breadcrumb` are 1.5px line icons with no filled shape. (`tidy_up` was
-one until #98 redrew it.)
+_Today:_ 8 icons, mostly 1.33px drawings (12px art scaled by 4/3) whose details
+would close up at 2px, and `help`, a 1.5px line icon whose dot would merge with
+its stem. They need redrawing, not a new width. (`tidy_up` was one until #98
+redrew it.)
 
 ### Caps and joins
 
@@ -104,7 +105,7 @@ the element or on an ancestor within the symbol. Undeclared, SVG defaults to
 butt caps and miter joins, and the line ends visibly differ from their
 neighbours.
 
-_Today:_ 31 icons have a stroke without both.
+_Today:_ every stroke declares both (#100).
 
 ### Corner radius (_review_)
 
@@ -119,7 +120,8 @@ The tinted secondary shape is the set's signature (the container behind
 `data_input`, the grid behind `column_add`); it gives a two-tone icon from a
 single `currentColor`. It has to be one level so that icons look related.
 
-_Today:_ 64 icons use one of 15 other levels.
+_Today:_ 11 icons: three-tone drawings such as `heatmap`, and icons tinted as a
+whole with no full-tone shape, such as `docs` and `root`.
 
 ### Colour
 
@@ -128,8 +130,7 @@ colour and dark mode works. Never `fill="white"` to knock out a shape: leave the
 gap. The only exceptions are brand marks, which must be named `*_color`
 (`google_color`, `github_color`, ...).
 
-_Today:_ 11 icons besides the brand marks, mostly `fill="white"` inside Figma
-clip paths, plus a hard-coded orange `star`.
+_Today:_ only the brand marks.
 
 ### Structure
 
@@ -139,7 +140,7 @@ them). Flatten on export. Ids inside a symbol share one document with every
 other icon and collide; transforms and clips are export residue that make an
 icon hard to edit.
 
-_Today:_ 19 icons, mostly with Figma ids such as `clip0_1514_223`.
+_Today:_ none; the Figma clips, ids and transforms were flattened in #100.
 
 ### Coordinates
 
@@ -147,8 +148,8 @@ At most 2 decimal places, and on the 0.5px grid wherever the shape allows it
 (straight edges, box corners, circle centres) — _review_. Off-grid edges render
 blurred at 1x.
 
-_Today:_ 205 icons have 3 or more decimals, the fingerprint of 12px drawings
-scaled by 4/3 on export.
+_Today:_ every value has at most 2 decimals, but the 12px drawings scaled by 4/3
+on export still sit off the 0.5px grid (`2.67`, `13.33`).
 
 ### Detail and legibility (_review_)
 
