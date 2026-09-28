@@ -87,7 +87,7 @@
   the rest, help matches the information icon, and the component browser's
   category icons (convert, parse, random and others) are clearer at their small
   size.
-- [Icons that meant the same thing now match everywhere][NNN]. The Trash
+- [Icons that meant the same thing now match everywhere][127]. The Trash
   category and label deletion use the standard trash icon, clearing the HTTP
   cache shows a trash can, zipping shows the join icon, time-of-day and
   dictionary functions share the time and array icons used elsewhere, and
@@ -221,7 +221,7 @@
 [124]: https://github.com/jdunkerley/enso/pull/124
 [125]: https://github.com/jdunkerley/enso/pull/125
 [126]: https://github.com/jdunkerley/enso/pull/126
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[127]: https://github.com/jdunkerley/enso/pull/127
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
