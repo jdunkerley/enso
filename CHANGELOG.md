@@ -72,6 +72,11 @@
   rounded ends and corners, two-tone icons use a single, lighter shade for their
   background shape, and a few odd line weights have been evened out. Nothing has
   been redrawn: every icon keeps its shape.
+- [Several icons have been redrawn][124]. Copy and close each use one drawing
+  everywhere; "information" is a solid circle with an i; the component browser's
+  metadata category has its own icon instead of reusing "information"; and the
+  documentation, find, join, union, root and workflow icons, which were drawn
+  entirely in a faint shade, now have a solid shape.
 
 #### Enso Language & Runtime
 
@@ -195,6 +200,7 @@
 [117]: https://github.com/jdunkerley/enso/pull/117
 [122]: https://github.com/jdunkerley/enso/pull/122
 [123]: https://github.com/jdunkerley/enso/pull/123
+[124]: https://github.com/jdunkerley/enso/pull/124
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
