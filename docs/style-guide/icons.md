@@ -97,10 +97,9 @@ filled icon, such as a clock's hands. No other widths.
 2px is the established weight (39 icons) and matches the visual mass of the
 filled icons; 1.5px strokes look anaemic beside them.
 
-_Today:_ 8 icons, mostly 1.33px drawings (12px art scaled by 4/3) whose details
-would close up at 2px, and `help`, a 1.5px line icon whose dot would merge with
-its stem. They need redrawing, not a new width. (`tidy_up` was one until #98
-redrew it.)
+_Today:_ 3 icons (`join2-1`, `sessions`, `versions`), all due to be repointed or
+deleted rather than redrawn. The 1.33px drawings (12px art scaled by 4/3) and
+`help` were redrawn in #103, and `tidy_up` in #98.
 
 ### Caps and joins
 
