@@ -1,8 +1,12 @@
 @font-face {
   font-family: "M PLUS 1";
-  src: url("/font-mplus1/MPLUS1[wght].ttf");
+  src: url("/font-mplus1/MPLUS1-Variable.woff2") format("woff2");
   /* Variable font (`wght` axis 100-900, per its `fvar` table); without a weight range this
      descriptor defaults to "normal" (400) and the face only matches font-weight: 400 requests,
      so `font-weight: 300`/`500`/`600`/`700` etc. can't reach the other instances at all. */
   font-weight: 100 900;
+  /* `block`, not `swap`: this face drives text measurement in the graph (`util/measurement.ts`),
+     so a fallback-font paint would lay nodes out at the wrong widths until the re-measure. The
+     file is preloaded from `index.html`, so the block period is normally short. */
+  font-display: block;
 }

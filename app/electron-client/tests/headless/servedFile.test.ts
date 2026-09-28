@@ -8,10 +8,10 @@ const BASE = path.resolve('/srv/assets')
 
 describe('resolveServedFile', () => {
   test('decodes percent-encoding so encoded filenames resolve', () => {
-    // The regression this was written for: the bundled font is literally `MPLUS1[wght].ttf`, and
-    // the browser requests it with the brackets encoded.
-    expect(resolveServedFile(BASE, '/font-mplus1/MPLUS1%5Bwght%5D.ttf')).toBe(
-      path.join(BASE, 'font-mplus1', 'MPLUS1[wght].ttf'),
+    // The regression this was written for: a font file named with the variable-font convention
+    // `Family[wght].ttf`, which the browser requests with the brackets encoded.
+    expect(resolveServedFile(BASE, '/fonts/Family%5Bwght%5D.ttf')).toBe(
+      path.join(BASE, 'fonts', 'Family[wght].ttf'),
     )
     expect(resolveServedFile(BASE, '/assets/a%20b.png')).toBe(path.join(BASE, 'assets', 'a b.png'))
   })

@@ -5,6 +5,17 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <!-- M PLUS 1 drives text measurement in the graph (`font-display: block` in
+         `src/project-view/assets/font-mplus1.css`), so fetch it before the CSS asks for it.
+         `crossorigin` is required for font preloads, even same-origin ones, or the browser
+         discards the preloaded response and fetches the font a second time. -->
+    <link
+      rel="preload"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      href="/font-mplus1/MPLUS1-Variable.woff2"
+    />
     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
     <!-- FIXME https://github.com/validator/validator/issues/917 -->
     <!-- FIXME Security Vulnerabilities: https://github.com/enso-org/ide/issues/226 -->

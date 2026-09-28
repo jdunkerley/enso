@@ -16,5 +16,10 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   that every standard library `icon:` tag names a real icon.
 - `base.css` — design tokens (`--font-sans`, `--font-code`, `--font-mono`,
   colours) and the `@font-face` imports from the `font-*.css` files.
+- `font-*.css` — one `@font-face` file per family; the font files and their
+  licence notices live in `public/font-*/`. Give every `src` a `format()` and
+  every face a `font-display` (`block` for M PLUS 1, which drives text
+  measurement and is preloaded from `index.html`). A renamed or added font
+  directory must also be listed in `build_tools/build/paths.yaml`.
 - `icon-*.svg`, `icons/` — standalone images imported directly by components,
   not part of the sprite.
