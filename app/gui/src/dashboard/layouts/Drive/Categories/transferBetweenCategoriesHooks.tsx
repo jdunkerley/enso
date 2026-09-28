@@ -223,7 +223,7 @@ export function useTransferBetweenCategories() {
                         )}
                       </Text>
 
-                      <Alert variant="outline" icon="copy2">
+                      <Alert variant="outline" icon="copy">
                         <Text>
                           {getText(
                             'copyInsteadOfRestoringDescription',
@@ -302,7 +302,7 @@ function askToCopyInstead(getText: GetText, text: string) {
       <>
         <Text>{text}</Text>
 
-        <Alert variant="outline" icon="copy2">
+        <Alert variant="outline" icon="copy">
           <Text>{getText('youCanCopyInstead')}</Text>
         </Alert>
       </>

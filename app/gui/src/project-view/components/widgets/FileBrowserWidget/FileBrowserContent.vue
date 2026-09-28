@@ -100,7 +100,7 @@ const renameDirectoryEnabled = computed(
 )
 
 function entryIcon(entry: AnyAsset) {
-  return assetIsDirectory(entry) ? 'folder' : 'text2'
+  return assetIsDirectory(entry) ? 'folder' : 'text'
 }
 
 const focused = ref<{ type: 'asset'; asset: AnyAsset } | { type: 'title'; title: string } | null>()

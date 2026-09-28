@@ -661,7 +661,7 @@ type Snowflake_Connection
             self.execute_query query write_operation=True
 
     ## ---
-       icon: parse
+       icon: parse3
        ---
        Returns the list of file formats for the current database.
 

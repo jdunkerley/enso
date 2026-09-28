@@ -63,16 +63,6 @@
     <path opacity="0.3" d="M5 7H7V9H5V7ZM9 7H11V9H9V7Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="array_new2" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect opacity="0.3" x="4" y="7" width="3" height="3" fill="currentColor"></rect>
-    <rect opacity="0.3" x="9" y="7" width="3" height="3" fill="currentColor"></rect>
-    <rect y="5" width="2" height="7" fill="currentColor"></rect>
-    <rect y="3" width="4" height="2" fill="currentColor"></rect>
-    <rect y="12" width="4" height="2" fill="currentColor"></rect>
-    <rect x="14" y="5" width="2" height="7" fill="currentColor"></rect>
-    <rect x="12" y="12" width="4" height="2" fill="currentColor"></rect>
-    <rect x="12" y="3" width="4" height="2" fill="currentColor"></rect>
-  </symbol>
 
   <symbol id="arrow_circle_left" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M10.67 8H5.33M5.33 8L7.33 10M5.33 8L7.33 6M2 8C2 4.69 4.69 2 8 2C11.31 2 14 4.69 14 8C14 11.31 11.31 14 8 14C4.69 14 2 11.31 2 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -144,9 +134,6 @@
 
 
 
-  <symbol id="clone" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M11 0.67H3C2.27 0.67 1.67 1.27 1.67 2V11.33H3V2H11V0.67ZM10.33 3.33L14.33 7.33V14C14.33 14.73 13.73 15.33 13 15.33H5.66C4.93 15.33 4.33 14.73 4.33 14L4.34 4.67C4.34 3.93 4.93 3.33 5.67 3.33H10.33ZM9.67 8H13.33L9.67 4.33V8Z" fill="currentColor"></path>
-  </symbol>
 
   <symbol id="close" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -236,9 +223,6 @@
     <path d="M10 10V14H2V6H6M6 10H14V2H6V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
   </symbol>
 
-  <symbol id="copy2" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M10 10V14H2V6H6M6 10H14V2H6V10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </symbol>
 
   <symbol id="copy_as_path" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M12 2 8 14H10L14 2H12ZM8 2 4 14H6L10 2H8ZM4 5H2V7H4V5ZM4 10H2V12H4V10Z" fill="currentColor"></path>
@@ -515,13 +499,6 @@
 
 
 
-  <symbol id="join2-1" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <circle opacity="0.52" cx="5.5" cy="8" r="5.5" fill="currentColor"></circle>
-    <circle opacity="0.52" cx="10.5" cy="8" r="5.5" fill="currentColor"></circle>
-    <path opacity="0.15" d="M8 3.1C9.78 4.01 11 5.86 11 8C11 10.14 9.78 11.99 8 12.9C6.22 11.99 5 10.14 5 8C5 5.86 6.22 4.01 8 3.1Z" fill="currentColor"></path>
-    <circle opacity="0.87" cx="5.5" cy="8" r="5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></circle>
-    <circle opacity="0.87" cx="10.5" cy="8" r="5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></circle>
-  </symbol>
 
   <symbol id="join_full" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M8 4.26C9.21 5.07 10 6.44 10 8C10 9.56 9.21 10.93 8 11.74C6.79 10.93 6 9.56 6 8C6 6.44 6.79 5.07 8 4.26Z" fill="currentColor"></path>
@@ -718,14 +695,6 @@
     <path fill="currentColor" d="M7 1H13V15H11V3H9V15H7V9C4.79 9 3 7.21 3 5C3 2.79 4.79 1 7 1Z"/>
   </symbol>
 
-  <symbol id="parse" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect x="2" y="3" width="10" height="1" fill="currentColor"></rect>
-    <path d="M12 1L16 3.5L12 6V1Z" fill="currentColor"></path>
-    <rect opacity="0.3" width="10" height="16" rx="4" fill="currentColor"></rect>
-    <rect x="2" y="6" width="4" height="1" fill="currentColor"></rect>
-    <rect x="2" y="9" width="6" height="1" fill="currentColor"></rect>
-    <rect x="2" y="12" width="5" height="1" fill="currentColor"></rect>
-  </symbol>
 
 
   <symbol id="parse3" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -777,10 +746,6 @@
     <path fill-rule="evenodd" fill="currentColor" d="M3 1H13C14.1 1 15 1.9 15 3V13C15 14.1 14.1 15 13 15H3C1.9 15 1 14.1 1 13V3C1 1.9 1.9 1 3 1ZM3 3H5V5H3V3ZM11 3H13V5H11V3ZM7 7H9V9H7V7ZM3 11H5V13H3V11ZM11 11H13V13H11V11Z"/>
   </symbol>
 
-  <symbol id="recent" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M12.69 8C12.69 5.42 10.6 3.33 8.02 3.33C6.7 3.33 5.75 3.79 4.83 4.67H6C6.37 4.67 6.67 4.97 6.67 5.33C6.67 5.7 6.37 6 6 6H4C3.26 6 2.67 5.4 2.67 4.67V2.67C2.67 2.3 2.97 2 3.33 2C3.7 2 4 2.3 4 2.67V3.62C5.08 2.61 6.32 2 8.02 2C11.33 2 14.02 4.69 14.02 8C14.02 11.31 11.33 14 8.02 14C5.4 14 3.18 12.33 2.36 10C2.24 9.65 2.42 9.27 2.77 9.15C3.11 9.03 3.49 9.21 3.62 9.56C4.26 11.37 5.99 12.67 8.02 12.67C10.6 12.67 12.69 10.58 12.69 8Z" fill="currentColor"/>
-    <path d="M8 5.5V8.17L9.67 9.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-  </symbol>
 
   <symbol id="redo" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M10.2 1.53C10.46 1.27 10.88 1.27 11.14 1.53L13.14 3.53C13.4 3.79 13.4 4.21 13.14 4.47L11.14 6.47C10.88 6.73 10.46 6.73 10.2 6.47C9.93 6.21 9.93 5.79 10.2 5.53L11.06 4.67H6.33C4.31 4.67 2.67 6.31 2.67 8.33C2.67 10.36 4.31 12 6.33 12H11.33C11.7 12 12 12.3 12 12.67C12 13.03 11.7 13.33 11.33 13.33H6.33C3.57 13.33 1.33 11.09 1.33 8.33C1.33 5.57 3.57 3.33 6.33 3.33H11.06L10.2 2.47C9.93 2.21 9.93 1.79 10.2 1.53Z" fill="currentColor"></path>
@@ -808,10 +773,6 @@
     <rect x="14" y="10" width="1" height="4" fill="currentColor"/>
   </symbol>
 
-  <symbol id="root" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path fill-rule="evenodd" d="M8 1A7 7 0 1 0 8 15A7 7 0 1 0 8 1ZM8 3A5 5 0 1 1 8 13A5 5 0 1 1 8 3Z" fill="currentColor"/>
-    <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
-  </symbol>
 
   <symbol id="row_add" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path opacity="0.3" d="M1 1H5V4H1V1ZM6 1H10V4H6V1ZM11 1H15V4H11V1Z" fill="currentColor"/>
@@ -848,9 +809,6 @@
     <path d="M1 11H5V15H1V11ZM6 11H10V15H6V11ZM11 11H15V15H11V11Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="sessions" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M10.18 8.76C11.83 8.36 13.67 9.19 14.53 11.25C14.98 12.32 14.02 13.33 12.86 13.33H11.33M7 4.67C7 5.77 6.11 6.67 5 6.67C3.9 6.67 3 5.77 3 4.67C3 3.56 3.9 2.67 5 2.67C6.11 2.67 7 3.56 7 4.67ZM13 4.67C13 5.77 12.11 6.67 11 6.67C9.9 6.67 9 5.77 9 4.67C9 3.56 9.9 2.67 11 2.67C12.11 2.67 13 3.56 13 4.67ZM6.86 13.33H3.15C1.99 13.33 1.02 12.32 1.47 11.25C2.91 7.81 7.09 7.81 8.53 11.25C8.98 12.32 8.02 13.33 6.86 13.33Z" stroke="currentColor" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"></path>
-  </symbol>
 
   <symbol id="settings" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M7.13 1C6.64 1 6.25 1.39 6.25 1.88V3.05C5.64 3.27 5.08 3.59 4.59 4.01L3.57 3.42C3.15 3.18 2.62 3.33 2.37 3.74L1.5 5.26C1.26 5.67 1.4 6.22 1.82 6.45L2.84 7.04C2.78 7.35 2.75 7.68 2.75 8C2.75 8.32 2.78 8.65 2.84 8.96L1.82 9.55C1.4 9.79 1.26 10.33 1.5 10.74L2.37 12.26C2.62 12.67 3.15 12.82 3.57 12.58L4.59 11.99C5.08 12.41 5.64 12.73 6.25 12.95V14.13C6.25 14.61 6.64 15 7.13 15H8.88C9.36 15 9.75 14.61 9.75 14.13V12.95C10.36 12.73 10.92 12.41 11.41 11.99L12.43 12.58C12.85 12.82 13.38 12.67 13.63 12.26L14.5 10.74C14.74 10.33 14.6 9.79 14.18 9.55L13.16 8.96C13.22 8.65 13.25 8.32 13.25 8C13.25 7.68 13.22 7.35 13.16 7.04L14.18 6.45C14.6 6.22 14.74 5.67 14.5 5.26L13.63 3.74C13.38 3.33 12.85 3.18 12.43 3.42L11.41 4.01C10.92 3.59 10.36 3.27 9.75 3.05V1.88C9.75 1.39 9.36 1 8.88 1H7.13ZM8 9.75C8.96 9.75 9.75 8.96 9.75 8C9.75 7.04 8.96 6.25 8 6.25C7.04 6.25 6.25 7.04 6.25 8C6.25 8.96 7.04 9.75 8 9.75Z" fill="currentColor"/>
@@ -924,9 +882,6 @@
     <rect x="1" y="12" width="14" height="2" rx="1" fill="currentColor"/>
   </symbol>
 
-  <symbol id="tab_close" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  </symbol>
 
   <symbol id="table" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M1 1H5V5H1V1ZM6 1H10V5H6V1ZM11 1H15V5H11V1Z" fill="currentColor"/>
@@ -949,19 +904,12 @@
     <path fill-rule="evenodd" d="M6.5 3H13C14.1 3 15 3.9 15 5V11C15 12.1 14.1 13 13 13H6.5C5.95 13 5.42 12.77 5.04 12.37L1.46 8.68C1.09 8.3 1.09 7.7 1.46 7.32L5.04 3.63C5.42 3.23 5.95 3 6.5 3ZM6.5 9.5C7.33 9.5 8 8.83 8 8C8 7.17 7.33 6.5 6.5 6.5C5.67 6.5 5 7.17 5 8C5 8.83 5.67 9.5 6.5 9.5Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="temp" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M1 12L-2 8H0C0 6.15 0.64 4.36 1.82 2.92C2.99 1.49 4.62 0.52 6.44 0.15C8.25 -0.21 10.14 0.07 11.77 0.94C13.4 1.82 14.68 3.23 15.39 4.94C16.1 6.65 16.19 8.55 15.66 10.32C15.12 12.09 13.98 13.62 12.44 14.65C10.91 15.68 9.06 16.14 7.22 15.96C5.37 15.78 3.65 14.97 2.34 13.66L3.77 12.23C4.75 13.21 6.04 13.82 7.41 13.95C8.79 14.09 10.17 13.74 11.32 12.98C12.48 12.21 13.32 11.06 13.73 9.74C14.13 8.41 14.06 6.99 13.53 5.71C13 4.43 12.04 3.37 10.82 2.72C9.6 2.07 8.19 1.86 6.83 2.13C5.48 2.4 4.25 3.13 3.37 4.2C2.5 5.27 2.02 6.62 2.02 8H4L1 12ZM9.29 5.29C9.68 4.9 10.32 4.9 10.71 5.29C11.1 5.68 11.1 6.32 10.71 6.71L9.41 8L10.71 9.29C11.1 9.68 11.1 10.31 10.71 10.7C10.31 11.1 9.68 11.1 9.29 10.7L8 9.41L6.71 10.7C6.32 11.09 5.69 11.09 5.3 10.7C4.91 10.31 4.91 9.68 5.3 9.29L6.59 8L5.3 6.71C4.91 6.32 4.91 5.69 5.3 5.3C5.69 4.91 6.32 4.91 6.71 5.3L8 6.59L9.29 5.29Z" fill="currentColor"></path>
-  </symbol>
 
   <symbol id="text" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <rect opacity="0.3" x="3" y="1" width="10" height="14" rx="2" fill="currentColor"/>
     <path d="M5 3H9V5H5V3ZM5 7H11V9H5V7ZM5 11H10V13H5V11Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="text2" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect opacity="0.3" x="2" y="1" width="12" height="14" rx="2" fill="currentColor"/>
-    <path d="M4 3H8V5H4V3ZM4 7H12V9H4V7ZM4 11H10V13H4V11Z" fill="currentColor"/>
-  </symbol>
 
   <symbol id="text3" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2.67C2 2.3 2.3 2 2.67 2H13.33C13.7 2 14 2.3 14 2.67V4C14 4.37 13.7 4.67 13.33 4.67C12.97 4.67 12.67 4.37 12.67 4V3.33H8.67V12.67H9.33C9.7 12.67 10 12.97 10 13.33C10 13.7 9.7 14 9.33 14H6.67C6.3 14 6 13.7 6 13.33C6 12.97 6.3 12.67 6.67 12.67H7.33V3.33H3.33V4C3.33 4.37 3.03 4.67 2.67 4.67C2.3 4.67 2 4.37 2 4V2.67Z" fill="currentColor"></path>
@@ -978,9 +926,6 @@
     <path d="M8 3C7.45 3 7 3.45 7 4V8C7 8.38 7.21 8.71 7.52 8.88L10.5 10.6C10.97 10.87 11.59 10.71 11.86 10.23C12.14 9.75 11.97 9.14 11.5 8.86L9 7.42V4C9 3.45 8.55 3 8 3Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="time2" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path fill-rule="evenodd" fill="currentColor" d="M8 1A7 7 0 1 0 8 15A7 7 0 1 0 8 1ZM8 3C7.45 3 7 3.45 7 4V8C7 8.38 7.21 8.71 7.52 8.88L10.5 10.6C10.97 10.87 11.59 10.71 11.86 10.23C12.14 9.75 11.97 9.14 11.5 8.86L9 7.42V4C9 3.45 8.55 3 8 3Z"/>
-  </symbol>
 
   <symbol id="transform" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M13 4V2H3L9 8L3 14H12L13 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -988,18 +933,12 @@
 
 
 
-  <symbol id="transform4" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M13 4V2.5H3L9 7.5L3 13.5H12L13 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-  </symbol>
 
   <symbol id="trash" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M6 1H10V3H13C13.55 3 14 3.45 14 4V5H2V4C2 3.45 2.45 3 3 3H6V1Z" fill="currentColor"/>
     <path fill-rule="evenodd" d="M3 6H13V13C13 14.1 12.1 15 11 15H5C3.9 15 3 14.1 3 13V6ZM5 8H7V13H5V8ZM9 8H11V13H9V8Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="trash_small" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path fill-rule="evenodd" clip-rule="evenodd" d="M4.94 3.33C5.46 2.16 6.63 1.33 8 1.33C9.37 1.33 10.54 2.16 11.06 3.33H14C14.37 3.33 14.67 3.63 14.67 4C14.67 4.37 14.37 4.67 14 4.67H13.29L12.79 12.18C12.7 13.58 11.53 14.67 10.13 14.67H5.87C4.47 14.67 3.3 13.58 3.21 12.18L2.71 4.67H2C1.63 4.67 1.33 4.37 1.33 4C1.33 3.63 1.63 3.33 2 3.33H4.94ZM6.51 3.33C6.88 2.92 7.41 2.67 8 2.67C8.59 2.67 9.13 2.92 9.49 3.33H6.51ZM7.33 7.33C7.33 6.97 7.03 6.67 6.67 6.67C6.3 6.67 6 6.97 6 7.33V10.67C6 11.03 6.3 11.33 6.67 11.33C7.03 11.33 7.33 11.03 7.33 10.67V7.33ZM9.33 6.67C9.7 6.67 10 6.97 10 7.33V10.67C10 11.03 9.7 11.33 9.33 11.33C8.97 11.33 8.67 11.03 8.67 10.67V7.33C8.67 6.97 8.97 6.67 9.33 6.67Z" fill="currentColor"></path>
-  </symbol>
 
   <symbol id="undo" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M5.14 1.53C5.4 1.79 5.4 2.21 5.14 2.47L4.28 3.33H9C11.76 3.33 14 5.57 14 8.33C14 11.09 11.76 13.33 9 13.33H4C3.63 13.33 3.33 13.03 3.33 12.67C3.33 12.3 3.63 12 4 12H9C11.03 12 12.67 10.36 12.67 8.33C12.67 6.31 11.03 4.67 9 4.67H4.28L5.14 5.53C5.4 5.79 5.4 6.21 5.14 6.47C4.88 6.73 4.46 6.73 4.2 6.47L2.2 4.47C1.93 4.21 1.93 3.79 2.2 3.53L4.2 1.53C4.46 1.27 4.88 1.27 5.14 1.53Z" fill="currentColor"></path>
@@ -1030,9 +969,6 @@
     <path fill-rule="evenodd" d="M8 15C11.87 15 15 11.87 15 8C15 4.13 11.87 1 8 1C4.13 1 1 4.13 1 8C1 11.87 4.13 15 8 15ZM7 7V4H9V7H12V9H9V12H7V9H4V7H7Z" fill="currentColor"/>
   </symbol>
 
-  <symbol id="versions" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M10 4.67V4C10 2.9 9.1 2 8 2H5.33C4.23 2 3.33 2.9 3.33 4V9.33C3.33 10.44 4.23 11.33 5.33 11.33H6M10.67 14H8C6.9 14 6 13.1 6 12V6.67C6 5.56 6.9 4.67 8 4.67H10.67C11.77 4.67 12.67 5.56 12.67 6.67V12C12.67 13.1 11.77 14 10.67 14Z" stroke="currentColor" stroke-width="1.33" stroke-linecap="round" stroke-linejoin="round"></path>
-  </symbol>
 
   <symbol id="warning" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path fill-rule="evenodd" clip-rule="evenodd" d="M8 1.33C8.24 1.33 8.45 1.46 8.57 1.66L14.91 12.33C15.03 12.53 15.03 12.79 14.91 13C14.79 13.2 14.57 13.33 14.33 13.33H1.67C1.43 13.33 1.21 13.2 1.09 13C0.97 12.79 0.97 12.53 1.09 12.33L7.43 1.66C7.55 1.46 7.76 1.33 8 1.33ZM8 6C8.37 6 8.67 6.3 8.67 6.67V8C8.67 8.37 8.37 8.67 8 8.67C7.63 8.67 7.33 8.37 7.33 8V6.67C7.33 6.3 7.63 6 8 6ZM7.17 10C7.17 9.54 7.54 9.17 8 9.17C8.46 9.17 8.83 9.54 8.83 10C8.83 10.46 8.46 10.83 8 10.83C7.54 10.83 7.17 10.46 7.17 10Z" fill="currentColor"></path>

@@ -17,33 +17,27 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
   canvas: [],
   // currentColor only; `*_color` brand marks are exempt (0)
   colour: [],
-  // stroke width 2 (1.5 only for a detail inside a filled icon) (3)
-  strokeWidth: ['join2-1', 'sessions', 'versions'],
+  // stroke width 2 (1.5 only for a detail inside a filled icon) (0)
+  strokeWidth: [],
   // round caps and round joins on every stroke (0)
   strokeEnds: [],
-  // one secondary tone, opacity 0.3 (1)
-  secondaryTone: ['join2-1'],
+  // one secondary tone, opacity 0.3 (0)
+  secondaryTone: [],
   // no transform, clip-path, mask, defs, gradient or inner ids (0)
   structure: [],
   // at most 2 decimals (0)
   coordinates: [],
-  // snake_case, no iteration numbers, no paths (16)
+  // snake_case, no iteration numbers, no paths (10)
   naming: [
     '3_dot_menu',
-    'array_new2',
     'bullet-list',
-    'copy2',
     'home2',
     'icon/lock',
-    'join2-1',
     'local_scope2',
     'local_scope4',
     'numbered-list',
     'parse3',
     'path2',
-    'text2',
     'text3',
-    'time2',
-    'transform4',
   ],
 }

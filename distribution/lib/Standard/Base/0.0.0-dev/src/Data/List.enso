@@ -126,7 +126,7 @@ type List
             loop self -index self
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines all the elements of the list, by iteratively applying the passed
        function with next elements of the list.

@@ -371,7 +371,7 @@ type Range
             go 0 self.start
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines all the elements of the range, by iteratively applying the passed
        function with next elements of the range.

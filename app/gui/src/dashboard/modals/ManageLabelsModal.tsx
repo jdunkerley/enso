@@ -436,7 +436,7 @@ function AllLabels(props: AllLabelsProps) {
               <Button
                 variant="icon"
                 aria-label={getText('delete')}
-                icon="trash_small"
+                icon="trash"
                 size="small"
                 className="ml-auto opacity-0 transition-opacity duration-75 group-hover:opacity-100"
               />

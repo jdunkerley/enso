@@ -1055,7 +1055,7 @@ type Array
         - join by row position
         - merge
        group: Calculations
-       icon: join2-1
+       icon: join
        suggested: 13
        ---
        Performs a pair-wise operation passed in `function` on consecutive

@@ -62,7 +62,7 @@ const displayableActions = {
     shortcut: graphBindings.bindings['components.collapse'],
   },
   'components.copy': {
-    icon: 'copy2',
+    icon: 'copy',
     description: 'Copy Components',
     shortcut: graphBindings.bindings['components.copy'],
   },

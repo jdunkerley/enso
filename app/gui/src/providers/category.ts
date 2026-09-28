@@ -110,12 +110,12 @@ export function isLocalCategory(category: Category) {
 export function categoryIcon(category: CategoryType): Icon {
   switch (category) {
     case 'cloud':
-    case 'recent':
+    case 'trash':
       return category
+    case 'recent':
+      return 'history'
     case 'local':
       return 'system'
-    case 'trash':
-      return 'trash_small'
     case 'team':
       return 'people'
     case 'localDirectory':

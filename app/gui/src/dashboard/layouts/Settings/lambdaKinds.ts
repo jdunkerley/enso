@@ -162,7 +162,7 @@ export const EVENT_TYPE_ICON: Record<LambdaKind, SvgUseIcon> = {
   'POST /projects/{PROJECT_ID}/close': 'close',
   'POST /projects/{PROJECT_ID}/upload': 'data_upload',
   'POST /projects/{PROJECT_ID}/versions/restore': 'redo',
-  'POST /projects/{PROJECT_ID}/versions/clone': 'clone',
+  'POST /projects/{PROJECT_ID}/versions/clone': 'duplicate',
   'POST /projects/{PROJECT_ID}/hybrid_set_opened': 'open',
   'POST /projects/{PROJECT_ID}/hybrid_set_open_in_progress': 'open',
   'GET /projects/{PROJECT_ID}/executions': 'schedule',

@@ -255,7 +255,7 @@ type Pair
                 Nothing
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines all the elements of the pair, by iteratively applying the passed
        function with next elements of the pair.

@@ -20,7 +20,7 @@ type Hashset
 
     ## ---
        aliases: [set]
-       icon: array_new2
+       icon: array_new
        advanced: true
        ---
        Constructs a new set from a vector.
