@@ -198,7 +198,7 @@ export function Settings() {
       >
         <Heading level={1} className="flex items-center px-heading-x">
           <Menu.Trigger>
-            <Button variant="icon" icon="3_dot_menu" className="mr-3 sm:hidden" />
+            <Button variant="icon" icon="menu_dots" className="mr-3 sm:hidden" />
             <Popover size="auto" UNSTABLE_portalContainer={root}>
               <SettingsSidebar
                 context={context}

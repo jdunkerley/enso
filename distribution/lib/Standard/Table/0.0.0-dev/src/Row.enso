@@ -41,7 +41,7 @@ type Row
     length self = self.java_row.column_count
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets the value of the specified column.
 
@@ -55,7 +55,7 @@ type Row
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Gets the value of the specified column.
 

@@ -194,7 +194,7 @@ type HTTP
 
     ## ---
        aliases: [flush]
-       icon: temp
+       icon: trash
        ---
        Clear the HTTP request cache.
 

@@ -77,7 +77,7 @@ export const colorForMessageType: Record<MessageType, string> = {
       />
       <SvgButton
         v-if="!containsLibraryName()"
-        name="copy2"
+        name="copy"
         class="copyButton"
         title="Copy message text"
         @activate="copyText"

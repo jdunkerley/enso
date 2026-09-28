@@ -981,7 +981,7 @@ type Decimal
 
     ## ---
        group: Math
-       icon: transform4
+       icon: transform
        ---
        Returns the smaller value of `self` and `that`.
 
@@ -1002,7 +1002,7 @@ type Decimal
 
     ## ---
        group: Math
-       icon: transform4
+       icon: transform
        ---
        Returns the larger value of `self` and `that`.
 

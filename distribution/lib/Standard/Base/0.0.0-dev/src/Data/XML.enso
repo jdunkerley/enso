@@ -146,7 +146,7 @@ type XML_Document
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets a child element of an XML document.
 
@@ -178,7 +178,7 @@ type XML_Document
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets the child element of the inner XML Element
 
@@ -193,7 +193,7 @@ type XML_Document
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets a child or attribute of an XML document.
 
@@ -342,7 +342,7 @@ type XML_Document
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Get an attribute of an XML document.
 
@@ -375,7 +375,7 @@ type XML_Document
     text self -> Text ! XML_Error = self.root_element.text
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Get elements denoted by the given XPath key.
 
@@ -394,7 +394,7 @@ type XML_Document
         XML_Utils.getXPath self.java_document key (e-> XML_Element.new e) False
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets the text of the first element denoted by the given XPath key.
 
@@ -416,7 +416,7 @@ type XML_Document
             e : XML_Element -> e.text
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets child elements matching a given tag name.
 
@@ -427,7 +427,7 @@ type XML_Document
         if tag_name=="*" || tag_name==self.root_element.name then [self.root_element] else []
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets descendant elements matching a given tag name.
        This searches through all descendants of the node, not just immediate
@@ -487,7 +487,7 @@ type XML_Element
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets a child of an XML element.
 
@@ -519,7 +519,7 @@ type XML_Element
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets a child or attribute of an XML element.
 
@@ -594,7 +594,7 @@ type XML_Element
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Get an attribute of an XML element.
 
@@ -731,7 +731,7 @@ type XML_Element
         write_impl self.java_element path encoding on_existing_file include_xml_declaration on_problems
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Get elements denoted by the given XPath key.
 
@@ -750,7 +750,7 @@ type XML_Element
         XML_Utils.getXPath self.java_element key (e-> XML_Element.new e) False
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets the text of the first element denoted by the given XPath key.
 
@@ -772,7 +772,7 @@ type XML_Element
             e : XML_Element -> e.text
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets child elements matching a given tag name.
 
@@ -784,7 +784,7 @@ type XML_Element
            self.children_cache.filter (c-> c.name == tag_name)
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets descendant elements matching a given tag name.
        This searches through all descendants of the node, not just immediate

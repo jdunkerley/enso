@@ -38,7 +38,7 @@ polyglot java import org.enso.base.Time_Utils
 type Time_Of_Day
     ## ---
        group: DateTime
-       icon: time2
+       icon: time
        ---
        Obtains the current time from the system clock in the default time-zone.
 
@@ -54,7 +54,7 @@ type Time_Of_Day
 
     ## ---
        group: Constants
-       icon: time2
+       icon: time
        ---
        Obtains an instance of `Time_Of_Day` from an hour, minute, second and
        nanosecond.

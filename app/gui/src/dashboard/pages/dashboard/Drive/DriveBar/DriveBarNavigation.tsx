@@ -140,7 +140,7 @@ export function DriveBarNavigation() {
           id: rootDirectoryId,
           category,
           label: getText('recentCategory'),
-          icon: 'recent',
+          icon: 'history',
         } satisfies PathItem,
         ...finalPathRaw.slice(1),
       ]
@@ -152,7 +152,7 @@ export function DriveBarNavigation() {
           id: categoryDirectoryId(category) ?? rootDirectoryId,
           category: category,
           label: getText('trashCategory'),
-          icon: 'trash_small',
+          icon: 'trash',
         } satisfies PathItem,
         ...finalPathRaw.slice(Math.max(1, finalPathRaw.length - 1)),
       ]

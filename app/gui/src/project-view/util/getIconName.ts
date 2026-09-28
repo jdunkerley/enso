@@ -40,7 +40,7 @@ export function typeNameToIcon(typePath: ProjectPath): Icon {
 /** Returns an icon override for a suggestion entry kind. */
 export function suggestionEntryToIcon(entry: SuggestionEntry) {
   if (entry.iconName) return entry.iconName
-  if (entry.kind === SuggestionKind.Local) return 'local_scope2'
+  if (entry.kind === SuggestionKind.Local) return 'local_scope'
   if (entry.kind === SuggestionKind.Module) return 'collection'
   return DEFAULT_ICON
 }

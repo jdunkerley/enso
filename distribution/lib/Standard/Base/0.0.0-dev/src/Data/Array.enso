@@ -32,7 +32,7 @@ from project.Metadata import Display, Widget
 type Array
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        suggested: 4
        ---
        Gets an element from the array at a specified index (0-based).
@@ -179,7 +179,7 @@ type Array
         - tail
         - top
        group: Selections
-       icon: parse3
+       icon: parse
        suggested: 6
        ---
        Creates a new `Vector` with only the specified range of elements from the
@@ -200,7 +200,7 @@ type Array
         - remove
         - skip
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Creates a new `Vector`, removing any elements from the specified range.
 
@@ -255,7 +255,7 @@ type Array
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Get the first element from the array, or an `Index_Out_Of_Bounds` if the
        array is empty.
@@ -271,7 +271,7 @@ type Array
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Get the second element from the array, or a `Index_Out_Of_Bounds` if the
        array doesn't have a second element.
@@ -860,7 +860,7 @@ type Array
         Array_Like_Helpers.find self condition start if_missing
 
     ## ---
-       icon: parse3
+       icon: parse
        suggested: 5
        ---
        Gets an element from the array at a specified index (0-based).
@@ -1055,7 +1055,7 @@ type Array
         - join by row position
         - merge
        group: Calculations
-       icon: join2-1
+       icon: join
        suggested: 13
        ---
        Performs a pair-wise operation passed in `function` on consecutive

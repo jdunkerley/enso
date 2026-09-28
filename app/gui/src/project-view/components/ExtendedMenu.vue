@@ -19,7 +19,7 @@ defineProps<{
     class="ExtendedMenu"
     title="Additional Options"
   >
-    <template #button><SvgIcon name="3_dot_menu" class="moreIcon" /></template>
+    <template #button><SvgIcon name="menu_dots" class="moreIcon" /></template>
     <template #menu>
       <ActionMenu :actions="actions" @close="open = false">
         <ZoomControl v-if="zoomControls" :zoomLevel="zoomControls.zoomLevel" />

@@ -421,7 +421,7 @@ type Number
 
     ## ---
        group: Math
-       icon: transform4
+       icon: transform
        ---
        Returns the smaller value of `self` and `that`.
 
@@ -446,7 +446,7 @@ type Number
 
     ## ---
        group: Math
-       icon: transform4
+       icon: transform
        ---
        Returns the larger value of `self` and `that`.
 

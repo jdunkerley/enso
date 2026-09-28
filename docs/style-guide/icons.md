@@ -97,9 +97,9 @@ filled icon, such as a clock's hands. No other widths.
 2px is the established weight (39 icons) and matches the visual mass of the
 filled icons; 1.5px strokes look anaemic beside them.
 
-_Today:_ 3 icons (`join2-1`, `sessions`, `versions`), all due to be repointed or
-deleted rather than redrawn. The 1.33px drawings (12px art scaled by 4/3) and
-`help` were redrawn in #103, and `tidy_up` in #98.
+_Today:_ none; the last three (`join2-1`, `sessions`, `versions`) were repointed
+or deleted in #104. The 1.33px drawings (12px art scaled by 4/3) and `help` were
+redrawn in #103, and `tidy_up` in #98.
 
 ### Caps and joins
 
@@ -123,8 +123,8 @@ The tinted secondary shape is the set's signature (the container behind
 `data_input`, the grid behind `column_add`); it gives a two-tone icon from a
 single `currentColor`. It has to be one level so that icons look related.
 
-_Today:_ 5 icons, all three-tone drawings such as `heatmap`. The six icons
-tinted as a whole with no full-tone shape (`docs`, `find`, `join`, `root`,
+_Today:_ none; `join2-1`, the last, was repointed to `join` in #104. The six
+icons tinted as a whole with no full-tone shape (`docs`, `find`, `join`, `root`,
 `union`, `workflow_play`) were redrawn with one.
 
 ### Colour
@@ -179,7 +179,8 @@ first caller (`chevron_right`, not `folder_closed`).
 A name used in a standard library `icon:` doc tag is effectively permanent:
 renaming it means editing `.enso` files, so choose it carefully.
 
-_Today:_ 38 ids break this.
+_Today:_ none; the last were renamed or merged in #104 (`parse3` is now `parse`,
+`local_scope4` is `select_cell`).
 
 ### Every icon is used (_review_)
 
@@ -191,7 +192,7 @@ an icon in a `Choice.Option ... icon="join_inner"` argument, not only in a doc
 tag.
 
 _Today:_ none known; 65 unused symbols were removed after this guide was
-written.
+written, and `sessions`, `versions` and `root` in #104.
 
 ## Worked example: `tidy_up`
 

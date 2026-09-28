@@ -39,13 +39,13 @@ from project.Widget_Helpers import make_all_selector
 @Builtin_Type
 type Dictionary key value
     ## ---
-       icon: array_new2
+       icon: array_new
        ---
        Returns an empty dictionary.
     empty -> Dictionary = Array_Like_Helpers.dict_empty
 
     ## ---
-       icon: array_new2
+       icon: array_new
        ---
        Returns a single-element dictionary with the given key and value.
        A Call to `Dictionary.singleton key value` is the same as a call to
@@ -70,7 +70,7 @@ type Dictionary key value
     ## ---
        aliases: [dictionary, lookup table]
        group: Constants
-       icon: array_new2
+       icon: array_new
        ---
        Builds a dictionary from two Vectors. The first vector contains the keys,
        and the second vector contains the values. The two vectors must be of the
@@ -95,7 +95,7 @@ type Dictionary key value
 
     ## ---
        aliases: [dictionary, lookup table]
-       icon: array_new2
+       icon: array_new
        ---
        Builds a dictionary from a vector of key-value pairs, with each key-value
        pair represented as a 2 element vector.
@@ -223,7 +223,7 @@ type Dictionary key value
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets the value associated with `key` in this dictionary, or throws a
        `No_Such_Key.Error` if `key` is not present.
@@ -245,7 +245,7 @@ type Dictionary key value
     at self key = self.get key (Error.throw (No_Such_Key.Error self key))
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets the value associated with `key` in this dictionary, or returns
        `if_missing` if it isn't present.
@@ -398,7 +398,7 @@ type Dictionary key value
             else new_dictionary
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines the values in the dictionary.
 
@@ -418,7 +418,7 @@ type Dictionary key value
     fold self init function = self.values.fold init function
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines the key-value pairs in the dictionary.
 

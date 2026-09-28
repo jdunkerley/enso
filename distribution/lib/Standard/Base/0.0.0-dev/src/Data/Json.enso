@@ -222,7 +222,7 @@ type JS_Object
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        suggested: 3
        ---
        Get a value for a key of the object, or a default value if that key is not
@@ -240,7 +240,7 @@ type JS_Object
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        suggested: 2
        ---
        Get a value for a key of the object.
@@ -525,7 +525,7 @@ key_value_widget =
     Vector_Editor item_editor=item_editor display=..Always item_default=default
 
 ## ---
-   icon: parse3
+   icon: parse
    ---
    Get a value for the key of the object.
    As `Nothing` has no keys, returns `if_missing`.

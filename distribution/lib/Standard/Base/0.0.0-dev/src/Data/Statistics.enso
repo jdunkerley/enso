@@ -46,7 +46,7 @@ type Rank_Method
 
     ## ---
        group: Statistics
-       icon: transform4
+       icon: transform
        ---
        Assigns a rank to each value of data, dealing with equal values according
        to the method.

@@ -72,7 +72,7 @@ export default forwardRef(function Label(props: LabelProps, ref: ForwardedRef<HT
           </aria.Button>
           {onDelete && (
             <Button
-              icon="tab_close"
+              icon="close"
               variant="icon"
               size="small"
               onPress={onDelete}

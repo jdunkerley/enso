@@ -946,7 +946,7 @@ type Column
 
     ## ---
        group: Standard.Base.Math
-       icon: transform4
+       icon: transform
        ---
        Returns a column of minimum on each row of `self` and `values`.
 
@@ -973,7 +973,7 @@ type Column
 
     ## ---
        group: Standard.Base.Math
-       icon: transform4
+       icon: transform
        ---
        Returns a column of maximum on each row of `self` and `values`.
 
@@ -2030,7 +2030,7 @@ type Column
     ## ---
        aliases: [join by row position]
        group: Standard.Base.Calculations
-       icon: join2-1
+       icon: join
        ---
        Joins this column with another column (or table) by zipping rows from both
        together - the first row of the left column is correlated with the first
@@ -2169,7 +2169,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the value contained in this column at the given index.
 
@@ -2193,7 +2193,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the value contained in this column at the given index.
 
@@ -2373,7 +2373,7 @@ type Column
     ## ---
        aliases: [first, head, keep, last, limit, sample, slice, tail, top]
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Creates a new Column with the specified range of rows from the input
        Column.
@@ -2413,7 +2413,7 @@ type Column
     ## ---
        aliases: [remove, skip]
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Creates a new Column from the input with the specified range of rows
        removed.
@@ -2434,7 +2434,7 @@ type Column
 
     ## ---
        group: Standard.Base.Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the first element in the column, if it exists.
        If the column is empty, this method will return a dataflow error
@@ -2538,7 +2538,7 @@ type Column
         - spearman: ..Spearman
         - r squared: ..R_Squared
        group: Standard.Base.Statistics
-       icon: transform4
+       icon: transform
        ---
        Compute a single statistic on the column.
 
@@ -2548,7 +2548,7 @@ type Column
         self.implementation.compute self statistic
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Compute statistics on the column.
 
@@ -2576,7 +2576,7 @@ type Column
         - spearman: ..Spearman
         - r squared: ..R_Squared
        group: Standard.Base.Statistics
-       icon: transform4
+       icon: transform
        ---
        Compute a single running statistic on the column.
 

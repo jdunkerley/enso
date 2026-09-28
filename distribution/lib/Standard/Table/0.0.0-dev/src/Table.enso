@@ -439,7 +439,7 @@ type Table
     ## ---
        aliases: [cell value, get cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets a value from the table.
 
@@ -479,7 +479,7 @@ type Table
     ## ---
        aliases: [first cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets the top left value from the table.
     first_value self -> Any ! Index_Out_Of_Bounds =
@@ -488,7 +488,7 @@ type Table
     ## ---
        aliases: [last cell]
        group: Standard.Base.Selections
-       icon: local_scope4
+       icon: select_cell
        ---
        Gets the bottom right value from the table.
     last_value self -> Any ! Index_Out_Of_Bounds =
@@ -1244,7 +1244,7 @@ type Table
         - mode: columns=[..Mode]
         - standard deviation: columns=[..Standard_Deviation]
        group: Standard.Base.Calculations
-       icon: transform4
+       icon: transform
        suggested: 7
        ---
        Groups the rows in the table.
@@ -3176,7 +3176,7 @@ type Table
     ## ---
        aliases: [join by row position]
        group: Standard.Base.Calculations
-       icon: join2-1
+       icon: join
        ---
        Joins two tables by zipping rows from both tables together - the first row
        of the left table is correlated with the first one of the right one etc.

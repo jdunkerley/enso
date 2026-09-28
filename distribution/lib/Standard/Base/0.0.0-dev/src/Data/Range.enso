@@ -73,7 +73,7 @@ type Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the first element that is included within the range.
        It will raise `Index_Out_Of_Bounds` if the range is empty.
@@ -82,7 +82,7 @@ type Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Returns the second element that is included within the range.
        It will raise `Index_Out_Of_Bounds` if the range has less than two
@@ -124,7 +124,7 @@ type Range
 
     ## ---
        group: Selections
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the Range at a specified index (0-based).
 
@@ -151,7 +151,7 @@ type Range
         self.get index (Error.throw (Index_Out_Of_Bounds.Error index self.length))
 
     ## ---
-       icon: parse3
+       icon: parse
        ---
        Gets an element from the Range at a specified index (0-based).
        If the index is invalid then `if_missing` is returned.
@@ -371,7 +371,7 @@ type Range
             go 0 self.start
 
     ## ---
-       icon: transform4
+       icon: transform
        ---
        Combines all the elements of the range, by iteratively applying the passed
        function with next elements of the range.

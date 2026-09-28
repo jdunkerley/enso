@@ -21,7 +21,7 @@ import project.Data.Vector.Vector
     - spearman: ..Spearman
     - r_squared: ..R_Squared
    group: Statistics
-   icon: transform4
+   icon: transform
    ---
    Compute a single statistic on the vector (ignoring Nothing and NaN values).
 
