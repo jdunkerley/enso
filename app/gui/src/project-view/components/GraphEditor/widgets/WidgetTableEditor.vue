@@ -249,6 +249,13 @@ export const widgetDefinition = defineWidget(
   color: rgba(0, 0, 0, 0.4);
 }
 
+/* Every data cell here is editable code, so no coding ligatures, even with the "Code ligatures"
+   setting on — as in the code editor (see `--font-mono-variant-ligatures` in `base.css`). */
+.WidgetTableEditor :deep(.agGridTableView) {
+  font-variant-ligatures: var(--font-mono-variant-ligatures);
+  font-feature-settings: var(--font-mono-feature-settings);
+}
+
 .WidgetTableEditor:deep(.ag-root-wrapper) {
   --ag-wrapper-border-radius: var(--node-port-border-radius);
   border: none;

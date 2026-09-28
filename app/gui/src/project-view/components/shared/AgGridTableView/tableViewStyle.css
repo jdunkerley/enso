@@ -48,6 +48,17 @@
   }
 }
 
+/* The code font, whatever order the stylesheets load in. `ag-theme-alpine.css` sets
+   `--ag-font-family` on `.ag-theme-alpine`, and `ag-grid.css` applies it with
+   `[class*=ag-theme-] { font-family: var(--ag-font-family) }` — both as specific as the rule above,
+   so which one wins depends on stylesheet order. In a node's `WidgetTableEditor` the theme is also
+   imported from the widget's script, lands later, and used to win: the grid showed the system sans
+   stack. Setting AG Grid's own variable on the grid root with a second class outranks both. */
+.ag-theme-alpine.agGridTableView {
+  --ag-font-family: var(--font-mono);
+  font-family: var(--font-mono);
+}
+
 .ag-theme-alpine .communityCellRangeSelected {
   background-color: var(
     --ag-range-selection-background-color,

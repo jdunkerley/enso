@@ -7,6 +7,7 @@
  * code font's rendering is intended, and check the new images by eye before committing them.
  */
 import { expect, test, type Locator, type Page } from 'integration-test/base'
+import { createTableNode } from './actions'
 import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
 
@@ -120,21 +121,24 @@ test('Code editor caret lands between `-` and `>`', async ({ editorPage, page })
 
   const cursor = page.locator('.CodeEditor .cm-cursor-primary')
   await expect(cursor).toBeVisible()
-  const cursorX = (await cursor.boundingBox())!.x
   // The left edge of the `>` of `->`, measured on the rendered text.
-  const arrowGreaterX = await codeLine.evaluate((line) => {
-    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
-    for (let node = walker.nextNode(); node != null; node = walker.nextNode()) {
-      const at = node.textContent!.indexOf('->')
-      if (at < 0) continue
-      const range = document.createRange()
-      range.setStart(node, at + 1)
-      range.setEnd(node, at + 2)
-      return range.getBoundingClientRect().x
-    }
-    return NaN
-  })
-  expect(Math.abs(cursorX - arrowGreaterX)).toBeLessThanOrEqual(1)
+  const arrowGreaterX = () =>
+    codeLine.evaluate((line) => {
+      const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node != null; node = walker.nextNode()) {
+        const at = node.textContent!.indexOf('->')
+        if (at < 0) continue
+        const range = document.createRange()
+        range.setStart(node, at + 1)
+        range.setEnd(node, at + 2)
+        return range.getBoundingClientRect().x
+      }
+      return NaN
+    })
+  // Polled: CodeMirror draws the cursor for the new selection in a later frame than the dispatch.
+  await expect
+    .poll(async () => Math.abs((await cursor.boundingBox())!.x - (await arrowGreaterX())))
+    .toBeLessThanOrEqual(1)
 })
 
 /**
@@ -209,5 +213,40 @@ test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await expect(page).toHaveScreenshot('docs-code.png', {
     clip: boundingClip(await textBoxes(code)),
+  })
+})
+
+// Not tagged `@ag-grid` either, for the same reason as the table visualization.
+test('Table editor widget uses Monaspace Neon', async ({ editorPage, page }) => {
+  await editorPage
+  const node = await createTableNode(page)
+  const widget = node.locator('.WidgetTableEditor')
+  await expect(widget).toBeVisible()
+  await widget.getByRole('button', { name: 'Add new column' }).click()
+  await expect(widget.locator('.ag-header-cell-text')).toHaveText(['#', 'Column 1'])
+  const firstValueCell = widget.locator('.ag-cell', { hasNotText: '0' }).first()
+  await firstValueCell.click()
+  await expect(firstValueCell).toBeFocused()
+  await page.keyboard.type('mlmlml -> >= |>')
+  await page.keyboard.press('Enter')
+  await expect(widget.locator('.ag-cell')).toHaveText(['0', 'mlmlml -> >= |>', '', '1', '', ''])
+  // Leave the grid, so that no cell shows focus.
+  await locate.graphEditor(page).click({ position: { x: 300, y: 300 } })
+  await expect(firstValueCell).not.toBeFocused()
+  await expectMonaspaceLoaded(page)
+
+  const grid = widget.locator('.agGridTableView')
+  await expect(grid).toHaveCSS('font-family', /^"Monaspace Neon"/)
+  await expect(grid).toHaveCSS('font-feature-settings', 'normal')
+  // Nodes sit at fractional graph coordinates, which differ between runs; shift the widget onto
+  // whole pixels, or every glyph edge anti-aliases differently.
+  await widget.evaluate((element) => {
+    const { x, y } = element.getBoundingClientRect()
+    ;(element as HTMLElement).style.translate = `${Math.round(x) - x}px ${Math.round(y) - y}px`
+  })
+  // Inset past the rounded corners, where the node's colour shows through and varies.
+  const box = (await widget.boundingBox())!
+  await expect(page).toHaveScreenshot('table-editor-widget.png', {
+    clip: { x: box.x + 8, y: box.y, width: box.width - 16, height: box.height - 8 },
   })
 })
