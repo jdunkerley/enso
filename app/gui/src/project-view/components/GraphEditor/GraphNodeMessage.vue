@@ -51,7 +51,7 @@ export type MessageType = 'error' | 'warning' | 'missing' | 'panic'
 export const iconForMessageType: Record<MessageType, Icon> = {
   error: 'error',
   warning: 'warning',
-  missing: 'metadata',
+  missing: 'info',
   panic: 'panic',
 }
 

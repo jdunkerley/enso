@@ -17,33 +17,12 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
   canvas: ['expanded_node'],
   // currentColor only; `*_color` brand marks are exempt (0)
   colour: [],
-  // stroke width 2 (1.5 only for a detail inside a filled icon) (8)
-  strokeWidth: [
-    'document',
-    'help',
-    'info',
-    'join2-1',
-    'properties',
-    'schedule',
-    'sessions',
-    'versions',
-  ],
+  // stroke width 2 (1.5 only for a detail inside a filled icon) (7)
+  strokeWidth: ['document', 'help', 'join2-1', 'properties', 'schedule', 'sessions', 'versions'],
   // round caps and round joins on every stroke (0)
   strokeEnds: [],
-  // one secondary tone, opacity 0.3 (11)
-  secondaryTone: [
-    'array_new',
-    'compass',
-    'docs',
-    'expanded_node',
-    'find',
-    'heatmap',
-    'join',
-    'join2-1',
-    'root',
-    'union',
-    'workflow_play',
-  ],
+  // one secondary tone, opacity 0.3 (5)
+  secondaryTone: ['array_new', 'compass', 'expanded_node', 'heatmap', 'join2-1'],
   // no transform, clip-path, mask, defs, gradient or inner ids (0)
   structure: [],
   // at most 2 decimals (0)
