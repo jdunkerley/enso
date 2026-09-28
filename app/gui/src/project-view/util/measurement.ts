@@ -6,9 +6,8 @@ function getMeasureContext() {
 }
 
 /**
- * A literal copy of the `--font-sans` custom property's value (`base.css`, also redeclared on
- * visualization hosts in `VisualizationHost.vue`), for use where the custom property itself
- * cannot be resolved (e.g. before CSS has loaded, or in a test environment without a stylesheet).
+ * A literal copy of the `--font-sans` custom property's value (`base.css`), for use where the
+ * custom property itself cannot be resolved (e.g. before CSS has loaded, or in a test environment without a stylesheet).
  */
 const FALLBACK_SANS_FONT_FAMILY =
   "'M PLUS 1', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif"

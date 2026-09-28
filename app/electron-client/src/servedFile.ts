@@ -5,8 +5,7 @@ import * as path from 'node:path'
  * Resolve a request path to a file inside `baseDir`, or `null` if it does not name one.
  *
  * Request paths are percent-encoded, so they must be decoded before they can name a file on disk:
- * the bundled font `font-mplus1/MPLUS1[wght].ttf` arrives as `font-mplus1/MPLUS1%5Bwght%5D.ttf`,
- * and passing that straight to `readFile` 404s.
+ * a file named `a b.png` arrives as `a%20b.png`, and passing that straight to `readFile` 404s.
  *
  * Decoding is also what makes confinement necessary — `%2e%2e%2f` decodes to `../`, which would
  * otherwise walk out of the served directory — so the resolved path is checked to lie under

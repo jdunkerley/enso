@@ -92,16 +92,10 @@ initializeActions()
   display: none;
 }
 
-/* Base style for visualizations. */
+/* Base style for visualizations. `--font-sans`/`--font-mono` are deliberately not redeclared:
+   custom properties inherit into this shadow root from the host element's ancestors, so the
+   values on `:root` in `assets/base.css` apply. */
 :host {
-  --font-sans:
-    'M PLUS 1', /* System sans-serif font stack */ system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-    'Helvetica Neue', Arial, sans-serif;
-  --font-mono:
-    'DejaVu Sans Mono', /* System monospace font stack */ ui-monospace, Menlo, Monaco,
-    'Cascadia Mono', 'Segoe UI Mono', 'Roboto Mono', 'Oxygen Mono', 'Ubuntu Monospace',
-    'Source Code Pro', 'Fira Mono', 'Droid Sans Mono', 'Courier New', monospace;
   --color-text: rgba(0, 0, 0, 0.9);
   color: var(--color-text);
   font-family: var(--font-sans);
