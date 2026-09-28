@@ -25,7 +25,7 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'icon/lock',
     'right_panel',
   ],
-  // stroke width 2 (1.5 only for a detail inside a filled icon) (14)
+  // stroke width 2 (1.5 only for a detail inside a filled icon) (13)
   strokeWidth: [
     'document',
     'help',
@@ -37,12 +37,11 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'schedule',
     'sessions',
     'text_input',
-    'tidy_up',
     'transform4',
     'union',
     'versions',
   ],
-  // round caps and round joins on every stroke (21)
+  // round caps and round joins on every stroke (20)
   strokeEnds: [
     'accessed_by_projects',
     'at',
@@ -61,7 +60,6 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'select',
     'shortcut',
     'text_input',
-    'tidy_up',
     'union',
     'versions',
     'zoom',
@@ -133,7 +131,7 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'right_panel',
     'shortcut',
   ],
-  // at most 2 decimals (155)
+  // at most 2 decimals (152)
   coordinates: [
     '3_dot_menu',
     'activity',
@@ -265,9 +263,7 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'settings',
     'show_all',
     'space_default',
-    'space_tight',
     'space_wide',
-    'space_zero',
     'spatial',
     'split',
     'system',
@@ -277,7 +273,6 @@ export const KNOWN_VIOLATIONS: Record<StyleRule, readonly string[]> = {
     'tag',
     'temp',
     'text3',
-    'tidy_up',
     'time',
     'time2',
     'trash',

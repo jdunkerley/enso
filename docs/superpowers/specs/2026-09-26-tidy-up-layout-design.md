@@ -106,12 +106,15 @@ Three pieces, in `app/gui/src/project-view/components/GraphEditor/tidy/`:
    It is enabled whenever the graph has at least two components.
 
 4. **A new icon, `tidy_up`.** Add a new 16×16 `<symbol id="tidy_up">` to
-   `project-view/assets/icons.svg`. Draw it in the same style as the align
-   icons: `viewBox="0 0 16 16"`, `fill="none"`, a `currentColor` stroke of width
-   2, round caps and joins. The motif is a tiny top-to-bottom flow: two short
-   columns of small rounded boxes joined by a connector, so it reads as "arrange
-   into columns", distinct from `align_*` and `space_*`. Then regenerate
-   `util/iconMetadata/iconName.ts` with
+   `project-view/assets/icons.svg`, `viewBox="0 0 16 16"`. The motif is a tiny
+   top-to-bottom flow: two left-aligned columns of rounded boxes joined by a
+   connector, so it reads as "arrange into columns", distinct from `align_*` and
+   `space_*`. The boxes are **filled** `currentColor` (6x4, `rx="1"`), with the
+   connectors a 2px `currentColor` stroke with round caps and joins, matching
+   the align icons' weight. (It first shipped as 1.5px outlined boxes: a 2px
+   outline leaves no interior at this size, and 1.5px looked lighter than its
+   neighbours. #98 redrew it filled; see `docs/style-guide/icons.md`, "Worked
+   example".) Then regenerate `util/iconMetadata/iconName.ts` with
    `corepack pnpm --filter enso-gui run generate-icons`. Do not hand-edit that
    file (see `app/gui/CLAUDE.md`, "Icons").
 

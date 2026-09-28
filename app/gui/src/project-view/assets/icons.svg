@@ -62,10 +62,10 @@
   </symbol>
 
   <symbol id="tidy_up" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect x="1.75" y="1.75" width="4.5" height="3" rx="1" stroke="currentColor" stroke-width="1.5"></rect>
-    <rect x="1.75" y="11.25" width="4.5" height="3" rx="1" stroke="currentColor" stroke-width="1.5"></rect>
-    <rect x="9.75" y="6.5" width="4.5" height="3" rx="1" stroke="currentColor" stroke-width="1.5"></rect>
-    <path d="M4 4.75V11.25M6.25 3.25H10C11.1046 3.25 12 4.14543 12 5.25V6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    <rect x="1" y="1" width="6" height="4" rx="1" fill="currentColor"></rect>
+    <rect x="1" y="11" width="6" height="4" rx="1" fill="currentColor"></rect>
+    <rect x="9" y="6" width="6" height="4" rx="1" fill="currentColor"></rect>
+    <path d="M4 5V11M7 3H11C11.55 3 12 3.45 12 4V6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
   </symbol>
 
   <symbol id="apple_color" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -961,7 +961,7 @@
   </symbol>
 
   <symbol id="space_tight" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M2.66667 3.33334H13.3333M2.66667 9.55H13.3333M2.66667 12.6667H13.3333M2.66667 6.44H13.3333" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M3 4H13M3 8H13M3 12H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
   </symbol>
 
   <symbol id="space_wide" viewBox="0 0 16 16" width="16" height="16" fill="none">
@@ -969,7 +969,7 @@
   </symbol>
 
   <symbol id="space_zero" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M2.66667 3.33334H13.3333M2.66667 8H13.3333M2.66667 12.6667H13.3333M2.66667 5.66H13.3333M2.66667 10.33H13.3333" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <path d="M3 7H13M3 10H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
   </symbol>
 
   <symbol id="spatial" viewBox="0 0 16 16" width="16" height="16" fill="none">
