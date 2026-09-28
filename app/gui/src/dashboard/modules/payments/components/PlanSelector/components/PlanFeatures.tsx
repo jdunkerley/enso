@@ -20,7 +20,7 @@ export function PlanFeatures(props: PlanFeaturesProps) {
       {features.map((feature, index) => (
         <li key={index} className="flex items-center gap-1">
           <span className="-mb-[1.5px] flex h-4 w-4 flex-none place-items-center rounded-full bg-green/30">
-            <Icon icon="check" size="small" className="text-green" />
+            <Icon icon="check" className="text-green" />
           </span>
 
           <Text variant="body" weight="medium" disableLineHeightCompensation>

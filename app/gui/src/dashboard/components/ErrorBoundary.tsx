@@ -137,7 +137,7 @@ export function ErrorDisplay(props: ErrorDisplayProps): React.JSX.Element {
     subtitle ??
     (isOfflineError ? getText('offlineErrorMessage') : getText('arbitraryErrorSubtitle'))
   const finalStatus =
-    status ?? (isOfflineError ? <Icon icon="cloud_offline" className="mx-1" /> : 'error')
+    status ?? (isOfflineError ? <Icon icon="cloud_offline" size="xlarge" /> : 'error')
 
   const defaultRender = (
     <Result

@@ -30,7 +30,7 @@ export function PaywallBulletPoints(props: PaywallBulletPointsProps) {
             <div className="m-0 flex">
               <div className="m-0 flex">
                 <span className="mt-1 flex aspect-square h-4 flex-none place-items-center justify-center rounded-full bg-green/30">
-                  <Icon icon="check" size="small" className="text-green" />
+                  <Icon icon="check" className="text-green" />
                 </span>
               </div>
             </div>

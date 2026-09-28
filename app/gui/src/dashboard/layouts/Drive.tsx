@@ -229,7 +229,7 @@ function OfflineMessage(props: OfflineMessageProps) {
 
   return (
     <result.Result
-      status={<Icon icon="cloud_offline" className="my-1" />}
+      status={<Icon icon="cloud_offline" size="xlarge" />}
       className="my-12"
       centered="horizontal"
       title={getText('cloudUnavailableOffline')}

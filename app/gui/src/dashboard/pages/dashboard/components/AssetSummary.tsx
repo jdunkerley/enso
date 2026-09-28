@@ -43,7 +43,8 @@ export default function AssetSummary(props: AssetSummaryProps) {
                 <Icon
                   icon="arrow_right_head_only"
                   color="muted"
-                  className="inline-block align-middle"
+                  // The glyph is 6x8 inside a 16x16 box; trim the box to the old 6x8 image.
+                  className="-mx-[5px] -my-1 inline-block align-middle"
                 />
                 {newName}
               </>
