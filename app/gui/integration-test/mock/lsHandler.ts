@@ -410,6 +410,13 @@ export function restoreMockWidgetConfigurations() {
  * map via their own `beforeEach`/`afterEach` hooks and must not be stomped on.
  */
 export function clearPreprocessorOverrides() {
+  // `updateVisualizationData` writes its data into the widget map too; undo that as well, or the
+  // data leaks into later tests in the same worker (a table test's rows showing up in another).
+  for (const key of preprocessorOverrides.keys()) {
+    const initial = initialMockWidgetConfigurations.get(key)
+    if (initial) mockWidgetConfigurations.set(key, initial)
+    else mockWidgetConfigurations.delete(key)
+  }
   preprocessorOverrides.clear()
 }
 
