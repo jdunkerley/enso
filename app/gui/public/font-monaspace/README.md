@@ -54,12 +54,11 @@ the `.woff2` files.
 
 ## Status
 
-Added by #109. Since #110, Monaspace Neon is `--font-mono` under the
-`enableMonaspaceCodeFont` feature flag (off by default), and
-`src/providers/codeFont.ts` starts loading it at app start-up while the flag is
-on; a `<link rel="preload">` in `index.html` would fetch it for everyone, flag
-or not. #113 removes the flag and moves the preload to `index.html`. Monaspace
-Radon is not referenced yet; #111 is expected to use it for comments.
+Added by #109. Since #110, Monaspace Neon is `--font-mono` (the code editor,
+documentation code, tables and visualizations) and is preloaded from
+`index.html`. The `enableMonaspaceCodeFont` feature flag, on by default, stays
+for one release as a kill switch back to DejaVu Sans Mono; #113 removes it.
+Monaspace Radon is not referenced yet; #111 is expected to use it for comments.
 
 ## Upgrading
 

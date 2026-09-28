@@ -334,9 +334,9 @@
   --scrollbar-scrollable-opacity: 100%;
 }
 
-/* Monaspace Neon as the code font, behind the `enableMonaspaceCodeFont` feature flag (#110; the
-   class is set on the document root by `src/providers/codeFont.ts`, and #113 folds this into
-   `:root` when the flag goes). The code editor grows to 13px because Neon's x-height is ~6% smaller
+/* Monaspace Neon as the code font, under the `enableMonaspaceCodeFont` feature flag — on by
+   default, kept for one release as a kill switch (#110; the class is set on the document root by
+   `src/providers/codeFont.ts`, and #113 folds this into `:root` when the flag goes). The code editor grows to 13px because Neon's x-height is ~6% smaller
    than DejaVu Sans Mono's. `--font-code` (nodes) deliberately stays M PLUS 1 (#112). */
 :root.monaspaceCodeFont {
   --font-mono:

@@ -52,15 +52,8 @@ export function setCodeLigatures(codeLigatures: boolean) {
 }
 
 /**
- * Keep the document root's code-font classes in sync with the feature flag and the setting, and
- * start loading Monaspace Neon as soon as the flag is on.
- *
- * `index.html` cannot preload the face conditionally, because the flag is only known at run time,
- * and preloading it unconditionally would fetch 0.5 MB on every start for a face that is unused
- * while the flag is off (and make Chromium warn about an unused preload). Asking the `FontFaceSet`
- * for it here does the same job — the download starts at app start-up, well before the first code
- * surface (the code editor, a table) renders — without either cost. #113 moves it to a plain
- * `<link rel="preload">` in `index.html` together with removing the flag.
+ * Keep the document root's code-font classes in sync with the feature flag and the setting.
+ * Monaspace Neon itself is preloaded from `index.html`.
  */
 export function useCodeFontRootClasses(root: HTMLElement = document.documentElement) {
   const monaspace = useFeatureFlag('enableMonaspaceCodeFont')
@@ -68,10 +61,5 @@ export function useCodeFontRootClasses(root: HTMLElement = document.documentElem
   watchEffect(() => {
     root.classList.toggle(MONASPACE_CODE_FONT_CLASS, monaspace.value)
     root.classList.toggle(CODE_LIGATURES_CLASS, codeLigatures.value)
-    // `document.fonts` is missing in some test environments (jsdom). A failed load needs no
-    // handling here: the stylesheet falls back to the rest of the `--font-mono` stack.
-    if (monaspace.value && 'fonts' in document) {
-      document.fonts.load('1em "Monaspace Neon"').catch(() => {})
-    }
   })
 }

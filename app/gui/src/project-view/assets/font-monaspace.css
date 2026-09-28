@@ -1,8 +1,7 @@
 /* Variable fonts (`wght`/`wdth`/`slnt` axes, per their `fvar` tables); the full upstream
    files are unmodified and unsubset (see `public/font-monaspace/README.md`). Neon is
-   `--font-mono` under the `enableMonaspaceCodeFont` feature flag (`base.css`), and is loaded
-   early from `src/providers/codeFont.ts` rather than preloaded from `index.html`, which cannot
-   depend on the flag. Radon is unused so far (#111 is expected to use it for comments).
+   `--font-mono` under the `enableMonaspaceCodeFont` feature flag (`base.css`; on by default) and
+   is preloaded from `index.html`. Radon is unused so far (#111 is expected to use it for comments).
 
    `font-style: oblique 0deg 11deg` covers the `slnt` axis's -11..0: CSS oblique angles are
    positive when leaning clockwise, OpenType `slnt` values negative, and browsers map one to

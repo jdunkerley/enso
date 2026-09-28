@@ -1,6 +1,7 @@
 /**
- * @file Screenshot tests for the code font (`--font-mono`): Monaspace Neon behind the
- * `enableMonaspaceCodeFont` feature flag, with the "Code ligatures" setting at its default (off).
+ * @file Screenshot tests for the code font (`--font-mono`): Monaspace Neon, with the "Code
+ * ligatures" setting at its default (off). The `enableMonaspaceCodeFont` feature flag is on by
+ * default; it is set explicitly here anyway, and the kill switch (flag off) has its own test.
  *
  * The baselines are Linux-only (`*-linux.png`): the suite cannot run on native Windows, and CI runs
  * it on Ubuntu. Regenerate them in WSL or on Linux with `--update-snapshots` when a change to the
@@ -313,4 +314,19 @@ test('"Code ligatures" applies to read-only code, and not to the code editor', a
   await expect
     .poll(() => page.evaluate(() => document.documentElement.classList.contains('codeLigatures')))
     .toBe(true)
+})
+
+test.describe('With the `enableMonaspaceCodeFont` kill switch off', () => {
+  test.use({ featureFlags: { enableMonaspaceCodeFont: false } })
+
+  test('Code editor falls back to DejaVu Sans Mono at 12px', async ({ editorPage, page }) => {
+    await editorPage
+    await page.keyboard.press(`ControlOrMeta+\``)
+    const scroller = locate.codeEditor(page).locator('.cm-scroller')
+    await expect(scroller).toHaveCSS('font-family', /^"DejaVu Sans Mono"/)
+    await expect(scroller).toHaveCSS('font-size', '12px')
+    expect(
+      await page.evaluate(() => document.documentElement.classList.contains('monaspaceCodeFont')),
+    ).toBe(false)
+  })
 })
