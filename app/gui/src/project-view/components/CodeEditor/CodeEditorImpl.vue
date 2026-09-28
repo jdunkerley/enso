@@ -81,6 +81,13 @@ onMounted(() => {
   font-feature-settings: var(--font-mono-feature-settings);
 }
 
+/* Comments' own face, under the "Handwritten comments" setting (see `--font-mono-comment`). Only the
+   code editor's: comments in documentation code blocks keep the code font. */
+:deep(.tok-comment) {
+  /*noinspection CssNoGenericFontName*/
+  font-family: var(--font-mono-comment);
+}
+
 :deep(.cm-editor) {
   backdrop-filter: var(--blur-app-bg);
   background-color: rgba(255, 255, 255, 0.9);

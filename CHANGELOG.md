@@ -114,6 +114,10 @@
   by default, joins operators such as `->` and `>=` into single symbols in
   documentation code, tables and visualizations; the code editor always shows
   them as separate characters.
+- [Comments in the code editor are handwritten][NNN]: they show in Monaspace
+  Radon, a handwriting face with the same character widths as the code font, so
+  code and comments still line up. The new "Handwritten comments" setting under
+  Settings → Appearance turns it off.
 
 #### Enso Language & Runtime
 
@@ -244,6 +248,7 @@
 [128]: https://github.com/jdunkerley/enso/pull/128
 [129]: https://github.com/jdunkerley/enso/pull/129
 [132]: https://github.com/jdunkerley/enso/pull/132
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

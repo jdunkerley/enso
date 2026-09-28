@@ -28,6 +28,14 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   `:root.monaspaceCodeFont` block in `base.css`; the class comes from
   `src/providers/codeFont.ts`). Neon is preloaded from `index.html`. #113
   removes the flag and DejaVu Sans Mono.
+- `--font-mono-comment` is the code editor's comment face: `--font-mono`, or
+  Monaspace Radon under the flag plus the "Handwritten comments" setting
+  (`:root.monaspaceCodeFont.handwrittenComments`; both on by default). Radon is
+  not preloaded: `src/providers/codeFont.ts` loads it only while both are on.
+  Comment tokens carry the stable class `tok-comment`
+  (`util/codemirror/highlight.ts`) besides their CSS-module colour class. Radon
+  shares Neon's 0.62em advance; never pair it with a face that does not, or
+  comments leave the column grid.
 - Ligatures on `--font-mono` text go through `--font-mono-variant-ligatures` /
   `--font-mono-feature-settings` (the code editor, and anything editable) and
   their `-readonly` variants (docs code, tables, visualizations), which the
