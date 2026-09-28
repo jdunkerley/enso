@@ -1,16 +1,34 @@
-import { expect, test } from 'integration-test/base'
+import { expect, test, type Page } from 'integration-test/base'
 import * as locate from './locate'
 
 test.use({ aiAvailable: true })
+
+/**
+ * Open the Component Browser in AI mode. It opens in AI mode only once the (mocked) agent has
+ * reported itself ready, which can land after the graph is shown on a cold start; opened before
+ * that, it falls back to component search and the prompt below would go nowhere. So reopen until
+ * the mode switch shows the AI icon.
+ */
+async function openAiComponentBrowser(page: Page, open: () => Promise<void>) {
+  const aiModeIcon = page.locator('.ModeMenu .iconDisc use[href$="#robot"]')
+  await expect(async () => {
+    if (await locate.componentBrowser(page).isVisible()) await page.keyboard.press('Escape')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await open()
+    await expect(locate.componentBrowser(page)).toBeVisible()
+    await expect(aiModeIcon).toBeVisible({ timeout: 1000 })
+  }).toPass()
+}
 
 test('AI prompt creates a User Defined Component node', async ({ editorPage, page }) => {
   await editorPage
 
   const sourceNode = locate.graphNodeByBinding(page, 'data')
-  await sourceNode.click()
-  await expect(sourceNode).toBeSelected()
-  await locate.graphEditor(page).press('Enter')
-  await expect(locate.componentBrowser(page)).toBeVisible()
+  await openAiComponentBrowser(page, async () => {
+    await sourceNode.click()
+    await expect(sourceNode).toBeSelected()
+    await locate.graphEditor(page).press('Enter')
+  })
 
   // The mocked `window.api.ai.generateComponent` (see `mock/registerMocks.ts`) returns a
   // hardcoded body — we just need to drive the AI flow end-to-end and inspect the
@@ -51,8 +69,7 @@ test('AI prompt without a source node still renders the category icon', async ({
   // The resulting call AST is just `Main.ai_helper` (a `PropertyAccess`, not an `App`),
   // which makes `WidgetAiPrompt` and `WidgetIcon` both eligible to render the root —
   // and a regression here drops the icon when `WidgetAiPrompt` outranks `WidgetIcon`.
-  await locate.addNewNodeButton(page).click()
-  await expect(locate.componentBrowser(page)).toBeVisible()
+  await openAiComponentBrowser(page, () => locate.addNewNodeButton(page).click())
 
   const PROMPT = 'no source needed'
   await page.keyboard.insertText(PROMPT)
