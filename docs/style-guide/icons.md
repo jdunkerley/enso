@@ -123,9 +123,10 @@ The tinted secondary shape is the set's signature (the container behind
 `data_input`, the grid behind `column_add`); it gives a two-tone icon from a
 single `currentColor`. It has to be one level so that icons look related.
 
-_Today:_ none; `join2-1`, the last, was repointed to `join` in #104. The six
-icons tinted as a whole with no full-tone shape (`docs`, `find`, `join`, `root`,
-`union`, `workflow_play`) were redrawn with one.
+_Today:_ none. `join2-1`, the last three-tone icon, was repointed to `join` in
+#104. Six icons used to be tinted as a whole, with no full-tone shape; #103 gave
+five of them one (`docs`, `find`, `join`, `union`, `workflow_play`), and the
+sixth, `root`, was unused and deleted in #104.
 
 ### Colour
 
