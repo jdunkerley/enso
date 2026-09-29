@@ -308,6 +308,102 @@ export async function openDropdownInWidget(page: Page, label: string) {
   await expect(page.locator('.DropdownWidget[data-transitioning]')).toHaveCount(0)
 }
 
+/** How far (px) a component's outline may reach past the graph editor's edge and still count as shown. */
+const SHOWN_TOLERANCE_PX = 8
+
+/**
+ * Click "Show All Components" (Ctrl+Shift+A), which zooms to the selected components or, with
+ * nothing selected, to the whole graph, and wait until every element of `targets` sits inside the
+ * graph editor and the view has stopped moving.
+ *
+ * The view is fitted to the components' sizes at the moment of the click, and a component keeps
+ * growing for a while as its widgets load, so the click is repeated whenever the view settles with
+ * a component still sticking out.
+ */
+async function showAll(page: Page, targets: Locator) {
+  const showAllButton = page.getByLabel('Show All Components')
+  const graphEditor = page.locator('.GraphEditor')
+  const deadline = Date.now() + 30_000
+  let previous = ''
+  let state = ''
+  let clicked = false
+  while (Date.now() < deadline) {
+    const bounds = await graphEditor.boundingBox()
+    const boxes = await Promise.all((await targets.all()).map((t) => t.boundingBox()))
+    state = JSON.stringify({ bounds, boxes })
+    const settled = state === previous
+    previous = state
+    if (settled && bounds && boxes.length > 0 && boxes.every((b) => b != null)) {
+      const inside = boxes.every(
+        (box) =>
+          box!.x >= bounds.x - SHOWN_TOLERANCE_PX &&
+          box!.y >= bounds.y - SHOWN_TOLERANCE_PX &&
+          box!.x + box!.width <= bounds.x + bounds.width + SHOWN_TOLERANCE_PX &&
+          box!.y + box!.height <= bounds.y + bounds.height + SHOWN_TOLERANCE_PX,
+      )
+      if (inside && clicked) return
+      if (!inside || !clicked) {
+        await showAllButton.click()
+        clicked = true
+        previous = ''
+      }
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`Components not shown within the graph editor: ${state}`)
+}
+
+/**
+ * Bring the selected component wholly into view before using its widgets, as a user would.
+ *
+ * A new component is panned to so that its left edge shows, and it widens as its arguments are
+ * filled in; a component wider than the space left runs off the right edge, under the right
+ * panel's tabs, where its widgets cannot be clicked. Call this again once filled-in arguments have
+ * widened the component, before using the arguments further right.
+ */
+export async function showSelectedComponent(page: Page) {
+  const selected = page.locator('.GraphNode.selected')
+  await expect(selected).toHaveCount(1)
+  await showAll(page, selected)
+}
+
+/**
+ * Bring every component into view, e.g. before picking a source component by its position in the
+ * DOM. "Show All" zooms to the selection if there is one, so first deselect by clicking the graph's
+ * background, at a point that no component covers.
+ */
+export async function showAllComponents(page: Page) {
+  const nodes = page.locator('.GraphNode')
+  const bounds = (await page.locator('.GraphEditor').boundingBox())!
+  const occupied = page.locator('.GraphNode, .GraphVisualization, .GraphNodeComment')
+  const boxes = (await Promise.all((await occupied.all()).map((n) => n.boundingBox()))).filter(
+    (b) => b != null,
+  )
+  const MARGIN = 24
+  // Stay clear of the top bar that overlays the graph, and of the edges.
+  const TOP = 64
+  let point: { x: number; y: number } | undefined
+  for (let y = bounds.y + TOP; y < bounds.y + bounds.height - MARGIN && !point; y += MARGIN) {
+    for (let x = bounds.x + MARGIN; x < bounds.x + bounds.width - MARGIN; x += MARGIN) {
+      const covered = boxes.some(
+        (b) =>
+          x > b.x - MARGIN &&
+          x < b.x + b.width + MARGIN &&
+          y > b.y - MARGIN &&
+          y < b.y + b.height + MARGIN,
+      )
+      if (!covered) {
+        point = { x, y }
+        break
+      }
+    }
+  }
+  if (!point) throw new Error('No empty graph background to click')
+  await page.mouse.click(point.x, point.y)
+  await expect(page.locator('.GraphNode.selected')).toHaveCount(0)
+  await showAll(page, nodes)
+}
+
 /** Find and click + button in an empty Vector Widget inside provided locator. */
 export function addFirstElementToWidgetVector(locator: Locator) {
   return locator.getByRole('list').filter({ hasText: /^$/ }).getByLabel('Add a new item').click()
