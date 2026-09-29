@@ -85,10 +85,10 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
   /** Switch to a different category. */
   goToCategory = {
     /** Switch to the "cloud" category. */
-    cloud: () => this.goToCategoryNamed('Cloud'),
-    local: () => this.goToCategoryNamed('Local'),
-    recent: () => this.goToCategoryNamed('Recent'),
-    trash: () => this.goToCategoryNamed('Trash'),
+    cloud: () => this.goToCategoryNamed('Cloud', 'cloud'),
+    local: () => this.goToCategoryNamed('Local', 'local'),
+    recent: () => this.goToCategoryNamed('Recent', 'recent'),
+    trash: () => this.goToCategoryNamed('Trash', 'trash'),
   }
 
   /** Interact with the assets search bar. */
@@ -98,8 +98,11 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
     )
   }
 
-  /** Select category of specified name. */
-  goToCategoryNamed(this: DrivePageActions<Context>, category: string) {
+  /**
+   * Select category of specified name. `key` is the category's `categoryKey`, which the drive view
+   * exposes as `data-category` once it has rendered that category.
+   */
+  goToCategoryNamed(this: DrivePageActions<Context>, category: string, key: string) {
     return this.step(`Go to "${category}" category`, async (page) => {
       await locateCategoryButton(page, category).click()
       // Move the cursor off the leftBar so its `mouseenter`-triggered auto-expand
@@ -108,6 +111,13 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       // toolbar/table buttons and intercepts subsequent clicks.
       await page.mouse.move(0, 0)
       await this.expectCategory(category)
+      // The sidebar marks the new category at once, but the drive view switches inside a React
+      // transition: until the new category has loaded, the previous one's rows stay on screen and
+      // take clicks. Wait for no drive view still showing another category (the check passes when
+      // there is no drive view at all, e.g. the "cloud unavailable" stub).
+      await expect(
+        page.locator(`[data-testid="drive-view"][data-category]:not([data-category="${key}"])`),
+      ).toHaveCount(0)
     })
   }
 

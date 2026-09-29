@@ -14,7 +14,7 @@ import AssetQuery from '#/utilities/AssetQuery'
 import * as download from '#/utilities/download'
 import * as github from '#/utilities/github'
 import * as appUtils from '$/appUtils'
-import { isCloudCategory } from '$/providers/category'
+import { categoryKey, isCloudCategory } from '$/providers/category'
 import * as authProvider from '$/providers/react'
 import { useBackends, useText } from '$/providers/react'
 import {
@@ -183,6 +183,7 @@ function DriveAssetsView(props: DriveProperties) {
   const { setFocusedPanel } = useContainerData()
   const { isOffline } = offlineHooks.useOffline()
   const associatedBackend = useDriveCurrentBackend()
+  const [category] = useDriveCurrentCategory()
   const [query, setQuery] = React.useState(() => AssetQuery.fromString(''))
   const isCloud = associatedBackend.type === BackendType.remote
   const isInaccessible = isCloud && isOffline
@@ -195,6 +196,10 @@ function DriveAssetsView(props: DriveProperties) {
     <div
       className="relative flex w-full grow flex-col overflow-hidden"
       data-testid="drive-view"
+      // The category this view has actually rendered. A category switch runs in a React
+      // transition, so the previous category's rows stay on screen while the new one suspends,
+      // even though the sidebar already shows the new category as selected.
+      data-category={categoryKey(category)}
       onFocus={onFocus}
     >
       <DriveBar query={query} setQuery={setQuery} toolbar={props.toolbar} />
