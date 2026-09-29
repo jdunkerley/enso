@@ -54,13 +54,12 @@ the `.woff2` files.
 
 ## Status
 
-Added by #109. Since #110, Monaspace Neon is `--font-mono` (the code editor,
-documentation code, tables and visualizations) and is preloaded from
-`index.html`. The `enableMonaspaceCodeFont` feature flag, on by default, stays
-for one release as a kill switch back to DejaVu Sans Mono; #113 removes it.
-Since #111, Monaspace Radon is the code editor's comment face (the "Handwritten
-comments" setting, on by default). It is not preloaded:
-`src/providers/codeFont.ts` loads it while the flag and the setting are both on.
+Added by #109. Monaspace Neon is `--font-mono` (the code editor, documentation
+code, tables and visualizations; #110) and `--font-code` (node text; #112), and
+is preloaded from `index.html`. It is the only bundled monospace face: the
+fallbacks are system fonts (#113). Since #111, Monaspace Radon is the code
+editor's comment face (the "Handwritten comments" setting, on by default). It is
+not preloaded: `src/providers/codeFont.ts` loads it while the setting is on.
 
 ## Upgrading
 

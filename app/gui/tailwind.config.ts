@@ -73,7 +73,7 @@ export default {
       },
       fontFamily: {
         // Follows the GUI's code font (`project-view/assets/base.css`), so the `font-mono` class
-        // matches the code editor and tables, including under the Monaspace feature flag.
+        // matches the code editor and tables.
         mono: 'var(--font-mono)',
       },
       fontSize: {
