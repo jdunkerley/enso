@@ -1,7 +1,9 @@
 /**
  * @file Screenshot tests for the code font (`--font-mono`): Monaspace Neon, with the "Code
- * ligatures" setting at its default (off). The `enableMonaspaceCodeFont` feature flag is on by
- * default; it is set explicitly here anyway, and the kill switch (flag off) has its own test.
+ * ligatures" setting at its default (off) and the "Handwritten comments" setting at its default
+ * (on: comments in the code editor use Monaspace Radon). The `enableMonaspaceCodeFont` feature
+ * flag is on by default; it is set explicitly here anyway, and the kill switch (flag off) has its
+ * own tests.
  *
  * The baselines are Linux-only (`*-linux.png`): the suite cannot run on native Windows, and CI runs
  * it on Ubuntu. Regenerate them in WSL or on Linux with `--update-snapshots` when a change to the
@@ -33,10 +35,12 @@ const SCREENSHOT_STYLE = `
   .CodeEditor .cm-editor { backdrop-filter: none !important; background-color: white !important; }
 `
 
-async function expectMonaspaceLoaded(page: Page) {
-  await expect
-    .poll(() => page.evaluate(() => document.fonts.check('13px "Monaspace Neon"')))
-    .toBe(true)
+async function expectMonaspaceLoaded(page: Page, families = ['Monaspace Neon']) {
+  for (const family of families) {
+    await expect
+      .poll(() => page.evaluate((family) => document.fonts.check(`13px "${family}"`), family))
+      .toBe(true)
+  }
   await page.evaluate(() => document.fonts.ready)
 }
 
@@ -76,26 +80,33 @@ async function textBoxes(locator: Locator): Promise<Box[]> {
   )
 }
 
-async function openCodeEditorWithSample(page: Page) {
+/** Open the code editor, and append the given lines to the module. */
+async function openCodeEditorWithLines(page: Page, lines: string[]) {
   await page.keyboard.press(`ControlOrMeta+\``)
   const codeEditor = locate.codeEditor(page)
   await expect(codeEditor).toBeVisible()
   await page.evaluate(
-    ({ comment, code }) => {
+    (text) => {
       const api = (window as any).__codeEditorApi
-      api.writeText(`\n${comment}\n${code}\n`, api.textLength())
+      api.writeText(text, api.textLength())
     },
-    { comment: SAMPLE_COMMENT, code: SAMPLE_CODE },
+    `\n${lines.join('\n')}\n`,
   )
-  const commentLine = codeEditor.locator('.cm-line', { hasText: SAMPLE_COMMENT })
-  const codeLine = codeEditor.locator('.cm-line', { hasText: SAMPLE_CODE })
-  await commentLine.scrollIntoViewIfNeeded()
+  const lineLocators = lines.map((line) => codeEditor.locator('.cm-line', { hasText: line }))
+  await lineLocators[0]!.scrollIntoViewIfNeeded()
   // Scrolling a line into view may scroll sideways too: every line is as wide as the longest one.
   await codeEditor.locator('.cm-scroller').evaluate((scroller) => (scroller.scrollLeft = 0))
-  await expect(commentLine).toBeVisible()
-  await expect(codeLine).toBeVisible()
-  await expectMonaspaceLoaded(page)
-  return { codeEditor, commentLine, codeLine }
+  for (const line of lineLocators) await expect(line).toBeVisible()
+  return { codeEditor, lines: lineLocators }
+}
+
+async function openCodeEditorWithSample(page: Page) {
+  const {
+    codeEditor,
+    lines: [commentLine, codeLine],
+  } = await openCodeEditorWithLines(page, [SAMPLE_COMMENT, SAMPLE_CODE])
+  await expectMonaspaceLoaded(page, ['Monaspace Neon', 'Monaspace Radon'])
+  return { codeEditor, commentLine: commentLine!, codeLine: codeLine! }
 }
 
 test('Code editor uses Monaspace Neon at 13px, without ligatures', async ({ editorPage, page }) => {
@@ -106,6 +117,11 @@ test('Code editor uses Monaspace Neon at 13px, without ligatures', async ({ edit
   await expect(scroller).toHaveCSS('font-family', /^"Monaspace Neon"/)
   await expect(scroller).toHaveCSS('font-size', '13px')
   await expect(scroller).toHaveCSS('font-feature-settings', 'normal')
+  // The comment is in Radon, by the "Handwritten comments" setting's default.
+  await expect(commentLine.locator('.tok-comment').first()).toHaveCSS(
+    'font-family',
+    /^"Monaspace Radon"/,
+  )
 
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await expect(page).toHaveScreenshot('code-editor.png', {
@@ -142,6 +158,163 @@ test('Code editor caret lands between `-` and `>`', async ({ editorPage, page })
   await expect
     .poll(async () => Math.abs((await cursor.boundingBox())!.x - (await arrowGreaterX())))
     .toBeLessThanOrEqual(1)
+})
+
+/** A text literal of `|`s, in Neon: a column ruler for the lines between the two of them. */
+const ruler = (name: 'above' | 'below') => `ruler_${name} = '${'|'.repeat(52)}'`
+/**
+ * Comments of every kind, between two rulers: a documentation comment, a line with code and a
+ * trailing comment (so that Neon and Radon meet within a line), and a line comment.
+ */
+const COMMENT_SAMPLE = [
+  ruler('above'),
+  '## Documentation comment: mlmlml iiii -> >=',
+  'sample = mlmlml -> 42 # trailing: iiii mlmlml',
+  '# Line comment: mlmlml iiii -> >= |> == !=',
+  ruler('below'),
+]
+/** The line where Neon and Radon meet, and the column where its comment starts. */
+const MIXED_LINE = COMMENT_SAMPLE[2]!
+const MIXED_LINE_COMMENT_COLUMN = MIXED_LINE.indexOf('#')
+
+/** The left edge of every character of a `.cm-line`, in order. */
+function characterXs(line: Locator): Promise<number[]> {
+  return line.evaluate((line) => {
+    const xs: number[] = []
+    const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node != null; node = walker.nextNode()) {
+      for (let i = 0; i < node.textContent!.length; i++) {
+        const range = document.createRange()
+        range.setStart(node, i)
+        range.setEnd(node, i + 1)
+        xs.push(range.getBoundingClientRect().x)
+      }
+    }
+    return xs
+  })
+}
+
+/**
+ * Place the code editor's caret at the given column of the given line, and check that it is at the
+ * left edge of the same column of the ruler line.
+ */
+async function expectCaretOnRuler(page: Page, ruler: Locator, line: string, column: number) {
+  await page.evaluate(
+    ({ line, column }) => {
+      const api = (window as any).__codeEditorApi
+      api.placeCursor(api.indexOf(line) + column)
+    },
+    { line, column },
+  )
+  const cursor = page.locator('.CodeEditor .cm-cursor-primary')
+  // Polled: CodeMirror draws the cursor for the new selection in a later frame than the dispatch.
+  // The ruler is measured again each time, in case placing the caret scrolled the editor.
+  await expect
+    .poll(
+      async () => Math.abs((await cursor.boundingBox())!.x - (await characterXs(ruler))[column]!),
+      { message: `caret at column ${column} of ${JSON.stringify(line)}` },
+    )
+    .toBeLessThanOrEqual(1)
+}
+
+test('Code editor comments use Monaspace Radon, on the Neon column grid', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
+  await expectMonaspaceLoaded(page, ['Monaspace Neon', 'Monaspace Radon'])
+  const [rulerAbove, docLine, mixedLine, commentLine] = lines as [
+    Locator,
+    Locator,
+    Locator,
+    Locator,
+  ]
+
+  // Every kind of comment is in Radon; the code beside a trailing comment stays in Neon.
+  for (const line of [docLine, mixedLine, commentLine]) {
+    await expect(line.locator('.tok-comment').first()).toHaveCSS(
+      'font-family',
+      /^"Monaspace Radon"/,
+    )
+  }
+  await expect(mixedLine.getByText('sample', { exact: true })).toHaveCSS(
+    'font-family',
+    /^"Monaspace Neon"/,
+  )
+
+  // Every character of every line starts on the ruler's column grid: Radon's advance is Neon's.
+  const rulerXs = await characterXs(rulerAbove)
+  for (const [index, line] of [docLine, mixedLine, commentLine].entries()) {
+    const text = COMMENT_SAMPLE[index + 1]!
+    expect(text.length).toBeLessThan(COMMENT_SAMPLE[0]!.length)
+    const xs = await characterXs(line)
+    expect(xs.length, text).toBe(text.length)
+    for (const [column, x] of xs.entries()) {
+      expect(Math.abs(x - rulerXs[column]!), `column ${column} of ${text}`).toBeLessThan(0.5)
+    }
+  }
+  // Radon's vertical metrics do not make comment lines taller than code lines.
+  const lineHeights = await Promise.all(lines.map(async (l) => (await l.boundingBox())!.height))
+  for (const height of lineHeights) expect(height).toBeCloseTo(lineHeights[0]!, 1)
+
+  await page.addStyleTag({ content: SCREENSHOT_STYLE })
+  await expect(page).toHaveScreenshot('code-editor-comments.png', {
+    clip: boundingClip((await Promise.all(lines.map(textBoxes))).flat()),
+  })
+})
+
+test('Code editor caret keeps the Neon grid across a comment boundary', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
+  await expectMonaspaceLoaded(page, ['Monaspace Neon', 'Monaspace Radon'])
+  await lines[2]!.click()
+  // Each side of the boundary between code and a trailing comment, the start and end of a line
+  // comment, and columns inside each.
+  const commentLine = COMMENT_SAMPLE[3]!
+  const positions: [string, number][] = [
+    ...[-2, -1, 0, 1, 2].map((d): [string, number] => [MIXED_LINE, MIXED_LINE_COMMENT_COLUMN + d]),
+    [MIXED_LINE, MIXED_LINE.length - 1],
+    [commentLine, 0],
+    [commentLine, 1],
+    [commentLine, 20],
+    [commentLine, commentLine.length - 1],
+  ]
+  for (const [line, column] of positions) await expectCaretOnRuler(page, lines[0]!, line, column)
+})
+
+test.describe('Handwritten comments off', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'enso-code-font-settings',
+        JSON.stringify({ state: { handwrittenComments: false }, version: 1 }),
+      )
+    })
+  })
+
+  test('Code editor comments use Monaspace Neon', async ({ editorPage, page }) => {
+    await editorPage
+    const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
+    await expectMonaspaceLoaded(page)
+    for (const line of lines.slice(1, -1)) {
+      await expect(line.locator('.tok-comment').first()).toHaveCSS(
+        'font-family',
+        /^"Monaspace Neon"/,
+      )
+    }
+    // Radon is not fetched.
+    expect(
+      await page.evaluate(() =>
+        [...document.fonts]
+          .filter((face) => face.family.includes('Radon') && face.status !== 'unloaded')
+          .map((face) => face.family),
+      ),
+    ).toEqual([])
+  })
 })
 
 /**
@@ -328,5 +501,25 @@ test.describe('With the `enableMonaspaceCodeFont` kill switch off', () => {
     expect(
       await page.evaluate(() => document.documentElement.classList.contains('monaspaceCodeFont')),
     ).toBe(false)
+  })
+
+  test('Code editor comments fall back to DejaVu Sans Mono', async ({ editorPage, page }) => {
+    await editorPage
+    const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
+    for (const line of lines.slice(1, -1)) {
+      await expect(line.locator('.tok-comment').first()).toHaveCSS(
+        'font-family',
+        /^"DejaVu Sans Mono"/,
+      )
+    }
+    // Radon is not fetched, although "Handwritten comments" is on. (Neon is: `index.html`
+    // preloads it whatever the flag.)
+    expect(
+      await page.evaluate(() =>
+        [...document.fonts]
+          .filter((face) => face.family.includes('Radon') && face.status !== 'unloaded')
+          .map((face) => face.family),
+      ),
+    ).toEqual([])
   })
 })

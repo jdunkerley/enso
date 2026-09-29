@@ -323,6 +323,9 @@
   --font-mono-readonly-variant-ligatures: var(--font-mono-variant-ligatures);
   --font-mono-readonly-feature-settings: var(--font-mono-feature-settings);
   --code-editor-font-size: 12px;
+  /* Comments in the code editor. The "Handwritten comments" setting switches it to Monaspace Radon
+     while Neon is the code font (`.monaspaceCodeFont.handwrittenComments` below). */
+  --font-mono-comment: var(--font-mono);
   /* Default resize handle widths, used for panels. */
   --resize-handle-inside: 3px;
   --resize-handle-outside: 3px;
@@ -352,6 +355,14 @@
 :root.codeLigatures {
   --font-mono-readonly-feature-settings:
     "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09";
+}
+
+/* The "Handwritten comments" setting (#111): comments in the code editor in Monaspace Radon. Only
+   with Neon as the code font, whose 0.62em advance Radon shares, so that comments keep the code's
+   column grid; next to DejaVu Sans Mono (0.602em) they would not. Ligature settings are inherited
+   from the surrounding code, so texture healing (`calt`) stays on and coding ligatures off. */
+:root.monaspaceCodeFont.handwrittenComments {
+  --font-mono-comment: "Monaspace Radon", var(--font-mono);
 }
 
 @keyframes s1 {

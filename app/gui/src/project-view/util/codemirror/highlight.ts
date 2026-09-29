@@ -84,6 +84,21 @@ const tagNames: (keyof typeof tags)[] = [
 ]
 
 /**
+ * A stable class on every comment token, next to the mapped highlighting class. The mapped classes
+ * are usually CSS module classes, private to the component that defines the colours; this one is
+ * for styles that apply to comments in only some editors, such as the code editor's comment font
+ * (`CodeEditorImpl.vue`).
+ */
+export const COMMENT_TOKEN_CLASS = 'tok-comment'
+
+const commentTagNames: ReadonlySet<keyof typeof tags> = new Set([
+  'comment',
+  'lineComment',
+  'blockComment',
+  'docComment',
+])
+
+/**
  * Defines an {@link Extension} that applies a highlighting CSS class for any {@link Tag} with a provided class mapping.
  * @param css A mapping from {@link Tag} names to CSS class names.
  */
@@ -93,7 +108,13 @@ export function highlightStyle(css: Record<string, string>): Extension {
       tag: (tags[mod] as any)(tags[tag]) as Tag,
       class: `${tags[mod]}-${tag}`,
     }))
-  const tagClasses = tagNames.map((tag) => ({ tag: tags[tag] as Tag, class: css[tag] ?? tag }))
+  const tagClasses = tagNames.map((tag) => {
+    const tagClass = css[tag] ?? tag
+    return {
+      tag: tags[tag] as Tag,
+      class: commentTagNames.has(tag) ? `${tagClass} ${COMMENT_TOKEN_CLASS}` : tagClass,
+    }
+  })
   return syntaxHighlighting(
     tagHighlighter([
       ...tagClasses,

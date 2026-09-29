@@ -44,6 +44,7 @@ import * as z from 'zod'
 import ActivityLogSettingsSection from './ActivityLogSettingsSection'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection'
 import DeleteUserAccountSettingsSection from './DeleteUserAccountSettingsSection'
+import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection'
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection'
 import MembersSettingsSection from './MembersSettingsSection'
 import OrganizationProfilePictureInput from './OrganizationProfilePictureInput'
@@ -525,6 +526,11 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
             type: 'custom',
             aliasesId: 'codeLigaturesSettingsCustomEntryAliases',
             render: () => <CodeLigaturesSettingsSection />,
+          },
+          {
+            type: 'custom',
+            aliasesId: 'handwrittenCommentsSettingsCustomEntryAliases',
+            render: () => <HandwrittenCommentsSettingsSection />,
           },
         ],
       },
