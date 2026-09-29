@@ -532,4 +532,75 @@ describe('SessionProvider', () => {
     signOutDeferred.resolve(undefined)
     await signOutPromise
   })
+
+  it('keeps the local stand-in session when a 401 arrives in local-only mode', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const httpClient = new HttpClient()
+    httpClient.clearSessionToken = vi.fn()
+    // Local-only mode, as in the app: auth is disabled and there is no Cognito client, so any
+    // attempt to refresh the session or sign out would throw `Cognito not initialized`.
+    const { session, queryClient, onQueryError, onMutationError } = withSetup(() => {
+      const queryClient = vueQuery.useQueryClient()
+      const session = createSessionStore(
+        undefined,
+        registerAuthEventListener,
+        httpClient,
+        undefined,
+        queryClient,
+        undefined,
+        true,
+      )
+      return {
+        session,
+        queryClient,
+        onQueryError: queryClient.getQueryCache().config.onError!,
+        onMutationError: queryClient.getMutationCache().config.onError!,
+      }
+    })
+    const offlineEmail = makeOfflineSession().email
+    await vi.advanceTimersByTimeAsync(0)
+    await expect.poll(() => session.session?.email).toBe(offlineEmail)
+    // The terminal cleanup removes the `usersMe` queries; spy rather than seed one, since fake
+    // timers would also run TanStack Query's garbage collection of an unobserved query.
+    const removeQueries = vi.spyOn(queryClient, 'removeQueries')
+    const mutation = { execute: vi.fn(() => Promise.resolve(undefined)) }
+
+    onQueryError(new NotAuthorizedError('Not authorized', 401), {
+      queryKey: ['local-only-query'],
+      queryHash: '["local-only-query"]',
+    } as never)
+    onMutationError(
+      new NotAuthorizedError('Not authorized', 401),
+      {},
+      undefined,
+      mutation as never,
+      {} as never,
+    )
+    await vi.runAllTimersAsync()
+
+    expect(session.session?.email).toBe(offlineEmail)
+    expect(queryClient.getQueryData(USER_SESSION_QUERY_KEY)).not.toBeNull()
+    expect(removeQueries).not.toHaveBeenCalled()
+    expect(httpClient.clearSessionToken).not.toHaveBeenCalled()
+    expect(session.isReconnectingSession).toBe(false)
+  })
+
+  it('makes sign-out a no-op for the local stand-in session', () =>
+    withSetup(async () => {
+      const session = createSessionStore(
+        undefined,
+        registerAuthEventListener,
+        new HttpClient(),
+        undefined,
+        undefined,
+        undefined,
+        true,
+      )
+      const offlineEmail = makeOfflineSession().email
+      await expect.poll(() => session.session?.email).toBe(offlineEmail)
+      await expect(session.signOut()).resolves.toBeUndefined()
+      await flushPromises()
+      expect(session.session?.email).toBe(offlineEmail)
+    }))
 })

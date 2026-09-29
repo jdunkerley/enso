@@ -117,6 +117,8 @@ export function createSessionStore(
   const logoutMutation = vueQuery.useMutation({
     mutationKey: computed(() => ['session', 'logout', session.data.value?.clientId] as const),
     mutationFn: async () => {
+      // Local-only mode has no account to sign out of: the stand-in session stays.
+      if (toValue(authDisabled)) return
       const auth = assertAuthService()
       isLoggingOut.value = true
       document.dispatchEvent(new Event(LOGOUT_EVENT))
@@ -135,6 +137,7 @@ export function createSessionStore(
     // If the User Menu is still visible, it breaks when `userSession` is set to `null`.
     onMutate: unsetModal,
     onSuccess: async () => {
+      if (toValue(authDisabled)) return
       analytics.cloudSignOut.after()
       localStorage.clearUserSpecificEntries()
       sentry.setUser(null)
@@ -148,6 +151,7 @@ export function createSessionStore(
   const { isReconnectingSession, resetUnauthorizedRecoveryState } = useUnauthorizedRecovery({
     queryClient,
     isLoggingOut,
+    isAuthDisabled: () => toValue(authDisabled),
     refreshUserSession: () => refreshUserSessionMutation.mutateAsync(),
     logout: () => logoutMutation.mutateAsync(),
     clearSessionToken: () => httpClient.clearSessionToken(),

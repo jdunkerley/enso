@@ -23,6 +23,12 @@ import {
 interface UseUnauthorizedRecoveryOptions {
   readonly queryClient: QueryClient
   readonly isLoggingOut: Ref<boolean>
+  /**
+   * Whether authentication is disabled (local-only mode). There is no session to recover then:
+   * the stand-in session has no token, so a refresh can only fail, and the terminal cleanup would
+   * log the user out of a session that was never real (closing the project, as in #72).
+   */
+  readonly isAuthDisabled: () => boolean
   readonly refreshUserSession: () => Promise<unknown>
   readonly logout: () => Promise<unknown>
   readonly clearSessionToken: () => void
@@ -45,7 +51,9 @@ export function useUnauthorizedRecovery(options: UseUnauthorizedRecoveryOptions)
   const isReconnectingSession = computed(() => state.reconnectingSessionBackoffWaitCount.value > 0)
 
   const isAuthRecoveryBlocked = () =>
-    state.terminalAuthFailurePromise != null || options.isLoggingOut.value
+    options.isAuthDisabled() ||
+    state.terminalAuthFailurePromise != null ||
+    options.isLoggingOut.value
 
   const waitForRecoveryBackoff = async (delayMs: number) => {
     if (delayMs <= RECONNECTING_SESSION_DELAY_MS) {
@@ -67,6 +75,11 @@ export function useUnauthorizedRecovery(options: UseUnauthorizedRecoveryOptions)
   const reportTerminalAuthFailure = (error: UnauthorizedRecoveryError) => {
     if (state.terminalAuthFailurePromise) {
       return state.terminalAuthFailurePromise
+    }
+    // The handlers also call this directly (e.g. for a mutation that fails again after replay),
+    // so guard here too, not only in the recovery entry points.
+    if (options.isAuthDisabled()) {
+      return Promise.resolve()
     }
 
     const isUsersMeQuery = (query: Query) => isUsersMeQueryKey(query.queryKey)
