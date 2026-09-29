@@ -175,11 +175,15 @@ Enterprise-gated is narrower:
 
 **Community replacement:** a small custom range-selection layer.
 
-- Track `{anchor, focus}` cell coordinates in a reactive model, updated from
-  Community-native events: `cellMouseDown` (start), `cellMouseOver` while the
-  mouse button is down (drag-extend), and the existing keydown interception
-  point (alongside `suppressCopy`) for `Shift+Click` and `Shift+Arrow`
-  extension.
+- Track `{anchor, focus}` cell coordinates in a reactive model, updated from the
+  native `mousedown` (start) and `mouseover` while the button is down
+  (drag-extend) on the grid, reading the cell from the `row-index` / `col-id`
+  attributes AG Grid renders, plus the existing keydown interception point
+  (alongside `suppressCopy`) for `Shift+Click` and `Shift+Arrow` extension.
+  (First built on AG Grid's `cellMouseDown` / `cellMouseOver`, but AG Grid
+  dispatches those from a `setTimeout(0)`: Chromium runs queued input before
+  timers, so a quick Ctrl+C after a Shift+Click copied the old range. The model
+  now updates in the input event itself; only the repaint stays deferred.)
 - Visual highlight via `cellClassRules` (Community-supported), recomputed with
   `api.refreshCells({ force: true })` on range change.
 - Copy/Cut (unlicensed): read the rectangle's values directly
