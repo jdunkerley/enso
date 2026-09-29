@@ -389,6 +389,15 @@ export function EnsoDevtools() {
                 />
                 <Switch
                   form={form}
+                  name="enableMonaspaceCodeFont"
+                  label="Monaspace code font"
+                  description="Use Monaspace Neon for code, tables and visualizations, and a 13px code editor."
+                  onChange={(value) => {
+                    setFeatureFlag('enableMonaspaceCodeFont', value)
+                  }}
+                />
+                <Switch
+                  form={form}
                   name="showDeveloperIds"
                   label={getText('ensoDevtoolsFeatureFlags.showDeveloperIds')}
                   description={getText('ensoDevtoolsFeatureFlags.showDeveloperIdsDescription')}

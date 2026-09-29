@@ -75,6 +75,10 @@ onMounted(() => {
 :deep(.cm-scroller) {
   /*noinspection CssNoGenericFontName*/
   font-family: var(--font-mono);
+  /* No coding ligatures in the editor, even with the "Code ligatures" setting on: they make the
+     caret's position inside `->` or `>=` ambiguous (see `--font-mono-variant-ligatures`). */
+  font-variant-ligatures: var(--font-mono-variant-ligatures);
+  font-feature-settings: var(--font-mono-feature-settings);
 }
 
 :deep(.cm-editor) {
@@ -86,7 +90,7 @@ onMounted(() => {
   opacity: 1;
   color: black;
   text-shadow: 0 0 2px rgba(255, 255, 255, 0.4);
-  font-size: 12px;
+  font-size: var(--code-editor-font-size);
   outline: 1px solid transparent;
   transition: outline 0.1s ease-in-out;
   &:deep(.cm-focused) {

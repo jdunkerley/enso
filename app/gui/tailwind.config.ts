@@ -71,6 +71,11 @@ export default {
         'black-a50': 'rgb(0 0 0 / 50%)',
         'gray-350': '#b7bcc5',
       },
+      fontFamily: {
+        // Follows the GUI's code font (`project-view/assets/base.css`), so the `font-mono` class
+        // matches the code editor and tables, including under the Monaspace feature flag.
+        mono: 'var(--font-mono)',
+      },
       fontSize: {
         '2xs': '10.5px',
         xs: '11.5px',

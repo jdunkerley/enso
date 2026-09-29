@@ -54,12 +54,11 @@ the `.woff2` files.
 
 ## Status
 
-Added by #109 to vendor the files only — nothing in the GUI references
-`"Monaspace Neon"` or `"Monaspace Radon"` yet (see
-`src/project-view/assets/font-monaspace.css`), so there is no preload link in
-`index.html` yet either: preloading an unused font would cost first-load time
-for nothing. #110 switches `--font-mono` to Monaspace Neon and adds the preload
-at that point; #111 is expected to use Monaspace Radon for comments.
+Added by #109. Since #110, Monaspace Neon is `--font-mono` (the code editor,
+documentation code, tables and visualizations) and is preloaded from
+`index.html`. The `enableMonaspaceCodeFont` feature flag, on by default, stays
+for one release as a kill switch back to DejaVu Sans Mono; #113 removes it.
+Monaspace Radon is not referenced yet; #111 is expected to use it for comments.
 
 ## Upgrading
 

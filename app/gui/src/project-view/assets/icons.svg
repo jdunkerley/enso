@@ -1018,7 +1018,7 @@
   </symbol>
 
   <symbol id="workflow_stop" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <rect x="4" y="4" width="8" height="8" rx="1" fill="currentColor"/>
+    <rect x="5" y="5" width="6" height="6" rx="1" fill="currentColor"/>
   </symbol>
   <symbol id="zoom" viewBox="0 0 16 16" width="16" height="16" fill="none">
     <path d="M7.33 5.33V9.33M9.33 7.33L5.33 7.33M13.33 13.33L10.7 10.7M12 7.33C12 9.91 9.91 12 7.33 12C4.76 12 2.67 9.91 2.67 7.33C2.67 4.76 4.76 2.67 7.33 2.67C9.91 2.67 12 4.76 12 7.33Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>

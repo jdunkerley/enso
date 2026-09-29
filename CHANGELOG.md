@@ -105,6 +105,15 @@
   typeface as the rest of the IDE][129], instead of three custom variants of it.
   Text looks almost the same, with slightly different spacing around dots,
   hyphens and commas, and the IDE download is about 1.3 MB smaller.
+- [Code now uses the Monaspace Neon typeface][132]: the code editor,
+  documentation code, table values and visualizations. It is designed for code,
+  and its letters adjust their spacing to their neighbours so that narrow and
+  wide characters such as `i` and `m` read more evenly. The code editor's text
+  grows from 12 to 13 px to match the new typeface's size; node text is
+  unchanged. A new "Code ligatures" setting, under Settings → Appearance and off
+  by default, joins operators such as `->` and `>=` into single symbols in
+  documentation code, tables and visualizations; the code editor always shows
+  them as separate characters.
 
 #### Enso Language & Runtime
 
@@ -234,6 +243,7 @@
 [127]: https://github.com/jdunkerley/enso/pull/127
 [128]: https://github.com/jdunkerley/enso/pull/128
 [129]: https://github.com/jdunkerley/enso/pull/129
+[132]: https://github.com/jdunkerley/enso/pull/132
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

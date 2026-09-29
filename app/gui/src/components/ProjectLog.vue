@@ -42,7 +42,9 @@ registerHandlers({
   overflow-y: auto;
   overflow-x: clip;
 
-  font-family: monospace;
+  font-family: var(--font-mono);
+  font-variant-ligatures: var(--font-mono-readonly-variant-ligatures);
+  font-feature-settings: var(--font-mono-readonly-feature-settings);
 
   height: 100%;
 }

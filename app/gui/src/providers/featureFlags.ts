@@ -32,6 +32,12 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   unsafeDarkTheme: z.boolean(),
   apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
+  /**
+   * Use Monaspace Neon for `--font-mono` (the code editor, docs code, tables and visualizations),
+   * with a 13px code editor. On by default; kept for one release as a kill switch that restores
+   * DejaVu Sans Mono and the 12px editor. #113 removes it.
+   */
+  enableMonaspaceCodeFont: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -69,6 +75,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         unsafeDarkTheme: false,
         apiKeyLimit: 5,
         debugHoverAreas: false,
+        enableMonaspaceCodeFont: true,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))
@@ -79,7 +86,8 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
     }),
     {
       name: 'enso-feature-flags',
-      version: 1,
+      version: 2,
+      migrate: migrateFeatureFlags,
       merge: (persistedState, newState) => {
         /** Mutates the state with provided feature flags. */
         function unsafeMutateFeatureFlags(flags: {
@@ -119,6 +127,25 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
     },
   ),
 )
+
+/**
+ * Upgrade persisted feature flags from an older `version`.
+ *
+ * Version 1 had `enableMonaspaceCodeFont` default to `false`, and the store persists every flag
+ * whenever any one changes (`ReactRoot` sets `enableLocalBackend` on each start), so a stored
+ * `false` usually records that old default rather than a choice. Version 2 drops it, so that the new
+ * default (`true`) applies; a `true` is kept, and a `false` set from now on is kept too.
+ */
+export function migrateFeatureFlags(persistedState: unknown, version: number): unknown {
+  if (version < 2) {
+    const parsed = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
+    if (parsed.success && parsed.data.featureFlags.enableMonaspaceCodeFont === false) {
+      const { enableMonaspaceCodeFont: _, ...featureFlags } = parsed.data.featureFlags
+      return { ...parsed.data, featureFlags }
+    }
+  }
+  return persistedState
+}
 
 /** Composable for getting a specific feature flag. */
 export function useFeatureFlag<Key extends keyof FeatureFlags>(key: Key) {
