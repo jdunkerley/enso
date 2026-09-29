@@ -38,6 +38,12 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
    * DejaVu Sans Mono and the 12px editor. #113 removes it.
    */
   enableMonaspaceCodeFont: z.boolean(),
+  /**
+   * Use Monaspace Neon for `--font-code`: node expressions and bindings, component browser entries
+   * and the AI pending node. Off by default while its impact on existing layouts is measured (#112):
+   * monospace text is wider, so a previously tidy graph can overlap until Tidy up re-spaces it.
+   */
+  monoNodes: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -76,6 +82,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         apiKeyLimit: 5,
         debugHoverAreas: false,
         enableMonaspaceCodeFont: true,
+        monoNodes: false,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))

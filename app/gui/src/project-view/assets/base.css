@@ -340,7 +340,7 @@
 /* Monaspace Neon as the code font, under the `enableMonaspaceCodeFont` feature flag — on by
    default, kept for one release as a kill switch (#110; the class is set on the document root by
    `src/providers/codeFont.ts`, and #113 folds this into `:root` when the flag goes). The code editor grows to 13px because Neon's x-height is ~6% smaller
-   than DejaVu Sans Mono's. `--font-code` (nodes) deliberately stays M PLUS 1 (#112). */
+   than DejaVu Sans Mono's. `--font-code` (nodes) stays M PLUS 1 unless `monoNodes` is on (below). */
 :root.monaspaceCodeFont {
   --font-mono:
     "Monaspace Neon", "DejaVu Sans Mono",
@@ -363,6 +363,15 @@
    from the surrounding code, so texture healing (`calt`) stays on and coding ligatures off. */
 :root.monaspaceCodeFont.handwrittenComments {
   --font-mono-comment: "Monaspace Radon", var(--font-mono);
+}
+
+/* Node text in Monaspace Neon, under the `monoNodes` feature flag (off by default; #112). Covers
+   every `--font-code` consumer: node expressions and bindings, component browser entries and the
+   AI pending node. Neon is already preloaded from `index.html`. Falls back to `--font-mono`'s stack,
+   resolved here on the root. Monospace text is ~10-15% wider than M PLUS 1, and node widths are
+   measured, never saved, so this changes no project data; a tidy graph may overlap until Tidy up. */
+:root.monoNodes {
+  --font-code: "Monaspace Neon", var(--font-mono);
 }
 
 @keyframes s1 {

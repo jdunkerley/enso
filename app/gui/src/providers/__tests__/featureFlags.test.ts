@@ -5,6 +5,10 @@ test('The Monaspace code font is on by default', () => {
   expect(flagsStore.getState().featureFlags.enableMonaspaceCodeFont).toBe(true)
 })
 
+test('Monospace node text is off by default', () => {
+  expect(flagsStore.getState().featureFlags.monoNodes).toBe(false)
+})
+
 test.each`
   version | stored       | expected
   ${1}    | ${false}     | ${undefined}

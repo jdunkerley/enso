@@ -398,6 +398,15 @@ export function EnsoDevtools() {
                 />
                 <Switch
                   form={form}
+                  name="monoNodes"
+                  label="Monospace nodes"
+                  description="Use Monaspace Neon for node text and component browser entries. Reopen the project after switching, so that widget inputs are re-measured."
+                  onChange={(value) => {
+                    setFeatureFlag('monoNodes', value)
+                  }}
+                />
+                <Switch
+                  form={form}
                   name="showDeveloperIds"
                   label={getText('ensoDevtoolsFeatureFlags.showDeveloperIds')}
                   description={getText('ensoDevtoolsFeatureFlags.showDeveloperIdsDescription')}
