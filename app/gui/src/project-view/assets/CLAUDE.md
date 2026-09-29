@@ -30,9 +30,10 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   removes the flag and DejaVu Sans Mono.
 - `--font-code` is node text (expressions, bindings, component browser entries,
   the AI pending node): M PLUS 1, or Monaspace Neon under the `monoNodes`
-  feature flag (off by default; `:root.monoNodes` in `base.css`, class from
-  `src/providers/codeFont.ts`). #112 is measuring its layout impact before the
-  default flips. Node widths are measured per session, never saved.
+  feature flag (on by default, kept for one release as a kill switch;
+  `:root.monoNodes` in `base.css`, class from `src/providers/codeFont.ts`). #113
+  removes it along with `enableMonaspaceCodeFont`. Nodes are ~14% wider than in
+  M PLUS 1; widths are measured per session, never saved.
 - `--font-mono-comment` is the code editor's comment face: `--font-mono`, or
   Monaspace Radon under the flag plus the "Handwritten comments" setting
   (`:root.monaspaceCodeFont.handwrittenComments`; both on by default). Radon is

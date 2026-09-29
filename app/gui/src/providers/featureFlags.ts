@@ -40,8 +40,9 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   enableMonaspaceCodeFont: z.boolean(),
   /**
    * Use Monaspace Neon for `--font-code`: node expressions and bindings, component browser entries
-   * and the AI pending node. Off by default while its impact on existing layouts is measured (#112):
-   * monospace text is wider, so a previously tidy graph can overlap until Tidy up re-spaces it.
+   * and the AI pending node (#112). On by default; kept for one release as a kill switch that
+   * restores M PLUS 1. Monospace text is wider, so a previously tidy graph can overlap until Tidy up
+   * re-spaces it. #113 removes it.
    */
   monoNodes: z.boolean(),
 })
@@ -82,7 +83,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         apiKeyLimit: 5,
         debugHoverAreas: false,
         enableMonaspaceCodeFont: true,
-        monoNodes: false,
+        monoNodes: true,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))
@@ -93,7 +94,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
     }),
     {
       name: 'enso-feature-flags',
-      version: 2,
+      version: 3,
       migrate: migrateFeatureFlags,
       merge: (persistedState, newState) => {
         /** Mutates the state with provided feature flags. */
@@ -136,22 +137,31 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
 )
 
 /**
- * Upgrade persisted feature flags from an older `version`.
+ * Flags whose default changed from `false` to `true`, with the store version that changed it.
  *
- * Version 1 had `enableMonaspaceCodeFont` default to `false`, and the store persists every flag
- * whenever any one changes (`ReactRoot` sets `enableLocalBackend` on each start), so a stored
- * `false` usually records that old default rather than a choice. Version 2 drops it, so that the new
- * default (`true`) applies; a `true` is kept, and a `false` set from now on is kept too.
+ * The store persists every flag whenever any one changes (`ReactRoot` sets `enableLocalBackend` on
+ * each start), so a stored `false` from before the change usually records the old default rather
+ * than a choice. Migrating past that version drops it once, so that the new default applies; a
+ * stored `true` is kept, and a `false` set after the migration is kept too.
  */
+const DEFAULTS_TURNED_ON: readonly { flag: keyof FeatureFlags; version: number }[] = [
+  { flag: 'enableMonaspaceCodeFont', version: 2 },
+  { flag: 'monoNodes', version: 3 },
+]
+
+/** Upgrade persisted feature flags from an older `version`: see {@link DEFAULTS_TURNED_ON}. */
 export function migrateFeatureFlags(persistedState: unknown, version: number): unknown {
-  if (version < 2) {
-    const parsed = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
-    if (parsed.success && parsed.data.featureFlags.enableMonaspaceCodeFont === false) {
-      const { enableMonaspaceCodeFont: _, ...featureFlags } = parsed.data.featureFlags
-      return { ...parsed.data, featureFlags }
+  const parsed = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
+  if (!parsed.success) return persistedState
+  const featureFlags = { ...parsed.data.featureFlags }
+  let changed = false
+  for (const { flag, version: changedIn } of DEFAULTS_TURNED_ON) {
+    if (version < changedIn && featureFlags[flag] === false) {
+      delete featureFlags[flag]
+      changed = true
     }
   }
-  return persistedState
+  return changed ? { ...parsed.data, featureFlags } : persistedState
 }
 
 /** Composable for getting a specific feature flag. */
