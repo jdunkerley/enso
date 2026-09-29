@@ -1,5 +1,5 @@
 import { EditorState } from '@codemirror/state'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import { completionTypeAt } from '..'
 import { tableExpression } from '../..'
 
@@ -110,4 +110,18 @@ test.each([
 ])('Binop completion: $source', ({ source, auto, insertDelim }) => {
   const { completion, anchor: pos } = completionTypeCase(source)
   expect(completion).toStrictEqual({ type: 'binop', pos, auto, insertDelim })
+})
+
+// CodeMirror parses a new state against a 20ms time budget, so on a busy thread the initial tree
+// can stop partway through the document. Simulate that by making every clock read 25ms later: the
+// result must still come from the whole expression, not from the part parsed in time.
+test('Completion does not depend on the initial parse finishing within its time budget', () => {
+  let now = 0
+  const clock = vi.spyOn(Date, 'now').mockImplementation(() => (now += 25))
+  try {
+    const { completion } = completionTypeCase('a_function(1, 2, 3|)')
+    expect(completion).toStrictEqual({ type: 'functionInfo', pos: 0, functionName: 'a_function' })
+  } finally {
+    clock.mockRestore()
+  }
 })

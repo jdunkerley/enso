@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { useCommunityCellRange } from '../communityCellRange'
+import { cellCoordFromEvent, useCommunityCellRange } from '../communityCellRange'
 
 const columnIds = () => ['a', 'b', 'c', 'd']
 
@@ -79,5 +79,36 @@ describe('useCommunityCellRange change reporting', () => {
     // Collapsing a multi-cell range back to its anchor *is* a change.
     extendTo({ rowIndex: 3, colId: 'd' })
     expect(startAt({ rowIndex: 1, colId: 'c' })).toBe(true)
+  })
+})
+
+describe('cellCoordFromEvent', () => {
+  function eventOn(html: string, selector: string): Event {
+    const root = document.createElement('div')
+    root.innerHTML = html
+    const target = root.querySelector(selector)!
+    const event = new MouseEvent('mousedown', { bubbles: true })
+    Object.defineProperty(event, 'target', { value: target })
+    return event
+  }
+
+  test('reads the row index and column id AG Grid renders on a body cell', () => {
+    const html =
+      '<div class="ag-row" row-index="3"><div class="ag-cell" col-id="Value"><span>x</span></div></div>'
+    expect(cellCoordFromEvent(eventOn(html, 'span'))).toEqual({ rowIndex: 3, colId: 'Value' })
+    expect(cellCoordFromEvent(eventOn(html, '.ag-cell'))).toEqual({ rowIndex: 3, colId: 'Value' })
+  })
+
+  test('ignores events outside a body cell', () => {
+    expect(cellCoordFromEvent(eventOn('<div class="ag-row" row-index="1"></div>', '.ag-row'))).toBe(
+      undefined,
+    )
+    const header = '<div class="ag-header-cell" col-id="Value"><span>Value</span></div>'
+    expect(cellCoordFromEvent(eventOn(header, 'span'))).toBeUndefined()
+  })
+
+  test('ignores pinned rows, whose row-index is not a body row index', () => {
+    const html = '<div class="ag-row" row-index="t-0"><div class="ag-cell" col-id="a"></div></div>'
+    expect(cellCoordFromEvent(eventOn(html, '.ag-cell'))).toBeUndefined()
   })
 })

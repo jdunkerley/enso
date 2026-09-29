@@ -12,6 +12,25 @@ interface Range {
 }
 
 /**
+ * The body cell a native DOM event happened in, read from the attributes AG Grid renders: the
+ * row's `row-index` and the cell's `col-id`. Returns `undefined` outside a body cell (headers,
+ * empty viewport) and for pinned rows, whose `row-index` (`t-0`, `b-0`) is not a body row index.
+ *
+ * The range is driven from native events rather than AG Grid's `cellMouseDown`/`cellMouseOver`
+ * because AG Grid delivers those asynchronously (queued behind a `setTimeout(…, 0)`). A key press
+ * already queued behind the click — Shift+Click then Ctrl+C, when the page is busy — then ran
+ * before the range was extended, and copied the old one.
+ */
+export function cellCoordFromEvent(event: Event): CellCoord | undefined {
+  if (!(event.target instanceof Element)) return undefined
+  const cell = event.target.closest('.ag-cell[col-id]')
+  const colId = cell?.getAttribute('col-id')
+  const rowIndexAttr = cell?.closest('.ag-row[row-index]')?.getAttribute('row-index')
+  if (colId == null || rowIndexAttr == null || !/^\d+$/.test(rowIndexAttr)) return undefined
+  return { rowIndex: Number(rowIndexAttr), colId }
+}
+
+/**
  * Tracks one contiguous rectangular cell selection from Community-native inputs (mouse
  * down/drag, keyboard extension), replacing AG Grid Enterprise's `cellSelection` for the
  * unlicensed fallback. Deliberately supports only a single rectangle — multi-range (ctrl+click)

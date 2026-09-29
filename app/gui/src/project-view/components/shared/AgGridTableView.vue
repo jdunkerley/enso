@@ -193,7 +193,7 @@ import {
 } from 'vue'
 import { AG_GRID_LOCALE_EN } from '@ag-grid-community/locale'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
-import { useCommunityCellRange } from './AgGridTableView/communityCellRange'
+import { cellCoordFromEvent, useCommunityCellRange } from './AgGridTableView/communityCellRange'
 import {
   installCommunityClipboardPatch,
   type ClipboardDeps,
@@ -559,36 +559,50 @@ function closeContextMenu() {
 
 // === Community cell-range selection (unlicensed fallback for Enterprise `cellSelection`) ===
 
-function onCellMouseDown(event: {
-  rowIndex: number | null
-  column: { getColId(): string }
-  event?: Event | null
-}) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE || event.rowIndex == null) return
-  const nativeEvent = event.event instanceof MouseEvent ? event.event : undefined
-  // Only the left/primary button starts or extends a range — right-click (context menu) and
-  // middle-click must not collapse an existing selection.
-  if (nativeEvent != null && nativeEvent.button !== 0) return
-  const coord = { rowIndex: event.rowIndex, colId: event.column.getColId() }
-  // Shift+Click extends the existing range from its anchor, matching the licensed Set Filter's
-  // own Shift+Click behavior and the design spec's requirement for Shift+Click range extension.
-  const changed =
-    nativeEvent?.shiftKey && communityRange.value != null ? extendTo(coord) : startAt(coord)
-  if (changed) gridApi.value?.refreshCells({ force: true })
+// Both handlers are bound to the wrapper's native `mousedown`/`mouseover`, not to AG Grid's
+// `cellMouseDown`/`cellMouseOver`: AG Grid dispatches those asynchronously (behind a
+// `setTimeout(…, 0)`), so under load a key press queued behind the click — Shift+Click, then
+// Ctrl+C — ran first and copied the stale range. The range itself now changes synchronously, in
+// the input event; only the repaint stays deferred, see `repaintRange`.
+
+/**
+ * Repaint the range highlight after the current event has finished. `refreshCells({ force: true })`
+ * re-renders every displayed cell; doing that *during* `mousedown` replaced the clicked element
+ * before the browser's default action focused it, so the grid lost focus and a following Ctrl+C
+ * went to the graph editor instead. Deferring it keeps the timing the async AG Grid events had.
+ */
+let repaintQueued = false
+function repaintRange() {
+  if (repaintQueued) return
+  repaintQueued = true
+  setTimeout(() => {
+    repaintQueued = false
+    const api = gridApi.value
+    if (api != null && !api.isDestroyed()) api.refreshCells({ force: true })
+  })
 }
 
-function onCellMouseOver(
-  event: { rowIndex: number | null; column: { getColId(): string } },
-  mouseButtonDown: boolean,
-) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE || event.rowIndex == null || !mouseButtonDown) return
+function onCellMouseDown(event: MouseEvent) {
+  if (AG_GRID_ENTERPRISE_AVAILABLE) return
+  // Only the left/primary button starts or extends a range — right-click (context menu) and
+  // middle-click must not collapse an existing selection.
+  if (event.button !== 0) return
+  const coord = cellCoordFromEvent(event)
+  if (coord == null) return
+  // Shift+Click extends the existing range from its anchor, matching the licensed Set Filter's
+  // own Shift+Click behavior and the design spec's requirement for Shift+Click range extension.
+  const changed = event.shiftKey && communityRange.value != null ? extendTo(coord) : startAt(coord)
+  if (changed) repaintRange()
+}
+
+function onCellMouseOver(event: MouseEvent) {
+  if (AG_GRID_ENTERPRISE_AVAILABLE || !mouseButtonDown) return
+  const coord = cellCoordFromEvent(event)
   // Only repaint when the range actually moved. `mouseover` fires continuously while dragging
   // within a single cell, and `refreshCells({ force: true })` re-renders every displayed cell —
   // doing that on each event replaced the cell DOM many times a second, so nothing in the grid
   // was ever stable mid-drag.
-  if (extendTo({ rowIndex: event.rowIndex, colId: event.column.getColId() })) {
-    gridApi.value?.refreshCells({ force: true })
-  }
+  if (coord != null && extendTo(coord)) repaintRange()
 }
 
 let mouseButtonDown = false
@@ -745,6 +759,8 @@ const customLocale = {
     @keydown.space.stop
     @mousedown.capture="onWrapperMouseDown"
     @mouseup.capture="onWrapperMouseUp"
+    @mousedown="onCellMouseDown"
+    @mouseover="onCellMouseOver"
   >
     <!-- The `cacheBlockSize` value of `1000` below must stay in sync with the backend's
          `max_rows` in `get_rows_for_table`
@@ -772,8 +788,6 @@ const customLocale = {
       :sendToClipboard="sendToClipboard"
       :suppressFieldDotNotation="true"
       :popupParent="popupParent"
-      @cellMouseDown="onCellMouseDown"
-      @cellMouseOver="onCellMouseOver($event, mouseButtonDown)"
       @gridReady="onGridReady"
       @firstDataRendered="updateColumnWidths"
       @rowDataUpdated="(updateColumnWidths($event), emit('rowDataUpdated', $event))"
