@@ -118,7 +118,7 @@
   Radon, a handwriting face with the same character widths as the code font, so
   code and comments still line up. The new "Handwritten comments" setting under
   Settings → Appearance turns it off.
-- [Node text is now in Monaspace Neon][NNN], the same typeface as the code
+- [Node text is now in Monaspace Neon][135], the same typeface as the code
   editor, as are the Component Browser's entries and AI placeholder nodes. Nodes
   are about 14% wider on average, so graphs laid out side by side may overlap
   after updating: use Tidy up (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>) to
@@ -254,7 +254,7 @@
 [129]: https://github.com/jdunkerley/enso/pull/129
 [132]: https://github.com/jdunkerley/enso/pull/132
 [133]: https://github.com/jdunkerley/enso/pull/133
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[135]: https://github.com/jdunkerley/enso/pull/135
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
