@@ -10,6 +10,8 @@ import {
   loginAsTestUser,
   openComponentBrowser,
   openDropdownInWidget,
+  showAllComponents,
+  showSelectedComponent,
   SKIP_ON_WINDOWS_CI,
   SKIP_ON_WINDOWS_CI_REASON,
   test,
@@ -79,12 +81,15 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     ).toHaveCount(0)
 
     // Set parameters
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'value')
     await page.getByRole('button', { name: '<Simple Expression>', exact: true }).click()
 
+    await showSelectedComponent(page)
     await page.getByText('input', { exact: true }).click()
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
+    await showSelectedComponent(page)
     await page.getByText('operation', { exact: true }).click()
     await page.getByRole('button', { name: 'Text', exact: true }).click()
 
@@ -92,12 +97,14 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await page.getByRole('button', { name: 'length', exact: true }).click()
 
     // Typing in the column name
+    await showSelectedComponent(page)
     await fillWidgetText(page, 'as“”', 'currency_code_length')
 
     // Adding filter component
     await openComponentBrowser(page, 'set')
 
     await page.locator('.ComponentEntry', { hasText: 'filter' }).click()
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'column')
 
     // Click with the assurance of component being in vision
@@ -105,11 +112,13 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await option.scrollIntoViewIfNeeded()
     await option.click()
 
+    await showSelectedComponent(page)
     openDropdownInWidget(page, 'filter')
     const notEqualBtn = page.getByRole('button', { name: '..Not_Equal', exact: true })
     await notEqualBtn.waitFor({ state: 'visible', timeout: 10000 })
     await notEqualBtn.click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'to')
     await page.getByRole('button', { name: '<Number Value>' }).click()
 
@@ -132,10 +141,12 @@ test('Exercise 1', async ({ page, projectsDir }) => {
   // ---------------- Objective 3 ----------------
   await test.step('Objective 3: Filter Data to find “Savings Account” records', async () => {
     // Creating filter component
-    await page.getByText('set', { exact: true }).click({ button: 'right' })
+    await showAllComponents(page)
+    await page.locator('.GraphNode').getByText('set', { exact: true }).click({ button: 'right' })
     await page.keyboard.press('Enter')
 
     await page.locator('.ComponentEntry', { hasText: 'filter' }).click()
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'column')
 
     // Click with the assurance of component being in vision
@@ -145,12 +156,15 @@ test('Exercise 1', async ({ page, projectsDir }) => {
     await option2.click()
 
     // Choosing the right parameters
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'filter')
     await page.getByRole('button', { name: '..Equal', exact: true }).click()
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'to')
     await page.getByRole('button', { name: '<Text Value>' }).click()
 
     // Set the filtered text value
+    await showSelectedComponent(page)
     await fillWidgetText(page, 'filter..Equal“”', 'Savings Account')
   })
 
@@ -209,6 +223,7 @@ test('Exercise 2', async ({ page }) => {
     await page.locator('.ComponentEntry', { hasText: 'aggregate' }).click()
 
     // Choosing parameters
+    await showSelectedComponent(page)
     const groupBy = page.getByText('group_by', { exact: true })
 
     // Ensuring 'plus' is visible, to avoid clicking too early
@@ -221,6 +236,7 @@ test('Exercise 2', async ({ page }) => {
     // Close the dropdown
     await page.getByText('aggregate').click()
 
+    await showSelectedComponent(page)
     await addFirstElementToWidgetVector(
       page.locator('div.WidgetTopLevelArgument', { hasText: 'columns' }),
     )
@@ -233,6 +249,7 @@ test('Exercise 2', async ({ page }) => {
     await openComponentBrowser(page, 'aggregate')
     await page.locator('.ComponentEntry', { hasText: 'sort' }).click()
 
+    await showSelectedComponent(page)
     await addFirstElementToWidgetVector(
       page.locator('div.WidgetTopLevelArgument', { hasText: 'columns' }),
     )
@@ -245,6 +262,7 @@ test('Exercise 2', async ({ page }) => {
       .click()
     await page.getByRole('button', { name: 'Count', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'direction')
     await page.getByRole('button', { name: '..Descending', exact: true }).click()
 
@@ -253,12 +271,10 @@ test('Exercise 2', async ({ page }) => {
 
   // ---------------- Objective 3 ----------------
   await test.step('Objective 3: Create table of currencies by product names', async () => {
-    // Park the cursor before scrolling: after a wheel the cursor stays at the
-    // same viewport coord while page contents shift, so it can end up over a
-    // column header and trigger a tooltip that intercepts the next click.
+    // Park the cursor, so that the view moving under it cannot leave it over a
+    // column header whose tooltip would intercept the next click.
     await page.mouse.move(0, 0)
-    // Scroll into view
-    await page.mouse.wheel(0, -200)
+    await showAllComponents(page)
 
     // Creating cross_tab component
     const readComponent = page.getByText('read', { exact: true }).nth(2)
@@ -268,6 +284,7 @@ test('Exercise 2', async ({ page }) => {
     await page.locator('.ComponentEntry', { hasText: 'cross_tab' }).click()
 
     // Choosing the right parameters
+    await showSelectedComponent(page)
     const crossGroup = await page.getByText('group_by', { exact: true }).nth(1)
 
     // Ensuring 'plus' is visible, to avoid clicking too early
@@ -275,15 +292,18 @@ test('Exercise 2', async ({ page }) => {
     await crossGroup.click()
     await page.getByRole('button', { name: 'product_name', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'names')
     const curRCode = page.getByRole('button', { name: 'currency_code' }).first()
     await expect(curRCode).toBeVisible()
     await curRCode.click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'values')
     await page.getByRole('button', { name: '..Count_Distinct', exact: true }).click()
 
     // Click the plus and select argument
+    await showSelectedComponent(page)
     await addFirstElementToWidgetVector(
       page.locator('div.WidgetTopLevelArgument', { hasText: 'columns' }),
     )
@@ -300,8 +320,7 @@ test('Exercise 2', async ({ page }) => {
   await test.step('Objective 4:  Fixing Dirty Data', async () => {
     // See note on the matching `mouse.move(0, 0)` in Objective 3.
     await page.mouse.move(0, 0)
-    // Scroll into view
-    await page.mouse.wheel(0, -200)
+    await showAllComponents(page)
 
     // Creating set component
     const readComponent = page.getByText('read', { exact: true }).nth(2)
@@ -311,36 +330,46 @@ test('Exercise 2', async ({ page }) => {
     await page.locator('.ComponentEntry', { hasText: 'set' }).click()
 
     // Choosing right parameters
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'value')
     await page.getByRole('button', { name: '<Simple Expression>', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'input')
     await page.getByRole('button', { name: 'currency_code', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'operation')
     await page.getByRole('button', { name: 'if', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'condition')
     await page.getByRole('button', { name: '..Equal', exact: true }).click()
 
+    await showSelectedComponent(page)
     await openDropdownInWidget(page, 'to')
     await page.getByRole('button', { name: '<Text Value>' }).click()
 
     // Write in the textbox
+    await showSelectedComponent(page)
     await fillWidgetText(page, '..Equal“”', 'G')
 
+    await showSelectedComponent(page)
     await page.getByText('true_value', { exact: true }).click()
     await page.getByRole('button', { name: '<Text Value>', exact: true }).click()
 
     // // Write in the textbox
+    await showSelectedComponent(page)
     await fillWidgetText(page, '..If(..Equal“G”)“”', 'GBP', 1)
 
+    await showSelectedComponent(page)
     await page.getByText('false_value', { exact: true }).click()
     const option = page.getByRole('button', { name: 'currency_code', exact: true })
     await option.hover()
     await option.click()
 
     // Write in the textbox
+    await showSelectedComponent(page)
     await fillWidgetText(page, 'as“”', 'currency_code')
     await visualizeData(page)
     await expect(page.getByText('191')).toBeVisible()

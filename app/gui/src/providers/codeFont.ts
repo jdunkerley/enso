@@ -1,8 +1,8 @@
 /**
- * @file The code font: which face `--font-mono` uses, and the "Code ligatures" and "Handwritten
- * comments" user settings.
+ * @file The code font: which face `--font-mono` uses, which face `--font-code` (node text) uses, and
+ * the "Code ligatures" and "Handwritten comments" user settings.
  *
- * All three are applied as classes on the document root, so the custom properties they switch in
+ * All four are applied as classes on the document root, so the custom properties they switch in
  * `project-view/assets/base.css` reach every consumer of `--font-mono` — including dashboard
  * portals outside `.App` and the shadow roots of custom-element visualizations, which inherit
  * custom properties but cannot be matched by an ancestor selector.
@@ -16,6 +16,8 @@ import { persist } from 'zustand/middleware'
 
 /** Root class set while the `enableMonaspaceCodeFont` feature flag is on. */
 export const MONASPACE_CODE_FONT_CLASS = 'monaspaceCodeFont'
+/** Root class set while the `monoNodes` feature flag is on: node text in Monaspace Neon (#112). */
+export const MONO_NODES_CLASS = 'monoNodes'
 /** Root class set while the "Code ligatures" setting is on. */
 export const CODE_LIGATURES_CLASS = 'codeLigatures'
 /** Root class set while the "Handwritten comments" setting is on. */
@@ -81,7 +83,7 @@ export function setHandwrittenComments(handwrittenComments: boolean) {
 }
 
 /**
- * Keep the document root's code-font classes in sync with the feature flag and the settings, and
+ * Keep the document root's code-font classes in sync with the feature flags and the settings, and
  * start loading Monaspace Radon, for comments, while the flag and the "Handwritten comments"
  * setting are both on. Monaspace Neon itself is preloaded from `index.html`.
  *
@@ -91,10 +93,12 @@ export function setHandwrittenComments(handwrittenComments: boolean) {
  */
 export function useCodeFontRootClasses(root: HTMLElement = document.documentElement) {
   const monaspace = useFeatureFlag('enableMonaspaceCodeFont')
+  const monoNodes = useFeatureFlag('monoNodes')
   const codeLigatures = useCodeLigatures()
   const handwrittenComments = useHandwrittenComments()
   watchEffect(() => {
     root.classList.toggle(MONASPACE_CODE_FONT_CLASS, monaspace.value)
+    root.classList.toggle(MONO_NODES_CLASS, monoNodes.value)
     root.classList.toggle(CODE_LIGATURES_CLASS, codeLigatures.value)
     root.classList.toggle(HANDWRITTEN_COMMENTS_CLASS, handwrittenComments.value)
     // `document.fonts` is missing in some test environments (jsdom). A failed load needs no

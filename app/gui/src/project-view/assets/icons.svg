@@ -1014,7 +1014,7 @@
   </symbol>
 
   <symbol id="workflow_play" viewBox="0 0 16 16" width="16" height="16" fill="none">
-    <path d="M5.52 2.91L12.57 7.14Q14 8 12.57 8.86L5.52 13.09Q4 14 4 12.23V3.77Q4 2 5.52 2.91Z" fill="currentColor"/>
+    <path d="M6.41 4.44L11.35 7.4Q12.35 8 11.35 8.6L6.41 11.56Q5.35 12.2 5.35 10.96V5.04Q5.35 3.8 6.41 4.44Z" fill="currentColor"/>
   </symbol>
 
   <symbol id="workflow_stop" viewBox="0 0 16 16" width="16" height="16" fill="none">
