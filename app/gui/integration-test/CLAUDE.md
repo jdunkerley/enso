@@ -23,6 +23,35 @@ pnpm test:integration          # headless
 pnpm test-dev:integration      # UI mode
 ```
 
+Single projects:
+`corepack pnpm exec cross-env NODE_ENV=production playwright test --project=Setup`
+(or `--project="Integration Tests"`). `PROD=true` builds and previews instead of
+running the dev server.
+
+### On native Windows
+
+The same commands work from PowerShell, Git Bash or `cmd.exe` (#21). Linux — WSL
+or CI — stays the reference: check anything timing- or rendering-sensitive there
+before trusting a Windows result. Differences to know about:
+
+- **Screenshot comparisons are skipped off Linux.** Baselines are `*-linux.png`
+  only, and Chromium rasterises text differently on Windows (about a fifth of
+  the code-font samples' pixels differ). Use `expectScreenshot` from
+  `integration-test/screenshot.ts`, never `expect(page).toHaveScreenshot`
+  directly: it compares on Linux and elsewhere records a `screenshot skipped`
+  annotation, while the rest of the test still runs. Do not commit `*-win32.png`
+  files — `--update-snapshots` on Windows has nothing to write through the
+  helper, but a direct `toHaveScreenshot` would create them.
+- **The mocked filesystem is POSIX-style.** Join its paths with `posix.join`
+  (`node:path`), not `join`: the tests run in Node on the host, so `join` writes
+  backslashes into them on Windows.
+- **Shutdown.** Playwright ignores `gracefulShutdown` on Windows and kills the
+  web server's process tree with `taskkill /T /F`; nothing is left listening on
+  the port afterwards.
+- The `webServer` command must stay shell-neutral: it runs through `cmd.exe` on
+  Windows, so no POSIX paths, no `VAR=value` prefixes, and no `.bin` shims
+  (`playwright.config.ts` runs Vite's `bin/vite.js` with `node`).
+
 ## AG Grid licensed vs unlicensed
 
 The suite runs in two Playwright projects, because the IDE's table view behaves
@@ -52,8 +81,6 @@ in both modes. Anything else runs once, unlicensed.
 
 - `DASHBOARD_TESTS=true` switches the run to a mocked backend (see
   `vite.config.ts`).
-- The Playwright `webServer` command uses a POSIX path, so the integration suite
-  does not run on native Windows. Use WSL, or rely on CI.
 - The Rust parser is imported as an ESM WebAssembly module
   (`import * as wasm from './rust_ffi_bg.wasm'` in `app/rust-ffi/dist/`). Node
   24 supports this unflagged; on Node 22 it needs

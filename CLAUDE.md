@@ -157,8 +157,9 @@ has silently produced a wrong result here:
 
 - **Verify on Linux, not only on Windows.** Several classes of bug here are
   invisible on Windows: `prettier-plugin-organize-imports` silently corrupts Vue
-  SFCs only on Linux (#19), and the Playwright integration suite cannot run on
-  native Windows at all (#21). WSL is the practical route. **Source
+  SFCs only on Linux (#19), and the GUI Playwright suite — which runs on native
+  Windows since #21 — compares its screenshots only on Linux, where its
+  baselines and CI are. WSL is the practical route. **Source
   `~/.enso-toolchain.sh` first** — `~/.bashrc` returns early in non-interactive
   shells, so a bare `wsl -e bash -lc` has no GraalVM, sbt or Node and quietly
   picks up the Windows binaries through `/mnt/c`. The script reads the GraalVM
