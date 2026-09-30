@@ -32,6 +32,12 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   unsafeDarkTheme: z.boolean(),
   apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
+  /**
+   * Show the Reka UI spike menu next to the user bar (#76). Proves the Vue headless-UI stack
+   * works beside React; off by default, set via `window.overrideFeatureFlags` or local storage.
+   * Remove with the spike once the Vue `DropdownMenu` primitive has a real mount site (#78).
+   */
+  enableHeadlessUiSpike: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -69,6 +75,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         unsafeDarkTheme: false,
         apiKeyLimit: 5,
         debugHoverAreas: false,
+        enableHeadlessUiSpike: false,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))

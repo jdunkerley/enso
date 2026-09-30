@@ -5,6 +5,7 @@ import type { ConfirmDeleteModalProps } from '#/modals/ConfirmDeleteModal'
 import { UserBar as UserBarReact } from '#/pages/dashboard/UserBar'
 import CommandPalette from '$/components/CommandPalette.vue'
 import { useContainerData } from '$/providers/container'
+import { useFeatureFlag } from '$/providers/featureFlags'
 import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { ContainerProviderForReact } from '$/providers/react/container'
@@ -25,6 +26,7 @@ import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBack
 import * as objects from 'enso-common/src/utilities/data/object'
 import { normalizeSlashes } from 'enso-common/src/utilities/file'
 import { onMounted, onUnmounted, shallowRef, toRef, toRefs } from 'vue'
+import HeadlessUiSpike from './HeadlessUiSpike.vue'
 import LeftPanel from './LeftPanel.vue'
 import MiddlePanel from './MiddlePanel.vue'
 import RightPanel from './RightPanel.vue'
@@ -50,6 +52,7 @@ const openedProjects = useOpenedProjects()
 const containerData = useContainerData()
 const { openProjectLocally, openSettingsTab, closeCurrentTab } = containerData
 const { focusedPanel, middlePanelShown } = toRefs(containerData)
+const headlessUiSpikeEnabled = useFeatureFlag('enableHeadlessUiSpike')
 provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
@@ -137,6 +140,7 @@ onUnmounted(() => {
         <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
           <div class="bar">
             <TabBar />
+            <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
             <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
           </div>
           <div class="belowBar">
