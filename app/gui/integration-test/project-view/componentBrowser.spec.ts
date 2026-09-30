@@ -159,6 +159,8 @@ test.describe('Accepting suggestion', () => {
     expected: string[],
   ) {
     await locate.addNewNodeButton(page).click()
+    // `Enter` goes to whatever has focus, and the browser focuses its input a moment after it opens.
+    await expect(locate.componentBrowserInput(page)).toBeFocused()
     const nodeCount = await locate.graphNode(page).count()
     await acceptSuggestion()
     await expect(locate.componentBrowser(page)).toBeHidden()

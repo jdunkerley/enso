@@ -103,6 +103,8 @@ async function emitProgress(page: Page, event: Record<string, unknown>): Promise
 async function openAiPrompt(page: Page, prompt: string): Promise<void> {
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toBeVisible()
+  // Keys go to whatever has focus, and the browser focuses its input a moment after it opens.
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
   await page.keyboard.insertText(prompt)
   await expect(page.locator('.ComponentList')).toBeHidden()
   await page.keyboard.press('Enter')
