@@ -1,23 +1,13 @@
 /** @file Utility functions for dialogs. */
 import * as aria from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
+import { IGNORE_INTERACT_OUTSIDE_SELECTOR } from '$/components/Dialog/variants'
 import { useRef, type RefObject } from 'react'
 import { useIsLatestDialogStackItem } from './DialogStackProvider'
 
-const IGNORE_INTERACT_OUTSIDE_ELEMENTS = [
-  // Toastify toasts
-  '.Toastify__toast-container',
-  // ReactQuery devtools
-  '.tsqd-parent-container',
-  // Our components that should ignore the interact outside event
-  ':is(.enso-app, .enso-chat, .enso-portal-root) [data-ignore-click-outside]',
-]
-
-const IGNORE_INTERACT_OUTSIDE_ELEMENTS_SELECTOR = `:is(${IGNORE_INTERACT_OUTSIDE_ELEMENTS.join(', ')})`
-
 /** Check if the element is a part of a component that should ignore the interact outside event */
 export function shouldIgnoreInteractOutside(element: HTMLElement) {
-  return element.closest(IGNORE_INTERACT_OUTSIDE_ELEMENTS_SELECTOR)
+  return element.closest(IGNORE_INTERACT_OUTSIDE_SELECTOR)
 }
 
 /** Props for {@link useInteractOutside} */

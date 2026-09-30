@@ -131,3 +131,91 @@ export const DIALOG_STYLES = tv({
     rounded: 'xxxlarge',
   },
 })
+
+export const POPOVER_STYLES = tv({
+  base: 'shadow-xl w-full overflow-clip',
+  variants: {
+    variant: {
+      custom: { dialog: '' },
+      light: { base: DIALOG_BACKGROUND({ variant: 'light' }) },
+      dark: { base: DIALOG_BACKGROUND({ variant: 'dark' }) },
+    },
+    isEntering: {
+      true: 'animate-in fade-in placement-bottom:slide-in-from-top-1 placement-top:slide-in-from-bottom-1 placement-left:slide-in-from-right-1 placement-right:slide-in-from-left-1 ease-out duration-200',
+    },
+    isExiting: {
+      true: 'animate-out fade-out placement-bottom:slide-out-to-top-1 placement-top:slide-out-to-bottom-1 placement-left:slide-out-to-right-1 placement-right:slide-out-to-left-1 ease-in duration-150',
+    },
+    size: {
+      custom: { base: '', dialog: '' },
+
+      'auto-xxsmall': { base: 'w-[unset]', dialog: 'p-1.5' },
+
+      auto: { base: 'w-[unset]', dialog: 'p-2.5' },
+      xxsmall: { base: 'max-w-[206px]', dialog: 'p-1.5' },
+      xsmall: { base: 'max-w-xs', dialog: 'p-3' },
+      small: { base: 'max-w-sm', dialog: 'px-4 p-3' },
+      medium: { base: 'max-w-md', dialog: 'px-5 p-3.5' },
+      large: { base: 'max-w-lg', dialog: 'p-4' },
+      xlarge: { base: 'max-w-xl', dialog: 'p-6' },
+      xxlarge: { base: 'max-w-2xl', dialog: 'px-8 py-7' },
+      xxxlarge: { base: 'max-w-3xl', dialog: 'px-10 py-9' },
+    },
+    rounded: {
+      none: { base: 'rounded-none', dialog: 'rounded-none' },
+      small: { base: 'rounded-sm', dialog: 'rounded-sm scroll-offset-edge-md' },
+      medium: { base: 'rounded-md', dialog: 'rounded-md scroll-offset-edge-xl' },
+      large: { base: 'rounded-lg', dialog: 'rounded-lg scroll-offset-edge-xl' },
+      xlarge: { base: 'rounded-xl', dialog: 'rounded-xl scroll-offset-edge-xl' },
+      xxlarge: { base: 'rounded-2xl', dialog: 'rounded-2xl scroll-offset-edge-2xl' },
+      xxxlarge: { base: 'rounded-3xl', dialog: 'rounded-3xl scroll-offset-edge-3xl' },
+      xxxxlarge: { base: 'rounded-4xl', dialog: 'rounded-4xl scroll-offset-edge-4xl' },
+    },
+  },
+  slots: {
+    dialog: 'flex-auto overflow-y-auto max-h-[inherit]',
+  },
+  defaultVariants: { rounded: 'xxlarge', size: 'small', variant: 'light' },
+})
+
+/**
+ * The enter/exit motion of the Vue `Dialog`'s box (a Reka `DialogContent`). In React it is on the
+ * full-screen `Modal` layer around the box (`DIALOG_MODAL_STYLES`'s `isEntering`/`isExiting`);
+ * Reka animates each layer it unmounts separately, so the Vue port moves it onto the box itself,
+ * keyed on Reka's `data-state`. The box is all that layer shows, so it looks the same.
+ */
+export const DIALOG_MOTION = tv({
+  base: [
+    'data-[state=open]:animate-in data-[state=open]:ease-out data-[state=open]:duration-200',
+    'data-[state=closed]:animate-out data-[state=closed]:ease-in data-[state=closed]:duration-200',
+  ],
+  variants: {
+    type: {
+      modal: 'data-[state=open]:slide-in-from-top-1 data-[state=closed]:slide-out-to-top-1',
+      fullscreen: 'data-[state=open]:zoom-in-[1.015] data-[state=closed]:zoom-out-[1.015]',
+    },
+  },
+})
+
+/**
+ * The enter/exit motion of the Vue `Popover` (a Reka `PopoverContent`), in place of
+ * `POPOVER_STYLES`'s `isEntering`/`isExiting`, which key the direction on react-aria's
+ * `placement-*:` modifiers. Reka reports the side it used as `data-side` (decision 5 of
+ * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
+ */
+export const POPOVER_MOTION = [
+  'data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:ease-out data-[state=open]:duration-200',
+  'data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:ease-in data-[state=closed]:duration-150',
+  'data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1',
+  'data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1',
+].join(' ')
+
+/** Elements a click on which never dismisses a dialog or popover (toasts, devtools, …). */
+export const IGNORE_INTERACT_OUTSIDE_SELECTOR = `:is(${[
+  // Toastify toasts
+  '.Toastify__toast-container',
+  // ReactQuery devtools
+  '.tsqd-parent-container',
+  // Our components that should ignore the interact outside event
+  ':is(.enso-app, .enso-chat, .enso-portal-root) [data-ignore-click-outside]',
+].join(', ')})`

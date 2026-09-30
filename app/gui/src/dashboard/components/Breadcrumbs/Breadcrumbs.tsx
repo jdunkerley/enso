@@ -2,7 +2,8 @@
 import { Button } from '#/components/Button'
 import type { IconProp, TestIdProps } from '#/components/types'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { BREADCRUMBS_STYLES } from '$/components/Breadcrumbs/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import {
   Fragment,
   memo,
@@ -15,12 +16,6 @@ import flattenChildren from 'react-keyed-flatten-children'
 import { useBreadcrumbs, type AriaBreadcrumbsProps, type DropEvent } from '../aria'
 import { Icon } from '../Icon'
 import { BreadcrumbItem, BreadcrumbItemProvider } from './BreadcrumbItem'
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const BREADCRUMBS_STYLES = tv({
-  base: 'flex items-center w-full',
-  slots: { separator: 'text-primary last:hidden w-2.5 h-2.5 mt-[0.5px]' },
-})
 
 /** The type of the `onDrop` callback. */
 export type OnDrop = (key: Key, e: DropEvent) => Promise<void> | void
@@ -119,3 +114,5 @@ const BreadcrumbSeparator = memo(function BreadcrumbSeparatorImpl<Icon extends s
 }) as <Icon extends string>(props: BreadcrumbSeparatorProps<Icon>) => ReactElement
 
 Breadcrumbs.Item = BreadcrumbItem
+
+export { BREADCRUMBS_STYLES } from '$/components/Breadcrumbs/variants'

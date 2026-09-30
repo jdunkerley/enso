@@ -3,39 +3,8 @@ import { Icon } from '#/components/Icon'
 import { Text, type TextProps } from '#/components/Text'
 import type { IconProp } from '#/components/types'
 import { VisualTooltip, type TooltipElementType } from '#/components/VisualTooltip'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
-
-const ICON_DISPLAY_STYLES = tv({
-  base: 'flex items-center gap-2 max-w-[14.5rem] min-w-4 px-[7px] border-0.5 border-transparent',
-  slots: {
-    visualTooltip: 'flex',
-    icon: '-mb-0.5',
-    // For some reason `min-w-0` is required for the ellipsis to appear.
-    container: 'flex min-w-0',
-    text: 'block truncate',
-  },
-  variants: {
-    variant: {
-      custom: '',
-      link: 'inline-block px-0 py-0 rounded-sm text-primary/50 underline border-0',
-      primary: 'bg-primary text-white',
-      accent: 'bg-accent text-white',
-      ghost: 'text-primary',
-      submit: 'bg-invite text-white opacity-80',
-      outline: 'border-0.5 rounded-full border-primary/20 text-primary px-1 mx-1',
-    },
-    align: {
-      left: { container: 'mr-auto' },
-      center: { container: 'mx-auto' },
-      right: { container: 'ml-auto' },
-    },
-  },
-  defaultVariants: {
-    variant: 'custom',
-    iconPosition: 'default',
-    align: 'center',
-  },
-})
+import { ICON_DISPLAY_STYLES } from '$/components/Icon/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 
 /** Props for an {@link IconDisplay}. */
 export interface IconDisplayProps<IconType extends string>

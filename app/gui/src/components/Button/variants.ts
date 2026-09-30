@@ -397,3 +397,49 @@ export const BUTTON_STYLES = tv({
     },
   ],
 })
+
+export const BUTTON_GROUP_STYLES = tv({
+  base: 'flex flex-1 shrink-0 max-h-max',
+  variants: {
+    wrap: { true: 'flex-wrap' },
+    direction: { column: 'flex-col', row: 'flex-row' },
+    width: { auto: 'w-auto', full: 'w-full', min: 'w-min', max: 'w-max' },
+    gap: {
+      custom: '',
+      none: 'gap-0',
+      joined: 'gap-0',
+      large: 'gap-3.5',
+      medium: 'gap-2',
+      small: 'gap-1.5',
+      xsmall: 'gap-1',
+      xxsmall: 'gap-0.5',
+    },
+    align: {
+      start: 'justify-start',
+      center: 'justify-center',
+      end: 'justify-end',
+      between: 'justify-between',
+      around: 'justify-around',
+      evenly: 'justify-evenly',
+    },
+    verticalAlign: {
+      start: 'items-start',
+      center: 'items-center',
+      end: 'items-end',
+    },
+  },
+  defaultVariants: {
+    direction: 'row',
+    gap: 'medium',
+    wrap: false,
+    width: 'full',
+  },
+  compoundVariants: [
+    { direction: 'column', align: 'start', class: 'items-start' },
+    { direction: 'column', align: 'center', class: 'items-center' },
+    { direction: 'column', align: 'end', class: 'items-end' },
+    { direction: 'column', verticalAlign: 'start', class: 'justify-start' },
+    { direction: 'column', verticalAlign: 'center', class: 'justify-center' },
+    { direction: 'column', verticalAlign: 'end', class: 'justify-end' },
+  ],
+})

@@ -3,28 +3,11 @@ import {
   ProgressBar as AriaProgressBar,
   type ProgressBarProps as AriaProgressBarProps,
 } from '#/components/aria'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { PROGRESS_BAR_STYLES } from '$/components/ProgressBar/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 
 /** `1` as a percentage. */
 const WHOLE_PERCENTAGE = 100
-
-const PROGRESS_BAR_STYLES = tv({
-  base: 'min-h-2 rounded-full bg-primary/10',
-  variants: {
-    variant: {
-      rounded: '',
-      clipped: { progressBar: 'w-full' },
-    },
-  },
-  slots: {
-    progressBar:
-      'h-full overflow-clip bg-accent rounded-full transition-[width,clip-path] duration-1000',
-    indeterminateProgressBar: 'animate-horizontal-loader-1/6 h-full w-1/6 bg-white/30',
-  },
-  defaultVariants: {
-    variant: 'rounded',
-  },
-})
 
 /** Props for a {@link ProgressBar}. */
 export interface ProgressBarProps
