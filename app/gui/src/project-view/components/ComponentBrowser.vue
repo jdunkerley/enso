@@ -154,7 +154,8 @@ function panIntoView() {
 onMounted(() => {
   interaction.setCurrent(cbOpen)
   input.reset(props.usage)
-  inputElement.value?.delayedFocus()
+  // Focus synchronously, so that no key typed right after the browser opens reaches the graph (#139).
+  inputElement.value?.focus()
   panIntoView()
 })
 
