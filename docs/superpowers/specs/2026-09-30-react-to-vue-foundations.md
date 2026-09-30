@@ -1,6 +1,7 @@
 # React → Vue: foundation decisions (#76)
 
-**Date:** 2026-09-30 **Status:** Recommendations, for the maintainer's approval
+**Date:** 2026-09-30 **Status:** Decisions 1–6b and 8 provisionally accepted
+2026-09-30 under delegation (maintainer to review); 7 decided by the maintainer
 **Epic:** #75 **Ticket:** #76
 
 The dashboard (`app/gui/src/dashboard/`, about 46.9k lines of React) rests on
@@ -14,26 +15,27 @@ made.
 Each decision is marked:
 
 - **Decided:** already settled by the maintainer.
-- **Needs approval:** a recommendation. Nothing downstream should build on it
-  until the maintainer says yes.
+- **Provisionally accepted:** the maintainer, away overnight, delegated these
+  decisions on 2026-09-30 (#76, last comment). Ports may build on them; the
+  maintainer reviews them and can reverse any.
 
 The spike in this PR (decision 1) is the only code. It adds no user-visible
 change.
 
 ## Summary
 
-| #   | Decision                   | Recommendation                                                                                                                                 | Status         |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| 1   | Headless accessibility lib | **Reka UI 2.10.5**, exact pin. Hand-roll only what it lacks (tables, drag and drop, selection brush), as React does today                      | Needs approval |
-| 2   | Forms                      | **In-house `useForm` over zod**, keeping today's `Form`/`Field`/`Submit`/`Reset`/`FormError`/`FieldValue` API. No vee-validate                 | Needs approval |
-| 3   | Toasts                     | **In-house `useToast` store + one `ToastHost.vue` on Reka `Toast` primitives.** No vue-sonner                                                  | Needs approval |
-| 4   | Modal stack                | **Global `{ component, props }` stack + one `ModalHost.vue`**, with a shim that keeps React `setModal`/`unsetModal` callers working            | Needs approval |
-| 5   | Tailwind modifiers         | **No mapping plugin.** Use Tailwind's built-in `aria-*:` and `data-[…]:` variants in Vue code. Drop `tailwindcss-react-aria-components` in #94 | Needs approval |
-| 6   | Where code goes            | Primitives in `src/components/`, features in `src/dashboard/` as `.vue`, stores via `createContextStore` (global state only where it must be)  | Needs approval |
-| 6a  | zustand                    | **Keep until #93** as framework-neutral glue; no new zustand stores; replace with Vue state and `useStorage` when the last React reader goes   | Needs approval |
-| 6b  | Cloud-only separability    | **`src/dashboard/cloud/<area>/`** behind a lint boundary and a contribution registry                                                           | Needs approval |
-| 7   | Port or delete             | **Port every cloud-only area; delete none.** The fork diverges freely from upstream                                                            | Decided        |
-| 8   | Port playbook              | Appended to `app/gui/src/dashboard/CLAUDE.md`                                                                                                  | Needs approval |
+| #   | Decision                   | Recommendation                                                                                                                                 | Status                                                              |
+| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| 1   | Headless accessibility lib | **Reka UI 2.10.5**, exact pin. Hand-roll only what it lacks (tables, drag and drop, selection brush), as React does today                      | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 2   | Forms                      | **In-house `useForm` over zod**, keeping today's `Form`/`Field`/`Submit`/`Reset`/`FormError`/`FieldValue` API. No vee-validate                 | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 3   | Toasts                     | **In-house `useToast` store + one `ToastHost.vue` on Reka `Toast` primitives.** No vue-sonner                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 4   | Modal stack                | **Global `{ component, props }` stack + one `ModalHost.vue`**, with a shim that keeps React `setModal`/`unsetModal` callers working            | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 5   | Tailwind modifiers         | **No mapping plugin.** Use Tailwind's built-in `aria-*:` and `data-[…]:` variants in Vue code. Drop `tailwindcss-react-aria-components` in #94 | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 6   | Where code goes            | Primitives in `src/components/`, features in `src/dashboard/` as `.vue`, stores via `createContextStore` (global state only where it must be)  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 6a  | zustand                    | **Keep until #93** as framework-neutral glue; no new zustand stores; replace with Vue state and `useStorage` when the last React reader goes   | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 6b  | Cloud-only separability    | **Top-level `src/cloud/<area>/`** behind a lint boundary and a contribution registry                                                           | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| 7   | Port or delete             | **Port every cloud-only area; delete none.** The fork diverges freely from upstream                                                            | Decided                                                             |
+| 8   | Port playbook              | Appended to `app/gui/src/dashboard/CLAUDE.md`                                                                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
 
 ## How the evidence was gathered
 
@@ -124,7 +126,9 @@ helpers.
   Reka imports also exists in 15, so a `pnpm.overrides` entry
   (`"reka-ui>@vueuse/core": "15.0.0"`, and the same for `@vueuse/shared`) would
   deduplicate it. That is left undone here: it swaps a dependency under Reka's
-  own tests. Do it deliberately, with the Playwright specs, in #78.
+  own tests. **Plan (provisionally accepted):** #78 adds the override and keeps
+  it only if Reka's tests and ours pass with it; otherwise we accept the 2.7 KB
+  and say why next to the pin.
 - **Bundle, measured in-app (spike):**
 
   | Build                          | Change (minified) | Change (gzip) |
@@ -217,9 +221,10 @@ The spike adds the following files:
 
 - `src/components/Menu/`: `DropdownMenu.vue`, `MenuItem.vue`,
   `MenuSeparator.vue` and `variants.ts`. They wrap Reka's `DropdownMenu*` and
-  style it with `DIALOG_BACKGROUND` (`#/components/Dialog/variants.ts`) and
-  `TEXT_STYLE` (`#/components/Text/variants.ts`). This is the same `variants.ts`
-  reuse as `DashboardDialogContent.vue`.
+  style it with `DIALOG_BACKGROUND` (`$/components/Dialog/variants.ts`) and
+  `TEXT_STYLE` (`$/components/Text/variants.ts`), which #77 moved out of the
+  dashboard. This is the same `variants.ts` reuse as
+  `DashboardDialogContent.vue`.
 - The menu portals into `#enso-portal-root`, next to the React overlays, so both
   frameworks share one stacking context and the dashboard's base styles.
 - `src/components/AppContainer/HeadlessUiSpike.vue` is mounted in
@@ -506,10 +511,10 @@ modifiers in the variants file it copies. When React goes (#94),
 
 - **Primitives** (Button, Dialog, Menu, Form, inputs, Toast host, Modal host) go
   in **`src/components/<Name>/`**, imported as `$/components/…`. Each gets a
-  `variants.ts` next to it. While `#/components/*/variants.ts` still exist, the
-  Vue variants import their building blocks, as
-  `src/components/Menu/variants.ts` does. When the React component is deleted,
-  its `variants.ts` moves over.
+  `variants.ts` next to it. #77 already moved the React components'
+  `variants.ts` to `src/components/<Name>/`, so the Vue variants import their
+  building blocks from there via `$/`, as `src/components/Menu/variants.ts`
+  does. Shared code may not import `#/` (#77's ESLint rule).
 - **Dashboard features** go in **`src/dashboard/`** (`#/…`) as `.vue` files,
   replacing the `.tsx` in place: same folder, same name, one PR per mount site.
   The directory ends up holding only Dashboard-specific Vue code, as
@@ -559,8 +564,10 @@ while both frameworks read it. From now on:
 The maintainer may later move cloud-only areas into a separate community version
 (see decision 7). Recommendation:
 
-- **Directory.** Ported cloud-only areas go under
-  **`src/dashboard/cloud/<area>/`**:
+- **Directory.** Ported cloud-only areas go under top-level
+  **`src/cloud/<area>/`**, not `src/dashboard/cloud/`. #77 (#151) created
+  `src/cloud/` for cloud-only framework-free logic, and a top-level folder is
+  what lets a community build leave cloud code out at build level:
   - `billing/` (plans, paywall, subscribe, payments success);
   - `organization/` (members, user groups, activity log, invitations, setup);
   - `versions/` (asset versions, diff, scheduling and executions);
@@ -574,11 +581,11 @@ The maintainer may later move cloud-only areas into a separate community version
   in `src/`.
 
 - **One-way boundary.** An ESLint `no-restricted-imports` rule forbids importing
-  `#/cloud/**` from anywhere outside `src/dashboard/cloud/`. Cloud code may
-  import the core; the core never imports cloud code.
+  `$/cloud/**` from anywhere outside `src/cloud/`. Cloud code may import the
+  core; the core never imports cloud code.
 - **Contribution points** instead of imports. The core exposes small registries.
-  `src/dashboard/cloud/index.ts` fills them at start-up, and it is the only file
-  the app entry imports from `cloud/`:
+  `src/cloud/index.ts` fills them at start-up, and it is the only file the app
+  entry imports from `cloud/`:
   - routes;
   - settings tabs;
   - user-menu entries;
@@ -623,16 +630,16 @@ component to Vue"):
   change takes the `CI: No changelog needed` label, and a visible change gets an
   entry.
 
-## Open questions for the maintainer
+## Delegated decisions (2026-09-30)
 
-1. **Approve decisions 1–6b and 8,** or redirect them. #78–#80 are blocked until
-   then.
-2. **The `@vueuse/core` duplicate:** add the `pnpm.overrides` dedupe in #78
-   (after re-running the specs), or accept 2.7 KB until Reka moves to vueuse 15?
-3. **Accessibility verification depth (epic question 10):** add an axe baseline
-   plus accessibility-tree snapshots to the Playwright suite in #78, or rely on
-   manual checks per port? The recommendation is axe on the ported areas only,
-   so it grows with the port.
-4. **Cloud boundary:** is `src/dashboard/cloud/` the split you want, or should
-   cloud code sit outside `src/dashboard/` altogether (for example,
-   `src/cloud/`), so that a community build can exclude it at the Vite level?
+The maintainer asked for sensible decisions overnight (#76, last comment):
+
+1. **Decisions 1–6b and 8:** provisionally accepted as written, with the cloud
+   location changed to `src/cloud/<area>/` (6b).
+2. **`@vueuse/core` duplicate:** #78 tries the `pnpm.overrides` dedupe (see
+   decision 1).
+3. **Accessibility:** automated. #81 adds axe checks with a checked-in baseline,
+   and every port runs them.
+4. **Merge plan:** this PR and the ports built on it (#78 onwards) stay open for
+   the maintainer's review; invisible refactors and tooling (#77, #81) merge on
+   green.

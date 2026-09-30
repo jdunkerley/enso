@@ -81,16 +81,17 @@ to this subtree; cloud-only logic goes to `src/cloud/`.
 ## Porting a React component to Vue (playbook)
 
 The foundation choices are recorded in
-`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Its status line
-says which ones the maintainer has approved; treat the rest as proposals. They
-are:
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`; its status line
+says which are provisionally accepted and which the maintainer has confirmed.
+They are:
 
 - Reka UI for accessibility primitives;
 - in-house `useForm` over zod;
 - `useToast` on Reka `Toast`;
 - a global modal stack;
 - Tailwind `aria-*:`/`data-[…]:` variants instead of the react-aria modifiers;
-- cloud-only areas under `src/dashboard/cloud/<area>/`.
+- cloud-only areas under top-level `src/cloud/<area>/`, so a community build can
+  leave them out.
 
 Every port PR follows this checklist.
 
@@ -111,8 +112,8 @@ Every port PR follows this checklist.
      `variants.ts`.
    - Features go in `src/dashboard/` as `.vue`, in the same folder the `.tsx`
      was in.
-   - Cloud-only features go in `src/dashboard/cloud/<area>/`, reached only
-     through the registries.
+   - Cloud-only features go in `src/cloud/<area>/`, reached only through the
+     registries.
    - Stores use `createContextStore`, unless non-component code must reach them.
 5. **Reuse the styles.** Build on the existing `variants.ts` (as
    `DashboardDialogContent.vue` and `src/components/Menu/variants.ts` do).
@@ -123,6 +124,8 @@ Every port PR follows this checklist.
    with `--repeat-each` and the default workers), and compare pass rates, not
    single runs. Use a private clone and a distinct `PLAYWRIGHT_PORT`. A new
    flake on the port branch blocks the merge, even if the spec is "known flaky".
+   Run the axe accessibility checks (#81) too; the ported area must not add
+   violations to the checked-in baseline.
 7. **Unit-test the behaviour react-aria gave for free**, with vitest and
    `@testing-library/user-event`: keyboard, focus and Escape (see
    `src/components/Menu/__tests__/DropdownMenu.test.ts`).
