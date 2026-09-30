@@ -70,3 +70,61 @@ alias), and each side subscribes.
 
 - Unit: `vitest` + `@testing-library/react`.
 - Integration: Playwright specs in `app/gui/integration-test/dashboard/`.
+
+## Porting a React component to Vue (playbook)
+
+The foundation choices are recorded in
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Its status line
+says which ones the maintainer has approved; treat the rest as proposals. They
+are:
+
+- Reka UI for accessibility primitives;
+- in-house `useForm` over zod;
+- `useToast` on Reka `Toast`;
+- a global modal stack;
+- Tailwind `aria-*:`/`data-[…]:` variants instead of the react-aria modifiers;
+- cloud-only areas under `src/dashboard/cloud/<area>/`.
+
+Every port PR follows this checklist.
+
+1. **One mount site per PR.** Port a slice, switch the single place that mounts
+   it (a `reactComponent(...)` wrapper, a route, a `reactTabs.ts` entry), and
+   **delete the React file in the same PR**. There are no feature flags and no
+   parallel copies, and the app ships after every PR. If the React file has
+   other importers, it is not ready to delete, so port a smaller slice.
+2. **Keep every `data-testid` and accessible name**, identical: role, label,
+   `aria-*`, visible text. The specs must pass **unedited**; only page objects
+   (`integration-test/actions/`) may change.
+3. **Neutralise locators before the swap.** Page objects that match react-aria
+   or react-toastify internals (`[data-selected="true"]`, `.Toastify__toast`,
+   and comments that mention react-aria timing) move to role, label or testid
+   locators, in the same PR, and pass on `develop` first.
+4. **Put code where the record says.**
+   - Primitives go in `src/components/<Name>/` (`$/components/…`), with their
+     `variants.ts`.
+   - Features go in `src/dashboard/` as `.vue`, in the same folder the `.tsx`
+     was in.
+   - Cloud-only features go in `src/dashboard/cloud/<area>/`, reached only
+     through the registries.
+   - Stores use `createContextStore`, unless non-component code must reach them.
+5. **Reuse the styles.** Build on the existing `variants.ts` (as
+   `DashboardDialogContent.vue` and `src/components/Menu/variants.ts` do).
+   Rewrite only the react-aria-only modifiers (`selected:`, `pressed:`,
+   `placement-*:`, `outside-visible-range:`, `placeholder:`, and `disabled:` on
+   non-native elements) to `aria-*:` or `data-[…]:`.
+6. **Run the area's Playwright specs N times in WSL, on both branches** (N ≥ 5,
+   with `--repeat-each` and the default workers), and compare pass rates, not
+   single runs. Use a private clone and a distinct `PLAYWRIGHT_PORT`. A new
+   flake on the port branch blocks the merge, even if the spec is "known flaky".
+7. **Unit-test the behaviour react-aria gave for free**, with vitest and
+   `@testing-library/user-event`: keyboard, focus and Escape (see
+   `src/components/Menu/__tests__/DropdownMenu.test.ts`).
+8. **Changelog, under the repo's current rule** (root `CLAUDE.md`).
+   - A **faithful port with no visible change** takes the
+     `CI: No changelog needed` label.
+   - A port that **changes what users see or can do** (a new keyboard path,
+     different styling) gets an entry.
+   - When in doubt, ask.
+9. **Verify** with a clean typecheck (delete `*.tsbuildinfo`), `eslint` and
+   `prettier` on the touched files, `vitest`, and `corepack pnpm run build`.
+   Note the bundle delta in the PR if it moves by more than a few KB.
