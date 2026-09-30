@@ -65,8 +65,10 @@ adding an entry. React files may import `$/…` freely.
   `src/utils/data/` for small data-structure helpers; `src/utils/style/` for
   Tailwind class composition (`tailwindVariants`, `tailwindMerge`).
 - `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
-  component of that name and its Vue port (`Button`, `Dialog`, `Inputs`,
-  `ProfilePicture`, `Text`), plus other framework-free component constants.
+  component of that name and its Vue port (`Button`, `Dialog`, `Text`, `Icon`,
+  `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
+  constants. The Vue primitives themselves live beside them; see
+  `src/components/CLAUDE.md`.
 - `src/configurations/` — static configuration: the dashboard's input bindings
   and the settings tabs.
 - `src/cloud/` — framework-free logic that only makes sense against the Enso

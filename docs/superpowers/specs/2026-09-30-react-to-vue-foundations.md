@@ -643,3 +643,87 @@ The maintainer asked for sensible decisions overnight (#76, last comment):
 4. **Merge plan:** this PR and the ports built on it (#78 onwards) stay open for
    the maintainer's review; invisible refactors and tooling (#77, #81) merge on
    green.
+
+## Rulings from #78 (core primitives, 2026-09-30)
+
+#78 built the Vue primitives in `src/components/` and had to settle its own open
+questions. They were delegated like the decisions above: provisionally accepted,
+for the maintainer to review.
+
+1. **One icon set: `icons.svg`.** The React `Icon` already draws only from it
+   (`SvgMask` and the standalone SVG imports are gone; `IconProp`'s `_Icon`
+   parameter is vestigial). The Vue `Icon.vue` uses the same `svgUseHref` with
+   the same `ICON_STYLES`. The project-view's `SvgIcon` stays as it is: it draws
+   from the same file and sizes itself with CSS variables for the graph editor,
+   so the two differ only in styling, not in icons.
+2. **No merge of the dashboard `Dialog` with `DashboardDialogContent` or
+   `MenuPanel`.** `Dialog.vue` is the one modal dialog. `DashboardDialogContent`
+   is a styling-only embedded layout and `MenuPanel` a graph-editor panel;
+   replacing their users is #82's.
+3. **Prop names follow React where they carry meaning, Vue where they are
+   mechanics.** Kept: `isDisabled`, `isLoading`, `isDismissable`,
+   `isKeyboardDismissDisabled`, `isNonModal`, `testId`, `tooltip`, every variant
+   name and value, and the component names (`Button`, `Text`, `Dialog`; an
+   ESLint override allows single-word names in `src/components/*/`). Changed:
+   `className` → `class` (still `twMerge`d through the variants, as React does),
+   `*ClassName` → `*Class`, render props → scoped slots, `onOpenChange` →
+   `v-model:open`, react-aria placements (`'bottom start'`) → `@floating-ui`
+   ones (`'bottom-start'`). A press handler that may return a promise is the
+   `onPress` prop, bound with `@press`, so that the button can show its loader.
+4. **Compound triggers become a `trigger` slot.** `Dialog.Trigger`,
+   `Popover.Trigger`, `Menu.Trigger` and `AlertDialog.Trigger` have no Vue
+   component. `DialogStackProvider` has none either: Reka's layer stack orders
+   Escape and outside clicks.
+5. **Two tooltips, and the project-view registry stays.** `Tooltip.vue` (Reka)
+   is the accessible one (`role="tooltip"`, `aria-describedby`, opens on focus).
+   `VisualTooltip.vue`, `Text`'s overflow tooltip and a disabled `Button`'s
+   tooltip are visual only (`aria-hidden`, hover only, `@floating-ui`), as in
+   React. The project-view `TooltipTrigger`/`TooltipDisplayer` registry is a
+   different design (one floating element, a 1.5 s delay, graph-editor styling,
+   and it must work inside visualizations' custom elements) and is left alone.
+6. **Motion moves to Reka's attributes.** The shared variants keep react-aria's
+   `isEntering`/`isExiting` and `placement-*:` for React. The Vue side adds
+   `DIALOG_MOTION`, `POPOVER_MOTION` and `TOOLTIP_MOTION` beside them, keyed on
+   `data-state` and `data-side` (decision 5). The dialog's slide moves from the
+   full-screen layer onto the box, because Reka animates each layer it unmounts
+   separately; the box is all that layer shows.
+7. **More `variants.ts` leave the React files.** So that both frameworks share
+   one definition, #78 moved `ICON_STYLES`, `ICON_DISPLAY_STYLES`,
+   `SEPARATOR_STYLES`, `BADGE_STYLES`, `STATUS_BADGE_STYLES`, `ALERT_STYLES`,
+   `PROGRESS_BAR_STYLES`, `RESULT_STYLES` (with the status colours),
+   `LOADER_STYLES` (with the spinner phases and sizes), `SCROLLER_STYLES`,
+   `BREADCRUMBS_STYLES`, `BREADCRUMB_ITEM_STYLES`, `TOOLTIP_STYLES`,
+   `POPOVER_STYLES`, the button group's styles and the dialogs'
+   ignore-outside-click selector into `src/components/<Name>/variants.ts`, and
+   the breadcrumb-collapsing utility (with its test) into
+   `src/components/Breadcrumbs/`. The React files import them unchanged.
+8. **`ContextMenu` is a Reka `DropdownMenu` at a virtual point.** Reka's own
+   `ContextMenu` cannot be closed or opened from code, which the drive's
+   imperative `ContextMenuApi` needs. Items are shared with `DropdownMenu`.
+9. **`Suspense` is `SuspenseLoader.vue`**, so that it cannot shadow Vue's
+   built-in `<Suspense>`. **`ErrorBoundary`** is `onErrorCaptured`; it cannot
+   reset failed queries as React's does (`@tanstack/vue-query` has no
+   `QueryErrorResetBoundary`), so it emits `@reset` for the caller to refetch.
+10. **`AlertDialog` has no form.** Forms are #79. It has two buttons; the
+    confirm button takes focus and shows loading while `onConfirm`'s promise is
+    pending. As in React, Escape and outside clicks do not dismiss it.
+11. **Parity is checked by classes.** `vuePortParity.test.tsx` renders the React
+    and Vue `Button`, `Text`, `Badge`, `Alert` and `Dialog` with the same props
+    and requires the same classes (the `DIALOG_MOTION` classes aside). With the
+    same stylesheet that is the same look, and unlike screenshots it runs
+    everywhere. The menu's in-app check is the spike's Playwright spec, which
+    compares computed styles. It found one difference: the spike's menu
+    separator was `bg-primary/10` where React's is `/30`; fixed.
+12. **The `@vueuse/core` override is kept.** `pnpm-workspace.yaml` dedupes
+    Reka's `@vueuse/core`/`@vueuse/shared` 14 onto the app's 15. Every
+    Reka-based test passes against it (see the PR for the runs).
+13. **A trap for porters: Vue casts an absent boolean prop to `false`.** A prop
+    typed `boolean` (or `string | false`) that is not passed arrives as `false`,
+    not `undefined`, which would override a variant's default or a button
+    group's shared value. The primitives declare such props with an explicit
+    `undefined` default; a new prop needs the same.
+14. **Not done here, by scope:** switching a real consumer to each primitive
+    (the feature tickets and #82 do that, one mount site at a time), and a
+    CHANGELOG entry (no user-visible change: the PR takes
+    `CI: No changelog needed`, per the repository rule). Reka's `ConfigProvider`
+    is mounted in `App.vue`, as decision 1 planned, with the user's locale.
