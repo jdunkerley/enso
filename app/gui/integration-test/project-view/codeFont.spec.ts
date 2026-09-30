@@ -3,13 +3,15 @@
  * ligatures" setting at its default (off) and the "Handwritten comments" setting at its default
  * (on: comments in the code editor use Monaspace Radon).
  *
- * The baselines are Linux-only (`*-linux.png`): the suite cannot run on native Windows, and CI runs
- * it on Ubuntu. Regenerate them in WSL or on Linux with `--update-snapshots` when a change to the
- * code font's rendering is intended, and check the new images by eye before committing them.
+ * The baselines are Linux-only (`*-linux.png`), since CI runs the suite on Ubuntu; on other
+ * platforms only the comparisons are skipped (see `integration-test/screenshot.ts`). Regenerate
+ * them in WSL or on Linux with `--update-snapshots` when a change to the code font's rendering is
+ * intended, and check the new images by eye before committing them.
  */
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import type { MockLocalApi } from 'integration-test/mock/localApi'
+import { expectScreenshot } from 'integration-test/screenshot'
 import { createTableNode } from './actions'
 import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
@@ -136,7 +138,7 @@ test('Code editor uses Monaspace Neon at 13px, without ligatures', async ({ edit
 
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await alignToPixelGrid(scroller)
-  await expect(page).toHaveScreenshot('code-editor.png', {
+  await expectScreenshot(page, 'code-editor.png', {
     clip: boundingClip([...(await textBoxes(commentLine)), ...(await textBoxes(codeLine))]),
   })
 })
@@ -272,7 +274,7 @@ test('Code editor comments use Monaspace Radon, on the Neon column grid', async 
 
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
   await alignToPixelGrid(codeEditor.locator('.cm-scroller'))
-  await expect(page).toHaveScreenshot('code-editor-comments.png', {
+  await expectScreenshot(page, 'code-editor-comments.png', {
     clip: boundingClip((await Promise.all(lines.map(textBoxes))).flat()),
   })
 })
@@ -380,7 +382,7 @@ test('Table visualization uses Monaspace Neon', async ({ editorPage, page, local
     /^"Monaspace Neon"/,
   )
   const cells = tableVisualization.locator('.ag-header-cell, .ag-cell')
-  await expect(page).toHaveScreenshot('table-visualization.png', {
+  await expectScreenshot(page, 'table-visualization.png', {
     clip: boundingClip(await elementBoxes(cells), 0),
   })
 })
@@ -412,7 +414,7 @@ test('Documentation code uses Monaspace Neon', async ({ editorPage, page }) => {
   const { docsContent, code } = await fillDocsWithSample(editorPage, page)
   await expect(docsContent.getByText(SAMPLE_COMMENT)).toHaveCSS('font-family', /^"Monaspace Neon"/)
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
-  await expect(page).toHaveScreenshot('docs-code.png', {
+  await expectScreenshot(page, 'docs-code.png', {
     clip: boundingClip(await textBoxes(code)),
   })
 })
@@ -443,7 +445,7 @@ test('Table editor widget uses Monaspace Neon', async ({ editorPage, page }) => 
   await alignToPixelGrid(widget)
   // Inset past the rounded corners, where the node's colour shows through and varies.
   const box = (await widget.boundingBox())!
-  await expect(page).toHaveScreenshot('table-editor-widget.png', {
+  await expectScreenshot(page, 'table-editor-widget.png', {
     clip: { x: box.x + 8, y: box.y + 8, width: box.width - 16, height: box.height - 16 },
   })
 })
@@ -482,7 +484,7 @@ test('"Code ligatures" applies to read-only code, and not to the code editor', a
       return JSON.stringify(clip) === JSON.stringify(previous)
     })
     .toBe(true)
-  await expect(page).toHaveScreenshot('docs-code-ligatures.png', { clip })
+  await expectScreenshot(page, 'docs-code-ligatures.png', { clip })
 
   const tableVisualization = await openSampleTable(editorPage, page, localApi)
   await expect(tableVisualization.locator('.ag-cell', { hasText: 'a -> b' })).toHaveCSS(
