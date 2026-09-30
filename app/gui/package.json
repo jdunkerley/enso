@@ -22,9 +22,9 @@
     "ResizeObserver is not supported in vitest, so we need to stub it.",
     "reka-ui is pinned exactly (2.10.5): it is the headless UI library the React dashboard is being",
     "ported onto (#75/#76), and a minor release can change focus and dismissal behaviour that the",
-    "Playwright specs depend on. Move it deliberately and re-run the ported areas' specs. It brings",
-    "its own @vueuse/core 14 alongside ours (15); see docs/superpowers/specs/",
-    "2026-09-30-react-to-vue-foundations.md before deduplicating that with an override."
+    "Playwright specs depend on. Move it deliberately and re-run the ported areas' specs. It declares",
+    "@vueuse/core ^14; an override in pnpm-workspace.yaml dedupes that onto our 15 (#78). When bumping",
+    "reka-ui, re-run src/components' tests with the override, and drop it once Reka is on 15 itself."
   ],
   "scripts": {
     "generate-icons": "node scripts/generateIconMetadata.mjs",
