@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import ToastHost from '$/components/Toast/ToastHost.vue'
+import {
+  useClearSelectionOnClick,
+  useDevNavigate,
+  useThemeClass,
+} from '$/composables/appShellEffects'
 import { useCodeFontRootClasses } from '$/providers/codeFont'
 import { ContextsForReactProvider } from '$/providers/react/globalProvider'
 import ReactRoot from '$/ReactRoot'
@@ -69,6 +74,10 @@ const platformClass = {
 }[platform()]
 
 useMounted(appOpenCloseCallback)
+
+useThemeClass()
+useClearSelectionOnClick()
+useDevNavigate()
 </script>
 
 <template>

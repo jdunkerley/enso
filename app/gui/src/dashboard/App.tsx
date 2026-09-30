@@ -2,17 +2,13 @@
  * @file File containing the {@link App} React component, which is the entrypoint into our React
  * application.
  *
- * The {@link App} component is responsible for defining the global context used by child
- * components. These global components are defined at the top of the {@link App} so that they are
- * available to all of the child components. The toasts and the modal stack are Vue's.
- *
- * The {@link App} also defines various providers.
+ * The {@link App} component defines the global React context used by child components: the
+ * react-aria router, the input bindings, and the About modal. The toasts, the modal stack and the
+ * app-wide effects (theme, selection clearing) are Vue's, in `App.vue`.
  */
 import * as React from 'react'
 
 import * as z from 'zod'
-
-import * as detect from 'enso-common/src/utilities/detect'
 
 import InputBindingsProvider from '#/providers/InputBindingsProvider'
 
@@ -21,13 +17,10 @@ import { RouterProvider } from 'react-aria-components'
 
 import { AboutModal } from '#/modals/AboutModal'
 
-import * as eventModule from '$/utils/event'
 import LocalStorage from '$/utils/LocalStorage'
 
 import type { ModalApi } from '#/utilities/modal'
 import { useRouter } from '$/providers/react'
-import { useFeatureFlag } from '$/providers/react/featureFlags'
-import { unsafeWriteValue } from '$/utils/write'
 
 declare module '$/utils/LocalStorage' {
   /** */
@@ -49,100 +42,21 @@ window.api?.menu.setMenuItemHandler('about', () => {
 /**
  * Component called by the parent module, returning the root React component for this
  * package.
- *
- * This component handles all the initialization and rendering of the app, and manages the app's
- * routes. It also initializes an `AuthProvider` that will be used by the rest of the app.
  */
 export default function App(props: React.PropsWithChildren) {
-  // `InputBindingsProvider` depends on `LocalStorageProvider`.
-  // Note that the `Router` must be the parent of the `AuthProvider`, because the `AuthProvider`
-  // will redirect the user between the login/register pages and the dashboard.
-  return <AppRouter {...props} />
-}
-
-/**
- * Router definition for the app.
- *
- * The only reason the {@link AppRouter} component is separate from the {@link App} component is
- * because the {@link AppRouter} relies on React hooks, which can't be used in the same React
- * component as the component that defines the provider.
- */
-function AppRouter(props: React.PropsWithChildren) {
   const { children } = props
   const { router } = useRouter()
   const navigate = router.push.bind(router)
-
-  if (detect.IS_DEV_MODE) {
-    // @ts-expect-error This is used exclusively for debugging.
-    unsafeWriteValue(window, 'navigate', navigate)
-  }
-
   const aboutModalRef = React.useRef<ModalApi>(null)
 
-  React.useEffect(() => {
-    let isClick = false
-    const onMouseDown = () => {
-      isClick = true
-    }
-    const onMouseUp = (event: MouseEvent) => {
-      if (
-        isClick &&
-        !eventModule.isElementTextInput(event.target) &&
-        !eventModule.isElementPartOfMonaco(event.target) &&
-        !eventModule.isElementTextInput(document.activeElement)
-      ) {
-        const selection = document.getSelection()
-        const app = document.getElementById('ProjectView')
-        const appContainsSelection =
-          app != null &&
-          selection != null &&
-          selection.anchorNode != null &&
-          app.contains(selection.anchorNode) &&
-          selection.focusNode != null &&
-          app.contains(selection.focusNode)
-        if (!appContainsSelection) {
-          selection?.removeAllRanges()
-        }
-      }
-    }
-    const onSelectStart = () => {
-      isClick = false
-    }
-
-    document.addEventListener('mousedown', onMouseDown)
-    document.addEventListener('mouseup', onMouseUp)
-    document.addEventListener('selectstart', onSelectStart)
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown)
-      document.removeEventListener('mouseup', onMouseUp)
-      document.removeEventListener('selectstart', onSelectStart)
-    }
-  }, [])
-
+  // `InputBindingsProvider` depends on `LocalStorageProvider`.
   return (
     <RouterProvider navigate={navigate}>
       <InputBindingsProvider>
         <VersionChecker />
-        <ThemeSynchronizer />
         <AboutModal ref={aboutModalRef} />
         {children}
       </InputBindingsProvider>
     </RouterProvider>
   )
-}
-
-/** Keep theme class on document body in sync with saved theme state. */
-function ThemeSynchronizer() {
-  const isDarkTheme = useFeatureFlag('unsafeDarkTheme')
-
-  React.useEffect(() => {
-    if (isDarkTheme) {
-      document.documentElement.classList.add('theme-dark')
-    } else {
-      document.documentElement.classList.remove('theme-dark')
-    }
-    localStorage.setItem('enso-theme', isDarkTheme ? 'dark' : 'light')
-  }, [isDarkTheme])
-
-  return null
 }
