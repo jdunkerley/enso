@@ -21,10 +21,16 @@ export function goToPageActions<Context>(
 ): GoToPageActions<Context> {
   return {
     drive: () =>
-      step('Go to Drive', (page) =>
+      step('Go to Drive', async (page) => {
         // Drive is not a separate tab, we focus left panel instead.
-        page.locator('.leftBar').click(),
-      ).into(DrivePageActions<Context>),
+        await page.locator('.leftBar').click()
+        // The click leaves the cursor resting on the leftBar, which expands over the drive panel
+        // 550ms after the pointer enters it. Playwright only moves the mouse once the target is
+        // uncovered, so a later click on the toolbar or a row's leftmost button then waits out its
+        // whole timeout under a bar that never collapses. Leaving the bar cancels the expansion,
+        // as a user's pointer heading for those buttons would.
+        await page.mouse.move(0, 0)
+      }).into(DrivePageActions<Context>),
     projectView: () =>
       step('Go to Project page', (page) =>
         page.getByTestId('project-view-tab-button').click(),
