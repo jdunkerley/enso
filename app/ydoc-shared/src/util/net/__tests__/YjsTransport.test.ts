@@ -64,6 +64,22 @@ describe('YjsTransport', () => {
     transport2.close()
   })
 
+  test('isOpen tracks open and close', async () => {
+    const transport = new YjsTransport(doc, 'is-open-channel')
+    expect(transport.isOpen).toBe(false)
+    const openStates: boolean[] = []
+    const closeStates: boolean[] = []
+    transport.on('open', () => openStates.push(transport.isOpen))
+    transport.on('close', () => closeStates.push(transport.isOpen))
+    await transport.connect()
+    expect(transport.isOpen).toBe(true)
+    transport.close()
+    expect(transport.isOpen).toBe(false)
+    // Listeners already see the new state.
+    expect(openStates).toEqual([true])
+    expect(closeStates).toEqual([false])
+  })
+
   test('sends message from one transport and receives on another', async () => {
     const messageListener = vi.fn()
     transport2.on('message', messageListener)
