@@ -38,6 +38,77 @@ const NOT_CAMEL_CASE = '/^(?!_?[a-z][a-z0-9*]*([A-Z0-9][a-z0-9]*)*$)(?!React$)/'
 const WHITELISTED_CONSTANTS = 'logger|.+Context|interpolationFunction.+'
 const NOT_CONSTANT_CASE = `/^(?!${WHITELISTED_CONSTANTS}$|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$)/`
 
+/** Imports banned everywhere. A later config block that sets `no-restricted-imports` must repeat these. */
+const RESTRICTED_IMPORT_PATHS = [
+  {
+    name: 'vue',
+    importNames: ['proxyRefs'],
+    message: 'Use more type-safe alternative in @/util/reactivity',
+  },
+  {
+    name: 'veaury',
+    importNames: ['applyReactInVue', 'applyPureReactInVue'],
+    message: 'Use `reactComponent` in @/util/react',
+  },
+]
+
+/**
+ * The `#/` (React dashboard) modules that code outside `src/dashboard/` may still import. Shared
+ * code must not depend on the dashboard: framework-free code belongs in `src/` (see #77). What is
+ * left is React itself, reached across the veaury bridge. Remove an entry when the ticket that
+ * ports its module lands; never add framework-free code here - move it to `src/` instead.
+ *
+ * `import()` expressions (the lazily loaded routes in `router.ts`) are not checked by
+ * `no-restricted-imports`, so they need no entry.
+ */
+const DASHBOARD_IMPORT_ALLOWLIST = [
+  // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
+  'App.tsx',
+  'components/Devtools',
+  'components/Dialog/Dialog',
+  'components/ErrorBoundary',
+  'components/Loader',
+  'components/ModalWrapper',
+  'components/OfflineNotificationManager',
+  'components/Result',
+  'components/Suspense',
+  'components/UIProviders',
+  'layouts/AssetPanel/components/AssetProperties',
+  'layouts/AssetPanel/components/AssetVersions',
+  'layouts/AssetPanel/components/ProjectExecutionsCalendar',
+  'layouts/AssetPanel/components/ProjectSessions',
+  'layouts/Drive',
+  'layouts/Settings',
+  'modals/AcceptInvitationModal',
+  'modals/AgreementsModal',
+  'modals/ConfirmDeleteModal',
+  'modals/PlanDowngradedModal',
+  'modals/SetupOrganizationForm',
+  'modals/TrialEndedModal',
+  'modals/UpsertSecretModal',
+  'pages/authentication/LoadingScreen',
+  'pages/authentication/Login',
+  'pages/authentication/Registration',
+  'pages/dashboard/UserBar',
+  'pages/dashboard/components/KeyboardShortcut',
+  'providers/LoggerProvider',
+  // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
+  'hooks/mountHooks',
+  'utilities/vue',
+  'utilities/zustand',
+  // React-owned state that Vue reaches into; each goes with the modal/toast host work (#80) or
+  // the shell collapse (#93). `persistentState` is a zustand store; see the zustand decision.
+  'layouts/Drive/Categories',
+  'layouts/Drive/persistentState',
+  'providers/ModalProvider',
+  // The dashboard's global stylesheets.
+  'styles.css',
+  'tailwind.css',
+]
+
+/** Escape a string for use in a regular expression. */
+const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
 // =======================================
 // === Restricted syntactic constructs ===
 // =======================================
@@ -247,23 +318,7 @@ const config = [
           argsIgnorePattern: '^_',
         },
       ],
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: [
-            {
-              name: 'vue',
-              importNames: ['proxyRefs'],
-              message: 'Use more type-safe alternative in @/util/reactivity',
-            },
-            {
-              name: 'veaury',
-              importNames: ['applyReactInVue', 'applyPureReactInVue'],
-              message: 'Use `reactComponent` in @/util/react',
-            },
-          ],
-        },
-      ],
+      'no-restricted-imports': ['error', { paths: RESTRICTED_IMPORT_PATHS }],
       'no-restricted-properties': [
         'warn',
         { object: 'console', property: 'debug', message: DEBUG_STATEMENTS_MESSAGE },
@@ -316,6 +371,27 @@ const config = [
       'jsdoc/require-param': 'off',
       'jsdoc/require-returns': 'off',
       'jsdoc/require-yields': 'off',
+    },
+  },
+
+  // === Shared code must not depend on the dashboard ===
+  {
+    files: ['app/gui/**/*.{ts,tsx,mts,cts,vue}'],
+    ignores: ['app/gui/src/dashboard/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: RESTRICTED_IMPORT_PATHS,
+          patterns: [
+            {
+              regex: `^#/(?!(?:${DASHBOARD_IMPORT_ALLOWLIST.map(escapeRegExp).join('|')})$)`,
+              message:
+                'Shared code must not import from the React dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
+            },
+          ],
+        },
+      ],
     },
   },
 
