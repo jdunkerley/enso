@@ -68,7 +68,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'components/Dialog/Dialog',
   'components/ErrorBoundary',
   'components/Loader',
-  'components/ModalWrapper',
   'components/OfflineNotificationManager',
   'components/Result',
   'components/Suspense',
@@ -96,11 +95,10 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'hooks/mountHooks',
   'utilities/vue',
   'utilities/zustand',
-  // React-owned state that Vue reaches into; each goes with the modal/toast host work (#80) or
-  // the shell collapse (#93). `persistentState` is a zustand store; see the zustand decision.
+  // React-owned state that Vue reaches into; each goes with the shell collapse (#93).
+  // `persistentState` is a zustand store; see the zustand decision.
   'layouts/Drive/Categories',
   'layouts/Drive/persistentState',
-  'providers/ModalProvider',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',

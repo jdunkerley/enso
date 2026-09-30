@@ -4,7 +4,7 @@
  *
  * The {@link App} component is responsible for defining the global context used by child
  * components. These global components are defined at the top of the {@link App} so that they are
- * available to all of the child components. The toasts are Vue's, in `App.vue`.
+ * available to all of the child components. The toasts and the modal stack are Vue's.
  *
  * The {@link App} also defines various providers.
  */
@@ -15,7 +15,6 @@ import * as z from 'zod'
 import * as detect from 'enso-common/src/utilities/detect'
 
 import InputBindingsProvider from '#/providers/InputBindingsProvider'
-import ModalProvider from '#/providers/ModalProvider'
 
 import VersionChecker from '#/layouts/VersionChecker'
 import { RouterProvider } from 'react-aria-components'
@@ -58,11 +57,7 @@ export default function App(props: React.PropsWithChildren) {
   // `InputBindingsProvider` depends on `LocalStorageProvider`.
   // Note that the `Router` must be the parent of the `AuthProvider`, because the `AuthProvider`
   // will redirect the user between the login/register pages and the dashboard.
-  return (
-    <ModalProvider>
-      <AppRouter {...props} />
-    </ModalProvider>
-  )
+  return <AppRouter {...props} />
 }
 
 /**

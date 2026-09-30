@@ -1,8 +1,8 @@
-import { unsetModal } from '#/providers/ModalProvider'
 import { ALL_PATHS_REGEX } from '$/appUtils'
 import * as cognito from '$/authentication/cognito'
 import { AuthEvent, type ListenFunction } from '$/authentication/listen'
 import { useInitAuthService } from '$/authentication/service'
+import { useModals } from '$/providers/modals'
 import { LOGOUT_EVENT } from '$/providers/session/constants'
 import * as analytics from '$/utils/analytics'
 import LocalStorage from '$/utils/LocalStorage'
@@ -135,7 +135,9 @@ export function createSessionStore(
       }
     },
     // If the User Menu is still visible, it breaks when `userSession` is set to `null`.
-    onMutate: unsetModal,
+    onMutate: () => {
+      useModals().closeAll()
+    },
     onSuccess: async () => {
       if (toValue(authDisabled)) return
       analytics.cloudSignOut.after()
