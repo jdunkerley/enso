@@ -1,10 +1,10 @@
 /** @file Displays the description of an element on hover or focus. */
 import * as aria from '#/components/aria'
 import { usePortalContext } from '#/components/Portal'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { ResetButtonGroupContext } from '../Button/shared'
-import { DIALOG_BACKGROUND } from '../Dialog/variants'
-import { TEXT_STYLE } from '../Text/variants'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const TOOLTIP_STYLES = tv({

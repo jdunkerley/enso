@@ -14,7 +14,6 @@ import { UpsertSecretForm } from '#/modals/UpsertSecretModal'
 import { CreatedByColumn, SharedWithColumn } from '#/pages/dashboard/components/column'
 import { DatalinkFormInput } from '#/pages/dashboard/components/DatalinkInput'
 import Label from '#/pages/dashboard/components/Label'
-import { tv } from '#/utilities/tailwindVariants'
 import { CATEGORY_BACKEND, type Category } from '$/providers/category'
 import { useBackends, useFullUserSession, useText } from '$/providers/react'
 import { useVueValue } from '$/providers/react/common'
@@ -24,6 +23,7 @@ import {
   useRightPanelFocusedAsset,
 } from '$/providers/react/container'
 import { useFeatureFlags } from '$/providers/react/featureFlags'
+import { tv } from '$/utils/style/tailwindVariants'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import type { Backend } from 'enso-common/src/services/Backend'
 import {

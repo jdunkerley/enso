@@ -56,7 +56,6 @@ import {
 import { useInputBindings } from '#/providers/InputBindingsProvider'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/utilities/drag'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { categoryKey, type Category } from '$/providers/category'
 import { useCategories, useFullUserSession, useLocalStorage, useText } from '$/providers/react'
@@ -75,6 +74,7 @@ import { isElementTextInput, isTextInputEvent } from '$/utils/event'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import LocalStorage from '$/utils/LocalStorage'
 import type { SortInfo } from '$/utils/sorting'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type {
   AssetId,

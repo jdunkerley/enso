@@ -14,8 +14,9 @@ import { Icon } from '#/components/Icon'
 import FocusRing from '#/components/styled/FocusRing'
 import { useSyncRef } from '#/hooks/syncRefHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
-import { DIALOG_BACKGROUND } from '../../Dialog/variants'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
+import { makeRoundedStyles } from '$/utils/style/roundedStyles'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import {
   Form,
   type FieldComponentProps,
@@ -27,7 +28,6 @@ import {
   type FormInstance,
   type TSchema,
 } from '../../Form'
-import { makeRoundedStyles } from '../../utilities'
 
 const DROPDOWN_STYLES = tv({
   base: 'group relative flex w-max cursor-pointer flex-col items-start whitespace-nowrap rounded-input',

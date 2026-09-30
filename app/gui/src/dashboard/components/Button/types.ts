@@ -7,10 +7,10 @@ import type {
   Placement,
   PressEvent,
 } from '#/components/aria'
-import type { ExtractFunction } from '#/utilities/tailwindVariants'
+import type { BUTTON_STYLES, ButtonVariants } from '$/components/Button/variants'
+import type { ExtractFunction } from '$/utils/style/tailwindVariants'
 import type { ReactElement, ReactNode } from 'react'
 import type { Addon, IconProp, TestIdProps } from '../types'
-import type { BUTTON_STYLES, ButtonVariants } from './variants'
 
 /** Position of a joined button. */
 export type PrivateJoinedButtonPosition = ButtonVariants['position']

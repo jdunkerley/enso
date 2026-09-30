@@ -1,9 +1,9 @@
 /** @file An option in a selector. */
 import { ListBoxItem, type ListBoxItemProps } from '#/components/aria'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, type ForwardedRef } from 'react'
-import { TEXT_STYLE } from '../../Text'
 
 /** Props for a {@link MultiSelectorOption}. */
 export interface MultiSelectorOptionProps

@@ -1,8 +1,8 @@
 /** @file A screen that shows a paywall. */
 import { Text } from '#/components/Text'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { getFeatureConfiguration, type PaywallFeatureName } from '$/composables/paywall'
 import { useText } from '$/providers/react'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import { PaywallBulletPoints, PaywallLock } from './components'
 import { UpgradeButton } from './UpgradeButton'
 

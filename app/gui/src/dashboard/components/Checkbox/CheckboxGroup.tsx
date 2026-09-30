@@ -2,8 +2,8 @@
 import type { CheckboxGroupProps as AriaCheckboxGroupProps } from '#/components/aria'
 import { CheckboxGroup as AriaCheckboxGroup, mergeProps } from '#/components/aria'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import {
   forwardRef,

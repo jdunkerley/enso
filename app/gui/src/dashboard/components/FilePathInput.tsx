@@ -1,9 +1,9 @@
 /** @file A file path input component with an integrated file browser. */
 import { Input } from '#/components/aria'
 import FocusRing from '#/components/styled/FocusRing'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { vueComponent } from '#/utilities/vue'
 import { useText } from '$/providers/react'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import FileBrowserWidgetVue from '@/components/widgets/FileBrowserWidget.vue'
 import { useRef, useState, type CSSProperties } from 'react'
 import { ROUNDED_INPUT_BASE_CLASSES } from './JSONSchemaInput'

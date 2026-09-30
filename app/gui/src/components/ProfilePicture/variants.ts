@@ -1,5 +1,5 @@
 /** @file Variants for the ProfilePicture component. */
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 /** Variants for the ProfilePicture component. */
 export const PROFILE_PICTURE_STYLES = tv({

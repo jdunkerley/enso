@@ -2,8 +2,9 @@
 import { mergeProps } from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import type { OTPInputProps } from 'input-otp'
 import { OTPInput as BaseOTPInput, type SlotProps as OTPInputSlotProps } from 'input-otp'
 import type { ForwardedRef, Ref } from 'react'
@@ -19,7 +20,6 @@ import type {
 } from '../../Form'
 import { filterNonDOMFormProps, Form } from '../../Form'
 import { Separator } from '../../Separator'
-import { TEXT_STYLE } from '../../Text'
 import type { TestIdProps } from '../../types'
 
 /** Props for an {@link OTPInput}. */

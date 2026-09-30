@@ -3,9 +3,9 @@
  *
  * Variants for the ResizableInput component.
  */
-import { makeRoundedStyles } from '#/components/utilities'
-import { tv } from '#/utilities/tailwindVariants'
-import { TEXT_STYLE } from '../Text'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { makeRoundedStyles } from '$/utils/style/roundedStyles'
+import { tv } from '$/utils/style/tailwindVariants'
 
 export const INPUT_STYLES = tv({
   base: 'block w-full bg-transparent transition-[border-color,outline] duration-200',

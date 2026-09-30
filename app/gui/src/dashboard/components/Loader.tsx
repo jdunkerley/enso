@@ -1,6 +1,6 @@
 /** @file A full-screen loading spinner. */
 import { StatelessSpinner, type SpinnerState } from '#/components/StatelessSpinner'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { memo } from 'react'
 
 const STYLES = tv({

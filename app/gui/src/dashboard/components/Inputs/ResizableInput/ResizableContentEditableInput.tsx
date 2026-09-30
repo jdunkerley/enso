@@ -11,7 +11,8 @@ import { Text } from '#/components/Text'
 import { useAutoFocus } from '#/hooks/autoFocusHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { INPUT_STYLES } from '$/components/Inputs/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import {
   forwardRef,
   useEffect,
@@ -20,7 +21,6 @@ import {
   type ForwardedRef,
   type HTMLAttributes,
 } from 'react'
-import { INPUT_STYLES } from '../variants'
 
 const CONTENT_EDITABLE_STYLES = tv({
   extend: INPUT_STYLES,

@@ -1,7 +1,7 @@
 /** @file A radio group. */
 import * as aria from '#/components/aria'
 import * as mergeRefs from '#/utilities/mergeRefs'
-import * as twv from '#/utilities/tailwindVariants'
+import * as twv from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import * as React from 'react'
 import type { FieldVariantProps } from '../Form'

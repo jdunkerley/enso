@@ -1,4 +1,4 @@
-/** @file Constants for aria components. */
+/** @file Rounded-corner style helpers for Tailwind variants. */
 
 import { identity } from '$/utils/functions'
 import { unsafeKeyValuePair, unsafeKeys } from 'enso-common/src/utilities/data/object'

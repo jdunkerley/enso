@@ -14,7 +14,8 @@ import { Text } from '#/components/Text'
 import type { SvgUseIcon, TestIdProps } from '#/components/types'
 import { useAutoFocus } from '#/hooks/autoFocusHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import type { ExtractFunction, VariantProps } from '#/utilities/tailwindVariants'
+import { INPUT_STYLES } from '$/components/Inputs/variants'
+import type { ExtractFunction, VariantProps } from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import {
   forwardRef,
@@ -25,7 +26,6 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { INPUT_STYLES } from '../variants'
 
 /** Props for an {@link Input}. */
 export interface InputProps<

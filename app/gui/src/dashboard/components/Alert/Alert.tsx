@@ -1,7 +1,7 @@
 /** @file Alert component. */
 import { forwardRef, type ForwardedRef, type HTMLAttributes, type PropsWithChildren } from 'react'
 
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { Icon } from '../Icon'
 import type { IconProp } from '../types'
 // eslint-disable-next-line react-refresh/only-export-components

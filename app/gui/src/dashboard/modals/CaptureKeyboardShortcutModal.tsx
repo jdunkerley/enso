@@ -5,8 +5,8 @@ import { Form } from '#/components/Form'
 import { Text } from '#/components/Text'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import { unsetModal } from '#/providers/ModalProvider'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import {
   modifierFlagsForEvent,
   modifiersForModifierFlags,

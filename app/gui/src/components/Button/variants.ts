@@ -3,8 +3,8 @@
  *
  * Variants for a button
  */
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
-import { TEXT_STYLE } from '../Text'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 
 /**
  * Variants for a button
@@ -147,7 +147,6 @@ export const BUTTON_STYLES = tv({
       accent: 'bg-accent text-white hover:bg-accent-dark',
       delete:
         'bg-danger/80 hover:bg-danger text-white focus-visible:outline-danger focus-visible:bg-danger',
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'delete-outline':
         'border-danger/40 hover:border-danger hover:bg-danger/10 text-danger focus-visible:outline-danger focus-visible:border-danger',
       icon: {
@@ -158,7 +157,6 @@ export const BUTTON_STYLES = tv({
       },
       ghost:
         'text-primary hover:text-primary/80 hover:bg-white focus-visible:text-primary/80 focus-visible:bg-white',
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'ghost-fading':
         'text-primary opacity-80 hover:opacity-100 hover:bg-white focus-visible:bg-white',
       submit: 'bg-invite text-white opacity-80 hover:opacity-100',

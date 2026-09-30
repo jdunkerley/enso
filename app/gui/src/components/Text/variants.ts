@@ -1,5 +1,5 @@
 /** @file Style for text component */
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 export const TEXT_STYLE = tv({
   base: '',
@@ -22,7 +22,6 @@ export const TEXT_STYLE = tv({
     variant: {
       custom: '',
       body: 'text-xs leading-[20px] before:h-[2px] after:h-[2px] macos:before:h-[1px] macos:after:h-[3px]',
-      // eslint-disable-next-line @typescript-eslint/naming-convention
       'body-sm':
         'text-[10.5px] leading-[16px] before:h-[2px] after:h-[2px] macos:before:h-[1px] macos:after:h-[3px]',
       h1: 'text-xl leading-[29px] before:h-0.5 after:h-[5px] macos:before:h-[3px] macos:after:h-[3px]',
@@ -60,7 +59,6 @@ export const TEXT_STYLE = tv({
     },
     truncate: {
       true: 'block truncate',
-      /* eslint-disable @typescript-eslint/naming-convention */
       '1': 'block truncate',
       '2': 'line-clamp-2',
       '3': 'line-clamp-3',
@@ -71,7 +69,6 @@ export const TEXT_STYLE = tv({
       '8': 'line-clamp-8',
       '9': 'line-clamp-9',
       custom: 'line-clamp-[var(--line-clamp)]',
-      /* eslint-enable @typescript-eslint/naming-convention */
     },
     monospace: { true: 'font-mono' },
     italic: { true: 'italic' },

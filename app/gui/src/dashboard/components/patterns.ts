@@ -2,7 +2,7 @@
  * @file Patterns are set of reusable styles for certain elements.
  */
 
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 export const TEXT_WITH_ICON = tv({
   base: 'flex',

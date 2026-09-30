@@ -7,8 +7,8 @@ import type { Addon, IconProp, TestIdProps } from '#/components/types'
 import type { TooltipElementType } from '#/components/VisualTooltip'
 import { useDragDelayAction, type DragDelayCallback } from '#/hooks/dragDelayHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
 import { noop } from '$/utils/functions'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import {
   createContext,
   useContext,

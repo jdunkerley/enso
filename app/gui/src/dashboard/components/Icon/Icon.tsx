@@ -4,7 +4,7 @@
  * Icon component that displays an icon based on different input.
  */
 import type { AvailableIconReturn, IconProp, IconPropSvgUse, TestIdProps } from '#/components/types'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import type { Icon as PossibleIcon } from '@/util/iconMetadata/iconName'
 import { svgUseHref } from '@/util/icons'
 import { memo } from 'react'

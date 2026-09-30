@@ -2,18 +2,16 @@
 import type { OmitUndefined } from 'tailwind-variants'
 import { createTV } from 'tailwind-variants'
 
-import { TAILWIND_MERGE_CONFIG } from '#/utilities/tailwindMerge'
 import { LRUCache } from '$/utils/LruCache'
+import { TAILWIND_MERGE_CONFIG } from '$/utils/style/tailwindMerge'
 
 export * from 'tailwind-variants'
 
 const MAX_CACHE_SIZE = 256
 
-// eslint-disable-next-line no-restricted-syntax
 const tvConstructor = createTV({ twMergeConfig: TAILWIND_MERGE_CONFIG })
 
 // This is a function, even though it does not contain function syntax.
-// eslint-disable-next-line no-restricted-syntax
 export const tv: typeof tvConstructor = function tvWithLRU(
   construct: Parameters<typeof tvConstructor>[0],
 ) {
@@ -42,7 +40,6 @@ export const tv: typeof tvConstructor = function tvWithLRU(
 
     if (typeof result === 'object' && result != null) {
       for (const slot in result) {
-        // eslint-disable-next-line no-restricted-syntax
         const value = result[slot as keyof typeof result]
 
         if (typeof value === 'function') {
@@ -60,12 +57,10 @@ export const tv: typeof tvConstructor = function tvWithLRU(
             }
 
             // @ts-expect-error - This is a valid assignment.
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             const classes = value(props)
 
             cache.set(slotCacheKey, { value: classes })
 
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
             return classes
           }
         }
@@ -79,7 +74,6 @@ export const tv: typeof tvConstructor = function tvWithLRU(
   // This is done to preserve the extra properties of the `baseVariants` function.
   variantsWithLRU.__proto__ = baseVariants
 
-  // eslint-disable-next-line no-restricted-syntax
   return variantsWithLRU as unknown as typeof tvConstructor
 } as unknown as typeof tvConstructor
 
@@ -95,10 +89,10 @@ export type TVWithoutExtends<T> = ExtractFunction<T> & Omit<T, 'extend'>
  *
  * TODO: \@MrFlashAccount [add support for styling individual slots](https://github.com/enso-org/cloud-v2/issues/1643)
  */
-export type VariantProps<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Component extends (...args: any) => any,
-> = Omit<OmitUndefined<Parameters<Component>[0]>, 'class' | 'className'> & {
+export type VariantProps<Component extends (...args: any) => any> = Omit<
+  OmitUndefined<Parameters<Component>[0]>,
+  'class' | 'className'
+> & {
   /**
    * Custom styles for a component.
    *

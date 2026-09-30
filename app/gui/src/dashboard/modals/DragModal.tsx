@@ -1,10 +1,10 @@
 /** @file Modal for dragging an asset. */
 import { Badge } from '#/components/Badge'
-import { DIALOG_BACKGROUND } from '#/components/Dialog'
 import Portal from '#/components/Portal'
 import { Underlay } from '#/components/Underlay'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { unsetModal } from '#/providers/ModalProvider'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import {
   Children,
   startTransition,

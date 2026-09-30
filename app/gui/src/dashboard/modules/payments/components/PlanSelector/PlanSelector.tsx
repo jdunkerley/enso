@@ -1,10 +1,10 @@
 /** @file Plan selector component. */
-import { DIALOG_BACKGROUND } from '#/components/Dialog/variants'
 import { backendQueryOptions } from '#/hooks/backendHooks'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import { mapPlanOnPaywall } from '$/composables/paywall/FeaturesConfiguration'
 import { useBackends } from '$/providers/backends'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import * as backend from 'enso-common/src/services/Backend'
 import { Card } from './components'

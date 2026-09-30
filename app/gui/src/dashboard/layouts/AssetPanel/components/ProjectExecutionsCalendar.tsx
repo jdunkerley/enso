@@ -20,13 +20,13 @@ import { useLocalStorageState } from '#/hooks/localStoreState'
 import { AssetPanelPlaceholder } from '#/layouts/AssetPanel/components/AssetPanelPlaceholder'
 import { ProjectExecution } from '#/layouts/AssetPanel/components/ProjectExecution'
 import { NewProjectExecutionModal } from '#/layouts/NewProjectExecutionModal'
-import { tv } from '#/utilities/tailwindVariants'
 import { CATEGORY_BACKEND } from '$/providers/category'
 import { useBackends, useText } from '$/providers/react'
 import {
   useRightPanelContextCategory,
   useRightPanelFocusedAsset,
 } from '$/providers/react/container'
+import { tv } from '$/utils/style/tailwindVariants'
 import {
   CalendarDate,
   getLocalTimeZone,
