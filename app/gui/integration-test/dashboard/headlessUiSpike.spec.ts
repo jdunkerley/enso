@@ -111,3 +111,43 @@ test('styled by the shared variants, rendered in the React portal root', async (
     await expect(item(page, 'alpha')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   })
 })
+
+/** The computed styles that make up a popover's look (not its position or animation state). */
+const POPOVER_LOOK = [
+  'backdrop-filter',
+  'background-color',
+  'border-top-left-radius',
+  'border-bottom-right-radius',
+  'box-shadow',
+  'max-width',
+  'overflow',
+] as const
+
+test('a Vue Popover looks like the React user-menu popover beside it', async ({ drivePage }) => {
+  await drivePage.do(async (page) => {
+    const look = (element: Element, properties: readonly string[]) => {
+      const style = getComputedStyle(element)
+      return Object.fromEntries(properties.map((p) => [p, style.getPropertyValue(p)]))
+    }
+    const inner = ['padding-top', 'padding-left', 'overflow-y', 'border-top-left-radius']
+
+    // Both are `size: 'xxsmall'` popovers styled by `POPOVER_STYLES`.
+    await page.getByLabel(TEXT.userMenuLabel).locator('visible=true').click()
+    const reactPopover = page.getByTestId('user-menu')
+    await expect(reactPopover).toBeVisible()
+    const react = await reactPopover.evaluate(look, POPOVER_LOOK)
+    const reactInner = await reactPopover.getByRole('dialog').evaluate(look, inner)
+    await page.keyboard.press('Escape')
+    await expect(reactPopover).toHaveCount(0)
+
+    await page.getByTestId('headless-ui-spike-popover-trigger').click()
+    const vuePopover = page.getByTestId('headless-ui-spike-popover')
+    await expect(vuePopover).toBeVisible()
+    await expect(vuePopover).toHaveAttribute('role', 'dialog')
+    expect(await vuePopover.evaluate(look, POPOVER_LOOK)).toEqual(react)
+    expect(await vuePopover.locator(':scope > div').evaluate(look, inner)).toEqual(reactInner)
+    await page.keyboard.press('Escape')
+    await expect(vuePopover).toHaveCount(0)
+    await expect(page.getByTestId('headless-ui-spike-popover-trigger')).toBeFocused()
+  })
+})
