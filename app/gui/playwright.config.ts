@@ -6,6 +6,7 @@
  * - System validation dialogs are not reliable between computers, as they may have different
  * default fonts.
  */
+import { createRequire } from 'node:module'
 import net from 'node:net'
 import path from 'node:path'
 import url from 'node:url'
@@ -26,6 +27,21 @@ const EXPECT_TIMEOUT_MS = DEBUG ? 100_000_000 : 10_000
 const WORKERS = isCI ? 2 : '35%'
 
 const dirName = path.dirname(url.fileURLToPath(import.meta.url))
+
+/**
+ * Vite's JS entry point, run with `node` rather than through `node_modules/.bin/vite`.
+ *
+ * Playwright runs `webServer.command` through the platform shell, which is `cmd.exe` on Windows:
+ * it reads the `/` in a relative POSIX path as a switch delimiter, and it cannot execute the
+ * extensionless shebang shim in `.bin` anyway. Resolving the package also survives pnpm's layout,
+ * where the real files live under `node_modules/.pnpm/`. It keeps one code path for every
+ * platform, and still avoids the startup cost of going through npm/npx.
+ */
+const viteBin = path.join(
+  path.dirname(createRequire(import.meta.url).resolve('vite/package.json')),
+  'bin',
+  'vite.js',
+)
 
 // === AG Grid licensed / unlicensed test configurations ===
 //
@@ -85,7 +101,7 @@ if (!Number.isFinite(portFromEnv) || !Number.isFinite(port)) {
   console.log(`Selected playwright server port: ${port}`)
 }
 
-// Make sure to set the env to actual port that is being used. This is necessary for wFemaiorkers to
+// Make sure to set the env to actual port that is being used. This is necessary for workers to
 // pick up the same configuration.
 process.env.PLAYWRIGHT_PORT = `${port}`
 
@@ -192,8 +208,7 @@ export default defineConfig({
 
 function runVite(...commands: string[]) {
   const portArgs = (cmd: string) => (cmd !== 'build' ? `--strictPort --port ${port}` : '')
-  // Avoid using npm commands for faster startup and compatibility with bazel environment
   return commands
-    .map((c) => `node_modules/.bin/vite -c vite.test.config.ts ${portArgs(c)} ${c}`)
+    .map((c) => `node "${viteBin}" -c vite.test.config.ts ${portArgs(c)} ${c}`)
     .join(' && ')
 }
