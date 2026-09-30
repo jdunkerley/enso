@@ -297,8 +297,9 @@ test('Editing existing nodes', async ({ editorPage, page }) => {
   await expect(page.getByTestId('component-editor-label')).toBeHidden()
   const content = locate.componentBrowserInput(page)
   await expect(content).toHaveText('Data.read')
+  await expect(content).toBeFocused()
 
-  // Add argument and accept - assume the editor is already focused.
+  // Add argument and accept.
   await page.keyboard.press('End')
   await page.keyboard.type(` ${ADDED_PATH}`)
   await expect(content).toHaveText(`Data.read ${ADDED_PATH}`)
