@@ -61,6 +61,7 @@ test('Editing an existing AI node sends prior prompt + definition and updates th
   // 1. Create an AI node (immediate-reply mock yields functionName=ai_helper).
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toBeVisible()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
   await page.keyboard.insertText('first prompt')
   await page.keyboard.press('Enter')
   const aiNode = locate.graphNodeByBinding(page, 'ai_component1')
@@ -72,6 +73,7 @@ test('Editing an existing AI node sends prior prompt + definition and updates th
   const isMac = process.platform === 'darwin'
   await aiNode.click({ modifiers: [isMac ? 'Meta' : 'Control'] })
   await expect(locate.componentBrowser(page)).toBeVisible()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
   // The CB's CodeMirror content is pre-filled with the previous prompt; the icon menu is locked.
   await expect(page.locator('.ModeMenu.locked')).toBeVisible()
   // Replace the prompt — Mod+A then type to overwrite the prefilled text.
@@ -111,6 +113,7 @@ test('Cancelling an in-flight AI edit restores the original node', async ({ edit
 
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toBeVisible()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
   await page.keyboard.insertText('initial prompt')
   await page.keyboard.press('Enter')
   const aiNode = locate.graphNodeByBinding(page, 'ai_component1')
@@ -120,6 +123,7 @@ test('Cancelling an in-flight AI edit restores the original node', async ({ edit
   const isMac = process.platform === 'darwin'
   await aiNode.click({ modifiers: [isMac ? 'Meta' : 'Control'] })
   await expect(locate.componentBrowser(page)).toBeVisible()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
   await page.keyboard.press(isMac ? 'Meta+A' : 'Control+A')
   await page.keyboard.type('replacement prompt')
   await page.keyboard.press('Enter')

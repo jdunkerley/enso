@@ -159,6 +159,8 @@ test.describe('Accepting suggestion', () => {
     expected: string[],
   ) {
     await locate.addNewNodeButton(page).click()
+    // `Enter` goes to whatever has focus, and the browser focuses its input a moment after it opens.
+    await expect(locate.componentBrowserInput(page)).toBeFocused()
     const nodeCount = await locate.graphNode(page).count()
     await acceptSuggestion()
     await expect(locate.componentBrowser(page)).toBeHidden()
@@ -204,6 +206,7 @@ test('Filling input with suggestion', async ({ editorPage, page }) => {
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toExist()
   await expect(locate.componentBrowserEntry(page)).toExist()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
 
   // Applying suggestion
   await page.keyboard.press('Shift+Enter')
@@ -294,8 +297,9 @@ test('Editing existing nodes', async ({ editorPage, page }) => {
   await expect(page.getByTestId('component-editor-label')).toBeHidden()
   const content = locate.componentBrowserInput(page)
   await expect(content).toHaveText('Data.read')
+  await expect(content).toBeFocused()
 
-  // Add argument and accept - assume the editor is already focused.
+  // Add argument and accept.
   await page.keyboard.press('End')
   await page.keyboard.type(` ${ADDED_PATH}`)
   await expect(content).toHaveText(`Data.read ${ADDED_PATH}`)
@@ -316,6 +320,7 @@ test('Editing existing nodes', async ({ editorPage, page }) => {
   await node.getByTestId('action:component.startEditing').click()
   await expect(locate.componentBrowser(page)).toBeVisible()
   await expect(content).toHaveText(`Data.read ${ADDED_PATH}`)
+  await expect(content).toBeFocused()
   for (let i = 0; i < ADDED_PATH.length; ++i) await page.keyboard.press('Backspace')
   await expect(content).toHaveText('Data.read ')
   await page.keyboard.press('Enter')
@@ -397,6 +402,7 @@ test.skip('Component browser handling of overridden record-mode', async ({ edito
   await expect(locate.componentBrowser(page)).toBeVisible()
   const content = locate.componentBrowserInput(page)
   await expect(content).toHaveText('Data.read')
+  await expect(content).toBeFocused()
   // Ensure committing an edit doesn't change the override state.
   await page.keyboard.press('End')
   await content.pressSequentially(` ${ADDED_PATH}`)

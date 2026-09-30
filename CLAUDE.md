@@ -150,9 +150,8 @@ has silently produced a wrong result here:
 - **A pin that is deliberately frozen must say so next to itself.** Several
   versions here are held back on purpose and are indistinguishable from neglect
   without a note — `akka` 2.6.20 (relicensed to BSL at 2.7, so this is an
-  Apache-2.0 floor), `playwright` (see `pnpm-workspace.yaml`),
-  `electron-builder` 26.8.1 (pinned by its patch). Treat an unexplained old pin
-  as a question, not a task.
+  Apache-2.0 floor), `electron-builder` 26.8.1 (pinned by its patch). Treat an
+  unexplained old pin as a question, not a task.
 
 ## Verifying changes
 

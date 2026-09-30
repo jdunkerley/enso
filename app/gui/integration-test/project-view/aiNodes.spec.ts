@@ -18,6 +18,7 @@ async function openAiComponentBrowser(page: Page, open: () => Promise<void>) {
     await expect(locate.componentBrowser(page)).toBeVisible()
     await expect(aiModeIcon).toBeVisible({ timeout: 1000 })
   }).toPass()
+  await expect(locate.componentBrowserInput(page)).toBeFocused()
 }
 
 test('AI prompt creates a User Defined Component node', async ({ editorPage, page }) => {
