@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useCodeFontRootClasses } from '$/providers/codeFont'
+import { useText } from '$/providers/text'
 import { ContextsForReactProvider } from '$/providers/react/globalProvider'
 import ReactRoot from '$/ReactRoot'
 import { appOpenCloseCallback } from '$/utils/analytics'
@@ -18,6 +19,7 @@ import { reactComponent } from '@/util/react'
 import { useQueryClient } from '@tanstack/vue-query'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Platform, platform } from 'enso-common/src/utilities/detect'
+import { ConfigProvider } from 'reka-ui'
 import LoadingScreen from './components/LoadingScreen.vue'
 
 // import LoadingScreenReact from '#/pages/authentication/LoadingScreen'
@@ -26,6 +28,9 @@ import LoadingScreen from './components/LoadingScreen.vue'
 const classSet = provideAppClassSet()
 useCodeFontRootClasses()
 const appTooltips = provideTooltipRegistry()
+// The locale for Reka UI's primitives (`$/components/`), as react-aria's `I18nProvider` gives the
+// React ones.
+const text = useText()
 
 const ReactRootWrapper = reactComponent(ReactRoot)
 const queryClient = useQueryClient()
@@ -71,18 +76,20 @@ useMounted(appOpenCloseCallback)
 </script>
 
 <template>
-  <div :class="['App', platformClass, ...classSet.keys()]">
-    <RouterView v-slot="{ Component }">
-      <ContextsForReactProvider v-if="Component">
-        <ReactRootWrapper :queryClient="queryClient">
-          <component :is="Component" />
-          <div id="floatingLayer" />
-          <TooltipDisplayer :registry="appTooltips" />
-        </ReactRootWrapper>
-      </ContextsForReactProvider>
-      <LoadingScreen v-else />
-    </RouterView>
-  </div>
+  <ConfigProvider :locale="text.locale">
+    <div :class="['App', platformClass, ...classSet.keys()]">
+      <RouterView v-slot="{ Component }">
+        <ContextsForReactProvider v-if="Component">
+          <ReactRootWrapper :queryClient="queryClient">
+            <component :is="Component" />
+            <div id="floatingLayer" />
+            <TooltipDisplayer :registry="appTooltips" />
+          </ReactRootWrapper>
+        </ContextsForReactProvider>
+        <LoadingScreen v-else />
+      </RouterView>
+    </div>
+  </ConfigProvider>
 </template>
 
 <style>
