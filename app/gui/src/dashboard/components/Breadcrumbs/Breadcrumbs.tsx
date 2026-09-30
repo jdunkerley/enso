@@ -2,7 +2,7 @@
 import { Button } from '#/components/Button'
 import type { IconProp, TestIdProps } from '#/components/types'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import {
   Fragment,
   memo,

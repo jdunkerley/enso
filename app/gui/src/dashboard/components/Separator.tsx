@@ -3,7 +3,7 @@ import {
   Separator as AriaSeparator,
   type SeparatorProps as AriaSeparatorProps,
 } from '#/components/aria'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 
 /** The props for {@link Separator} component. */
 export interface SeparatorProps extends AriaSeparatorProps, VariantProps<typeof SEPARATOR_STYLES> {

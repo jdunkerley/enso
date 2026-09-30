@@ -10,11 +10,11 @@ import { Input } from '#/components/Inputs/Input'
 import { Selector } from '#/components/Inputs/Selector/Selector'
 import { Text } from '#/components/Text'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
+import * as ms365 from '$/cloud/serviceCredentials/ms365'
+import type { CredentialFormProps } from '$/cloud/serviceCredentials/types'
 import { useRemoteConfig, useText } from '$/providers/react'
 import type { TextId } from 'enso-common/src/text'
 import { CredentialsFormFooter } from './CredentialsFormFooter'
-import * as ms365 from './ms365'
-import type { CredentialFormProps } from './types'
 
 /** Dialog for a MS365 credential. */
 export function MS365CredentialsForm(props: CredentialFormProps) {

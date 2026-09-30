@@ -2,7 +2,7 @@
 import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 import type { SvgUseIcon } from '#/components/types'
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import type { RenderStepProps } from './types'
 

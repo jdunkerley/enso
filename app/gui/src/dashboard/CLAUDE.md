@@ -28,12 +28,11 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 - `providers/` — React context providers (auth, text/i18n, modals, toasts,
   etc.).
 - `hooks/` — Custom React hooks.
-- `configurations/` — Static/derived configuration (feature flags, endpoints,
-  subscription tiers).
-- `data/` — Client-side data-access helpers (React Query query/mutation
-  factories for the Enso Cloud API).
+- `data/serviceCredentials/` — the React forms for creating service credentials.
+  Their framework-free recipes live in `src/cloud/`.
 - `modals/` — Global-modal registry and renderer.
-- `utilities/` — Pure TS helpers (no React).
+- `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
+  `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
 - `styles.css`, `tailwind.css`, `typings.d.ts` — Tailwind plus global resets.
 
 ## Conventions (current React stack)
@@ -70,3 +69,11 @@ alias), and each side subscribes.
 
 - Unit: `vitest` + `@testing-library/react`.
 - Integration: Playwright specs in `app/gui/integration-test/dashboard/`.
+
+## Framework-free code does not live here
+
+Utilities, types, configuration and Tailwind variants that import no React live
+in shared `src/` (see "Where framework-free shared code lives" in
+`app/gui/CLAUDE.md`), and React files here import them via `$/…`. When a
+dashboard module turns out to be framework-free, move it out rather than adding
+to this subtree; cloud-only logic goes to `src/cloud/`.

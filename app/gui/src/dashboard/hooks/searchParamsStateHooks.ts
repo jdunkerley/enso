@@ -10,8 +10,8 @@ import * as appUtils from '$/appUtils'
 import * as eventCallback from '#/hooks/eventCallbackHooks'
 import * as lazyMemo from '#/hooks/useLazyMemoHooks'
 
-import * as safeJsonParse from '#/utilities/safeJsonParse'
 import { useQueryParam } from '$/providers/react/queryParams'
+import * as safeJsonParse from '$/utils/safeJsonParse'
 
 /** The return type of the `useSearchParamsState` hook. */
 type SearchParamsStateReturnType<T> = Readonly<

@@ -3,8 +3,8 @@ import { CloseButton } from '#/components/Button'
 import { Icon } from '#/components/Icon'
 import { ProgressBar } from '#/components/ProgressBar'
 import { Text } from '#/components/Text'
-import { tv } from '#/utilities/tailwindVariants'
 import { useText } from '$/providers/react'
+import { tv } from '$/utils/style/tailwindVariants'
 import type { NotificationInfo } from './types'
 
 const NOTIFICATION_ITEM_STYLES = tv({

@@ -8,7 +8,6 @@ import { SelectionBrush, type OnDragParams } from '#/components/SelectionBrush'
 import { StatelessSpinner } from '#/components/StatelessSpinner'
 import { Text } from '#/components/Text'
 import { UserWithPopover } from '#/components/UserWithPopover'
-import { ASSETS_MIME_TYPE } from '#/data/mimeTypes'
 import { useAutoScroll } from '#/hooks/autoScrollHooks'
 import {
   backendMutationOptions,
@@ -55,14 +54,7 @@ import {
 } from '#/providers/DriveProvider'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
-import AssetQuery from '#/utilities/AssetQuery'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/utilities/drag'
-import { isElementTextInput, isTextInputEvent } from '#/utilities/event'
-import { DEFAULT_HANDLER } from '#/utilities/inputBindings'
-import LocalStorage from '#/utilities/LocalStorage'
-import { withPresence } from '#/utilities/set'
-import type { SortInfo } from '#/utilities/sorting'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { categoryKey, type Category } from '$/providers/category'
 import { useCategories, useFullUserSession, useLocalStorage, useText } from '$/providers/react'
@@ -75,6 +67,15 @@ import {
   useRightPanelData,
 } from '$/providers/react/container'
 import { useFeatureFlag } from '$/providers/react/featureFlags'
+import AssetQuery from '$/utils/AssetQuery'
+import type { AssetsDataTransferPayload } from '$/utils/assetsDataTransfer'
+import { withPresence } from '$/utils/data/set'
+import { isElementTextInput, isTextInputEvent } from '$/utils/event'
+import { DEFAULT_HANDLER } from '$/utils/inputBindings'
+import LocalStorage from '$/utils/LocalStorage'
+import { ASSETS_MIME_TYPE } from '$/utils/mimeTypes'
+import type { SortInfo } from '$/utils/sorting'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type {
   AssetId,
@@ -120,10 +121,9 @@ import {
 import { toast } from 'react-toastify'
 import invariant from 'tiny-invariant'
 import * as z from 'zod'
-import type { AssetsDataTransferPayload } from './Drive/Categories/transferBetweenCategoriesHooks'
 import { SUGGESTIONS_FOR_TYPE } from './Drive/suggestionsConstants'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** */
   interface LocalStorageData {
     readonly enabledColumns: readonly Column[]

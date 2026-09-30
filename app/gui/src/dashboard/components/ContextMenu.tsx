@@ -6,7 +6,7 @@ import type { MenuEntryProps } from '#/components/MenuEntry'
 import { usePortalContext } from '#/components/Portal'
 import { useEventListener } from '#/hooks/eventListenerHooks'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
-import { twMerge } from '#/utilities/tailwindMerge'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import {
   forwardRef,

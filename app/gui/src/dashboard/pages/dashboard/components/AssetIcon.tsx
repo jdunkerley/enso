@@ -1,6 +1,6 @@
 /** @file Displays a non-interactable icon for an asset based on its type and name. */
 import { Icon } from '#/components/Icon'
-import * as fileIcon from '#/utilities/fileIcon'
+import * as fileIcon from '$/utils/fileIcon'
 import * as backend from 'enso-common/src/services/Backend'
 
 /** Props for an {@link AssetIcon}. */

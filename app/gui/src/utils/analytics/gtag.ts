@@ -1,5 +1,5 @@
 /** @file API for sending events to Google Analytics. */
-import { noop } from '#/utilities/functions'
+import { noop } from '$/utils/functions'
 import { loadScript } from '$/utils/load'
 
 const GOOGLE_ANALYTICS_TAG = typeof $config !== 'undefined' && $config.GOOGLE_ANALYTICS_TAG

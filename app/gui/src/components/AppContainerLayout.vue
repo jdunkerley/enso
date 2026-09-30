@@ -12,7 +12,7 @@ import {
   TrialEndedModal as TrialEndedModalReact,
   type TrialEndedModalProps,
 } from '#/modals/TrialEndedModal'
-import { DAY_MS } from '#/utilities/time'
+import { DAY_MS } from '$/utils/time'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import type { DataLoader } from '$/router'

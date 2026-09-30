@@ -2,7 +2,7 @@
 import { ErrorBoundary } from '#/components/ErrorBoundary'
 import { Suspense } from '#/components/Suspense'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import type { CSSProperties, ReactNode } from 'react'
 import { Step } from './Step'
 import { StepContent } from './StepContent'

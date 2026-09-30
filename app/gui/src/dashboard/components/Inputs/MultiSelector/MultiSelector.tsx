@@ -15,7 +15,7 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { omit, unsafeRemoveUndefined } from 'enso-common/src/utilities/data/object'
 import { forwardRef, useRef, type CSSProperties, type ForwardedRef, type Ref } from 'react'
 import { MultiSelectorOption, type MultiSelectorOptionProps } from './MultiSelectorOption'

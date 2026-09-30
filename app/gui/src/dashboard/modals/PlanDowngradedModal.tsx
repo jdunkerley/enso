@@ -4,9 +4,10 @@ import { AlertDialog } from '#/components/AlertDialog'
 import { Text } from '#/components/Text'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useLocalStorageState } from '#/hooks/localStoreState'
-import LocalStorage from '#/utilities/LocalStorage'
-import { DAY_MS, HOUR_MS, HOURS_PER_DAY, MINUTE_MS, useCurrentTimestamp } from '#/utilities/time'
+import { useCurrentTimestamp } from '#/hooks/timeHooks'
 import { useText } from '$/providers/react'
+import LocalStorage from '$/utils/LocalStorage'
+import { DAY_MS, HOUR_MS, HOURS_PER_DAY, MINUTE_MS } from '$/utils/time'
 import { z } from 'zod'
 
 /** Props for a {@link PlanDowngradedModal}. */
@@ -14,7 +15,7 @@ export interface PlanDowngradedModalProps {
   readonly deletionDeadlineTimestamp: number
 }
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** Metadata containing the last time user has acknowledged the modal with asset removal deadline. */
   interface LocalStorageData {
     readonly downgradeModal: z.infer<typeof STORAGE_SCHEMA>

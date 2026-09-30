@@ -2,8 +2,8 @@
 import { Form, type FieldPath, type TSchema } from '#/components/Form'
 import { Input, type InputProps } from '#/components/Inputs/Input'
 import { Password } from '#/components/Inputs/Password'
-import { TEXT_STYLE } from '#/components/Text'
-import { tv } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 const SETTINGS_FIELD_STYLES = tv({
   extend: Form.FIELD_STYLES,

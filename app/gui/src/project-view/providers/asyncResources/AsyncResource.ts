@@ -1,4 +1,4 @@
-import { LRUCache } from '#/utilities/LruCache'
+import { LRUCache } from '$/utils/LruCache'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import {
   EffectScope,

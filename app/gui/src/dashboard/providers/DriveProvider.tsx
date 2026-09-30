@@ -1,8 +1,9 @@
 /** @file The React provider (and associated hooks) for Data Catalog state. */
-import type { PasteData } from '#/utilities/pasteData'
-import { EMPTY_SET } from '#/utilities/set'
 import { createStore, useStore, type StoreApi } from '#/utilities/zustand'
 import type { Category } from '$/providers/category'
+import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
+import { EMPTY_SET } from '$/utils/data/set'
+import type { PasteData } from '$/utils/pasteData'
 import type {
   AnyAsset,
   AssetId,
@@ -12,7 +13,6 @@ import type {
 } from 'enso-common/src/services/Backend'
 import * as React from 'react'
 import invariant from 'tiny-invariant'
-import type { TransferrableAsset } from '../layouts/Drive/Categories'
 
 /** Attached data for a paste payload. */
 export interface DrivePastePayload {

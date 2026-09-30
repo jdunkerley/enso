@@ -22,41 +22,12 @@ import {
 } from '$/providers/category'
 import { useBackends, useCategories, useText, useUser } from '$/providers/react'
 import type { GetText } from '$/providers/text'
+import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
 import type { DropOperation } from '@react-types/shared'
-import {
-  AssetType,
-  BackendType,
-  type AssetId,
-  type DirectoryId,
-} from 'enso-common/src/services/Backend'
+import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
 import { toast } from 'react-toastify'
 import invariant from 'tiny-invariant'
-import { z } from 'zod'
 import { parseDirectoriesPath } from './parseDirectoriesPath'
-
-/** A transferrable asset. */
-export const TRANSFERRABLE_ASSET_SCHEMA = z.object({
-  // eslint-disable-next-line no-restricted-syntax
-  id: z.string().transform((id) => id as AssetId),
-  title: z.string(),
-  type: z.nativeEnum(AssetType),
-  // eslint-disable-next-line no-restricted-syntax
-  parentId: z.string().transform((id) => id as DirectoryId),
-  parentsPath: z.string(),
-  virtualParentsPath: z.string(),
-})
-
-/** A data transfer payload for assets. */
-export const ASSETS_DATA_TRANSFER_PAYLOAD = z.object({
-  category: z.string(),
-  items: z.array(TRANSFERRABLE_ASSET_SCHEMA),
-})
-
-/** A data transfer payload for assets. */
-export type AssetsDataTransferPayload = z.infer<typeof ASSETS_DATA_TRANSFER_PAYLOAD>
-
-/** A transferrable asset. */
-export type TransferrableAsset = z.infer<typeof TRANSFERRABLE_ASSET_SCHEMA>
 
 /** A signature of function returned from {@link useTransferBetweenCategories}. */
 export type TransferBetweenCategoriesFunction = ReturnType<typeof useTransferBetweenCategories>

@@ -2,8 +2,8 @@
 import type * as aria from '#/components/aria'
 import { Button } from '#/components/Button'
 import { Text } from '#/components/Text'
-import { PERMISSION_CLASS_NAME } from '#/utilities/permissionsClasses'
-import * as tailwindMerge from '#/utilities/tailwindMerge'
+import { PERMISSION_CLASS_NAME } from '$/cloud/permissionsClasses'
+import * as tailwindMerge from '$/utils/style/tailwindMerge'
 import * as permissionsModule from 'enso-common/src/utilities/permissions'
 import * as React from 'react'
 

@@ -6,7 +6,7 @@
  */
 import { useMeasureCallback } from '#/hooks/measureHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import type { ForwardedRef } from 'react'
 import { forwardRef, useRef, type ReactNode } from 'react'
 

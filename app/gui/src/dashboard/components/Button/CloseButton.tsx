@@ -1,6 +1,6 @@
 /** @file A button for closing a modal. */
-import { twMerge } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import { memo } from 'react'
 import { Button } from './Button'

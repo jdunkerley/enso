@@ -2,14 +2,12 @@
  * @file A spinning arc that animates using the `dasharray-<percentage>` custom Tailwind
  * classes.
  */
+import { ROTATING_ELEMENT_SIZE } from '$/components/Spinner/constants'
 import * as React from 'react'
 import { twJoin } from 'tailwind-merge'
 
 /** The state of the spinner. It should go from `initial`, to `loading`, to `done`. */
 export type SpinnerPhase = 'done' | 'initial' | 'loading-fast' | 'loading-medium' | 'loading-slow'
-
-/** The default size of the spinner. */
-export const ROTATING_ELEMENT_SIZE = 24
 
 const SPINNER_CSS_CLASSES: Readonly<Record<SpinnerPhase, string>> = {
   initial: 'dasharray-5 ease-linear',

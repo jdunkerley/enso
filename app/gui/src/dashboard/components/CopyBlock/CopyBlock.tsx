@@ -1,10 +1,10 @@
 /** @file A block of text with a copy button. */
 import { useCopy } from '#/hooks/copyHooks'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
 import { useText } from '$/providers/react'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import type { ReactNode } from 'react'
 import { Button } from '../Button'
-import { TEXT_STYLE } from '../Text'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const COPY_BLOCK_STYLES = tv({

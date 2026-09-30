@@ -8,10 +8,10 @@ import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import { Text } from '#/components/Text'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
+import * as salesforce from '$/cloud/serviceCredentials/salesforce'
+import type { CredentialFormProps } from '$/cloud/serviceCredentials/types'
 import { useRemoteConfig, useText } from '$/providers/react'
 import { CredentialsFormFooter } from './CredentialsFormFooter'
-import * as salesforce from './salesforce'
-import type { CredentialFormProps } from './types'
 
 /** Dialog for a Salesforce credential. */
 export function SalesforceCredentialsForm(props: CredentialFormProps) {

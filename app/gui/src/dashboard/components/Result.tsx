@@ -1,6 +1,6 @@
 /** @file Display the result of an operation. */
 import type { SvgUseIcon, TestIdProps } from '#/components/types'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import type { JSX, PropsWithChildren, ReactElement } from 'react'
 import { Icon } from './Icon'
 import { Loader } from './Loader'

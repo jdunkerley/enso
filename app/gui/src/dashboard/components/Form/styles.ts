@@ -3,7 +3,7 @@
  *
  * Styles for form components.
  */
-import * as twv from '#/utilities/tailwindVariants'
+import * as twv from '$/utils/style/tailwindVariants'
 
 /** Props for form components. */
 export type FormStyleProps = twv.VariantProps<typeof FORM_STYLES>

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { CATEGORIES } from '#/configurations/inputBindings'
+import { CATEGORIES } from '$/configurations/inputBindings'
 import KeyboardShortcutReact from '#/pages/dashboard/components/KeyboardShortcut'
 import { unsetModal } from '#/providers/ModalProvider'
-import { isTextInputEvent } from '#/utilities/event'
+import { isTextInputEvent } from '$/utils/event'
 import { useActionsStore, type Action } from '$/providers/actions'
 import { useText } from '$/providers/text'
 import { commandPaletteBindings } from '@/bindings'

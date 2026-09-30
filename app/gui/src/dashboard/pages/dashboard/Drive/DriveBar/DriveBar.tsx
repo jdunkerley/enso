@@ -3,7 +3,7 @@
  * the current directory and some configuration options.
  */
 import Portal from '#/components/Portal'
-import type AssetQuery from '#/utilities/AssetQuery'
+import type AssetQuery from '$/utils/AssetQuery'
 import { DriveBarNavigation } from './DriveBarNavigation'
 import { DriveBarToolbar } from './DriveBarToolbar'
 

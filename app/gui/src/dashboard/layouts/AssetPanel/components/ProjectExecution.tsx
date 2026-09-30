@@ -9,10 +9,10 @@ import { useLocalStorageState } from '#/hooks/localStoreState'
 import { useGetOrdinal } from '#/hooks/ordinalHooks'
 import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { setModal } from '#/providers/ModalProvider'
-import { tv } from '#/utilities/tailwindVariants'
 import { useText } from '$/providers/react'
 import { useContainerData } from '$/providers/react/container'
 import { useFeatureFlag } from '$/providers/react/featureFlags'
+import { tv } from '$/utils/style/tailwindVariants'
 import {
   getLocalTimeZone,
   now,

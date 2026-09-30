@@ -13,4 +13,3 @@ export {
 } from './DialogStackProvider'
 export * from './DialogTrigger'
 export * from './Popover'
-export * from './variants'

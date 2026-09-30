@@ -15,8 +15,13 @@ import { Suspense } from '#/components/Suspense'
 import { Text } from '#/components/Text'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { unsafeWriteValue } from '#/utilities/write'
+import {
+  DIALOG_MODAL_STYLES,
+  DIALOG_OVERLAY_STYLES,
+  DIALOG_STYLES,
+} from '$/components/Dialog/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { unsafeWriteValue } from '$/utils/write'
 import * as React from 'react'
 import { Close } from './Close'
 import { DialogProvider } from './DialogProvider'
@@ -24,7 +29,6 @@ import { DialogStackRegistrar, type DialogStackItem } from './DialogStackProvide
 import { DialogTrigger } from './DialogTrigger'
 import type * as types from './types'
 import { useInteractOutside } from './utilities'
-import { DIALOG_MODAL_STYLES, DIALOG_OVERLAY_STYLES, DIALOG_STYLES } from './variants'
 
 /** Props for the {@link Dialog} component. */
 export interface DialogProps

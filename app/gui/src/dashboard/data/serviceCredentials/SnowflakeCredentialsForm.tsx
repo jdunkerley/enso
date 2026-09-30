@@ -7,10 +7,10 @@ import { Button } from '#/components/Button'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
+import * as snowflake from '$/cloud/serviceCredentials/snowflake'
+import type { CredentialFormProps } from '$/cloud/serviceCredentials/types'
 import { useRemoteConfig, useText } from '$/providers/react'
 import { CredentialsFormFooter } from './CredentialsFormFooter'
-import * as snowflake from './snowflake'
-import type { CredentialFormProps } from './types'
 
 /** Dialog for a Snowflake credential. */
 export function SnowflakeCredentialsForm(props: CredentialFormProps) {

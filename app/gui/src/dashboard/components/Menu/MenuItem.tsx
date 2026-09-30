@@ -1,11 +1,12 @@
 /** @file An item within a menu that represents a single action or option. */
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { memo, type ReactElement, type ReactNode } from 'react'
 import type { MenuItemProps as AriaMenuItemProps, MenuItemRenderProps } from 'react-aria-components'
 import { MenuItem as AriaMenuItem, Keyboard } from 'react-aria-components'
 import { Check } from '../Check'
 import { Icon } from '../Icon'
-import { Text, TEXT_STYLE } from '../Text'
+import { Text } from '../Text'
 import type { IconProp, TestIdProps } from '../types'
 
 // eslint-disable-next-line react-refresh/only-export-components

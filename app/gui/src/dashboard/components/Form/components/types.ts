@@ -7,7 +7,7 @@ import type * as React from 'react'
 import type * as reactHookForm from 'react-hook-form'
 import type * as z from 'zod'
 
-import type { Path } from '#/utilities/objectPath'
+import type { Path } from '$/utils/objectPath'
 import type { FormEvent } from 'react'
 import type * as schemaModule from './schema'
 

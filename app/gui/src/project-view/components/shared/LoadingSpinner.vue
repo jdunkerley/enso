@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ROTATING_ELEMENT_SIZE } from '#/components/Spinner'
-import { twJoin } from '#/utilities/tailwindMerge'
+import { ROTATING_ELEMENT_SIZE } from '$/components/Spinner/constants'
+import { twJoin } from '$/utils/style/tailwindMerge'
 
 const SVG_VIEWBOX_SIZE = '24'
 /* NOTE: Due to some bug in vue, when a component is used both as web components and normally,

@@ -3,8 +3,8 @@ import * as aria from '#/components/aria'
 import Portal from '#/components/Portal'
 import { TOOLTIP_STYLES, type TooltipProps } from '#/components/Tooltip'
 import * as eventCallback from '#/hooks/eventCallbackHooks'
-import { unsafeWriteValue } from '#/utilities/write'
 import { isOverflowing } from '$/utils/dom'
+import { unsafeWriteValue } from '$/utils/write'
 import * as React from 'react'
 
 /** Props for {@link useVisualTooltip}. */

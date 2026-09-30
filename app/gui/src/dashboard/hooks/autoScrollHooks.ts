@@ -1,6 +1,6 @@
 /** @file Hooks for. */
 import { useSyncRef } from '#/hooks/syncRefHooks'
-import { unsafeWriteValue } from '#/utilities/write'
+import { unsafeWriteValue } from '$/utils/write'
 import * as React from 'react'
 
 /** See {@link AutoScrollOptions.threshold}. */

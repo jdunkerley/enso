@@ -3,10 +3,10 @@ import { Header } from '#/components/aria'
 import { Button } from '#/components/Button'
 import SidebarTabButton from '#/components/styled/SidebarTabButton'
 import { Text } from '#/components/Text'
+import type SettingsTabType from '$/configurations/settingsTabs'
 import { useText } from '$/providers/react'
 import { memo, type Dispatch, type SetStateAction } from 'react'
 import { SETTINGS_DATA, type SettingsContext } from './data'
-import type SettingsTabType from './TabType'
 
 /** Props for a {@link SettingsSidebar} */
 export interface SettingsSidebarProps {

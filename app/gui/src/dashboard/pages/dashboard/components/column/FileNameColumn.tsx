@@ -5,9 +5,9 @@ import { useRenameAsset } from '#/hooks/backendHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
 import { useDriveStore } from '#/providers/DriveProvider'
-import { fileIcon } from '#/utilities/fileIcon'
 import { useStore } from '#/utilities/zustand'
 import { useDriveCurrentBackend } from '$/providers/react/container'
+import { fileIcon } from '$/utils/fileIcon'
 import { titleSchema, type FileAsset } from 'enso-common/src/services/Backend'
 
 /** Props for a {@link FileNameColumn}. */

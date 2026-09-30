@@ -14,10 +14,11 @@ import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { useDownloadDirectory } from '#/layouts/Drive/useDownloadDirectory'
 import SearchBar from '#/layouts/SearchBar'
-import { regexEscape } from '#/utilities/string'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import SettingsTabType from '$/configurations/settingsTabs'
 import { useBackends, useFullUserSession, useSession, useText } from '$/providers/react'
 import { includesPredicate } from '$/utils/data/array'
+import { regexEscape } from '$/utils/data/string'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import * as React from 'react'
 import {
@@ -30,7 +31,6 @@ import {
 } from './data'
 import SettingsSidebar from './Sidebar'
 import SettingsTab from './Tab'
-import SettingsTabType from './TabType'
 
 /** Settings screen. */
 export function Settings() {

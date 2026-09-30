@@ -7,9 +7,9 @@ import {
   type SwitchProps as AriaSwitchProps,
 } from '#/components/aria'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import { Form, type FieldPath, type FieldProps, type FieldStateProps, type TSchema } from '../Form'
-import { TEXT_STYLE } from '../Text'
 
 /** Props for a {@link Switch}. */
 export interface SwitchProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, boolean>>
