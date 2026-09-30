@@ -4,13 +4,13 @@
  */
 import * as React from 'react'
 
-import * as inputBindingsModule from '#/configurations/inputBindings'
-import LocalStorage from '#/utilities/LocalStorage'
+import * as inputBindingsModule from '$/configurations/inputBindings'
 import { useLocalStorage } from '$/providers/react'
+import LocalStorage from '$/utils/LocalStorage'
 import * as object from 'enso-common/src/utilities/data/object'
 import { z } from 'zod'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** */
   interface LocalStorageData {
     readonly inputBindings: Readonly<Record<string, readonly string[]>>

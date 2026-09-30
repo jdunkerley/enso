@@ -9,9 +9,9 @@
  * `tailwindcss-react-aria-components` modifiers (which only match react-aria's own elements).
  * See `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`, decision 5.
  */
-import { DIALOG_BACKGROUND } from '#/components/Dialog/variants'
-import { TEXT_STYLE } from '#/components/Text/variants'
-import { tv } from '#/utilities/tailwindVariants'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 export const MENU_STYLES = tv({
   base: [

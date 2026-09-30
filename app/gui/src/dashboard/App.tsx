@@ -24,15 +24,15 @@ import { RouterProvider } from 'react-aria-components'
 
 import { AboutModal } from '#/modals/AboutModal'
 
-import * as eventModule from '#/utilities/event'
-import LocalStorage from '#/utilities/LocalStorage'
+import * as eventModule from '$/utils/event'
+import LocalStorage from '$/utils/LocalStorage'
 
 import type { ModalApi } from '#/utilities/modal'
-import { unsafeWriteValue } from '#/utilities/write'
 import { useRouter } from '$/providers/react'
 import { useFeatureFlag } from '$/providers/react/featureFlags'
+import { unsafeWriteValue } from '$/utils/write'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** */
   interface LocalStorageData {
     readonly preferredTimeZone: string

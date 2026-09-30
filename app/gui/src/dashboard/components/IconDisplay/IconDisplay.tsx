@@ -3,7 +3,7 @@ import { Icon } from '#/components/Icon'
 import { Text, type TextProps } from '#/components/Text'
 import type { IconProp } from '#/components/types'
 import { VisualTooltip, type TooltipElementType } from '#/components/VisualTooltip'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 
 const ICON_DISPLAY_STYLES = tv({
   base: 'flex items-center gap-2 max-w-[14.5rem] min-w-4 px-[7px] border-0.5 border-transparent',

@@ -22,7 +22,8 @@ import { Tooltip, TooltipTrigger } from '#/components/Tooltip'
 import type { SvgUseIcon } from '#/components/types'
 import { useVisualTooltip } from '#/components/VisualTooltip'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { isExternalLink } from '#/utilities/url'
+import { BUTTON_STYLES } from '$/components/Button/variants'
+import { isExternalLink } from '$/utils/url'
 import { useDialogContext } from '../Dialog/DialogProvider'
 import { useContextProps } from '../hooks/useContextProps'
 import { ButtonGroup, ButtonGroupJoin } from './ButtonGroup'
@@ -33,7 +34,6 @@ import {
   useMergedButtonStyles,
 } from './shared'
 import type { ButtonProps } from './types'
-import { BUTTON_STYLES } from './variants'
 
 const ICON_LOADER_DELAY = 150
 

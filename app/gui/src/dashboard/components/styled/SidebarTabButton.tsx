@@ -1,7 +1,7 @@
 /** @file A styled button representing a tab on a sidebar. */
 import { Button, type ButtonProps } from '#/components/Button'
 import type { SvgUseIcon } from '#/components/types'
-import { tv } from '#/utilities/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 
 const SIDEBAR_TAB_BUTTON_STYLES = tv({
   base: 'z-1 font-medium',

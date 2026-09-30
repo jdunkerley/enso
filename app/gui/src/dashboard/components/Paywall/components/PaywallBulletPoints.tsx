@@ -1,8 +1,8 @@
 /** @file A list of bullet points for a paywall. */
 import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
-import { twMerge } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
+import { twMerge } from '$/utils/style/tailwindMerge'
 import type { TextId } from 'enso-common/src/text'
 
 /** Props for a {@link PaywallBulletPoints}. */

@@ -38,7 +38,7 @@ import * as results from 'ts-results'
 
 import * as detect from 'enso-common/src/utilities/detect'
 
-import type * as loggerProvider from '#/providers/LoggerProvider'
+import type { Logger } from '$/log'
 
 import type * as saveAccessToken from 'enso-common/src/accessToken'
 import * as dateTime from 'enso-common/src/utilities/data/dateTime'
@@ -268,7 +268,7 @@ export class Cognito implements ISessionProvider {
 
   /** Create a new Cognito wrapper. */
   constructor(
-    private readonly logger: loggerProvider.Logger,
+    private readonly logger: Logger,
     private readonly supportsDeepLinks: boolean,
     private readonly amplifyConfig: service.AmplifyConfig,
   ) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ASSETS_MIME_TYPE } from '#/data/mimeTypes'
-import { ASSETS_DATA_TRANSFER_PAYLOAD } from '#/layouts/Drive/Categories'
+import { ASSETS_MIME_TYPE } from '$/utils/mimeTypes'
+import { ASSETS_DATA_TRANSFER_PAYLOAD } from '$/utils/assetsDataTransfer'
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import {
   canTransferBetweenCategories,

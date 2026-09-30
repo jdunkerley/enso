@@ -3,7 +3,7 @@ import {
   ProgressBar as AriaProgressBar,
   type ProgressBarProps as AriaProgressBarProps,
 } from '#/components/aria'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 
 /** `1` as a percentage. */
 const WHOLE_PERCENTAGE = 100

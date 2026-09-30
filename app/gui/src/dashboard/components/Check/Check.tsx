@@ -1,5 +1,5 @@
 /** @file A checkmark icon. */
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const CHECK_CLASSES = tv({

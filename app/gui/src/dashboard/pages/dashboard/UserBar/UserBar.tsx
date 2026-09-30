@@ -9,7 +9,6 @@ import { VisualTooltip } from '#/components/VisualTooltip'
 import { backendQueryOptions } from '#/hooks/backendHooks'
 import { useOffline } from '#/hooks/offlineHooks'
 import InviteUsersModal from '#/modals/InviteUsersModal'
-import { rfc3339DurationProgress } from '#/utilities/time'
 import { SUBSCRIBE_PATH } from '$/appUtils'
 import {
   useBackends,
@@ -17,6 +16,7 @@ import {
   useIsFeatureUnderPaywall,
   useText,
 } from '$/providers/react'
+import { rfc3339DurationProgress } from '$/utils/time'
 import { useQuery } from '@tanstack/react-query'
 import { Plan } from 'enso-common/src/services/Backend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'

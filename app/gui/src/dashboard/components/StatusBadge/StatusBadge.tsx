@@ -1,5 +1,5 @@
 /** @file A status badge to notify the user of the state of an item. */
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import type { PropsWithChildren } from 'react'
 
 const STATUS_BADGE_STYLES = tv({

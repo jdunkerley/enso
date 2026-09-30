@@ -1,5 +1,5 @@
 /** @file A hook used to measure the size and position of an element. */
-import { findScrollContainers, type HTMLOrSVGElement } from '#/utilities/scrollContainers'
+import { findScrollContainers, type HTMLOrSVGElement } from '$/utils/scrollContainers'
 import { unsafeMutable } from 'enso-common/src/utilities/data/object'
 import { useEffect, useRef, useState } from 'react'
 import { useDebouncedCallback, type DebouncedFunction } from './debounceCallbackHooks'

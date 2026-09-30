@@ -12,7 +12,7 @@
 import DropdownMenu from '$/components/Menu/DropdownMenu.vue'
 import MenuItem from '$/components/Menu/MenuItem.vue'
 import MenuSeparator from '$/components/Menu/MenuSeparator.vue'
-import { TEXT_STYLE } from '#/components/Text/variants'
+import { TEXT_STYLE } from '$/components/Text/variants'
 import { ref } from 'vue'
 
 const selected = ref<string>()

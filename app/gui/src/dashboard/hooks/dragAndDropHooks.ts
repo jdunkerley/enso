@@ -1,7 +1,7 @@
 /** @file Hooks related to the HTML5 Drag and Drop API. */
 import * as React from 'react'
 
-import * as eventModule from '#/utilities/event'
+import * as eventModule from '$/utils/event'
 
 /**
  * Parameters for the `useDraggable` hook.

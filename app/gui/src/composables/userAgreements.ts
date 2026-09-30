@@ -1,10 +1,10 @@
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import { proxyRefs } from '$/utils/reactivity'
 import * as vueQuery from '@tanstack/vue-query'
 import { computed, effectScope } from 'vue'
 import * as z from 'zod'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** Metadata containing the version hash of the terms of service that the user has accepted. */
   interface LocalStorageData {
     readonly termsOfService: z.infer<typeof TOS_SCHEMA>

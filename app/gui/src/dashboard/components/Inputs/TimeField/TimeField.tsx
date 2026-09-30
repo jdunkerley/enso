@@ -20,9 +20,9 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { Text } from '#/components/Text'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
 import { useText } from '$/providers/react'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'
 import type { DateSegment as DateSegmentType } from 'react-stately'
 

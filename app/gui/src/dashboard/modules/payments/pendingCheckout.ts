@@ -1,9 +1,9 @@
 /** @file A module for managing the pending checkout target plan in local storage. */
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import { Plan } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /**
    * Stores the user's intended subscription plan during checkout process so that the app can
    * track the user's intended subscription plan while navigating between pages.

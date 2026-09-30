@@ -1,7 +1,7 @@
 /** @file Displays a profile picture. */
-import type { VariantProps } from '#/utilities/tailwindVariants'
+import { PROFILE_PICTURE_STYLES } from '$/components/ProfilePicture/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { Icon } from '../Icon'
-import { PROFILE_PICTURE_STYLES } from './variants'
 
 /** Props for a {@link ProfilePicture}. */
 export interface ProfilePictureProps extends Omit<

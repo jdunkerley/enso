@@ -1,6 +1,6 @@
 import { localRootDirectoryStore } from '#/layouts/Drive/persistentState'
-import { download } from '#/utilities/download'
 import { useConfig } from '$/providers/config'
+import { download } from '$/utils/download'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import { createGlobalState } from '@vueuse/core'
 import { BackendType, DirectoryId, Path } from 'enso-common/src/services/Backend'

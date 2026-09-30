@@ -1,8 +1,8 @@
 /** @file Displays a few details of an asset. */
 import { Text } from '#/components/Text'
 import AssetIcon from '#/pages/dashboard/components/AssetIcon'
-import * as tailwindMerge from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
+import * as tailwindMerge from '$/utils/style/tailwindMerge'
 import type * as backend from 'enso-common/src/services/Backend'
 import * as dateTime from 'enso-common/src/utilities/data/dateTime'
 import { Badge } from '../../../components/Badge'

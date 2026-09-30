@@ -1,10 +1,10 @@
 /** @file Field component */
 import * as aria from '#/components/aria'
-import type { Path } from '#/utilities/objectPath'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import type { Path } from '$/utils/objectPath'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import { ContextualHelp } from '../../ContextualHelp'
-import * as text from '../../Text'
 import { Form } from '../Form'
 import type * as types from './types'
 
@@ -48,9 +48,9 @@ export const FIELD_STYLES = tv({
     fieldContent: 'contents',
     contextualHelp: '',
     labelContainer: 'flex gap-1 items-center',
-    label: text.TEXT_STYLE({ variant: 'body' }),
+    label: TEXT_STYLE({ variant: 'body' }),
     content: 'flex flex-col items-start w-full',
-    description: text.TEXT_STYLE({ variant: 'body', color: 'disabled' }),
+    description: TEXT_STYLE({ variant: 'body', color: 'disabled' }),
   },
   defaultVariants: { fullWidth: true },
 })
@@ -167,7 +167,7 @@ export const Field = React.forwardRef(function FieldImpl<Schema extends types.TS
 
 // eslint-disable-next-line react-refresh/only-export-components
 export const FIELD_ERROR_STYLES = tv({
-  base: text.TEXT_STYLE({ variant: 'body', color: 'danger', className: 'block' }),
+  base: TEXT_STYLE({ variant: 'body', color: 'danger', className: 'block' }),
   variants: { fullWidth: { true: 'w-full' } },
   defaultVariants: { fullWidth: true },
 })

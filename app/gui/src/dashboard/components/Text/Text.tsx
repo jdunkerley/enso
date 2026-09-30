@@ -9,12 +9,12 @@ import type { TooltipElementType } from '#/components/VisualTooltip'
 import * as visualTooltip from '#/components/VisualTooltip'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import type { VariantProps } from '#/utilities/tailwindVariants'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import { memo } from 'react'
 import type { TestIdProps } from '../types'
 import * as textProvider from './TextProvider'
-import { TEXT_STYLE } from './variants'
 
 /** Props for the Text component */
 export interface TextProps

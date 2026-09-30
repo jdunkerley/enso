@@ -3,8 +3,8 @@
  * via the shared React context.
  */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import type { LocalStorageData, LocalStorageKey } from '#/utilities/LocalStorage'
 import { useLocalStorage } from '$/providers/react'
+import type { LocalStorageData, LocalStorageKey } from '$/utils/LocalStorage'
 import * as React from 'react'
 
 /** Options for {@link useLocalStorageState}. */

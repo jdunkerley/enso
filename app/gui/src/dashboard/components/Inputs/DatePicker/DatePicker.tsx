@@ -18,10 +18,10 @@ import {
   type DatePickerProps as AriaDatePickerProps,
   type DateValue,
 } from '#/components/aria'
-import { makeRoundedStyles } from '#/components/utilities'
-import type { VariantProps } from '#/utilities/tailwindVariants'
-import { tv } from '#/utilities/tailwindVariants'
 import { useText } from '$/providers/react'
+import { makeRoundedStyles } from '$/utils/style/roundedStyles'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'
 import type { DateSegment as DateSegmentType } from 'react-stately'
 
@@ -36,8 +36,9 @@ import {
   type FieldValues,
   type TSchema,
 } from '#/components/Form'
-import { Text, TEXT_STYLE } from '#/components/Text'
-import { twJoin } from '#/utilities/tailwindMerge'
+import { Text } from '#/components/Text'
+import { TEXT_STYLE } from '$/components/Text/variants'
+import { twJoin } from '$/utils/style/tailwindMerge'
 const DATE_PICKER_STYLES = tv({
   base: '',
   variants: {

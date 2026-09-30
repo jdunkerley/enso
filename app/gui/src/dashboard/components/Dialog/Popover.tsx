@@ -14,7 +14,8 @@ import { ErrorBoundary } from '#/components/ErrorBoundary'
 import { usePortalContext } from '#/components/Portal'
 import * as suspense from '#/components/Suspense'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
+import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import { ResetButtonGroupContext } from '../Button'
 import type { Placement } from '../types'
@@ -22,7 +23,6 @@ import { Close } from './Close'
 import { DialogProvider } from './DialogProvider'
 import { DialogStackRegistrar } from './DialogStackProvider'
 import { useInteractOutside } from './utilities'
-import { DIALOG_BACKGROUND } from './variants'
 
 /** Props for a {@link Popover}. */
 export interface PopoverProps

@@ -3,7 +3,7 @@
  *
  * This file contains common schemas for authentication.
  */
-import { PASSWORD_REGEX } from '#/utilities/validation'
+import { PASSWORD_REGEX } from '$/cloud/validation'
 import type { GetText } from '$/providers/text'
 import { z } from 'zod'
 

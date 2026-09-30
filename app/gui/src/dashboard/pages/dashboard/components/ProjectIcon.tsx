@@ -3,7 +3,6 @@ import { Button } from '#/components/Button'
 import { Spinner } from '#/components/Spinner'
 import { StatelessSpinner, type SpinnerState } from '#/components/StatelessSpinner'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { twJoin, twMerge } from '#/utilities/tailwindMerge'
 import type { Tab } from '$/providers/container'
 import { useFullUserSession, useText } from '$/providers/react'
 import { useContainerData } from '$/providers/react/container'
@@ -14,6 +13,7 @@ import {
   useIsProjectOpening,
   useOpenedProjects,
 } from '$/providers/react/openedProjects'
+import { twJoin, twMerge } from '$/utils/style/tailwindMerge'
 import type { Backend } from 'enso-common/src/services/Backend'
 import { BackendType, ProjectState, type ProjectAsset } from 'enso-common/src/services/Backend'
 

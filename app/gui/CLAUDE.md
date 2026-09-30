@@ -51,6 +51,29 @@ Reaching across subtrees (`@/` from `src/dashboard/`, or `#/` from
 `src/project-view/`) is allowed but usually a smell — prefer pulling shared code
 into `src/` and importing via `$/`, or cross the framework bridge via `veaury`.
 
+**Nothing outside `src/dashboard/` may import `#/…`**, except the React modules
+listed in `DASHBOARD_IMPORT_ALLOWLIST` in the root `eslint.config.mjs` (React
+components mounted through `reactComponent`, and the bridge's own glue). ESLint
+enforces this. The list only shrinks: when shared code needs something from the
+dashboard that is framework-free, move it to `src/` (as #77 did) rather than
+adding an entry. React files may import `$/…` freely.
+
+## Where framework-free shared code lives
+
+- `src/utils/` — general helpers (`LocalStorage`, `LruCache`, `event`,
+  `inputBindings`, `download`, `mimeTypes`, `datalinkValidator`, …);
+  `src/utils/data/` for small data-structure helpers; `src/utils/style/` for
+  Tailwind class composition (`tailwindVariants`, `tailwindMerge`).
+- `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
+  component of that name and its Vue port (`Button`, `Dialog`, `Inputs`,
+  `ProfilePicture`, `Text`), plus other framework-free component constants.
+- `src/configurations/` — static configuration: the dashboard's input bindings
+  and the settings tabs.
+- `src/cloud/` — framework-free logic that only makes sense against the Enso
+  Cloud: service-credential recipes, organization-invite email parsing, the
+  Cognito password rule, permission classes. Keep cloud-only code here rather
+  than in `src/utils/`, so a build without the cloud can drop one folder.
+
 ## Entry points
 
 - `index.html` → `src/entrypoint.ts` (browser bundle)

@@ -12,7 +12,7 @@ import {
   AgreementsModal as AgreementsModalReact,
   type AgreementsModalProps,
 } from '#/modals/AgreementsModal'
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import { DASHBOARD_PATH, LOGIN_PATH, RESTORE_USER_PATH } from '$/appUtils'
 import { useAppTitle } from '$/composables/appTitle'
 import { useUserAgreements } from '$/composables/userAgreements'

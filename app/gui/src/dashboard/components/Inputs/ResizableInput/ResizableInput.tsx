@@ -2,8 +2,8 @@
 import * as aria from '#/components/aria'
 import * as eventCallbackHooks from '#/hooks/eventCallbackHooks'
 import * as mergeRefs from '#/utilities/mergeRefs'
+import * as variants from '$/components/Inputs/variants'
 import * as React from 'react'
-import * as variants from '../variants'
 
 /** Props for a {@link ResizableInput}. */
 export interface ResizableInputProps extends aria.TextFieldProps {

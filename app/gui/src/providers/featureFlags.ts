@@ -1,5 +1,5 @@
 /** @file Provider for feature flags, used to enable or disable certain features in the application. */
-import { unsafeWriteValue } from '#/utilities/write'
+import { unsafeWriteValue } from '$/utils/write'
 import { useZustandStoreRef } from '$/utils/zustand'
 import { Plan } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'

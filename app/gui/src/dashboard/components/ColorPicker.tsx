@@ -7,7 +7,7 @@ import RadioGroup from '#/components/styled/RadioGroup'
 
 import * as backend from 'enso-common/src/services/Backend'
 
-import * as tailwindMerge from '#/utilities/tailwindMerge'
+import * as tailwindMerge from '$/utils/style/tailwindMerge'
 
 /** Props for a {@link ColorPickerItem}. */
 export interface InternalColorPickerItemProps {

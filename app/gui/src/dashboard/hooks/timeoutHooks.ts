@@ -1,8 +1,8 @@
 /**
  * @file Timeout related hooks.
  */
+import { noop } from '$/utils/functions'
 import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react'
-import { noop } from '../utilities/functions'
 import { useEventCallback } from './eventCallbackHooks'
 import { useUnmount } from './unmountHooks'
 

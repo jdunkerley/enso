@@ -1,4 +1,4 @@
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import * as analytics from '$/utils/analytics'
 import { proxyRefs } from '$/utils/reactivity'
 import type { Opt } from '@/util/data/opt'
@@ -53,7 +53,7 @@ type OpenedTab = z.infer<typeof OPENED_TAB_SCHEMA>
 /** A structure identifying one of the GUI panels. */
 export type Panel = Tab | { type: 'drive' }
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   interface LocalStorageData {
     readonly openedTabs: (Tab & { runningProject?: RunningProjectInfo | undefined })[]
     readonly rightPanelWidth: number
