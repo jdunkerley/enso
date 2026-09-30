@@ -372,6 +372,7 @@ test.describe('Dynamic configuration updates', () => {
     await locate.graphNodeIcon(node).click({ modifiers: ['ControlOrMeta'] })
     await expect(locate.componentBrowser(page)).toBeVisible()
     const content = locate.componentBrowserInput(page)
+    await expect(content).toBeFocused()
     await page.keyboard.press('End')
     await page.keyboard.type(` 1`)
     await expect(content).toHaveText(`select_columns 1`)
