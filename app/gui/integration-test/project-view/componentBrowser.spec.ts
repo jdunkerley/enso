@@ -88,6 +88,77 @@ test('Different ways of opening Component Browser', async ({ editorPage, page })
   await expectAndCancelBrowser(page, '', 'Table', 'selected')
 })
 
+test.describe('Typing straight after opening Component Browser', () => {
+  // These deliberately do not wait for the input to be focused: a user typing quickly after
+  // opening the browser must not lose the first keys (#139).
+  const TYPED = 'read_many'
+
+  async function typeAndCancel(page: Page) {
+    const nodeCount = await locate.graphNode(page).count()
+    await page.keyboard.type(TYPED)
+    await expect(locate.componentBrowserInput(page)).toHaveText(TYPED)
+    await page.keyboard.press('Escape')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await expect(locate.graphNode(page)).toHaveCount(nodeCount)
+  }
+
+  test('(+) button, then accept', async ({ editorPage, page }) => {
+    await editorPage
+    const nodeCount = await locate.graphNode(page).count()
+    await locate.addNewNodeButton(page).click()
+    await page.keyboard.type(TYPED)
+    await expect(locate.componentBrowserInput(page)).toHaveText(TYPED)
+    await expect(locate.componentBrowserSelectedEntry(page)).toHaveText('Data.read_many')
+    await page.keyboard.press('Enter')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await expect(locate.graphNode(page)).toHaveCount(nodeCount + 1)
+    await expect(locate.graphNode(page).last().locator('.WidgetToken')).toHaveText([
+      'Data',
+      '.',
+      'read_many',
+    ])
+  })
+
+  test('Enter on the graph', async ({ editorPage, page }) => {
+    await editorPage
+    await locate.graphEditor(page).click({ position: { x: 100, y: 500 } })
+    await locate.graphEditor(page).press('Enter')
+    await typeAndCancel(page)
+  })
+
+  test('Enter on a selected node', async ({ editorPage, page }) => {
+    await editorPage
+    await locate.graphNodeByBinding(page, 'selected').click()
+    await locate.graphEditor(page).press('Enter')
+    await typeAndCancel(page)
+  })
+
+  test('Dragging out an edge', async ({ editorPage, page }) => {
+    await editorPage
+    const outputPort = await locate.outputPortCoordinates(
+      page,
+      locate.graphNodeByBinding(page, 'selected'),
+    )
+    await page.mouse.move(outputPort.x, outputPort.y)
+    await page.mouse.down({ button: 'left' })
+    await page.mouse.move(outputPort.x + 300, outputPort.y + 400)
+    await page.mouse.up({ button: 'left' })
+    await typeAndCancel(page)
+  })
+
+  test('Editing a node', async ({ editorPage, page }) => {
+    await editorPage
+    const node = locate.graphNodeByBinding(page, 'data')
+    await locate.graphNodeIcon(node).click({ modifiers: ['ControlOrMeta'] })
+    await page.keyboard.press('End')
+    await page.keyboard.type('_many')
+    await expect(locate.componentBrowserInput(page)).toHaveText('Data.read_many')
+    await page.keyboard.press('Enter')
+    await expect(locate.componentBrowser(page)).toBeHidden()
+    await expect(node.locator('.WidgetToken')).toHaveText(['Data', '.', 'read_many'])
+  })
+})
+
 test('Opening Component Browser from output port buttons', async ({ editorPage, page }) => {
   await editorPage
 
@@ -159,7 +230,7 @@ test.describe('Accepting suggestion', () => {
     expected: string[],
   ) {
     await locate.addNewNodeButton(page).click()
-    // `Enter` goes to whatever has focus, and the browser focuses its input a moment after it opens.
+    // The browser focuses its input as it opens (#139); checked here so a regression fails clearly.
     await expect(locate.componentBrowserInput(page)).toBeFocused()
     const nodeCount = await locate.graphNode(page).count()
     await acceptSuggestion()

@@ -166,12 +166,17 @@ export function useCodeMirror(
       }),
     }),
   )
+  // Attach the editor as soon as its root is mounted. `flush: 'sync'` matters: Vue sets template
+  // refs before it runs `mounted` hooks, so the editor is already in the document when the owning
+  // component (or its parent) is mounted, and can be focused there. With the default `pre` flush,
+  // attaching would wait for a later scheduler pass, so a `focus()` in `onMounted` would silently
+  // do nothing, and keys typed until some later focus would go elsewhere (#139).
   watch(
     () => toValue(editorRoot),
     (editorRootValue) => {
       if (editorRootValue) editorRootValue.$el.prepend(view.dom)
     },
-    { immediate: true },
+    { immediate: true, flush: 'sync' },
   )
 
   if (contentTestId != null) view.contentDOM.dataset['testid'] = contentTestId

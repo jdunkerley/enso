@@ -57,18 +57,13 @@ const codeEditIcon = computed<Icon>(() => {
   return DEFAULT_ICON
 })
 
-const focus = editorView.focus.bind(editorView)
-
 defineExpose({
   blur: editorView.contentDOM.blur.bind(editorView.contentDOM),
-  focus,
   /**
-   * Focus the editor asynchronously.
-   *
-   * THe editor cannot be focused until after it is mounted, because it is inserted into the DOM
-   * dynamically. This function focuses the editor when it is ready.
+   * Focus the editor. `useCodeMirror` attaches it to the document as soon as its root is mounted,
+   * so this works synchronously from the parent's `onMounted`.
    */
-  delayedFocus: () => setTimeout(focus),
+  focus: editorView.focus.bind(editorView),
 })
 
 const rootStyle = computed(() => {

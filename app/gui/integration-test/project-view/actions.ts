@@ -47,8 +47,8 @@ export async function createTableNode(page: Page, content?: string) {
   // Adding `Table.new` component will display the widget
   await locate.addNewNodeButton(page).click()
   await expect(locate.componentBrowser(page)).toBeVisible()
-  // `keyboard.type` goes to whatever has focus: typing as soon as the browser is visible can
-  // land before its input is focused, leaving the filter empty (and `Data.read` selected).
+  // The browser focuses its input as it opens (#139); this check only makes a regression fail
+  // here, rather than as an empty filter with `Data.read` selected.
   await expect(locate.componentBrowserInput(page)).toBeFocused()
   await page.keyboard.type('Table.input')
   // Wait for CB entry to appear; this way we're sure about node name (binding).
