@@ -1,6 +1,5 @@
 /** @file Types common to all credentials dialogs. */
 import type { CredentialInput, SecretId } from 'enso-common/src/services/Backend'
-import type { TextId } from 'enso-common/src/text'
 
 /**
  * A 'recipe' for creating a credential of given type.
@@ -18,12 +17,4 @@ export interface CredentialRecipe {
  */
 export interface CredentialFormProps {
   readonly createCredentials: (recipe: CredentialRecipe) => Promise<void>
-}
-
-/** Information to describe a credential in the list of credentials. */
-export interface CredentialInfo {
-  readonly nameId: TextId & `${string}CredentialType`
-  /** The type of the credential, sent to the backend. */
-  readonly credentialType: string
-  readonly form: React.ComponentType<CredentialFormProps>
 }

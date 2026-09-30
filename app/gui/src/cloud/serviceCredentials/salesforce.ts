@@ -48,14 +48,14 @@ export function submitForm(
       const state = btoa(JSON.stringify({ secretId, nonce }))
       const scope = oauthScopes.join(' ')
       const query = new URLSearchParams({
-        /* eslint-disable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-disable camelcase */
         client_id: salesforceOauthClientId,
         redirect_uri: getOauthRedirectUri(apiUrl, 'Salesforce'),
         response_type: 'code',
         response_mode: 'query',
         state,
         scope,
-        /* eslint-enable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-enable camelcase */
       })
       return `${SALESFORCE_OAUTH_AUTHORIZE_URL}?${query.toString()}`
     },

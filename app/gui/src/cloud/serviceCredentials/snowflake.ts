@@ -40,13 +40,13 @@ export function submitForm(
       const state = btoa(JSON.stringify({ secretId, nonce }))
       const scope = 'refresh_token' + (' session:role:' + role)
       const query = new URLSearchParams({
-        /* eslint-disable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-disable camelcase */
         client_id: values.clientId,
         response_type: 'code',
         redirect_uri: getOauthRedirectUri(apiUrl, 'Snowflake'),
         state,
         scope,
-        /* eslint-enable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-enable camelcase */
       })
       return `https://${encodeURIComponent(account)}.snowflakecomputing.com/oauth/authorize?${query.toString()}`
     },

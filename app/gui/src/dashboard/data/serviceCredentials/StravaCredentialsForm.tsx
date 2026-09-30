@@ -8,10 +8,10 @@ import { Checkbox } from '#/components/Checkbox'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
+import * as strava from '$/cloud/serviceCredentials/strava'
+import type { CredentialFormProps } from '$/cloud/serviceCredentials/types'
 import { useRemoteConfig, useText } from '$/providers/react'
 import { CredentialsFormFooter } from './CredentialsFormFooter'
-import * as strava from './strava'
-import type { CredentialFormProps } from './types'
 
 /** Dialog for a Strava credential. */
 export function StravaCredentialsForm(props: CredentialFormProps) {

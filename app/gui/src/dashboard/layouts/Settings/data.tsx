@@ -9,7 +9,7 @@ import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/per
 import { ApiKeySettingsSection } from '#/layouts/Settings/ApiKeysSettingsSection'
 import { passwordWithPatternSchema } from '#/pages/authentication/schemas'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
-import { PASSWORD_REGEX } from '#/utilities/validation'
+import { PASSWORD_REGEX } from '$/cloud/validation'
 import type { PaywallFeatureName } from '$/composables/paywall'
 import { BINDINGS } from '$/configurations/inputBindings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'

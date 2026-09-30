@@ -64,7 +64,7 @@ export function submitForm(
       const state = btoa(JSON.stringify({ secretId, nonce }))
       const scope = oauthScopes.join(' ')
       const query = new URLSearchParams({
-        /* eslint-disable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-disable camelcase */
         response_type: 'code',
         access_type: 'offline',
         prompt: 'consent',
@@ -72,7 +72,7 @@ export function submitForm(
         client_id: googleOauthClientId,
         state,
         scope,
-        /* eslint-enable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-enable camelcase */
       })
       return `https://accounts.google.com/o/oauth2/v2/auth?${query.toString()}`
     },

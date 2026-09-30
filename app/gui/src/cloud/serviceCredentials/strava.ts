@@ -40,14 +40,14 @@ export function submitForm(
       const state = btoa(JSON.stringify({ secretId, nonce }))
       const scope = oauthScopes.join(',')
       const query = new URLSearchParams({
-        /* eslint-disable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-disable camelcase */
         client_id: stravaOauthClientId,
         redirect_uri: getOauthRedirectUri(apiUrl, 'Strava'),
         response_type: 'code',
         approval_prompt: 'auto',
         state,
         scope,
-        /* eslint-enable @typescript-eslint/naming-convention, camelcase */
+        /* eslint-enable camelcase */
       })
       return `https://www.strava.com/oauth/authorize?${query.toString()}`
     },

@@ -1,7 +1,7 @@
 /** @file Basic tests for this */
 import * as v from 'vitest'
 
-import * as validation from '#/utilities/validation'
+import * as validation from '$/cloud/validation'
 
 /** Runs all tests. */
 v.test('password validation', () => {
