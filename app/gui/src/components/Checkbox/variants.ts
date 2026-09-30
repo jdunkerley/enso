@@ -117,3 +117,11 @@ export const CHECKBOX_GROUP_STYLES = tv({
   base: 'flex flex-col gap-0.5 items-start',
   variants: { fullWidth: { true: 'w-full' } },
 })
+
+/**
+ * The Vue checkbox's spelling of the react-aria-only modifiers in `CHECKBOX_STYLES`'s icon
+ * (`group-selected:`, `group-pressed:`, `group-focus-visible:`), which key on attributes react-aria
+ * sets on its `<label>`. The Vue `<label>` has the native input inside it instead (decision 5).
+ */
+export const CHECKBOX_VUE_STATES =
+  'group-data-[selected=true]:border-transparent group-active:border group-has-[:focus-visible]:outline-offset-0 group-has-[:focus-visible]:outline-primary'

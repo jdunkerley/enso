@@ -321,10 +321,6 @@ export function useForm<Schema extends TSchema, SubmitResult = void>(
     }
   }
 
-  function isFieldRequired(name: string) {
-    return isRequiredInSchema(schema, name)
-  }
-
   async function submit(event?: Event | null) {
     event?.preventDefault()
     event?.stopPropagation()
@@ -402,21 +398,6 @@ export function useForm<Schema extends TSchema, SubmitResult = void>(
     registerField,
     changeField,
     blurField,
-    isFieldRequired,
   }
   return form
-}
-
-/**
- * Whether the schema requires a field: a string with a positive minimum length, as the React
- * `useFieldRegister` reads it. Refined schemas (`ZodEffects`) are unwrapped.
- */
-function isRequiredInSchema(schema: TSchema, name: string): boolean {
-  let current: z.ZodTypeAny = schema
-  while (current instanceof z.ZodEffects) current = current.innerType()
-  if (!(current instanceof z.ZodObject)) return false
-  const field: unknown = (current.shape as Record<string, unknown>)[name]
-  if (!(field instanceof z.ZodString)) return false
-  const min = field.minLength
-  return min != null && min > 0
 }

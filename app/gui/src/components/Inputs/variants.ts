@@ -523,3 +523,31 @@ export const OTP_SLOT_STYLES = tv({
   },
   compoundVariants: [{ isActive: true, isInvalid: true, class: { base: 'outline-danger' } }],
 })
+
+/**
+ * The Vue `MultiSelector` option's spelling of `MULTI_SELECTOR_OPTION_STYLES`'s `selected:` and
+ * `pressed:`, for a Reka `ListboxItem` (`aria-selected`, native `:active`).
+ */
+export const MULTI_SELECTOR_OPTION_VUE_STATES =
+  'aria-selected:bg-primary aria-selected:text-white active:bg-primary/10'
+
+/**
+ * The Vue `DatePicker` calendar cell's spelling of `DATE_PICKER_STYLES`'s
+ * `outside-visible-range:`, `disabled:` and `selected:`, for Reka's `DatePickerCellTrigger`.
+ */
+export const CALENDAR_CELL_VUE_STATES =
+  'data-[outside-view]:text-primary/30 data-[disabled]:text-primary/30 data-[unavailable]:text-primary/30 data-[selected]:border-primary/40'
+
+/**
+ * The Vue `Dropdown`'s spelling of `DROPDOWN_STYLES`'s `not-focus:` and `not-selected:`, which
+ * only match react-aria elements. The options are Reka `ListboxItem`s, which take real focus, so
+ * `focus:` itself works unchanged.
+ */
+export const DROPDOWN_OPTION_VUE_STATES =
+  '[&:not(:focus)]:hover:bg-hover-bg [&[aria-selected=false]]:hover:bg-hover-bg'
+
+/**
+ * The date and time segments' spelling of react-aria's `placeholder-shown:`, for Reka's segments
+ * (`data-placeholder`).
+ */
+export const DATE_SEGMENT_VUE_STATES = 'data-[placeholder]:text-primary/30'

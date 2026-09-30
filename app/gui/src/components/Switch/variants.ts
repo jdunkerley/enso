@@ -1,6 +1,6 @@
 /**
- * @file Tailwind variants of the switch, shared by the React
- * `Switch` and their Vue ports in this folder.
+ * @file Tailwind variants of the switch, shared by the React `Switch` and its Vue port in this
+ * folder.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
@@ -38,3 +38,14 @@ export const SWITCH_STYLES = tv({
     disabled: false,
   },
 })
+
+/**
+ * The Vue switch's spelling of `SWITCH_STYLES`'s react-aria-only modifiers (`group-selected:`,
+ * `group-pressed:`, `group-focus-visible:`), for the native input inside its `<label>`
+ * (decision 5).
+ */
+export const SWITCH_VUE_STATES = {
+  background:
+    'group-has-[:focus-visible]:ring-2 group-active:bg-primary/60 group-data-[selected=true]:bg-primary group-data-[selected=true]:group-active:bg-primary/50',
+  thumb: 'group-data-[selected=true]:translate-x-[100%]',
+}

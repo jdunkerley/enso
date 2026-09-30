@@ -196,8 +196,6 @@ export interface FormInstance<Schema extends TSchema = TSchema> {
   readonly changeField: (name: string, value: unknown) => void
   /** Mark a field as touched, from its input's blur, and validate by the form's mode. */
   readonly blurField: (name: string) => void
-  /** Whether the schema marks the field required (a string with a minimum length). */
-  readonly isFieldRequired: (name: string) => boolean
 }
 
 /** A form of any schema, for components that do not need to know its fields. */

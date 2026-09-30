@@ -15,7 +15,11 @@ export interface UseFieldOptions {
   /** Overrides the form's default value for this field, applied once when the field is created. */
   readonly defaultValue?: unknown
   readonly isDisabled?: MaybeRefOrGetter<boolean | undefined>
-  /** Overrides whether the field is required; by default, read from the schema. */
+  /**
+   * Whether the field is required: its `*` mark and the input's `required`. Not read from the
+   * schema: the React form's schema reading never reached the field (react-hook-form returns
+   * `required` only in progressive mode), so a field showed as required only when told.
+   */
   readonly isRequired?: MaybeRefOrGetter<boolean | undefined>
   /** Overrides whether the field shows as invalid; by default, whether it has an error. */
   readonly isInvalid?: MaybeRefOrGetter<boolean | undefined>
@@ -52,7 +56,7 @@ export function useField<T = unknown>(options: UseFieldOptions) {
   /** Only the prop: inputs that React disables while submitting add `isSubmitting` themselves. */
   const isDisabled = computed(() => toValue(options.isDisabled) ?? false)
   const isSubmitting = computed(() => form.formState.isSubmitting)
-  const isRequired = computed(() => toValue(options.isRequired) ?? form.isFieldRequired(name.value))
+  const isRequired = computed(() => toValue(options.isRequired) ?? false)
 
   const id = useId()
   const ids: FieldIds = {

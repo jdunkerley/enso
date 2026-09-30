@@ -128,12 +128,14 @@ describe('validation', () => {
     expect(errorOf('email')?.textContent).toBe(getText('invalidEmailValidationError'))
   })
 
-  test('marks a field required from the schema', () => {
-    mountForm()
-    // `name` has a minimum length, so it is required; `email` has none.
-    expect(byTestId('name')!.querySelector('[data-testid="required-mark"]')).not.toBeNull()
-    expect(inputOf('name').required).toBe(true)
-    expect(byTestId('email')!.querySelector('[data-testid="required-mark"]')).toBeNull()
+  test('marks a field required only when told, as React does', () => {
+    mountForm({}, () =>
+      h(Input, { name: 'name', label: 'Nick', testId: 'required', isRequired: true }),
+    )
+    // The schema's minimum length does not mark `name` required.
+    expect(byTestId('name')!.querySelector('[data-testid="required-mark"]')).toBeNull()
+    expect(byTestId('required')!.querySelector('[data-testid="required-mark"]')).not.toBeNull()
+    expect(inputOf('required').required).toBe(true)
   })
 })
 
