@@ -56,6 +56,21 @@ function boundingClip(boxes: Box[], margin = 4): Box {
   return { x, y, width: right - x, height: bottom - y }
 }
 
+/**
+ * Shift the element by less than a pixel, onto whole-pixel coordinates.
+ *
+ * Text at a fractional offset is rasterised with its edges anti-aliased by that fraction - and the
+ * code editor's scroller sits at one: its text rendered one pixel up in some runs and not others,
+ * with identical layout. Nodes, in turn, sit at fractional graph coordinates that differ between
+ * runs.
+ */
+async function alignToPixelGrid(locator: Locator) {
+  await locator.evaluate((element) => {
+    const { x, y } = element.getBoundingClientRect()
+    ;(element as HTMLElement).style.translate = `${Math.round(x) - x}px ${Math.round(y) - y}px`
+  })
+}
+
 /** The boxes of the elements themselves. */
 async function elementBoxes(locator: Locator): Promise<Box[]> {
   return Promise.all((await locator.all()).map(async (l) => (await l.boundingBox())!))
@@ -120,6 +135,7 @@ test('Code editor uses Monaspace Neon at 13px, without ligatures', async ({ edit
   )
 
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
+  await alignToPixelGrid(scroller)
   await expect(page).toHaveScreenshot('code-editor.png', {
     clip: boundingClip([...(await textBoxes(commentLine)), ...(await textBoxes(codeLine))]),
   })
@@ -218,7 +234,7 @@ test('Code editor comments use Monaspace Radon, on the Neon column grid', async 
   page,
 }) => {
   await editorPage
-  const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
+  const { codeEditor, lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
   await expectMonaspaceLoaded(page, ['Monaspace Neon', 'Monaspace Radon'])
   const [rulerAbove, docLine, mixedLine, commentLine] = lines as [
     Locator,
@@ -255,6 +271,7 @@ test('Code editor comments use Monaspace Radon, on the Neon column grid', async 
   for (const height of lineHeights) expect(height).toBeCloseTo(lineHeights[0]!, 1)
 
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
+  await alignToPixelGrid(codeEditor.locator('.cm-scroller'))
   await expect(page).toHaveScreenshot('code-editor-comments.png', {
     clip: boundingClip((await Promise.all(lines.map(textBoxes))).flat()),
   })
@@ -422,12 +439,8 @@ test('Table editor widget uses Monaspace Neon', async ({ editorPage, page }) => 
   const grid = widget.locator('.agGridTableView')
   await expect(grid).toHaveCSS('font-family', /^"Monaspace Neon"/)
   await expect(grid).toHaveCSS('font-feature-settings', 'normal')
-  // Nodes sit at fractional graph coordinates, which differ between runs; shift the widget onto
-  // whole pixels, or every glyph edge anti-aliases differently.
-  await widget.evaluate((element) => {
-    const { x, y } = element.getBoundingClientRect()
-    ;(element as HTMLElement).style.translate = `${Math.round(x) - x}px ${Math.round(y) - y}px`
-  })
+  // Nodes sit at fractional graph coordinates, which differ between runs.
+  await alignToPixelGrid(widget)
   // Inset past the rounded corners, where the node's colour shows through and varies.
   const box = (await widget.boundingBox())!
   await expect(page).toHaveScreenshot('table-editor-widget.png', {
@@ -455,11 +468,16 @@ test('"Code ligatures" applies to read-only code, and not to the code editor', a
 
   await expect(docsCode).toHaveCSS('font-feature-settings', CODING_SETS)
   await page.addStyleTag({ content: SCREENSHOT_STYLE })
-  // The panels may still be settling after the tab switch: wait until the text stops moving.
+  // The panels may still be settling after the tab switch: wait until the text stops moving. Compare
+  // positions a couple of frames apart - two reads within one frame always agree, and the first
+  // poll runs straight after the first read, so it passed mid-animation.
   let clip = boundingClip(await textBoxes(code))
   await expect
     .poll(async () => {
       const previous = clip
+      await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      )
       clip = boundingClip(await textBoxes(code))
       return JSON.stringify(clip) === JSON.stringify(previous)
     })
