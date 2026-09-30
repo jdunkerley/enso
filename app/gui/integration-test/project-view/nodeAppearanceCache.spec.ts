@@ -58,11 +58,14 @@ test('a pending node shows the colour and icon cached from its last computation'
     notAppliedArguments: [],
   })
   await expect(five).not.toHaveClass(/pending/)
-  const computedColor = await resolvedNodeColor(five)
-  expect(computedColor).toBeDefined()
-  expect(computedColor).not.toBe('var(--node-color-no-type)')
   // The method's suggestion entry gives the node its icon (`data_input` for `Data.read`).
   await expect.poll(() => nodeIcon(five)).toBe('data_input')
+  // The group colour arrives with that entry, a moment after `pending` clears: wait for it before
+  // reading the colour, or `computedColor` is the no-type colour and the checks below compare the
+  // cache against the wrong value. (Compare the raw value: resolved, it is a plain hex colour.)
+  await expect.poll(() => nodeColor(five)).not.toBe('var(--node-color-no-type)')
+  const computedColor = await resolvedNodeColor(five)
+  expect(computedColor).toBeDefined()
 
   // The method call is no longer reported (e.g. the node is about to be re-evaluated): with no
   // group or type known, the cached colour is already shown here, before the node is even
