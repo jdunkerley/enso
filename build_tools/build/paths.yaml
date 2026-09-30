@@ -23,13 +23,11 @@
       playwright-report/: # Test results for the GUI that we want to keep as artifacts.
       public/:
         font-mplus1/:
-        font-dejavu/:
         font-monaspace/:
       src/:
         project-view/:
           assets/:
             font-mplus1.css:
-            font-dejavu.css:
             font-monaspace.css:
     ide-desktop/:
       client/:

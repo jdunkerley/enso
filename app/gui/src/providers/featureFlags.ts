@@ -32,19 +32,6 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   unsafeDarkTheme: z.boolean(),
   apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
-  /**
-   * Use Monaspace Neon for `--font-mono` (the code editor, docs code, tables and visualizations),
-   * with a 13px code editor. On by default; kept for one release as a kill switch that restores
-   * DejaVu Sans Mono and the 12px editor. #113 removes it.
-   */
-  enableMonaspaceCodeFont: z.boolean(),
-  /**
-   * Use Monaspace Neon for `--font-code`: node expressions and bindings, component browser entries
-   * and the AI pending node (#112). On by default; kept for one release as a kill switch that
-   * restores M PLUS 1. Monospace text is wider, so a previously tidy graph can overlap until Tidy up
-   * re-spaces it. #113 removes it.
-   */
-  monoNodes: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -82,8 +69,6 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
         unsafeDarkTheme: false,
         apiKeyLimit: 5,
         debugHoverAreas: false,
-        enableMonaspaceCodeFont: true,
-        monoNodes: true,
       },
       setFeatureFlag: (key, value) => {
         set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))
@@ -94,7 +79,7 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
     }),
     {
       name: 'enso-feature-flags',
-      version: 3,
+      version: 4,
       migrate: migrateFeatureFlags,
       merge: (persistedState, newState) => {
         /** Mutates the state with provided feature flags. */
@@ -137,31 +122,33 @@ export const flagsStore = createStore<FeatureFlagsStore>()(
 )
 
 /**
- * Flags whose default changed from `false` to `true`, with the store version that changed it.
+ * Flags that no longer exist, with the store version that removed them. Earlier versions migrated
+ * them: version 2 turned `enableMonaspaceCodeFont` on by default (#110), version 3 `monoNodes`
+ * (#112); version 4 removed both, making Monaspace Neon unconditional (#113).
  *
- * The store persists every flag whenever any one changes (`ReactRoot` sets `enableLocalBackend` on
- * each start), so a stored `false` from before the change usually records the old default rather
- * than a choice. Migrating past that version drops it once, so that the new default applies; a
- * stored `true` is kept, and a `false` set after the migration is kept too.
+ * `merge` already ignores unknown keys (the schema strips them), so a stale entry would do no harm;
+ * migrating strips it from storage too, so that the stored flags match the schema.
  */
-const DEFAULTS_TURNED_ON: readonly { flag: keyof FeatureFlags; version: number }[] = [
-  { flag: 'enableMonaspaceCodeFont', version: 2 },
-  { flag: 'monoNodes', version: 3 },
+const REMOVED_FLAGS: readonly { flag: string; version: number }[] = [
+  { flag: 'enableMonaspaceCodeFont', version: 4 },
+  { flag: 'monoNodes', version: 4 },
 ]
 
-/** Upgrade persisted feature flags from an older `version`: see {@link DEFAULTS_TURNED_ON}. */
+/** Upgrade persisted feature flags from an older `version`: see {@link REMOVED_FLAGS}. */
 export function migrateFeatureFlags(persistedState: unknown, version: number): unknown {
-  const parsed = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
-  if (!parsed.success) return persistedState
-  const featureFlags = { ...parsed.data.featureFlags }
+  if (typeof persistedState !== 'object' || persistedState == null) return persistedState
+  if (!('featureFlags' in persistedState)) return persistedState
+  const storedFlags = persistedState.featureFlags
+  if (typeof storedFlags !== 'object' || storedFlags == null) return persistedState
+  const featureFlags: Record<string, unknown> = { ...storedFlags }
   let changed = false
-  for (const { flag, version: changedIn } of DEFAULTS_TURNED_ON) {
-    if (version < changedIn && featureFlags[flag] === false) {
+  for (const { flag, version: removedIn } of REMOVED_FLAGS) {
+    if (version < removedIn && flag in featureFlags) {
       delete featureFlags[flag]
       changed = true
     }
   }
-  return changed ? { ...parsed.data, featureFlags } : persistedState
+  return changed ? { ...persistedState, featureFlags } : persistedState
 }
 
 /** Composable for getting a specific feature flag. */

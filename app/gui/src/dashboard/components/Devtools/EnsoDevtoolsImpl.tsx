@@ -389,24 +389,6 @@ export function EnsoDevtools() {
                 />
                 <Switch
                   form={form}
-                  name="enableMonaspaceCodeFont"
-                  label="Monaspace code font"
-                  description="Use Monaspace Neon for code, tables and visualizations, and a 13px code editor."
-                  onChange={(value) => {
-                    setFeatureFlag('enableMonaspaceCodeFont', value)
-                  }}
-                />
-                <Switch
-                  form={form}
-                  name="monoNodes"
-                  label="Monospace nodes"
-                  description="Use Monaspace Neon for node text and component browser entries (on by default; off restores M PLUS 1). Reopen the project after switching, so that widget inputs are re-measured."
-                  onChange={(value) => {
-                    setFeatureFlag('monoNodes', value)
-                  }}
-                />
-                <Switch
-                  form={form}
                   name="showDeveloperIds"
                   label={getText('ensoDevtoolsFeatureFlags.showDeveloperIds')}
                   description={getText('ensoDevtoolsFeatureFlags.showDeveloperIdsDescription')}

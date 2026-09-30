@@ -1,5 +1,4 @@
 @import url("./font-mplus1.css");
-@import url("./font-dejavu.css");
 @import url("./font-monaspace.css");
 
 /*************************************************
@@ -303,15 +302,15 @@
     "M PLUS 1", /* System sans-serif font stack */ system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
     "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
-  --font-code:
-    "M PLUS 1", /* System sans-serif font stack */ system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
-    "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif;
+  /* Monaspace Neon is the code font (#110): `--font-mono` covers the code editor, docs code, tables
+     and visualizations; `--font-code` covers node text — node expressions and bindings, component
+     browser entries and the AI pending node (#112). Neon is preloaded from `index.html`. Node widths
+     are measured, never saved, so the face changes no project data. */
   --font-mono:
-    "DejaVu Sans Mono", /* System monospace font stack */ ui-monospace, Menlo,
-    Monaco, "Cascadia Mono", "Segoe UI Mono", "Roboto Mono", "Oxygen Mono",
-    "Ubuntu Monospace", "Source Code Pro", "Fira Mono", "Droid Sans Mono",
-    "Courier New", monospace;
+    "Monaspace Neon", /* System monospace font stack */ ui-monospace,
+    "Cascadia Mono", "SF Mono", Menlo, Consolas, "Roboto Mono", "Segoe UI Mono",
+    "Source Code Pro", "Fira Mono", "Droid Sans Mono", "Courier New", monospace;
+  --font-code: var(--font-mono);
   /* Ligatures on `--font-mono` text. Texture healing (`calt`, contextual alternates) is always on:
      it never changes a character's advance. Common ligatures and Monaspace's coding ligatures
      (stylistic sets `ss01`-`ss09`, which join `->`, `>=`, `|>`, `==`, `..`, `::`) are off, because
@@ -322,9 +321,10 @@
   --font-mono-feature-settings: normal;
   --font-mono-readonly-variant-ligatures: var(--font-mono-variant-ligatures);
   --font-mono-readonly-feature-settings: var(--font-mono-feature-settings);
-  --code-editor-font-size: 12px;
+  /* 13px rather than 12px: Neon's x-height is small for its advance. */
+  --code-editor-font-size: 13px;
   /* Comments in the code editor. The "Handwritten comments" setting switches it to Monaspace Radon
-     while Neon is the code font (`.monaspaceCodeFont.handwrittenComments` below). */
+     (`.handwrittenComments` below). */
   --font-mono-comment: var(--font-mono);
   /* Default resize handle widths, used for panels. */
   --resize-handle-inside: 3px;
@@ -337,42 +337,19 @@
   --scrollbar-scrollable-opacity: 100%;
 }
 
-/* Monaspace Neon as the code font, under the `enableMonaspaceCodeFont` feature flag — on by
-   default, kept for one release as a kill switch (#110; the class is set on the document root by
-   `src/providers/codeFont.ts`, and #113 folds this into `:root` when the flag goes). The code editor grows to 13px because Neon's x-height is ~6% smaller
-   than DejaVu Sans Mono's. `--font-code` (nodes) is switched separately, by `monoNodes` (below). */
-:root.monaspaceCodeFont {
-  --font-mono:
-    "Monaspace Neon", "DejaVu Sans Mono",
-    /* System monospace font stack */ ui-monospace, "Cascadia Mono", "SF Mono",
-    Menlo, Consolas, "Roboto Mono", "Segoe UI Mono", "Source Code Pro",
-    "Fira Mono", "Droid Sans Mono", "Courier New", monospace;
-  --code-editor-font-size: 13px;
-}
-
-/* The "Code ligatures" setting: Monaspace's coding ligatures on read-only code. Inert on faces
-   without these stylistic sets, such as DejaVu Sans Mono. */
+/* The "Code ligatures" setting: Monaspace's coding ligatures on read-only code. Inert on the
+   system fallback faces, which lack these stylistic sets. */
 :root.codeLigatures {
   --font-mono-readonly-feature-settings:
     "ss01", "ss02", "ss03", "ss04", "ss05", "ss06", "ss07", "ss08", "ss09";
 }
 
-/* The "Handwritten comments" setting (#111): comments in the code editor in Monaspace Radon. Only
-   with Neon as the code font, whose 0.62em advance Radon shares, so that comments keep the code's
-   column grid; next to DejaVu Sans Mono (0.602em) they would not. Ligature settings are inherited
-   from the surrounding code, so texture healing (`calt`) stays on and coding ligatures off. */
-:root.monaspaceCodeFont.handwrittenComments {
+/* The "Handwritten comments" setting (#111): comments in the code editor in Monaspace Radon, which
+   shares Neon's 0.62em advance, so that comments keep the code's column grid. Ligature settings are
+   inherited from the surrounding code, so texture healing (`calt`) stays on and coding ligatures
+   off. */
+:root.handwrittenComments {
   --font-mono-comment: "Monaspace Radon", var(--font-mono);
-}
-
-/* Node text in Monaspace Neon, under the `monoNodes` feature flag (#112; on by default, kept for
-   one release as a kill switch that restores M PLUS 1; #113 folds this into `:root`). Covers
-   every `--font-code` consumer: node expressions and bindings, component browser entries and the
-   AI pending node. Neon is already preloaded from `index.html`. Falls back to `--font-mono`'s stack,
-   resolved here on the root. Monospace text is ~10-15% wider than M PLUS 1, and node widths are
-   measured, never saved, so this changes no project data; a tidy graph may overlap until Tidy up. */
-:root.monoNodes {
-  --font-code: "Monaspace Neon", var(--font-mono);
 }
 
 @keyframes s1 {

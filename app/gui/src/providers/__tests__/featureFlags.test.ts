@@ -1,60 +1,67 @@
 import { expect, test } from 'vitest'
-import { flagsStore, migrateFeatureFlags } from '../featureFlags'
+import { FEATURE_FLAGS_SCHEMA, flagsStore, migrateFeatureFlags } from '../featureFlags'
 
-test('The Monaspace code font is on by default', () => {
-  expect(flagsStore.getState().featureFlags.enableMonaspaceCodeFont).toBe(true)
-})
-
-test('Monospace node text is on by default', () => {
-  expect(flagsStore.getState().featureFlags.monoNodes).toBe(true)
-})
-
-test.each`
-  version | stored       | expected
-  ${1}    | ${false}     | ${undefined}
-  ${1}    | ${true}      | ${true}
-  ${1}    | ${undefined} | ${undefined}
-  ${2}    | ${false}     | ${false}
-`(
-  'Persisted `enableMonaspaceCodeFont: $stored` from version $version migrates to $expected',
-  ({ version, stored, expected }) => {
-    const persisted = {
-      featureFlags: {
-        enableLocalBackend: true,
-        ...(stored !== undefined ? { enableMonaspaceCodeFont: stored } : {}),
-      },
-    }
-    const migrated = migrateFeatureFlags(persisted, version) as typeof persisted
-    expect(migrated.featureFlags.enableLocalBackend).toBe(true)
-    expect(
-      (migrated.featureFlags as { enableMonaspaceCodeFont?: boolean }).enableMonaspaceCodeFont,
-    ).toBe(expected)
+test.each(['enableMonaspaceCodeFont', 'monoNodes'])(
+  'The removed `%s` flag is not defined',
+  (flag) => {
+    expect(Object.keys(FEATURE_FLAGS_SCHEMA.shape)).not.toContain(flag)
   },
 )
 
 test.each`
-  version | stored       | expected
-  ${1}    | ${false}     | ${undefined}
-  ${2}    | ${false}     | ${undefined}
-  ${2}    | ${true}      | ${true}
-  ${2}    | ${undefined} | ${undefined}
-  ${3}    | ${false}     | ${false}
+  version | enableMonaspaceCodeFont | monoNodes
+  ${1}    | ${false}                | ${undefined}
+  ${2}    | ${true}                 | ${false}
+  ${3}    | ${false}                | ${true}
+  ${3}    | ${undefined}            | ${undefined}
 `(
-  'Persisted `monoNodes: $stored` from version $version migrates to $expected',
-  ({ version, stored, expected }) => {
+  'Persisted removed flags from version $version are stripped, and other flags kept',
+  ({ version, enableMonaspaceCodeFont, monoNodes }) => {
     const persisted = {
       featureFlags: {
         enableLocalBackend: true,
-        enableMonaspaceCodeFont: false,
-        ...(stored !== undefined ? { monoNodes: stored } : {}),
+        ...(enableMonaspaceCodeFont !== undefined ? { enableMonaspaceCodeFont } : {}),
+        ...(monoNodes !== undefined ? { monoNodes } : {}),
       },
     }
-    const migrated = migrateFeatureFlags(persisted, version) as typeof persisted
-    expect(migrated.featureFlags.enableLocalBackend).toBe(true)
-    expect((migrated.featureFlags as { monoNodes?: boolean }).monoNodes).toBe(expected)
-    // A version-2 store has already had its `enableMonaspaceCodeFont` migrated; it is not touched again.
-    expect(
-      (migrated.featureFlags as { enableMonaspaceCodeFont?: boolean }).enableMonaspaceCodeFont,
-    ).toBe(version < 2 ? undefined : false)
+    const migrated = migrateFeatureFlags(persisted, version) as {
+      featureFlags: Record<string, unknown>
+    }
+    expect(migrated.featureFlags).toEqual({ enableLocalBackend: true })
+  },
+)
+
+test.each([null, 'garbage', {}, { featureFlags: null }])(
+  'Malformed persisted state %j is passed through unchanged',
+  (persisted) => {
+    expect(migrateFeatureFlags(persisted, 3)).toBe(persisted)
+  },
+)
+
+test.each([3, 4])(
+  'A version-%i store holding removed flags loads without them',
+  async (version) => {
+    localStorage.setItem(
+      'enso-feature-flags',
+      JSON.stringify({
+        state: {
+          featureFlags: {
+            enableLocalBackend: true,
+            enableMonaspaceCodeFont: false,
+            monoNodes: false,
+          },
+        },
+        version,
+      }),
+    )
+    try {
+      await flagsStore.persist.rehydrate()
+      const { featureFlags } = flagsStore.getState()
+      expect(featureFlags.enableLocalBackend).toBe(true)
+      expect(featureFlags).not.toHaveProperty('enableMonaspaceCodeFont')
+      expect(featureFlags).not.toHaveProperty('monoNodes')
+    } finally {
+      localStorage.removeItem('enso-feature-flags')
+    }
   },
 )

@@ -1,9 +1,7 @@
 /**
  * @file Screenshot tests for the code font (`--font-mono`): Monaspace Neon, with the "Code
  * ligatures" setting at its default (off) and the "Handwritten comments" setting at its default
- * (on: comments in the code editor use Monaspace Radon). The `enableMonaspaceCodeFont` feature
- * flag is on by default; it is set explicitly here anyway, and the kill switch (flag off) has its
- * own tests.
+ * (on: comments in the code editor use Monaspace Radon).
  *
  * The baselines are Linux-only (`*-linux.png`): the suite cannot run on native Windows, and CI runs
  * it on Ubuntu. Regenerate them in WSL or on Linux with `--update-snapshots` when a change to the
@@ -15,8 +13,6 @@ import type { MockLocalApi } from 'integration-test/mock/localApi'
 import { createTableNode } from './actions'
 import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
-
-test.use({ featureFlags: { enableMonaspaceCodeFont: true } })
 
 /**
  * Texture healing shows on `mlmlml` and `iiii`; the operators must stay three separate glyph pairs,
@@ -487,39 +483,4 @@ test('"Code ligatures" applies to read-only code, and not to the code editor', a
   await expect
     .poll(() => page.evaluate(() => document.documentElement.classList.contains('codeLigatures')))
     .toBe(true)
-})
-
-test.describe('With the `enableMonaspaceCodeFont` kill switch off', () => {
-  test.use({ featureFlags: { enableMonaspaceCodeFont: false } })
-
-  test('Code editor falls back to DejaVu Sans Mono at 12px', async ({ editorPage, page }) => {
-    await editorPage
-    await page.keyboard.press(`ControlOrMeta+\``)
-    const scroller = locate.codeEditor(page).locator('.cm-scroller')
-    await expect(scroller).toHaveCSS('font-family', /^"DejaVu Sans Mono"/)
-    await expect(scroller).toHaveCSS('font-size', '12px')
-    expect(
-      await page.evaluate(() => document.documentElement.classList.contains('monaspaceCodeFont')),
-    ).toBe(false)
-  })
-
-  test('Code editor comments fall back to DejaVu Sans Mono', async ({ editorPage, page }) => {
-    await editorPage
-    const { lines } = await openCodeEditorWithLines(page, COMMENT_SAMPLE)
-    for (const line of lines.slice(1, -1)) {
-      await expect(line.locator('.tok-comment').first()).toHaveCSS(
-        'font-family',
-        /^"DejaVu Sans Mono"/,
-      )
-    }
-    // Radon is not fetched, although "Handwritten comments" is on. (Neon is: `index.html`
-    // preloads it whatever the flag.)
-    expect(
-      await page.evaluate(() =>
-        [...document.fonts]
-          .filter((face) => face.family.includes('Radon') && face.status !== 'unloaded')
-          .map((face) => face.family),
-      ),
-    ).toEqual([])
-  })
 })

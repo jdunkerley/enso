@@ -23,25 +23,19 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   directory must also be listed in `build_tools/build/paths.yaml`.
 - `font-monaspace.css` / `public/font-monaspace/` — Monaspace Neon and Radon
   (variable woff2, v1.400, unmodified upstream files; see the README there).
-  `--font-mono` is Neon under the `enableMonaspaceCodeFont` feature flag, which
-  is on by default and kept for one release as a kill switch (the
-  `:root.monaspaceCodeFont` block in `base.css`; the class comes from
-  `src/providers/codeFont.ts`). Neon is preloaded from `index.html`. #113
-  removes the flag and DejaVu Sans Mono.
+  `--font-mono` is Neon (13px in the code editor), followed only by system
+  monospace faces; Neon is preloaded from `index.html`.
 - `--font-code` is node text (expressions, bindings, component browser entries,
-  the AI pending node): M PLUS 1, or Monaspace Neon under the `monoNodes`
-  feature flag (on by default, kept for one release as a kill switch;
-  `:root.monoNodes` in `base.css`, class from `src/providers/codeFont.ts`). #113
-  removes it along with `enableMonaspaceCodeFont`. Nodes are ~14% wider than in
-  M PLUS 1; widths are measured per session, never saved.
+  the AI pending node): the same stack as `--font-mono`. Nodes are ~14% wider
+  than they were in M PLUS 1; widths are measured per session, never saved.
 - `--font-mono-comment` is the code editor's comment face: `--font-mono`, or
-  Monaspace Radon under the flag plus the "Handwritten comments" setting
-  (`:root.monaspaceCodeFont.handwrittenComments`; both on by default). Radon is
-  not preloaded: `src/providers/codeFont.ts` loads it only while both are on.
-  Comment tokens carry the stable class `tok-comment`
-  (`util/codemirror/highlight.ts`) besides their CSS-module colour class. Radon
-  shares Neon's 0.62em advance; never pair it with a face that does not, or
-  comments leave the column grid.
+  Monaspace Radon under the "Handwritten comments" setting
+  (`:root.handwrittenComments`, on by default; the class comes from
+  `src/providers/codeFont.ts`). Radon is not preloaded: `codeFont.ts` loads it
+  only while the setting is on. Comment tokens carry the stable class
+  `tok-comment` (`util/codemirror/highlight.ts`) besides their CSS-module colour
+  class. Radon shares Neon's 0.62em advance; never pair it with a face that does
+  not, or comments leave the column grid.
 - Ligatures on `--font-mono` text go through `--font-mono-variant-ligatures` /
   `--font-mono-feature-settings` (the code editor, and anything editable) and
   their `-readonly` variants (docs code, tables, visualizations), which the
