@@ -1,5 +1,5 @@
 /** @file Utilities related to sorting. */
-import type { SvgUseIcon } from '#/components/types'
+import type { Icon } from '@/util/iconMetadata/iconName'
 import type { AssetSortDirection } from 'enso-common/src/services/Backend'
 
 /** Sort direction for assets. */
@@ -29,7 +29,7 @@ export function nextSortDirection(
 export function iconIdFor(
   sortDirection: AssetSortDirection | null | undefined,
   sortInfoAppliesToCurrentColumn = true,
-): SvgUseIcon {
+): Icon {
   if (!sortInfoAppliesToCurrentColumn) {
     return 'sort'
   }

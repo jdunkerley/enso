@@ -2,7 +2,7 @@
 import { startTransition, useEffect, useLayoutEffect, useState, type CSSProperties } from 'react'
 
 import Portal from '#/components/Portal'
-import { convertCSSUnitString } from '#/utilities/convertCSSUnits'
+import { convertCSSUnitString } from '$/utils/convertCSSUnits'
 import { useEventCallback } from './eventCallbackHooks'
 import type { RectReadOnly } from './measureHooks'
 import { useMeasure } from './measureHooks'

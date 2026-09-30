@@ -3,7 +3,7 @@ import type { OmitUndefined } from 'tailwind-variants'
 import { createTV } from 'tailwind-variants'
 
 import { TAILWIND_MERGE_CONFIG } from '#/utilities/tailwindMerge'
-import { LRUCache } from './LruCache'
+import { LRUCache } from '$/utils/LruCache'
 
 export * from 'tailwind-variants'
 

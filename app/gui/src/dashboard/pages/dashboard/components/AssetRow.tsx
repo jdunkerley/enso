@@ -21,9 +21,7 @@ import {
 } from '#/providers/DriveProvider'
 import { unsetModal } from '#/providers/ModalProvider'
 import * as drag from '#/utilities/drag'
-import * as eventModule from '#/utilities/event'
 import * as tailwindMerge from '#/utilities/tailwindMerge'
-import Visibility from '#/utilities/Visibility'
 import { useStore } from '#/utilities/zustand'
 import { isLocalCategory } from '$/providers/category'
 import { useFullUserSession } from '$/providers/react'
@@ -33,6 +31,8 @@ import {
   useDriveCurrentDirectory,
 } from '$/providers/react/container'
 import { useIsProjectClosing } from '$/providers/react/openedProjects'
+import * as eventModule from '$/utils/event'
+import Visibility from '$/utils/Visibility'
 import type { Label } from 'enso-common/src/services/Backend'
 import * as backendModule from 'enso-common/src/services/Backend'
 import {

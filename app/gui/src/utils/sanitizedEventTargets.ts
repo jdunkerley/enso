@@ -39,7 +39,6 @@ interface SanitizedDocumentEventTarget extends Omit<
 }
 
 // This MUST be lowercase, so that it looks identical to the regular `document`.
-// eslint-disable-next-line no-restricted-syntax
 export const document: SanitizedDocumentEventTarget = globalThis.document
 
 /** `window` without the unsafe {@link EventTarget} overloads. */
@@ -60,5 +59,4 @@ interface SanitizedWindowEventTarget extends Omit<
 }
 
 // This MUST be lowercase, so that it looks identical to the regular `window`.
-// eslint-disable-next-line no-restricted-syntax
 export const window: SanitizedWindowEventTarget = globalThis.window

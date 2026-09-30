@@ -1,12 +1,12 @@
 /** @file Persistent state for the Drive. */
 import { useStore } from '#/hooks/storeHooks'
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import { Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import { createStore } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   /** */
   interface LocalStorageData {
     /** @deprecated Prefer `useLocalRootDirectory` and `setLocalRootDirectory`. */

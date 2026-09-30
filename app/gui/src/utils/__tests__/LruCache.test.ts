@@ -2,7 +2,7 @@
 import { fc, test } from '@fast-check/vitest'
 import { describe, expect, vi } from 'vitest'
 
-import { LRUCache } from '../LruCache'
+import { LRUCache } from '$/utils/LruCache'
 
 describe('LruCache', () => {
   test('retreive cached results', () => {

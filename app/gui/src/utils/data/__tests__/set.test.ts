@@ -2,7 +2,7 @@
 import * as fc from '@fast-check/vitest'
 import * as v from 'vitest'
 
-import * as setModule from '#/utilities/set'
+import * as setModule from '$/utils/data/set'
 
 fc.test.prop({
   set: fc.fc.array(fc.fc.anything(), { minLength: 1 }).map((array) => new Set(array)),

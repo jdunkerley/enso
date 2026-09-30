@@ -1,6 +1,6 @@
 /** @file Shortcuts for the dashboard application. */
 import { SETTINGS_TAB_DATA } from '#/layouts/Settings/data'
-import * as inputBindings from '#/utilities/inputBindings'
+import * as inputBindings from '$/utils/inputBindings'
 import * as detect from 'enso-common/src/utilities/detect'
 
 /** The type of the keybind and mousebind namespace for the dashboard. */

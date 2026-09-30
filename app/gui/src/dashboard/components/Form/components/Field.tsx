@@ -1,7 +1,7 @@
 /** @file Field component */
 import * as aria from '#/components/aria'
-import type { Path } from '#/utilities/objectPath'
 import { tv, type VariantProps } from '#/utilities/tailwindVariants'
+import type { Path } from '$/utils/objectPath'
 import * as React from 'react'
 import { ContextualHelp } from '../../ContextualHelp'
 import * as text from '../../Text'

@@ -1,4 +1,4 @@
-import { DAY_MS, HOUR_MS, HOURS_PER_DAY, rfc3339DurationProgress } from '#/utilities/time'
+import { DAY_MS, HOUR_MS, HOURS_PER_DAY, rfc3339DurationProgress } from '$/utils/time'
 import { fc, test as fcTest } from '@fast-check/vitest'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { expect } from 'vitest'

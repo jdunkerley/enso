@@ -1,7 +1,7 @@
 /** @file Tests for `dateTime.ts`. */
 import * as v from 'vitest'
 
-import { MINUTE_MS, toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
+import { MINUTE_MS, toRfc3339 } from '../dateTime'
 
 /** Adds a UTC offset to a {@link Date}. Daylight savings-aware. */
 function convertLocalToUTC(date: Date) {

@@ -38,7 +38,6 @@ export function safeJsonParse<T = unknown>(
 
     // This is safe because if we don't pass a predicate,
     // we know that the parsed value is of type `T`.
-    // eslint-disable-next-line no-restricted-syntax
     return parsed as T
   } catch {
     return defaultValue

@@ -2,8 +2,8 @@
  * @file Exports `defineKeybinds`, a function to define a namespace containing keyboard and mouse
  * shortcuts.
  */
-import { isElementTextInput, isTextInputEvent } from '#/utilities/event'
-import { camelCaseToTitleCase } from '#/utilities/string'
+import { camelCaseToTitleCase } from '$/utils/data/string'
+import { isElementTextInput, isTextInputEvent } from '$/utils/event'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import {
   modifierFlagsForEvent,
@@ -18,22 +18,41 @@ import {
 import { unsafeMutable } from 'enso-common/src/utilities/data/object'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
 
+/** The fields that the binding handlers read from every input event. */
+interface InputEventFields {
+  readonly altKey: boolean
+  readonly ctrlKey: boolean
+  readonly metaKey: boolean
+  readonly shiftKey: boolean
+  readonly preventDefault: () => void
+  readonly stopPropagation: () => void
+}
+
+/** A keyboard event wrapped by a UI framework: the fields read by the binding handlers. */
+interface WrappedKeyboardEvent extends InputEventFields {
+  readonly key: string
+}
+
+/** A mouse event wrapped by a UI framework: the fields read by the binding handlers. */
+interface WrappedMouseEvent extends InputEventFields {
+  readonly button: number
+  readonly buttons: number
+}
+
+/**
+ * A {@link KeyboardEvent}, {@link MouseEvent} or {@link PointerEvent}, either from the DOM or wrapped
+ * by a UI framework. Wrapped events are described structurally so that this module does not depend
+ * on any framework's event types.
+ */
+export type BindableInputEvent =
+  KeyboardEvent | MouseEvent | PointerEvent | WrappedKeyboardEvent | WrappedMouseEvent
+
 /** The target of a {@link KeyboardEvent}, {@link MouseEvent}, or {@link PointerEvent}. */
-export interface InputEventTarget<
-  EventName extends string,
-  Event extends
-    | KeyboardEvent
-    | MouseEvent
-    | PointerEvent
-    | React.KeyboardEvent
-    | React.MouseEvent
-    | React.PointerEvent,
-> {
+export interface InputEventTarget<EventName extends string, Event extends BindableInputEvent> {
   readonly addEventListener: (eventName: EventName, handler: (event: Event) => void) => void
   readonly removeEventListener: (eventName: EventName, handler: (event: Event) => void) => void
 }
 
-/* eslint-disable @typescript-eslint/naming-convention */
 const MODIFIER_FLAG_NAME: Readonly<Record<Modifier, ModifierKey>> = {
   Mod: isOnMacOS() ? 'Meta' : 'Ctrl',
   Alt: 'Alt',
@@ -64,7 +83,6 @@ function buttonToPointerButtonFlags(button: number) {
       return POINTER_BUTTON_FLAG.PointerForward
     }
     default: {
-      // eslint-disable-next-line no-restricted-syntax
       return 0 as PointerButtonFlags
     }
   }
@@ -123,7 +141,6 @@ type Keybinds<T extends Record<keyof T, KeybindValue>, Category extends string> 
 const DEFINED_NAMESPACES = new Map<
   string,
   // This is SAFE, as the value is only being stored for bookkeeping purposes.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ReturnType<typeof defineBindingNamespace<Record<any, any>, string>>
 >()
 
@@ -204,16 +221,13 @@ export function defineBindingNamespace<
 
   const bindings = structuredClone(originalBindings)
   // This is SAFE, as it is a `readonly` upcast.
-  const bindingsAsRecord =
-    // eslint-disable-next-line no-restricted-syntax
-    bindings as Readonly<Record<string, KeybindValue>>
+  const bindingsAsRecord = bindings as Readonly<Record<string, KeybindValue>>
 
   // This non-null assertion is SAFE, as it is immediately assigned by `rebuildMetadata()`.
   let metadata!: Record<BindingKey, KeybindsWithMetadata<Category>>
   const rebuildMetadata = () => {
     // This is SAFE, as this type is a direct mapping from `bindingsAsRecord`, which has `BindingKey`
     // as its keys.
-    // eslint-disable-next-line no-restricted-syntax
     metadata = Object.fromEntries(
       Object.entries(bindingsAsRecord).map((kv) => {
         const [name, info] = kv
@@ -233,7 +247,6 @@ export function defineBindingNamespace<
     for (const [nameRaw, value] of Object.entries(bindingsAsRecord)) {
       const keybindStrings = 'bindings' in value ? value.bindings : value
       // This is SAFE, as `Keybinds<T>` is a type derived from `T`.
-      // eslint-disable-next-line no-restricted-syntax
       const name = nameRaw as BindingKey
       for (const keybindString of keybindStrings) {
         const keybind = parseKeybindString(keybindString).bind
@@ -256,20 +269,11 @@ export function defineBindingNamespace<
   }
   rebuildLookups()
 
-  const handler = <
-    Event extends
-      | KeyboardEvent
-      | MouseEvent
-      | PointerEvent
-      | React.KeyboardEvent
-      | React.MouseEvent
-      | React.PointerEvent,
-  >(
+  const handler = <Event extends BindableInputEvent>(
     handlers: Partial<
       // This MUST be `void` to allow implicit returns.
       Record<
         BindingKey | typeof DEFAULT_HANDLER,
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
         (event: Event, matchingBindings: Set<BindingKey>) => boolean | void
       >
     >,
@@ -282,7 +286,6 @@ export function defineBindingNamespace<
           keyboardShortcuts[event.key.toLowerCase()]?.[eventModifierFlags]
         : mouseShortcuts[
             event.buttons !== 0 ?
-              // eslint-disable-next-line no-restricted-syntax
               (event.buttons as PointerButtonFlags)
             : buttonToPointerButtonFlags(event.button)
           ]?.[eventModifierFlags]
@@ -295,7 +298,6 @@ export function defineBindingNamespace<
         for (const bindingNameRaw in handlers) {
           // This is SAFE, because `handlers` is an object with identical keys to `T`,
           // which `BindingName` is also derived from.
-          // eslint-disable-next-line no-restricted-syntax
           const bindingName = bindingNameRaw as BindingKey
           if (matchingBindings.has(bindingName)) {
             handle = handlers[bindingName]
@@ -326,7 +328,6 @@ export function defineBindingNamespace<
       // This MUST be `void` to allow implicit returns.
       Record<
         BindingKey | typeof DEFAULT_HANDLER,
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
         (event: Event, matchingBindings: Set<BindingKey>) => boolean | void
       >
     >,
@@ -334,23 +335,13 @@ export function defineBindingNamespace<
     handlers: Handlers,
   ) => handlers
 
-  const attach = <
-    EventName extends string,
-    Event extends
-      | KeyboardEvent
-      | MouseEvent
-      | PointerEvent
-      | React.KeyboardEvent
-      | React.MouseEvent
-      | React.PointerEvent,
-  >(
+  const attach = <EventName extends string, Event extends BindableInputEvent>(
     target: InputEventTarget<EventName, Event>,
     eventName: EventName,
     handlers: Partial<
       // This MUST be `void` to allow implicit returns.
       Record<
         BindingKey | typeof DEFAULT_HANDLER,
-        // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
         (event: Event, matchingBindings: Set<BindingKey>) => boolean | void
       >
     >,
@@ -414,7 +405,6 @@ export function defineBindingNamespace<
     /** Add this namespace to the global lookup. */
     register: () => {
       if (DEFINED_NAMESPACES.has(namespace)) {
-        // eslint-disable-next-line no-restricted-properties
         console.warn(
           `Overriding the keybind namespace '${namespace}', which has already been defined.`,
         )

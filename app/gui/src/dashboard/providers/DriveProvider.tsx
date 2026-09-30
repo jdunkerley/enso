@@ -1,8 +1,8 @@
 /** @file The React provider (and associated hooks) for Data Catalog state. */
-import type { PasteData } from '#/utilities/pasteData'
-import { EMPTY_SET } from '#/utilities/set'
 import { createStore, useStore, type StoreApi } from '#/utilities/zustand'
 import type { Category } from '$/providers/category'
+import { EMPTY_SET } from '$/utils/data/set'
+import type { PasteData } from '$/utils/pasteData'
 import type {
   AnyAsset,
   AssetId,

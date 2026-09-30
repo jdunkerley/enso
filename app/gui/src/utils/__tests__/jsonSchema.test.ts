@@ -3,7 +3,7 @@ import * as fc from '@fast-check/vitest'
 import Ajv from 'ajv/dist/2020'
 import * as v from 'vitest'
 
-import * as jsonSchema from '#/utilities/jsonSchema'
+import * as jsonSchema from '$/utils/jsonSchema'
 
 const AJV = new Ajv()
 
@@ -24,7 +24,6 @@ fc.test.prop({
   }
 })
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 v.test.each([{ value: JSON.parse('{"__proto__":{}}') }])(
   'converting between constant value and schema',
   ({ value }) => {

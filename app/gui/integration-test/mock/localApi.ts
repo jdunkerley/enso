@@ -1,4 +1,4 @@
-import { capitalizeFirst } from '#/utilities/string'
+import { capitalizeFirst } from '$/utils/data/string'
 import * as backend from 'enso-common/src/services/Backend'
 import {
   Path,

@@ -1,9 +1,7 @@
 /** @file A LocalStorage data manager. */
-import { useVueValue } from '$/providers/react/common'
 import * as common from 'enso-common/src/constants'
 import * as object from 'enso-common/src/utilities/data/object'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
-import { useCallback } from 'react'
 import invariant from 'tiny-invariant'
 import { computed, shallowReactive, toRaw } from 'vue'
 import * as z from 'zod'
@@ -40,7 +38,6 @@ export interface LocalStorageKeyMetadata<K extends LocalStorageKey> {
 export interface LocalStorageData {
   // Add a dummy key to avoid type errors for configurations that don't import
   // any files that merge declarations into `LocalStorageData`.
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   readonly _dummyLocalStorageKey: true
 }
 
@@ -82,7 +79,6 @@ export default class LocalStorage {
 
   /** Get all {@link LocalStorageKey} variants that has been registered using {@link registerKey} method so far. */
   static getAllRegisteredKeys(): LocalStorageKey[] {
-    // eslint-disable-next-line no-restricted-syntax
     return Object.keys(LocalStorage.keyMetadata) as LocalStorageKey[]
   }
 
@@ -173,7 +169,6 @@ export default class LocalStorage {
 
     for (const key of keys) {
       // This is safe because we asserted that `values` is an object.
-      // eslint-disable-next-line no-restricted-syntax
       const value: unknown = key in values ? (values as Record<string, unknown>)[key] : null
       this.setFromUntrustedSource(key, value)
     }
@@ -184,7 +179,6 @@ export default class LocalStorage {
    */
   delete<K extends LocalStorageKey>(key: K) {
     this.assertRegisteredKey(key)
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete this.values[key]
     this.save(key)
     this.eventTarget.dispatchEvent(new Event(key))
@@ -246,7 +240,6 @@ export default class LocalStorage {
       if (valueToSave == null) localStorage.removeItem(itemKey)
       else localStorage.setItem(itemKey, JSON.stringify(valueToSave))
     } catch (error) {
-      // eslint-disable-next-line no-restricted-properties
       console.warn('LocalStorage failed to persist data', { key, error })
     }
   }
@@ -277,7 +270,6 @@ export default class LocalStorage {
     try {
       storedValue = storedJson != null ? JSON.parse(storedJson) : null
     } catch (error) {
-      // eslint-disable-next-line no-restricted-properties
       console.warn('LocalStorage failed to parse JSON', { key, error })
     }
 
@@ -288,22 +280,8 @@ export default class LocalStorage {
     if (parsedValue.success) return parsedValue.data
 
     const error = parsedValue.error
-    // eslint-disable-next-line no-restricted-properties
     console.warn('LocalStorage failed to parse value', { key, storedValue, error })
 
     return null
   }
-}
-
-/** React hook for viewing whole `LocalStorage` contents as a state variable. */
-export function useLocalStorageValues(storage: LocalStorage): Partial<LocalStorageData> {
-  return useVueValue(
-    useCallback(() => {
-      // NOTE: `values` is shallowReactive. Create a shallow snapshot to:
-      // - avoid deep traversal (stack overflow risk),
-      // - provide a new reference so React re-renders.
-      const values = storage['values']
-      return { ...values }
-    }, [storage]),
-  )
 }

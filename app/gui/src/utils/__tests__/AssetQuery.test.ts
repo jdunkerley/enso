@@ -1,7 +1,7 @@
 /** @file Tests for {@link AssetQuery}. */
 import * as v from 'vitest'
 
-import AssetQuery from '#/utilities/AssetQuery'
+import AssetQuery from '$/utils/AssetQuery'
 
 v.test.each([
   { query: '' },

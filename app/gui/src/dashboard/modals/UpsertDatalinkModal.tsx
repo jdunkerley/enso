@@ -6,8 +6,8 @@ import { Input } from '#/components/Inputs/Input'
 import SCHEMA from '#/data/datalinkSchema.json' with { type: 'json' }
 import { validateDatalink } from '#/data/datalinkValidator'
 import { DatalinkFormInput } from '#/pages/dashboard/components/DatalinkInput'
-import { constantValueOfSchema } from '#/utilities/jsonSchema'
 import { useText } from '$/providers/react'
+import { constantValueOfSchema } from '$/utils/jsonSchema'
 
 const DEFS: Record<string, object> = SCHEMA.$defs
 const INITIAL_DATALINK_VALUE = constantValueOfSchema(DEFS, SCHEMA.$defs.DataLink, true)[0] ?? null

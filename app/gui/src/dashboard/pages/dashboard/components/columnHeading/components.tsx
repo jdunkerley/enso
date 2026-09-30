@@ -5,9 +5,9 @@ import { Text } from '#/components/Text'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import type { AssetColumnHeadingProps } from '#/pages/dashboard/components/column'
 import { Column } from '#/pages/dashboard/components/column/columnUtils'
-import { iconIdFor, nextSortDirection } from '#/utilities/sorting'
 import { twJoin } from '#/utilities/tailwindMerge'
 import { useText } from '$/providers/react'
+import { iconIdFor, nextSortDirection } from '$/utils/sorting'
 
 /** A heading for the "Accessed by projects" column. */
 export function AccessedByProjectsColumnHeading(props: AssetColumnHeadingProps) {

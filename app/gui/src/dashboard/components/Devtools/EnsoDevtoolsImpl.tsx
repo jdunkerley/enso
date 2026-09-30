@@ -11,8 +11,7 @@ import { Text } from '#/components/Text'
 import { Tooltip } from '#/components/Tooltip'
 import { Underlay } from '#/components/Underlay'
 import { VisualTooltip } from '#/components/VisualTooltip'
-import LocalStorage, { useLocalStorageValues } from '#/utilities/LocalStorage'
-import { safeJsonParse } from '#/utilities/safeJsonParse'
+import { useLocalStorageValues } from '#/hooks/localStorageHooks'
 import { getFeatureConfiguration } from '$/composables/paywall/FeaturesConfiguration'
 import {
   DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS,
@@ -29,6 +28,8 @@ import {
   useShowVersionChecker,
 } from '$/providers/react/devTools'
 import { useFeatureFlags, useSetFeatureFlag } from '$/providers/react/featureFlags'
+import LocalStorage from '$/utils/LocalStorage'
+import { safeJsonParse } from '$/utils/safeJsonParse'
 import { useQueryClient } from '@tanstack/react-query'
 import * as backend from 'enso-common/src/services/Backend'
 import { unsafeKeys } from 'enso-common/src/utilities/data/object'

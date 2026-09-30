@@ -1,6 +1,6 @@
 /** @file Common logic for the credential creation form. */
 
-import { openInNewBrowserTab } from '#/utilities/window'
+import { openInNewBrowserTab } from '$/utils/window'
 import type { CredentialConfig, SecretId } from 'enso-common/src/services/Backend'
 import type { CredentialRecipe } from './types'
 

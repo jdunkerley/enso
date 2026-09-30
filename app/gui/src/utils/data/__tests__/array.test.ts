@@ -1,3 +1,4 @@
+import { fc, test as fcTest } from '@fast-check/vitest'
 import { expect, test } from 'vitest'
 import * as array from '../array'
 
@@ -28,4 +29,23 @@ const transposeCases: TransposeCase[] = [
 test.each(transposeCases)('transpose: case %#', ({ matrix, expected }) => {
   const transposed = array.transpose(matrix)
   expect(transposed).toStrictEqual(expected)
+})
+
+fcTest.prop({ array: fc.array(fc.anything()) })('`array.shallowEqual`', ({ array: items }) => {
+  expect(array.shallowEqual(items, [...items]))
+})
+
+fcTest.prop({
+  array: fc.array(fc.anything(), { minLength: 1 }).chain((items) =>
+    fc.record({
+      array: fc.constant(items),
+      i: fc.nat(items.length - 1),
+    }),
+  ),
+})('`array.includesPredicate`', ({ array: { array: items, i } }) => {
+  expect(
+    array.includesPredicate(items)(items[i]),
+    `'${JSON.stringify(items)}' should include '${JSON.stringify(items[i])}'`,
+  ).toBe(true)
+  expect(array.includesPredicate(items)({}), 'unique object should not be in array').toBe(false)
 })

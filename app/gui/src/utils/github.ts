@@ -2,8 +2,6 @@
 import * as common from 'enso-common/src/constants'
 import * as detect from 'enso-common/src/utilities/detect'
 
-/* eslint-disable @typescript-eslint/naming-convention */
-
 const ONE_HOUR_MS = 3_600_000
 export const LATEST_RELEASE_PAGE_URL = 'https://github.com/enso-org/enso/releases/latest'
 
@@ -92,7 +90,6 @@ const LOCAL_STORAGE_KEY = `${common.PRODUCT_NAME.toLowerCase()}-cached-release`
 /** Gets the metadata for the latest release of the app. */
 export async function getLatestRelease() {
   const savedCachedRelease = localStorage.getItem(LOCAL_STORAGE_KEY)
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const cachedRelease: CachedRelease | null =
     savedCachedRelease != null ? JSON.parse(savedCachedRelease) : null
   if (cachedRelease != null && Number(new Date()) - cachedRelease.lastFetchEpochMs < ONE_HOUR_MS) {
@@ -104,7 +101,6 @@ export async function getLatestRelease() {
         ['X-GitHub-Api-Version', '2022-11-28'],
       ],
     })
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const data: GitHubRelease = await response.json()
     localStorage.setItem(
       LOCAL_STORAGE_KEY,

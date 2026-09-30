@@ -1,15 +1,23 @@
 /** @file Utility functions related to event handling. */
-import type * as React from 'react'
-
 import * as detect from 'enso-common/src/utilities/detect'
 
+/**
+ * The fields of a mouse event that these helpers read. Structural, so that DOM events and
+ * framework-wrapped events are both accepted.
+ */
+type ClickEventLike = Pick<MouseEvent, 'detail'>
+/** The modifier-key fields of a keyboard or mouse event. */
+type ModifierEventLike = Pick<MouseEvent, 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>
+/** The fields of a keyboard event that these helpers read. */
+type KeyEventLike = ModifierEventLike & Pick<KeyboardEvent, 'key'>
+
 /** Returns `true` if and only if the event is a single click event. */
-export function isSingleClick(event: React.MouseEvent) {
+export function isSingleClick(event: ClickEventLike) {
   return event.detail === 1
 }
 
 /** Returns `true` if and only if the event is a double click event. */
-export function isDoubleClick(event: React.MouseEvent) {
+export function isDoubleClick(event: ClickEventLike) {
   return event.detail === 2
 }
 
@@ -17,7 +25,7 @@ export function isDoubleClick(event: React.MouseEvent) {
  * Returns `true` if and only if the event has the modifier key set
  * (`Ctrl` on Windows/Linux; `Cmd` on macOS).
  */
-export function isModKey(event: React.KeyboardEvent | React.MouseEvent) {
+export function isModKey(event: ModifierEventLike) {
   return detect.isOnMacOS() ? event.metaKey : event.ctrlKey
 }
 
@@ -28,19 +36,17 @@ export function isModKey(event: React.KeyboardEvent | React.MouseEvent) {
 const SPECIAL_CHARACTER_KEYCODE_REGEX = /^[A-Z][a-z]/
 
 /** Whether `event` may trigger a shortcut. */
-export function isPotentiallyShortcut(event: KeyboardEvent | React.KeyboardEvent) {
+export function isPotentiallyShortcut(event: ModifierEventLike) {
   return event.ctrlKey || event.metaKey || event.altKey
 }
 
 /** Return `true` if none of `Ctrl`, `Shift`, `Alt` and `Meta` are pressed.*/
-export function areNoModifiersPressed(
-  event: KeyboardEvent | MouseEvent | React.KeyboardEvent | React.MouseEvent,
-) {
+export function areNoModifiersPressed(event: ModifierEventLike) {
   return !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey
 }
 
 /** Whether `event.key` is an arrow key. */
-export function isArrowKeyEvent(event: KeyboardEvent | React.KeyboardEvent) {
+export function isArrowKeyEvent(event: KeyEventLike) {
   return (
     event.key === 'ArrowLeft' ||
     event.key === 'ArrowRight' ||
@@ -50,7 +56,7 @@ export function isArrowKeyEvent(event: KeyboardEvent | React.KeyboardEvent) {
 }
 
 /** Whether `event.key` is a key used in text editing. */
-export function isTextInputKey(event: KeyboardEvent | React.KeyboardEvent) {
+export function isTextInputKey(event: KeyEventLike) {
   return (
     !SPECIAL_CHARACTER_KEYCODE_REGEX.test(event.key) ||
     event.key === 'Backspace' ||
@@ -61,7 +67,7 @@ export function isTextInputKey(event: KeyboardEvent | React.KeyboardEvent) {
 }
 
 /** Whether `event` will produce text. This excludes shortcutManager, as they do not produce text. */
-export function isTextInputEvent(event: KeyboardEvent | React.KeyboardEvent) {
+export function isTextInputEvent(event: KeyEventLike) {
   // Allow `alt` key to be pressed in case it is being used to enter special characters.
   return (
     (!event.ctrlKey && !event.shiftKey && !event.metaKey && isTextInputKey(event)) ||

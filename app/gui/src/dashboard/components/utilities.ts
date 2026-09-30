@@ -1,6 +1,6 @@
 /** @file Constants for aria components. */
 
-import { identity } from '#/utilities/functions'
+import { identity } from '$/utils/functions'
 import { unsafeKeyValuePair, unsafeKeys } from 'enso-common/src/utilities/data/object'
 
 /** Possible values for the `rounded` variant. */

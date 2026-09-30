@@ -124,7 +124,6 @@ export default class AssetQuery {
     const owners: string[] = []
     const tagNameToSet: Readonly<Record<string, string[]>> = {
       // This is a dictionary, not an object.
-      /* eslint-disable @typescript-eslint/naming-convention */
       '': keywords,
       name: names,
       label: labels,
@@ -136,7 +135,6 @@ export default class AssetQuery {
       modified: modifieds,
       creations: creations,
       owner: owners,
-      /* eslint-enable @typescript-eslint/naming-convention */
     }
     for (const term of terms) {
       if (term.tag == null) {

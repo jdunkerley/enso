@@ -3,10 +3,9 @@ import { actionToTextId, type MenuEntryProps } from '#/components/MenuEntry'
 import type { DashboardBindingKey } from '#/configurations/inputBindings'
 import { useBindingFocusScope } from '#/providers/BindingFocusScopeProvider'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
-import { DEFAULT_HANDLER } from '#/utilities/inputBindings'
 import type { Action } from '$/providers/actions'
 import { useActionsStore, useText } from '$/providers/react'
-import type { Icon } from '@/util/iconMetadata/iconName'
+import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { useEffect, useRef, useState } from 'react'
 import { ref } from 'vue'
@@ -28,8 +27,7 @@ export function useBindGlobalActions(actions: Partial<Record<DashboardBindingKey
           category: getText(`${metadata.category}BindingCategory`),
           doAction,
           shortcuts: metadata.bindings,
-          // eslint-disable-next-line no-restricted-syntax
-          icon: metadata.icon as Icon | undefined,
+          icon: metadata.icon,
         },
       ]
     })
@@ -66,8 +64,7 @@ export function useMenuEntries(entries: readonly (MenuEntryProps | false | null 
           category: getText(`${metadata.category}BindingCategory`),
           doAction: entry.doAction,
           shortcuts: metadata.bindings,
-          // eslint-disable-next-line no-restricted-syntax
-          icon: (entry.icon ?? metadata.icon) as Icon | undefined,
+          icon: entry.icon ?? metadata.icon,
         },
       ]
     })

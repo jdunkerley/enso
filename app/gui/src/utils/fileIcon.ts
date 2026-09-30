@@ -1,9 +1,9 @@
 /** @file Return the appropriate file icon given the file name. */
-import type { SvgUseIcon } from '#/components/types'
+import type { Icon } from '@/util/iconMetadata/iconName'
 import { basenameAndExtension } from 'enso-common/src/utilities/file'
 
 /** Return the appropriate icon given the file name. */
-export function fileIcon(fileName: string): SvgUseIcon {
+export function fileIcon(fileName: string): Icon {
   const { extension } = basenameAndExtension(fileName)
   switch (extension.toLowerCase()) {
     case 'png':

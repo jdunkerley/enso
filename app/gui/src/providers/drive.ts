@@ -1,4 +1,4 @@
-import LocalStorage from '#/utilities/LocalStorage'
+import LocalStorage from '$/utils/LocalStorage'
 import { proxyRefs } from '$/utils/reactivity'
 import { createContextStore } from '@/providers'
 import { isDirectoryId, type DirectoryId } from 'enso-common/src/services/Backend'
@@ -25,7 +25,7 @@ const DRIVE_DISPLAY_SCHEMA = z
     currentCategory: z.string(),
   })
   .nullable()
-declare module '#/utilities/LocalStorage' {
+declare module '$/utils/LocalStorage' {
   interface LocalStorageData {
     readonly driveDisplay: z.infer<typeof DRIVE_DISPLAY_SCHEMA>
   }
