@@ -8,6 +8,7 @@ import { useContainerData } from '$/providers/container'
 import { useFeatureFlag } from '$/providers/featureFlags'
 import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
+import { useText } from '$/providers/text'
 import { ContainerProviderForReact } from '$/providers/react/container'
 import { provideReactApi } from '$/providers/reactApi'
 import { provideRightPanelData } from '$/providers/rightPanel'
@@ -25,6 +26,7 @@ import { BackendType, EnsoPath } from 'enso-common/src/services/Backend'
 import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBackend'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { normalizeSlashes } from 'enso-common/src/utilities/file'
+import { ConfigProvider } from 'reka-ui'
 import { onMounted, onUnmounted, shallowRef, toRef, toRefs } from 'vue'
 import HeadlessUiSpike from './HeadlessUiSpike.vue'
 import LeftPanel from './LeftPanel.vue'
@@ -53,6 +55,7 @@ const containerData = useContainerData()
 const { openProjectLocally, openSettingsTab, closeCurrentTab } = containerData
 const { focusedPanel, middlePanelShown } = toRefs(containerData)
 const headlessUiSpikeEnabled = useFeatureFlag('enableHeadlessUiSpike')
+const text = useText()
 provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
@@ -131,26 +134,31 @@ onUnmounted(() => {
 
 <template>
   <ContainerProviderForReact>
-    <div class="AppContainer">
-      <PopoverRootProvider>
-        <div class="topBarBackground" />
-        <CommandPalette />
-        <ModalWrapper />
-        <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
-        <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
-          <div class="bar">
-            <TabBar />
-            <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
-            <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
+    <!-- The locale for the Reka UI primitives (`$/components/`), as react-aria's `I18nProvider`
+    gives the React ones. Mounted here rather than in `App.vue`, so that Reka stays out of the
+    initial chunk: this is the lazily loaded dashboard, where the primitives are used. -->
+    <ConfigProvider :locale="text.locale">
+      <div class="AppContainer">
+        <PopoverRootProvider>
+          <div class="topBarBackground" />
+          <CommandPalette />
+          <ModalWrapper />
+          <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
+          <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
+            <div class="bar">
+              <TabBar />
+              <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
+              <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
+            </div>
+            <div class="belowBar">
+              <MiddlePanel v-if="middlePanelShown" />
+              <RightPanel />
+            </div>
           </div>
-          <div class="belowBar">
-            <MiddlePanel v-if="middlePanelShown" />
-            <RightPanel />
-          </div>
-        </div>
-        <div ref="fullscreenRoot" class="FullscreenRoot" @wheel.stop />
-      </PopoverRootProvider>
-    </div>
+          <div ref="fullscreenRoot" class="FullscreenRoot" @wheel.stop />
+        </PopoverRootProvider>
+      </div>
+    </ConfigProvider>
   </ContainerProviderForReact>
 </template>
 

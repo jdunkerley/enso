@@ -725,5 +725,9 @@ for the maintainer to review.
 14. **Not done here, by scope:** switching a real consumer to each primitive
     (the feature tickets and #82 do that, one mount site at a time), and a
     CHANGELOG entry (no user-visible change: the PR takes
-    `CI: No changelog needed`, per the repository rule). Reka's `ConfigProvider`
-    is mounted in `App.vue`, as decision 1 planned, with the user's locale.
+    `CI: No changelog needed`, per the repository rule).
+15. **Reka's `ConfigProvider` is mounted in `AppContainer.vue`, not `App.vue`**
+    as decision 1 planned. In `App.vue` it pulled Reka's shared code into the
+    initial chunk (+79 KB minified there, measured); `AppContainer` is the
+    lazily loaded dashboard, where the primitives are used. A primitive used
+    before sign-in would fall back to Reka's default locale, `en`.

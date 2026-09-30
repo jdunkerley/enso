@@ -137,7 +137,8 @@ test('a Vue Popover looks like the React user-menu popover beside it', async ({ 
     await expect(reactPopover).toBeVisible()
     const react = await reactPopover.evaluate(look, POPOVER_LOOK)
     const reactInner = await reactPopover.getByRole('dialog').evaluate(look, inner)
-    await page.keyboard.press('Escape')
+    // Its underlay takes the next click (see "coexists" above), which closes it.
+    await page.mouse.click(1, 1)
     await expect(reactPopover).toHaveCount(0)
 
     await page.getByTestId('headless-ui-spike-popover-trigger').click()

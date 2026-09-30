@@ -17,6 +17,8 @@
  *   `close`), like React's `onDismiss`. Setting `open` to `false` from outside does not fire it.
  * - Like React, keys other than Escape do not propagate out of the dialog, so global shortcuts do
  *   not fire while it is open.
+ * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
+ *   development builds.
  *
  * The global modal stack (`setModal` and its Vue replacement) is #80's; this is the primitive it
  * will render.
