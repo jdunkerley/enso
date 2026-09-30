@@ -4,7 +4,7 @@
  */
 import * as React from 'react'
 
-import * as inputBindingsModule from '#/configurations/inputBindings'
+import * as inputBindingsModule from '$/configurations/inputBindings'
 import { useLocalStorage } from '$/providers/react'
 import LocalStorage from '$/utils/LocalStorage'
 import * as object from 'enso-common/src/utilities/data/object'

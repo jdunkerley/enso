@@ -4,7 +4,6 @@ import type { TSchema } from '#/components/Form'
 import type { ComboBoxProps } from '#/components/Inputs/ComboBox'
 import { actionToTextId } from '#/components/MenuEntry'
 import { Text } from '#/components/Text'
-import { BINDINGS } from '#/configurations/inputBindings'
 import type { ToastAndLogCallback } from '#/hooks/toastAndLogHooks'
 import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { ApiKeySettingsSection } from '#/layouts/Settings/ApiKeysSettingsSection'
@@ -12,6 +11,8 @@ import { passwordWithPatternSchema } from '#/pages/authentication/schemas'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { PASSWORD_REGEX } from '#/utilities/validation'
 import type { PaywallFeatureName } from '$/composables/paywall'
+import { BINDINGS } from '$/configurations/inputBindings'
+import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import type { GetText } from '$/providers/text'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import { getLocalTimeZone, now } from '@internationalized/date'
@@ -50,7 +51,6 @@ import MembersSettingsSection from './MembersSettingsSection'
 import OrganizationProfilePictureInput from './OrganizationProfilePictureInput'
 import ProfilePictureInput from './ProfilePictureInput'
 import { SetupTwoFaForm } from './SetupTwoFaForm'
-import SettingsTabType from './TabType'
 import UsageSettingsSection from './UsageSettingsSection'
 import { UserGroupsSettingsSection } from './UserGroupsSettingsSection'
 
@@ -71,7 +71,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.account]: {
     nameId: 'accountSettingsTab',
     settingsTab: SettingsTabType.account,
-    icon: 'settings',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
     // The tab stays visible in degraded-auth mode so the Cognito-only sections
     // (password change, 2FA setup) remain reachable; the cloud-dependent sections
     // hide themselves via their own `getVisible`.
@@ -256,7 +256,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.organization]: {
     nameId: 'organizationSettingsTab',
     settingsTab: SettingsTabType.organization,
-    icon: 'people_settings',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
     sections: [
@@ -331,7 +331,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.local]: {
     nameId: 'localSettingsTab',
     settingsTab: SettingsTabType.local,
-    icon: 'system',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.local],
     visible: ({ localBackend }) => localBackend != null,
     sections: [
       {
@@ -436,7 +436,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.billingAndPlans]: {
     nameId: 'billingAndPlansSettingsTab',
     settingsTab: SettingsTabType.billingAndPlans,
-    icon: 'credit_card',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
     organizationOnly: true,
     visible: ({ user, organization }) =>
       user.isOrganizationAdmin && organization?.subscription != null,
@@ -487,7 +487,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.members]: {
     nameId: 'membersSettingsTab',
     settingsTab: SettingsTabType.members,
-    icon: 'people',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
     feature: 'inviteUser',
@@ -502,7 +502,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.userGroups]: {
     nameId: 'userGroupsSettingsTab',
     settingsTab: SettingsTabType.userGroups,
-    icon: 'people_settings',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
     feature: 'userGroups',
@@ -517,7 +517,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.appearance]: {
     nameId: 'appearanceSettingsTab',
     settingsTab: SettingsTabType.appearance,
-    icon: 'paint_palette',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.appearance],
     sections: [
       {
         nameId: 'codeSettingsSection',
@@ -539,7 +539,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.keyboardShortcuts]: {
     nameId: 'keyboardShortcutsSettingsTab',
     settingsTab: SettingsTabType.keyboardShortcuts,
-    icon: 'keyboard_shortcuts',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.keyboardShortcuts],
     sections: [
       {
         nameId: 'keyboardShortcutsSettingsSection',
@@ -568,7 +568,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.activityLog]: {
     nameId: 'activityLogSettingsTab',
     settingsTab: SettingsTabType.activityLog,
-    icon: 'log',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
     sections: [
@@ -587,7 +587,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.apiKeys]: {
     nameId: 'apiKeysSettingsTab',
     settingsTab: SettingsTabType.apiKeys,
-    icon: 'key',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.apiKeys],
     visible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
     sections: [
       {
@@ -606,7 +606,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.usage]: {
     nameId: 'usageSettingsTab',
     settingsTab: SettingsTabType.usage,
-    icon: 'credit_card',
+    icon: SETTINGS_TAB_ICONS[SettingsTabType.usage],
     feature: 'scheduler',
     sections: [
       {

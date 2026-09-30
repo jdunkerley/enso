@@ -2,20 +2,8 @@
  * @file The React provider for the {@link Logger} interface, along with a hook to use the
  * provider via the shared React context.
  */
+import type { Logger } from '$/log'
 import * as React from 'react'
-
-/**
- * Interface used to log logs, errors, etc.
- *
- * In the browser, this is the `Console` interface. In Electron, this is the `Logger` interface
- * provided by the EnsoGL packager.
- */
-export interface Logger {
-  /** Log a message to the console. */
-  readonly log: (message: unknown, ...optionalParams: unknown[]) => void
-  /** Log an error message to the console. */
-  readonly error: (message: unknown, ...optionalParams: unknown[]) => void
-}
 
 /** See `AuthContext` for safety details. */
 // eslint-disable-next-line no-restricted-syntax

@@ -6,7 +6,7 @@ import * as url from 'node:url'
 
 import * as v from 'vitest'
 
-import * as datalinkValidator from '#/data/datalinkValidator'
+import * as datalinkValidator from '$/utils/datalinkValidator'
 
 v.test('correctly rejects invalid values as not matching the schema', () => {
   v.expect(datalinkValidator.validateDatalink({})).toBe(false)
@@ -28,8 +28,8 @@ function testSchema(json: unknown, fileName: string): void {
   }
 }
 
-// We need to go up from `app/dashboard/` to the root of the repo
-const DIR_DEPTH = 6
+// We need to go up from `app/gui/src/utils/__tests__/` to the root of the repo
+const DIR_DEPTH = 5
 const REPO_ROOT = url.fileURLToPath(new URL('../'.repeat(DIR_DEPTH), import.meta.url))
 const BASE_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Base_Tests/data/datalinks/')
 const S3_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/AWS_Tests/data/')

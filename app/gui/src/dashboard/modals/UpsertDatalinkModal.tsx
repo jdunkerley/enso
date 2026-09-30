@@ -3,10 +3,10 @@ import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
-import SCHEMA from '#/data/datalinkSchema.json' with { type: 'json' }
-import { validateDatalink } from '#/data/datalinkValidator'
 import { DatalinkFormInput } from '#/pages/dashboard/components/DatalinkInput'
 import { useText } from '$/providers/react'
+import SCHEMA from '$/utils/datalinkSchema.json' with { type: 'json' }
+import { validateDatalink } from '$/utils/datalinkValidator'
 import { constantValueOfSchema } from '$/utils/jsonSchema'
 
 const DEFS: Record<string, object> = SCHEMA.$defs

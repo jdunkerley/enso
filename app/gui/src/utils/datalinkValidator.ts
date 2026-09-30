@@ -2,15 +2,13 @@
 import type * as ajv from 'ajv/dist/2020'
 import Ajv from 'ajv/dist/2020'
 
-import SCHEMA from '#/data/datalinkSchema.json' with { type: 'json' }
+import SCHEMA from '$/utils/datalinkSchema.json' with { type: 'json' }
 
 import * as error from 'enso-common/src/utilities/errors'
 
 export const AJV = new Ajv({
   formats: {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     'enso-secret': (value) => typeof value === 'string' && value !== '',
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     'enso-file': true,
   },
 })

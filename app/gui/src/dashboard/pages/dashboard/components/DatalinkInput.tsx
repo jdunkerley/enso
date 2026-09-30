@@ -3,8 +3,8 @@ import { FieldError } from '#/components/aria'
 import { Form, type FieldPath, type FormInstance, type TSchema } from '#/components/Form'
 import type * as jsonSchemaInput from '#/components/JSONSchemaInput'
 import JSONSchemaInput from '#/components/JSONSchemaInput'
-import SCHEMA from '#/data/datalinkSchema.json' with { type: 'json' }
-import * as datalinkValidator from '#/data/datalinkValidator'
+import SCHEMA from '$/utils/datalinkSchema.json' with { type: 'json' }
+import * as datalinkValidator from '$/utils/datalinkValidator'
 import * as error from 'enso-common/src/utilities/errors'
 
 const DEFS: Record<string, object> = SCHEMA.$defs

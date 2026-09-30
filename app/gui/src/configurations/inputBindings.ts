@@ -1,5 +1,5 @@
 /** @file Shortcuts for the dashboard application. */
-import { SETTINGS_TAB_DATA } from '#/layouts/Settings/data'
+import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import * as inputBindings from '$/utils/inputBindings'
 import * as detect from 'enso-common/src/utilities/detect'
 
@@ -117,38 +117,42 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
     },
     goToAccountSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA.account.icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
       category: 'settings',
     },
     goToOrganizationSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA.organization.icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
       category: 'settings',
     },
-    goToLocalSettings: { bindings: [], icon: SETTINGS_TAB_DATA.local.icon, category: 'settings' },
+    goToLocalSettings: {
+      bindings: [],
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.local],
+      category: 'settings',
+    },
     goToBillingAndPlansSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA['billing-and-plans'].icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
       category: 'settings',
     },
     goToMembersSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA.members.icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
       category: 'settings',
     },
     goToUserGroupsSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA['user-groups'].icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
       category: 'settings',
     },
     goToKeyboardShortcutsSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA['keyboard-shortcuts'].icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.keyboardShortcuts],
       category: 'settings',
     },
     goToActivityLogSettings: {
       bindings: [],
-      icon: SETTINGS_TAB_DATA['activity-log'].icon,
+      icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
       category: 'settings',
     },
     copyId: {

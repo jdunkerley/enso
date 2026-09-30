@@ -1,8 +1,8 @@
 /** @file A visual representation of a keyboard shortcut. */
 import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
-import type { DashboardBindingKey } from '#/configurations/inputBindings'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
+import type { DashboardBindingKey } from '$/configurations/inputBindings'
 import { useText } from '$/providers/react'
 import type { GetText } from '$/providers/text'
 import { toModifierKey } from '$/utils/inputBindings'
