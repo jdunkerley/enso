@@ -2,7 +2,7 @@
 import { Icon } from '#/components/Icon'
 import { Text } from '#/components/Text'
 import type { SvgUseIcon } from '#/components/types'
-import { tv } from '$/utils/style/tailwindVariants'
+import { STEP_STYLES } from '$/components/Stepper/variants'
 import * as React from 'react'
 import type { RenderStepProps } from './types'
 
@@ -18,27 +18,6 @@ export interface StepProps extends RenderStepProps {
   readonly description?: StepProp<React.ReactElement | string | null | undefined>
   readonly children?: StepProp<React.ReactNode>
 }
-
-const STEP_STYLES = tv({
-  base: 'relative flex items-center gap-2 select-none',
-  slots: {
-    icon: 'w-6 h-6 border-0.5 flex-none border-current rounded-full flex items-center justify-center transition-colors duration-200',
-    titleContainer: '-mt-1 flex flex-col items-start justify-start transition-colors duration-200',
-    content: 'flex-1',
-  },
-  variants: {
-    position: { first: 'rounded-l-full', last: 'rounded-r-full' },
-    status: {
-      completed: {
-        base: 'text-primary',
-        icon: 'bg-primary border-transparent text-invert',
-        content: 'text-primary',
-      },
-      current: { base: 'text-primary', content: 'text-primary/30' },
-      next: { base: 'text-primary/30', content: 'text-primary/30' },
-    },
-  },
-})
 
 /** A step component is used to represent a single step in a stepper component. */
 export function Step(props: StepProps) {

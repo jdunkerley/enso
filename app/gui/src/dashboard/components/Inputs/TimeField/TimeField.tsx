@@ -20,45 +20,11 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { Text } from '#/components/Text'
+import { TIME_FIELD_STYLES } from '$/components/Inputs/variants'
 import { useText } from '$/providers/react'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'
 import type { DateSegment as DateSegmentType } from 'react-stately'
-
-const DATE_PICKER_STYLES = tv({
-  base: '',
-  variants: {
-    size: {
-      small: {
-        inputGroup: 'h-6 px-2',
-      },
-      medium: {
-        inputGroup: 'h-8 px-4',
-      },
-    },
-  },
-  slots: {
-    inputGroup: 'flex items-center gap-2 rounded-full border-0.5 border-primary/20',
-    dateInput: 'flex justify-center grow',
-    dateSegment: 'rounded placeholder-shown:text-primary/30 focus:bg-primary/10 px-[0.5px]',
-    resetButton: '',
-    calendarPopover: '',
-    calendarDialog: 'text-primary text-xs mx-2',
-    calendarContainer: '',
-    calendarHeader: 'flex items-center mb-2',
-    calendarHeading: 'grow text-center',
-    calendarGrid: '',
-    calendarGridHeader: 'flex',
-    calendarGridHeaderCell: '',
-    calendarGridBody: '',
-    calendarGridCell:
-      'text-center px-1 rounded border border-transparent hover:bg-primary/10 outside-visible-range:text-primary/30 disabled:text-primary/30 selected:border-primary/40',
-  },
-  defaultVariants: {
-    size: 'medium',
-  },
-})
 
 /** Props for a {@link TimeField}. */
 export interface TimeFieldProps<
@@ -78,7 +44,7 @@ export interface TimeFieldProps<
     >,
     FieldProps,
     Pick<FieldComponentProps<Schema>, 'className' | 'style'>,
-    VariantProps<typeof DATE_PICKER_STYLES> {
+    VariantProps<typeof TIME_FIELD_STYLES> {
   readonly noResetButton?: boolean
   readonly segments?: Partial<Record<DateSegmentType['type'], boolean>>
 }
@@ -103,7 +69,7 @@ export const TimeField = forwardRef(function TimeFieldImpl<
     label,
     className,
     size,
-    variants = DATE_PICKER_STYLES,
+    variants = TIME_FIELD_STYLES,
     granularity,
     style,
     isInvalid,

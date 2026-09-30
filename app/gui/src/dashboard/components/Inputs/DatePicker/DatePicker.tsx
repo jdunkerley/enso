@@ -18,10 +18,9 @@ import {
   type DatePickerProps as AriaDatePickerProps,
   type DateValue,
 } from '#/components/aria'
+import { DATE_PICKER_STYLES } from '$/components/Inputs/variants'
 import { useText } from '$/providers/react'
-import { makeRoundedStyles } from '$/utils/style/roundedStyles'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'
 import type { DateSegment as DateSegmentType } from 'react-stately'
 
@@ -39,40 +38,6 @@ import {
 import { Text } from '#/components/Text'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { twJoin } from '$/utils/style/tailwindMerge'
-const DATE_PICKER_STYLES = tv({
-  base: '',
-  variants: {
-    rounded: makeRoundedStyles('inputContainer'),
-    size: {
-      custom: '',
-      small: { inputContainer: 'px-[11px] pb-0.5 pt-1' },
-      medium: { inputContainer: 'px-[11px] pb-[6.5px] pt-[8.5px]' },
-    },
-  },
-  slots: {
-    inputContainer: 'flex items-center gap-2 rounded-full border-0.5 border-primary/20',
-    dateInput: 'flex justify-start grow order-2',
-    dateSegment: 'rounded placeholder-shown:text-primary/30 focus:bg-primary/10 px-[0.5px]',
-    calendarButton: 'order-1 rotate-90',
-    resetButton: 'order-2',
-    calendarPopover: '',
-    calendarDialog: 'text-primary text-xs mx-2',
-    calendarContainer: '',
-    calendarHeader: 'flex items-center mb-2',
-    calendarHeading: 'grow text-center',
-    calendarGrid: '',
-    calendarGridHeader: 'flex',
-    calendarGridHeaderCell: '',
-    calendarGridBody: '',
-    calendarGridCell:
-      'text-center px-1 rounded border border-transparent hover:bg-primary/10 outside-visible-range:text-primary/30 disabled:text-primary/30 selected:border-primary/40',
-  },
-  defaultVariants: {
-    size: 'medium',
-    rounded: 'xlarge',
-  },
-})
-
 /** Return the date segment using English placeholders. */
 function normalizeDateSegment(segment: DateSegmentType): DateSegmentType {
   if (segment.text !== segment.placeholder) {

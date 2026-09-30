@@ -15,7 +15,8 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { MULTI_SELECTOR_STYLES } from '$/components/Inputs/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { omit, unsafeRemoveUndefined } from 'enso-common/src/utilities/data/object'
 import { forwardRef, useRef, type CSSProperties, type ForwardedRef, type Ref } from 'react'
 import { MultiSelectorOption, type MultiSelectorOptionProps } from './MultiSelectorOption'
@@ -52,44 +53,6 @@ export interface MultiSelectorProps<
   readonly inputRef?: Ref<HTMLDivElement>
   readonly placeholder?: string
 }
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const MULTI_SELECTOR_STYLES = tv({
-  base: 'block w-full bg-transparent transition-[border-color,outline] duration-200',
-  variants: {
-    disabled: {
-      true: { base: 'cursor-default opacity-50', textArea: 'cursor-default' },
-      false: { base: 'cursor-text', textArea: 'cursor-text' },
-    },
-    readOnly: { true: 'cursor-default' },
-    size: {
-      medium: '',
-    },
-    rounded: {
-      none: 'rounded-none',
-      small: 'rounded-sm',
-      medium: 'rounded-md',
-      large: 'rounded-lg',
-      xlarge: 'rounded-xl',
-      xxlarge: 'rounded-2xl',
-      xxxlarge: 'rounded-3xl',
-      full: 'rounded-full',
-    },
-    variant: {
-      outline: 'border-[0.5px] border-primary/20',
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      'separate-outline': { listBox: 'gap-2' },
-    },
-  },
-  defaultVariants: {
-    size: 'medium',
-    rounded: 'xxlarge',
-    variant: 'outline',
-  },
-  slots: {
-    listBox: 'grid',
-  },
-})
 
 // This is a function, even though it does not contain function syntax.
 // eslint-disable-next-line no-restricted-syntax, @typescript-eslint/no-explicit-any
