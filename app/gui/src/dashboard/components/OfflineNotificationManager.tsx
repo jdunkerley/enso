@@ -8,7 +8,7 @@
 
 import * as React from 'react'
 
-import * as toast from 'react-toastify'
+import { toast } from '#/utilities/toast'
 
 import * as offlineHooks from '#/hooks/offlineHooks'
 
@@ -34,15 +34,15 @@ export function OfflineNotificationManager(props: OfflineNotificationManagerProp
 
   offlineHooks.useOfflineChange(
     (isOffline) => {
-      toast.toast.dismiss(toastId)
+      toast.dismiss(toastId)
 
       if (isOffline) {
-        toast.toast.info(getText('offlineToastMessage'), {
+        toast.info(getText('offlineToastMessage'), {
           toastId,
           hideProgressBar: true,
         })
       } else {
-        toast.toast.info(getText('onlineToastMessage'), {
+        toast.info(getText('onlineToastMessage'), {
           toastId,
           hideProgressBar: true,
         })

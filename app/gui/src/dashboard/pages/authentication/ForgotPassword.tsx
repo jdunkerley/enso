@@ -7,11 +7,11 @@ import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import Link from '#/components/Link'
 import AuthenticationPage from '#/pages/authentication/AuthenticationPage'
+import { toast } from '#/utilities/toast'
 import { LOGIN_PATH } from '$/appUtils'
 import { useBackends, useRouter, useSession, useText } from '$/providers/react'
 import { useQueryParam } from '$/providers/react/queryParams'
 import { useState } from 'react'
-import { toast } from 'react-toastify'
 
 /** A form for users to request for their password to be reset. */
 export default function ForgotPassword() {

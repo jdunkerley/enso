@@ -9,11 +9,11 @@ import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { setModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import { useText } from '$/providers/react'
 import { useDriveCurrentBackend } from '$/providers/react/container'
 import { isDoubleClick } from '$/utils/event'
 import { isAssetCredential, titleSchema, type SecretAsset } from 'enso-common/src/services/Backend'
-import { toast } from 'react-toastify'
 import { useStore } from 'zustand'
 
 /** Props for a {@link SecretNameColumn}. */

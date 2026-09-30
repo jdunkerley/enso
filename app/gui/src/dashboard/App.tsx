@@ -3,15 +3,13 @@
  * application.
  *
  * The {@link App} component is responsible for defining the global context used by child
- * components. For example, it defines a {@link toastify.ToastContainer}, which is used to display temporary
- * notifications to the user. These global components are defined at the top of the {@link App} so
- * that they are available to all of the child components.
+ * components. These global components are defined at the top of the {@link App} so that they are
+ * available to all of the child components. The toasts are Vue's, in `App.vue`.
  *
  * The {@link App} also defines various providers.
  */
 import * as React from 'react'
 
-import * as toastify from 'react-toastify'
 import * as z from 'zod'
 
 import * as detect from 'enso-common/src/utilities/detect'
@@ -61,20 +59,9 @@ export default function App(props: React.PropsWithChildren) {
   // Note that the `Router` must be the parent of the `AuthProvider`, because the `AuthProvider`
   // will redirect the user between the login/register pages and the dashboard.
   return (
-    <>
-      <toastify.ToastContainer
-        position="top-center"
-        theme="light"
-        closeOnClick={false}
-        draggable={false}
-        toastClassName="text-sm leading-cozy bg-selected-frame rounded-lg backdrop-blur-default"
-        transition={toastify.Slide}
-        limit={3}
-      />
-      <ModalProvider>
-        <AppRouter {...props} />
-      </ModalProvider>
-    </>
+    <ModalProvider>
+      <AppRouter {...props} />
+    </ModalProvider>
   )
 }
 

@@ -37,7 +37,7 @@ export default class EditorPageActions<Context = object> extends PageActions<Con
     return this.step('Close toast notifications', async () => {
       await Promise.all(
         await this.page
-          .locator('.Toastify__toast')
+          .getByTestId('toast')
           .getByRole('button')
           .all()
           .then((buttons) => buttons.map((button) => button.click())),

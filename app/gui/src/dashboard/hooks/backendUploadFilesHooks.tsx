@@ -10,6 +10,7 @@ import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
 import { resolveDuplications } from '#/modals/DuplicateAssetsModal'
 import { useSetSelectedAssets, type SelectedAssetInfo } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import type { Category, CategoryType } from '$/providers/category'
 import { useBackends, useHttpClient, useText } from '$/providers/react'
 import { useUploadsToCloudStore } from '$/providers/react/upload'
@@ -30,7 +31,6 @@ import {
   type UploadFileRequestParams,
 } from 'enso-common/src/services/Backend'
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
-import { toast } from 'react-toastify'
 
 declare module '$/utils/queryClient' {
   /** */
