@@ -26,7 +26,7 @@ const triggerClasses = TEXT_STYLE({
 
 <template>
   <div class="HeadlessUiSpike" data-testid="headless-ui-spike">
-    <DropdownMenu testId="headless-ui-spike-menu" align="end">
+    <DropdownMenu testId="headless-ui-spike-menu" placement="bottom-end">
       <template #trigger>
         <button type="button" :class="triggerClasses" data-testid="headless-ui-spike-trigger">
           Reka spike
@@ -34,7 +34,7 @@ const triggerClasses = TEXT_STYLE({
       </template>
       <MenuItem testId="headless-ui-spike-item-alpha" @select="selected = 'Alpha'">Alpha</MenuItem>
       <MenuItem testId="headless-ui-spike-item-beta" @select="selected = 'Beta'">Beta</MenuItem>
-      <MenuItem disabled testId="headless-ui-spike-item-disabled">Unavailable</MenuItem>
+      <MenuItem isDisabled testId="headless-ui-spike-item-disabled">Unavailable</MenuItem>
       <MenuSeparator />
       <MenuItem testId="headless-ui-spike-item-gamma" @select="selected = 'Gamma'">Gamma</MenuItem>
     </DropdownMenu>

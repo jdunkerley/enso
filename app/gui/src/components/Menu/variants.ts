@@ -10,6 +10,7 @@
  * See `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`, decision 5.
  */
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
+import { SEPARATOR_STYLES } from '$/components/Separator/variants'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
 
@@ -40,14 +41,48 @@ export const MENU_ITEM_STYLES = tv({
     'data-[disabled]:cursor-not-allowed data-[disabled]:opacity-30',
   ],
   slots: {
+    row: 'flex w-full gap-2',
+    icon: 'mt-[3.5px] h-4 w-4 flex-none text-primary',
     title: TEXT_STYLE({
       variant: 'body',
       color: 'primary',
       className: 'block w-full flex-1 truncate',
     }),
+    // The React `MenuItemContent` with a description: title above a caption.
+    titleWithDescription: '-mt-[1px] flex w-full min-w-0 flex-1 flex-col',
+    description: TEXT_STYLE({
+      variant: 'caption',
+      color: 'primary',
+      disableLineHeightCompensation: true,
+      className: '-mt-[4px] block w-full truncate',
+    }),
+    shortcut: TEXT_STYLE({
+      variant: 'body',
+      color: 'primary',
+      nowrap: true,
+      textSelection: 'none',
+      transform: 'uppercase',
+      className: 'mt-[1px] self-center truncate',
+    }),
+    submenuIndicator: 'h-4 w-4 flex-none self-center text-primary',
   },
 })
 
+export const MENU_SECTION_STYLES = tv({
+  base: 'flex flex-col',
+  slots: {
+    header: TEXT_STYLE({
+      variant: 'body-sm',
+      weight: 'bold',
+      color: 'muted',
+      textSelection: 'none',
+      className: 'block px-3.5 py-0.5',
+    }),
+  },
+})
+
+/** React's `MENU_SEPARATOR_STYLES`: a thin `Separator`, inset. Render it with `size: 'thin'`. */
 export const MENU_SEPARATOR_STYLES = tv({
-  base: 'mx-2 my-1.5 h-[0.5px] rounded-full bg-primary/10',
+  extend: SEPARATOR_STYLES,
+  base: 'my-1.5 mx-2',
 })

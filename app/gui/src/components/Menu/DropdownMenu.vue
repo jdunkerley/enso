@@ -6,37 +6,37 @@
  * Reka provides the accessibility behaviour react-aria provided on the React side: `menu` /
  * `menuitem` roles, focus moved into the menu on open and back to the trigger on close, arrow-key
  * navigation with typeahead, Escape and outside-click dismissal.
+ *
+ * The trigger is the `trigger` slot, replacing React's `Menu.Trigger` wrapper; the items
+ * (`MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`) are the default slot.
  */
+import { placementToSideAlign, type Placement } from '$/components/placement'
+import { portalTarget } from '$/components/portal'
 import {
   DropdownMenuContent,
   DropdownMenuPortal,
   DropdownMenuRoot,
   DropdownMenuTrigger,
-  type DropdownMenuContentProps,
 } from 'reka-ui'
 import { computed } from 'vue'
 import { MENU_STYLES } from './variants'
 
 const {
   variant = 'light',
-  side = 'bottom',
-  align = 'start',
+  placement = 'bottom-start',
   testId,
+  class: className,
 } = defineProps<{
-  variant?: 'light' | 'dark'
-  side?: DropdownMenuContentProps['side']
-  align?: DropdownMenuContentProps['align']
-  testId?: string
+  variant?: 'dark' | 'light' | undefined
+  placement?: Placement | undefined
+  testId?: string | undefined
+  class?: string | undefined
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
 
-/**
- * Render into the same root as the React overlays (`index.html`), so both frameworks' popups share
- * one stacking context and the dashboard's base styles (`:where(.enso-portal-root)`).
- */
-const portalTarget = computed(() => document.getElementById('enso-portal-root') ?? 'body')
-const classes = computed(() => MENU_STYLES({ variant }))
+const sideAlign = computed(() => placementToSideAlign(placement))
+const classes = computed(() => MENU_STYLES({ variant, className }))
 </script>
 
 <template>
@@ -44,10 +44,10 @@ const classes = computed(() => MENU_STYLES({ variant }))
     <DropdownMenuTrigger asChild>
       <slot name="trigger" />
     </DropdownMenuTrigger>
-    <DropdownMenuPortal :to="portalTarget">
+    <DropdownMenuPortal :to="portalTarget()">
       <DropdownMenuContent
-        :side="side"
-        :align="align"
+        :side="sideAlign.side"
+        :align="sideAlign.align"
         :sideOffset="4"
         :class="classes"
         :data-testid="testId"
