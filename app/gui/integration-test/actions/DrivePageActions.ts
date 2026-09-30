@@ -231,7 +231,10 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       },
       withSelectedRows(callback: LocatorCallback<Context>) {
         return self.step('Interact with selected drive table rows', async (page, context) => {
-          await callback(locateAssetRows(page).and(page.locator('[data-selected="true"]')), context)
+          await callback(
+            locateAssetRows(page).and(page.getByRole('row', { selected: true })),
+            context,
+          )
         })
       },
       /** Drag a row onto another row. */

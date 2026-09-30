@@ -258,6 +258,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
             data-testid="asset-row"
             tabIndex={0}
             data-selected={isSelected}
+            aria-selected={isSelected}
             data-id={item.id}
             onDoubleClick={() => {
               if (item.type === backendModule.AssetType.directory) {

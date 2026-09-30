@@ -46,7 +46,7 @@ export default class LoginPageActions<Context = object> extends BaseActions<Cont
         await this.loginInternal(email, password)
       }
       await expect(page.getByTestId('content-not-allowed')).toHaveCount(0, { timeout: 10_000 })
-      const agreementModalVisible = (await page.locator('#agreements-modal').count()) > 0
+      const agreementModalVisible = (await page.getByTestId('agreements-modal').count()) > 0
       if (agreementModalVisible) {
         await this.passAgreementsDialog()
       }
@@ -130,7 +130,7 @@ export default class LoginPageActions<Context = object> extends BaseActions<Cont
 
   private passAgreementsDialog() {
     return test.step('Accept Terms and Conditions', async () => {
-      await this.page.waitForSelector('#agreements-modal')
+      await expect(this.page.getByTestId('agreements-modal')).toBeVisible()
       await this.page
         .getByRole('group', { name: TEXT.licenseAgreementCheckbox })
         .getByText(TEXT.licenseAgreementCheckbox)

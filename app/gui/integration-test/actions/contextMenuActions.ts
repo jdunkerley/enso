@@ -71,9 +71,9 @@ export function contextMenuActions<T extends BaseActions<Context>, Context>(
         // Confirm the deletion in the dialog
         const dialog = page.getByTestId('modal-dialog')
         await dialog.getByRole('button', { name: TEXT.delete }).getByText(TEXT.delete).click()
-        // Wait for the dialog to be detached. While the react-aria exit animation
-        // runs (~200ms `slide-out-to-top-1`), the modal still has `fixed inset-0`
-        // and intercepts subsequent clicks.
+        // Wait until the dialog is gone. A closing modal can stay in the page for its exit
+        // transition, covering the page and intercepting the next click; waiting for the state
+        // (rather than for a fixed duration) holds whatever the transition is.
         await expect(dialog).toBeHidden()
       }),
     moveToTrash: () =>
@@ -86,9 +86,9 @@ export function contextMenuActions<T extends BaseActions<Context>, Context>(
         // Confirm the deletion in the dialog
         const dialog = page.getByTestId('modal-dialog')
         await dialog.getByRole('button', { name: TEXT.delete }).getByText(TEXT.delete).click()
-        // Wait for the dialog to be detached. While the react-aria exit animation
-        // runs (~200ms `slide-out-to-top-1`), the modal still has `fixed inset-0`
-        // and intercepts subsequent clicks.
+        // Wait until the dialog is gone. A closing modal can stay in the page for its exit
+        // transition, covering the page and intercepting the next click; waiting for the state
+        // (rather than for a fixed duration) holds whatever the transition is.
         await expect(dialog).toBeHidden()
       }),
     restoreFromTrash: () =>
