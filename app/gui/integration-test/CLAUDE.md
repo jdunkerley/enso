@@ -113,3 +113,11 @@ in both modes. Anything else runs once, unlicensed.
 - Mock at the boundary (HTTP / Amplify / LS), not inside components.
 - Avoid `page.waitForTimeout` — prefer role-based `toBeVisible` / `toHaveText`
   assertions.
+- **Never leave the cursor on the dashboard's left bar.** It expands over the
+  drive panel 550ms after the pointer enters it, covering the toolbar's "New
+  Project" and each row's leftmost button. Playwright moves the mouse only once
+  its target is uncovered, so the bar never collapses and the click times out
+  (`<div class="categories"> from <div class="leftBar expanded"> intercepts pointer events`)
+  — but only when the next click lands more than ~550ms later, i.e. on a loaded
+  CI runner (#146). Every helper that clicks or drops on the bar ends with
+  `page.mouse.move(0, 0)`; do the same in new ones.

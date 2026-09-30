@@ -88,8 +88,12 @@ test.describe(() => {
         PROFILE_PICTURE_CONTENT,
         PROFILE_PICTURE_MIMETYPE,
       )
+      // Choosing the file only starts the upload; the mock records the picture once the request
+      // arrives, so poll for it (as `userSettings.spec.ts` does for the user's picture).
       .step('Profile picture should be updated', () =>
-        expect(cloudApi.currentOrganizationProfilePicture()).toEqual(PROFILE_PICTURE_CONTENT),
+        expect(() =>
+          expect(cloudApi.currentOrganizationProfilePicture()).toEqual(PROFILE_PICTURE_CONTENT),
+        ).toPass(),
       )
   })
 })
