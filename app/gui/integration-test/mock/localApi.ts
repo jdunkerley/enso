@@ -24,7 +24,7 @@ import { getDirectoryAndName } from 'enso-common/src/utilities/file'
 import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { test } from 'integration-test/base'
 import { uuidv4 } from 'lib0/random.js'
-import { join } from 'node:path'
+import { posix } from 'node:path'
 import type { Page, WebSocketRoute } from 'playwright'
 import { YjsChannel } from 'ydoc-channel'
 import { WSSharedDoc, YjsConnection, type YjsSocket } from 'ydoc-server'
@@ -40,6 +40,8 @@ function array<T>(): Readonly<T>[] {
   return []
 }
 
+// The mocked filesystem is POSIX-style whatever the host is: join its paths with `posix.join`, not
+// the host's `join`, which would write backslashes into them on Windows.
 const ROOT_PARENT_PATH = Path('/home/user/enso')
 const ROOT_PATH = Path('/home/user/enso/enso-projects')
 const DOWNLOAD_PATH = Path('/home/user/enso/Downloads')
@@ -487,8 +489,8 @@ export async function mockLocalApi(page: Page) {
         return route.fulfill({ status: 400 })
       }
       const projectId = uniqueString()
-      const parentDirectory = join(ROOT_PATH, `cloud-project-${projectId}`)
-      const targetDirectory = join(parentDirectory, 'project_root')
+      const parentDirectory = posix.join(ROOT_PATH, `cloud-project-${projectId}`)
+      const targetDirectory = posix.join(parentDirectory, 'project_root')
       addDirectory({ path: Path(parentDirectory) })
       addProject({
         path: Path(targetDirectory),
