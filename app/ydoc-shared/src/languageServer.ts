@@ -151,9 +151,14 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     private transport: YjsTransport,
   ) {
     super()
-    this.initialized = this.scheduleInitializationAfterConnect()
+    // The client must exist before initialization runs, because initialization sends requests
+    // through it. `new RequestManager` connects the transport, and `YjsTransport.connect` emits
+    // `open` synchronously, so the transport can already be open once the client exists;
+    // `scheduleInitializationAfterConnect` therefore checks `isOpen` rather than only waiting for
+    // a future `open` event.
     const requestManager = new RequestManager([transport])
     this.client = new Client(requestManager)
+    this.initialized = this.scheduleInitializationAfterConnect()
     this.client.onNotification((notification) => {
       this.emit(notification.method as keyof Notifications, [notification.params])
     })
@@ -195,27 +200,25 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     if (this.initializationScheduled) return this.initialized
     this.initializationScheduled = true
     this.initialized = new Promise((resolve) => {
-      this.transport.on(
-        'open',
-        () => {
-          this.emit('transport/connected', [])
-          this.initializationScheduled = false
-          exponentialBackoff(() => this.initProtocolConnection(this.clientID), {
-            onBeforeRetry: (error, _, delay) => {
-              console.warn(
-                `Failed to initialize Language Server connection, retrying after ${delay}ms...\n`,
-                error,
-              )
-            },
-          }).then((result) => {
-            if (!result.ok) {
-              result.error.log('Error initializing Language Server RPC')
-            }
-            resolve(result)
-          })
-        },
-        { once: true },
-      )
+      const initialize = () => {
+        this.emit('transport/connected', [])
+        this.initializationScheduled = false
+        exponentialBackoff(() => this.initProtocolConnection(this.clientID), {
+          onBeforeRetry: (error, _, delay) => {
+            console.warn(
+              `Failed to initialize Language Server connection, retrying after ${delay}ms...\n`,
+              error,
+            )
+          },
+        }).then((result) => {
+          if (!result.ok) {
+            result.error.log('Error initializing Language Server RPC')
+          }
+          resolve(result)
+        })
+      }
+      if (this.transport.isOpen) initialize()
+      else this.transport.on('open', initialize, { once: true })
     })
     return this.initialized
   }

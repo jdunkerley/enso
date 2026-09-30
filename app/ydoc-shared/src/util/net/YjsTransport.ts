@@ -37,6 +37,7 @@ export class YjsTransport extends Transport {
   protected doc: Y.Doc
   protected channelName: string
   protected eventListeners: Map<string, Set<EventListener<any>>> = new Map()
+  private opened = false
 
   /**
    * Create a {@link YjsTransport}.
@@ -59,9 +60,18 @@ export class YjsTransport extends Transport {
         this.emit('message', new MessageEvent('message', { data: message }))
         this.transportRequestManager.resolveResponse(message)
       })
+      this.opened = true
       this.emit('open', new Event('open'))
       resolve()
     })
+  }
+
+  /**
+   * Whether the transport is open: `open` has been emitted and `close` has not been emitted since.
+   * Lets a listener that attaches late tell that it has already missed the `open` event.
+   */
+  get isOpen(): boolean {
+    return this.opened
   }
 
   /**
@@ -90,6 +100,7 @@ export class YjsTransport extends Transport {
   /** Close the channel and clean up subscriptions. */
   public close(): void {
     this.channel.close()
+    this.opened = false
     this.emit('close', new CloseEvent('close'))
   }
 
