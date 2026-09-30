@@ -1,0 +1,72 @@
+[
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(5)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(7)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab[aria-label=\"Documentation\"][role=\"tab\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Activity\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Description\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Properties\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Versions\"]"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".DropdownMenu.helpButton > .toggledOff.MenuButton"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".ensoIcon > .toggledOff.MenuButton"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".leftBarIcon"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": "#<generated>"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": "#<generated>"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": "#<generated>"
+  },
+  {
+    "rule": "meta-viewport",
+    "impact": "moderate",
+    "target": "meta[name=\"viewport\"]"
+  }
+]

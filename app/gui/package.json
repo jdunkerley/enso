@@ -19,7 +19,11 @@
     "--max-old-space-size=4096 is required when sourcemaps are enabled,",
     "otherwise Rollup runs out of memory when Vite is rendering chunks.",
     "ResizeObserver is required for the dashboard tests to work.",
-    "ResizeObserver is not supported in vitest, so we need to stub it."
+    "ResizeObserver is not supported in vitest, so we need to stub it.",
+    "@axe-core/playwright is pinned exactly (and so its axe-core, ~4.13.0, through the lockfile):",
+    "integration-test/dashboard/accessibility.spec.ts fails on any axe violation not listed in",
+    "integration-test/accessibility-baseline/, and a new axe-core release adds or changes rules.",
+    "Bump it deliberately and regenerate the baseline in the same PR (#81)."
   ],
   "scripts": {
     "generate-icons": "node scripts/generateIconMetadata.mjs",
@@ -129,6 +133,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@fast-check/vitest": "catalog:",
     "@open-rpc/server-js": "^1.10.1",

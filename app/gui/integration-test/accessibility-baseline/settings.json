@@ -1,0 +1,72 @@
+[
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(1)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(2)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(6)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(7)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Activity\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Scheduler - Exclusive to Cloud\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Versions - Exclusive to Cloud\"]"
+  },
+  {
+    "rule": "autocomplete-valid",
+    "impact": "serious",
+    "target": "input[name=\"currentPassword\"]"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".CloseButton"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".DropdownMenu.helpButton > .toggledOff.MenuButton"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".ensoIcon > .toggledOff.MenuButton"
+  },
+  {
+    "rule": "button-name",
+    "impact": "critical",
+    "target": ".leftBarIcon"
+  },
+  {
+    "rule": "meta-viewport",
+    "impact": "moderate",
+    "target": "meta[name=\"viewport\"]"
+  },
+  {
+    "rule": "nested-interactive",
+    "impact": "serious",
+    "target": ".selected"
+  }
+]
