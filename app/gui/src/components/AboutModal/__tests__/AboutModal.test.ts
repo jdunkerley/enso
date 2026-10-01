@@ -23,6 +23,7 @@ function mountAbout() {
   mountWithProviders(() =>
     h(AboutModal, {
       open: about.isOpen.value,
+      opener: about.opener.value,
       'onUpdate:open': (value: boolean) => (about.isOpen.value = value),
     }),
   )
@@ -82,5 +83,25 @@ describe('AboutModal', () => {
     expect(dialog()).toBeNull()
     expect(useAboutModal().isOpen.value).toBe(false)
     expect(byTestId('modal-dialog')).toBeNull()
+  })
+
+  test('focus returns to the menu it was opened from, though the menu item has gone', async () => {
+    const menu = document.createElement('div')
+    menu.innerHTML =
+      '<button aria-controls="user-menu" data-testid="user-button">User</button>' +
+      '<div id="user-menu"><button data-testid="about-item">About Enso</button></div>'
+    document.body.appendChild(menu)
+    byTestId('about-item')!.focus()
+    openAboutModal()
+    // The menu closes as the dialog opens; the dialog mounts (it is loaded on demand) after that.
+    byTestId('about-item')!.remove()
+    mountAbout()
+    await flushPromises()
+    expect(dialog()).not.toBeNull()
+    await userEvent.setup().keyboard('{Escape}')
+    await flushPromises()
+    expect(dialog()).toBeNull()
+    expect(document.activeElement).toBe(byTestId('user-button'))
+    menu.remove()
   })
 })

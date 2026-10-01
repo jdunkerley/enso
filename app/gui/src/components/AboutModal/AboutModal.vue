@@ -8,6 +8,7 @@
  */
 import CopyButton from '$/components/Button/CopyButton.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
+import type { FocusReturnTarget } from '$/components/Dialog/focusReturn'
 import Icon from '$/components/Icon/Icon.vue'
 import Heading from '$/components/Text/Heading.vue'
 import Text from '$/components/Text/Text.vue'
@@ -17,6 +18,11 @@ import type { TextId } from 'enso-common/src/text'
 import { computed } from 'vue'
 
 const open = defineModel<boolean>('open', { default: false })
+
+const { opener } = defineProps<{
+  /** Where focus returns on closing (`openAboutModal` notes it). */
+  opener?: FocusReturnTarget | undefined
+}>()
 
 const { localBackend } = useBackends()
 const { getText } = useText()
@@ -42,7 +48,12 @@ const copyText = computed(() =>
 </script>
 
 <template>
-  <Dialog v-model:open="open" :title="getText('aboutThisAppShortcut')" size="large">
+  <Dialog
+    v-model:open="open"
+    :title="getText('aboutThisAppShortcut')"
+    size="large"
+    :opener="opener"
+  >
     <div class="relative flex flex-col items-center gap-4">
       <Icon icon="enso_logo" class="size-16 shrink-0" />
 

@@ -102,7 +102,11 @@ window.api?.menu.setMenuItemHandler('about', openAboutModal)
       <ContextsForReactProvider v-if="Component">
         <ReactRootWrapper :queryClient="queryClient">
           <ToastHost />
-          <AboutModal v-if="aboutMounted" v-model:open="about.isOpen.value" />
+          <AboutModal
+            v-if="aboutMounted"
+            v-model:open="about.isOpen.value"
+            :opener="about.opener.value"
+          />
           <ErrorBoundary onlyRenderErrors :resetKeys="[route.path]">
             <component :is="Component" />
           </ErrorBoundary>

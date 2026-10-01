@@ -396,3 +396,66 @@ describe('`closed`', () => {
     expect(onClosed).toHaveBeenCalledOnce()
   })
 })
+
+describe('focus without a trigger (as react-aria)', () => {
+  function mountControlled(props: Record<string, unknown> = {}) {
+    const open = ref(false)
+    mountWithProviders(() => [
+      h('div', { id: 'menu-popup' }, [h('button', { 'data-testid': 'item' }, 'About')]),
+      h('button', { 'data-testid': 'menu-trigger', 'aria-controls': 'menu-popup' }, 'Menu'),
+      h(
+        Dialog,
+        {
+          title: 'About',
+          testId: 'dialog',
+          open: open.value,
+          'onUpdate:open': (value: boolean) => (open.value = value),
+          ...props,
+        },
+        () => h('button', { 'data-testid': 'inside' }, 'Inside'),
+      ),
+    ])
+    return open
+  }
+
+  test('it focuses itself on opening, and returns focus to its opener on closing', async () => {
+    const open = mountControlled()
+    byTestId('item')!.focus()
+    open.value = true
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('dialog'))
+    open.value = false
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('item'))
+  })
+
+  test('when the opener has gone, focus returns to the trigger of the menu it was in', async () => {
+    const open = mountControlled()
+    byTestId('item')!.focus()
+    open.value = true
+    await flushPromises()
+    byTestId('item')!.remove()
+    open.value = false
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('menu-trigger'))
+  })
+
+  test('an AlertDialog returns focus the same way', async () => {
+    const open = ref(false)
+    mountWithProviders(() => [
+      h('button', { 'data-testid': 'opener' }, 'Delete'),
+      h(AlertDialog, {
+        title: 'Delete?',
+        open: open.value,
+        'onUpdate:open': (value: boolean) => (open.value = value),
+      }),
+    ])
+    byTestId('opener')!.focus()
+    open.value = true
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('alert-dialog-confirm'))
+    await userEvent.setup().click(byTestId('alert-dialog-cancel')!)
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('opener'))
+  })
+})

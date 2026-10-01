@@ -36,7 +36,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from 'reka-ui'
-import { computed, ref } from 'vue'
+import { useDialogFocus } from '$/components/Dialog/focusReturn'
+import { computed, ref, useSlots } from 'vue'
 
 const {
   title,
@@ -69,6 +70,10 @@ const emit = defineEmits<{
 }>()
 
 const { getText } = useText()
+
+// Focus returns to the opener on closing, as in `Dialog.vue`; it opens on the confirm button.
+const slots = useSlots()
+const focus = useDialogFocus(open, () => slots.trigger != null)
 
 const pending = ref<'cancel' | 'confirm'>()
 
@@ -120,6 +125,7 @@ const styles = computed(() =>
             :data-testid="testId"
             @escapeKeyDown.prevent
             @openAutoFocus="focusConfirm"
+            @closeAutoFocus="focus.onCloseAutoFocus"
           >
             <div class="w-full">
               <header :class="styles.header({ scrolledToTop: true })">

@@ -994,5 +994,17 @@ the rulings above: provisionally accepted, for the maintainer to review.
     boundary in `App.vue` brought `Button`, `Result` and Reka into the initial
     chunk (+101 KB minified, measured); now the initial chunk is unchanged (+0.6
     KB). Tests wait for the display to appear.
-11. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
+11. **A dialog without a trigger handles focus as react-aria does**
+    (`Dialog/focusReturn.ts`), found by comparing the running app before and
+    after. Reka focused the dialog's first button on opening (the About dialog's
+    Close button) and, when the element that opened it had gone, dropped focus
+    on the page's body on closing. Now the dialog focuses itself on opening (an
+    `AlertDialog` still focuses its confirm button, as React's `autoFocus` did),
+    and on closing returns focus to its opener or, when that was an item of a
+    menu that closed as the dialog opened, to that menu's trigger (found by
+    `aria-controls`): the user menu's button, after "About Enso". The Vue
+    dialogs also fix two React quirks, invisible to a mouse user: they are named
+    by their title (React's had no accessible name), and Tab stays inside the
+    confirmation (React's let it escape to the page once).
+12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
     (they go with #94) and `VersionChecker` (with its feature's port).

@@ -17,6 +17,9 @@
  *   `close`), like React's `onDismiss`. Setting `open` to `false` from outside does not fire it.
  * - Like React, keys other than Escape do not propagate out of the dialog, so global shortcuts do
  *   not fire while it is open.
+ * - Without a trigger it focuses itself on opening, and returns focus on closing to the element
+ *   that opened it, or to the trigger of the menu that element was in (`./focusReturn.ts`), as
+ *   react-aria does. `opener` gives that element when the caller knew it before the dialog mounted.
  * - `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
  *   (`$/providers/modals`) emits `close` then, so that it does not vanish mid-animation.
  * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
@@ -47,8 +50,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from 'reka-ui'
-import { computed, ref } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 import { provideDialogContext } from './dialogContext'
+import { useDialogFocus, type FocusReturnTarget } from './focusReturn'
 
 type DialogVariants = VariantProps<typeof DIALOG_STYLES>
 
@@ -67,6 +71,7 @@ const {
   role = 'dialog',
   testId,
   class: className,
+  opener,
 } = defineProps<{
   title?: string | undefined
   type?: 'fullscreen' | 'modal' | undefined
@@ -84,6 +89,8 @@ const {
   role?: 'alertdialog' | 'dialog' | undefined
   testId?: string | undefined
   class?: string | undefined
+  /** Where focus returns on closing, when known before the dialog mounted (`focusReturnTarget()`). */
+  opener?: FocusReturnTarget | undefined
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -105,6 +112,13 @@ function onOpenChange(value: boolean) {
 }
 
 provideDialogContext({ close })
+
+const slots = useSlots()
+const focus = useDialogFocus(
+  open,
+  () => slots.trigger != null,
+  () => opener,
+)
 
 const styles = computed(() =>
   DIALOG_STYLES({
@@ -175,6 +189,8 @@ function stopNonEscapeKeys(event: KeyboardEvent) {
             :aria-describedby="undefined"
             @pointerDownOutside="onPointerDownOutside"
             @escapeKeyDown="onEscapeKeyDown"
+            @openAutoFocus="focus.onOpenAutoFocus"
+            @closeAutoFocus="focus.onCloseAutoFocus"
           >
             <div class="w-full">
               <header :class="styles.header({ scrolledToTop: isScrolledToTop })">
