@@ -8,8 +8,10 @@ test("Activity tab lists the open project's sessions", async ({ editorPage, loca
   await editorPage.do(async (page) => {
     await page.getByRole('tab', { name: 'Activity' }).click()
     const panel = page.getByTestId('right-panel')
-    await expect(panel.getByText('Session 2', { exact: true })).toBeVisible()
-    await expect(panel.getByText('Session 1', { exact: true })).toBeVisible()
+    // Not `exact`: each entry's element holds its date as well ("Session 2on 2026-10-01 …").
+    await expect(panel.getByText('Session 2')).toBeVisible()
+    await expect(panel.getByText('Session 1')).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Show Logs' })).toHaveCount(2)
     await expect(panel.getByText('Select a single project to view its sessions.')).toBeHidden()
     expect(calls.listProjectSessions).toHaveLength(1)
   })
