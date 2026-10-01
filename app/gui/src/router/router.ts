@@ -1,15 +1,4 @@
-import Login from '#/pages/authentication/Login'
-import {
-  CONFIRM_REGISTRATION_PATH,
-  DASHBOARD_PATH,
-  FORGOT_PASSWORD_PATH,
-  LOGIN_PATH,
-  PAYMENTS_SUCCESS_PATH,
-  REGISTRATION_PATH,
-  RESET_PASSWORD_PATH,
-  RESTORE_USER_PATH,
-  SUBSCRIBE_PATH,
-} from '$/appUtils'
+import { DASHBOARD_PATH, PAYMENTS_SUCCESS_PATH, SUBSCRIBE_PATH } from '$/appUtils'
 import { useAuth } from '$/providers/auth'
 import { useConfig } from '$/providers/config'
 import { flagsStore } from '$/providers/featureFlags'
@@ -20,6 +9,7 @@ import {
   redirectFromPath,
 } from '$/router/dashboardGuards'
 import { withDataLoader } from '$/router/dataLoader'
+import { PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
 import { reactComponent, suspendedReactComponent } from '@/util/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
@@ -31,21 +21,14 @@ function requireCloudBrowserEnabled() {
   if (!isCloudExecutionEnabled) return { name: 'cloudDisabled' }
 }
 
+// The cloud's authentication pages (sign-in, sign-up, password reset, …) are not listed here:
+// `registerCloud` (`$/cloud`) adds them, some as children of the protected layout.
 const routes = [
   {
+    name: PROTECTED_LAYOUT_ROUTE,
     path: UNAVAILABLE_PATH,
     component: withDataLoader(() => import('$/components/ProtectedLayout.vue')),
     children: [
-      {
-        path: LOGIN_PATH,
-        meta: { access: 'guest' },
-        component: reactComponent(Login),
-      },
-      {
-        path: REGISTRATION_PATH,
-        meta: { access: 'guest' },
-        component: withDataLoader(() => import('$/components/RegistrationPage.vue')),
-      },
       {
         path: UNAVAILABLE_PATH,
         meta: { access: 'anyLoggedIn' },
@@ -93,14 +76,6 @@ const routes = [
         ],
       },
       {
-        path: RESTORE_USER_PATH,
-        meta: { access: 'deleted' },
-        component: () =>
-          import('#/pages/authentication/RestoreAccount').then((mod) =>
-            reactComponent(mod.default),
-          ),
-      },
-      {
         path: '/cloudDisabled',
         name: 'cloudDisabled',
         meta: { access: 'anyLoggedIn' },
@@ -117,25 +92,6 @@ const routes = [
     meta: { access: 'anyLoggedIn' },
     component: () =>
       import('#/pages/PaymentsSuccess').then((mod) => reactComponent(mod.PaymentsSuccess)),
-  },
-
-  /* Other pages are visible to unauthenticated and authenticated users. */
-  {
-    path: CONFIRM_REGISTRATION_PATH,
-    component: () =>
-      import('#/pages/authentication/ConfirmRegistration').then((mod) =>
-        reactComponent(mod.default),
-      ),
-  },
-  {
-    path: FORGOT_PASSWORD_PATH,
-    component: () =>
-      import('#/pages/authentication/ForgotPassword').then((mod) => reactComponent(mod.default)),
-  },
-  {
-    path: RESET_PASSWORD_PATH,
-    component: () =>
-      import('#/pages/authentication/ResetPassword').then((mod) => reactComponent(mod.default)),
   },
   {
     path: '/:anyPath(.*)*',
