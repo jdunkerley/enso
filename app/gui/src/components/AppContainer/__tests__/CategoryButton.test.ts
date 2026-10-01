@@ -1,4 +1,6 @@
+import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import type { Category } from '$/providers/category'
+import { useModals } from '$/providers/modals'
 import type { ReactApi } from '$/providers/reactApi'
 import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
@@ -9,12 +11,15 @@ import CategoryButton from '../CategoryButton.vue'
 
 // `useCategories` and `useContainerData` are global stores (see `mountWithProviders`), so they are
 // replaced here by module mocks; everything else in these modules stays real.
+const removeLocalDirectory = vi.fn()
 vi.mock('$/providers/category', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$/providers/category')>()),
   useCategories: () => ({
     categoryLabel: (category: Category) =>
-      useText().getText(`${category.type}Category` as 'cloudCategory'),
-    removeLocalDirectory: vi.fn(),
+      category.type === 'localDirectory' ?
+        'Projects'
+      : useText().getText(`${category.type}Category` as 'cloudCategory'),
+    removeLocalDirectory,
   }),
 }))
 const containerData = reactive({ leftPanelShown: true, leftPanelToggledOn: false })
@@ -25,7 +30,6 @@ function makeReactApi(): ReactApi {
     startTransition: (action) => action(),
     isTransitioning: false,
     transferBetweenCategories: vi.fn(),
-    confirmDelete: vi.fn(),
   }
 }
 
@@ -76,5 +80,25 @@ describe('CategoryButton', () => {
     await press(wrapper, 1)
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/settings'))
     expect(router.currentRoute.value.query).toEqual({ 'cloud-ide_SettingsTab': '"local"' })
+  })
+
+  test("the extended local directory's remove button asks first, through the modal stack", async () => {
+    removeLocalDirectory.mockClear()
+    const modals = useModals()
+    const { wrapper } = await mountCategoryButton(
+      { type: 'localDirectory', path: '/home/projects' } as Category,
+      { extended: true },
+    )
+    await press(wrapper, 1)
+    const entry = modals.stack.value.at(-1)!
+    expect(entry.component).toBe(ConfirmDeleteModal)
+    expect(entry.props).toMatchObject({
+      actionText: "remove the local folder 'Projects' from your sidebar",
+      actionButtonLabel: 'Remove',
+    })
+    expect(removeLocalDirectory).not.toHaveBeenCalled()
+    await (entry.props.onConfirm as () => Promise<void>)()
+    expect(removeLocalDirectory).toHaveBeenCalledWith('/home/projects')
+    modals.closeAll()
   })
 })

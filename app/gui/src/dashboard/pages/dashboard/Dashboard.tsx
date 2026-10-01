@@ -6,10 +6,8 @@ import { Dialog } from '#/components/Dialog'
 import Page from '#/components/Page'
 import { Text } from '#/components/Text'
 import { backendQueryOptions } from '#/hooks/backendHooks'
-import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useBindGlobalActions } from '#/hooks/menuHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
-import ConfirmDeleteModal, { type ConfirmDeleteModalProps } from '#/modals/ConfirmDeleteModal'
 import * as inputBindingsProvider from '#/providers/InputBindingsProvider'
 import * as modalProvider from '#/providers/ModalProvider'
 import { vueComponent } from '#/utilities/vue'
@@ -65,9 +63,6 @@ export function Dashboard() {
     React.useCallback(() => openedProjects.closingOnAppExit.value, [openedProjects]),
   )
   const transferBetweenCategories = useTransferBetweenCategories()
-  const confirmDelete = useEventCallback((properties: ConfirmDeleteModalProps) => {
-    modalProvider.setModal(<ConfirmDeleteModal {...properties} />)
-  })
 
   const inputBindingHandlers = React.useMemo(() => {
     const hasOrganization = backendModule.isUserOnPlanWithMultipleSeats(user)
@@ -152,7 +147,6 @@ export function Dashboard() {
           startReactTransition={startTransition}
           isReactTransitioning={isTransitioningState}
           transferBetweenCategories={transferBetweenCategories}
-          confirmDelete={confirmDelete}
         />
       </div>
     </Page>
