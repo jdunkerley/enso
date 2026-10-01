@@ -1,7 +1,8 @@
 /** @file A radio group. */
 import * as aria from '#/components/aria'
 import * as mergeRefs from '#/utilities/mergeRefs'
-import * as twv from '$/utils/style/tailwindVariants'
+import { RADIO_GROUP_STYLES } from '$/components/Radio/variants'
+import type * as twv from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import * as React from 'react'
 import type { FieldVariantProps } from '../Form'
@@ -27,12 +28,6 @@ export interface RadioGroupProps<
   readonly className?: string
   readonly style?: React.CSSProperties
 }
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const RADIO_GROUP_STYLES = twv.tv({
-  base: 'flex flex-col gap-0.5 items-start',
-  variants: { fullWidth: { true: 'w-full' } },
-})
 
 // This is a function, even though it does not contain function syntax.
 // eslint-disable-next-line no-restricted-syntax

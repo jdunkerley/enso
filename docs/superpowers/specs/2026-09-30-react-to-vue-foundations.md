@@ -733,6 +733,107 @@ for the maintainer to review.
     lazily loaded dashboard, where the primitives are used. A primitive used
     before sign-in would fall back to Reka's default locale, `en`.
 
+## Rulings from #79 (forms and inputs, 2026-10-01)
+
+#79 built the Vue form layer and inputs in `src/components/` (`Form/`,
+`Inputs/`, `Checkbox/`, `Radio/`, `Switch/`, `Stepper/`) and settled the
+ticket's open questions. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **In-house, confirmed against `useForm.ts`.** The three features the ticket
+   named all fit without a library:
+   - _default values from queries_: `defaultValues` may be a getter, read when
+     the form is created and again by `reset()`. As in React it is not
+     re-applied on its own; a form fed by a query calls `reset()` when the data
+     arrives, or is keyed on it;
+   - _`onSubmit` returning a promise_: awaited, with `formState.isSubmitting`
+     set meanwhile (inputs and `Submit` disabled, `Submit` loading);
+   - _`setFormError`_: a `root.submit` error that `FormError` shows, as a failed
+     submission does.
+
+   The rest keeps react-hook-form's names and rules: `mode`/`reValidateMode`
+   (validate on submit, then re-validate on change), dirty and touched state,
+   `setValue`, `getValues`, `trigger`, `setError`, `clearErrors`, `reset`,
+   `resetField`, `setFocus`, focus on the first invalid field, the offline rule,
+   `method="dialog"`, `resetOnSubmit`, and Sentry capture of JS errors. About
+   800 lines of TypeScript (`useForm`, `useField`, types, value helpers) and 500
+   of components; vee-validate stays out.
+
+2. **Where the Vue API differs, by design.**
+   - `errors` is flat, keyed by dotted path, with `root.submit` and
+     `root.offline` for the form-level ones.
+   - `watch(name)` is a reactive read: wrap it in `computed`. There is no
+     `control`, `Controller` or `register`: an input calls `useField`, which
+     replaces `useController`, `useFieldRegister` and `useFieldState`.
+   - `submit()` resolves after a failed submission instead of rejecting; the
+     failure is shown by `FormError` and reported to `onSubmitFailed`.
+   - A submission is not a tracked vue-query mutation. The React one existed
+     only to show submissions in the query devtools.
+   - Render props are scoped slots (`Form`'s `{ form }`, `FieldValue`'s
+     `{ value }`), and `children` naming an item is a `toLabel`/`toTextValue`
+     prop or a `{ item }` slot.
+
+3. **`Submit` is disabled while submitting, not while invalid.** The ticket
+   asked for both, but React never disabled it while invalid, and pressing
+   Submit on an invalid form is what shows the errors and focuses the first one;
+   specs rely on that. `isDisabledWhenInvalid` opts in.
+
+4. **"Required" comes from `isRequired` only.** React's `useFieldRegister` reads
+   a string's minimum length from the schema, but react-hook-form returns
+   `required` only in progressive mode, so the reading never reached a field:
+   React shows the `*` (and sets `required`) only when told. The Vue port does
+   the same, and the parity test checks it.
+
+5. **Messages come from `useText()` keys**, through the zod error map now in the
+   framework-free `src/components/Form/errorMap.ts`, which the React `useForm`
+   uses too, with the form-level error rule (offline notice, submission error,
+   generic fallback).
+
+6. **The control carries the ARIA state.** React put `aria-invalid` and the
+   error's id on the field's wrapper `div`; the Vue inputs also set
+   `aria-invalid`, `aria-describedby` and `aria-errormessage` on the control
+   itself. Invisible, and what a screen reader reads.
+
+7. **Native controls where react-aria rendered native ones.** Reka's `Checkbox`,
+   `RadioGroup` and `Switch` are `<button role="checkbox">` and friends;
+   react-aria renders a native input hidden in a `<label>`. The Vue `Checkbox`,
+   `Radio`, `Switch` and `Selector` keep react-aria's DOM, so they keep native
+   keyboard and form behaviour, and the hover/press/focus-visible states React
+   styled on are tracked the same way (identical classes). Lists
+   (`MultiSelector`, `Dropdown`), `ComboBox`, `DatePicker`, `TimeField` and
+   `OTPInput` are Reka's.
+
+8. **Dates: ISO input, localized calendar.** React formats the date input in the
+   `sv` locale to get ISO order, but in Reka the locale also names the
+   calendar's months, weekdays and cells (it read "måndag 31 augusti" to a
+   screen reader). The Vue `DatePicker` uses the user's locale and orders the
+   segments itself (`yyyy-mm-dd`, 24-hour, English placeholders), so the input
+   looks as React's and the calendar speaks the user's language. `TimeField`
+   uses the user's locale, as React's does. Both stay (decision 7 keeps the
+   scheduling and activity-log filters that use them).
+
+9. **`ResizableInput` and `ResizableContentEditableInput` are deleted, not
+   ported:** nothing imported either.
+
+10. **`OTPInput` is on Reka's `PinInput`,** one `<input>` per character, which
+    shows the native caret where `input-otp` drew a blinking fake one; pasting
+    fills every box. `input-otp` stays in `package.json` until the last React
+    caller (`SetupTwoFaForm`, #84) is ported, and goes in that PR. No new
+    dependency.
+
+11. **Shared variants, Vue spellings beside them.** #79 moved the form, input,
+    checkbox, radio, switch and stepper `tv()` definitions out of the React
+    files (`src/components/<Name>/variants.ts`); the React files import them
+    unchanged. React-aria-only modifiers get Vue spellings in `*_VUE_STATES`
+    constants, which `vuePortFormParity.test.tsx` strips before comparing the
+    React and Vue classes of every input family.
+
+12. **No screen is ported here.** The ticket's end-to-end proof
+    (`ForgotPassword`) is left to #85, which owns the auth pages; `Form.vue`'s
+    header shows that form in Vue as its usage example. No mount site changes,
+    so the Playwright suite is untouched, and the PR takes
+    `CI: No changelog needed`.
+
 ## Rulings from #80 (app-wide services, 2026-10-01)
 
 #80 moved the toasts, the programmatic modal stack and the app-wide effects to

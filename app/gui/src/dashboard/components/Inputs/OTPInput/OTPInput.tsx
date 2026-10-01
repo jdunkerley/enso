@@ -2,9 +2,8 @@
 import { mergeProps } from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { TEXT_STYLE } from '$/components/Text/variants'
+import { OTP_INPUT_STYLES, OTP_SLOT_STYLES } from '$/components/Inputs/otpVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { tv } from '$/utils/style/tailwindVariants'
 import type { OTPInputProps } from 'input-otp'
 import { OTPInput as BaseOTPInput, type SlotProps as OTPInputSlotProps } from 'input-otp'
 import type { ForwardedRef, Ref } from 'react'
@@ -28,7 +27,7 @@ export interface OtpInputProps<Schema extends TSchema, TFieldName extends FieldP
     FieldStateProps<Omit<OTPInputProps, 'children' | 'render'>, Schema, TFieldName, string>,
     FieldProps,
     FieldVariantProps,
-    Omit<VariantProps<typeof STYLES>, 'disabled' | 'invalid'>,
+    Omit<VariantProps<typeof OTP_INPUT_STYLES>, 'disabled' | 'invalid'>,
     TestIdProps {
   readonly inputRef?: Ref<HTMLInputElement>
   readonly maxLength: number
@@ -42,32 +41,6 @@ export interface OtpInputProps<Schema extends TSchema, TFieldName extends FieldP
   readonly onComplete?: () => void
 }
 
-const STYLES = tv({
-  base: 'group flex overflow-hidden p-1 w-[calc(100%+8px)] -m-1 flex-1',
-  slots: {
-    slotsContainer: 'flex items-center justify-center flex-1 w-full gap-1',
-  },
-})
-
-const SLOT_STYLES = tv({
-  base: [
-    'flex-1 h-10 min-w-8 flex items-center justify-center',
-    'border border-primary rounded-xl',
-    'outline outline-1 outline-transparent -outline-offset-2',
-    'transition-[outline-offset] duration-200',
-  ],
-  variants: {
-    isActive: { true: 'relative outline-offset-0 outline-2 outline-primary' },
-    isInvalid: { true: { base: 'border-danger', char: 'text-danger' } },
-  },
-  slots: {
-    char: TEXT_STYLE({ variant: 'body', weight: 'bold', color: 'current' }),
-    fakeCaret:
-      'absolute pointer-events-none inset-0 flex items-center justify-center animate-caret-blink before:w-px before:h-5 before:bg-primary',
-  },
-  compoundVariants: [{ isActive: true, isInvalid: true, class: { base: 'outline-danger' } }],
-})
-
 /** Accessible one-time password component with copy paste functionality. */
 export const OTPInput = forwardRef(function OTPInputImpl<
   Schema extends TSchema,
@@ -75,7 +48,7 @@ export const OTPInput = forwardRef(function OTPInputImpl<
 >(props: OtpInputProps<Schema, TFieldName>, ref: ForwardedRef<HTMLDivElement>) {
   const {
     maxLength,
-    variants = STYLES,
+    variants = OTP_INPUT_STYLES,
     className,
     name,
     fieldVariants,
@@ -234,14 +207,15 @@ function Section(props: SectionProps) {
 }
 
 /** Props for a single {@link Slot}. */
-interface SlotProps extends Omit<OTPInputSlotProps, 'isActive'>, VariantProps<typeof SLOT_STYLES> {}
+interface SlotProps
+  extends Omit<OTPInputSlotProps, 'isActive'>, VariantProps<typeof OTP_SLOT_STYLES> {}
 
 /**
  * Slot is a component that represents a single char in the OTP input.
  * @internal
  */
 function Slot(props: SlotProps) {
-  const { char, isActive, hasFakeCaret, variants = SLOT_STYLES, isInvalid } = props
+  const { char, isActive, hasFakeCaret, variants = OTP_SLOT_STYLES, isInvalid } = props
   const classes = variants({ isActive, isInvalid })
 
   return (
