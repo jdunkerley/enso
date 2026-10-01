@@ -5,14 +5,13 @@ import { useContainerData } from '$/providers/react/container'
 import type {
   Backend,
   ProjectSession as BackendProjectSession,
-  ProjectAsset,
 } from 'enso-common/src/services/Backend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 
 /** Props for a {@link ProjectSession}. */
 export interface ProjectSessionProps {
   readonly backend: Backend
-  readonly project: ProjectAsset
+  readonly project: { readonly title: string }
   readonly projectSession: BackendProjectSession
   readonly index: number
 }
