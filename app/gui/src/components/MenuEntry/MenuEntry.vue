@@ -54,6 +54,14 @@ defineSlots<{
   picture?: () => unknown
 }>()
 
+/**
+ * React's `FocusRing` adds the `focus-ring` class while the entry has visible focus. Tailwind does
+ * not generate variants of that class (it is a multi-selector component), so its rules are spelled
+ * out under `focus-visible:`.
+ */
+const FOCUS_RING =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary focus-visible:transition-all'
+
 const { getText } = useText()
 const inputBindings = useDashboardInputBindings()
 const dialog = injectDialogContext(true)
@@ -95,7 +103,7 @@ function press() {
 <template>
   <button
     type="button"
-    class="group flex w-full rounded-menu-entry focus-visible:focus-ring"
+    :class="['group flex w-full rounded-menu-entry', FOCUS_RING]"
     :disabled="isDisabled"
     @click="press"
   >

@@ -77,10 +77,22 @@ function onOpenChange(value: boolean) {
 
 provideDialogContext({ close })
 
+/** How close to the viewport's edges it may go: react-aria's `containerPadding` default. */
+const CONTAINER_PADDING = 12
+
 const sideAlign = computed(() => placementToSideAlign(placement))
 // Reka's `alignOffset` is `@floating-ui`'s `alignmentAxis`, which an `end` alignment inverts.
 const alignOffset = computed(() => (sideAlign.value.align === 'end' ? -crossOffset : crossOffset))
 const styles = computed(() => POPOVER_STYLES({ size, rounded, variant }))
+/**
+ * The content's classes. React's popover is positioned against the viewport, so its `w-full` is the
+ * viewport's width, capped by the size's `max-w-*`; Reka's sits in a wrapper as wide as its content,
+ * so `w-full` would shrink it to fit. `w-screen` gives it React's width.
+ */
+const contentClass = computed(() => {
+  const base = styles.value.base({ className })
+  return `${base.split(' ').includes('w-full') ? base.replace(/(^| )w-full( |$)/, '$1w-screen$2') : base} ${POPOVER_MOTION}`
+})
 
 function onOpenAutoFocus(event: Event) {
   event.preventDefault()
@@ -113,8 +125,9 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
         :side="sideAlign.side"
         :align="sideAlign.align"
         :sideOffset="offset"
+        :collisionPadding="CONTAINER_PADDING"
         :alignOffset="alignOffset"
-        :class="`${styles.base({ className })} ${POPOVER_MOTION}`"
+        :class="contentClass"
         :data-testid="testId"
         @pointerDownOutside="onPointerDownOutside"
         @openAutoFocus="onOpenAutoFocus"
