@@ -80,7 +80,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'layouts/Settings',
   'modals/AcceptInvitationModal',
   'modals/AgreementsModal',
-  'modals/ConfirmDeleteModal',
   'modals/PlanDowngradedModal',
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
