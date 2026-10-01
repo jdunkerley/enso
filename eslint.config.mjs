@@ -85,7 +85,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'pages/authentication/Login',
   'pages/authentication/Registration',
   'pages/dashboard/UserBar',
-  'pages/dashboard/components/KeyboardShortcut',
   'providers/LoggerProvider',
   // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
   'hooks/mountHooks',
