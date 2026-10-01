@@ -1016,3 +1016,77 @@ the rulings above: provisionally accepted, for the maintainer to review.
     (React's let it escape to the page once).
 12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
     (they go with #94) and `VersionChecker` (with its feature's port).
+
+## Rulings from #82 (React leaves in Vue hosts, 2026-10-01)
+
+#82 replaced the small React components that Vue mounted through
+`reactComponent`. Delegated like the rulings above: provisionally accepted, for
+the maintainer to review.
+
+1. **Split.** Two parts of the ticket moved elsewhere:
+   - **The devtools are #172.** `EnsoDevtoolsImpl` (666 lines) uses nearly every
+     #78/#79 primitive and needs Vue counterparts of five React hooks; it would
+     have doubled the PR for a panel that only development builds render and no
+     spec covers. The React query panel goes with it: the one `QueryClient` is
+     Vue's, and the Vue DevTools plugin already shows it, so whether
+     `@tanstack/vue-query-devtools` is wanted at all is #172's question.
+   - **`FilePathInput` goes with `JSONSchemaInput` (#92).** Its only user is the
+     React `JSONSchemaInput`, so a Vue `FilePathInput` would just move the
+     Vue-in-React crossing from `FilePathInput` into `JSONSchemaInput`: the same
+     number of bridge points.
+
+   `ProtectedLayout.vue` therefore still calls `reactComponent`, for the
+   devtools (#172) and `AgreementsModal` (#84); `CommandPalette.vue` and
+   `UpsertSecretPanel.vue` no longer do.
+
+2. **`src/project-view/` is React-free.** Its `Result`/`Loader` users and
+   `WithCurrentProject.vue` use `Result.vue` and `Loader.vue`. The bridge itself
+   (`reactComponent`, `suspendedReactComponent`), which lived in
+   `project-view/util/react.tsx` and imported `#/components/Suspense`, moved to
+   `src/utils/react.tsx` (`$/utils/react`), beside `zustand.ts`, until #93.
+
+3. **`centered` is a plain attribute again.** The "does not work with React
+   components" workarounds (`:centered="true"`) became `centered`. Both give
+   `m-auto`, which is also the default, so nothing moves.
+
+4. **`Dialog.vue` puts its attributes on the dialog element**
+   (`inheritAttrs: false`, `v-bind="$attrs"` on Reka's `DialogContent`), as
+   React spreads its other props onto react-aria's `Dialog`. The session
+   overlays ("Logging out", "Reconnecting session…") have no title and are named
+   by `aria-label`; Reka's renderless `DialogRoot` had dropped it.
+
+5. **The session overlays sit outside Reka's `ConfigProvider`**
+   (`ProtectedLayout` is above `AppContainer.vue`). They show a spinner and a
+   title, nothing locale-dependent, so falling back to Reka's default locale
+   changes nothing (as the About dialog, #156 ruling 7).
+
+6. **`KeyboardShortcut.vue` is a shared primitive** in
+   `src/components/KeyboardShortcut/`: the menus and the keyboard-shortcuts
+   settings tab will use it too. It takes the shortcut string only. React's
+   `action` form reads the user-rebindable bindings from the React
+   `InputBindingsProvider`, which has no Vue counterpart until #170; it comes
+   with it. The React component stays for its three React users (the menus'
+   `MenuEntry`, the settings tab and the capture modal), as #156 kept the React
+   `ConfirmDeleteModal`.
+
+7. **`UpsertSecretForm.vue` is cloud code, in `src/cloud/credentials/`**:
+   secrets exist only in the Enso Cloud. The core `UpsertSecretPanel.vue`
+   imports it directly and says why: decision 6b's lint boundary and registries
+   do not exist yet, and a registry for one panel would be built ahead of its
+   design. A community split needs a slot for the file browser's "New secret"
+   action. React's `doCreate`/`doCancel` callbacks became a `create` event and a
+   `cancel` prop (`'close' | 'reset' | 'emit'`). The React form stays for the
+   drive's `UpsertSecretModal` and the asset panel (#92, #89).
+
+8. **Parity was checked element by element and in the running app.**
+   `vuePortParity.test.tsx` now compares the React and Vue `Result`, `Loader`
+   and `KeyboardShortcut` trees (tags, classes, text; the shortcut on macOS,
+   Windows and Linux), and `upsertSecretFormParity.test.tsx` the two secret
+   forms, allowing only the Vue `Button`'s two known differences (its
+   always-present `focus:` classes and the `display: contents` span around its
+   label). veaury's wrapper element was `display: contents` (`App.vue`), so
+   dropping it leaves the layout as it was; screenshots of each touched screen
+   taken on the base and the branch were compared pixel for pixel (see the PR).
+
+9. **No changelog entry.** Nothing changes for users, so the PR takes
+   `CI: No changelog needed`, though the ticket asked for an entry.

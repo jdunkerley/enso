@@ -47,8 +47,11 @@ ask first: is this ProjectView-specific, or would another feature want it too?
 
 The Dashboard (currently React under `src/dashboard/`) is being migrated to Vue.
 Cross-subtree wiring should go through `src/providers/` (the `$/providers/`
-alias), not by reaching into the other subtree's internals. For React/Vue
-interop today, use the existing `veaury` wrappers.
+alias), not by reaching into the other subtree's internals. Nothing under
+`src/project-view/` renders React any more (#82): when the project view needs
+something the dashboard has only in React, port it to Vue (a primitive in
+`src/components/`, a cloud-only part in `src/cloud/`) rather than wrapping it
+with `reactComponent` (`$/utils/react`).
 
 ## Graph editor
 

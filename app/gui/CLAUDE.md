@@ -21,8 +21,10 @@ feature:
   Import via `#/…`.
 
 While the migration is in progress the two subtrees are bridged by **`veaury`**
-so Vue can embed React (and vice versa). Stay in one framework per file; only
-cross at the bridge boundary.
+so Vue can embed React (and vice versa): Vue mounts React through
+`reactComponent` (`$/utils/react`), React mounts Vue through `vueComponent`
+(`#/utilities/vue`). Stay in one framework per file; only cross at the bridge
+boundary. `src/project-view/` no longer crosses it at all (#82).
 
 Many commons still sit inside `src/project-view/` for historical reasons. The
 plan is to move genuinely shared UI/utilities **out** of `project-view/` and
