@@ -1007,9 +1007,12 @@ the rulings above: provisionally accepted, for the maintainer to review.
     an id its popover does not render, the one open popup trigger
     (`aria-expanded="true"` with `aria-controls`) outside the portal root. The
     return waits for Reka's own clean-up, whose still active focus trap would
-    otherwise take the focus back. The Vue dialogs also fix two React quirks,
-    invisible to a mouse user: they are named by their title (React's had no
-    accessible name), and Tab stays inside the confirmation (React's let it
-    escape to the page once).
+    otherwise take the focus back. An `AlertDialog`'s confirm button is focused
+    as visibly focused (`focus({ focusVisible: true })`), as react-aria shows
+    focus that no key or pointer press led to: React's Delete button opened in
+    its focused colour, and so does the Vue one. The Vue dialogs also fix two
+    React quirks, invisible to a mouse user: they are named by their title
+    (React's had no accessible name), and Tab stays inside the confirmation
+    (React's let it escape to the page once).
 12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
     (they go with #94) and `VersionChecker` (with its feature's port).

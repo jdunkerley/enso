@@ -88,13 +88,17 @@ async function respond(response: 'cancel' | 'confirm') {
   }
 }
 
-/** Focus the confirm button rather than Reka's default, the first focusable element. */
+/**
+ * Focus the confirm button rather than Reka's default, the first focusable element. It is focused
+ * as visibly focused, as React's `autoFocus` is: react-aria treats focus that no key or pointer
+ * press led to as "virtual", and shows it, so the button shows its focused colour from the start.
+ */
 function focusConfirm(event: Event) {
   const container = event.target instanceof Element ? event.target : document
   const button = container.querySelector<HTMLElement>('[data-alert-dialog-confirm]')
   if (button != null) {
     event.preventDefault()
-    button.focus()
+    button.focus({ focusVisible: true })
   }
 }
 
