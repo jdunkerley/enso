@@ -3,7 +3,7 @@
  * @file A group of checkboxes bound to one form field holding the selected values: the Vue
  * counterpart of the React `Checkbox.Group`, styled by the same `CHECKBOX_GROUP_STYLES`. The
  * checkboxes are the default slot, each with its `value`. It is a `role="group"` labelled by its
- * field's label. The `description` slot replaces the `description` text, for a description with
+ * field's label or, without one, by its content (the checkboxes' text), as in React. The `description` slot replaces the `description` text, for a description with
  * markup (React's `ReactNode` description).
  */
 import { CHECKBOX_GROUP_STYLES } from '$/components/Checkbox/variants'
@@ -76,7 +76,7 @@ provideCheckboxGroup({
   <div
     role="group"
     :class="CHECKBOX_GROUP_STYLES({ fullWidth, className: props.class })"
-    :aria-labelledby="label != null ? field.ids.labelId : undefined"
+    :aria-labelledby="field.ids.labelId"
     :aria-describedby="field.error.value != null ? field.ids.errorId : undefined"
     :data-testid="testId"
     :data-invalid="field.isInvalid.value || undefined"

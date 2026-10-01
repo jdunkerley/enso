@@ -402,6 +402,23 @@ describe('Input', () => {
     }
   })
 
+  test('autoFocus does not take the focus from another text field focused meanwhile', async () => {
+    vi.useFakeTimers()
+    try {
+      mountInForm(z.object({ name: z.string(), other: z.string() }), {}, () => [
+        h(Input, { name: 'name', autoFocus: true, testId: 'name' }),
+        h(Input, { name: 'other', testId: 'other' }),
+      ])
+      await nextTick()
+      const other = byTestId('other')!.querySelector('input')!
+      other.focus()
+      vi.runAllTimers()
+      expect(document.activeElement).toBe(other)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   test('HiddenFile stores the chosen file, and can submit on choice', async () => {
     const onSubmit = vi.fn()
     mountInForm(
