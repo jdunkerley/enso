@@ -1,7 +1,12 @@
 /**
- * @file
+ * @file Tailwind variants of the text input, shared by the React `#/components/Inputs` and their
+ * Vue ports in this folder. The other inputs' variants are in the `*Variants.ts` files beside it,
+ * one per family, so that each is bundled with the code that uses it.
  *
- * Variants for the ResizableInput component.
+ * A few of those classes use react-aria-only modifiers (`selected:`, `pressed:`,
+ * `outside-visible-range:`, `disabled:` on non-native elements). The Vue ports add the equivalents
+ * keyed on Reka's `data-*`/ARIA attributes from the `*_VUE_STATES` constants beside them, per
+ * decision 5 of the React-to-Vue record.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { makeRoundedStyles } from '$/utils/style/roundedStyles'

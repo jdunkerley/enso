@@ -20,36 +20,11 @@ import {
 import { BasicInput, type InputProps } from '#/components/Inputs/Input'
 import { Text } from '#/components/Text'
 import { VisualTooltip } from '#/components/VisualTooltip'
+import { COMBO_BOX_STYLES } from '$/components/Inputs/comboBoxVariants'
 import { useText } from '$/providers/react'
-import { makeRoundedStyles } from '$/utils/style/roundedStyles'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { tv } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, useRef, type ForwardedRef, type ReactNode } from 'react'
 import invariant from 'tiny-invariant'
-
-const COMBO_BOX_STYLES = tv({
-  base: 'w-full',
-  variants: {
-    rounded: makeRoundedStyles('inputContainer'),
-    size: {
-      custom: '',
-      small: { inputContainer: 'px-[11px] pb-0.5 pt-1' },
-      medium: { inputContainer: 'px-[11px] pb-[6.5px] pt-[8.5px]' },
-    },
-  },
-  slots: {
-    inputContainer: 'flex items-center gap-2 px-1.5 rounded-full border-0.5 border-primary/20',
-    input: 'grow',
-    resetButton: '',
-    popover: 'py-2 w-[calc(var(--trigger-width)_+_48px)]',
-    listBox: 'text-primary text-xs',
-    listBoxItem: 'cursor-pointer rounded-full hover:bg-hover-bg px-2',
-  },
-  defaultVariants: {
-    size: 'medium',
-    rounded: 'xlarge',
-  },
-})
 
 /** Props for a {@link ComboBox}. */
 export interface ComboBoxProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, string>>

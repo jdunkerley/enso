@@ -11,7 +11,8 @@ import {
 } from '#/components/Form'
 import RadioGroup from '#/components/styled/RadioGroup'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { SELECTOR_STYLES } from '$/components/Inputs/selectorVariants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import { SelectorOption } from './SelectorOption'
 
@@ -35,45 +36,6 @@ export interface SelectorProps<Schema extends TSchema, TFieldName extends FieldP
   readonly inputRef?: React.Ref<HTMLDivElement>
   readonly placeholder?: string
 }
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const SELECTOR_STYLES = tv({
-  base: 'block w-full bg-transparent transition-[border-color,outline] duration-200',
-  variants: {
-    disabled: {
-      true: { base: 'cursor-default opacity-50', textArea: 'cursor-default' },
-      false: { base: 'cursor-text', textArea: 'cursor-text' },
-    },
-    readOnly: { true: 'cursor-default' },
-    size: {
-      medium: { base: '' },
-      small: { base: '' },
-    },
-    rounded: {
-      none: 'rounded-none',
-      small: 'rounded-sm',
-      medium: 'rounded-md',
-      large: 'rounded-lg',
-      xlarge: 'rounded-xl',
-      xxlarge: 'rounded-2xl',
-      xxxlarge: 'rounded-3xl',
-      full: 'rounded-full',
-    },
-    variant: {
-      outline: {
-        base: 'border-[0.5px] border-primary/20',
-      },
-    },
-  },
-  defaultVariants: {
-    size: 'medium',
-    rounded: 'xxlarge',
-    variant: 'outline',
-  },
-  slots: {
-    radioGroup: 'grid',
-  },
-})
 
 /** A horizontal selector. */
 export const Selector = React.forwardRef(function SelectorImpl<

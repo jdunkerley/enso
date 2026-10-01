@@ -2,8 +2,8 @@
 import type { CheckboxGroupProps as AriaCheckboxGroupProps } from '#/components/aria'
 import { CheckboxGroup as AriaCheckboxGroup, mergeProps } from '#/components/aria'
 import { mergeRefs } from '#/utilities/mergeRefs'
+import { CHECKBOX_GROUP_STYLES } from '$/components/Checkbox/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { tv } from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import {
   forwardRef,
@@ -33,11 +33,6 @@ export interface CheckboxGroupProps<
   readonly checkboxRef?: ForwardedRef<HTMLInputElement>
   readonly children: ReactNode | ((props: AriaCheckboxGroupProps) => ReactNode)
 }
-
-const CHECKBOX_GROUP_STYLES = tv({
-  base: 'flex flex-col gap-0.5 items-start',
-  variants: { fullWidth: { true: 'w-full' } },
-})
 
 /** A selector for one or more items from a list of choices. */
 export const CheckboxGroup = forwardRef(
