@@ -6,6 +6,7 @@ import {
   ProjectSessions,
 } from '$/components/AppContainer/reactTabs'
 import SelectableTab from '$/components/AppContainer/SelectableTab.vue'
+import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import { useContainerData } from '$/providers/container'
 import { useRightPanelData, type RightPanelTabId } from '$/providers/rightPanel'
 import { optPx } from '$/utils/dom'
@@ -93,7 +94,9 @@ registerHandlers({
             v-model:fullscreen="data.fullscreen"
             :containerStyle="CONTAINER_STYLE"
           >
-            <component :is="component" :toolbar="toolbarElement" />
+            <ErrorBoundary onlyRenderErrors :resetKeys="[data.displayedTab]">
+              <component :is="component" :toolbar="toolbarElement" />
+            </ErrorBoundary>
           </PanelContents>
           <ResizeHandles left v-on="resizeHandles.events" />
         </div>

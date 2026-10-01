@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { openAboutModal, useAboutModal } from '$/components/AboutModal/aboutModal'
+import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import ToastHost from '$/components/Toast/ToastHost.vue'
 import {
   useClearSelectionOnClick,
@@ -95,12 +96,16 @@ window.api?.menu.setMenuItemHandler('about', openAboutModal)
 
 <template>
   <div :class="['App', platformClass, ...classSet.keys()]">
-    <RouterView v-slot="{ Component }">
+    <!-- A route that fails to render shows the error display (its `ErrorBoundary`) rather than
+    nothing; navigating elsewhere resets it. -->
+    <RouterView v-slot="{ Component, route }">
       <ContextsForReactProvider v-if="Component">
         <ReactRootWrapper :queryClient="queryClient">
           <ToastHost />
           <AboutModal v-if="aboutMounted" v-model:open="about.isOpen.value" />
-          <component :is="Component" />
+          <ErrorBoundary onlyRenderErrors :resetKeys="[route.path]">
+            <component :is="Component" />
+          </ErrorBoundary>
           <div id="floatingLayer" />
           <TooltipDisplayer :registry="appTooltips" />
         </ReactRootWrapper>

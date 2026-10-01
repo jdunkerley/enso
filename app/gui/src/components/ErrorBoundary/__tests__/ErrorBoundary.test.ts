@@ -1,3 +1,4 @@
+/* eslint-disable vue/one-component-per-file -- Each test defines the small components it needs. */
 /** @file The Vue `ErrorBoundary` (on `onErrorCaptured`) and `SuspenseLoader`. */
 import {
   byTestId,
@@ -16,6 +17,17 @@ usePrimitiveTestEnvironment()
 
 vi.mock('@sentry/vue', () => ({ captureException: vi.fn() }))
 
+/** Wait for the error display, which is loaded on first use (slowly in a test: it is transformed). */
+const errorDisplay = () =>
+  vi.waitFor(
+    () => {
+      const display = byTestId('error-display')
+      if (display == null) throw new Error('No error display yet')
+      return display
+    },
+    { timeout: 10_000 },
+  )
+
 let shouldThrow = true
 /** A functional component that fails to render while {@link shouldThrow} is set. */
 function Fragile() {
@@ -32,10 +44,8 @@ describe('ErrorBoundary', () => {
   test('shows the error display instead of content that failed to render, and reports it', async () => {
     const onError = vi.fn()
     mountWithProviders(() => h(ErrorBoundary, { onError }, () => h(Fragile)))
-    // The boundary re-renders with the fallback on the next tick.
-    await flushPromises()
+    const display = await errorDisplay()
     expect(byTestId('content')).toBeNull()
-    const display = byTestId('error-display')!
     expect(display.querySelector('h2')!.textContent!.trim()).toBe('Something went wrong')
     expect(display.textContent).toContain('Try again')
     expect(sentry.captureException).toHaveBeenCalledOnce()
@@ -45,9 +55,9 @@ describe('ErrorBoundary', () => {
   test('"Try again" re-mounts the content', async () => {
     const onReset = vi.fn()
     mountWithProviders(() => h(ErrorBoundary, { onReset }, () => h(Fragile)))
-    await flushPromises()
+    const display = await errorDisplay()
     shouldThrow = false
-    await userEvent.setup().click(byTestId('error-display')!.querySelector('button')!)
+    await userEvent.setup().click(display.querySelector('button')!)
     await flushPromises()
     expect(byTestId('content')).not.toBeNull()
     expect(byTestId('error-display')).toBeNull()
@@ -57,8 +67,7 @@ describe('ErrorBoundary', () => {
   test('a change to resetKeys resets it', async () => {
     const key = ref(1)
     mountWithProviders(() => h(ErrorBoundary, { resetKeys: [key.value] }, () => h(Fragile)))
-    await flushPromises()
-    expect(byTestId('error-display')).not.toBeNull()
+    await errorDisplay()
     shouldThrow = false
     key.value = 2
     await flushPromises()
@@ -79,6 +88,82 @@ describe('ErrorBoundary', () => {
     await userEvent.setup().click(byTestId('fallback')!)
     await flushPromises()
     expect(byTestId('content')).not.toBeNull()
+  })
+})
+
+describe('ErrorBoundary with `onlyRenderErrors` (the route and tab roots)', () => {
+  beforeEach(() => {
+    shouldThrow = true
+    vi.mocked(sentry.captureException).mockClear()
+  })
+
+  test('catches an error thrown while rendering, anywhere below it', async () => {
+    const Wrapper = defineComponent({ setup: () => () => h('div', [h(Fragile)]) })
+    mountWithProviders(() => h(ErrorBoundary, { onlyRenderErrors: true }, () => h(Wrapper)))
+    await errorDisplay()
+    expect(sentry.captureException).toHaveBeenCalledOnce()
+  })
+
+  test('catches an error thrown by a setup function', async () => {
+    const FailingSetup = defineComponent({
+      setup() {
+        throw new Error('No setup')
+      },
+    })
+    mountWithProviders(() => h(ErrorBoundary, { onlyRenderErrors: true }, () => h(FailingSetup)))
+    await errorDisplay()
+  })
+
+  test('lets an event handler’s error through, and keeps the content', async () => {
+    const appErrors: unknown[] = []
+    const Clicky = defineComponent({
+      emits: ['boom'],
+      setup:
+        (_props, { emit }) =>
+        () =>
+          h('button', { 'data-testid': 'content', onClick: () => emit('boom') }, 'Click'),
+    })
+    const wrapper = mountWithProviders(() =>
+      h(ErrorBoundary, { onlyRenderErrors: true }, () =>
+        h(Clicky, {
+          onBoom: () => {
+            throw new Error('Handler failed')
+          },
+        }),
+      ),
+    )
+    wrapper.vm.$.appContext.config.errorHandler = (error) => {
+      appErrors.push(error)
+    }
+    byTestId('content')!.click()
+    // Long enough for the display to load, had the boundary caught the error.
+    await import('../ErrorDisplay.vue')
+    await flushPromises()
+    expect(byTestId('content')).not.toBeNull()
+    expect(byTestId('error-display')).toBeNull()
+    expect(sentry.captureException).not.toHaveBeenCalled()
+    expect(appErrors).toEqual([new Error('Handler failed')])
+  })
+
+  test('without it, the same event handler’s error is caught', async () => {
+    const Clicky = defineComponent({
+      emits: ['boom'],
+      setup:
+        (_props, { emit }) =>
+        () =>
+          h('button', { 'data-testid': 'content', onClick: () => emit('boom') }, 'Click'),
+    })
+    mountWithProviders(() =>
+      h(ErrorBoundary, null, () =>
+        h(Clicky, {
+          onBoom: () => {
+            throw new Error('Handler failed')
+          },
+        }),
+      ),
+    )
+    byTestId('content')!.click()
+    await errorDisplay()
   })
 })
 

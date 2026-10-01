@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import { panelKey, tabFromRoute, useContainerData } from '$/providers/container'
 import { computed, onUnmounted, ref, toRefs, useTemplateRef, watch } from 'vue'
 
@@ -39,14 +40,19 @@ onUnmounted(() => {
     @focusin="focusedInBrowser = true"
     @focusout="focusedInBrowser = false"
   >
+    <!-- Each tab in its own boundary, kept alive with it. A tab that fails to render shows the
+    error display; the other tabs and the rest of the app go on working. (A `null` key, with no
+    current tab, keys the cache by component, as before; Vue types a component's key as
+    non-null.) -->
     <RouterView v-slot="{ Component, route }">
       <KeepAlive>
-        <component
-          :is="Component"
+        <ErrorBoundary
           v-if="Component"
-          :key="currentTab && panelKey(currentTab)"
-          :tab="tabFromRoute(route)"
-        />
+          :key="(currentTab && panelKey(currentTab)) as PropertyKey"
+          onlyRenderErrors
+        >
+          <component :is="Component" :tab="tabFromRoute(route)" />
+        </ErrorBoundary>
       </KeepAlive>
     </RouterView>
   </div>
