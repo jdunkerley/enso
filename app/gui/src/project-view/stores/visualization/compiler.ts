@@ -115,7 +115,8 @@ export interface FetchWorkerRequest {
 export interface FetchResultWorkerResponse {
   type: 'fetch-result-worker-response'
   path: string
-  contents: ArrayBuffer
+  /** A whole `fetch` response body, or a view of the file bytes in a data-server reply. */
+  contents: BufferSource
   contentType: string | undefined
 }
 
@@ -304,7 +305,7 @@ function compileError(path: string, error: Error) {
 }
 
 interface FetchResponse {
-  contents: ArrayBuffer
+  contents: BufferSource
   contentType: string | undefined
 }
 

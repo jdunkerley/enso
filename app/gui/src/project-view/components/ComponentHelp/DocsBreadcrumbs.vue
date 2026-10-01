@@ -40,7 +40,10 @@ function shrinkFactor(index: number): number {
       />
     </div>
     <TransitionGroup name="breadcrumbs">
-      <template v-for="(breadcrumb, index) in props.breadcrumbs" :key="[index, breadcrumb.label]">
+      <template
+        v-for="(breadcrumb, index) in props.breadcrumbs"
+        :key="`${index}:${breadcrumb.label}`"
+      >
         <SvgIcon v-if="index > 0" name="chevron_right" />
         <Breadcrumb
           :text="breadcrumb.label"
