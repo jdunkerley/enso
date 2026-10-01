@@ -17,6 +17,8 @@
  *   `close`), like React's `onDismiss`. Setting `open` to `false` from outside does not fire it.
  * - Like React, keys other than Escape do not propagate out of the dialog, so global shortcuts do
  *   not fire while it is open.
+ * - `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
+ *   (`$/providers/modals`) emits `close` then, so that it does not vanish mid-animation.
  * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
  *   development builds.
  *
@@ -89,6 +91,8 @@ const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{
   /** The user closed the dialog. */
   dismiss: []
+  /** It closed, and its exit animation has ended. */
+  closed: []
 }>()
 
 function close() {
@@ -158,7 +162,12 @@ function stopNonEscapeKeys(event: KeyboardEvent) {
         "
         @keydown="stopNonEscapeKeys"
       >
-        <div :class="DIALOG_MODAL_STYLES({ type })" data-testid="modal-dialog">
+        <!-- Reka unmounts the overlay once its exit animation has ended. -->
+        <div
+          :class="DIALOG_MODAL_STYLES({ type })"
+          data-testid="modal-dialog"
+          @vue:unmounted="emit('closed')"
+        >
           <DialogContent
             :class="`${styles.base({ className })} ${DIALOG_MOTION({ type })}`"
             :role="role"

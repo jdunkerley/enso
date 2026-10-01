@@ -357,3 +357,42 @@ describe('AlertDialog', () => {
     expect(role('alertdialog')).toBeNull()
   })
 })
+
+describe('`closed`', () => {
+  test('a Dialog emits it once it has closed and left the page, not before', async () => {
+    const open = ref(true)
+    const onClosed = vi.fn()
+    mountWithProviders(() =>
+      h(
+        Dialog,
+        {
+          title: 'Settings',
+          open: open.value,
+          'onUpdate:open': (value: boolean) => (open.value = value),
+          onClosed,
+        },
+        () => 'Content',
+      ),
+    )
+    await flushPromises()
+    expect(role('dialog')).not.toBeNull()
+    expect(onClosed).not.toHaveBeenCalled()
+    open.value = false
+    await flushPromises()
+    expect(role('dialog')).toBeNull()
+    expect(onClosed).toHaveBeenCalledOnce()
+  })
+
+  test('an AlertDialog emits it once answered and gone', async () => {
+    const onClosed = vi.fn()
+    mountWithProviders(() =>
+      h(AlertDialog, { title: 'Delete?', message: 'Sure?', open: true, onClosed }),
+    )
+    await flushPromises()
+    expect(onClosed).not.toHaveBeenCalled()
+    await userEvent.setup().click(byTestId('alert-dialog-confirm')!)
+    await flushPromises()
+    expect(role('alertdialog')).toBeNull()
+    expect(onClosed).toHaveBeenCalledOnce()
+  })
+})

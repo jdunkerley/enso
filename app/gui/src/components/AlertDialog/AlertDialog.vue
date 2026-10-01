@@ -11,6 +11,9 @@
  * need one.)
  *
  * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
+ *
+ * `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
+ * (`$/providers/modals`) leaves it then, so that it does not vanish mid-animation.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -60,6 +63,11 @@ const {
 
 const open = defineModel<boolean>('open', { default: false })
 
+const emit = defineEmits<{
+  /** It closed, and its exit animation has ended. */
+  closed: []
+}>()
+
 const { getText } = useText()
 
 const pending = ref<'cancel' | 'confirm'>()
@@ -101,7 +109,12 @@ const styles = computed(() =>
           DIALOG_OVERLAY_STYLES({ isEntering: open, isExiting: !open, blockInteractions: true })
         "
       >
-        <div :class="DIALOG_MODAL_STYLES({ type: 'modal' })" data-testid="modal-dialog">
+        <!-- Reka unmounts the overlay once its exit animation has ended. -->
+        <div
+          :class="DIALOG_MODAL_STYLES({ type: 'modal' })"
+          data-testid="modal-dialog"
+          @vue:unmounted="emit('closed')"
+        >
           <AlertDialogContent
             :class="`${styles.base()} ${DIALOG_MOTION({ type: 'modal' })}`"
             :data-testid="testId"
@@ -120,8 +133,9 @@ const styles = computed(() =>
             <div :class="styles.scroller()">
               <div :class="styles.measurerWrapper()">
                 <div :class="styles.content()" class="flex flex-col gap-4">
+                  <!-- Laid out as React's form is: a column, items at the start, 1rem apart. -->
                   <AlertDialogDescription asChild>
-                    <div>
+                    <div class="flex flex-col items-start gap-4">
                       <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
                         <Text v-if="message != null">{{ message }}</Text>
                       </slot>
