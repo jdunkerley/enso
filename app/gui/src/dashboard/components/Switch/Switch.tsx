@@ -9,7 +9,13 @@ import {
 import { mergeRefs } from '#/utilities/mergeRefs'
 import { SWITCH_STYLES } from '$/components/Switch/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { Form, type FieldPath, type FieldProps, type FieldStateProps, type TSchema } from '../Form'
+import {
+  Form,
+  type FieldPath,
+  type FieldPropsExcept,
+  type FieldStateProps,
+  type TSchema,
+} from '../Form'
 
 /** Props for a {@link Switch}. */
 export interface SwitchProps<Schema extends TSchema, TFieldName extends FieldPath<Schema, boolean>>
@@ -20,7 +26,7 @@ export interface SwitchProps<Schema extends TSchema, TFieldName extends FieldPat
       TFieldName,
       boolean
     >,
-    FieldProps,
+    FieldPropsExcept<AriaSwitchProps>,
     Omit<VariantProps<typeof SWITCH_STYLES>, 'disabled' | 'invalid'> {
   readonly className?: string
   readonly style?: CSSProperties

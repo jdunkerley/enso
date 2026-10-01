@@ -6,8 +6,11 @@ import {
 import { SEPARATOR_STYLES } from '$/components/Separator/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 
+// `orientation` is React Aria's prop (and also selects the variant); the variant props' copy of it
+// is left out, as its type differs under `exactOptionalPropertyTypes` (TS2320 from TypeScript 6).
 /** The props for {@link Separator} component. */
-export interface SeparatorProps extends AriaSeparatorProps, VariantProps<typeof SEPARATOR_STYLES> {
+export interface SeparatorProps
+  extends AriaSeparatorProps, Omit<VariantProps<typeof SEPARATOR_STYLES>, 'orientation'> {
   readonly className?: string | undefined
 }
 

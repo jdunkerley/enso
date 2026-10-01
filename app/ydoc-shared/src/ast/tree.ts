@@ -3535,7 +3535,19 @@ export function materializeMutable(module: MutableModule, fields: FixedMap<AstFi
   bail(`Invalid type: ${type}`)
 }
 
+declare const brandFields: unique symbol
 export interface FixedMapView<Fields> {
+  /**
+   * Type-level only (never present at run time): ties a view to its `Fields`, covariantly.
+   *
+   * The AST node classes differ structurally only in their `fields` type, and {@link Mutable}
+   * picks a node's mutable class by that structure. Without this member the only use of `Fields`
+   * is inside the generic `get` below, and TypeScript 6 no longer tells two views apart through
+   * it: `Vector` and `TextLiteral` became assignable to `NumericLiteral`, so `Mutable<Vector>`
+   * resolved to `MutableNumericLiteral`. A function type, so that {@link DeepReadonly} (which
+   * leaves functions alone) does not recurse into `Fields` through it.
+   */
+  readonly [brandFields]?: () => Fields
   get<Key extends string & keyof Fields>(key: Key): DeepReadonly<Fields[Key]>
   /**
    * Unsafe. The caller must ensure the yielded values are not modified.

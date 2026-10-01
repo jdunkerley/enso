@@ -474,6 +474,8 @@ function makeAbstractType(
       ),
       makeIsInstance(type, baseIdent),
     ]),
+    // Emit `namespace`, not the legacy `module` keyword (TS1540 from TypeScript 6).
+    ts.NodeFlags.Namespace,
   )
   const abstractTypeExport = tsf.createTypeAliasDeclaration(
     [modifiers.export],

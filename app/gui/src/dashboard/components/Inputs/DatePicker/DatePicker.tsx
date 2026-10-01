@@ -30,7 +30,7 @@ import {
   Form,
   type FieldComponentProps,
   type FieldPath,
-  type FieldProps,
+  type FieldPropsExcept,
   type FieldStateProps,
   type FieldValues,
   type TSchema,
@@ -91,7 +91,7 @@ export interface DatePickerProps<
       TFieldName,
       DateValue
     >,
-    FieldProps,
+    FieldPropsExcept<AriaDatePickerProps<DateValue>>,
     Pick<FieldComponentProps<Schema>, 'className' | 'style'>,
     VariantProps<typeof DATE_PICKER_STYLES> {
   readonly noResetButton?: boolean

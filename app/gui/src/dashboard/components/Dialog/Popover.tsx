@@ -24,9 +24,14 @@ import { DialogProvider } from './DialogProvider'
 import { DialogStackRegistrar } from './DialogStackProvider'
 import { useInteractOutside } from './utilities'
 
+// `isEntering`/`isExiting` are React Aria's own props; the variants of those names are fed from
+// its render values, so they are not taken again from the variant props (where their types differ
+// under `exactOptionalPropertyTypes`, which TypeScript 6 rejects as TS2320).
 /** Props for a {@link Popover}. */
 export interface PopoverProps
-  extends Omit<aria.PopoverProps, 'children' | 'placement'>, VariantProps<typeof POPOVER_STYLES> {
+  extends
+    Omit<aria.PopoverProps, 'children' | 'placement'>,
+    Omit<VariantProps<typeof POPOVER_STYLES>, 'isEntering' | 'isExiting'> {
   readonly children:
     | React.ReactNode
     | ((opts: aria.PopoverRenderProps & { readonly close: () => void }) => React.ReactNode)

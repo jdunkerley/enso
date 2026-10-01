@@ -12,7 +12,7 @@ import {
   Form,
   type FieldComponentProps,
   type FieldPath,
-  type FieldProps,
+  type FieldPropsExcept,
   type FieldStateProps,
   type FieldValues,
   type TSchema,
@@ -38,7 +38,7 @@ export interface ComboBoxProps<Schema extends TSchema, TFieldName extends FieldP
       TFieldName,
       string
     >,
-    FieldProps,
+    FieldPropsExcept<AriaComboBoxProps<object>>,
     Pick<FieldComponentProps<Schema>, 'className' | 'style'>,
     VariantProps<typeof COMBO_BOX_STYLES>,
     Pick<InputProps<Schema, TFieldName, string>, 'placeholder'> {

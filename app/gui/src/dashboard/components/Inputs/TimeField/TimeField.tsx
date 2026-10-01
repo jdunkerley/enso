@@ -14,7 +14,7 @@ import {
   Form,
   type FieldComponentProps,
   type FieldPath,
-  type FieldProps,
+  type FieldPropsExcept,
   type FieldStateProps,
   type FieldValues,
   type TSchema,
@@ -42,7 +42,7 @@ export interface TimeFieldProps<
       TFieldName,
       TimeValue
     >,
-    FieldProps,
+    FieldPropsExcept<AriaTimeFieldProps<TimeValue>>,
     Pick<FieldComponentProps<Schema>, 'className' | 'style'>,
     VariantProps<typeof TIME_FIELD_STYLES> {
   readonly noResetButton?: boolean
