@@ -1,4 +1,4 @@
-import { setModal, unsetModal, useModalRef } from '#/providers/ModalProvider'
+import { askModal, setModal, unsetModal, useModalRef } from '#/providers/ModalProvider'
 import { getModalsStore } from '$/providers/modals'
 import { afterEach, describe, expect, test } from 'vitest'
 
@@ -41,5 +41,34 @@ describe('the React `setModal` shim', () => {
     expect(modalRef.current).toBeNull()
     getModalsStore().open({ render: () => null }, {})
     expect(modalRef.current).not.toBeNull()
+  })
+})
+
+describe('the React `ask`, forwarded to the Vue stack', () => {
+  const topProps = () =>
+    getModalsStore().stack.value.at(-1)?.props as {
+      modal: unknown
+      onConfirm: () => Promise<void>
+      onCancel: () => Promise<void>
+    }
+
+  test('replaces every open modal, and resolves with the answer, closing every modal', async () => {
+    setModal(<div>Below</div>)
+    const question = <div>Sure?</div>
+    const answer = askModal(question)
+    expect(openModals()).toEqual([question])
+    await topProps().onConfirm()
+    await expect(answer).resolves.toBe('confirm')
+    expect(openModals()).toEqual([])
+  })
+
+  test("a cancel resolves `'dismiss'`, and so does a modal replaced unanswered", async () => {
+    const cancelled = askModal(<div>Sure?</div>)
+    await topProps().onCancel()
+    await expect(cancelled).resolves.toBe('dismiss')
+
+    const replaced = askModal(<div>Sure?</div>)
+    setModal(<div>Other</div>)
+    await expect(replaced).resolves.toBe('dismiss')
   })
 })

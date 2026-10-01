@@ -357,3 +357,129 @@ describe('AlertDialog', () => {
     expect(role('alertdialog')).toBeNull()
   })
 })
+
+describe('`closed`', () => {
+  test('a Dialog emits it once it has closed and left the page, not before', async () => {
+    const open = ref(true)
+    const onClosed = vi.fn()
+    mountWithProviders(() =>
+      h(
+        Dialog,
+        {
+          title: 'Settings',
+          open: open.value,
+          'onUpdate:open': (value: boolean) => (open.value = value),
+          onClosed,
+        },
+        () => 'Content',
+      ),
+    )
+    await flushPromises()
+    expect(role('dialog')).not.toBeNull()
+    expect(onClosed).not.toHaveBeenCalled()
+    open.value = false
+    await flushPromises()
+    expect(role('dialog')).toBeNull()
+    expect(onClosed).toHaveBeenCalledOnce()
+  })
+
+  test('an AlertDialog emits it once answered and gone', async () => {
+    const onClosed = vi.fn()
+    mountWithProviders(() =>
+      h(AlertDialog, { title: 'Delete?', message: 'Sure?', open: true, onClosed }),
+    )
+    await flushPromises()
+    expect(onClosed).not.toHaveBeenCalled()
+    await userEvent.setup().click(byTestId('alert-dialog-confirm')!)
+    await flushPromises()
+    expect(role('alertdialog')).toBeNull()
+    expect(onClosed).toHaveBeenCalledOnce()
+  })
+})
+
+describe('focus without a trigger (as react-aria)', () => {
+  function mountControlled(props: Record<string, unknown> = {}) {
+    const open = ref(false)
+    mountWithProviders(() => [
+      h('div', { id: 'menu-popup' }, [h('button', { 'data-testid': 'item' }, 'About')]),
+      h('button', { 'data-testid': 'menu-trigger', 'aria-controls': 'menu-popup' }, 'Menu'),
+      h(
+        Dialog,
+        {
+          title: 'About',
+          testId: 'dialog',
+          open: open.value,
+          'onUpdate:open': (value: boolean) => (open.value = value),
+          ...props,
+        },
+        () => h('button', { 'data-testid': 'inside' }, 'Inside'),
+      ),
+    ])
+    return open
+  }
+
+  test('it focuses itself on opening, and returns focus to its opener on closing', async () => {
+    const open = mountControlled()
+    byTestId('item')!.focus()
+    open.value = true
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('dialog'))
+    open.value = false
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('item')))
+  })
+
+  test('when the opener has gone, focus returns to the trigger of the menu it was in', async () => {
+    const open = mountControlled()
+    byTestId('item')!.focus()
+    open.value = true
+    await flushPromises()
+    byTestId('item')!.remove()
+    open.value = false
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('menu-trigger')))
+  })
+
+  test('a menu in the portal root whose trigger names another id: its one open trigger', async () => {
+    const open = ref(false)
+    const trigger = document.createElement('button')
+    trigger.setAttribute('aria-controls', 'not-rendered')
+    trigger.setAttribute('aria-expanded', 'true')
+    trigger.dataset.testid = 'user-button'
+    document.body.appendChild(trigger)
+    const menu = document.createElement('div')
+    menu.innerHTML = '<button data-testid="portal-item">About</button>'
+    env.portalRoot.appendChild(menu)
+    mountWithProviders(() =>
+      h(Dialog, {
+        title: 'About',
+        open: open.value,
+        'onUpdate:open': (value: boolean) => (open.value = value),
+      }),
+    )
+    byTestId('portal-item')!.focus()
+    open.value = true
+    await flushPromises()
+    menu.remove()
+    trigger.setAttribute('aria-expanded', 'false')
+    open.value = false
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger))
+    trigger.remove()
+  })
+
+  test('an AlertDialog returns focus the same way', async () => {
+    const open = ref(false)
+    mountWithProviders(() => [
+      h('button', { 'data-testid': 'opener' }, 'Delete'),
+      h(AlertDialog, {
+        title: 'Delete?',
+        open: open.value,
+        'onUpdate:open': (value: boolean) => (open.value = value),
+      }),
+    ])
+    byTestId('opener')!.focus()
+    open.value = true
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('alert-dialog-confirm'))
+    await userEvent.setup().click(byTestId('alert-dialog-cancel')!)
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('opener')))
+  })
+})

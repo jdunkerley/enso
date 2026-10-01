@@ -4,7 +4,7 @@ import {
 } from '$/components/__tests__/mountWithProviders'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { createModalsStore } from '$/providers/modals'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import { h, nextTick, type SetupContext, type VNode } from 'vue'
 
 usePrimitiveTestEnvironment()
@@ -69,6 +69,9 @@ describe('modal stack', () => {
     store.open(Broken, {})
     await nextTick()
     expect(rendered()).toEqual(['fine'])
-    expect(document.body.textContent).toContain('Something went wrong')
+    // The error display is loaded on first use.
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Something went wrong'), {
+      timeout: 10_000,
+    })
   })
 })

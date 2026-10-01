@@ -3,8 +3,8 @@
  * application.
  *
  * The {@link App} component defines the global React context used by child components: the
- * react-aria router, the input bindings, and the About modal. The toasts, the modal stack and the
- * app-wide effects (theme, selection clearing) are Vue's, in `App.vue`.
+ * react-aria router and the input bindings. The toasts, the modal stack, the About dialog with its
+ * menu handler, and the app-wide effects (theme, selection clearing) are Vue's, in `App.vue`.
  */
 import * as React from 'react'
 
@@ -15,11 +15,8 @@ import InputBindingsProvider from '#/providers/InputBindingsProvider'
 import VersionChecker from '#/layouts/VersionChecker'
 import { RouterProvider } from 'react-aria-components'
 
-import { AboutModal } from '#/modals/AboutModal'
-
 import LocalStorage from '$/utils/LocalStorage'
 
-import type { ModalApi } from '#/utilities/modal'
 import { useRouter } from '$/providers/react'
 
 declare module '$/utils/LocalStorage' {
@@ -35,10 +32,6 @@ LocalStorage.registerKey('loginRedirect', {
   schema: z.string(),
 })
 
-window.api?.menu.setMenuItemHandler('about', () => {
-  AboutModal.open()
-})
-
 /**
  * Component called by the parent module, returning the root React component for this
  * package.
@@ -47,14 +40,12 @@ export default function App(props: React.PropsWithChildren) {
   const { children } = props
   const { router } = useRouter()
   const navigate = router.push.bind(router)
-  const aboutModalRef = React.useRef<ModalApi>(null)
 
   // `InputBindingsProvider` depends on `LocalStorageProvider`.
   return (
     <RouterProvider navigate={navigate}>
       <InputBindingsProvider>
         <VersionChecker />
-        <AboutModal ref={aboutModalRef} />
         {children}
       </InputBindingsProvider>
     </RouterProvider>

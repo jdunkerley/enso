@@ -13,6 +13,8 @@ import {
 } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
+import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
+import { useModals } from '$/providers/modals'
 import { useReactApi } from '$/providers/reactApi'
 import { useText } from '$/providers/text'
 import { debouncedGetter } from '$/utils/reactivity'
@@ -38,6 +40,7 @@ const { categoryLabel, removeLocalDirectory } = useCategories()
 const { currentCategory } = toRefs(useDriveLocation())
 const { leftPanelShown, leftPanelToggledOn } = toRefs(useContainerData())
 const reactApi = useReactApi()
+const modals = useModals()
 const { getText } = useText()
 const router = useRouter()
 
@@ -100,8 +103,7 @@ async function onDrop(event: DragEvent) {
 
   if (category.type === 'trash') {
     const itemsCount = payloads.flatMap(({ items }) => items).length
-    reactApi.confirmDelete({
-      defaultOpen: true,
+    void modals.ask(ConfirmDeleteModal, {
       actionText:
         itemsCount === 1 ?
           getText('deleteSelectedAssetActionText', firstItem.title)
@@ -114,7 +116,7 @@ async function onDrop(event: DragEvent) {
 }
 
 function onRemoveLocalDirClick(directory: LocalDirectory) {
-  reactApi.confirmDelete({
+  void modals.ask(ConfirmDeleteModal, {
     actionText: getText('removeTheLocalDirectoryXFromFavorites', categoryLabel(directory)),
     actionButtonLabel: getText('remove'),
     onConfirm: () => {

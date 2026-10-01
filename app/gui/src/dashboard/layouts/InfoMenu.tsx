@@ -3,8 +3,8 @@ import { Popover } from '#/components/Dialog'
 import { Icon } from '#/components/Icon'
 import MenuEntry from '#/components/MenuEntry'
 import { Text } from '#/components/Text'
-import { AboutModal } from '#/modals/AboutModal'
 import { LOGIN_PATH } from '$/appUtils'
+import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import { useAuth, useRouter, useSession, useText } from '$/providers/react'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 
@@ -26,7 +26,7 @@ export function InfoMenu() {
           <MenuEntry
             action="aboutThisApp"
             doAction={() => {
-              AboutModal.open()
+              openAboutModal()
             }}
           />
           {session && (

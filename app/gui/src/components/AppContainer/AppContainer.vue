@@ -1,6 +1,5 @@
 <script lang="ts">
 import type { TransferBetweenCategoriesFunction } from '#/layouts/Drive/Categories'
-import type { ConfirmDeleteModalProps } from '#/modals/ConfirmDeleteModal'
 import { UserBar as UserBarReact } from '#/pages/dashboard/UserBar'
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
@@ -42,7 +41,6 @@ const props = defineProps<{
   startReactTransition: (action: () => void) => void
   isReactTransitioning: boolean
   transferBetweenCategories: TransferBetweenCategoriesFunction
-  confirmDelete: (properties: ConfirmDeleteModalProps) => void
 }>()
 
 // NOTE: This cannot be `useTemplateRef`, because that creates a **readonly** ref, and it interferes
@@ -64,7 +62,6 @@ provideReactApi(
     startTransition: props.startReactTransition,
     isTransitioning: toRef(props, 'isReactTransitioning'),
     transferBetweenCategories: props.transferBetweenCategories,
-    confirmDelete: props.confirmDelete,
   }),
 )
 

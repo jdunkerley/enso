@@ -912,3 +912,107 @@ provisionally accepted, for the maintainer to review.
     compared on #80's with zero differing pixels, with the same geometry,
     computed styles and accessible names, and the phase durations measured the
     same (see the PR).
+
+## Rulings from #156 (About, `ask`, error boundaries, 2026-10-01)
+
+#156 took over the rest of #80: key bindings, the About menu handler,
+`confirm`/`ask` and the error boundaries at route and tab roots. Delegated like
+the rulings above: provisionally accepted, for the maintainer to review.
+
+1. **Split again: key bindings are #170.** The ticket asks for one registry,
+   with rebinding reaching "both the dashboard and the graph editor". Today only
+   the dashboard's shortcuts are user-rebindable (the settings tab lists them;
+   they persist in `LocalStorage` under `inputBindings`); the graph editor's
+   (`@/bindings`) are fixed. Making them rebindable adds rows to the settings
+   tab and changes what users can do: a feature, with a changelog entry and
+   design questions (which shortcuts, how cross-scope conflicts such as `Mod+C`
+   show), which a parity PR cannot carry. The two registries also differ in
+   semantics (`defineKeybinds` has `allowRepeat` and first-match handler order;
+   `defineBindingNamespace` has metadata and a default handler), so unifying
+   them touches every keyboard path in the drive and the graph editor and
+   deserves its own review, with a migration test against the stored format.
+2. **`ask` is on the modal store**: `useModals().ask(component, props)` pushes
+   the modal with `onConfirm`/`onCancel` and resolves `'confirm'` or
+   `'dismiss'`. A caller's own `onConfirm` (the deletion itself) runs first, so
+   the `AlertDialog` shows it pending as React's did; if it throws, the question
+   stays open. A modal that leaves the stack unanswered (`closeAll`, a
+   `setModal`) resolves `'dismiss'`. There is no separate `confirm`: `ask` with
+   `ConfirmDeleteModal` (or another `AlertDialog`) is it.
+3. **A stack modal leaves after its exit animation.** The design left open in
+   #80 (ruling 9): `Dialog` and `AlertDialog` emit `closed` once Reka has
+   unmounted the overlay, which it does when the exit animation ends, and a
+   stack modal emits `close` then. The host itself stays simple.
+4. **`ConfirmDeleteModal.vue` is in `src/components/AlertDialog/`**, not in
+   `src/dashboard/modals/` beside the React one: its caller,
+   `CategoryButton.vue`, is shared code and may not import `#/`, and the modal
+   is a generic "are you sure" over the shared `AlertDialog`. The React
+   `ConfirmDeleteModal` stays (the playbook's "delete the React file" does not
+   apply): eight React callers open it from a `Dialog.Trigger`, and each goes
+   with its feature's port. Same title, prompt, alerts, button labels and
+   `data-testid`s (`modal-dialog`, `alert-dialog-confirm`/`-cancel`); the
+   message is laid out as React's form lays it out (a column, items at the
+   start, 1rem apart).
+5. **One visible difference, deliberately kept.** A Vue-asked modal leaves the
+   stack when it closes; a `setModal` entry stayed until the next
+   `setModal`/`unsetModal` (#80, ruling 7). So after confirming a drop on Trash,
+   or removing a favourite folder, `useModalRef` no longer reports a modal, and
+   typing goes to the asset search bar at once, as it does when no dialog has
+   been opened. Keeping the stale entry would mean emulating that bug in the Vue
+   stack.
+6. **The React `ask` forwards to the Vue one** (`askModal` in the
+   `ModalProvider` shim): the React dialog renders in the shim's frame, which
+   passes it `onConfirm`/`onCancel`. It keeps its old semantics: it replaces
+   every open modal, and closes them all once answered.
+7. **The About dialog is mounted in `App.vue`, not opened on the stack.** It
+   must open from the app menu on every page, as it did from `App.tsx`; the
+   stack is rendered only where a page mounts its host (not on the agreements,
+   subscribe or restore-account pages, for instance). `App.vue` registers the
+   menu handler and mounts `AboutModal.vue` (loaded on first use, kept mounted
+   for its exit animation) inside the React root's slot, so it is available
+   exactly where the React one was. The user and info menus open it with
+   `openAboutModal()`. It sits outside Reka's `ConfigProvider`
+   (`AppContainer.vue`), which changes nothing: it has no locale-dependent part.
+8. **The Vue `CopyButton` toasts as React's does**, reversing #78's note:
+   "Copied to clipboard" at the bottom right (`successToastMessage`, `true` by
+   default), closing with the check icon after 2 s; a failure shows an error
+   toast and keeps the error icon.
+9. **Error boundaries at the roots catch only render errors**
+   (`onlyRenderErrors`): errors thrown by a component's `setup` or render
+   function, which is what React's boundary catches. The Vue boundary otherwise
+   catches everything `onErrorCaptured` sees, including event handlers and
+   watchers; at a root that would replace a working graph editor with the error
+   display because one click handler threw. Those errors go on to the app's
+   handler (Sentry's), as before. Placed around: the route in `App.vue` (reset
+   on navigation), each middle-panel tab inside its `KeepAlive` (so the other
+   tabs live on), and the right panel's open panel (reset on switching).
+   `ReactRoot.tsx`'s and `Page.tsx`'s React boundaries stay for React content.
+   **For review:** with a boundary at the roots, a render error deep in Vue
+   content now shows the error display over the nearest root, where Vue alone
+   leaves just the failing component empty. That is React's behaviour and the
+   ticket's intent, but it trades graceful degradation for a visible failure.
+10. **The boundary's error display is loaded on first use.** Statically, a
+    boundary in `App.vue` brought `Button`, `Result` and Reka into the initial
+    chunk (+101 KB minified, measured); now the initial chunk is unchanged (+0.6
+    KB). Tests wait for the display to appear.
+11. **A dialog without a trigger handles focus as react-aria does**
+    (`Dialog/focusReturn.ts`), found by comparing the running app before and
+    after. Reka focused the dialog's first button on opening (the About dialog's
+    Close button) and, when the element that opened it had gone, dropped focus
+    on the page's body on closing. Now the dialog focuses itself on opening (an
+    `AlertDialog` still focuses its confirm button, as React's `autoFocus` did),
+    and on closing returns focus to its opener or, when that was an item of a
+    menu that closed as the dialog opened, to that menu's trigger: the user
+    menu's button, after "About Enso". The trigger is the element whose
+    `aria-controls` names the menu or, since react-aria's `DialogTrigger` names
+    an id its popover does not render, the one open popup trigger
+    (`aria-expanded="true"` with `aria-controls`) outside the portal root. The
+    return waits for Reka's own clean-up, whose still active focus trap would
+    otherwise take the focus back. An `AlertDialog`'s confirm button is focused
+    as visibly focused (`focus({ focusVisible: true })`), as react-aria shows
+    focus that no key or pointer press led to: React's Delete button opened in
+    its focused colour, and so does the Vue one. The Vue dialogs also fix two
+    React quirks, invisible to a mouse user: they are named by their title
+    (React's had no accessible name), and Tab stays inside the confirmation
+    (React's let it escape to the page once).
+12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
+    (they go with #94) and `VersionChecker` (with its feature's port).

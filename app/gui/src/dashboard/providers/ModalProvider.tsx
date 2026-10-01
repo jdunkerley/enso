@@ -8,7 +8,7 @@
  * React caller is ported (#75).
  */
 import { ReactModalFrame } from '#/components/ReactModalFrame'
-import { getModalsStore } from '$/providers/modals'
+import { getModalsStore, type Resolution } from '$/providers/modals'
 import { reactComponent } from '@/util/react'
 import { isValidElement, type JSX } from 'react'
 import type { Component } from 'vue'
@@ -44,6 +44,17 @@ export function setModal(modal: ModalOrCallback) {
   const modals = getModalsStore()
   modals.closeAll()
   if (next != null) modals.open(getReactModalEntry(), { modal: next })
+}
+
+/**
+ * Replace every open modal with this one, as {@link setModal} does, and ask the user through it:
+ * the modal stack's `ask` passes it `onConfirm`/`onCancel`, and its answer resolves the promise.
+ * Every modal is closed once it has answered, as the React `ask` always did.
+ */
+export function askModal(modal: Modal): Promise<Resolution> {
+  const modals = getModalsStore()
+  modals.closeAll()
+  return modals.ask(getReactModalEntry(), { modal }).finally(unsetModal)
 }
 
 /** Close every open modal. Returns `false` if there was none. */

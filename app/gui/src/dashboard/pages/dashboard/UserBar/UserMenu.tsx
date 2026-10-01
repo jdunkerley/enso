@@ -6,11 +6,11 @@ import { Text } from '#/components/Text'
 import { backendMutationOptions } from '#/hooks/backendHooks'
 import { useMenuEntries } from '#/hooks/menuHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
-import { AboutModal } from '#/modals/AboutModal'
 import { unsetModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
 import { SUBSCRIBE_PATH } from '$/appUtils'
+import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import { useBackends, useFullUserSession, useRouter, useSession, useText } from '$/providers/react'
 import { useShowEnsoDevtools } from '$/providers/react/devTools'
 import { download } from '$/utils/download'
@@ -94,7 +94,7 @@ export function UserMenu(props: UserMenuProps) {
     {
       action: 'aboutThisApp',
       doAction: () => {
-        AboutModal.open()
+        openAboutModal()
       },
     },
     user.isEnsoTeamMember &&

@@ -26,8 +26,10 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `react-aria-components` with project-level styling applied. Truly shared UI
   will move to `src/` proper as it's ported.
 - `providers/` — React context providers (auth, text/i18n, input bindings,
-  etc.). `ModalProvider.tsx` is only a shim now: `setModal`/`unsetModal` forward
-  to the Vue modal stack (`$/providers/modals`).
+  etc.). `ModalProvider.tsx` is only a shim now: `setModal`/`unsetModal` (and
+  `askModal`, behind the React `ask`) forward to the Vue modal stack
+  (`$/providers/modals`). The About dialog is Vue's: open it with
+  `openAboutModal()` (`$/components/AboutModal/aboutModal`).
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.

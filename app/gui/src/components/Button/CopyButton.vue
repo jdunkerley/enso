@@ -3,11 +3,14 @@
  * @file A button that copies text to the clipboard, and briefly shows whether that worked: the
  * Vue counterpart of the React `Button/CopyButton`.
  *
- * The React one also shows a "copied" toast; that belongs to the toast host (#80), and a port that
- * needs it can pass `@copy`.
+ * Like the React one, it shows a "Copied to clipboard" toast at the bottom right on success (unless
+ * `successToastMessage` is `false`), which closes with the success icon; a failure shows an error
+ * toast and is logged.
  */
 import { useText } from '$/providers/text'
+import { useToasts } from '$/providers/toasts'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'
+import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { onScopeDispose, ref, useAttrs } from 'vue'
 import Button from './Button.vue'
 
@@ -17,6 +20,7 @@ const {
   successIcon = 'check',
   errorIcon = 'close',
   variant = 'icon',
+  successToastMessage = true,
 } = defineProps<{
   copyText: string
   /** `null` shows no icon (`false` in React). */
@@ -24,31 +28,73 @@ const {
   successIcon?: IconName | undefined
   errorIcon?: IconName | undefined
   variant?: InstanceType<typeof Button>['$props']['variant']
+  /**
+   * The toast shown once the text is copied: `true` for "Copied to clipboard" (the default), a
+   * string for another message, `false` for none.
+   */
+  successToastMessage?: boolean | string | undefined
 }>()
 
 const emit = defineEmits<{ copy: [] }>()
 
 const { getText } = useText()
+const toasts = useToasts()
 const attrs = useAttrs()
+
+/** The success toast's id, shared by every copy button as in React: one such toast at a time. */
+const SUCCESS_TOAST_ID = 'copySuccess'
 
 /** How long the success or error icon stays before the copy icon comes back. */
 const RESET_DELAY = 2000
 
 const state = ref<'error' | 'idle' | 'success'>('idle')
 let resetTimer: ReturnType<typeof setTimeout> | undefined
-onScopeDispose(() => clearTimeout(resetTimer))
+let stopWatchingToast: (() => void) | undefined
+onScopeDispose(() => {
+  clearTimeout(resetTimer)
+  stopWatchingToast?.()
+})
+
+function reset() {
+  stopWatchingToast?.()
+  stopWatchingToast = undefined
+  state.value = 'idle'
+}
+
+function showSuccessToast() {
+  if (successToastMessage === false) return
+  toasts.show(successToastMessage === true ? getText('copiedToClipboard') : successToastMessage, {
+    toastId: SUCCESS_TOAST_ID,
+    type: 'success',
+    closeOnClick: true,
+    hideProgressBar: true,
+    position: 'bottom-right',
+  })
+  // Closing the toast resets the button, as in React.
+  stopWatchingToast?.()
+  stopWatchingToast = toasts.onChange((change) => {
+    if (change.id === SUCCESS_TOAST_ID && change.status === 'removed') reset()
+  })
+}
 
 async function copy() {
   clearTimeout(resetTimer)
   try {
     await navigator.clipboard.writeText(copyText)
-    state.value = 'success'
-    emit('copy')
   } catch (error) {
-    console.error('Could not copy to the clipboard', error)
+    const message = `${getText('arbitraryErrorTitle')}: ${getMessageOrToString(error)}`
+    toasts.show(message, { type: 'error' })
+    console.error(message)
     state.value = 'error'
+    return
   }
-  resetTimer = setTimeout(() => (state.value = 'idle'), RESET_DELAY)
+  state.value = 'success'
+  emit('copy')
+  showSuccessToast()
+  resetTimer = setTimeout(() => {
+    toasts.dismiss(SUCCESS_TOAST_ID)
+    reset()
+  }, RESET_DELAY)
 }
 </script>
 

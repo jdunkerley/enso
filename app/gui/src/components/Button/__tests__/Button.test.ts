@@ -7,9 +7,10 @@ import {
   mountWithProviders,
   usePrimitiveTestEnvironment,
 } from '$/components/__tests__/mountWithProviders'
+import { useToasts } from '$/providers/toasts'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import { describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { h, nextTick, ref } from 'vue'
 import Button from '../Button.vue'
 import ButtonGroup from '../ButtonGroup.vue'
@@ -194,5 +195,78 @@ describe('CopyButton', () => {
     expect(writeText).toHaveBeenCalledWith('hello')
     expect(onCopy).toHaveBeenCalledOnce()
     expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('check')
+  })
+
+  describe('toasts, as the React one does', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+      // No host here plays the exit animation that would remove a dismissed toast.
+      for (const toast of useToasts().toasts.value) useToasts().remove(toast.id)
+    })
+    const copyToasts = () => useToasts().toasts.value.filter((toast) => toast.isIn)
+
+    test('a "Copied to clipboard" toast at the bottom right, gone with the check after 2 s', async () => {
+      mountWithProviders(() => h(CopyButton, { testId: 'copy', copyText: 'hello' }))
+      const button = byTestId('copy')!
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      button.click()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(copyToasts()).toEqual([
+        expect.objectContaining({
+          id: 'copySuccess',
+          content: 'Copied to clipboard',
+          type: 'success',
+          closeOnClick: true,
+          hideProgressBar: true,
+          position: 'bottom-right',
+        }),
+      ])
+      await vi.advanceTimersByTimeAsync(1999)
+      expect(copyToasts()).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(copyToasts()).toEqual([])
+      expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('duplicate')
+    })
+
+    test('closing the toast resets the icon', async () => {
+      const user = userEvent.setup()
+      mountWithProviders(() => h(CopyButton, { testId: 'copy', copyText: 'hello' }))
+      const button = byTestId('copy')!
+      await user.click(button)
+      await flushPromises()
+      expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('check')
+      useToasts().remove('copySuccess')
+      await flushPromises()
+      expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('duplicate')
+    })
+
+    test('a custom message, or none with `successToastMessage: false`', async () => {
+      const user = userEvent.setup()
+      mountWithProviders(() => [
+        h(CopyButton, { testId: 'custom', copyText: 'a', successToastMessage: 'Copied the id' }),
+        h(CopyButton, { testId: 'silent', copyText: 'b', successToastMessage: false }),
+      ])
+      await user.click(byTestId('silent')!)
+      await flushPromises()
+      expect(copyToasts()).toEqual([])
+      await user.click(byTestId('custom')!)
+      await flushPromises()
+      expect(copyToasts()).toEqual([expect.objectContaining({ content: 'Copied the id' })])
+    })
+
+    test('a failure shows an error toast and the error icon', async () => {
+      const user = userEvent.setup()
+      vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('Denied'))
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      mountWithProviders(() => h(CopyButton, { testId: 'copy', copyText: 'hello' }))
+      await user.click(byTestId('copy')!)
+      await flushPromises()
+      expect(copyToasts()).toEqual([
+        expect.objectContaining({ type: 'error', content: 'An error occurred: Denied' }),
+      ])
+      expect(consoleError).toHaveBeenCalledWith('An error occurred: Denied')
+      expect(byTestId('copy')!.querySelector('use')?.getAttribute('data-icon')).toBe('close')
+      consoleError.mockRestore()
+    })
   })
 })

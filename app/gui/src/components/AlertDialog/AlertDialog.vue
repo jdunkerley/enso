@@ -11,6 +11,9 @@
  * need one.)
  *
  * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
+ *
+ * `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
+ * (`$/providers/modals`) leaves it then, so that it does not vanish mid-animation.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -33,7 +36,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from 'reka-ui'
-import { computed, ref } from 'vue'
+import { useDialogFocus } from '$/components/Dialog/focusReturn'
+import { computed, ref, useSlots } from 'vue'
 
 const {
   title,
@@ -60,7 +64,16 @@ const {
 
 const open = defineModel<boolean>('open', { default: false })
 
+const emit = defineEmits<{
+  /** It closed, and its exit animation has ended. */
+  closed: []
+}>()
+
 const { getText } = useText()
+
+// Focus returns to the opener on closing, as in `Dialog.vue`; it opens on the confirm button.
+const slots = useSlots()
+const focus = useDialogFocus(open, () => slots.trigger != null)
 
 const pending = ref<'cancel' | 'confirm'>()
 
@@ -75,13 +88,17 @@ async function respond(response: 'cancel' | 'confirm') {
   }
 }
 
-/** Focus the confirm button rather than Reka's default, the first focusable element. */
+/**
+ * Focus the confirm button rather than Reka's default, the first focusable element. It is focused
+ * as visibly focused, as React's `autoFocus` is: react-aria treats focus that no key or pointer
+ * press led to as "virtual", and shows it, so the button shows its focused colour from the start.
+ */
 function focusConfirm(event: Event) {
   const container = event.target instanceof Element ? event.target : document
   const button = container.querySelector<HTMLElement>('[data-alert-dialog-confirm]')
   if (button != null) {
     event.preventDefault()
-    button.focus()
+    button.focus({ focusVisible: true })
   }
 }
 
@@ -101,12 +118,18 @@ const styles = computed(() =>
           DIALOG_OVERLAY_STYLES({ isEntering: open, isExiting: !open, blockInteractions: true })
         "
       >
-        <div :class="DIALOG_MODAL_STYLES({ type: 'modal' })" data-testid="modal-dialog">
+        <!-- Reka unmounts the overlay once its exit animation has ended. -->
+        <div
+          :class="DIALOG_MODAL_STYLES({ type: 'modal' })"
+          data-testid="modal-dialog"
+          @vue:unmounted="emit('closed')"
+        >
           <AlertDialogContent
             :class="`${styles.base()} ${DIALOG_MOTION({ type: 'modal' })}`"
             :data-testid="testId"
             @escapeKeyDown.prevent
             @openAutoFocus="focusConfirm"
+            @closeAutoFocus="focus.onCloseAutoFocus"
           >
             <div class="w-full">
               <header :class="styles.header({ scrolledToTop: true })">
@@ -120,8 +143,9 @@ const styles = computed(() =>
             <div :class="styles.scroller()">
               <div :class="styles.measurerWrapper()">
                 <div :class="styles.content()" class="flex flex-col gap-4">
+                  <!-- Laid out as React's form is: a column, items at the start, 1rem apart. -->
                   <AlertDialogDescription asChild>
-                    <div>
+                    <div class="flex flex-col items-start gap-4">
                       <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
                         <Text v-if="message != null">{{ message }}</Text>
                       </slot>
