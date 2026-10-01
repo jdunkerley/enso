@@ -1,9 +1,7 @@
-/**
- * @file Tests for the Breadcrumbs component.
- */
+/** @file Tests for collapsing a long breadcrumb path (moved from the React `Breadcrumbs.test.tsx`). */
 
 import { describe } from 'vitest'
-import { getItemsWithCollapsedItem } from './utilities'
+import { getItemsWithCollapsedItem } from '../utilities'
 
 describe('getItemsWithCollapsedItem', (it) => {
   it('returns the items when there is enough space', ({ expect }) => {

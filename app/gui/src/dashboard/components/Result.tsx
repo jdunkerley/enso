@@ -1,6 +1,13 @@
 /** @file Display the result of an operation. */
 import type { SvgUseIcon, TestIdProps } from '#/components/types'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import {
+  RESULT_STATUS_STYLES,
+  RESULT_STYLES,
+  type ResultStatus,
+  type ResultStatusStyle,
+} from '$/components/Result/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import * as objects from 'enso-common/src/utilities/data/object'
 import type { JSX, PropsWithChildren, ReactElement } from 'react'
 import { Icon } from './Icon'
 import { Loader } from './Loader'
@@ -13,58 +20,20 @@ const INFO_ICON = (
   </Text>
 )
 
-const STATUS_ICON_MAP: Readonly<Record<Status, StatusIcon>> = {
-  loading: {
-    icon: <Loader minHeight="h8" />,
-    colorClassName: 'text-primary',
-    bgClassName: 'bg-transparent',
-  },
-  info: {
-    icon: INFO_ICON,
-    colorClassName: 'text-primary',
-    bgClassName: 'bg-primary/15',
-  },
-  error: { icon: 'close', colorClassName: 'text-red-500', bgClassName: 'bg-red-500' },
-  success: { icon: 'check', colorClassName: 'text-green-500', bgClassName: 'bg-green' },
-  // pending is the same as loading. Used for mutations.
-  pending: {
-    icon: <Loader minHeight="h8" />,
-    colorClassName: 'text-primary',
-    bgClassName: 'bg-transparent',
-  },
-  // idle is the same as info. Used for mutations.
-  idle: {
-    icon: INFO_ICON,
-    colorClassName: 'text-primary',
-    bgClassName: 'bg-primary/30',
-  },
-}
+const STATUS_ICONS = {
+  loader: <Loader minHeight="h8" />,
+  info: INFO_ICON,
+  check: 'check',
+  close: 'close',
+} as const satisfies Record<ResultStatusStyle['icon'], ReactElement | SvgUseIcon>
 
-const RESULT_STYLES = tv({
-  base: 'flex flex-col items-center justify-center max-w-full px-6 py-4 text-center h-[max-content]',
-  variants: {
-    centered: {
-      true: 'm-auto',
-      false: '',
-      horizontal: 'mx-auto',
-      vertical: 'my-auto',
-      all: 'm-auto',
-      none: '',
-    },
-  },
-  slots: {
-    statusIcon:
-      'mb-2 flex h-8 w-8 flex-none items-center justify-center rounded-full bg-opacity-25 p-1 text-green',
-    icon: 'h-6 w-6 flex-none',
-    title: '',
-    subtitle: 'max-w-[750px]',
-    content: 'mt-3 w-full',
-  },
-  defaultVariants: { centered: 'all' },
-})
+const STATUS_ICON_MAP: Readonly<Record<Status, StatusIcon>> = objects.mapEntries(
+  RESULT_STATUS_STYLES,
+  (_status, { icon, ...colors }) => ({ icon: STATUS_ICONS[icon], ...colors }),
+)
 
 /** Possible statuses for a result. */
-export type Status = 'error' | 'idle' | 'info' | 'loading' | 'pending' | 'success'
+export type Status = ResultStatus
 
 /** The corresponding icon and color for each status. */
 interface StatusIcon {

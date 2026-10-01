@@ -1,7 +1,7 @@
 /**
- * @file Utilities for the Breadcrumbs component
+ * @file Framework-free utilities for breadcrumbs: collapsing a long path into a "more" item. Shared
+ * by the React `#/components/Breadcrumbs` and the Vue `$/components/Breadcrumbs`.
  */
-import type * as aria from 'react-aria-components'
 import invariant from 'tiny-invariant'
 
 const DEFAULT_START_VISIBLE_ITEMS_COUNT = 1
@@ -18,7 +18,7 @@ interface BreadcrumbCollapsedItem<T> {
   /**
    * Id determines a unique key across the collection
    */
-  readonly id: aria.Key
+  readonly id: string | number
 }
 
 /**

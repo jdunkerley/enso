@@ -4,7 +4,8 @@
  * Icon component that displays an icon based on different input.
  */
 import type { AvailableIconReturn, IconProp, IconPropSvgUse, TestIdProps } from '#/components/types'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { ICON_STYLES } from '$/components/Icon/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { Icon as PossibleIcon } from '@/util/iconMetadata/iconName'
 import { svgUseHref } from '@/util/icons'
 import { memo } from 'react'
@@ -24,53 +25,7 @@ export interface SvgUseIconProps<Render = never> {
   readonly icon: IconPropSvgUse<Render>
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
-export const ICON_COLORS = [
-  'custom',
-  'primary',
-  'danger',
-  'success',
-  'accent',
-  'muted',
-  'disabled',
-  'invert',
-  'inherit',
-  'current',
-] as const satisfies readonly VariantProps<typeof ICON_STYLES>['color'][]
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const ICON_STYLES = tv({
-  base: 'flex-none aspect-square w-full h-full [&>svg]:stroke-current [&>svg]:w-full [&>svg]:h-full',
-  variants: {
-    color: {
-      custom: '',
-      primary: 'text-primary',
-      danger: 'text-danger',
-      success: 'text-accent-dark',
-      accent: 'text-accent-dark',
-      muted: 'text-primary/50',
-      disabled: 'text-disabled',
-      invert: 'text-invert',
-      inherit: 'text-inherit',
-      current: 'text-current',
-    },
-    size: {
-      xsmall: 'h-2 w-2',
-      small: 'h-3 w-3',
-      medium: 'h-4 w-4',
-      large: 'h-5 w-5',
-      xlarge: 'h-6 w-6',
-      xxlarge: 'h-7 w-7',
-      xxxlarge: 'h-8 w-8',
-      xxxxlarge: 'h-9 w-9',
-      full: 'h-full w-full',
-    },
-  },
-  defaultVariants: {
-    color: 'current',
-    size: 'medium',
-  },
-})
+export { ICON_STYLES } from '$/components/Icon/variants'
 
 /** Icon component that displays an icon based on different input. */
 // eslint-disable-next-line no-restricted-syntax

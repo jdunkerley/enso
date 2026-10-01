@@ -3,22 +3,14 @@
  * classes.
  */
 import { ROTATING_ELEMENT_SIZE } from '$/components/Spinner/constants'
+import {
+  SPINNER_PHASE_CLASSES as SPINNER_CSS_CLASSES,
+  type SpinnerPhase,
+} from '$/components/Spinner/variants'
 import * as React from 'react'
 import { twJoin } from 'tailwind-merge'
 
-/** The state of the spinner. It should go from `initial`, to `loading`, to `done`. */
-export type SpinnerPhase = 'done' | 'initial' | 'loading-fast' | 'loading-medium' | 'loading-slow'
-
-const SPINNER_CSS_CLASSES: Readonly<Record<SpinnerPhase, string>> = {
-  initial: 'dasharray-5 ease-linear',
-  /* eslint-disable-next-line @typescript-eslint/naming-convention */
-  'loading-slow': 'dasharray-75 duration-spinner-slow ease-linear',
-  /* eslint-disable-next-line @typescript-eslint/naming-convention */
-  'loading-medium': 'dasharray-75 duration-spinner-medium ease-linear',
-  /* eslint-disable-next-line @typescript-eslint/naming-convention */
-  'loading-fast': 'dasharray-75 duration-spinner-fast ease-linear',
-  done: 'dasharray-100 duration-spinner-fast ease-in',
-}
+export type { SpinnerPhase }
 
 /** Props for a {@link Spinner}. */
 export interface SpinnerProps {

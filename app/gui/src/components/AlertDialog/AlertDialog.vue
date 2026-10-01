@@ -1,0 +1,158 @@
+<script setup lang="ts">
+/**
+ * @file A dialog that asks the user to confirm or cancel an action, on Reka UI's `AlertDialog`:
+ * the Vue counterpart of the React `#/components/AlertDialog`, and styled the same way (a small
+ * `Dialog` with no close button).
+ *
+ * `role="alertdialog"`; it opens with focus on the confirm button, as React's `autoFocus` does, and
+ * cannot be dismissed by an outside click or Escape: the user must choose. `onConfirm` and
+ * `onCancel` may return a promise; the dialog shows the confirm button loading until it settles,
+ * then closes. (React routes this through its `Form`; forms are #79, and a yes/no answer does not
+ * need one.)
+ *
+ * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
+ */
+import Button from '$/components/Button/Button.vue'
+import ButtonGroup from '$/components/Button/ButtonGroup.vue'
+import {
+  DIALOG_MODAL_STYLES,
+  DIALOG_MOTION,
+  DIALOG_OVERLAY_STYLES,
+  DIALOG_STYLES,
+} from '$/components/Dialog/variants'
+import { portalTarget } from '$/components/portal'
+import Heading from '$/components/Text/Heading.vue'
+import Text from '$/components/Text/Text.vue'
+import { useText } from '$/providers/text'
+import {
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogRoot,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from 'reka-ui'
+import { computed, ref } from 'vue'
+
+const {
+  title,
+  message,
+  confirm: confirmLabel,
+  cancel: cancelLabel,
+  isDestructive = false,
+  onConfirm,
+  onCancel,
+  testId,
+} = defineProps<{
+  title: string
+  message?: string | undefined
+  /** The confirm button's label. Defaults to "Confirm". */
+  confirm?: string | undefined
+  /** The cancel button's label. Defaults to "Cancel". */
+  cancel?: string | undefined
+  /** Styles the confirm button as a delete. */
+  isDestructive?: boolean | undefined
+  onConfirm?: (() => unknown) | undefined
+  onCancel?: (() => unknown) | undefined
+  testId?: string | undefined
+}>()
+
+const open = defineModel<boolean>('open', { default: false })
+
+const { getText } = useText()
+
+const pending = ref<'cancel' | 'confirm'>()
+
+async function respond(response: 'cancel' | 'confirm') {
+  if (pending.value != null) return
+  pending.value = response
+  try {
+    await (response === 'confirm' ? onConfirm : onCancel)?.()
+    open.value = false
+  } finally {
+    pending.value = undefined
+  }
+}
+
+/** Focus the confirm button rather than Reka's default, the first focusable element. */
+function focusConfirm(event: Event) {
+  const container = event.target instanceof Element ? event.target : document
+  const button = container.querySelector<HTMLElement>('[data-alert-dialog-confirm]')
+  if (button != null) {
+    event.preventDefault()
+    button.focus()
+  }
+}
+
+const styles = computed(() =>
+  DIALOG_STYLES({ type: 'modal', size: 'small', closeButton: 'none', padding: 'medium' }),
+)
+</script>
+
+<template>
+  <AlertDialogRoot v-model:open="open">
+    <AlertDialogTrigger v-if="$slots.trigger" asChild>
+      <slot name="trigger" />
+    </AlertDialogTrigger>
+    <AlertDialogPortal :to="portalTarget()">
+      <AlertDialogOverlay
+        :class="
+          DIALOG_OVERLAY_STYLES({ isEntering: open, isExiting: !open, blockInteractions: true })
+        "
+      >
+        <div :class="DIALOG_MODAL_STYLES({ type: 'modal' })" data-testid="modal-dialog">
+          <AlertDialogContent
+            :class="`${styles.base()} ${DIALOG_MOTION({ type: 'modal' })}`"
+            :data-testid="testId"
+            @escapeKeyDown.prevent
+            @openAutoFocus="focusConfirm"
+          >
+            <div class="w-full">
+              <header :class="styles.header({ scrolledToTop: true })">
+                <AlertDialogTitle asChild>
+                  <Heading :level="2" :class="styles.heading()" weight="semibold">
+                    {{ title }}
+                  </Heading>
+                </AlertDialogTitle>
+              </header>
+            </div>
+            <div :class="styles.scroller()">
+              <div :class="styles.measurerWrapper()">
+                <div :class="styles.content()" class="flex flex-col gap-4">
+                  <AlertDialogDescription asChild>
+                    <div>
+                      <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
+                        <Text v-if="message != null">{{ message }}</Text>
+                      </slot>
+                    </div>
+                  </AlertDialogDescription>
+                  <ButtonGroup align="end">
+                    <Button
+                      variant="ghost"
+                      :isDisabled="pending != null"
+                      :isLoading="false"
+                      testId="alert-dialog-cancel"
+                      @press="respond('cancel')"
+                    >
+                      {{ cancelLabel ?? getText('cancel') }}
+                    </Button>
+                    <Button
+                      :variant="isDestructive ? 'delete' : 'primary'"
+                      :isLoading="pending === 'confirm'"
+                      testId="alert-dialog-confirm"
+                      data-alert-dialog-confirm
+                      @press="respond('confirm')"
+                    >
+                      {{ confirmLabel ?? getText('confirm') }}
+                    </Button>
+                  </ButtonGroup>
+                </div>
+              </div>
+            </div>
+          </AlertDialogContent>
+        </div>
+      </AlertDialogOverlay>
+    </AlertDialogPortal>
+  </AlertDialogRoot>
+</template>

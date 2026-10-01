@@ -23,7 +23,7 @@ function mountMenu() {
             default: () => [
               h(MenuItem, { testId: 'alpha', onSelect: () => onSelect('Alpha') }, () => 'Alpha'),
               h(MenuItem, { testId: 'beta', onSelect: () => onSelect('Beta') }, () => 'Beta'),
-              h(MenuItem, { testId: 'disabled', disabled: true }, () => 'Unavailable'),
+              h(MenuItem, { testId: 'disabled', isDisabled: true }, () => 'Unavailable'),
               h(MenuSeparator),
               h(MenuItem, { testId: 'gamma', onSelect: () => onSelect('Gamma') }, () => 'Gamma'),
             ],

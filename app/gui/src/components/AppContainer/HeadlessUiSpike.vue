@@ -7,8 +7,12 @@
  * with the dashboard's `variants.ts` gets focus management, Escape and keyboard navigation right
  * next to react-aria, whose own overlays and global listeners are live on the same page
  * (`integration-test/dashboard/headlessUiSpike.spec.ts`). It is not a user-facing feature and goes
- * away once the `DropdownMenu` primitive has a real mount site (#78).
+ * away once the `DropdownMenu` primitive has a real mount site.
+ *
+ * #78 added a Vue `Popover` beside it, so that the spec can compare it, in a real browser with the
+ * real stylesheet, against the React user menu's popover next to it.
  */
+import Popover from '$/components/Dialog/Popover.vue'
 import DropdownMenu from '$/components/Menu/DropdownMenu.vue'
 import MenuItem from '$/components/Menu/MenuItem.vue'
 import MenuSeparator from '$/components/Menu/MenuSeparator.vue'
@@ -26,7 +30,7 @@ const triggerClasses = TEXT_STYLE({
 
 <template>
   <div class="HeadlessUiSpike" data-testid="headless-ui-spike">
-    <DropdownMenu testId="headless-ui-spike-menu" align="end">
+    <DropdownMenu testId="headless-ui-spike-menu" placement="bottom-end">
       <template #trigger>
         <button type="button" :class="triggerClasses" data-testid="headless-ui-spike-trigger">
           Reka spike
@@ -34,10 +38,22 @@ const triggerClasses = TEXT_STYLE({
       </template>
       <MenuItem testId="headless-ui-spike-item-alpha" @select="selected = 'Alpha'">Alpha</MenuItem>
       <MenuItem testId="headless-ui-spike-item-beta" @select="selected = 'Beta'">Beta</MenuItem>
-      <MenuItem disabled testId="headless-ui-spike-item-disabled">Unavailable</MenuItem>
+      <MenuItem isDisabled testId="headless-ui-spike-item-disabled">Unavailable</MenuItem>
       <MenuSeparator />
       <MenuItem testId="headless-ui-spike-item-gamma" @select="selected = 'Gamma'">Gamma</MenuItem>
     </DropdownMenu>
+    <Popover testId="headless-ui-spike-popover" size="xxsmall" placement="bottom-end">
+      <template #trigger>
+        <button
+          type="button"
+          :class="triggerClasses"
+          data-testid="headless-ui-spike-popover-trigger"
+        >
+          Reka popover
+        </button>
+      </template>
+      <span :class="TEXT_STYLE({ variant: 'body' })">Popover</span>
+    </Popover>
     <output data-testid="headless-ui-spike-selection" :class="TEXT_STYLE({ variant: 'body' })">
       {{ selected ?? '' }}
     </output>

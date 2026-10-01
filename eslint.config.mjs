@@ -345,6 +345,15 @@ const config = [
       'vue/multi-word-component-names': 0,
     },
   },
+  {
+    // The shared primitives keep the React dashboard's component names (`Button`, `Text`,
+    // `Dialog`, …) so that ports stay mechanical (#78). They are always imported, never registered
+    // globally, so a PascalCase `<Button>` is never resolved as the HTML `<button>`.
+    files: ['app/gui/src/components/*/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 0,
+    },
+  },
   // JsDoc lints for typescript - the recommended set with some modifications.
   {
     ignores: ['**/*.js'],

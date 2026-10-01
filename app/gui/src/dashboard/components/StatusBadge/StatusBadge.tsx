@@ -1,29 +1,7 @@
 /** @file A status badge to notify the user of the state of an item. */
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import { STATUS_BADGE_STYLES } from '$/components/Badge/variants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { PropsWithChildren } from 'react'
-
-const STATUS_BADGE_STYLES = tv({
-  base: 'relative flex',
-  variants: {
-    color: {
-      custom: { badge: '' },
-      primary: { badge: 'after:bg-primary' },
-      danger: { badge: 'after:bg-danger' },
-      success: { badge: 'after:bg-accent-dark' },
-      accent: { badge: 'after:bg-accent-dark' },
-      muted: { badge: 'after:bg-primary/40' },
-      disabled: { badge: 'after:bg-disabled' },
-      invert: { badge: 'after:bg-invert' },
-      inherit: { badge: 'after:bg-inherit' },
-      current: { badge: 'after:bg-current' },
-    },
-    hidden: { true: { badge: 'invisible' } },
-  },
-  slots: {
-    badge:
-      'absolute bg-dashboard/80 top-0 right-0 rounded-full size-1.5 after:absolute after:rounded-full after:size-1 after:top-px after:right-px',
-  },
-})
 
 /** Props for a {@link StatusBadge}. */
 export interface StatusBadgeProps
