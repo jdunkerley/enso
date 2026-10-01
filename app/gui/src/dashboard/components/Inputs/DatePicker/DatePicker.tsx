@@ -18,7 +18,7 @@ import {
   type DatePickerProps as AriaDatePickerProps,
   type DateValue,
 } from '#/components/aria'
-import { DATE_PICKER_STYLES } from '$/components/Inputs/variants'
+import { DATE_PICKER_STYLES } from '$/components/Inputs/dateVariants'
 import { useText } from '$/providers/react'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'

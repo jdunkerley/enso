@@ -11,7 +11,7 @@ import {
 } from '#/components/Form'
 import RadioGroup from '#/components/styled/RadioGroup'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { SELECTOR_STYLES } from '$/components/Inputs/variants'
+import { SELECTOR_STYLES } from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import * as React from 'react'
 import { SelectorOption } from './SelectorOption'

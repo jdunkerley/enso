@@ -1,6 +1,6 @@
 /** @file An option in a selector. */
 import { ListBoxItem, type ListBoxItemProps } from '#/components/aria'
-import { MULTI_SELECTOR_OPTION_STYLES } from '$/components/Inputs/variants'
+import { MULTI_SELECTOR_OPTION_STYLES } from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { forwardRef, type ForwardedRef } from 'react'
 

@@ -12,7 +12,7 @@
  * `FormDropdown.vue` binds one to a form field.
  */
 import Icon from '$/components/Icon/Icon.vue'
-import { DROPDOWN_OPTION_VUE_STATES, DROPDOWN_STYLES } from '$/components/Inputs/variants'
+import { DROPDOWN_OPTION_VUE_STATES, DROPDOWN_STYLES } from '$/components/Inputs/dropdownVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { useEventListener } from '@vueuse/core'
 import { ListboxContent, ListboxItem, ListboxRoot } from 'reka-ui'

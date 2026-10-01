@@ -15,7 +15,7 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { MULTI_SELECTOR_STYLES } from '$/components/Inputs/variants'
+import { MULTI_SELECTOR_STYLES } from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { omit, unsafeRemoveUndefined } from 'enso-common/src/utilities/data/object'
 import { forwardRef, useRef, type CSSProperties, type ForwardedRef, type Ref } from 'react'

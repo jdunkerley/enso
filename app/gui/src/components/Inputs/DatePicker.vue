@@ -20,7 +20,7 @@ import {
   CALENDAR_CELL_VUE_STATES,
   DATE_PICKER_STYLES,
   DATE_SEGMENT_VUE_STATES,
-} from '$/components/Inputs/variants'
+} from '$/components/Inputs/dateVariants'
 import { portalTarget } from '$/components/portal'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { useText } from '$/providers/text'

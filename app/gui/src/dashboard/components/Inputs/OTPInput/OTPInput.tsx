@@ -2,7 +2,7 @@
 import { mergeProps } from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { OTP_INPUT_STYLES, OTP_SLOT_STYLES } from '$/components/Inputs/variants'
+import { OTP_INPUT_STYLES, OTP_SLOT_STYLES } from '$/components/Inputs/otpVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { OTPInputProps } from 'input-otp'
 import { OTPInput as BaseOTPInput, type SlotProps as OTPInputSlotProps } from 'input-otp'

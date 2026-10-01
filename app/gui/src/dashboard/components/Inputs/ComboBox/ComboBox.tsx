@@ -20,7 +20,7 @@ import {
 import { BasicInput, type InputProps } from '#/components/Inputs/Input'
 import { Text } from '#/components/Text'
 import { VisualTooltip } from '#/components/VisualTooltip'
-import { COMBO_BOX_STYLES } from '$/components/Inputs/variants'
+import { COMBO_BOX_STYLES } from '$/components/Inputs/comboBoxVariants'
 import { useText } from '$/providers/react'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, useRef, type ForwardedRef, type ReactNode } from 'react'

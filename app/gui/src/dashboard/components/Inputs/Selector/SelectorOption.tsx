@@ -1,6 +1,6 @@
 /** @file An option in a selector. */
 import { Radio, type RadioProps } from '#/components/aria'
-import { SELECTOR_OPTION_STYLES } from '$/components/Inputs/variants'
+import { SELECTOR_OPTION_STYLES } from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { forwardRef, memo, type ForwardedRef } from 'react'
 

@@ -30,10 +30,8 @@ import DatePickerVue from '$/components/Inputs/DatePicker.vue'
 import InputVue from '$/components/Inputs/Input.vue'
 import MultiSelectorVue from '$/components/Inputs/MultiSelector.vue'
 import SelectorVue from '$/components/Inputs/Selector.vue'
-import {
-  DATE_SEGMENT_VUE_STATES,
-  MULTI_SELECTOR_OPTION_VUE_STATES,
-} from '$/components/Inputs/variants'
+import { DATE_SEGMENT_VUE_STATES } from '$/components/Inputs/dateVariants'
+import { MULTI_SELECTOR_OPTION_VUE_STATES } from '$/components/Inputs/selectorVariants'
 import RadioVue from '$/components/Radio/Radio.vue'
 import RadioGroupVue from '$/components/Radio/RadioGroup.vue'
 import SwitchVue from '$/components/Switch/Switch.vue'

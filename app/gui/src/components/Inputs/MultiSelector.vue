@@ -14,7 +14,7 @@ import {
   MULTI_SELECTOR_OPTION_STYLES,
   MULTI_SELECTOR_OPTION_VUE_STATES,
   MULTI_SELECTOR_STYLES,
-} from '$/components/Inputs/variants'
+} from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { ListboxContent, ListboxItem, ListboxRoot } from 'reka-ui'
 import { computed, useAttrs } from 'vue'

@@ -14,7 +14,7 @@ import { Icon } from '#/components/Icon'
 import FocusRing from '#/components/styled/FocusRing'
 import { useSyncRef } from '#/hooks/syncRefHooks'
 import { mergeRefs } from '#/utilities/mergeRefs'
-import { DROPDOWN_STYLES } from '$/components/Inputs/variants'
+import { DROPDOWN_STYLES } from '$/components/Inputs/dropdownVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import {
   Form,

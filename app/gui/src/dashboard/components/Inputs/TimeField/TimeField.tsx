@@ -20,7 +20,7 @@ import {
   type TSchema,
 } from '#/components/Form'
 import { Text } from '#/components/Text'
-import { TIME_FIELD_STYLES } from '$/components/Inputs/variants'
+import { TIME_FIELD_STYLES } from '$/components/Inputs/dateVariants'
 import { useText } from '$/providers/react'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { forwardRef, useContext, type ForwardedRef } from 'react'

@@ -12,7 +12,7 @@
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
 import { useField } from '$/components/Form/useField'
-import { OTP_INPUT_STYLES, OTP_SLOT_STYLES } from '$/components/Inputs/variants'
+import { OTP_INPUT_STYLES, OTP_SLOT_STYLES } from '$/components/Inputs/otpVariants'
 import Separator from '$/components/Separator/Separator.vue'
 import { PinInputInput, PinInputRoot } from 'reka-ui'
 import { computed, ref } from 'vue'
