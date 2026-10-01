@@ -25,6 +25,9 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `ModalHost/`        | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
 | `AboutModal/`       | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
 | `KeyboardShortcut/` | `KeyboardShortcut` (a shortcut string drawn as modifier icons and keys)                         |
+| `MenuEntry/`        | `MenuEntry` (a button entry of a popover menu: the user and info menus)                         |
+| `ProfilePicture/`   | `ProfilePicture` (a user's or organization's picture, or the default user icon)                 |
+| `InfoBar/`          | `InfoBar`, `InfoMenu`: the logo and info menu of the pages outside the dashboard (#83)          |
 | others              | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
 Forms and inputs are #79's.
