@@ -785,7 +785,9 @@ provisionally accepted, for the maintainer to review.
    `Page` for the other pages. The React modals need the providers they had
    there (`AppContainer` gives React its container data, drive location and
    `reactApi`); a host in `App.vue` would render them without. As before, a page
-   has exactly one host.
+   has exactly one host. `Page` loads its host as an async component: the host's
+   `ErrorBoundary` brings Reka, which would otherwise join the initial chunk (82
+   KB minified, measured).
 6. **The host adds no element and does not teleport.** Each modal portals its
    own overlay (the React shim through React's `Portal`, as `ModalWrapper` did;
    a Vue `Dialog` through Reka), so the DOM is unchanged. Each entry sits in the
