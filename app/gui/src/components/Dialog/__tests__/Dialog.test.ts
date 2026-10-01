@@ -425,8 +425,7 @@ describe('focus without a trigger (as react-aria)', () => {
     await flushPromises()
     expect(document.activeElement).toBe(byTestId('dialog'))
     open.value = false
-    await flushPromises()
-    expect(document.activeElement).toBe(byTestId('item'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('item')))
   })
 
   test('when the opener has gone, focus returns to the trigger of the menu it was in', async () => {
@@ -436,8 +435,34 @@ describe('focus without a trigger (as react-aria)', () => {
     await flushPromises()
     byTestId('item')!.remove()
     open.value = false
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('menu-trigger')))
+  })
+
+  test('a menu in the portal root whose trigger names another id: its one open trigger', async () => {
+    const open = ref(false)
+    const trigger = document.createElement('button')
+    trigger.setAttribute('aria-controls', 'not-rendered')
+    trigger.setAttribute('aria-expanded', 'true')
+    trigger.dataset.testid = 'user-button'
+    document.body.appendChild(trigger)
+    const menu = document.createElement('div')
+    menu.innerHTML = '<button data-testid="portal-item">About</button>'
+    env.portalRoot.appendChild(menu)
+    mountWithProviders(() =>
+      h(Dialog, {
+        title: 'About',
+        open: open.value,
+        'onUpdate:open': (value: boolean) => (open.value = value),
+      }),
+    )
+    byTestId('portal-item')!.focus()
+    open.value = true
     await flushPromises()
-    expect(document.activeElement).toBe(byTestId('menu-trigger'))
+    menu.remove()
+    trigger.setAttribute('aria-expanded', 'false')
+    open.value = false
+    await vi.waitFor(() => expect(document.activeElement).toBe(trigger))
+    trigger.remove()
   })
 
   test('an AlertDialog returns focus the same way', async () => {
@@ -455,7 +480,6 @@ describe('focus without a trigger (as react-aria)', () => {
     await flushPromises()
     expect(document.activeElement).toBe(byTestId('alert-dialog-confirm'))
     await userEvent.setup().click(byTestId('alert-dialog-cancel')!)
-    await flushPromises()
-    expect(document.activeElement).toBe(byTestId('opener'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('opener')))
   })
 })

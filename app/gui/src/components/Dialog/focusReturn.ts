@@ -7,7 +7,7 @@
  *   its short delay.
  * - **On close,** focus returns to the element that opened the dialog. When that element has gone,
  *   because it was an item in a menu that closed as the dialog opened (the user menu's "About
- *   Enso"), focus returns to the trigger of that menu instead, found through its `aria-controls`.
+ *   Enso"), focus returns to the trigger of that menu instead (see {@link popupTrigger}).
  *   This is the step react-aria's chain of focus scopes takes; Reka, without it, leaves focus on
  *   the page's body.
  *
@@ -15,14 +15,24 @@
  */
 import { toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
 
-/** The trigger of the popup (`aria-controls`) that contains `element`, if any. */
+/**
+ * The trigger of the popup that contains `element`, if any: the element whose `aria-controls` names
+ * the popup or one of its ancestors; failing that, for an element in a portalled popup, the one
+ * open popup trigger (`aria-expanded="true"` with `aria-controls`) outside the portal root.
+ * (react-aria's `DialogTrigger` names an id in `aria-controls` that the popover does not render.)
+ */
 function popupTrigger(element: Element | null): HTMLElement | null {
   for (let node = element; node != null; node = node.parentElement) {
     if (node.id === '') continue
     const trigger = document.querySelector(`[aria-controls~="${CSS.escape(node.id)}"]`)
     if (trigger instanceof HTMLElement) return trigger
   }
-  return null
+  const portalRoot = element?.closest('#enso-portal-root')
+  if (portalRoot == null) return null
+  const openTriggers = [
+    ...document.querySelectorAll<HTMLElement>('[aria-expanded="true"][aria-controls]'),
+  ].filter((trigger) => !portalRoot.contains(trigger))
+  return openTriggers.length === 1 ? openTriggers[0]! : null
 }
 
 /**
@@ -75,7 +85,9 @@ export function useDialogFocus(
       : null
     if (element != null) {
       event.preventDefault()
-      element.focus({ preventScroll: true })
+      // After Reka's own clean-up, which runs in a timeout of its own: until then the dialog's focus
+      // trap is still active, and would take the focus back.
+      setTimeout(() => setTimeout(() => element.focus({ preventScroll: true })))
     }
   }
 

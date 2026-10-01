@@ -101,7 +101,7 @@ describe('AboutModal', () => {
     await userEvent.setup().keyboard('{Escape}')
     await flushPromises()
     expect(dialog()).toBeNull()
-    expect(document.activeElement).toBe(byTestId('user-button'))
+    await vi.waitFor(() => expect(document.activeElement).toBe(byTestId('user-button')))
     menu.remove()
   })
 })
