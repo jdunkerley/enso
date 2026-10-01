@@ -10,6 +10,24 @@
     "../vitest.node.base.ts",
     "./*.ts",
     "./integration-test/**/*.ts",
-    "./project-manager-shim-middleware/**/*.ts"
+    "./project-manager-shim-middleware/**/*.ts",
+    // The files below are not node-side code themselves, but are pulled into this program by
+    // type-only imports from integration-test/src files above (e.g. `base.ts` importing the
+    // `FeatureFlags` type). Composite projects must list every file the checker reaches, even
+    // transitively and even for a type-only import (TS6307) — so this is the closed set actually
+    // reached from the entries above, not a stand-in for `tsconfig.app.json`'s own `src/` include.
+    "./src/electronApi.ts",
+    "./src/providers/featureFlags.ts",
+    "./src/utils/write.ts",
+    "./src/utils/zustand.ts",
+    "./src/project-view/util/equals.ts",
+    "./src/project-view/util/shortcuts.ts",
+    "./src/project-view/util/fileFilter.ts",
+    "./src/project-view/util/menuItems.ts",
+    "./src/project-view/util/projectPath.ts",
+    "./src/project-view/util/qualifiedName.ts",
+    "./src/project-view/util/ast/abstract.ts",
+    "./src/project-view/components/GraphEditor/widgets/WidgetFunction/consts.ts",
+    "./src/utils/data/string.ts"
   ]
 }

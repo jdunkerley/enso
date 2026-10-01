@@ -23,7 +23,7 @@ export abstract class LazyObject {
 
 type Reader<T> = (view: DataView, address: number) => T
 
-function makeDataView(buffer: ArrayBuffer, address: number) {
+function makeDataView(buffer: ArrayBufferLike, address: number) {
   return new DataView(buffer, address)
 }
 

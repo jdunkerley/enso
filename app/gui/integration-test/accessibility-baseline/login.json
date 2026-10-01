@@ -1,0 +1,22 @@
+[
+  {
+    "rule": "color-contrast",
+    "impact": "serious",
+    "target": ".gap-auth-link"
+  },
+  {
+    "rule": "color-contrast",
+    "impact": "serious",
+    "target": "#<generated>"
+  },
+  {
+    "rule": "color-contrast",
+    "impact": "serious",
+    "target": "#<generated>"
+  },
+  {
+    "rule": "meta-viewport",
+    "impact": "moderate",
+    "target": "meta[name=\"viewport\"]"
+  }
+]

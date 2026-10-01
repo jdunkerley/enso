@@ -24,11 +24,15 @@
     "ported onto (#75/#76), and a minor release can change focus and dismissal behaviour that the",
     "Playwright specs depend on. Move it deliberately and re-run the ported areas' specs. It declares",
     "@vueuse/core ^14; an override in pnpm-workspace.yaml dedupes that onto our 15 (#78). When bumping",
-    "reka-ui, re-run src/components' tests with the override, and drop it once Reka is on 15 itself."
+    "reka-ui, re-run src/components' tests with the override, and drop it once Reka is on 15 itself.",
+    "@axe-core/playwright is pinned exactly (and so its axe-core, ~4.13.0, through the lockfile):",
+    "integration-test/dashboard/accessibility.spec.ts fails on any axe violation not listed in",
+    "integration-test/accessibility-baseline/, and a new axe-core release adds or changes rules.",
+    "Bump it deliberately and regenerate the baseline in the same PR (#81)."
   ],
   "scripts": {
     "generate-icons": "node scripts/generateIconMetadata.mjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build-cloud": "cross-env ENSO_IDE_CLOUD_BUILD=true corepack pnpm run build",
     "preview": "vite preview",
@@ -123,7 +127,7 @@
     "validator": "^13.15.35",
     "veaury": "=2.4.4",
     "vue": "catalog:",
-    "vue-component-type-helpers": "^2.2.12",
+    "vue-component-type-helpers": "^3.3.11",
     "vue-router": "^4.6.3",
     "y-protocols": "^1.0.7",
     "y-textarea": "^1.0.2",
@@ -135,6 +139,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@codemirror/theme-one-dark": "^6.1.3",
     "@fast-check/vitest": "catalog:",
     "@open-rpc/server-js": "^1.10.1",
@@ -198,7 +203,7 @@
     "vite-plugin-vue-devtools": "^8.2.1",
     "vite-plugin-wasm": "^3.6.0",
     "vitest": "catalog:",
-    "vue-tsc": "^2.2.12",
+    "vue-tsc": "catalog:",
     "yaml": "^2.9.1",
     "yauzl": "^3.4.0",
     "ydoc-server": "workspace:*",

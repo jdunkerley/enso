@@ -25,11 +25,11 @@ async function writeToFocusedComponentBrowser(page: Page, content: string): Prom
 }
 
 // A test checking duplication of projects.
-// Skipped on the Windows CI runner: the packaged Language Server there intermittently fails to
-// come up for the first project (`session/initProtocolConnection` never completes), which is a
-// runner-environment problem, not a product one — Linux runs this and the full suite.
-const projectDuplicateTest = SKIP_ON_WINDOWS_CI ? test.skip : test
-projectDuplicateTest('Project Duplicate', async ({ page }) => {
+// This used to be skipped on the Windows CI runner, where `session/initProtocolConnection` for the
+// first project intermittently never completed. A slow cold start there makes the ydoc server's
+// first read of the project fail and restart its Language Server client, and until #143 that
+// restart left the IDE's proxy channel closed, so the IDE's requests were never delivered.
+test('Project Duplicate', async ({ page }) => {
   await loginAsTestUser(page)
   await closeWelcome(page)
   await createNewProject(page)

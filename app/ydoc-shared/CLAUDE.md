@@ -42,3 +42,12 @@ a bare specifier.
 ## Test
 
 Vitest only (`pnpm run test:unit`). Tests live in `src/__tests__/`.
+
+## Gotchas
+
+- Closing a `YjsChannel` is final: it stops observing its `Y.Array`, and a later
+  `subscribe` on it never hears another message. `YjsTransport` therefore takes
+  a fresh channel when it connects again after `close`, and `YjsServerTransport`
+  hands the Language Server a new channel pair on every `connect` and closes the
+  old pair on `close` (#143). Keep that shape for any new channel-backed
+  transport.
