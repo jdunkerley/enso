@@ -36,14 +36,9 @@ const displayedId = computed({
       :aiMode="rightPanel.context?.help?.aiMode ?? false"
       @update:selectedEntry="displayedId = Ok($event)"
     />
-    <Result
-      v-else-if="!displayedId.ok"
-      status="info"
-      :title="`${displayedId.error.payload}`"
-      centered
-    />
+    <Result v-else-if="!displayedId.ok" status="info" :title="`${displayedId.error.payload}`" />
     <template #fallback>
-      <Result status="info" :title="UNAVAILABLE_MESSAGE" centered />
+      <Result status="info" :title="UNAVAILABLE_MESSAGE" />
     </template>
   </WithCurrentProject>
 </template>

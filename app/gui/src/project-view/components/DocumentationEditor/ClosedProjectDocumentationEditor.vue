@@ -90,5 +90,5 @@ const extensions = [syncExt, editorPersistenceExt]
     :teleportToolbarTo="toolbar"
   >
   </MarkdownEditor>
-  <Result v-else status="info" :title="editorMarkdown.error.message('')" centered />
+  <Result v-else status="info" :title="editorMarkdown.error.message('')" />
 </template>

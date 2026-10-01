@@ -104,7 +104,7 @@ function editorReadyCallback(view: EditorView) {
       :editorReadyCallback="editorReadyCallback"
       :teleportToolbarTo="toolbar"
     />
-    <Result v-else status="info" title="Select a single asset to edit its description" centered />
+    <Result v-else status="info" title="Select a single asset to edit its description" />
   </div>
 </template>
 

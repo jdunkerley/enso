@@ -1045,9 +1045,16 @@ the maintainer to review.
    `project-view/util/react.tsx` and imported `#/components/Suspense`, moved to
    `src/utils/react.tsx` (`$/utils/react`), beside `zustand.ts`, until #93.
 
-3. **`centered` is a plain attribute again.** The "does not work with React
-   components" workarounds (`:centered="true"`) became `centered`. Both give
-   `m-auto`, which is also the default, so nothing moves.
+3. **The `centered` workarounds go, and `Result.vue` gets the bare attribute
+   right.** The comments blamed React, but the cause was Vue's: a prop typed
+   through `VariantProps<…>` is a type the SFC compiler cannot resolve, so it
+   does not know the prop is a boolean, and a bare `centered` arrives as `''`,
+   which names no variant (and so drops `m-auto`). The callers now leave it out
+   (the default, `all`, is `m-auto`), and `Result.vue` spells the prop's type
+   out, `boolean` first, so that a bare `centered` means `true`; a test pins it.
+   The in-app comparison found this: the first port wrote `centered`, and the
+   "No documentation available" result moved to the top of the panel. The same
+   trap applies to any boolean variant prop typed through `VariantProps`.
 
 4. **`Dialog.vue` puts its attributes on the dialog element**
    (`inheritAttrs: false`, `v-bind="$attrs"` on Reka's `DialogContent`), as

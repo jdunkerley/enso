@@ -58,5 +58,5 @@ const extensions = [syncExt, editorPersistenceExt]
       />
     </template>
   </MarkdownEditor>
-  <Result v-else status="info" :title="graph.currentMethod.ast.error.message('')" centered />
+  <Result v-else status="info" :title="graph.currentMethod.ast.error.message('')" />
 </template>

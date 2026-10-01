@@ -215,9 +215,8 @@ const projectContents = computed(() => {
         v-else-if="rightPanel.context?.item"
         status="info"
         title="No preview available for this asset"
-        centered
       />
-      <Result v-else status="info" title="Select a single asset to see its preview" centered />
+      <Result v-else status="info" title="Select a single asset to see its preview" />
     </div>
   </div>
 </template>
