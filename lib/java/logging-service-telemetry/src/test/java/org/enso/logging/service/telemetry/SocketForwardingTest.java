@@ -5,7 +5,9 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.startsWith;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeTrue;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -14,9 +16,15 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import ch.qos.logback.core.util.Duration;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.enso.logging.service.logback.DeferredProcessingSocketAppender;
 import org.enso.logging.service.logback.SocketServer;
@@ -34,13 +42,13 @@ import org.slf4j.MDC;
 public class SocketForwardingTest {
   private LoggerContext serverContext;
   private SocketServer server;
+  private int port;
   private DeferredProcessingSocketAppender appender;
   private Logger sender;
   private final List<ILoggingEvent> received = new CopyOnWriteArrayList<>();
 
   @Before
   public void setup() throws Exception {
-    int port;
     try (var s = new ServerSocket(0)) {
       port = s.getLocalPort();
     }
@@ -163,5 +171,33 @@ public class SocketForwardingTest {
     assertThat(
         received.stream().map(ILoggingEvent::getFormattedMessage).toList(),
         hasItem("local message"));
+  }
+
+  /** Note [Logging Server Listens On Loopback Only] in {@link SocketServer}. */
+  @Test
+  public void listensOnLoopbackOnly() throws Exception {
+    var external = nonLoopbackAddress();
+    assumeTrue("This machine has no non-loopback address to probe", external.isPresent());
+    try (var probe = new Socket()) {
+      assertThrows(
+          ConnectException.class,
+          () -> probe.connect(new InetSocketAddress(external.get(), port), 5_000));
+    }
+  }
+
+  /** An address of this machine that is not a loopback one, if it has any. */
+  private static Optional<InetAddress> nonLoopbackAddress() throws SocketException {
+    return NetworkInterface.networkInterfaces()
+        .filter(
+            nic -> {
+              try {
+                return nic.isUp() && !nic.isLoopback();
+              } catch (SocketException e) {
+                return false;
+              }
+            })
+        .flatMap(NetworkInterface::inetAddresses)
+        .filter(a -> !a.isLoopbackAddress() && !a.isLinkLocalAddress())
+        .findFirst();
   }
 }

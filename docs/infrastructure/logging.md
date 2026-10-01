@@ -369,6 +369,12 @@ to send log events to the logging server. The logging server then properly
 dispatches the received logging event to all the appenders in
 [SocketLoggingNode](https://github.com/enso-org/enso/blob/3e0b4dd7413e45373dc4ac26f124ee6aedffd50c/lib/scala/logging-service-logback/src/main/java/org/enso/logging/service/logback/SocketLoggingNode.java#L87-L94).
 
+The logging server listens on the loopback address only (`127.0.0.1`, or `::1`
+when `java.net.preferIPv6Addresses` is set), on the port from
+`logging-service.server.port` (`$ENSO_LOGSERVER_PORT`, 6000 by default). All of
+its clients run on the same machine, so it cannot be reached from another host;
+pointing a socket appender's `hostname` at a remote machine will not work.
+
 ## Telemetry
 
 Telemetry gathers anonymized, yet still useful information about the environment
