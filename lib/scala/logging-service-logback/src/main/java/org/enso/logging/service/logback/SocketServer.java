@@ -32,17 +32,55 @@ public class SocketServer extends Thread {
 
   private final int port;
   private final LoggerContext lc;
-  private boolean closed = false;
-  private ServerSocket serverSocket;
+  private volatile boolean closed = false;
+  private volatile ServerSocket serverSocket;
   private List<SocketLoggingNode> socketNodeList = new ArrayList<>();
 
   // used for testing purposes
   private CountDownLatch latch;
 
+  /**
+   * Creates a server for the given port.
+   *
+   * @param lc the context the received events are logged to
+   * @param port the port to listen on; 0 lets the operating system pick a free one, which {@link
+   *     #bind()} then reports
+   */
   public SocketServer(LoggerContext lc, int port) {
     this.lc = lc;
     this.port = port;
   }
+
+  /**
+   * Binds the server socket on the calling thread, so that a failure to bind reaches the caller
+   * instead of only the server thread. Call it before {@link #start()}; see Note [Logging Server
+   * Binds Before It Starts].
+   *
+   * @return the port the server is listening on, which differs from the requested one when that was
+   *     0
+   * @throws IOException if the port cannot be bound, e.g. because something else listens on it
+   */
+  public synchronized int bind() throws IOException {
+    if (serverSocket == null) {
+      // Note [Logging Server Listens On Loopback Only]
+      var address = InetAddress.getLoopbackAddress();
+      serverSocket = getServerSocketFactory().createServerSocket(port, BACKLOG, address);
+      logger.debug("Listening on " + address.getHostAddress() + ":" + serverSocket.getLocalPort());
+    }
+    return serverSocket.getLocalPort();
+  }
+
+  /* Note [Logging Server Binds Before It Starts]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The server used to create its server socket in `run`, on its own thread. A
+   * failed bind - the port already taken by another language server's logging
+   * server, or by an unrelated program - was then only logged from that thread,
+   * while `LoggingServer.start` had already returned the URI as if the server
+   * were up. Its own socket appender then connected to whoever owned the port.
+   * Binding in `bind`, on the caller's thread, lets `LoggingServer.start` fail,
+   * so `LoggingSetupHelper` can fall back to logging locally. It also tells the
+   * caller the actual port, which is what makes port 0 (any free port) usable.
+   */
 
   public void run() {
 
@@ -53,13 +91,14 @@ public class SocketServer extends Thread {
       final String newThreadName = getServerThreadName();
       Thread.currentThread().setName(newThreadName);
 
-      // Note [Logging Server Listens On Loopback Only]
-      var address = InetAddress.getLoopbackAddress();
-      logger.debug("Listening on " + address.getHostAddress() + ":" + port);
-      serverSocket = getServerSocketFactory().createServerSocket(port, BACKLOG, address);
+      var listening = serverSocket;
+      if (listening == null) {
+        bind();
+        listening = serverSocket;
+      }
       while (!closed) {
         signalAlmostReadiness();
-        Socket socket = serverSocket.accept();
+        Socket socket = listening.accept();
         SocketLoggingNode newSocketNode = new SocketLoggingNode(this, socket, lc);
         synchronized (socketNodeList) {
           socketNodeList.add(newSocketNode);
@@ -95,7 +134,9 @@ public class SocketServer extends Thread {
 
   /** Returns the name given to the server thread. */
   protected String getServerThreadName() {
-    return String.format("Logback %s (port %d)", getClass().getSimpleName(), port);
+    var listening = serverSocket;
+    var actualPort = listening != null ? listening.getLocalPort() : port;
+    return String.format("Logback %s (port %d)", getClass().getSimpleName(), actualPort);
   }
 
   /** Returns a name to identify each client thread. */

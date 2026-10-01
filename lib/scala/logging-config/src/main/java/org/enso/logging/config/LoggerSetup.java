@@ -120,6 +120,22 @@ public abstract class LoggerSetup {
   public abstract boolean setup(
       Level logLevel, Path logRoot, String logPrefix, LoggingServiceConfig config);
 
+  /**
+   * Sets up this process's loggers to write to the sinks a logging server would, as configured by
+   * {@code sinks}: its default appender (typically the console plus, with {@code log-to-file}, a
+   * log file under {@code logRoot}), and its {@code telemetry} and {@code opensearch} appenders
+   * when it has them. A logging server uses it for the events it receives; a process that cannot
+   * reach or start one uses it to log locally instead.
+   *
+   * @param logLevel maximal log level allowed for log events
+   * @param logRoot the root directory where logs are located
+   * @param logPrefix the prefix used in the name of the log file
+   * @param sinks the configuration of the sinks, e.g. the {@code logging-service.server} section
+   * @return true if the default appender was set up correctly, false otherwise
+   */
+  public abstract boolean setupLocalSinks(
+      Level logLevel, Path logRoot, String logPrefix, BaseConfig sinks);
+
   /** Shuts down all loggers. */
   public abstract void teardown();
 

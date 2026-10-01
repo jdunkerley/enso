@@ -118,7 +118,29 @@ public final class LogbackSetup extends LoggerSetup {
   }
 
   @Override
+  public boolean setupLocalSinks(Level logLevel, Path logRoot, String logPrefix, BaseConfig sinks) {
+    var local =
+        new LogbackSetup(
+            LoggingServiceConfig.withSingleAppender(sinks, config.getLoggers()), context());
+    var initialized = local.setup(logLevel, logRoot, logPrefix, local.getConfig());
+    var telemetry =
+        sinks.getAppenders().get(org.enso.logging.config.TelemetryAppender.appenderName);
+    if (telemetry != null) {
+      telemetry.setup(logLevel, local);
+    }
+    var openSearch =
+        sinks.getAppenders().get(org.enso.logging.config.OpenSearchAppender.appenderName);
+    var openSearchEnabled = openSearch != null && openSearch.setup(logLevel, local);
+    if (!openSearchEnabled) System.err.println("Remote Logs: Disabled");
+    return initialized;
+  }
+
+  @Override
   public boolean setupSocketAppender(Level logLevel, String hostname, int port) {
+    if (port <= 0) {
+      // Note [Socket Appender Port 0]
+      return false;
+    }
     Level targetLogLevel;
     // Modify log level if we were asked to always log to a file.
     // The receiver needs to get all logs (up to `trace`) to be able to log all verbose messages.
@@ -145,6 +167,16 @@ public final class LogbackSetup extends LoggerSetup {
     env.finalizeAppender(socketAppender);
     return true;
   }
+
+  /* Note [Socket Appender Port 0]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Port 0 in a `socket` appender's config means "this process's own logging
+   * server, on whatever port it got" (see `application-ls.conf`).
+   * `LoggingSetupHelper` connects to the bound port it learns from the server, so
+   * the configured 0 is only reached when no server was started in this process
+   * and no port was given: there is nothing to connect to, so the setup fails and
+   * the caller falls back to logging locally.
+   */
 
   private static void acceptAllTelemetryEvents(
       ch.qos.logback.core.Appender<ILoggingEvent> appender) {
