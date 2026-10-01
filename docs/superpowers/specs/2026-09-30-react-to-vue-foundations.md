@@ -1001,10 +1001,15 @@ the rulings above: provisionally accepted, for the maintainer to review.
     on the page's body on closing. Now the dialog focuses itself on opening (an
     `AlertDialog` still focuses its confirm button, as React's `autoFocus` did),
     and on closing returns focus to its opener or, when that was an item of a
-    menu that closed as the dialog opened, to that menu's trigger (found by
-    `aria-controls`): the user menu's button, after "About Enso". The Vue
-    dialogs also fix two React quirks, invisible to a mouse user: they are named
-    by their title (React's had no accessible name), and Tab stays inside the
-    confirmation (React's let it escape to the page once).
+    menu that closed as the dialog opened, to that menu's trigger: the user
+    menu's button, after "About Enso". The trigger is the element whose
+    `aria-controls` names the menu or, since react-aria's `DialogTrigger` names
+    an id its popover does not render, the one open popup trigger
+    (`aria-expanded="true"` with `aria-controls`) outside the portal root. The
+    return waits for Reka's own clean-up, whose still active focus trap would
+    otherwise take the focus back. The Vue dialogs also fix two React quirks,
+    invisible to a mouse user: they are named by their title (React's had no
+    accessible name), and Tab stays inside the confirmation (React's let it
+    escape to the page once).
 12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
     (they go with #94) and `VersionChecker` (with its feature's port).
