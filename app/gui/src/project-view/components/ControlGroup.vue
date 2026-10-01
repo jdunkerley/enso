@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import VNodes from '@/components/VNodes.vue'
+import VNodes from '@/components/VNodes'
 
 const slots = defineSlots<{ default(): any }>()
 </script>

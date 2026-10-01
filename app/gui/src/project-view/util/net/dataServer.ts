@@ -72,13 +72,15 @@ export class DataServer extends ObservableV2<DataServerEvents> {
         // misconfiguration and should also be ignored.
         return
       }
+      // Copy the payload's bytes out (`slice` on the typed array yields a plain `ArrayBuffer`,
+      // which `ByteBuffer` requires; the payload's own buffer could be a `SharedArrayBuffer`).
+      const payloadBytes = new Uint8Array(
+        rawPayload.buffer,
+        rawPayload.byteOffset,
+        rawPayload.byteLength,
+      ).slice()
       const binaryMessage = OutboundMessage.getRootAsOutboundMessage(
-        new ByteBuffer(
-          rawPayload.buffer.slice(
-            rawPayload.byteOffset,
-            rawPayload.byteOffset + rawPayload.byteLength,
-          ),
-        ),
+        new ByteBuffer(payloadBytes.buffer),
       )
       const payloadType = binaryMessage.payloadType()
       const payload = binaryMessage.payload(new PAYLOAD_CONSTRUCTOR[payloadType]())

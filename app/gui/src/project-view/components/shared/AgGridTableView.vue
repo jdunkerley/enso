@@ -1,22 +1,27 @@
 <script lang="ts">
 import type { CellCoord } from './AgGridTableView/communityCellRange'
 
+// The optional props admit an explicit `undefined`, which Vue treats as absent: wrappers forward
+// their own `$props` here, and in `$props` an optional prop that was not passed is present as
+// `undefined` (plain `boolean` props excepted, which Vue casts to `false`).
 export type AgGridTableViewProps<TData, TValue> = {
   rowData: TData[]
   columnDefs: (ColDef<TData, TValue> | ColGroupDef<TData>)[] | null
   defaultColDef: ColDef<TData>
-  getRowId?: GetRowIdFunc<TData>
-  components?: Record<string, Component>
+  getRowId?: GetRowIdFunc<TData> | undefined
+  components?: Record<string, Component> | undefined
   singleClickEdit?: boolean
   stopEditingWhenCellsLoseFocus?: boolean
   suppressDragLeaveHidesColumns?: boolean
   suppressMoveWhenColumnDragging?: boolean
-  textFormatOption?: TextFormatOptions
-  processDataFromClipboard?: (params: ProcessDataFromClipboardParams<TData>) => string[][] | null
-  datasource?: IServerSideDatasource | IDatasource | boolean
+  textFormatOption?: TextFormatOptions | undefined
+  processDataFromClipboard?:
+    ((params: ProcessDataFromClipboardParams<TData>) => string[][] | null) | undefined
+  datasource?: IServerSideDatasource | IDatasource | boolean | undefined
   isServerSideModel?: boolean
-  gridIdHash?: string | null
-  getContextMenuItems?: (params: GetContextMenuItemsParams) => (MenuItemDef | DefaultMenuItem)[]
+  gridIdHash?: string | null | undefined
+  getContextMenuItems?:
+    ((params: GetContextMenuItemsParams) => (MenuItemDef | DefaultMenuItem)[]) | undefined
 }
 
 /**

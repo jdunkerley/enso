@@ -4,6 +4,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.joran.JoranConfigurator;
 import ch.qos.logback.core.joran.spi.JoranException;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
@@ -23,6 +24,9 @@ import org.slf4j.LoggerFactory;
  * @since 0.8.4
  */
 public class SocketServer extends Thread {
+
+  /** The accept backlog {@link ServerSocketFactory#createServerSocket(int)} uses by default. */
+  private static final int BACKLOG = 50;
 
   Logger logger = LoggerFactory.getLogger(SocketServer.class);
 
@@ -49,8 +53,10 @@ public class SocketServer extends Thread {
       final String newThreadName = getServerThreadName();
       Thread.currentThread().setName(newThreadName);
 
-      logger.debug("Listening on port " + port);
-      serverSocket = getServerSocketFactory().createServerSocket(port);
+      // Note [Logging Server Listens On Loopback Only]
+      var address = InetAddress.getLoopbackAddress();
+      logger.debug("Listening on " + address.getHostAddress() + ":" + port);
+      serverSocket = getServerSocketFactory().createServerSocket(port, BACKLOG, address);
       while (!closed) {
         signalAlmostReadiness();
         Socket socket = serverSocket.accept();
@@ -71,6 +77,21 @@ public class SocketServer extends Thread {
       Thread.currentThread().setName(oldThreadName);
     }
   }
+
+  /* Note [Logging Server Listens On Loopback Only]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Every client of the logging server runs on the same machine: language servers
+   * and the runners the launcher spawns connect to the `localhost` URI that
+   * `LoggingServer.start` hands out, or to the `localhost` default of the `socket`
+   * appender's `hostname`. Nothing needs to reach it from another host, while
+   * anyone who can connect can feed it log and telemetry events, which it writes
+   * to the user's log files and forwards to the cloud. So it binds to the loopback
+   * address rather than the wildcard address (every interface).
+   *
+   * `InetAddress.getLoopbackAddress()` follows `java.net.preferIPv6Addresses` the
+   * same way resolving `localhost` does, so the address the clients resolve and
+   * the address the server binds stay on the same IP family.
+   */
 
   /** Returns the name given to the server thread. */
   protected String getServerThreadName() {

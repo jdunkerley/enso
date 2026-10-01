@@ -13,6 +13,7 @@ import url from 'node:url'
 import { defineConfig } from 'playwright/test'
 import invariant from 'tiny-invariant'
 import { loadEnv } from 'vite'
+import type { AppConfig } from './integration-test/base'
 
 const UNSAFE_SKIP_BUILD = process.env.PW_UNSAFE_SKIP_BUILD === 'true'
 const DEBUG = process.env.DEBUG_TEST === 'true'
@@ -105,7 +106,7 @@ if (!Number.isFinite(portFromEnv) || !Number.isFinite(port)) {
 // pick up the same configuration.
 process.env.PLAYWRIGHT_PORT = `${port}`
 
-export default defineConfig({
+export default defineConfig<{ appConfig: AppConfig }>({
   fullyParallel: true,
   ...(WORKERS ? { workers: WORKERS } : {}),
   forbidOnly: isCI,
