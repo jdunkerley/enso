@@ -9,6 +9,8 @@
  * - It is modal by default, like react-aria's popovers: focus is trapped and the rest of the page
  *   is inert until it closes. `isNonModal` makes it non-modal (focus may leave, the page stays
  *   interactive), as React's `isNonModal` does.
+ * - It focuses itself as it opens, not its first control, as react-aria's dialogs do (Tab goes on
+ *   from there); a keyboard user does not see a focus ring appear on the first entry.
  * - `@close` fires whenever it closes, like React's `onClose`.
  * - Attributes (`aria-label`, …) go on the `role="dialog"` element.
  */
@@ -34,6 +36,7 @@ defineOptions({ inheritAttrs: false })
 const {
   placement = 'bottom',
   offset = 8,
+  crossOffset = 0,
   isDismissable = true,
   isNonModal = false,
   size,
@@ -45,6 +48,11 @@ const {
   placement?: Placement | undefined
   /** Distance from the trigger, in pixels. React-aria's default, 8. */
   offset?: number | undefined
+  /**
+   * Shift along the trigger's edge, in pixels, as react-aria's `crossOffset`: positive is to the
+   * right (or down), whatever the alignment.
+   */
+  crossOffset?: number | undefined
   isDismissable?: boolean | undefined
   isNonModal?: boolean | undefined
   size?: PopoverVariants['size']
@@ -70,7 +78,18 @@ function onOpenChange(value: boolean) {
 provideDialogContext({ close })
 
 const sideAlign = computed(() => placementToSideAlign(placement))
+// Reka's `alignOffset` is `@floating-ui`'s `alignmentAxis`, which an `end` alignment inverts.
+const alignOffset = computed(() => (sideAlign.value.align === 'end' ? -crossOffset : crossOffset))
 const styles = computed(() => POPOVER_STYLES({ size, rounded, variant }))
+
+function onOpenAutoFocus(event: Event) {
+  event.preventDefault()
+  // Dispatched on the focus scope, which wraps the dialog element (`tabindex="-1"`).
+  const scope = event.target
+  if (!(scope instanceof HTMLElement)) return
+  const dialog = scope.matches('[role="dialog"]') ? scope : scope.querySelector('[role="dialog"]')
+  if (dialog instanceof HTMLElement) dialog.focus({ preventScroll: true })
+}
 
 function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }>) {
   const target = event.detail.originalEvent.target
@@ -94,9 +113,11 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
         :side="sideAlign.side"
         :align="sideAlign.align"
         :sideOffset="offset"
+        :alignOffset="alignOffset"
         :class="`${styles.base({ className })} ${POPOVER_MOTION}`"
         :data-testid="testId"
         @pointerDownOutside="onPointerDownOutside"
+        @openAutoFocus="onOpenAutoFocus"
       >
         <div :class="styles.dialog()">
           <ErrorBoundary>

@@ -249,10 +249,18 @@ describe('Popover', () => {
     expect(popover.getAttribute('data-side')).toBe('bottom')
     expect(popover.getAttribute('data-align')).toBe('start')
     expect(env.portalRoot.contains(popover)).toBe(true)
-    expect(popover.contains(document.activeElement)).toBe(true)
+    // The dialog itself, as react-aria's: Tab goes on to its first control.
+    expect(document.activeElement).toBe(popover)
     // `POPOVER_STYLES` defaults: `size: 'small'`, `rounded: 'xxlarge'`.
     expect(popover.classList).toContain('max-w-sm')
     expect(popover.classList).toContain('rounded-2xl')
+  })
+
+  test('Tab moves from the dialog to its first control', async () => {
+    mountPopover()
+    const user = await openWithKeyboard()
+    await user.tab()
+    expect(document.activeElement).toBe(byTestId('first'))
   })
 
   test('Escape closes it and returns focus to the trigger', async () => {
