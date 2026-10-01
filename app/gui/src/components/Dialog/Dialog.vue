@@ -23,7 +23,8 @@
  * - `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
  *   (`$/providers/modals`) emits `close` then, so that it does not vanish mid-animation.
  * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
- *   development builds.
+ *   development builds. Attributes (`aria-label` among them) go on the `role="dialog"` element, as
+ *   React spreads its other props onto react-aria's `Dialog`.
  *
  * The global modal stack (`setModal` and its Vue replacement) is #80's; this is the primitive it
  * will render.
@@ -55,6 +56,8 @@ import { provideDialogContext } from './dialogContext'
 import { useDialogFocus, type FocusReturnTarget } from './focusReturn'
 
 type DialogVariants = VariantProps<typeof DIALOG_STYLES>
+
+defineOptions({ inheritAttrs: false })
 
 const {
   title,
@@ -183,6 +186,7 @@ function stopNonEscapeKeys(event: KeyboardEvent) {
           @vue:unmounted="emit('closed')"
         >
           <DialogContent
+            v-bind="$attrs"
             :class="`${styles.base({ className })} ${DIALOG_MOTION({ type })}`"
             :role="role"
             :data-testid="testId"

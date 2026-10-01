@@ -200,6 +200,18 @@ describe('Dialog', () => {
     expect(open.value).toBe(false)
     expect(role('dialog')).toBeNull()
   })
+
+  test('without a title, an aria-label names the dialog element itself', async () => {
+    mountWithProviders(() =>
+      h(Dialog, { open: true, 'aria-label': 'Logging out', hideCloseButton: true }, () =>
+        h('p', 'Content'),
+      ),
+    )
+    await flushPromises()
+    const dialog = role('dialog')!
+    expect(dialog.getAttribute('aria-label')).toBe('Logging out')
+    expect(document.querySelectorAll('[aria-label="Logging out"]')).toHaveLength(1)
+  })
 })
 
 describe('Popover', () => {
