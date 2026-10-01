@@ -345,6 +345,16 @@ The two fields can be overridden via environment variables:
 - `hostname` has an equivalent `$ENSO_LOGSERVER_HOSTNAME` variable
 - `port` has an equivalent `$ENSO_LOGSERVER_PORT` variable
 
+No logging server listens on a well-known port: each language server hosts its
+own on a port the operating system picks (see
+[Logging server](#logging-server)). So `port` defaults to `0`, which names no
+server. A language server connects its socket appender to the port its own
+server actually bound, whatever `port` says. Anything else - the launcher with
+`ENSO_APPENDER_DEFAULT=socket`, or a language server with
+`ENSO_LOGSERVER_START=false` - has to be given the port of a running server
+through `$ENSO_LOGSERVER_PORT`; without one it logs locally and warns that it
+does.
+
 ## Logging server
 
 The following section describes the _logging server_ architecture when user
@@ -371,9 +381,45 @@ dispatches the received logging event to all the appenders in
 
 The logging server listens on the loopback address only (`127.0.0.1`, or `::1`
 when `java.net.preferIPv6Addresses` is set), on the port from
-`logging-service.server.port` (`$ENSO_LOGSERVER_PORT`, 6000 by default). All of
-its clients run on the same machine, so it cannot be reached from another host;
-pointing a socket appender's `hostname` at a remote machine will not work.
+`logging-service.server.port` (`$ENSO_LOGSERVER_PORT`). All of its clients run
+on the same machine, so it cannot be reached from another host; pointing a
+socket appender's `hostname` at a remote machine will not work.
+
+### One logging server per language server
+
+Every language server starts its own logging server
+(`logging-service.server.start` in `application-ls.conf`) and forwards its own
+logs to it. The server writes them to that language server's project log file
+(`<logs>/<project id>/enso-language-server-*.log`), and to the telemetry and
+OpenSearch sinks. So each project's log file holds that project's language
+server's logs, and only those.
+
+- **Port.** `logging-service.server.port` defaults to `0`: the server binds any
+  free loopback port the operating system assigns, and the language server
+  connects its socket appender to the port actually bound. Several language
+  servers - several projects, or several IDE instances - therefore never compete
+  for a port, nothing has to allocate ports for them, and closing one project
+  does not affect another's logging. `$ENSO_LOGSERVER_PORT` still sets a fixed
+  port explicitly.
+- **Bind failure.** The server binds its port before `LoggingServer.start`
+  returns (Note [Logging Server Binds Before It Starts] in `SocketServer`), so a
+  port that cannot be bound - typically an explicit `$ENSO_LOGSERVER_PORT` that
+  is already in use - fails the start. `LoggingSetupHelper` then writes the
+  language server's logs directly to the sinks the server would have used, in
+  the same process, and logs a warning that starts
+  `Could not start the logging server on port <port>`. It never connects to
+  whoever else holds the port.
+
+Until #159 the port was fixed at 6000 and a failed bind went unnoticed: the
+first language server hosted the server and every later one sent its logs into
+the first project's log file, lost them once that project closed, or - when an
+unrelated program owned port 6000 - sent them to that program. See Note [Each
+Process Hosts Its Own Logging Server] in `LoggingSetupHelper`.
+
+Nothing else hosts a logging server. The launcher passes `--logger-connect` to
+the engine runners it spawns only when it has a logging server endpoint, which
+it never does; the IDE's project manager (`app/project-manager-shim`) passes
+nothing logging-related to the language servers it starts.
 
 ## Telemetry
 
@@ -554,9 +600,11 @@ public class MyService {
 
 `org.enso.logging.service.LoggingSetupHelper` class was introduced to help with
 the most common use cases - establishing a file-based logging in the Enso's
-dedicated directories or connecting to an existing logging server once it starts
-accepting connections. That is why services don't call `LoggerSetup` directly
-but instead provide a service-specific implementation of
+dedicated directories, starting this process's own logging server and connecting
+to it, or connecting to an existing logging server. When a logging server cannot
+be started or reached, it falls back to logging locally and logs a warning that
+says so. That is why services don't call `LoggerSetup` directly but instead
+provide a service-specific implementation of
 `org.enso.logging.service.LoggingSetupHelper`. `LoggingSetupHelper` and
 `LoggerSetup` provide `teardown` methods to properly dispose of log events.
 
