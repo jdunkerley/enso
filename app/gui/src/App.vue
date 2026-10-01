@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { openAboutModal, useAboutModal } from '$/components/AboutModal/aboutModal'
 import ToastHost from '$/components/Toast/ToastHost.vue'
 import {
   useClearSelectionOnClick,
@@ -24,6 +25,7 @@ import { reactComponent } from '@/util/react'
 import { useQueryClient } from '@tanstack/vue-query'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Platform, platform } from 'enso-common/src/utilities/detect'
+import { defineAsyncComponent, ref, watch } from 'vue'
 import LoadingScreen from './components/LoadingScreen.vue'
 
 // import LoadingScreenReact from '#/pages/authentication/LoadingScreen'
@@ -78,6 +80,17 @@ useMounted(appOpenCloseCallback)
 useThemeClass()
 useClearSelectionOnClick()
 useDevNavigate()
+
+// The "About Enso" dialog, opened by the app menu here, and by the user and info menus. Loaded on
+// first use, so that it keeps the dialog (and Reka) out of the initial chunk, and kept mounted
+// from then on, so that it can play its exit animation.
+const AboutModal = defineAsyncComponent(() => import('$/components/AboutModal/AboutModal.vue'))
+const about = useAboutModal()
+const aboutMounted = ref(false)
+watch(about.isOpen, (isOpen) => {
+  if (isOpen) aboutMounted.value = true
+})
+window.api?.menu.setMenuItemHandler('about', openAboutModal)
 </script>
 
 <template>
@@ -86,6 +99,7 @@ useDevNavigate()
       <ContextsForReactProvider v-if="Component">
         <ReactRootWrapper :queryClient="queryClient">
           <ToastHost />
+          <AboutModal v-if="aboutMounted" v-model:open="about.isOpen.value" />
           <component :is="Component" />
           <div id="floatingLayer" />
           <TooltipDisplayer :registry="appTooltips" />
