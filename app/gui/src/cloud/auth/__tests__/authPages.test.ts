@@ -17,6 +17,7 @@ import ForgotPassword from '../ForgotPassword.vue'
 import LoginPage from '../LoginPage.vue'
 import RegistrationPage from '../RegistrationPage.vue'
 import ResetPassword from '../ResetPassword.vue'
+import RestoreAccount from '../RestoreAccount.vue'
 
 const session = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),
@@ -286,6 +287,22 @@ describe('ConfirmRegistration', () => {
     const { router } = await mountWithProviders(ConfirmRegistration, { route: '/confirmation' })
     await flushPromises()
     expect(session.confirmSignUp).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.path).toBe(LOGIN_PATH)
+  })
+})
+
+describe('RestoreAccount', () => {
+  test('restores the account, or signs out to the sign-in page', async () => {
+    auth.restoreUser.mockResolvedValue(undefined)
+    session.signOut.mockResolvedValue(undefined)
+    const { router } = await mountWithProviders(RestoreAccount, { route: '/restore-user' })
+    expect(document.querySelector('h1')?.textContent).toBe(getText('restoreAccount'))
+    const user = userEvent.setup()
+    await user.click(button(getText('restoreAccountSubmit'))!)
+    expect(auth.restoreUser).toHaveBeenCalledOnce()
+    await user.click(button(getText('signOutShortcut'))!)
+    await flushPromises()
+    expect(session.signOut).toHaveBeenCalledOnce()
     expect(router.currentRoute.value.path).toBe(LOGIN_PATH)
   })
 })
