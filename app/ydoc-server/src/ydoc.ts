@@ -103,7 +103,10 @@ export function setupGatewayClient(
   docName: string,
   byteBuffer: JavaByteBufferClass,
   jsonChannelServer: YjsChannelServer,
-  binaryChannelServer: YjsChannelServer,
+  // Unlike `jsonChannelServer`, this is passed straight to `YjsBinaryChannel.get`, which requires
+  // a `YjsChannelServer<JavaByteBuffer>` — leaving this defaulted to `unknown` was a latent type
+  // hole that only surfaced once `tsconfig.node.json` started type-checking this file (#141).
+  binaryChannelServer: YjsChannelServer<JavaByteBuffer>,
   visControlChannelServer: YjsChannelServer<string>,
   visDataChannelServer: YjsChannelServer<JavaByteBuffer>,
   inspectManager?: InspectManager | null,
