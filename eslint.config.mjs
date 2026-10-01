@@ -65,11 +65,8 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
   'App.tsx',
   'components/Devtools',
-  'components/Dialog/Dialog',
   'components/ErrorBoundary',
-  'components/Loader',
   'components/OfflineNotificationManager',
-  'components/Result',
   'components/Suspense',
   'components/UIProviders',
   'layouts/AssetPanel/components/AssetProperties',

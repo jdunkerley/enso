@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import Result from '$/components/Result/Result.vue'
 import WithCurrentProject from '$/components/WithCurrentProject.vue'
 import { useContainerData } from '$/providers/container'
 import { useRightPanelData } from '$/providers/rightPanel'
 import ComponentHelp from '@/components/ComponentHelp.vue'
-import { ResultComponent } from '@/util/react'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
 import { computed } from 'vue'
 
@@ -36,16 +36,14 @@ const displayedId = computed({
       :aiMode="rightPanel.context?.help?.aiMode ?? false"
       @update:selectedEntry="displayedId = Ok($event)"
     />
-    <!-- Specifying `<ResultComponent ... centered /> does not work with React components
-      `="true"` must be there-->
-    <ResultComponent
+    <Result
       v-else-if="!displayedId.ok"
       status="info"
       :title="`${displayedId.error.payload}`"
-      :centered="true"
+      centered
     />
     <template #fallback>
-      <ResultComponent status="info" :title="UNAVAILABLE_MESSAGE" :centered="true" />
+      <Result status="info" :title="UNAVAILABLE_MESSAGE" centered />
     </template>
   </WithCurrentProject>
 </template>

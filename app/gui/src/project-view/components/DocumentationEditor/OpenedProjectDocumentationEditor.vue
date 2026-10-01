@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Result from '$/components/Result/Result.vue'
 import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import { useDocumentViewId } from '@/components/DocumentationEditor/documentViewId'
 import FunctionSignatureEditor from '@/components/FunctionSignatureEditor.vue'
@@ -6,7 +7,6 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { useYTextSync } from '@/util/codemirror'
 import { editorPersistence } from '@/util/codemirror/persistence'
 import { methodPointerEquals } from '@/util/methodPointer'
-import { ResultComponent } from '@/util/react'
 import { mapOk, unwrapOr } from 'enso-common/src/utilities/data/result'
 import { computed } from 'vue'
 
@@ -58,12 +58,5 @@ const extensions = [syncExt, editorPersistenceExt]
       />
     </template>
   </MarkdownEditor>
-  <!-- Specifying `<ResultComponent ... centered /> does not work with React components
-      `="true"` must be there-->
-  <ResultComponent
-    v-else
-    status="info"
-    :title="graph.currentMethod.ast.error.message('')"
-    :centered="true"
-  />
+  <Result v-else status="info" :title="graph.currentMethod.ast.error.message('')" centered />
 </template>

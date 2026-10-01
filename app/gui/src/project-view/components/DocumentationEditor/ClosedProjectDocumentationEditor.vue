@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Result from '$/components/Result/Result.vue'
 import { useBackends } from '$/providers/backends'
 import { CATEGORY_BACKEND } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
@@ -8,9 +9,14 @@ import { Ast } from '@/util/ast'
 import { parseModule } from '@/util/ast/abstract'
 import { useYTextSync } from '@/util/codemirror'
 import { editorPersistence } from '@/util/codemirror/persistence'
-import { ResultComponent } from '@/util/react'
 import { useQuery } from '@tanstack/vue-query'
-import { Err, mapOk, Ok, type Result, unwrapOr } from 'enso-common/src/utilities/data/result'
+import {
+  Err,
+  mapOk,
+  Ok,
+  type Result as Fallible,
+  unwrapOr,
+} from 'enso-common/src/utilities/data/result'
 import { computed } from 'vue'
 
 defineProps<{ toolbar: HTMLElement | string }>()
@@ -41,7 +47,7 @@ const fileContentsFromCloud = useQuery({
   },
 })
 
-const currentMethodAst = computed((): Result<Ast.FunctionDef> => {
+const currentMethodAst = computed((): Fallible<Ast.FunctionDef> => {
   if (fileContentsFromCloud.data != null) {
     if (fileContentsFromCloud.error.value) return Err(fileContentsFromCloud.error.value)
     if (fileContentsFromCloud.isLoading.value) return Err('Loading documentation...')
@@ -84,12 +90,5 @@ const extensions = [syncExt, editorPersistenceExt]
     :teleportToolbarTo="toolbar"
   >
   </MarkdownEditor>
-  <!-- Specifying `<ResultComponent ... centered /> does not work with React components
-      `="true"` must be there-->
-  <ResultComponent
-    v-else
-    status="info"
-    :title="editorMarkdown.error.message('')"
-    :centered="true"
-  />
+  <Result v-else status="info" :title="editorMarkdown.error.message('')" centered />
 </template>

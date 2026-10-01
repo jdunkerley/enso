@@ -3,10 +3,11 @@ import { useOpenedProjects } from '$/providers/openedProjects'
 import type { Initialized as InitializedProject } from '$/providers/openedProjects/projectStates'
 import { groupColorVar } from '@/composables/nodeColors'
 import { createContextStore } from '@/providers'
+import Result from '$/components/Result/Result.vue'
+import Loader from '$/components/Spinner/Loader.vue'
 import { assert } from '@/util/assert'
 import { colorFromString } from '@/util/colors'
 import type { Opt } from '@/util/data/opt'
-import { Loader, ResultComponent } from '@/util/react'
 import type { ProjectId } from 'enso-common/src/services/Backend'
 import { computed, type Ref, shallowRef, watch } from 'vue'
 
@@ -131,11 +132,7 @@ const groupColors = computed(() => {
 <template>
   <div class="WithCurrentProject" :style="groupColors">
     <slot v-if="project?.error != null" name="error">
-      <ResultComponent
-        status="error"
-        title="Failed to open project"
-        :subtitle="`${project.error}`"
-      />
+      <Result status="error" title="Failed to open project" :subtitle="`${project.error}`" />
     </slot>
     <slot v-else-if="initializedProject != null" />
     <slot

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Result from '$/components/Result/Result.vue'
 import { useBackends } from '$/providers/backends'
 import { CATEGORY_BACKEND } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
@@ -6,7 +7,6 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { backendMutationOptions } from '@/composables/backend'
 import { useEvent } from '@/composables/events'
 import { useStringSync } from '@/util/codemirror'
-import { ResultComponent } from '@/util/react'
 import { EditorView } from '@codemirror/view'
 import { useMutation } from '@tanstack/vue-query'
 import type { AssetDetailsResponse, AssetId } from 'enso-common/src/services/Backend'
@@ -104,12 +104,7 @@ function editorReadyCallback(view: EditorView) {
       :editorReadyCallback="editorReadyCallback"
       :teleportToolbarTo="toolbar"
     />
-    <ResultComponent
-      v-else
-      status="info"
-      title="Select a single asset to edit its description"
-      :centered="true"
-    />
+    <Result v-else status="info" title="Select a single asset to edit its description" centered />
   </div>
 </template>
 

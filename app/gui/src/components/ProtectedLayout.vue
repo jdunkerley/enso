@@ -12,6 +12,8 @@ import {
   AgreementsModal as AgreementsModalReact,
   type AgreementsModalProps,
 } from '#/modals/AgreementsModal'
+import Dialog from '$/components/Dialog/Dialog.vue'
+import Result from '$/components/Result/Result.vue'
 import LocalStorage from '$/utils/LocalStorage'
 import { DASHBOARD_PATH, LOGIN_PATH, RESTORE_USER_PATH } from '$/appUtils'
 import { useAppTitle } from '$/composables/appTitle'
@@ -22,7 +24,7 @@ import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
 import type { DataLoader } from '$/router'
 import { useAppClass } from '@/providers/appClass'
-import { Dialog, reactComponent, ResultComponent } from '@/util/react'
+import { reactComponent } from '@/util/react'
 import * as vueQuery from '@tanstack/vue-query'
 import { useQueryClient } from '@tanstack/vue-query'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
@@ -164,10 +166,7 @@ watchPostEffect(() => {
   }
 })
 
-const logoutModalProps = computed(() => ({ isOpen: session.isLoggingOut }))
-const reconnectingModalProps = computed(() => ({
-  isOpen: session.isReconnectingSession && !session.isLoggingOut,
-}))
+const isReconnecting = computed(() => session.isReconnectingSession && !session.isLoggingOut)
 const displayDevTools = computed(() => auth.session != null)
 
 const shouldDisplayAgreementsModal = computed(
@@ -188,23 +187,23 @@ useAppTitle(computed(() => auth.session))
   </div>
 
   <Dialog
+    :open="session.isLoggingOut"
     :aria-label="text.getText('loggingOut')"
     :isDismissable="false"
-    :isKeyboardDismissDisabled="true"
-    :hideCloseButton="true"
-    :modalProps="logoutModalProps"
+    isKeyboardDismissDisabled
+    hideCloseButton
   >
-    <ResultComponent status="loading" :title="text.getText('loggingOut')" />
+    <Result status="loading" :title="text.getText('loggingOut')" />
   </Dialog>
 
   <Dialog
+    :open="isReconnecting"
     :aria-label="text.getText('reconnectingSession')"
     :isDismissable="false"
-    :isKeyboardDismissDisabled="true"
-    :hideCloseButton="true"
-    :modalProps="reconnectingModalProps"
+    isKeyboardDismissDisabled
+    hideCloseButton
   >
-    <ResultComponent status="loading" :title="text.getText('reconnectingSession')" />
+    <Result status="loading" :title="text.getText('reconnectingSession')" />
   </Dialog>
 
   <AgreementsModal
