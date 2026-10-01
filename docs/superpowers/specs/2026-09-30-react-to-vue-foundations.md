@@ -1181,12 +1181,12 @@ above: provisionally accepted, for the maintainer to review.
    fork publishes any: it publishes none (`gh release list` is empty,
    `releases/latest` answers 404), so it keeps polling
    `enso-org/enso/releases/latest` exactly as before, and the question went to
-   the maintainer as a follow-up issue. `App.vue` mounts it where React did (in
-   the React root, on every page), only while the check is enabled (the desktop
-   app, or forced from the devtools), and loads it then. "Remind me later" now
-   marks the cached release as postponed; React wrote its `select`ed view into
-   the cache, so the next `select` threw and the dialog was hidden by that error
-   until the next check. The outcome is the same.
+   the maintainer as #180. `App.vue` mounts it where React did (in the React
+   root, on every page), only while the check is enabled (the desktop app, or
+   forced from the devtools), and loads it then. "Remind me later" now marks the
+   cached release as postponed; React wrote its `select`ed view into the cache,
+   so the next `select` threw and the dialog was hidden by that error until the
+   next check. The outcome is the same.
 8. **About.** The user and info menus open the existing Vue dialog through
    `openAboutModal()`. Its `Mod+/` shortcut now comes from the Vue
    `useMenuEntries`. In Playwright (Chromium, base and branch alike), About

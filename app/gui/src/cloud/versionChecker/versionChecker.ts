@@ -4,7 +4,7 @@
  *
  * It checks the latest release of the upstream `enso-org/enso` repository (`$/utils/github`),
  * exactly as the React `VersionChecker` did; whether this fork should check its own releases is
- * an open question for its maintainer.
+ * an open question for its maintainer (#180).
  */
 import { useBackends } from '$/providers/backends'
 import { useDevtoolsStore } from '$/providers/devTools'
