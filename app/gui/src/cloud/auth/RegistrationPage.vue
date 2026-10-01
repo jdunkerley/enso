@@ -76,7 +76,13 @@ const isManualCodeEntry = ref(false)
 const { stepperState } = useStepperState({ steps: 2, defaultStep: isUserCreated ? 1 : 0 })
 
 const form = useForm({
-  defaultValues: { email: initialEmail ?? '', agreedToTos: [], agreedToPrivacyPolicy: [] },
+  defaultValues: {
+    email: initialEmail ?? '',
+    password: '',
+    confirmPassword: '',
+    agreedToTos: [],
+    agreedToPrivacyPolicy: [],
+  },
   resetOnSubmit: false,
   schema: z
     .object({
@@ -141,6 +147,7 @@ watch(
 
 const codeForm = useForm({
   schema: z.object({ verificationCode: z.string().min(1) }),
+  defaultValues: { verificationCode: '' },
   onSubmit: async ({ verificationCode }) => {
     await session.confirmSignUp(email.value, verificationCode)
     await session.signInWithPassword(email.value, password())

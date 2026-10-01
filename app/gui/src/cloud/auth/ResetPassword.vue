@@ -88,7 +88,12 @@ const form = useForm({
         })
       }
     }),
-  defaultValues: { email: defaultEmail ?? '', verificationCode: defaultVerificationCode ?? '' },
+  defaultValues: {
+    email: defaultEmail ?? '',
+    verificationCode: defaultVerificationCode ?? '',
+    newPassword: '',
+    confirmNewPassword: '',
+  },
   onSubmit: async ({ email, verificationCode, newPassword }) => {
     await session.resetPassword(email, verificationCode, newPassword)
     toasts.show(getText('resetPasswordSuccess'), { type: 'success' })

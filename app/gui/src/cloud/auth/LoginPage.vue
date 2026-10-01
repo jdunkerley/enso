@@ -58,7 +58,7 @@ const form = useForm({
       .email(getText('invalidEmailValidationError')),
     password: passwordSchema(getText),
   }),
-  defaultValues: { email: initialEmail ?? '' },
+  defaultValues: { email: initialEmail ?? '', password: '' },
   onSubmit: async ({ email, password }, loginForm) => {
     // A special case for the Electron end-to-end tests: see `electronTest.ts`.
     const passwordOverride = window.passwordOverride
@@ -113,6 +113,7 @@ const signInWithApple = signInWith(() => session.signInWithApple())
 
 const otpForm = useForm({
   schema: z.object({ otp: z.string().min(OTP_LENGTH).max(OTP_LENGTH) }),
+  defaultValues: { otp: '' },
   onSubmit: async ({ otp }, codeForm) => {
     const result = await session.confirmSignIn(otp)
     if (result.ok) {
