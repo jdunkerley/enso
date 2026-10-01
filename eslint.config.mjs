@@ -80,7 +80,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/PlanDowngradedModal',
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
-  'modals/UpsertSecretModal',
   'pages/authentication/LoadingScreen',
   'pages/authentication/Login',
   'pages/authentication/Registration',
