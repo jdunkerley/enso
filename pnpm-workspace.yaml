@@ -73,6 +73,12 @@ overrides:
   uuid: ^14.0.0
   picomatch@2: ^2.3.2
   picomatch@4: ^4.0.4
+  # reka-ui 2.10.5 declares @vueuse/core ^14; the app is on 15, so without these pnpm installs both
+  # (2.7 KB in the bundle). Every vueuse function Reka imports exists unchanged in 15, and Reka's
+  # primitives' own tests (`src/components/**/__tests__`) pass against it (#78). Drop these when a
+  # Reka release moves to vueuse 15 itself.
+  "reka-ui>@vueuse/core": ^15.0.0
+  "reka-ui>@vueuse/shared": ^15.0.0
 packageExtensions:
   "@aws-amplify/auth":
     dependencies:
@@ -105,9 +111,6 @@ packageExtensions:
     dependencies:
       "@types/react": "*"
   "@stripe/react-stripe-js":
-    dependencies:
-      "@types/react": "*"
-  react-toastify:
     dependencies:
       "@types/react": "*"
   react-hook-form:

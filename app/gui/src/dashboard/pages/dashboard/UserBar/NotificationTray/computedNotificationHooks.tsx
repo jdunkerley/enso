@@ -1,5 +1,6 @@
 /** @file Hooks for computing temporary notifications. */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
+import { toast } from '#/utilities/toast'
 import { useText } from '$/providers/react'
 import { useVueValue } from '$/providers/react/common'
 import { useUploadsToCloudStore } from '$/providers/react/upload'
@@ -7,7 +8,6 @@ import { useIsMutating, type MutationKey } from '@tanstack/react-query'
 import { BackendType } from 'enso-common/src/services/Backend'
 import { omit } from 'enso-common/src/utilities/data/object'
 import { useCallback, useState } from 'react'
-import { toast } from 'react-toastify'
 import { NotificationItem } from './NotificationItem'
 import type { NotificationInfo } from './types'
 

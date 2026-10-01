@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import ToastHost from '$/components/Toast/ToastHost.vue'
+import {
+  useClearSelectionOnClick,
+  useDevNavigate,
+  useThemeClass,
+} from '$/composables/appShellEffects'
 import { useCodeFontRootClasses } from '$/providers/codeFont'
 import { ContextsForReactProvider } from '$/providers/react/globalProvider'
 import ReactRoot from '$/ReactRoot'
@@ -68,6 +74,10 @@ const platformClass = {
 }[platform()]
 
 useMounted(appOpenCloseCallback)
+
+useThemeClass()
+useClearSelectionOnClick()
+useDevNavigate()
 </script>
 
 <template>
@@ -75,6 +85,7 @@ useMounted(appOpenCloseCallback)
     <RouterView v-slot="{ Component }">
       <ContextsForReactProvider v-if="Component">
         <ReactRootWrapper :queryClient="queryClient">
+          <ToastHost />
           <component :is="Component" />
           <div id="floatingLayer" />
           <TooltipDisplayer :registry="appTooltips" />

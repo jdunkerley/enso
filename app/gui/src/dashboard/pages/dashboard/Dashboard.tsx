@@ -140,7 +140,7 @@ export function Dashboard() {
   }, [closingOnAppExit])
 
   return (
-    <Page hideInfoBar hideModalWrapper>
+    <Page hideInfoBar hideModalHost>
       <div
         className="flex h-full flex-col text-xs text-primary"
         onContextMenu={(event) => {

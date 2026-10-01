@@ -2,10 +2,10 @@
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useOffline, useOfflineChange } from '#/hooks/offlineHooks'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { FORM_OFFLINE_ERROR, FORM_SUBMIT_ERROR, makeFormErrorMap } from '$/components/Form/errorMap'
 import { useText } from '$/providers/react'
 import * as zodResolver from '@hookform/resolvers/zod'
 import * as sentry from '@sentry/vue'
-import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
 import * as errorUtils from 'enso-common/src/utilities/errors'
 import * as React from 'react'
 import * as reactHookForm from 'react-hook-form'
@@ -86,51 +86,7 @@ export function useForm<Schema extends types.TSchema, SubmitResult = void>(
         computedSchema,
         {
           async: true,
-          errorMap: (issue) => {
-            if (IS_DEV_MODE) {
-              // eslint-disable-next-line no-restricted-properties
-              console.error('(Development only) Form validation error:', issue)
-            }
-            switch (issue.code) {
-              case 'too_small':
-                if (issue.minimum === 1 && issue.type === 'string') {
-                  return {
-                    message: getText('arbitraryFieldRequired'),
-                  }
-                } else {
-                  return {
-                    message: getText('arbitraryFieldTooSmall', issue.minimum.toString()),
-                  }
-                }
-              case 'too_big':
-                return { message: getText('arbitraryFieldTooLarge', issue.maximum.toString()) }
-              case 'invalid_type':
-                return { message: getText('arbitraryFieldInvalid') }
-              case 'invalid_string':
-                if (issue.validation === 'email') {
-                  return { message: getText('invalidEmailValidationError') }
-                }
-
-                return { message: getText('arbitraryFieldInvalid') }
-
-              case 'invalid_literal':
-              case 'invalid_enum_value':
-              case 'invalid_union':
-              case 'unrecognized_keys':
-              case 'invalid_union_discriminator':
-              case 'invalid_arguments':
-              case 'invalid_return_type':
-              case 'not_multiple_of':
-              case 'custom':
-              case 'invalid_intersection_types':
-              case 'invalid_date':
-              case 'not_finite':
-              default:
-                return {
-                  message: getText('arbitraryFieldInvalid'),
-                }
-            }
-          },
+          errorMap: makeFormErrorMap(getText),
         },
         { mode: 'async' },
       ),
@@ -228,9 +184,9 @@ export function useForm<Schema extends types.TSchema, SubmitResult = void>(
     useOfflineChange(
       (offline) => {
         if (offline) {
-          formInstance.setError('root.offline', { message: getText('unavailableOffline') })
+          formInstance.setError(FORM_OFFLINE_ERROR, { message: getText('unavailableOffline') })
         } else {
-          formInstance.clearErrors('root.offline')
+          formInstance.clearErrors(FORM_OFFLINE_ERROR)
         }
       },
       { isDisabled: canSubmitOffline },
@@ -242,7 +198,7 @@ export function useForm<Schema extends types.TSchema, SubmitResult = void>(
         event?.stopPropagation()
 
         if (isOffline && !canSubmitOffline) {
-          formInstance.setError('root.offline', { message: getText('unavailableOffline') })
+          formInstance.setError(FORM_OFFLINE_ERROR, { message: getText('unavailableOffline') })
           return Promise.resolve()
         }
 
@@ -255,7 +211,7 @@ export function useForm<Schema extends types.TSchema, SubmitResult = void>(
     )
 
     const setFormError = useEventCallback((error: string) => {
-      formInstance.setError('root.submit', { message: error })
+      formInstance.setError(FORM_SUBMIT_ERROR, { message: error })
     })
 
     const reset = useEventCallback(() => {

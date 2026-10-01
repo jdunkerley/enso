@@ -6,8 +6,8 @@
 
 import * as React from 'react'
 
+import { toast } from '#/utilities/toast'
 import * as reactQuery from '@tanstack/react-query'
-import * as toastify from 'react-toastify'
 
 import * as toastAndLogHooks from '#/hooks/toastAndLogHooks'
 
@@ -46,13 +46,13 @@ export function useCopy(props: UseCopyProps = {}) {
       const toastId = 'copySuccess'
 
       if (successToastMessage !== false) {
-        toastify.toast.success(
+        toast.success(
           successToastMessage === true ? getText('copiedToClipboard') : successToastMessage,
           { toastId, closeOnClick: true, hideProgressBar: true, position: 'bottom-right' },
         )
         // If user closes the toast, reset the button state
-        toastify.toast.onChange((toast) => {
-          if (toast.id === toastId && toast.status === 'removed') {
+        toast.onChange((change) => {
+          if (change.id === toastId && change.status === 'removed') {
             copyQuery.reset()
           }
         })
@@ -60,7 +60,7 @@ export function useCopy(props: UseCopyProps = {}) {
 
       // Reset the button to its original state after a timeout.
       resetTimeoutIdRef.current = setTimeout(() => {
-        toastify.toast.dismiss(toastId)
+        toast.dismiss(toastId)
         copyQuery.reset()
       }, DEFAULT_TIMEOUT)
     },

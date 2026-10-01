@@ -56,6 +56,7 @@ import { useInputBindings } from '#/providers/InputBindingsProvider'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/utilities/drag'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import { categoryKey, type Category } from '$/providers/category'
 import { useCategories, useFullUserSession, useLocalStorage, useText } from '$/providers/react'
 import { useVueValue } from '$/providers/react/common'
@@ -118,7 +119,6 @@ import {
   type RefObject,
   type SetStateAction,
 } from 'react'
-import { toast } from 'react-toastify'
 import invariant from 'tiny-invariant'
 import * as z from 'zod'
 import { SUGGESTIONS_FOR_TYPE } from './Drive/suggestionsConstants'

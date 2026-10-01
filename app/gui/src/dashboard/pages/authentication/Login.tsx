@@ -10,11 +10,11 @@ import { Text } from '#/components/Text'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import AuthenticationPage from '#/pages/authentication/AuthenticationPage'
 import { passwordSchema } from '#/pages/authentication/schemas'
+import { toast } from '#/utilities/toast'
 import { DASHBOARD_PATH, FORGOT_PASSWORD_PATH, REGISTRATION_PATH } from '$/appUtils'
 import { useRouter, useSession, useText } from '$/providers/react'
 import { useQueryParam } from '$/providers/react/queryParams'
 import { isOnElectron } from 'enso-common/src/utilities/detect'
-import * as toastify from 'react-toastify'
 
 /** A form for users to log in. */
 export default function Login() {
@@ -83,9 +83,9 @@ export default function Login() {
 
   const handleFederatedSignInError = (err: unknown) => {
     if (err instanceof Error && err.message.includes('Missing required user email value')) {
-      toastify.toast.error(getText('missingEmailError'))
+      toast.error(getText('missingEmailError'))
     } else {
-      toastify.toast.error(getText('registrationError'))
+      toast.error(getText('registrationError'))
     }
   }
 

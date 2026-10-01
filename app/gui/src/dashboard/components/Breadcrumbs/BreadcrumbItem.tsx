@@ -7,8 +7,9 @@ import type { Addon, IconProp, TestIdProps } from '#/components/types'
 import type { TooltipElementType } from '#/components/VisualTooltip'
 import { useDragDelayAction, type DragDelayCallback } from '#/hooks/dragDelayHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
+import { BREADCRUMB_ITEM_STYLES } from '$/components/Breadcrumbs/variants'
 import { noop } from '$/utils/functions'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import {
   createContext,
   useContext,
@@ -28,25 +29,6 @@ import {
 } from 'react-aria'
 import type * as aria from 'react-aria-components'
 import invariant from 'tiny-invariant'
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const BREADCRUMB_ITEM_STYLES = tv({
-  base: 'flex items-center gap-2 bg-transparent transition-colors rounded-4xl drop-target-after',
-  slots: {
-    link: 'block max-w-48 min-w-4 w-auto',
-    more: 'aspect-square',
-    container: 'flex items-center gap-2',
-    iconDisplay: 'h-8',
-  },
-  variants: {
-    isCurrent: {
-      true: { link: 'flex justify-center px-2 h-8' },
-    },
-  },
-  defaultVariants: {
-    isCurrent: false,
-  },
-})
 
 /** Render props for {@link BreadcrumbItem}. */
 export interface BreadcrumbItemRenderProps {
@@ -257,3 +239,5 @@ export function BreadcrumbItem<IconType extends string>(props: BreadcrumbItemPro
     </li>
   )
 }
+
+export { BREADCRUMB_ITEM_STYLES } from '$/components/Breadcrumbs/variants'

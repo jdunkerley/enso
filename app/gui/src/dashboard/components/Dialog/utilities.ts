@@ -1,23 +1,13 @@
 /** @file Utility functions for dialogs. */
 import * as aria from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
+import { IGNORE_INTERACT_OUTSIDE_SELECTOR } from '$/components/Dialog/variants'
 import { useRef, type RefObject } from 'react'
 import { useIsLatestDialogStackItem } from './DialogStackProvider'
 
-const IGNORE_INTERACT_OUTSIDE_ELEMENTS = [
-  // Toastify toasts
-  '.Toastify__toast-container',
-  // ReactQuery devtools
-  '.tsqd-parent-container',
-  // Our components that should ignore the interact outside event
-  ':is(.enso-app, .enso-chat, .enso-portal-root) [data-ignore-click-outside]',
-]
-
-const IGNORE_INTERACT_OUTSIDE_ELEMENTS_SELECTOR = `:is(${IGNORE_INTERACT_OUTSIDE_ELEMENTS.join(', ')})`
-
 /** Check if the element is a part of a component that should ignore the interact outside event */
 export function shouldIgnoreInteractOutside(element: HTMLElement) {
-  return element.closest(IGNORE_INTERACT_OUTSIDE_ELEMENTS_SELECTOR)
+  return element.closest(IGNORE_INTERACT_OUTSIDE_SELECTOR)
 }
 
 /** Props for {@link useInteractOutside} */
@@ -49,9 +39,9 @@ export function useInteractOutside(props: UseInteractOutsideProps) {
   aria.useInteractOutside({
     ref,
     isDisabled: isDisabled || !isLatest,
-    // we need to prevent the dialog from closing when interacting with the toastify container
-    // and when interaction starts, we check if the target is inside the toastify container
-    // and in the next callback we prevent the dialog from closing
+    // we need to prevent the dialog from closing when interacting with the toasts (and the other
+    // `IGNORE_INTERACT_OUTSIDE_SELECTOR` elements): when interaction starts, we check if the target
+    // is inside one of them, and in the next callback we prevent the dialog from closing
     // For some reason aria doesn't fire onInteractOutsideStart if onInteractOutside is not defined
     onInteractOutsideStart: onInteractOutsideStartCb,
     onInteractOutside: onInteractOutsideCb,

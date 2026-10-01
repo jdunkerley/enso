@@ -12,6 +12,7 @@ import {
 import { useUploadFileToCloud } from '#/hooks/backendUploadFilesHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import {
   CATEGORY_BACKEND,
   categoryEq,
@@ -25,7 +26,6 @@ import type { GetText } from '$/providers/text'
 import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
 import type { DropOperation } from '@react-types/shared'
 import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
-import { toast } from 'react-toastify'
 import invariant from 'tiny-invariant'
 import { parseDirectoriesPath } from './parseDirectoriesPath'
 

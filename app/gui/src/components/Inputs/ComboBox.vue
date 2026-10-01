@@ -1,0 +1,211 @@
+<script setup lang="ts" generic="T">
+/**
+ * @file A combo box bound to a form field: a text input that filters a list of items, the Vue
+ * counterpart of the React `ComboBox`, styled by the same `COMBO_BOX_STYLES` and `INPUT_STYLES`.
+ *
+ * It is a Reka `Combobox`, which gives what react-aria's did: `role="combobox"` with
+ * `aria-expanded` and `aria-controls`, typing filters and opens the list, ArrowDown/ArrowUp open it
+ * and move through it, Enter selects, Escape closes it. The chevron button opens it too, and the
+ * `x` button clears the typed text (unless `noResetButton`).
+ *
+ * The field holds the item itself. Each item needs a unique text: `toKey`, else `toTextValue`,
+ * else the item when it is a string. `toTextValue` is what typing filters by; `toTooltip` what the
+ * option's tooltip shows. The default slot (`{ item }`) renders an option; without it, the text.
+ */
+import Button from '$/components/Button/Button.vue'
+import { POPOVER_MOTION, POPOVER_STYLES } from '$/components/Dialog/variants'
+import Field from '$/components/Form/Field.vue'
+import type { AnyFormInstance } from '$/components/Form/types'
+import { useField } from '$/components/Form/useField'
+import { COMBO_BOX_STYLES } from '$/components/Inputs/comboBoxVariants'
+import { INPUT_STYLES } from '$/components/Inputs/variants'
+import { portalTarget } from '$/components/portal'
+import Text from '$/components/Text/Text.vue'
+import VisualTooltip from '$/components/Tooltip/VisualTooltip.vue'
+import { useText } from '$/providers/text'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
+import {
+  ComboboxAnchor,
+  ComboboxCancel,
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+  ComboboxViewport,
+} from 'reka-ui'
+import { computed, ref, useSlots } from 'vue'
+
+type ComboBoxVariants = VariantProps<typeof COMBO_BOX_STYLES>
+
+const props = withDefaults(
+  defineProps<{
+    name: string
+    form?: AnyFormInstance | undefined
+    items: readonly T[]
+    toKey?: ((item: T) => string) | undefined
+    toTextValue?: ((item: T) => string) | undefined
+    toTooltip?: ((item: T) => string) | undefined
+    defaultValue?: T | undefined
+    label?: string | undefined
+    description?: string | undefined
+    contextualHelp?: string | undefined
+    placeholder?: string | undefined
+    isDisabled?: boolean | undefined
+    isRequired?: boolean | undefined
+    /** Hide the `x` button that clears the typed text. */
+    noResetButton?: boolean | undefined
+    size?: ComboBoxVariants['size']
+    rounded?: ComboBoxVariants['rounded']
+    /** The accessible name of the input and list, when there is no `label`. */
+    ariaLabel?: string | undefined
+    testId?: string | undefined
+    class?: string | undefined
+  }>(),
+  { noResetButton: false },
+)
+
+defineSlots<{
+  default?: (props: { item: T }) => unknown
+  addonStart?: (props: { item: T | undefined }) => unknown
+  addonEnd?: (props: { item: T | undefined }) => unknown
+}>()
+
+const slots = useSlots()
+const { getText } = useText()
+const input = ref<InstanceType<typeof ComboboxInput>>()
+
+const field = useField<T | undefined>({
+  name: () => props.name,
+  form: () => props.form,
+  defaultValue: props.defaultValue,
+  isDisabled: () => props.isDisabled,
+  isRequired: () => props.isRequired,
+  focus: () => (input.value?.$el as HTMLElement | undefined)?.focus(),
+})
+
+/** The item's text: `toTextValue`, else the item when it is a string. */
+function textOf(item: T): string {
+  const text = props.toTextValue?.(item) ?? (typeof item === 'string' ? item : null)
+  if (text == null) throw new Error('Every element in a `ComboBox` must have a text value.')
+  return text
+}
+const keyOf = (item: T) => props.toKey?.(item) ?? textOf(item)
+
+const itemsByKey = computed(() => new Map(props.items.map((item) => [keyOf(item), item])))
+
+/** Reka works on string keys; the field holds the item. */
+const selectedKey = computed<string | null>({
+  get: () => {
+    const value = field.value.value
+    return value === undefined || value === null ? null : keyOf(value)
+  },
+  set: (key) => field.onChange(key == null ? undefined : itemsByKey.value.get(key)),
+})
+
+const styles = computed(() => COMBO_BOX_STYLES({ size: props.size, rounded: props.rounded }))
+const inputStyles = computed(() => INPUT_STYLES({ size: 'custom', variant: 'custom' }))
+const popoverStyles = computed(() => POPOVER_STYLES({ size: 'auto-xxsmall' }))
+const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo box')
+</script>
+
+<template>
+  <Field
+    :name="name"
+    :form="field.form"
+    :label="label"
+    :description="description"
+    :contextualHelp="contextualHelp"
+    :isRequired="field.isRequired.value"
+    :isInvalid="field.isInvalid.value"
+    :fullWidth="true"
+    :ids="field.ids"
+    :testId="testId"
+  >
+    <ComboboxRoot
+      v-model="selectedKey"
+      :disabled="field.isDisabled.value"
+      :class="styles.base({ className: props.class })"
+      @focusout="field.onBlur"
+    >
+      <ComboboxAnchor :class="styles.inputContainer()">
+        <ComboboxTrigger asChild>
+          <Button variant="icon" icon="chevron_right" class="rotate-90" :tooltip="false" />
+        </ComboboxTrigger>
+        <div :class="inputStyles.base()">
+          <div :class="inputStyles.content()">
+            <div
+              v-if="slots.addonStart"
+              :class="inputStyles.addonStart()"
+              data-testid="addon-start"
+            >
+              <slot name="addonStart" :item="field.value.value" />
+            </div>
+            <div :class="inputStyles.inputContainer()">
+              <ComboboxInput
+                ref="input"
+                :name="name"
+                :placeholder="placeholder"
+                :displayValue="
+                  (key: string) => (itemsByKey.get(key) != null ? textOf(itemsByKey.get(key)!) : '')
+                "
+                :aria-label="accessibleName"
+                :aria-invalid="field.isInvalid.value || undefined"
+                :aria-describedby="field.error.value != null ? field.ids.errorId : undefined"
+                :class="inputStyles.textArea()"
+                data-testid="input"
+              />
+            </div>
+            <div v-if="slots.addonEnd" :class="inputStyles.addonEnd()" data-testid="addon-end">
+              <slot name="addonEnd" :item="field.value.value" />
+            </div>
+          </div>
+        </div>
+        <ComboboxCancel v-if="!noResetButton" asChild>
+          <Button
+            variant="icon"
+            icon="close"
+            :aria-label="getText('reset')"
+            :class="styles.resetButton()"
+          />
+        </ComboboxCancel>
+      </ComboboxAnchor>
+
+      <ComboboxPortal :to="portalTarget()">
+        <ComboboxContent
+          position="popper"
+          :sideOffset="8"
+          :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} [--trigger-width:var(--reka-combobox-trigger-width)]`"
+        >
+          <ComboboxViewport :class="popoverStyles.dialog({ className: styles.listBox() })">
+            <ComboboxItem
+              v-for="item in items"
+              :key="keyOf(item)"
+              :value="keyOf(item)"
+              :textValue="textOf(item)"
+              :class="styles.listBoxItem()"
+            >
+              <VisualTooltip
+                v-if="slots.default"
+                :tooltip="toTooltip?.(item) ?? textOf(item)"
+                class="flex w-full"
+              >
+                <slot :item="item" />
+              </VisualTooltip>
+              <Text
+                v-else
+                truncate="1"
+                class="w-full"
+                :tooltip="toTooltip?.(item) ?? textOf(item)"
+                tooltipPlacement="left"
+              >
+                {{ textOf(item) }}
+              </Text>
+            </ComboboxItem>
+          </ComboboxViewport>
+        </ComboboxContent>
+      </ComboboxPortal>
+    </ComboboxRoot>
+  </Field>
+</template>

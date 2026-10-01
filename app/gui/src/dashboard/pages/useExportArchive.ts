@@ -4,12 +4,12 @@ import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useDownloadDirectory } from '#/layouts/Drive/useDownloadDirectory'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import { useText } from '$/providers/react'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 import type { Backend } from 'enso-common/src/services/Backend'
 import { Path } from 'enso-common/src/services/Backend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
-import { toast } from 'react-toastify'
 
 /** Options for {@link useExportArchive}. */
 export interface ExportArchiveOptions {

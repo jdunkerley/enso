@@ -1,24 +1,6 @@
 /**
  * @file
  *
- * Styles for form components.
+ * Styles for form components. They live in `$/components/Form/variants`, shared with the Vue port.
  */
-import * as twv from '$/utils/style/tailwindVariants'
-
-/** Props for form components. */
-export type FormStyleProps = twv.VariantProps<typeof FORM_STYLES>
-export const FORM_STYLES = twv.tv({
-  base: 'flex flex-col items-start',
-  variants: {
-    gap: {
-      custom: '',
-      none: 'gap-0',
-      small: 'gap-2',
-      medium: 'gap-4',
-      large: 'gap-6',
-    },
-  },
-  defaultVariants: {
-    gap: 'medium',
-  },
-})
+export { FORM_STYLES, type FormStyleProps } from '$/components/Form/variants'

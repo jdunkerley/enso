@@ -2,7 +2,7 @@
 import { ErrorBoundary } from '#/components/ErrorBoundary'
 import { Suspense } from '#/components/Suspense'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { tv } from '$/utils/style/tailwindVariants'
+import { STEPPER_STYLES } from '$/components/Stepper/variants'
 import type { CSSProperties, ReactNode } from 'react'
 import { Step } from './Step'
 import { StepContent } from './StepContent'
@@ -20,15 +20,6 @@ export interface StepperProps {
   readonly style?:
     CSSProperties | ((props: BaseRenderProps) => CSSProperties | undefined) | undefined
 }
-
-const STEPPER_STYLES = tv({
-  base: 'flex flex-col items-center w-full gap-4',
-  slots: {
-    steps: 'flex items-center justify-between w-full',
-    step: 'flex-1 last:flex-none',
-    content: 'relative w-full',
-  },
-})
 
 /** A stepper component is used to indicate progress through a multi-step process. */
 export function Stepper(props: StepperProps) {
