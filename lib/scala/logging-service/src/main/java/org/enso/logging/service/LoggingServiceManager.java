@@ -46,9 +46,11 @@ public class LoggingServiceManager {
               }
               try {
                 var server = LoggingServiceFactory.get().localServerFor(port);
+                // Throws if the server cannot bind its port; it is then not recorded, so a
+                // later `teardown` has nothing to stop.
+                var uri = server.start(logLevel, logPath, logFileSuffix, config);
                 loggingService = server;
-                return new LoggingServerConfig(
-                    currentLevel, server.start(logLevel, logPath, logFileSuffix, config));
+                return new LoggingServerConfig(currentLevel, uri);
               } finally {
                 MDC.clear();
               }

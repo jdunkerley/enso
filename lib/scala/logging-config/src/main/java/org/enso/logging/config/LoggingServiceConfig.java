@@ -107,14 +107,17 @@ public class LoggingServiceConfig implements BaseConfig {
   }
 
   public static LoggingServiceConfig withSingleAppender(BaseConfig config) {
+    return withSingleAppender(config, LoggersLevels.parse());
+  }
+
+  /**
+   * Like {@link #withSingleAppender(BaseConfig)}, but filtering events by the given per-logger
+   * levels.
+   */
+  public static LoggingServiceConfig withSingleAppender(BaseConfig config, LoggersLevels loggers) {
     Map<String, Appender> map = config.getAppenders();
     return new LoggingServiceConfig(
-        LoggersLevels.parse(),
-        Optional.empty(),
-        map,
-        config.getAppender().getName(),
-        config.logToFile(),
-        null);
+        loggers, Optional.empty(), map, config.getAppender().getName(), config.logToFile(), null);
   }
 
   public LoggersLevels getLoggers() {
