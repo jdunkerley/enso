@@ -360,8 +360,9 @@ lines, plus tests, in #79.
 
 **Option C: an in-house `useToast` store (global, framework-free API) and one
 `ToastHost.vue` built on Reka `Toast`, styled with Tailwind to match today's
-toasts.** The toasts look the same, so this is a faithful port with no visible
-change. The `useToast` signature stays exactly as it is.
+toasts.** (Revised in #80: the host is hand-built, not on Reka `Toast`; see
+"Rulings from #80", item 2.) The toasts look the same, so this is a faithful
+port with no visible change. The `useToast` signature stays exactly as it is.
 
 - **Transition shim:** while React code still calls `toastify.toast(...)`,
   replace those imports with a small `#/utilities/toast` adapter over the same
@@ -832,3 +833,82 @@ accepted, for the maintainer to review.
     header shows that form in Vue as its usage example. No mount site changes,
     so the Playwright suite is untouched, and the PR takes
     `CI: No changelog needed`.
+
+## Rulings from #80 (app-wide services, 2026-10-01)
+
+#80 moved the toasts, the programmatic modal stack and the app-wide effects to
+Vue, and had to settle its own questions. Like #78's, they were delegated:
+provisionally accepted, for the maintainer to review.
+
+1. **Split.** #80 delivers the toasts, the modal stack and the theme,
+   selection-clearing and `window.navigate` effects. Key bindings, the About
+   menu handler, `confirm`/`ask` (with `reactApi.confirmDelete`) and error
+   boundaries at route and tab roots moved to #156: each is a reviewable change
+   of its own, and the key-binding registry is the largest part of the ticket.
+2. **The toast host is built by hand, not on Reka's `Toast`**, reversing that
+   part of decision 3. `ToastHost.vue` still keeps the in-house store and the
+   `useToast` API. Three things in Reka 2.10.5's `ToastRoot` break parity with
+   today's toasts:
+   - it listens for Escape on `window` (`onKeyStroke`), so any Escape anywhere,
+     including the graph editor's, closes every toast;
+   - it renders a second, hidden copy of each toast's text, prefixed with a
+     label, in a separate `role="alert"` element: what assistive technology gets
+     differs from today, and a Playwright `getByText` on a toast's message
+     matches two elements;
+   - its timer pauses all toasts while the viewport is hovered, and it has no
+     progress bar to keep in step with the timer.
+
+   The hand-built host reproduces react-toastify's behaviour instead: about 480
+   lines for the host and its styles, 200 for the store. It also keeps Reka out
+   of the initial chunk, since `App.vue` mounts it.
+
+3. **Toasts look and behave as react-toastify's did.** The CSS values were
+   copied (320px container at the top centre, or the bottom right for the copy
+   and notification toasts; padding, shadow, the same Tailwind classes; icons,
+   close button, 5px progress bar and their colours), and so were the mechanics:
+   the timer is the progress bar's shrink animation, which starts once the toast
+   has slid in (0.7 s), pauses on hover and while the window is unfocused, and
+   closes the toast when it ends (5 s by default); the toast then slides out
+   (0.7 s) and collapses (0.3 s); at most three are shown, the rest queued;
+   `role="alert"` on the message, a `close` button, `role="progressbar"`
+   "notification timer". Two differences, neither visible: an update applies at
+   once (react-toastify deferred it by a tick and 100 ms), and dismissing a
+   queued toast drops it (react-toastify showed it later).
+4. **React callers use a shim, `#/utilities/toast`**, with the subset of
+   react-toastify's `toast` they used (`success`/`error`/`info`/`warning`,
+   `loading`, `promise`, `update`, `dismiss`, `onChange`); React content renders
+   through `reactComponent`. react-toastify is removed. Toasts carry
+   `data-testid="toast"`, and the host's containers carry
+   `data-ignore-click-outside`, which replaces `.Toastify__toast-container` in
+   `IGNORE_INTERACT_OUTSIDE_SELECTOR`.
+5. **The modal host mounts where `ModalWrapper` did**, not in `App.vue` as
+   decision 4 planned: in `AppContainer.vue` for the dashboard, and in the React
+   `Page` for the other pages. The React modals need the providers they had
+   there (`AppContainer` gives React its container data, drive location and
+   `reactApi`); a host in `App.vue` would render them without. As before, a page
+   has exactly one host. `Page` loads its host as an async component: the host's
+   `ErrorBoundary` brings Reka, which would otherwise join the initial chunk (82
+   KB minified, measured).
+6. **The host adds no element and does not teleport.** Each modal portals its
+   own overlay (the React shim through React's `Portal`, as `ModalWrapper` did;
+   a Vue `Dialog` through Reka), so the DOM is unchanged. Each entry sits in the
+   Vue `ErrorBoundary`; the shim's frame keeps the React one inside.
+7. **`setModal` keeps its single-slot meaning.** It replaces the whole stack,
+   and its entry stays until the next `setModal`/`unsetModal`, even after the
+   dialog closed itself, as the zustand slot did: `useModalRef` (the asset
+   search bar's "is a modal open" check) depends on it. Fixing that is a
+   behaviour change for a later port.
+8. **React code reaches the global stores as
+   `getToastsStore`/`getModalsStore`**, aliases of `useToasts`/`useModals`: a
+   `use` name called outside a component trips React's rules-of-hooks lint, and
+   these stores are not hooks.
+9. **No Vue `ask`/`confirm` yet.** Nothing would call it; it lands with its
+   first caller, the `ConfirmDeleteModal` port, in #156.
+10. **The theme and selection effects run from app start** (`App.vue`), not from
+    when React mounted. The outcome is the same: the dark-theme flag is a global
+    store, and the listeners are document-wide.
+11. **Parity was checked in the running app**, not only by class: screenshots of
+    the offline and sign-out toasts taken on #154's branch (react-toastify) were
+    compared on #80's with zero differing pixels, with the same geometry,
+    computed styles and accessible names, and the phase durations measured the
+    same (see the PR).

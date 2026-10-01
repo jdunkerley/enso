@@ -1,13 +1,20 @@
 /**
- * @file The React provider for modals, along with hooks to use the provider via
- * the shared React context.
+ * @file The React dashboard's global modal: `setModal`/`unsetModal`, forwarding to the app's Vue
+ * modal stack (`$/providers/modals`), so that React and Vue modals share `ModalHost.vue`.
+ *
+ * `setModal` keeps its single-slot meaning: it replaces every open modal with the given element,
+ * which renders in a {@link ReactModalFrame}. It stays on the stack until the next
+ * `setModal`/`unsetModal`, even once the dialog has closed itself. The shim goes when the last
+ * React caller is ported (#75).
  */
-import { useStore } from '#/hooks/storeHooks'
-import * as React from 'react'
-import { createStore } from 'zustand'
+import { ReactModalFrame } from '#/components/ReactModalFrame'
+import { getModalsStore } from '$/providers/modals'
+import { reactComponent } from '@/util/react'
+import { isValidElement, type JSX } from 'react'
+import type { Component } from 'vue'
 
 /** The type of a modal. */
-export type Modal = React.JSX.Element
+export type Modal = JSX.Element
 
 /**
  * A modal or a function that returns a modal.
@@ -17,136 +24,42 @@ export type Modal = React.JSX.Element
  */
 export type ModalOrCallback = Modal | ((prevModal: Modal | null) => Modal | null)
 
-/** State contained in a `ModalStaticContext`. */
-interface ModalStaticContextType {
-  readonly setModal: React.Dispatch<React.SetStateAction<Modal | null>>
-  readonly modalRef: React.RefObject<Modal>
+let reactModalEntry: Component | undefined
+
+/** The Vue component rendering a {@link ReactModalFrame}; made on first use, so imports stay acyclic. */
+function getReactModalEntry() {
+  return (reactModalEntry ??= reactComponent(ReactModalFrame))
 }
 
-/** State contained in a `ModalContext`. */
-interface ModalContextType {
-  readonly key: number
-  readonly modal: Modal | null
+/** The topmost modal, if it was opened by {@link setModal}. */
+function topReactModal(): Modal | null {
+  const entry = getModalsStore().stack.value.at(-1)
+  const modal: unknown = entry?.component === reactModalEntry ? entry?.props.modal : null
+  return isValidElement(modal) ? modal : null
 }
 
-const ModalsStore = createStore<{
-  readonly key: number
-  readonly modal: Modal | null
-  readonly setModal: (modal: ModalOrCallback | null) => void
-}>((set, get) => ({
-  key: 0,
-  modal: null,
-  setModal: (modal) => {
-    const existingModal = get().modal
-
-    const nextKey = get().key + 1
-
-    if (typeof modal === 'function') {
-      set({ modal: modal(existingModal), key: nextKey })
-    } else {
-      set({ modal, key: nextKey })
-    }
-  },
-}))
-
-/**
- * Set the currently active modal.
- */
-// eslint-disable-next-line react-refresh/only-export-components
+/** Replace every open modal with this one. */
 export function setModal(modal: ModalOrCallback) {
-  const modalsStore = ModalsStore.getState()
-  modalsStore.setModal(modal)
+  const next = typeof modal === 'function' ? modal(topReactModal()) : modal
+  const modals = getModalsStore()
+  modals.closeAll()
+  if (next != null) modals.open(getReactModalEntry(), { modal: next })
 }
 
-/**
- * Unset the currently active modal.
- */
-// eslint-disable-next-line react-refresh/only-export-components
+/** Close every open modal. Returns `false` if there was none. */
 export function unsetModal() {
-  const modalsStore = ModalsStore.getState()
-  if (modalsStore.modal != null) {
-    modalsStore.setModal(null)
-  } else {
-    return false
-  }
+  if (!getModalsStore().closeAll()) return false
 }
 
-/**
- * Get the currently active modal.
- */
-// eslint-disable-next-line react-refresh/only-export-components
-export function getModal() {
-  const modalsStore = ModalsStore.getState()
-  return modalsStore.modal
-}
-
-const ModalContext = React.createContext<ModalContextType>({ modal: null, key: 0 })
-
-const ModalStaticContext = React.createContext<ModalStaticContextType>({
-  setModal: ModalsStore.getState().setModal,
-  modalRef: {
-    /**
-     * Get the currently active modal.
-     */
-    get current() {
-      return ModalsStore.getState().modal
-    },
+/** A ref to the topmost open modal: `current` is `null` when no modal is open. */
+const MODAL_REF: { readonly current: unknown } = {
+  /** The topmost open modal's stack entry, React or Vue. */
+  get current() {
+    return getModalsStore().stack.value.at(-1) ?? null
   },
-})
-
-/** Props for a {@link ModalProvider}. */
-export type ModalProviderProps = Readonly<React.PropsWithChildren>
-
-/** A React provider containing the currently active modal. */
-export default function ModalProvider(props: ModalProviderProps) {
-  const { children } = props
-
-  const modalState = useStore(ModalsStore, (state) => state, {
-    areEqual: 'never',
-    unsafeEnableTransition: true,
-  })
-
-  return (
-    <ModalContext.Provider value={{ modal: modalState.modal, key: modalState.key }}>
-      <ModalStaticProvider>{children}</ModalStaticProvider>
-    </ModalContext.Provider>
-  )
 }
 
-/** Props for a {@link ModalStaticProvider}. */
-interface InternalModalStaticProviderProps extends Readonly<React.PropsWithChildren> {}
-
-/** A React provider containing a function to set the currently active modal. */
-function ModalStaticProvider(props: InternalModalStaticProviderProps) {
-  const { children } = props
-
-  const modalState = useStore(ModalsStore, (state) => ({ setModal: state.setModal }), {
-    areEqual: 'always',
-    unsafeEnableTransition: true,
-  })
-
-  const modalRef = useStore(ModalsStore, (state) => ({ current: state.modal }), {
-    areEqual: 'object',
-    unsafeEnableTransition: true,
-  })
-
-  return (
-    <ModalStaticContext.Provider value={{ setModal: modalState.setModal, modalRef }}>
-      {children}
-    </ModalStaticContext.Provider>
-  )
-}
-
-/** A React context hook exposing the currently active modal, if one is currently visible. */
-// eslint-disable-next-line react-refresh/only-export-components
-export function useModal() {
-  const { modal, key } = React.useContext(ModalContext)
-  return { modal, key } as const
-}
-
-/** A React context hook exposing the currently active modal (if one is currently visible) as a ref. */
-// eslint-disable-next-line react-refresh/only-export-components
+/** Whether a modal is open, as a ref to read when needed. */
 export function useModalRef() {
-  const { modalRef } = React.useContext(ModalStaticContext)
-  return { modalRef } as const
+  return { modalRef: MODAL_REF } as const
 }

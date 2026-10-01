@@ -25,14 +25,17 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   (`Button/`, `Form/`, `Dialog/`, `Menu/`). The `aria/` folder re-exports
   `react-aria-components` with project-level styling applied. Truly shared UI
   will move to `src/` proper as it's ported.
-- `providers/` — React context providers (auth, text/i18n, modals, toasts,
-  etc.).
+- `providers/` — React context providers (auth, text/i18n, input bindings,
+  etc.). `ModalProvider.tsx` is only a shim now: `setModal`/`unsetModal` forward
+  to the Vue modal stack (`$/providers/modals`).
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.
 - `modals/` — Global-modal registry and renderer.
 - `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
   `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
+  `toast.tsx` is the React shim over the Vue toast store (`$/providers/toasts`):
+  import `toast` from there, never from a toast library.
 - `styles.css`, `tailwind.css`, `typings.d.ts` — Tailwind plus global resets.
 
 ## Conventions (current React stack)
@@ -90,7 +93,8 @@ They are:
 
 - Reka UI for accessibility primitives;
 - in-house `useForm` over zod;
-- `useToast` on Reka `Toast`;
+- `useToast` on one Vue `ToastHost` (hand-built, not Reka's `Toast`; see
+  "Rulings from #80");
 - a global modal stack;
 - Tailwind `aria-*:`/`data-[…]:` variants instead of the react-aria modifiers;
 - cloud-only areas under top-level `src/cloud/<area>/`, so a community build can

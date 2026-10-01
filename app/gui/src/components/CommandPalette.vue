@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { CATEGORIES } from '$/configurations/inputBindings'
 import KeyboardShortcutReact from '#/pages/dashboard/components/KeyboardShortcut'
-import { unsetModal } from '#/providers/ModalProvider'
 import { isTextInputEvent } from '$/utils/event'
 import { useActionsStore, type Action } from '$/providers/actions'
+import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { commandPaletteBindings } from '@/bindings'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -17,6 +17,7 @@ import { computed, ref, watchEffect } from 'vue'
 const KeyboardShortcut = reactComponent(KeyboardShortcutReact)
 
 const { findActions } = useActionsStore()
+const modals = useModals()
 const interaction = injectInteractionHandler()
 const { getText } = useText()
 
@@ -44,7 +45,7 @@ const commandPaletteInteraction = {
 
 function open() {
   visible.value = true
-  unsetModal()
+  modals.closeAll()
   interaction.setCurrent(commandPaletteInteraction)
 }
 

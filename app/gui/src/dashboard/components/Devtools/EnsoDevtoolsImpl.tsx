@@ -12,6 +12,7 @@ import { Tooltip } from '#/components/Tooltip'
 import { Underlay } from '#/components/Underlay'
 import { VisualTooltip } from '#/components/VisualTooltip'
 import { useLocalStorageValues } from '#/hooks/localStorageHooks'
+import { toast } from '#/utilities/toast'
 import { getFeatureConfiguration } from '$/composables/paywall/FeaturesConfiguration'
 import {
   DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS,
@@ -34,7 +35,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import * as backend from 'enso-common/src/services/Backend'
 import { unsafeKeys } from 'enso-common/src/utilities/data/object'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
-import { toast } from 'react-toastify'
 import { twJoin } from 'tailwind-merge'
 import invariant from 'tiny-invariant'
 

@@ -1,6 +1,6 @@
 /** @file A styled colored link with an icon. */
+import { toast } from '#/utilities/toast'
 import * as React from 'react'
-import * as toastify from 'react-toastify'
 
 import * as aria from '#/components/aria'
 import { Icon } from '#/components/Icon'
@@ -38,7 +38,7 @@ function Link(props: LinkProps, ref: React.ForwardedRef<HTMLAnchorElement>) {
         className="flex items-center gap-auth-link rounded-full px-auth-link-x py-auth-link-y text-center text-xs font-bold text-blue-500 transition-all duration-auth hover:text-blue-700 focus:text-blue-700"
         onPress={() => {
           if (openInBrowser) {
-            toastify.toast.success(getText('openedLinkInBrowser'))
+            toast.success(getText('openedLinkInBrowser'))
           }
           onPress?.()
         }}

@@ -21,9 +21,18 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `Tooltip/`       | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
 | `ErrorBoundary/` | `ErrorBoundary`, `SuspenseLoader`                                                               |
 | `Spinner/`       | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
+| `Toast/`         | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
+| `ModalHost/`     | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
 | others           | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
-Forms and inputs are #79's; the toast host and the global modal stack are #80's.
+Forms and inputs are #79's.
+
+**Toasts and programmatic modals are global stores**, not components you mount:
+call `useToast()` (`@/util/toast`) or `useToasts()`, and
+`useModals().open(C, props)`. `ModalHost` is mounted where the React modals need
+their providers (`AppContainer.vue`, and the React `Page` elsewhere); never
+mount a second one on a page that has one. A dialog opened by its own trigger
+stays a local `<Dialog>`.
 
 ## Rules
 

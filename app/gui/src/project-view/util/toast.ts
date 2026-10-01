@@ -1,6 +1,5 @@
+import { useToasts, type ToastOptions, type ToastType } from '$/providers/toasts'
 import type { ResultError } from 'enso-common/src/utilities/data/result'
-// We are using `react-toastify`, since we share toast environment with dashboard.
-import { toast, type ToastContent, type ToastOptions, type TypeOptions } from 'react-toastify'
 import { onScopeDispose } from 'vue'
 
 declare const toastIdBrand: unique symbol
@@ -10,7 +9,7 @@ function makeToastId(): ToastId {
   return `toast-${crypto.randomUUID()}` as ToastId
 }
 
-export interface UseToastOptions extends ToastOptions {
+export interface UseToastOptions extends Omit<ToastOptions, 'toastId'> {
   outliveScope?: boolean
 }
 
@@ -31,19 +30,22 @@ export interface UseToastOptions extends ToastOptions {
  *
  * ```
  *
- * For details, read about `toastify` library.
+ * The toasts are shown by `$/components/Toast/ToastHost.vue`; see `$/providers/toasts` for the
+ * options.
  */
 export function useToast(options: UseToastOptions = {}) {
+  const toasts = useToasts()
   const id = makeToastId()
-  if (options?.outliveScope !== true) {
-    onScopeDispose(() => toast.dismiss(id), true)
+  const { outliveScope, ...toastOptions } = options
+  if (outliveScope !== true) {
+    onScopeDispose(() => toasts.dismiss(id), true)
   }
 
   return {
     /** Show or update toast. */
-    show(content: ToastContent) {
-      if (toast.isActive(id)) toast.update(id, { ...options, render: content })
-      else toast(content, { ...options, toastId: id })
+    show(content: string) {
+      if (toasts.isActive(id)) toasts.update(id, { ...toastOptions, render: content })
+      else toasts.show(content, { ...toastOptions, toastId: id })
     },
     /** A helper for reporting {@link ResultError} to both toast and console. */
     reportError<E>(result: ResultError<E>, preamble?: string) {
@@ -53,12 +55,12 @@ export function useToast(options: UseToastOptions = {}) {
     },
     /** Dismiss the displayed toast. */
     dismiss() {
-      toast.dismiss(id)
+      toasts.dismiss(id)
     },
   }
 }
 
-const useToastKind = (type: TypeOptions) => (options?: UseToastOptions) =>
+const useToastKind = (type: ToastType) => (options?: UseToastOptions) =>
   useToast({ ...options, type })
 
 useToast.error = useToastKind('error')

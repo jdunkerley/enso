@@ -212,10 +212,8 @@ export const POPOVER_MOTION = [
 
 /** Elements a click on which never dismisses a dialog or popover (toasts, devtools, …). */
 export const IGNORE_INTERACT_OUTSIDE_SELECTOR = `:is(${[
-  // Toastify toasts
-  '.Toastify__toast-container',
   // ReactQuery devtools
   '.tsqd-parent-container',
-  // Our components that should ignore the interact outside event
+  // Our components that should ignore the interact outside event, toasts included
   ':is(.enso-app, .enso-chat, .enso-portal-root) [data-ignore-click-outside]',
 ].join(', ')})`

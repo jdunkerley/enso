@@ -17,6 +17,7 @@ import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
 import { useLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import { useCategories, useText } from '$/providers/react'
 import {
   useDriveCurrentBackend,
@@ -35,7 +36,6 @@ import {
 } from 'enso-common/src/services/Backend'
 import { NetworkError } from 'enso-common/src/utilities/errors'
 import { useEffect, useTransition } from 'react'
-import { toast } from 'react-toastify'
 
 /**
  * Display the current directory path and permissions, upload and download buttons,

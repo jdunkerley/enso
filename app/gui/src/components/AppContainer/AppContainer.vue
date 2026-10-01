@@ -1,9 +1,9 @@
 <script lang="ts">
-import { ModalWrapper as ModalWrapperReact } from '#/components/ModalWrapper'
 import type { TransferBetweenCategoriesFunction } from '#/layouts/Drive/Categories'
 import type { ConfirmDeleteModalProps } from '#/modals/ConfirmDeleteModal'
 import { UserBar as UserBarReact } from '#/pages/dashboard/UserBar'
 import CommandPalette from '$/components/CommandPalette.vue'
+import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useContainerData } from '$/providers/container'
 import { useFeatureFlag } from '$/providers/featureFlags'
 import { provideDriveLocation } from '$/providers/drive'
@@ -34,7 +34,6 @@ import MiddlePanel from './MiddlePanel.vue'
 import RightPanel from './RightPanel.vue'
 import TabBar from './TabBar.vue'
 
-const ModalWrapper = reactComponent(ModalWrapperReact)
 const UserBar = reactComponent(UserBarReact)
 </script>
 
@@ -142,7 +141,7 @@ onUnmounted(() => {
         <PopoverRootProvider>
           <div class="topBarBackground" />
           <CommandPalette />
-          <ModalWrapper />
+          <ModalHost />
           <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
           <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
             <div class="bar">

@@ -7,6 +7,7 @@ import {
   clearPendingCheckoutTargetPlan,
   getPendingCheckoutTargetPlan,
 } from '#/modules/payments/pendingCheckout'
+import { toast } from '#/utilities/toast'
 import { DASHBOARD_PATH } from '$/appUtils'
 import { useAuth } from '$/providers/auth'
 import { useRouter, useText } from '$/providers/react'
@@ -16,7 +17,6 @@ import type { Plan } from 'enso-common/src/services/Backend'
 import { BackendType } from 'enso-common/src/services/Backend'
 import { wait } from 'lib0/promise'
 import { useEffect } from 'react'
-import { toast } from 'react-toastify'
 
 const USER_REFETCH_DELAY_MS = 3_000
 const TIMEOUT = 60_000

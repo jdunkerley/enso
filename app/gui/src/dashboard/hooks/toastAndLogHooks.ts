@@ -1,5 +1,5 @@
 /** @file */
-import * as toastify from 'react-toastify'
+import { toast, type Id } from '#/utilities/toast'
 
 import type * as text from 'enso-common/src/text'
 
@@ -22,7 +22,7 @@ export function useToastAndLogWithId() {
 
   return useEventCallback(
     <K extends text.TextId, T>(
-      toastId: toastify.Id,
+      toastId: Id,
       textId: K | null,
       ...[error, ...replacements]: text.Replacements[K] extends readonly [] ?
         [error?: Error | errorModule.MustNotBeKnown<T>]
@@ -43,7 +43,7 @@ export function useToastAndLogWithId() {
         : `${
             messagePrefix != null ? messagePrefix + ': ' : ''
           }${errorModule.getMessageOrToString<unknown>(error)}`
-      toastify.toast.update(toastId, {
+      toast.update(toastId, {
         type: 'error',
         render: message,
         isLoading: false,
@@ -84,7 +84,7 @@ export function useToastAndLog() {
         : `${
             messagePrefix != null ? messagePrefix + ': ' : ''
           }${errorModule.getMessageOrToString<unknown>(error)}`
-      const id = toastify.toast.error(message)
+      const id = toast.error(message)
       logger.error(message)
       return id
     },

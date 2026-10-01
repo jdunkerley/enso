@@ -39,9 +39,9 @@ export function useInteractOutside(props: UseInteractOutsideProps) {
   aria.useInteractOutside({
     ref,
     isDisabled: isDisabled || !isLatest,
-    // we need to prevent the dialog from closing when interacting with the toastify container
-    // and when interaction starts, we check if the target is inside the toastify container
-    // and in the next callback we prevent the dialog from closing
+    // we need to prevent the dialog from closing when interacting with the toasts (and the other
+    // `IGNORE_INTERACT_OUTSIDE_SELECTOR` elements): when interaction starts, we check if the target
+    // is inside one of them, and in the next callback we prevent the dialog from closing
     // For some reason aria doesn't fire onInteractOutsideStart if onInteractOutside is not defined
     onInteractOutsideStart: onInteractOutsideStartCb,
     onInteractOutside: onInteractOutsideCb,

@@ -9,6 +9,7 @@ import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { AboutModal } from '#/modals/AboutModal'
 import { unsetModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { toast } from '#/utilities/toast'
 import { SUBSCRIBE_PATH } from '$/appUtils'
 import { useBackends, useFullUserSession, useRouter, useSession, useText } from '$/providers/react'
 import { useShowEnsoDevtools } from '$/providers/react/devTools'
@@ -17,7 +18,6 @@ import { getDownloadUrl } from '$/utils/github'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { NetworkError, Plan } from 'enso-common/src/services/Backend'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
-import { toast } from 'react-toastify'
 
 /** Props for a {@link UserMenu}. */
 export interface UserMenuProps {

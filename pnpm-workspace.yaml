@@ -111,9 +111,6 @@ packageExtensions:
   "@stripe/react-stripe-js":
     dependencies:
       "@types/react": "*"
-  react-toastify:
-    dependencies:
-      "@types/react": "*"
   react-hook-form:
     dependencies:
       "@types/react": "*"

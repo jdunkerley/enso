@@ -1,18 +1,28 @@
 /** @file A page. */
 import { ErrorBoundary } from '#/components/ErrorBoundary'
-import { ModalWrapper } from '#/components/ModalWrapper'
 import InfoBar from '#/layouts/InfoBar'
+import { vueComponent } from '#/utilities/vue'
 import * as React from 'react'
+import { defineAsyncComponent } from 'vue'
+
+/**
+ * The modal host for the pages outside the dashboard (which mounts its own). Loaded on demand: its
+ * error boundary pulls in Reka, which the initial chunk otherwise does without.
+ */
+const ModalHost = vueComponent(
+  defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue')),
+).default
 
 /** Props for a {@link Page}. */
 export interface PageProps extends Readonly<React.PropsWithChildren> {
   readonly hideInfoBar?: true
-  readonly hideModalWrapper?: true
+  /** Set by a page that mounts the modal host itself (the dashboard, in `AppContainer.vue`). */
+  readonly hideModalHost?: true
 }
 
 /** A page. */
 export default function Page(props: PageProps) {
-  const { hideInfoBar = false, hideModalWrapper = false, children } = props
+  const { hideInfoBar = false, hideModalHost = false, children } = props
 
   return (
     <>
@@ -22,7 +32,7 @@ export default function Page(props: PageProps) {
           <InfoBar />
         </div>
       )}
-      {!hideModalWrapper && <ModalWrapper />}
+      {!hideModalHost && <ModalHost />}
     </>
   )
 }
