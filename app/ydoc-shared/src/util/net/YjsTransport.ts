@@ -38,6 +38,7 @@ export class YjsTransport extends Transport {
   protected channelName: string
   protected eventListeners: Map<string, Set<EventListener<any>>> = new Map()
   private opened = false
+  private channelClosed = false
 
   /**
    * Create a {@link YjsTransport}.
@@ -55,6 +56,13 @@ export class YjsTransport extends Transport {
    * Initiate the channel subscription.
    */
   public connect(): Promise<void> {
+    if (this.channelClosed) {
+      // Closing a `YjsChannel` is final, like closing a WebSocket: it stops observing the shared
+      // array, so a subscription made afterwards never hears another message. A reconnect after
+      // `close` therefore needs a fresh channel over the same array.
+      this.channel = new YjsChannel<string>(this.doc, this.channelName)
+      this.channelClosed = false
+    }
     return new Promise((resolve) => {
       this.channel.subscribe((message) => {
         this.emit('message', new MessageEvent('message', { data: message }))
@@ -100,6 +108,7 @@ export class YjsTransport extends Transport {
   /** Close the channel and clean up subscriptions. */
   public close(): void {
     this.channel.close()
+    this.channelClosed = true
     this.opened = false
     this.emit('close', new CloseEvent('close'))
   }
@@ -166,16 +175,21 @@ export class YjsTransport extends Transport {
  *
  * Both channels are registered with the LS via `server.onConnect()`, but operate
  * independently so requests from the IDE and the ydoc-server don't interfere.
+ *
+ * Every {@link connect} hands the LS a fresh pair of channels, and {@link close} closes them, so
+ * after a reconnect only the new LS connection receives messages.
  */
 export class YjsServerTransport extends YjsTransport {
-  private readonly proxyChannel: YjsChannel
+  private readonly proxyChannelName: string
   private readonly server: YjsChannelServer
+  /** The LS ends of the proxy and backend channels for the current connection. */
+  private languageServerChannels: YjsChannel[] = []
 
   /** Create a {@link YjsServerTransport}. */
   constructor(doc: Y.Doc, channelName: string, server: YjsChannelServer) {
     super(doc, `backend-${channelName}`)
     this.server = server
-    this.proxyChannel = new YjsChannel(doc, channelName)
+    this.proxyChannelName = channelName
   }
 
   /**
@@ -183,8 +197,11 @@ export class YjsServerTransport extends YjsTransport {
    */
   override connect(): Promise<void> {
     const proxyConnect = new Promise<void>((resolve) => {
-      this.server.onConnect(this.proxyChannel)
-      this.server.onConnect(new YjsChannel(this.doc, this.channelName))
+      this.languageServerChannels = [
+        new YjsChannel(this.doc, this.proxyChannelName),
+        new YjsChannel(this.doc, this.channelName),
+      ]
+      for (const channel of this.languageServerChannels) this.server.onConnect(channel)
       resolve()
     })
     return proxyConnect.then(() => super.connect())
@@ -192,7 +209,8 @@ export class YjsServerTransport extends YjsTransport {
 
   /** Close the channel and clean up subscriptions. */
   override close(): void {
-    this.proxyChannel.close()
+    for (const channel of this.languageServerChannels) channel.close()
+    this.languageServerChannels = []
     super.close()
   }
 }

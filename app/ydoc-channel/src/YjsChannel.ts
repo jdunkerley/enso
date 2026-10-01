@@ -48,9 +48,15 @@ export const identityCodec: ChannelCodec<any, any> = {
 export interface YjsChannelServer<T = unknown> {
   /**
    * Called when a new channel is established.
+   *
+   * Generic in the channel's storage type (`TStored`) because the server only ever interacts
+   * with the channel's external message type `T` — the storage representation is each caller's
+   * own concern (e.g. a codec coding `T` to a different `Y.Array` element type). Fixing `TStored`
+   * to `unknown` here would reject every concretely-typed channel a caller actually constructs,
+   * since `YjsChannel`'s storage parameter is used invariantly internally.
    * @param channel - The newly connected channel
    */
-  onConnect(channel: YjsChannel<T, unknown>): void
+  onConnect<TStored = unknown>(channel: YjsChannel<T, TStored>): void
 }
 
 /**

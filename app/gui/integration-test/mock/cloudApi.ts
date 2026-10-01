@@ -915,18 +915,15 @@ export async function mockCloudApi(page: Page) {
         // Can be any asset ID.
         const id = `${assetId?.split('-')[0]}-${uniqueString()}` as backend.DirectoryId
 
-        const json: backend.CopyAssetResponse = {
-          asset: {
-            id,
-            parentId,
-            title: asset.title + ' (copy)',
-          },
-        }
         const newAsset = { ...asset }
         newAsset.id = id
         newAsset.parentId = parentId
         newAsset.title += ' (copy)'
         addAsset(newAsset)
+
+        const json: backend.CopyAssetResponse = {
+          asset: newAsset,
+        }
 
         return json
       }

@@ -63,7 +63,9 @@ adding an entry. React files may import `$/…` freely.
 - `src/utils/` — general helpers (`LocalStorage`, `LruCache`, `event`,
   `inputBindings`, `download`, `mimeTypes`, `datalinkValidator`, …);
   `src/utils/data/` for small data-structure helpers; `src/utils/style/` for
-  Tailwind class composition (`tailwindVariants`, `tailwindMerge`).
+  Tailwind class composition (`tailwindVariants`, `tailwindMerge`);
+  `src/utils/testing/` for test-only helpers (`mountWithProviders`, the Vue
+  component-test harness).
 - `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
   component of that name and its Vue port (`Button`, `Dialog`, `Text`, `Icon`,
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
@@ -146,3 +148,25 @@ check on this key must test for non-empty, never merely "is set".
 Vite production builds need `NODE_OPTIONS=--max-old-space-size=6144` (already
 set in the `build` script). If you invoke Vite directly, re-export it or the
 Rollup chunker OOMs when sourcemaps are on.
+
+## Gotcha: two tsconfigs are type-checked, and `tsconfig.node.json`'s `include` is a closed list
+
+The `typecheck` script (what CI's `ci:typecheck` runs) checks **both**
+`tsconfig.app.json` (the Vue app, `src/`) and `tsconfig.node.json` (node-side
+code: `integration-test/`, `playwright.config.ts`, the Vite configs) — see #141.
+Before that fix, `tsconfig.node.json` was never checked in CI and had quietly
+accumulated ~20 errors.
+
+`tsconfig.node.json` is a **composite** project (inherited from `tsconfig.json`
+via `extends`), so TypeScript requires every file the checker reaches —
+including one pulled in only by a type-only import — to appear in its `include`.
+Node-side code occasionally needs a type or small pure-TS helper from `src/`
+(e.g. `base.ts` importing the `FeatureFlags` type), and that file's own imports
+then need listing too. **Resist the urge to fix a resulting `TS6307` by adding a
+broad `"./src/**/*.ts"` glob** — that pulls in `entrypoint.ts`, which imports
+`App.vue`, which cascades into the whole Vue app and produces hundreds of
+unrelated errors (every `.vue`/`.tsx` file is then "reachable but not
+included"). Instead add the exact file(s) TypeScript names in the error to
+`tsconfig.node.json`'s `include` list, one by one, until the error is gone — the
+closure is small and finite in practice (it was 13 files for #141, listed in the
+file with a comment explaining why).

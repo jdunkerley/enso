@@ -28,7 +28,8 @@ const containers = computed(() =>
 </script>
 
 <template>
-  <div class="ToastHost">
+  <!-- The test ID is the integration tests' handle on toasts (a contract kept from the React host, #81). -->
+  <div class="ToastHost" data-testid="toast-host">
     <div
       v-for="{ position, toasts } in containers"
       :key="position"

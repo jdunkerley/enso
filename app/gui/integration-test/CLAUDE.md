@@ -4,6 +4,13 @@ Playwright-based integration tests for the GUI. Organized by feature subtree,
 mirroring `src/`. Expect the structure to evolve as the Dashboard is ported to
 Vue:
 
+**Type-checked in CI** (`tsconfig.node.json`, run by `app/gui`'s `typecheck`
+script alongside the app's own `tsconfig.app.json` — see #141). If a new file
+here imports a type or helper from `src/` that isn't already reachable,
+`vue-tsc --noEmit -p tsconfig.node.json` fails with `TS6307` naming the missing
+file; add it to `tsconfig.node.json`'s `include` list (see the gotcha in
+`app/gui/CLAUDE.md` — do not widen it to a `src/**` glob).
+
 - `dashboard/` — Dashboard feature flows (sign-in, project list, settings). The
   Dashboard subtree is still React, legacy.
 - `project-view/` — ProjectView feature flows (create nodes, connect edges, open
@@ -106,6 +113,100 @@ in both modes. Anything else runs once, unlicensed.
   compare rates — a single run proves nothing either way.
 - CI runs with a matrix of {dashboard, project-view} × {chromium}. Don't add
   cross-suite test IDs — they must stay independent.
+
+## Accessibility checks
+
+`dashboard/accessibility.spec.ts` is the dashboard's accessibility safety net
+for the React→Vue port (#75, #81). It runs in every CI build, as part of the
+ordinary suite.
+
+- **axe-core** (`@axe-core/playwright`, WCAG 2.0–2.2 A/AA rules) scans four
+  screens — login, drive, settings, and the asset panel — through
+  `expectNoNewAxeViolations` in `accessibility.ts`. Each screen has a baseline,
+  `accessibility-baseline/<screen>.json`: the violations the dashboard had when
+  the check came in, keyed by rule id and (normalized) target selector. A
+  violation not in the baseline fails the test; a baseline entry that no longer
+  occurs is only annotated, so a fix never breaks the build.
+- **axe runs only once the page's animations have settled**
+  (`waitForAnimationsToSettle`). Layout rules such as `target-size` otherwise
+  measure a panel mid-slide: the asset panel's Fullscreen button failed
+  `target-size` in 2 of 10 runs until this wait went in. Scan a new screen the
+  same way, and check it repeatedly (`--repeat-each=10 --workers=2`) before
+  trusting its baseline.
+- **Regenerating a baseline:** on Linux (WSL), with
+  `UPDATE_AXE_BASELINE=true corepack pnpm exec playwright test --project="Integration Tests" integration-test/dashboard/accessibility.spec.ts`.
+  Review the diff: a removed line is a fix, an added line is a new violation and
+  needs a reason in the PR. `@axe-core/playwright` is pinned exactly for this
+  reason (see `package.json`'s `"//"`); a bump means a regenerated baseline in
+  the same PR.
+- **Accessibility-tree snapshots** (`toMatchAriaSnapshot`) pin the roles, names
+  and states of the drive table header, the user menu and the settings sidebar.
+  They are partial on purpose — no unnamed icons, no react-aria-only nodes such
+  as its hidden "Dismiss" buttons — so they hold a port to the contract, not to
+  React's DOM. When a port changes a tree deliberately (e.g. the user menu
+  becoming a `menu` of `menuitem`s), update the snapshot in the same PR
+  (`--update-snapshots --update-source-method=overwrite`) and say why.
+
+## Framework-neutral locators
+
+The page objects must survive the port unchanged, so they locate things only by
+role, accessible name, text, or an explicit `data-testid`. Do not use:
+
+- react-aria's state attributes and classes (`data-selected`, `data-focused`,
+  `data-pressed`, `data-entering`/`data-exiting`, `react-aria-*` classes) — use
+  the ARIA state instead (e.g. `getByRole('row', { selected: true })`: drive
+  rows carry `aria-selected`);
+- react-toastify's classes (`.Toastify__*`) — toasts are inside
+  `getByTestId('toast-host')`;
+- generated or framework ids (`#react-aria-…`, `:r1:`) — `#agreements-modal`
+  became `getByTestId('agreements-modal')`;
+- waits for an animation's duration — wait for the resulting state
+  (`toBeHidden()`, `toHaveCount(0)`) instead.
+
+A `data-testid` is a contract with the Vue port: keep it on the equivalent
+element. The ones the page objects rely on include `drive-view`, `asset-row`,
+`asset-row-name`, `dummy-row`, `context-menu`, `modal-dialog`,
+`agreements-modal`, `user-menu`, `right-panel`, `asset-search-bar`,
+`upsert-secret-modal`, `directory-row-navigate-button` and `toast-host`.
+
+## Port parity checklist
+
+Every PR that ports part of the dashboard to Vue copies this into its
+description and ticks it off. The flake baseline it compares against is
+`docs/superpowers/specs/2026-09-30-dashboard-test-baseline.md`.
+
+- [ ] Full dashboard suite (`integration-test/dashboard/`) run ≥5 times on
+      **both** the PR and its base, in WSL/Linux with CI's settings (the
+      commands are in the baseline doc); per-spec pass rates no worse than the
+      base's.
+- [ ] `accessibility.spec.ts` passes, with no baseline entry added — or each
+      added entry explained — and entries the port fixed removed from the
+      baseline.
+- [ ] Accessibility-tree snapshots unchanged, or updated deliberately with the
+      reason given.
+- [ ] Page objects still framework-neutral (see above); every `data-testid` and
+      accessible name the tests use survives on the Vue side.
+- [ ] Vue unit tests for the ported components, mounted with
+      `mountWithProviders` (`src/utils/testing/mountWithProviders.ts`).
+- [ ] Keyboard-only pass over the ported screen: reach and operate every control
+      with Tab, Shift+Tab, Enter, Space, Escape and the arrow keys; focus stays
+      visible, and returns to the trigger when a menu or dialog closes.
+- [ ] Electron e2e (`app/electron-client/tests/`), **only** when the port
+      touches a flow an Electron spec drives; then run the specs that drive it.
+      They need a packaged build, and the cloud specs a test account. The flows:
+  - login form: the `email`/`password` textboxes and the Login button
+    (`electronTest.ts`, `loginAsTestUser`);
+  - terms-and-privacy dialog: the checkbox groups named by their labels, and
+    Accept;
+  - drive: `drive-view`, `asset-row-name`, the Cloud category button, the New
+    Project button, a project row's context menu → Duplicate
+    (`localWorkflow.spec.ts`, `cloudWorkflow.spec.ts`);
+  - project tabs: the welcome project's `tab` and its close button
+    (`closeWelcome`);
+  - user menu → Settings → Members tab and its members table, with Remove
+    (`cloudWorkflow.spec.ts`);
+  - project rename from the editor, checked back in the drive's row names
+    (`localWorkflow.spec.ts`).
 
 ## Writing tests
 
