@@ -42,7 +42,7 @@ async function resolveLastRequest(
 
 async function readLastRequest(page: Page): Promise<{
   prompt: string
-  editContext?: { previousPrompt: string; previousDefinition?: string }
+  editContext: { previousPrompt: string; previousDefinition?: string } | undefined
 }> {
   return await page.evaluate(() => {
     const w = window as unknown as { __aiMockController: MockController }

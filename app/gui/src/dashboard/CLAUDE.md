@@ -67,8 +67,11 @@ alias), and each side subscribes.
 
 ## Tests
 
-- Unit: `vitest` + `@testing-library/react`.
-- Integration: Playwright specs in `app/gui/integration-test/dashboard/`.
+- Unit: `vitest` + `@testing-library/react`. Vue ports of dashboard components
+  use plain `@vue/test-utils` through `mountWithProviders`
+  (`src/utils/testing/`).
+- Integration: Playwright specs in `app/gui/integration-test/dashboard/`. A port
+  follows the parity checklist in `app/gui/integration-test/CLAUDE.md`.
 
 ## Framework-free code does not live here
 

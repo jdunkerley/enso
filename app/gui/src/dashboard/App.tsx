@@ -62,15 +62,18 @@ export default function App(props: React.PropsWithChildren) {
   // will redirect the user between the login/register pages and the dashboard.
   return (
     <>
-      <toastify.ToastContainer
-        position="top-center"
-        theme="light"
-        closeOnClick={false}
-        draggable={false}
-        toastClassName="text-sm leading-cozy bg-selected-frame rounded-lg backdrop-blur-default"
-        transition={toastify.Slide}
-        limit={3}
-      />
+      {/* The test ID is the tests' handle on toasts, independent of the toast library. */}
+      <div data-testid="toast-host">
+        <toastify.ToastContainer
+          position="top-center"
+          theme="light"
+          closeOnClick={false}
+          draggable={false}
+          toastClassName="text-sm leading-cozy bg-selected-frame rounded-lg backdrop-blur-default"
+          transition={toastify.Slide}
+          limit={3}
+        />
+      </div>
       <ModalProvider>
         <AppRouter {...props} />
       </ModalProvider>

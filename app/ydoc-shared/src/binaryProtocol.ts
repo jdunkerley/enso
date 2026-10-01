@@ -722,10 +722,14 @@ export class Builder {
 /** An {@link ArrayBuffer} wrapper with added utility methods. */
 export class ByteBuffer {
   position = 0
-  view: DataView
+  view: DataView<ArrayBuffer>
 
-  /** TODO: Add docs */
-  constructor(buffer: ArrayBufferLike) {
+  /**
+   * Wrap `buffer`. It must be a plain {@link ArrayBuffer}, not a `SharedArrayBuffer`: the
+   * accessors hand out copies of it (`rawMessage`) and `Uint8Array` views over it
+   * (`contentsArray`, `bytesArray`), and callers pass both on as `ArrayBuffer`-backed data.
+   */
+  constructor(buffer: ArrayBuffer) {
     this.view = new DataView(buffer)
   }
 
@@ -1117,7 +1121,7 @@ export class Error implements Table {
   }
 
   /** TODO: Add docs */
-  static addMessage(builder: Builder, messageOffset: Offset<string | ArrayBuffer>) {
+  static addMessage(builder: Builder, messageOffset: Offset<string | Uint8Array>) {
     builder.addFieldOffset(1, messageOffset, Null)
   }
 
@@ -1142,7 +1146,7 @@ export class Error implements Table {
   static createError(
     builder: Builder,
     code: number,
-    messageOffset: Offset<string | ArrayBuffer>,
+    messageOffset: Offset<string | Uint8Array>,
     dataType: ErrorPayload,
     dataOffset: Offset<AnyErrorPayload>,
   ): Offset<Error> {
@@ -1372,7 +1376,7 @@ export class Path implements Table {
     const offset = this.bb.offset(this.bbPos, 6)
     return offset ?
         this.bb.rawMessage(this.bb.vector(this.bbPos + offset) + index * 4)
-      : new Uint8Array()
+      : new ArrayBuffer(0)
   }
 
   /** TODO: Add docs */
@@ -1397,15 +1401,15 @@ export class Path implements Table {
   }
 
   /** TODO: Add docs */
-  static addSegments(builder: Builder, segmentsOffset: Offset<string[] | ArrayBuffer[]>) {
+  static addSegments(builder: Builder, segmentsOffset: Offset<string[] | Uint8Array[]>) {
     builder.addFieldOffset(1, segmentsOffset, Null)
   }
 
   /** TODO: Add docs */
   static createSegmentsVector(
     builder: Builder,
-    data: Offset<string>[] | Offset<ArrayBuffer>[],
-  ): Offset<string[] | ArrayBuffer[]> {
+    data: Offset<string>[] | Offset<Uint8Array>[],
+  ): Offset<string[] | Uint8Array[]> {
     builder.startVector(4, data.length, 4)
     // An iterator is more type-safe, but less performant.
     for (let i = data.length - 1; i >= 0; i -= 1) {
@@ -1429,7 +1433,7 @@ export class Path implements Table {
   static createPath(
     builder: Builder,
     createRootId: CreateOffset<EnsoUUID>,
-    segmentsOffset: Offset<string[] | ArrayBuffer[]>,
+    segmentsOffset: Offset<string[] | Uint8Array[]>,
   ): Offset<Path> {
     Path.startPath(builder)
     Path.addRootId(builder, createRootId?.(builder) ?? Null)
@@ -1488,7 +1492,7 @@ export class WriteFileCommand implements Table {
   }
 
   /** TODO: Add docs */
-  contentsArray(): Uint8Array | null {
+  contentsArray(): Uint8Array<ArrayBuffer> | null {
     const offset = this.bb.offset(this.bbPos, 6)
     return offset ?
         new Uint8Array(
@@ -1656,7 +1660,7 @@ export class FileContentsReply implements Table {
   }
 
   /** TODO: Add docs */
-  contentsArray(): Uint8Array | null {
+  contentsArray(): Uint8Array<ArrayBuffer> | null {
     const offset = this.bb.offset(this.bbPos, 4)
     return offset ?
         new Uint8Array(
@@ -1771,7 +1775,7 @@ export class WriteBytesCommand implements Table {
   }
 
   /** TODO: Add docs */
-  bytesArray(): Uint8Array | null {
+  bytesArray(): Uint8Array<ArrayBuffer> | null {
     const offset = this.bb.offset(this.bbPos, 10)
     return offset ?
         new Uint8Array(
@@ -2024,7 +2028,7 @@ export class ReadBytesReply implements Table {
   }
 
   /** TODO: Add docs */
-  bytesArray(): Uint8Array | null {
+  bytesArray(): Uint8Array<ArrayBuffer> | null {
     const offset = this.bb.offset(this.bbPos, 6)
     return offset ?
         new Uint8Array(
@@ -2258,7 +2262,7 @@ export class EnsoDigest implements Table {
   }
 
   /** TODO: Add docs */
-  bytesArray(): Uint8Array | null {
+  bytesArray(): Uint8Array<ArrayBuffer> | null {
     const offset = this.bb.offset(this.bbPos, 4)
     return offset ?
         new Uint8Array(
