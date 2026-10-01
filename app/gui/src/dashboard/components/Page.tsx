@@ -2,12 +2,16 @@
 import { ErrorBoundary } from '#/components/ErrorBoundary'
 import InfoBar from '#/layouts/InfoBar'
 import { vueComponent } from '#/utilities/vue'
-import ModalHostVue from '$/components/ModalHost/ModalHost.vue'
 import * as React from 'react'
+import { defineAsyncComponent } from 'vue'
 
-// This is a component, not a mere constant
-// eslint-disable-next-line no-restricted-syntax
-const ModalHost = vueComponent(ModalHostVue).default
+/**
+ * The modal host for the pages outside the dashboard (which mounts its own). Loaded on demand: its
+ * error boundary pulls in Reka, which the initial chunk otherwise does without.
+ */
+const ModalHost = vueComponent(
+  defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue')),
+).default
 
 /** Props for a {@link Page}. */
 export interface PageProps extends Readonly<React.PropsWithChildren> {
