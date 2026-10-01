@@ -1,7 +1,8 @@
 import type { IJSONRPCData } from '@open-rpc/client-js/build/Request.js'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { YjsChannel, type YjsChannelServer } from 'ydoc-channel'
 import * as Y from 'yjs'
-import { YjsTransport } from '../YjsTransport'
+import { YjsServerTransport, YjsTransport } from '../YjsTransport'
 
 // Helper function to create JSON-RPC notification data (no id = no response expected)
 function createNotification(method: string, params?: any): IJSONRPCData {
@@ -13,6 +14,30 @@ function createNotification(method: string, params?: any): IJSONRPCData {
       ...(params === undefined ? { params: null } : { params }),
     },
   }
+}
+
+// Helper function to create JSON-RPC request data (has an id, so a response is expected)
+function createRequest(method: string, id: number): IJSONRPCData {
+  return {
+    internalID: id,
+    request: { jsonrpc: '2.0', id, method, params: [] },
+  }
+}
+
+/**
+ * Answer every JSON-RPC request arriving on `channel` with its method name as the result, the way
+ * the Language Server answers on the channels it is given. Returns the methods it has answered.
+ */
+function respondOn(channel: YjsChannel<string>, answered: string[] = []) {
+  channel.subscribe((raw) => {
+    const message = JSON.parse(raw)
+    if (typeof message.method !== 'string' || message.id == null) return
+    answered.push(message.method)
+    queueMicrotask(() =>
+      channel.send(JSON.stringify({ jsonrpc: '2.0', id: message.id, result: message.method })),
+    )
+  })
+  return answered
 }
 
 // Polyfill DOM event types for Node.js environment
@@ -248,5 +273,50 @@ describe('YjsTransport', () => {
     await new Promise((resolve) => setTimeout(resolve, 10))
 
     expect(listener).not.toHaveBeenCalled()
+  })
+})
+
+describe('YjsTransport reconnect', () => {
+  test('receives responses after close and connect', async () => {
+    const doc = new Y.Doc()
+    respondOn(new YjsChannel<string>(doc, 'reconnect-channel'))
+    const transport = new YjsTransport(doc, 'reconnect-channel')
+    await transport.connect()
+    await expect(transport.sendData(createRequest('before', 1), 1000)).resolves.toBe('before')
+
+    transport.close()
+    await transport.connect()
+    expect(transport.isOpen).toBe(true)
+    await expect(transport.sendData(createRequest('after', 2), 1000)).resolves.toBe('after')
+    transport.close()
+  })
+
+  test('server transport serves both channels after close and connect', async () => {
+    const doc = new Y.Doc()
+    // Stands in for the Language Server: answers on every channel it is handed, as
+    // `YdocJsonRpcServer.ServerCallbacks` does.
+    const answered: string[] = []
+    const server: YjsChannelServer = {
+      onConnect: (channel) => void respondOn(channel as YjsChannel<string>, answered),
+    }
+    const transport = new YjsServerTransport(doc, 'ls-url', server)
+    // The IDE's side of the proxy channel.
+    const ide = new YjsTransport(doc, 'ls-url')
+    await ide.connect()
+
+    await transport.connect()
+    await expect(transport.sendData(createRequest('backend-1', 1), 1000)).resolves.toBe('backend-1')
+    await expect(ide.sendData(createRequest('proxy-1', 1), 1000)).resolves.toBe('proxy-1')
+
+    transport.close()
+    await transport.connect()
+    await expect(transport.sendData(createRequest('backend-2', 2), 1000)).resolves.toBe('backend-2')
+    await expect(ide.sendData(createRequest('proxy-2', 2), 1000)).resolves.toBe('proxy-2')
+    // Each request reached exactly one Language Server connection: the previous connection's
+    // channels no longer receive.
+    expect(answered).toEqual(['backend-1', 'proxy-1', 'backend-2', 'proxy-2'])
+
+    transport.close()
+    ide.close()
   })
 })

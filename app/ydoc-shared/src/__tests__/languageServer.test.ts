@@ -67,17 +67,6 @@ class DeferredOpenTransport extends YjsTransport {
   }
 }
 
-/**
- * A transport that can be connected again after {@link close}. `YjsTransport.close` closes its
- * channel for good, so the base class alone cannot model a reconnect.
- */
-class ReopenableTransport extends YjsTransport {
-  override connect(): Promise<void> {
-    this.channel = new YjsChannel<string>(this.doc, this.channelName)
-    return super.connect()
-  }
-}
-
 describe('LanguageServer initialization', () => {
   let doc: Y.Doc
   let server: ReturnType<typeof fakeLanguageServer>
@@ -142,7 +131,7 @@ describe('LanguageServer initialization', () => {
   })
 
   test('re-initializes after the transport closes and opens again', async () => {
-    const transport = new ReopenableTransport(doc, CHANNEL)
+    const transport = new YjsTransport(doc, CHANNEL)
     ls = new LanguageServer(CLIENT_ID, transport)
     expect((await ls.initialized).ok).toBe(true)
     expect(server.initRequests()).toBe(1)
@@ -165,6 +154,21 @@ describe('LanguageServer initialization', () => {
     expect((await reinitialized).ok).toBe(true)
     expect(server.initRequests()).toBe(2)
     expect(connected()).toBe(1)
+    expect(warn).not.toHaveBeenCalled()
+    expect(error).not.toHaveBeenCalled()
+  })
+
+  test('serves requests after reconnect()', async () => {
+    // The ydoc server restarts its Language Server client this way (`restartClient`).
+    ls = new LanguageServer(CLIENT_ID, new YjsTransport(doc, CHANNEL))
+    expect((await ls.initialized).ok).toBe(true)
+
+    ls.reconnect()
+    expect((await ls.initialized).ok).toBe(true)
+    expect(server.initRequests()).toBe(2)
+    const root = { rootId: CLIENT_ID, segments: [] }
+    expect((await ls.listFiles(root)).ok).toBe(true)
+    expect(server.requests.at(-1)).toBe('file/list')
     expect(warn).not.toHaveBeenCalled()
     expect(error).not.toHaveBeenCalled()
   })
