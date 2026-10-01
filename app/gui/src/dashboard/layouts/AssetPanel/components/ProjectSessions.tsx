@@ -3,41 +3,36 @@ import { ErrorBoundary } from '#/components/ErrorBoundary'
 import { Result } from '#/components/Result'
 import { Scroller } from '#/components/Scroller'
 import { AssetPanelPlaceholder } from '#/layouts/AssetPanel/components/AssetPanelPlaceholder'
-import { CATEGORY_BACKEND } from '$/providers/category'
 import { useBackends, useText } from '$/providers/react'
-import {
-  useRightPanelContextCategory,
-  useRightPanelFocusedAsset,
-} from '$/providers/react/container'
+import { useVueValue } from '$/providers/react/common'
+import { useRightPanelData, useRightPanelFocusedAsset } from '$/providers/react/container'
+import type { SessionsProject } from '$/providers/rightPanel'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import type { Backend } from 'enso-common/src/services/Backend'
-import { AssetType, type ProjectAsset } from 'enso-common/src/services/Backend'
+import { AssetType } from 'enso-common/src/services/Backend'
+import { useCallback } from 'react'
 import { ProjectSession } from './ProjectSession'
 
 /** A list of previous versions of an asset. */
 export function ProjectSessions() {
   const { getText } = useText()
+  const rightPanel = useRightPanelData()
   const focusedAsset = useRightPanelFocusedAsset()
-  const category = useRightPanelContextCategory()
+  const project = useVueValue(useCallback(() => rightPanel.sessionsProject, [rightPanel]))
   const { backendForType } = useBackends()
 
-  const backend = category != null ? backendForType(CATEGORY_BACKEND[category.type]) : null
-
-  if (backend == null) {
-    return <AssetPanelPlaceholder title={getText('assetProjectSessions.notSelected')} />
-  }
-
-  if (focusedAsset == null) {
-    return <AssetPanelPlaceholder title={getText('assetProjectSessions.notSelected')} />
-  }
-
-  if (focusedAsset.type !== AssetType.project) {
-    return <AssetPanelPlaceholder title={getText('assetProjectSessions.notProjectAsset')} />
+  if (project == null) {
+    const isOtherAsset = focusedAsset != null && focusedAsset.type !== AssetType.project
+    const title =
+      isOtherAsset ?
+        getText('assetProjectSessions.notProjectAsset')
+      : getText('assetProjectSessions.notSelected')
+    return <AssetPanelPlaceholder title={title} />
   }
 
   return (
     <ErrorBoundary>
-      <AssetProjectSessionsInternal backend={backend} item={focusedAsset} />
+      <AssetProjectSessionsInternal backend={backendForType(project.backendType)} item={project} />
     </ErrorBoundary>
   )
 }
@@ -45,7 +40,7 @@ export function ProjectSessions() {
 /** Props for a {@link AssetProjectSessionsInternal}. */
 interface AssetProjectSessionsInternalProps {
   readonly backend: Backend
-  readonly item: ProjectAsset
+  readonly item: SessionsProject
 }
 
 /** A list of previous versions of an asset. */
