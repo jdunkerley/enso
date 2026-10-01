@@ -12,23 +12,26 @@ import {
   AgreementsModal as AgreementsModalReact,
   type AgreementsModalProps,
 } from '#/modals/AgreementsModal'
-import Dialog from '$/components/Dialog/Dialog.vue'
-import Result from '$/components/Result/Result.vue'
 import LocalStorage from '$/utils/LocalStorage'
 import { DASHBOARD_PATH, LOGIN_PATH, RESTORE_USER_PATH } from '$/appUtils'
 import { useAppTitle } from '$/composables/appTitle'
 import { useUserAgreements } from '$/composables/userAgreements'
 import { useAuth, type AuthStore } from '$/providers/auth'
 import { useFeatureFlag } from '$/providers/featureFlags'
-import { useSession } from '$/providers/session'
-import { useText } from '$/providers/text'
 import type { DataLoader } from '$/router'
 import { useAppClass } from '@/providers/appClass'
 import { reactComponent } from '$/utils/react'
 import * as vueQuery from '@tanstack/vue-query'
 import { useQueryClient } from '@tanstack/vue-query'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
-import { computed, effectScope, EffectScope, watch, watchPostEffect } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  effectScope,
+  EffectScope,
+  watch,
+  watchPostEffect,
+} from 'vue'
 import { useRoute, useRouter, type RouteLocation } from 'vue-router'
 
 declare module 'vue-router' {
@@ -38,6 +41,8 @@ declare module 'vue-router' {
 }
 
 const AgreementsModal = reactComponent(AgreementsModalReact)
+// Loaded on its own, so that its dialog code is not on every route's critical path.
+const SessionOverlays = defineAsyncComponent(() => import('$/components/SessionOverlays.vue'))
 
 function routeAllowed(route: RouteLocation, auth: AuthStore) {
   switch (route.meta.access) {
@@ -129,12 +134,10 @@ export const dataLoader: DataLoader<Props> = {
 <script setup lang="ts">
 const props = defineProps<Props>()
 
-const session = useSession()
 const auth = useAuth()
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
-const text = useText()
 const EnsoDevtools = reactComponent(EnsoDevToolsReact)
 const ReactQueryDevtools = reactComponent(ReactQueryDevtoolsReact)
 
@@ -166,7 +169,6 @@ watchPostEffect(() => {
   }
 })
 
-const isReconnecting = computed(() => session.isReconnectingSession && !session.isLoggingOut)
 const displayDevTools = computed(() => auth.session != null)
 
 const shouldDisplayAgreementsModal = computed(
@@ -186,25 +188,7 @@ useAppTitle(computed(() => auth.session))
     authenticated. -->
   </div>
 
-  <Dialog
-    :open="session.isLoggingOut"
-    :aria-label="text.getText('loggingOut')"
-    :isDismissable="false"
-    isKeyboardDismissDisabled
-    hideCloseButton
-  >
-    <Result status="loading" :title="text.getText('loggingOut')" />
-  </Dialog>
-
-  <Dialog
-    :open="isReconnecting"
-    :aria-label="text.getText('reconnectingSession')"
-    :isDismissable="false"
-    isKeyboardDismissDisabled
-    hideCloseButton
-  >
-    <Result status="loading" :title="text.getText('reconnectingSession')" />
-  </Dialog>
+  <SessionOverlays />
 
   <AgreementsModal
     v-if="allowed && agreementsModalProps && shouldDisplayAgreementsModal"

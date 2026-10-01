@@ -1062,10 +1062,16 @@ the maintainer to review.
    overlays ("Logging out", "Reconnecting session…") have no title and are named
    by `aria-label`; Reka's renderless `DialogRoot` had dropped it.
 
-5. **The session overlays sit outside Reka's `ConfigProvider`**
-   (`ProtectedLayout` is above `AppContainer.vue`). They show a spinner and a
-   title, nothing locale-dependent, so falling back to Reka's default locale
-   changes nothing (as the About dialog, #156 ruling 7).
+5. **The session overlays are their own component, loaded asynchronously.**
+   `SessionOverlays.vue` holds the two dialogs, and `ProtectedLayout.vue` mounts
+   it through `defineAsyncComponent`. `ProtectedLayout` is the root of every
+   route, the login page included; importing `Dialog.vue` statically put 64 KiB
+   of Reka dialog code (minified, measured) on that critical path, where React's
+   dialog had come with React itself. Now the chunk is fetched just after the
+   layout renders, long before any logout. The overlays sit outside Reka's
+   `ConfigProvider` (`ProtectedLayout` is above `AppContainer.vue`); they show a
+   spinner and a title, nothing locale-dependent, so Reka's default locale
+   changes nothing (as for the About dialog, #156 ruling 7).
 
 6. **`KeyboardShortcut.vue` is a shared primitive** in
    `src/components/KeyboardShortcut/`: the menus and the keyboard-shortcuts
