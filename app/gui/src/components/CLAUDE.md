@@ -16,23 +16,27 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `Text/`          | `Text`, `Heading`, `TextGroup`                                                                  |
 | `Icon/`          | `Icon` (from `icons.svg`)                                                                       |
 | `Dialog/`        | `Dialog`, `Popover`, `DialogClose`                                                              |
-| `AlertDialog/`   | `AlertDialog`                                                                                   |
+| `AlertDialog/`   | `AlertDialog`, `ConfirmDeleteModal` (asked through the modal stack)                             |
 | `Menu/`          | `DropdownMenu`, `ContextMenu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`        |
 | `Tooltip/`       | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
-| `ErrorBoundary/` | `ErrorBoundary`, `SuspenseLoader`                                                               |
+| `ErrorBoundary/` | `ErrorBoundary` (`onlyRenderErrors` at route and tab roots), `SuspenseLoader`                   |
 | `Spinner/`       | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
 | `Toast/`         | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
 | `ModalHost/`     | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
+| `AboutModal/`    | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
 | others           | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:
 call `useToast()` (`@/util/toast`) or `useToasts()`, and
-`useModals().open(C, props)`. `ModalHost` is mounted where the React modals need
-their providers (`AppContainer.vue`, and the React `Page` elsewhere); never
-mount a second one on a page that has one. A dialog opened by its own trigger
-stays a local `<Dialog>`.
+`useModals().open(C, props)`, or `useModals().ask(C, props)` for a confirmation
+(it resolves `'confirm'` or `'dismiss'`). A stack modal leaves when it emits
+`close`; a `Dialog`/`AlertDialog` emits `closed` after its exit animation, which
+is when to emit it. `ModalHost` is mounted where the React modals need their
+providers (`AppContainer.vue`, and the React `Page` elsewhere); never mount a
+second one on a page that has one. A dialog opened by its own trigger stays a
+local `<Dialog>`.
 
 ## Rules
 
