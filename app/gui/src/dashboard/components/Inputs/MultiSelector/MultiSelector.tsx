@@ -9,7 +9,7 @@ import {
 import {
   Form,
   type FieldPath,
-  type FieldProps,
+  type FieldPropsExcept,
   type FieldStateProps,
   type FieldValues,
   type TSchema,
@@ -42,7 +42,7 @@ export interface MultiSelectorProps<
       TFieldName,
       readonly T[]
     >,
-    FieldProps,
+    FieldPropsExcept<ListBoxItemProps>,
     Omit<VariantProps<typeof MULTI_SELECTOR_STYLES>, 'disabled' | 'invalid'> {
   readonly items: readonly T[]
   readonly children?: (item: T) => string

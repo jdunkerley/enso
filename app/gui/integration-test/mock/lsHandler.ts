@@ -733,6 +733,28 @@ export function mockFsDirectoryHandle(
   name: string,
   path: string[] = [],
 ): FileSystemDirectoryHandle {
+  type Entry = FileSystemDirectoryHandle | FileSystemFileHandle
+  // The iterators are declared `undefined`-returning, not inferred: TypeScript 6's DOM lib types
+  // them as `FileSystemDirectoryHandleAsyncIterator`, whose return type is `BuiltinIteratorReturn`
+  // (`undefined`), while an unannotated generator returns `void`. They are shared by the methods
+  // below, rather than called through `this`, because `this.values()` resolves to the older
+  // `@types/wicg-file-system-access` overload, whose `AsyncIterableIterator` the DOM lib rejects.
+  async function* keys(): AsyncGenerator<string, undefined> {
+    for (const name in tree) yield name
+  }
+  async function* values(): AsyncGenerator<Entry, undefined> {
+    for await (const [, entry] of entries()) yield entry
+  }
+  async function* entries(): AsyncGenerator<[string, Entry], undefined> {
+    for (const name in tree) {
+      const entry = tree[name]!
+      if (typeof entry === 'string' || entry instanceof ArrayBuffer) {
+        yield [name, mockFsFileHandle(entry, name, [...path, name])]
+      } else {
+        yield [name, mockFsDirectoryHandle(entry, name, [...path, name])]
+      }
+    }
+  }
   return {
     kind: 'directory',
     isFile: false,
@@ -791,34 +813,10 @@ export function mockFsDirectoryHandle(
     async removeEntry() {
       throw new Error('Cannot remove an entry from a read-only mock.')
     },
-    async *keys() {
-      for (const name in tree) yield name
-    },
-    async *values() {
-      for (const name in tree) {
-        const entry = tree[name]!
-        if (typeof entry === 'string' || entry instanceof ArrayBuffer) {
-          yield mockFsFileHandle(entry, name, [...path, name])
-        } else {
-          yield mockFsDirectoryHandle(entry, name, [...path, name])
-        }
-      }
-    },
-    getEntries() {
-      return this.values()
-    },
-    async *entries() {
-      for (const name in tree) {
-        const entry = tree[name]!
-        if (typeof entry === 'string' || entry instanceof ArrayBuffer) {
-          yield [name, mockFsFileHandle(entry, name, [...path, name])]
-        } else {
-          yield [name, mockFsDirectoryHandle(entry, name, [...path, name])]
-        }
-      }
-    },
-    [Symbol.asyncIterator]() {
-      return this.entries()
-    },
+    keys,
+    values,
+    getEntries: values,
+    entries,
+    [Symbol.asyncIterator]: entries,
   }
 }

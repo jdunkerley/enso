@@ -4,7 +4,7 @@ import {
   Form,
   type FieldComponentProps,
   type FieldPath,
-  type FieldProps,
+  type FieldPropsExcept,
   type FieldStateProps,
   type FieldVariantProps,
   type TSchema,
@@ -24,7 +24,7 @@ export interface SelectorProps<Schema extends TSchema, TFieldName extends FieldP
       TFieldName,
       T
     >,
-    FieldProps,
+    FieldPropsExcept<RadioGroupProps>,
     Omit<VariantProps<typeof SELECTOR_STYLES>, 'disabled' | 'invalid' | 'variants'>,
     FieldVariantProps {
   readonly items: readonly T[]

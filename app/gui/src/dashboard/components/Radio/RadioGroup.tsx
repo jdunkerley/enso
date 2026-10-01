@@ -5,7 +5,13 @@ import * as twv from '$/utils/style/tailwindVariants'
 import { omit } from 'enso-common/src/utilities/data/object'
 import * as React from 'react'
 import type { FieldVariantProps } from '../Form'
-import { Form, type FieldPath, type FieldProps, type FieldStateProps, type TSchema } from '../Form'
+import {
+  Form,
+  type FieldPath,
+  type FieldPropsExcept,
+  type FieldStateProps,
+  type TSchema,
+} from '../Form'
 import { RadioGroupProvider } from './RadioGroupContext'
 
 /** Props for {@link RadioGroup}. */
@@ -21,7 +27,7 @@ export interface RadioGroupProps<
       string
     >,
     twv.VariantProps<typeof RADIO_GROUP_STYLES>,
-    FieldProps,
+    FieldPropsExcept<Omit<aria.AriaRadioGroupProps, 'description' | 'label'>>,
     FieldVariantProps {
   readonly children?: React.ReactNode
   readonly className?: string

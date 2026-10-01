@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "module": "ESNext",
     "types": ["node", "vitest/importMeta"],
     "verbatimModuleSyntax": true

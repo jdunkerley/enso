@@ -226,11 +226,18 @@ export interface GroupInfo {
   project: QualifiedName
 }
 
-class Synchronizer {
+/**
+ * Keeps a {@link SuggestionDb} in step with the language server's suggestion database.
+ *
+ * Exported only so that declaration emit can name it: the store returns an instance, and since
+ * TypeScript 6 an unexported class with a `#private` member cannot be written out inline (TS4094).
+ */
+export class Synchronizer {
   queue: AsyncQueue<{ currentVersion: number }>
   /** Resolves once the initial suggestion database has been loaded (which implies groups were). */
   initialized: Promise<unknown>
 
+  /** Start loading `entries` from the project's language server, then keep applying its updates. */
   constructor(
     projectStore: ProjectStore,
     public entries: SuggestionDb,
@@ -251,6 +258,7 @@ class Synchronizer {
     this.queue = new AsyncQueue(initState)
   }
 
+  /** Fill `entries` with the language server's current suggestion database. */
   static async loadDatabase(
     entries: SuggestionDb,
     lsRpc: LanguageServer,

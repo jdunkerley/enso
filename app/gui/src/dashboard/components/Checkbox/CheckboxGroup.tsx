@@ -13,7 +13,13 @@ import {
   type ReactNode,
 } from 'react'
 import type { FieldVariantProps } from '../Form'
-import { Form, type FieldPath, type FieldProps, type FieldStateProps, type TSchema } from '../Form'
+import {
+  Form,
+  type FieldPath,
+  type FieldPropsExcept,
+  type FieldStateProps,
+  type TSchema,
+} from '../Form'
 import type { TestIdProps } from '../types'
 import { CheckboxGroupProvider } from './CheckboxContext'
 
@@ -24,7 +30,7 @@ export interface CheckboxGroupProps<
 >
   extends
     FieldStateProps<AriaCheckboxGroupProps, Schema, TFieldName, readonly string[]>,
-    FieldProps,
+    FieldPropsExcept<AriaCheckboxGroupProps>,
     FieldVariantProps,
     Omit<VariantProps<typeof CHECKBOX_GROUP_STYLES>, 'disabled' | 'invalid'>,
     TestIdProps {

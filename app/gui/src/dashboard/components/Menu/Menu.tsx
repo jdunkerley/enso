@@ -194,7 +194,8 @@ export const MenuSectionHeader = createLeafComponent(
 
 /** Props for {@link MenuSeparator} */
 export interface MenuSeparatorProps
-  extends SeparatorProps, VariantProps<typeof MENU_SEPARATOR_STYLES> {}
+  // `orientation` comes from `SeparatorProps`; see there.
+  extends SeparatorProps, Omit<VariantProps<typeof MENU_SEPARATOR_STYLES>, 'orientation'> {}
 
 /**
  * A separator in a menu.

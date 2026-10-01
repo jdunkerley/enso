@@ -18,7 +18,9 @@ catalog:
   # Pinned exactly, and overridden below, so the tree holds one TypeScript: `@marijn/buildtool`
   # (a dev dependency of the Lezer/CodeMirror markdown forks) asks for `^5.3.3` and otherwise keeps
   # whatever the lockfile last resolved. Move `vue-tsc` with it; it type-checks the GUI.
-  typescript: 5.9.3
+  # Held at 6.0.x: `@typescript-eslint` 8.70 peers `typescript <6.1.0`, so a 6.1 needs it moved too,
+  # and 7.0 has no JavaScript API for `vue-tsc`, typed linting or our AST codegen (see #149, #166).
+  typescript: 6.0.3
   # Also a peer of `prettier-plugin-organize-imports` at the root, which auto-installs its own copy
   # unless overridden below (unused there: .vue files skip that plugin, see `.prettierrc.yaml`).
   vue-tsc: ^3.3.11

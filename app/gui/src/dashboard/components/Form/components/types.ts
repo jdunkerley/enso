@@ -227,6 +227,19 @@ export interface FieldProps {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   'aria-details'?: string | undefined
 }
+
+/**
+ * {@link FieldProps} without the props that a field's own (React Aria) props already declare.
+ *
+ * A field component extends both {@link FieldStateProps} of its React Aria props and
+ * {@link FieldProps}. React Aria declares its ARIA labelling props as `?: string`, where
+ * {@link FieldProps} has `?: string | undefined`; under `exactOptionalPropertyTypes` those are
+ * different types, and since TypeScript 6 an interface cannot extend both (TS2320). Before, the
+ * first base's declaration (React Aria's) silently won; dropping the duplicates here keeps it.
+ *
+ * `BaseProps` must not be generic, as an interface can only extend statically known members.
+ */
+export type FieldPropsExcept<BaseProps> = Omit<FieldProps, keyof BaseProps>
 /**
  * Base Props for a Form Field.
  * @internal
