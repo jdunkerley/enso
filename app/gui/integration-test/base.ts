@@ -11,6 +11,22 @@ import { registerMocks } from './mock/registerMocks'
 
 export type * from 'playwright/test'
 
+/**
+ * The `$config` the page should boot with, injected before any app script runs. Supplied by
+ * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
+ * explicitly per project rather than inherited from whatever the build happened to bake in.
+ * See `integration-test/CLAUDE.md` for how the licensed/unlicensed projects differ.
+ *
+ * Empty (the default) means "no override": nothing is injected and the page boots with whatever
+ * Vite baked in. It is not a merge — a non-empty value replaces the whole config — so a project
+ * that sets this must supply a complete one, as both integration projects do via `loadEnv`.
+ *
+ * Exported so `playwright.config.ts` can pass it to `defineConfig`'s generic parameter — without
+ * that, `appConfig` in a project's `use` block is not a fixture `defineConfig`'s default type
+ * parameter knows about, and TypeScript rejects it (#141).
+ */
+export type AppConfig = Record<string, string | undefined>
+
 export const test = base.extend<{
   featureFlags: Partial<FeatureFlags>
   /**
@@ -18,17 +34,7 @@ export const test = base.extend<{
    * specs assume `false`. AI specs opt in with `test.use({ aiAvailable: true })`.
    */
   aiAvailable: boolean
-  /**
-   * The `$config` the page should boot with, injected before any app script runs. Supplied by
-   * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
-   * explicitly per project rather than inherited from whatever the build happened to bake in.
-   * See `integration-test/CLAUDE.md` for how the licensed/unlicensed projects differ.
-   *
-   * Empty (the default) means "no override": nothing is injected and the page boots with whatever
-   * Vite baked in. It is not a merge — a non-empty value replaces the whole config — so a project
-   * that sets this must supply a complete one, as both integration projects do via `loadEnv`.
-   */
-  appConfig: Record<string, string | undefined>
+  appConfig: AppConfig
   setupApi: {
     cloud?: (api: MockCloudApi) => void
     local?: (api: MockLocalApi) => void

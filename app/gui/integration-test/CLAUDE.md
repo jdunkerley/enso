@@ -4,6 +4,13 @@ Playwright-based integration tests for the GUI. Organized by feature subtree,
 mirroring `src/`. Expect the structure to evolve as the Dashboard is ported to
 Vue:
 
+**Type-checked in CI** (`tsconfig.node.json`, run by `app/gui`'s `typecheck`
+script alongside the app's own `tsconfig.app.json` — see #141). If a new file
+here imports a type or helper from `src/` that isn't already reachable,
+`vue-tsc --noEmit -p tsconfig.node.json` fails with `TS6307` naming the missing
+file; add it to `tsconfig.node.json`'s `include` list (see the gotcha in
+`app/gui/CLAUDE.md` — do not widen it to a `src/**` glob).
+
 - `dashboard/` — Dashboard feature flows (sign-in, project list, settings). The
   Dashboard subtree is still React, legacy.
 - `project-view/` — ProjectView feature flows (create nodes, connect edges, open

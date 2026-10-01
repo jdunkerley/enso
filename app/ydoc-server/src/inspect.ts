@@ -61,7 +61,7 @@ export class InspectManager {
   /** Wraps a JSON {@link YjsChannelServer} to intercept channel creation. */
   wrapJsonServer(delegate: YjsChannelServer<string>): YjsChannelServer<string> {
     return {
-      onConnect: (channel: YjsChannel<string, unknown>) => {
+      onConnect: <TStored>(channel: YjsChannel<string, TStored>) => {
         this.registerChannel(
           channel,
           'json',
@@ -76,7 +76,7 @@ export class InspectManager {
   /** Wraps a binary {@link YjsChannelServer} to intercept channel creation. */
   wrapBinaryServer(delegate: YjsChannelServer<JavaByteBuffer>): YjsChannelServer<JavaByteBuffer> {
     return {
-      onConnect: (channel: YjsChannel<JavaByteBuffer, unknown>) => {
+      onConnect: <TStored>(channel: YjsChannel<JavaByteBuffer, TStored>) => {
         this.registerChannel(
           channel,
           'data',
@@ -91,7 +91,7 @@ export class InspectManager {
   /** Wraps the visualization control (JSON) server to intercept channel creation. */
   wrapVisControlServer(delegate: YjsChannelServer<string>): YjsChannelServer<string> {
     return {
-      onConnect: (channel: YjsChannel<string, unknown>) => {
+      onConnect: <TStored>(channel: YjsChannel<string, TStored>) => {
         this.registerChannel(
           channel,
           'json',
@@ -111,7 +111,7 @@ export class InspectManager {
    */
   wrapVisDataServer(delegate: YjsChannelServer<JavaByteBuffer>): YjsChannelServer<JavaByteBuffer> {
     return {
-      onConnect: (channel: YjsChannel<JavaByteBuffer, unknown>) => {
+      onConnect: <TStored>(channel: YjsChannel<JavaByteBuffer, TStored>) => {
         this.registerChannel(
           channel,
           'data',
@@ -131,8 +131,8 @@ export class InspectManager {
     new YjsConnection(ws, this.inspectDoc)
   }
 
-  private registerChannel<TMessage, TStored extends string | Uint8Array>(
-    channel: YjsChannel<TMessage, unknown>,
+  private registerChannel<TMessage, TStored extends string | Uint8Array, TChannelStored = unknown>(
+    channel: YjsChannel<TMessage, TChannelStored>,
     type: 'json' | 'data',
     toLog: ToLog<TMessage, TStored>,
     fromCmd: FromCmd<TMessage, TStored>,
@@ -222,9 +222,13 @@ export class InspectManager {
   }
 
   /** Forwards commands from the inspect client to the real channel as outgoing messages. */
-  private setupCommandForwarding<TMessage, TStored extends string | Uint8Array>(
+  private setupCommandForwarding<
+    TMessage,
+    TStored extends string | Uint8Array,
+    TChannelStored = unknown,
+  >(
     channelId: string,
-    realChannel: YjsChannel<TMessage, unknown>,
+    realChannel: YjsChannel<TMessage, TChannelStored>,
     fromCmd: FromCmd<TMessage, TStored>,
   ): () => void {
     return this.observeAndConsume<TStored>(`snd:${channelId}`, (value) => {
@@ -237,9 +241,13 @@ export class InspectManager {
   }
 
   /** Forwards commands from the inspect client to the real channel as incoming messages. */
-  private setupReceiveForwarding<TMessage, TStored extends string | Uint8Array>(
+  private setupReceiveForwarding<
+    TMessage,
+    TStored extends string | Uint8Array,
+    TChannelStored = unknown,
+  >(
     channelId: string,
-    realChannel: YjsChannel<TMessage, unknown>,
+    realChannel: YjsChannel<TMessage, TChannelStored>,
     fromCmd: FromCmd<TMessage, TStored>,
   ): () => void {
     return this.observeAndConsume<TStored>(`rcv:${channelId}`, (value) => {

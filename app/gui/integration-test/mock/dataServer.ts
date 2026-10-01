@@ -32,8 +32,13 @@ import { uuidToBits } from 'ydoc-shared/uuid'
 
 const sha3 = createSHA3(224)
 
-function pathSegments(path: Path) {
-  return Array.from({ length: path.segmentsLength() }, (_, i) => path.segments(i))
+function pathSegments(path: Path): string[] {
+  // `path.segments(i)` is typed nullable by the generated flatbuffers API (it returns `null` only
+  // for a corrupt/missing string-table entry); drop any such segment rather than widen `readFile`
+  // to accept `null`.
+  return Array.from({ length: path.segmentsLength() }, (_, i) => path.segments(i)).filter(
+    (segment): segment is string => segment != null,
+  )
 }
 
 function createError(builder: Builder, code: LanguageServerErrorCode, message: string) {
@@ -106,7 +111,7 @@ export function mockDataWSHandler(
           response = createError(builder, LanguageServerErrorCode.NotFile, 'Invalid Path')
           break
         }
-        let segments: (string | null)[]
+        let segments: string[]
         try {
           segments = pathSegments(path)
         } catch {

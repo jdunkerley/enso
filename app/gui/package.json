@@ -23,7 +23,7 @@
   ],
   "scripts": {
     "generate-icons": "node scripts/generateIconMetadata.mjs",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build-cloud": "cross-env ENSO_IDE_CLOUD_BUILD=true corepack pnpm run build",
     "preview": "vite preview",
