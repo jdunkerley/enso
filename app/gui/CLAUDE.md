@@ -63,7 +63,9 @@ adding an entry. React files may import `$/…` freely.
 - `src/utils/` — general helpers (`LocalStorage`, `LruCache`, `event`,
   `inputBindings`, `download`, `mimeTypes`, `datalinkValidator`, …);
   `src/utils/data/` for small data-structure helpers; `src/utils/style/` for
-  Tailwind class composition (`tailwindVariants`, `tailwindMerge`).
+  Tailwind class composition (`tailwindVariants`, `tailwindMerge`);
+  `src/utils/testing/` for test-only helpers (`mountWithProviders`, the Vue
+  component-test harness).
 - `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
   component of that name and its Vue port (`Button`, `Dialog`, `Inputs`,
   `ProfilePicture`, `Text`), plus other framework-free component constants.

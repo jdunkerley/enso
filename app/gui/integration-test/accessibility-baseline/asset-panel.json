@@ -1,0 +1,37 @@
+[
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(5)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(7)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": ".SelectableTab[aria-label=\"Documentation\"][role=\"tab\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Activity\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Description\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Properties\"]"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
+    "target": "button[aria-label=\"Versions\"]"
+  }
+]
