@@ -1,6 +1,7 @@
 /** @file Shortcuts for the dashboard application. */
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import * as inputBindings from '$/utils/inputBindings'
+import type { TextId } from 'enso-common/src/text'
 import * as detect from 'enso-common/src/utilities/detect'
 
 /** The type of the keybind and mousebind namespace for the dashboard. */
@@ -14,6 +15,11 @@ export type DashboardBindingCategory = (typeof CATEGORIES)[number]
 
 /** The nameof a dashboard binding */
 export type DashboardBindingKey = keyof typeof BINDINGS
+
+/** The text id of the name of a binding's action (`<action>Shortcut`). */
+export function actionToTextId(action: DashboardBindingKey): TextId {
+  return `${action}Shortcut`
+}
 
 /** Create a keybind and mousebind namespace. */
 export function createBindings() {

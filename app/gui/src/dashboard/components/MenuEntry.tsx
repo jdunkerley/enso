@@ -10,42 +10,21 @@ import { useVisualTooltip } from '#/components/VisualTooltip'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import * as inputBindingsProvider from '#/providers/InputBindingsProvider'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
+import { MENU_ENTRY_VARIANTS } from '$/components/MenuEntry/variants'
 import type { PaywallFeatureName } from '$/composables/paywall'
-import type * as inputBindings from '$/configurations/inputBindings'
+import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import { useText } from '$/providers/react'
 import { twMerge } from '$/utils/style/tailwindMerge'
-import * as tailwindVariants from '$/utils/style/tailwindVariants'
+import type * as tailwindVariants from '$/utils/style/tailwindVariants'
 import type * as text from 'enso-common/src/text'
 import * as detect from 'enso-common/src/utilities/detect'
 import * as React from 'react'
-
-const MENU_ENTRY_VARIANTS = tailwindVariants.tv({
-  base: 'flex h-row grow place-content-between items-center rounded-inherit p-menu-entry text-left group-disabled:opacity-30 group-enabled:active',
-  variants: {
-    variant: {
-      // eslint-disable-next-line @typescript-eslint/naming-convention
-      'context-menu': 'px-context-menu-entry-x',
-    },
-    hasHoverBackground: {
-      true: 'group-enabled:hover:bg-hover-bg',
-    },
-  },
-  defaultVariants: {
-    hasHoverBackground: true,
-  },
-})
-
-/** Get {@link text.TextId} for given shortcut action. */
-// eslint-disable-next-line react-refresh/only-export-components
-export function actionToTextId(action: inputBindings.DashboardBindingKey): text.TextId {
-  return `${action}Shortcut`
-}
 
 /** Props for a {@link MenuEntry}. */
 export interface MenuEntryProps extends tailwindVariants.VariantProps<typeof MENU_ENTRY_VARIANTS> {
   readonly icon?: SvgUseIcon | undefined
   readonly picture?: JSX.Element
-  readonly action: inputBindings.DashboardBindingKey
+  readonly action: DashboardBindingKey
   /** Overrides the text for the menu entry. */
   readonly label?: string | undefined
   readonly truncateLabel?: boolean | undefined
