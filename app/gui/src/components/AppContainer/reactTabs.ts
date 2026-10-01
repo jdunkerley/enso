@@ -4,7 +4,7 @@ import { ProjectExecutionsCalendar as ReactProjectExecutionsCalendar } from '#/l
 import { ProjectSessions as ReactProjectSessions } from '#/layouts/AssetPanel/components/ProjectSessions'
 import { Drive as ReactDrive } from '#/layouts/Drive'
 import ReactSettings from '#/layouts/Settings'
-import { suspendedReactComponent } from '@/util/react'
+import { suspendedReactComponent } from '$/utils/react'
 
 export const Drive = suspendedReactComponent(ReactDrive)
 export const Settings = suspendedReactComponent(ReactSettings)

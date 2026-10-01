@@ -48,7 +48,7 @@ const RESTRICTED_IMPORT_PATHS = [
   {
     name: 'veaury',
     importNames: ['applyReactInVue', 'applyPureReactInVue'],
-    message: 'Use `reactComponent` in @/util/react',
+    message: 'Use `reactComponent` in $/utils/react',
   },
 ]
 

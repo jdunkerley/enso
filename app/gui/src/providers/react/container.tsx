@@ -5,7 +5,7 @@ import {
   useRightPanelData as useRightPanelDataVue,
   type RightPanelData,
 } from '$/providers/rightPanel'
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import type { Backend, DirectoryId } from 'enso-common/src/services/Backend'
 import * as react from 'react'
 import { toRef } from 'vue'

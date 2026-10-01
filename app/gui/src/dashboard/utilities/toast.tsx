@@ -11,7 +11,7 @@ import {
   type ToastOptions,
   type ToastType,
 } from '$/providers/toasts'
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import type { ReactNode } from 'react'
 import type { Component } from 'vue'
 
