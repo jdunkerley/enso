@@ -6,8 +6,11 @@ import { InfoMenu } from '#/layouts/InfoMenu'
 import { useText } from '$/providers/react'
 import { memo } from 'react'
 
-/** A toolbar containing chat and the user menu. */
-function InfoBar() {
+/**
+ * A toolbar containing chat and the user menu. Exported unmemoized for `reactComponent`, which
+ * mounts it on the Vue authentication pages (`$/cloud/auth/AuthenticationPage.vue`).
+ */
+export function InfoBar() {
   const { getText } = useText()
 
   return (
