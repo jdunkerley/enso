@@ -236,7 +236,7 @@ const shouldCollapseTags = computed(() => {
           <Button icon="compare">{{ getText('seeChanges') }}</Button>
         </template>
       </VersionDialog>
-      <DropdownMenu>
+      <DropdownMenu placement="bottom" :offset="8">
         <template #trigger>
           <Button icon="chevron_down" iconPosition="end" variant="outline">
             <template v-if="!isProject" #default>{{ getText('actions') }}</template>

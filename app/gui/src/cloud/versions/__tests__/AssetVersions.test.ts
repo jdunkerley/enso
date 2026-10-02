@@ -324,7 +324,8 @@ describe('tags', () => {
     await user.click(addTag)
     await flushPromises()
     const input = document.querySelector<HTMLInputElement>('input[aria-label="Add tag"]')!
-    expect(document.activeElement).toBe(input)
+    // Focused after a short delay, once the popover's own focus handling has settled.
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
     expect(backend.listAssetVersionTags).toHaveBeenCalledTimes(2)
     // Case-insensitive, as react-aria's filter was.
     await user.keyboard('NIGHT')

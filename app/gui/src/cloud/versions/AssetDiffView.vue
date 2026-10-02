@@ -47,8 +47,12 @@ const MONACO_THEME = EditorView.theme({
     fontSize: '14px',
     lineHeight: '19px',
   },
+  '.cm-content': { padding: '0' },
+  // Monaco's line highlight starts where the text does.
+  '.cm-line': { padding: '0 2px 0 0' },
   '.cm-gutters': { backgroundColor: 'transparent', border: 'none', color: '#237893' },
-  '.cm-lineNumbers .cm-gutterElement': { padding: '0 16px 0 8px' },
+  // Where Monaco puts its line numbers and text (measured on screenshots of both).
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 33px' },
   '&.cm-merge-a .cm-changedLine': { backgroundColor: 'rgba(255, 0, 0, 0.2)' },
   '&.cm-merge-b .cm-changedLine': { backgroundColor: 'rgba(155, 185, 85, 0.2)' },
   '&.cm-merge-a .cm-changedText': { background: '#ff000033' },
