@@ -14,12 +14,11 @@ import SettingsSection from './Section'
 export interface SettingsTabProps {
   readonly context: SettingsContext
   readonly data: SettingsTabData
-  readonly onInteracted: () => void
 }
 
-/** Styled content of a settings tab. */
+/** Styled content of a React settings tab (see `ReactSettingsTab`). */
 export default function SettingsTab(props: SettingsTabProps) {
-  const { context, data, onInteracted } = props
+  const { context, data } = props
   const { sections } = data
   const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
   const paywallFeature =
@@ -47,30 +46,18 @@ export default function SettingsTab(props: SettingsTabProps) {
     return [resultColumns, resultClasses]
   }, [sections])
 
-  const contentProps = {
-    onMouseDown: onInteracted,
-    onPointerDown: onInteracted,
-    onFocus: onInteracted,
-  }
-
   if (paywallFeature) {
     return <SettingsPaywall feature={paywallFeature} />
   }
 
   const content =
     columns.length === 1 ?
-      <div
-        className={twMerge('flex max-w-[512px] flex-none grow flex-col gap-8', classes[0])}
-        {...contentProps}
-      >
+      <div className={twMerge('flex max-w-[512px] flex-none grow flex-col gap-8', classes[0])}>
         {sections.map((section) => (
           <SettingsSection key={section.nameId} context={context} data={section} />
         ))}
       </div>
-    : <div
-        className="grid min-h-full max-w-[1024px] flex-none grow grid-cols-1 gap-8 lg:h-auto lg:grid-cols-2"
-        {...contentProps}
-      >
+    : <div className="grid min-h-full max-w-[1024px] flex-none grow grid-cols-1 gap-8 lg:h-auto lg:grid-cols-2">
         {columns.map((sectionsInColumn, i) => (
           <div key={i} className={twMerge('flex h-fit flex-1 flex-col gap-8', classes[i])}>
             {sectionsInColumn.map((section) => (

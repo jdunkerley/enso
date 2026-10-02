@@ -1,6 +1,5 @@
 /** @file Rendering for an {@link SettingsInputData}. */
 import type { FieldPath, TSchema } from '#/components/Form'
-import { ComboBox } from '#/components/Inputs/ComboBox'
 import { useText } from '$/providers/react'
 import type { HTMLInputTypeAttribute } from 'react'
 import {
@@ -28,39 +27,18 @@ export default function SettingsInput<T extends Record<keyof T, string>>(
   const isEditable = typeof editable === 'function' ? editable(context) : (editable ?? true)
   const hidden = typeof hiddenRaw === 'function' ? hiddenRaw(context) : (hiddenRaw ?? false)
 
-  switch (data.type) {
-    case 'comboBox': {
-      const extraProps =
-        typeof data.comboBoxProps === 'function' ? data.comboBoxProps(context) : data.comboBoxProps
-      return (
-        <ComboBox
-          name={name}
-          label={getText(nameId)}
-          {...(descriptionId != null && { description: getText(descriptionId) })}
-          {...extraProps}
-        >
-          {extraProps.children ?? String}
-        </ComboBox>
-      )
-    }
-    case 'email':
-    case 'password':
-    case 'text':
-    case undefined: {
-      const Input = INPUT_TYPE_MAP[data.type ?? 'text']
+  const Input = INPUT_TYPE_MAP[data.type ?? 'text']
 
-      return (
-        <Input
-          readOnly={!isEditable}
-          label={getText(nameId)}
-          name={name}
-          hidden={hidden}
-          autoComplete={autoComplete}
-          {...(descriptionId != null && { description: getText(descriptionId) })}
-        />
-      )
-    }
-  }
+  return (
+    <Input
+      readOnly={!isEditable}
+      label={getText(nameId)}
+      name={name}
+      hidden={hidden}
+      autoComplete={autoComplete}
+      {...(descriptionId != null && { description: getText(descriptionId) })}
+    />
+  )
 }
 
 const INPUT_TYPE_MAP: Record<

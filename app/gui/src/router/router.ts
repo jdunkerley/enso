@@ -2,6 +2,7 @@ import { DASHBOARD_PATH, PAYMENTS_SUCCESS_PATH, SUBSCRIBE_PATH } from '$/appUtil
 import { useAuth } from '$/providers/auth'
 import { useConfig } from '$/providers/config'
 import { flagsStore } from '$/providers/featureFlags'
+import { loadSettingsContributions } from '$/providers/settingsContributions'
 import {
   maybeRedirectToProject,
   maybeRedirectToTab,
@@ -11,7 +12,7 @@ import {
 import { withDataLoader } from '$/router/dataLoader'
 import { PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
-import { reactComponent, suspendedReactComponent } from '@/util/react'
+import { reactComponent } from '@/util/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const UNAVAILABLE_PATH = '/UNAVAILABLE'
@@ -57,8 +58,11 @@ const routes = [
               {
                 name: 'settings',
                 path: 'settings',
+                // The cloud's sections of the Account tab load with the page.
                 component: () =>
-                  import('#/layouts/Settings').then((mod) => suspendedReactComponent(mod.Settings)),
+                  Promise.all([import('#/layouts/Settings'), loadSettingsContributions()]).then(
+                    ([mod]) => mod.default,
+                  ),
               },
               {
                 name: 'ensoPath',

@@ -1,22 +1,8 @@
 /** @file A styled input for settings pages. */
-import { Form, type FieldPath, type TSchema } from '#/components/Form'
+import type { FieldPath, TSchema } from '#/components/Form'
 import { Input, type InputProps } from '#/components/Inputs/Input'
 import { Password } from '#/components/Inputs/Password'
-import { TEXT_STYLE } from '$/components/Text/variants'
-import { tv } from '$/utils/style/tailwindVariants'
-
-const SETTINGS_FIELD_STYLES = tv({
-  extend: Form.FIELD_STYLES,
-  slots: {
-    base: 'flex-row flex-wrap',
-    labelContainer: 'flex min-h-row items-center gap-1.5 w-full',
-    label: TEXT_STYLE({
-      className: 'flex justify-center self-start w-40 h-10 shrink-0',
-      variant: 'body',
-    }),
-    error: 'ml-[180px]',
-  },
-})
+import { SETTINGS_FIELD_STYLES } from '$/components/Form/variants'
 
 /** Props for a {@link SettingsAriaInput}. */
 export interface SettingsAriaInputProps<
