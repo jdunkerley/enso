@@ -1,34 +1,16 @@
 /**
  * @file The React provider for keyboard and mouse shortcuts, along with hooks to use the provider
- * via the shared React context.
+ * via the shared React context. The bindings themselves are the window's
+ * (`$/providers/dashboardInputBindings`), which the Vue settings page edits too.
  */
 import * as React from 'react'
 
 import * as inputBindingsModule from '$/configurations/inputBindings'
-import { useLocalStorage } from '$/providers/react'
-import LocalStorage from '$/utils/LocalStorage'
-import * as object from 'enso-common/src/utilities/data/object'
-import { z } from 'zod'
-
-declare module '$/utils/LocalStorage' {
-  /** */
-  interface LocalStorageData {
-    readonly inputBindings: Readonly<Record<string, readonly string[]>>
-  }
-}
-
-LocalStorage.registerKey('inputBindings', {
-  schema: z.record(z.string().array().readonly()).transform((value) =>
-    Object.fromEntries(
-      Object.entries<unknown>({ ...value }).flatMap((kv) => {
-        const [k, v] = kv
-        return Array.isArray(v) && v.every((item): item is string => typeof item === 'string') ?
-            [[k, v]]
-          : []
-      }),
-    ),
-  ),
-})
+import {
+  getDashboardInputBindings,
+  type DashboardInputBindings,
+} from '$/providers/dashboardInputBindings'
+import { useVueValue } from '$/providers/react/common'
 
 /** State contained in a `ShortcutsContext`. */
 export type InputBindingsContextType = inputBindingsModule.DashboardBindingNamespace
@@ -39,66 +21,18 @@ const InputBindingsContext = React.createContext<InputBindingsContextType>(
 
 /** Props for a {@link InputBindingsProvider}. */
 export interface InputBindingsProviderProps extends Readonly<React.PropsWithChildren> {
-  readonly inputBindings?: inputBindingsModule.DashboardBindingNamespace
+  readonly inputBindings?: DashboardInputBindings
 }
 
 /** A React Provider that lets components get the input bindings. */
 export default function InputBindingsProvider(props: InputBindingsProviderProps) {
   const { children } = props
 
-  const localStorage = useLocalStorage()
-
-  const [inputBindings] = React.useState(() => {
-    const inputBindingsRaw = inputBindingsModule.createBindings()
-
-    const savedInputBindings = localStorage.get('inputBindings')
-
-    if (savedInputBindings != null) {
-      const filteredInputBindings = object.mapEntries(
-        inputBindingsRaw.metadata,
-        (k) => savedInputBindings[k],
-      )
-      for (const [bindingKey, newBindings] of object.unsafeEntries(filteredInputBindings)) {
-        for (const oldBinding of inputBindingsRaw.metadata[bindingKey].bindings) {
-          inputBindingsRaw.delete(bindingKey, oldBinding)
-        }
-        for (const newBinding of newBindings ?? []) {
-          inputBindingsRaw.add(bindingKey, newBinding)
-        }
-      }
-    }
-
-    const updateLocalStorage = () => {
-      localStorage.set(
-        'inputBindings',
-        Object.fromEntries(
-          Object.entries(inputBindingsRaw.metadata).map((kv) => {
-            const [k, v] = kv
-            return [k, v.bindings]
-          }),
-        ),
-      )
-    }
-    return {
-      ...inputBindingsRaw,
-      reset: (bindingKey: inputBindingsModule.DashboardBindingKey) => {
-        inputBindingsRaw.reset(bindingKey)
-        updateLocalStorage()
-      },
-      add: (bindingKey: inputBindingsModule.DashboardBindingKey, binding: string) => {
-        inputBindingsRaw.add(bindingKey, binding)
-        updateLocalStorage()
-      },
-      delete: (bindingKey: inputBindingsModule.DashboardBindingKey, binding: string) => {
-        inputBindingsRaw.delete(bindingKey, binding)
-        updateLocalStorage()
-      },
-      /** Transparently pass through `metadata`. */
-      get metadata() {
-        return inputBindingsRaw.metadata
-      },
-    }
-  })
+  const [inputBindings] = React.useState(() => props.inputBindings ?? getDashboardInputBindings())
+  // A change (from the Vue settings page) gives the consumers a new value, so that they re-read the
+  // bindings: the command palette's shortcuts, the menus' and the handlers.
+  const revision = useVueValue(React.useCallback(() => inputBindings.revision, [inputBindings]))
+  const value = React.useMemo(() => ({ ...inputBindings, revision }), [inputBindings, revision])
 
   React.useEffect(() => {
     inputBindings.register()
@@ -108,9 +42,7 @@ export default function InputBindingsProvider(props: InputBindingsProviderProps)
     }
   }, [inputBindings])
 
-  return (
-    <InputBindingsContext.Provider value={inputBindings}>{children}</InputBindingsContext.Provider>
-  )
+  return <InputBindingsContext.Provider value={value}>{children}</InputBindingsContext.Provider>
 }
 
 /**
