@@ -1180,8 +1180,10 @@ rulings above: provisionally accepted, for the maintainer to review.
      chevron button, which is its first control, so hovering anywhere on the
      field hovered the button; it now shows hover only for a real pointer, as
      react-aria's `data-hovered` did. It is named "Show suggestions", as
-     react-aria named it. `toOptionText` gives an option a text other than the
-     one typing filters by (React's `children` returning a string).
+     react-aria named it; the list is named by the field's label, and the reset
+     button is in the tab order again (Reka takes it out). `toOptionText` gives
+     an option a text other than the one typing filters by (React's `children`
+     returning a string).
    - `OTPInput`: an `<input>`'s intrinsic width kept the six boxes from sharing
      the row, and three of them were clipped.
    - `Popover` keeps 12px from the window's edges, react-aria's
@@ -1206,6 +1208,9 @@ rulings above: provisionally accepted, for the maintainer to review.
     of the personal tabs was compared with the base branch in the running app
     (25 screenshots, accessibility trees and DOM): the differences left are the
     drive's timestamps behind the page, antialiasing, the deliberate ones above,
-    and two of the primitives': the one-time code is six labelled inputs rather
-    than one (#79, ruling 10), and a combo box opened from the keyboard keeps
-    the caret where it was rather than at the end.
+    and three of the primitives': the one-time code is six labelled inputs
+    rather than one (#79, ruling 10); a combo box opened from the keyboard keeps
+    the caret where it was rather than at the end; and while a combo box's list
+    is open, react-aria hid the rest of the page from assistive technology
+    (`aria-hidden` outside it), which Reka's combo box does not. The tab order
+    through each personal tab is the React page's.

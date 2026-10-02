@@ -195,10 +195,12 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
             </div>
           </div>
         </div>
+        <!-- In the tab order, as react-aria's was; Reka takes it out. -->
         <ComboboxCancel v-if="!noResetButton" asChild>
           <Button
             variant="icon"
             icon="close"
+            tabindex="0"
             :aria-label="getText('reset')"
             :class="styles.resetButton()"
           />
@@ -214,6 +216,7 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
           align="start"
           :sideOffset="8"
           :collisionPadding="12"
+          :aria-label="accessibleName"
           :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} flex max-h-[var(--reka-combobox-content-available-height)] flex-col [--trigger-width:calc(var(--reka-combobox-trigger-width)_-_48px)]`"
         >
           <ComboboxViewport
