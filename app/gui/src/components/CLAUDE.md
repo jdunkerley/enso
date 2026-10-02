@@ -27,6 +27,11 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `Link/`          | `Link` (a coloured link with an icon); `useClientNavigation` (`clientNavigation.ts`)            |
 | others           | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
+Also, from the settings page's port (#86): `CopyBlock/` (text that copies
+itself; the copy toast is `Button/copy.ts`'s `useCopy`, shared with
+`CopyButton`), `KeyboardShortcut/`, `ProfilePicture/` and `QrCode/` (drawn as
+`qrcode.react` drew it, with `uqr`'s port of the same encoder).
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:

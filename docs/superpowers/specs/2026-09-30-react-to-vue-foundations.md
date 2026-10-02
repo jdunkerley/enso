@@ -1110,3 +1110,102 @@ provisionally accepted, for the maintainer to review.
     link and the Login button's content, which carried react-aria's generated
     ids); the pixels are the same, so the baseline keeps them rather than
     claiming a fix. The PR takes `CI: No changelog needed`.
+
+## Rulings from #86 (settings: the shell and the personal tabs, 2026-10-02)
+
+#86 ported the settings page's shell (sidebar, search, layout, the `SettingsTab`
+query parameter) and its personal tabs: Account (with two-factor
+authentication), Local, Appearance and Keyboard shortcuts. Delegated like the
+rulings above: provisionally accepted, for the maintainer to review.
+
+1. **One PR, not split.** The ticket allowed a split (shell, Local and Account
+   first; 2FA and shortcuts later). Every split point left a React piece inside
+   a Vue tab: 2FA is a section of the Account tab, and the capture modal shares
+   the keyboard tab's bindings. The work is in reviewable commits instead: the
+   bindings store, the shell and its tabs, the cloud's sections, and the
+   primitives' fixes.
+2. **The declarative model survives,** framework-free, in
+   `src/configurations/settings.ts`: tabs, sections and entries, the context
+   their predicates receive, and the search. One search spans the Vue and the
+   React tabs, so search results stay as they were. Entries name a Vue component
+   instead of JSX; a component reads the page's context with
+   `useSettingsContext` (`$/providers/settingsContext`, a `createContextStore`)
+   rather than as props, so a component that needs none does not get one as a
+   stray attribute. The Appearance tab (two switches) was ported too: it was the
+   last personal tab, and a third framework boundary for 60 lines was not worth
+   keeping.
+3. **The Account tab is the cloud's,** under decision 6b. Every one of its
+   sections needs Enso Cloud or Cognito. They are in `src/cloud/account/`
+   (profile and password forms as data, the account's deletion, the profile
+   picture) and `src/cloud/auth/` (two-factor authentication), and reach the
+   core through the second registry, `contributeSettingsSections(tab, loader)`
+   (`$/providers/settingsContributions`). A loader keeps them out of the initial
+   chunk; the settings route waits for it, so the tab never renders half-filled.
+   `account` joins `CLOUD_AREAS`. In a build without the cloud the Account tab
+   is empty.
+4. **The organization tabs stay React, inside the Vue page**, through one
+   `ReactSettingsTab` (`reactComponent`), with a TODO for #87 and #88: their
+   React shell (`Tab`, `Section`, `Entry`, `FormEntry`, `Input`, `AriaInput`,
+   `CustomEntry`, `Paywall`) and their data stay too. The React context lost the
+   members only the personal tabs used.
+5. **One set of dashboard bindings per window.** The bindings lived in the React
+   `InputBindingsProvider`'s state, out of Vue's reach. They moved, unchanged,
+   to `$/providers/dashboardInputBindings`: the same `localStorage` key
+   (`inputBindings`), the same format, and the same loading. Tests load what the
+   React provider saved. One quirk is kept for #170: an action missing from the
+   saved record loads with no bindings (only an action added in a later release
+   can be missing). A change bumps a counter that Vue tracks and the React
+   provider watches, so React's consumers re-read the bindings: the command
+   palette shows a new shortcut at once.
+6. **Rebinding works now; it did not on `develop`.** Comparing the running app
+   found that the React capture modal never received a key: its form had the
+   focus, yet `Ctrl+Shift+K`, `q` or `Escape` left it at "No shortcut entered"
+   (Playwright, on the base branch). The Vue modal takes the keys at once. It is
+   a bug fix, so the PR takes `CI: No changelog needed` under the repository's
+   rule.
+7. **`qrcode.react` is replaced by `uqr` 0.1.3** (exact pin, MIT, no
+   dependencies), a port of the encoder `qrcode.react` bundles (Nayuki's QR Code
+   generator). For six links, including the authenticator links Cognito issues,
+   the two give identical modules; a test pins one. `QrCode.vue` draws them as
+   `QRCodeCanvas` did. `input-otp` goes too, with the last React one-time-code
+   input (#79, ruling 10).
+8. **Fixes to the primitives, found by comparing screenshots.**
+   - `Switch`, `Checkbox`, `Radio` and the `Selector`'s options rendered
+     `data-selected="false"`, which the react-aria Tailwind plugin's `selected:`
+     matches (it tests presence): an unchecked switch looked checked. They now
+     omit the attribute, as react-aria does.
+   - `ComboBox`: its list is as wide as the field and starts under it, is no
+     taller than the space below (12px short of the window's edge), and scrolls
+     inside, opening at the selected item. The field's `<label>` wraps the
+     chevron button, which is its first control, so hovering anywhere on the
+     field hovered the button; it now shows hover only for a real pointer, as
+     react-aria's `data-hovered` did. It is named "Show suggestions", as
+     react-aria named it. `toOptionText` gives an option a text other than the
+     one typing filters by (React's `children` returning a string).
+   - `OTPInput`: an `<input>`'s intrinsic width kept the six boxes from sharing
+     the row, and three of them were clipped.
+   - `Popover` keeps 12px from the window's edges, react-aria's
+     `containerPadding`.
+   - `CopyButton`'s copy-and-toast moved to `Button/copy.ts` (`useCopy`), which
+     the new `CopyBlock` shares.
+9. **Small things that change nothing visible.**
+   - The current-password field's `autocomplete` was `current-assword`. It is
+     `current-password` now, and the axe baseline's `autocomplete-valid` entry
+     for it is gone.
+   - The React tab content's `onInteracted` set the tab to its own value: a
+     no-op. It was dropped.
+   - The time-zone field's `hidden` predicate (free and solo plans) never
+     applied: the React combo box ignored it. It was dropped, and the field
+     shows as before.
+   - Names: `SettingsPage.vue` and `SettingsSearchBar.vue`
+     (`vue/multi-word-component-names`). `reactTabs.ts`' unused `Settings`
+     export is gone.
+   - `KeyboardShortcut.vue` is byte-identical to #174's, so that either PR can
+     land first.
+10. **What a user notices: rebinding works** (ruling 6). Otherwise every state
+    of the personal tabs was compared with the base branch in the running app
+    (25 screenshots, accessibility trees and DOM): the differences left are the
+    drive's timestamps behind the page, antialiasing, the deliberate ones above,
+    and two of the primitives': the one-time code is six labelled inputs rather
+    than one (#79, ruling 10), and a combo box opened from the keyboard keeps
+    the caret where it was rather than at the end.

@@ -71,16 +71,18 @@ adding an entry. React files may import `$/…` freely.
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
   constants. The Vue primitives themselves live beside them; see
   `src/components/CLAUDE.md`.
-- `src/configurations/` — static configuration: the dashboard's input bindings
-  and the settings tabs.
+- `src/configurations/` — static configuration: the dashboard's input bindings,
+  the settings tabs, and the settings page's model (`settings.ts`: tabs,
+  sections and entries, their context, and the search over them).
 - `src/cloud/` — code that only makes sense against the Enso Cloud: at the top,
   framework-free logic (service-credential recipes, organization-invite email
   parsing, the Cognito password rule, permission classes); in
   `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
-  and password pages). Keep cloud-only code here rather than in `src/utils/`, so
-  a build without the cloud can drop one folder. The core reaches the areas only
-  through `registerCloud` (`src/cloud/index.ts`), which `entrypoint.ts` calls;
-  see `src/cloud/CLAUDE.md`.
+  and password pages; `account/`: the Account settings tab's sections). Keep
+  cloud-only code here rather than in `src/utils/`, so a build without the cloud
+  can drop one folder. The core reaches the areas only through `registerCloud`
+  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  `src/cloud/CLAUDE.md`.
 
 ## Entry points
 
