@@ -128,6 +128,11 @@
   an offline user, and explains that cloud account settings such as your
   password, two-factor authentication and organization are not available. The
   user menu shows the same offline user, and the cloud-only Usage tab is hidden.
+- [Opening a project switches to it straight away][174], with a loading spinner
+  in the graph area until the project is ready, just as when Enso reopens the
+  project you had open last time. Before, the graph area stayed blank until the
+  project had opened, with only the small spinner on the project's tab to show
+  progress. If the project fails to open, the reason is shown in its place.
 
 #### Enso Language & Runtime
 
@@ -261,6 +266,7 @@
 [133]: https://github.com/jdunkerley/enso/pull/133
 [135]: https://github.com/jdunkerley/enso/pull/135
 [186]: https://github.com/jdunkerley/enso/pull/186
+[174]: https://github.com/jdunkerley/enso/pull/174
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

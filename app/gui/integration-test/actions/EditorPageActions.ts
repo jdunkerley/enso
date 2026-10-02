@@ -25,10 +25,14 @@ export default class EditorPageActions<Context = object> extends PageActions<Con
     return goToPageActions(this.step.bind(this))
   }
 
-  /** Wait for the editor to load. */
+  /**
+   * Wait for the editor to load: the project view shows from the moment the project starts
+   * opening (with a loading spinner), so wait for the graph editor that replaces the spinner.
+   */
   waitForEditorToLoad(): EditorPageActions<Context> {
     return this.step('Wait for the project view to load', async () => {
       await this.page.waitForSelector('.ProjectView', { state: 'visible' })
+      await expect(locate.graphEditor(this.page)).toBeVisible()
     })
   }
 

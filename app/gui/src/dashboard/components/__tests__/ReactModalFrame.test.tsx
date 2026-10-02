@@ -3,7 +3,7 @@
  * `onConfirm`/`onCancel` as Vue props, and they must arrive as React props through the
  * `reactComponent` bridge, which `ReactModalFrame` then hands to the dialog.
  */
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, expect, test, vi } from 'vitest'
 import { defineComponent, h } from 'vue'

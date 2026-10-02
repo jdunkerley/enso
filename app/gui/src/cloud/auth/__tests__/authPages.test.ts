@@ -41,9 +41,12 @@ vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return { useBackends: () => mockBackends() }
 })
-// The info bar is React, and the modal host renders the React modals: neither is under test.
-vi.mock('#/layouts/InfoBar', () => ({ InfoBar: () => null }))
-vi.mock('@/util/react', () => ({ reactComponent: () => ({ render: () => null }) }))
+// The info bar has its own tests, and the modal host renders the React modals: neither is under
+// test.
+vi.mock('$/components/InfoBar/InfoBar.vue', () => ({
+  __esModule: true,
+  default: { render: () => null },
+}))
 vi.mock('$/components/ModalHost/ModalHost.vue', () => ({
   __esModule: true,
   default: { render: () => null },

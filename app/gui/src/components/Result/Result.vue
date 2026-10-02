@@ -15,11 +15,8 @@ import {
 import Loader from '$/components/Spinner/Loader.vue'
 import Heading from '$/components/Text/Heading.vue'
 import Text from '$/components/Text/Text.vue'
-import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'
 import { computed } from 'vue'
-
-type ResultVariants = VariantProps<typeof RESULT_STYLES>
 
 const {
   status = 'success',
@@ -36,7 +33,12 @@ const {
   title?: string | undefined
   subtitle?: string | undefined
   icon?: IconName | false | undefined
-  centered?: ResultVariants['centered']
+  /**
+   * Spelled out, not taken from `VariantProps<typeof RESULT_STYLES>`: the SFC compiler cannot
+   * resolve that type, so it would not know the prop is a boolean, and a bare `centered` attribute
+   * would arrive as `''` (no variant) instead of `true`. `boolean` must come first for that cast.
+   */
+  centered?: boolean | 'horizontal' | 'vertical' | 'all' | 'none' | undefined
   testId?: string | undefined
   class?: string | undefined
 }>()

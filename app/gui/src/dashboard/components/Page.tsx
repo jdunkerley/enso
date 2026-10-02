@@ -1,6 +1,5 @@
 /** @file A page. */
 import { ErrorBoundary } from '#/components/ErrorBoundary'
-import InfoBar from '#/layouts/InfoBar'
 import { vueComponent } from '#/utilities/vue'
 import * as React from 'react'
 import { defineAsyncComponent } from 'vue'
@@ -11,6 +10,14 @@ import { defineAsyncComponent } from 'vue'
  */
 const ModalHost = vueComponent(
   defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue')),
+).default
+
+/**
+ * The bar with the info menu, at the top right of each page (#83). Loaded on demand, like the modal
+ * host: its popover brings Reka, and the login page is on every session's critical path.
+ */
+const InfoBar = vueComponent(
+  defineAsyncComponent(() => import('$/components/InfoBar/InfoBar.vue')),
 ).default
 
 /** Props for a {@link Page}. */
