@@ -251,6 +251,8 @@ export const REACT_SETTINGS_TAB_DATA = {
     react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.usage],
     feature: 'scheduler',
+    // Scheduled executions run in Enso Cloud: in local-only mode the tab could only offer a plan.
+    visible: ({ isAuthDisabled }) => !isAuthDisabled,
     sections: [
       {
         nameId: 'usageSettingsSection',

@@ -26,12 +26,23 @@ import ProfilePictureInput from './ProfilePictureInput.vue'
 
 /**
  * Whether the user signed in with a password, rather than through GitHub or Google: only they can
- * change it, and set up two-factor authentication.
+ * change it, and set up two-factor authentication. Never in local-only mode, which has no account
+ * and no token.
  */
-function hasPassword({ accessToken }: SettingsBaseContext) {
-  // The shape of the JWT payload is statically known.
-  const username: string | null = JSON.parse(atob(accessToken.split('.')[1]!)).username
-  return username != null ? !/^Github_|^Google_/.test(username) : false
+function hasPassword({ accessToken, isAuthDisabled }: SettingsBaseContext) {
+  if (isAuthDisabled) return false
+  const payload = accessToken.split('.')[1]
+  if (payload == null) return false
+  try {
+    // The shape of the JWT payload is statically known. It is base64url, which `atob` reads once
+    // its two URL-safe characters are put back.
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const username: string | null = JSON.parse(json).username
+    return username != null ? !/^Github_|^Google_/.test(username) : false
+  } catch {
+    // Not a JWT: the sections that need one cannot work.
+    return false
+  }
 }
 
 /** The GMT offset of a time zone, now; the local one when the description names none. */

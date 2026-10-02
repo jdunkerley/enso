@@ -36,6 +36,7 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
   const session = useFullUserSession()
   const { user, accessToken } = session
   const isCloudDataUnavailable = session.isCloudDataUnavailable ?? false
+  const isAuthDisabled = session.isAuthDisabled ?? false
   const { getText } = useText()
   const toastAndLog = useToastAndLog()
   const { data: organization = null } = useQuery(
@@ -56,6 +57,7 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       toastAndLog,
       getText,
       isCloudDataUnavailable,
+      isAuthDisabled,
     }),
     [
       accessToken,
@@ -67,6 +69,7 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       toastAndLog,
       getText,
       isCloudDataUnavailable,
+      isAuthDisabled,
     ],
   )
 
