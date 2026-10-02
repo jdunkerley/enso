@@ -229,7 +229,7 @@ overrides:
   reka-ui>@vueuse/core: ^15.0.0
   reka-ui>@vueuse/shared: ^15.0.0
 
-packageExtensionsChecksum: sha256-euNW8DyS1EFg21wmQr9izkjD2RlN6jRhMnQfGSZbqo4=
+packageExtensionsChecksum: sha256-lH+3wLcGYJ3i6paWhrIHx20/9u0qhpizjawfNno/MP0=
 
 pnpmfileChecksum: sha256-UtO9fqHFiHrcyVfxRK3T27+ItLb0V49gpeqgN3Zj4zw=
 
@@ -499,6 +499,9 @@ importers:
       '@codemirror/lint':
         specifier: ^6.9.7
         version: 6.9.7
+      '@codemirror/merge':
+        specifier: ^6.12.2
+        version: 6.12.2
       '@codemirror/search':
         specifier: ^6.7.2
         version: 6.7.2
@@ -532,9 +535,6 @@ importers:
       '@lezer/highlight':
         specifier: 'catalog:'
         version: 1.2.3
-      '@monaco-editor/react':
-        specifier: 4.6.0
-        version: 4.6.0(monaco-editor@0.48.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@noble/hashes':
         specifier: ^1.6.1
         version: 1.6.1
@@ -640,9 +640,6 @@ importers:
       modern-isomorphic-ws:
         specifier: ^1.0.5
         version: 1.0.5(@types/ws@8.5.13)(ws@8.21.3)
-      monaco-editor:
-        specifier: 0.48.0
-        version: 0.48.0
       murmurhash:
         specifier: ^2.0.1
         version: 2.0.1
@@ -1756,6 +1753,9 @@ packages:
   '@codemirror/lint@6.9.7':
     resolution: {integrity: sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg==}
 
+  '@codemirror/merge@6.12.2':
+    resolution: {integrity: sha512-V8JvyAPjHbPupqP7BeMcsdsYCbyPij74jxIbaIJDORI+VZzW44zFmon8bF+oxGWvOKhcRmkiUMXd8MxHr3YA2w==}
+
   '@codemirror/search@6.7.2':
     resolution: {integrity: sha512-gUYkYhT2+n/+VGZ+8EzE5WFkYZUZYm1VOKDudIsNqh42uRVQJ0a6Yss9sdKT3MeOYfuL1N6AZA57oza0Oyr0LA==}
 
@@ -2293,18 +2293,6 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
-
-  '@monaco-editor/loader@1.4.0':
-    resolution: {integrity: sha512-00ioBig0x642hytVspPl7DbQyaSWRaolYie/UFNjoTdvoKPzo6xrXLhTk9ixgIKcLH5b5vDOjVNiGyY+uDCUlg==}
-    peerDependencies:
-      monaco-editor: '>= 0.21.0 < 1'
-
-  '@monaco-editor/react@4.6.0':
-    resolution: {integrity: sha512-RFkU9/i7cN2bsq/iTkurMWOEErmYcY6JiQI3Jn+WeR/FGISH8JbHERjpS9oRuSOPvDMJI0Z8nJeKkbOs9sBYQw==}
-    peerDependencies:
-      monaco-editor: '>= 0.25.0 < 1'
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
-      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -6649,9 +6637,6 @@ packages:
       '@types/ws': '*'
       ws: ^8.18.0
 
-  monaco-editor@0.48.0:
-    resolution: {integrity: sha512-goSDElNqFfw7iDHMg8WDATkfcyeLTNpBHQpO8incK6p5qZt5G/1j41X0xdGzpIkGojGXM+QiRQyLjnfDVvrpwA==}
-
   moo@0.5.2:
     resolution: {integrity: sha512-iSAJLHYKnX41mKcJKjqvnAN9sf0LMDTXDEvFv+ffuRR9a1MIuXLjMNL6EsnDHSkKLTWNqQQ5uo61P4EbU4NU+Q==}
 
@@ -7756,9 +7741,6 @@ packages:
   stat-mode@1.0.0:
     resolution: {integrity: sha512-jH9EhtKIjuXZ2cWxmXS8ZP80XyC3iasQxMDV8jzhNJpfDb7VbQLVW4Wvsxz9QZvzV+G4YoSfBUVKDOyxLzi/sg==}
     engines: {node: '>= 6'}
-
-  state-local@1.0.7:
-    resolution: {integrity: sha512-HTEHMNieakEnoe33shBYcZ7NX83ACUjCu8c40iOGEZsngj9zRnkqS9j1pqQPXwobB0ZcVTk27REb7COQ0UR59w==}
 
   statuses@1.5.0:
     resolution: {integrity: sha512-OpZ3zP+jT1PI7I8nemJX4AKmAX070ZkYPVWV/AaKTJl+tXCTGyVdC1a4SL8RUQYEwk/f34ZX8UTykN68FwrqAA==}
@@ -9651,6 +9633,14 @@ snapshots:
       '@codemirror/view': 6.43.12
       crelt: 1.0.6
 
+  '@codemirror/merge@6.12.2':
+    dependencies:
+      '@codemirror/language': 6.12.4
+      '@codemirror/state': 6.7.5
+      '@codemirror/view': 6.43.12
+      '@lezer/highlight': 1.2.3
+      style-mod: 4.1.2
+
   '@codemirror/search@6.7.2':
     dependencies:
       '@codemirror/state': 6.7.5
@@ -10277,19 +10267,6 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
-
-  '@monaco-editor/loader@1.4.0(monaco-editor@0.48.0)':
-    dependencies:
-      monaco-editor: 0.48.0
-      state-local: 1.0.7
-
-  '@monaco-editor/react@4.6.0(monaco-editor@0.48.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@monaco-editor/loader': 1.4.0(monaco-editor@0.48.0)
-      '@types/react': 18.3.18
-      monaco-editor: 0.48.0
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true
@@ -15740,8 +15717,6 @@ snapshots:
       '@types/ws': 8.5.13
       ws: 8.21.3
 
-  monaco-editor@0.48.0: {}
-
   moo@0.5.2: {}
 
   mount-point@3.0.0:
@@ -17022,8 +16997,6 @@ snapshots:
   stackback@0.0.2: {}
 
   stat-mode@1.0.0: {}
-
-  state-local@1.0.7: {}
 
   statuses@1.5.0: {}
 
