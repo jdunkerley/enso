@@ -1,6 +1,6 @@
 /** @file App-wide side effects that `App.vue` sets up once. */
 import { useFeatureFlag } from '$/providers/featureFlags'
-import { isElementPartOfMonaco, isElementTextInput } from '$/utils/event'
+import { isElementTextInput } from '$/utils/event'
 import { useEventListener } from '@vueuse/core'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
 import { watchEffect } from 'vue'
@@ -34,7 +34,6 @@ export function useClearSelectionOnClick() {
     if (
       !isClick ||
       isElementTextInput(event.target) ||
-      isElementPartOfMonaco(event.target) ||
       isElementTextInput(document.activeElement)
     ) {
       return
