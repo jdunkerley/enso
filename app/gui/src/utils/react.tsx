@@ -1,6 +1,3 @@
-import { Dialog as DialogReact } from '#/components/Dialog/Dialog'
-import { Loader as LoaderReact } from '#/components/Loader'
-import { Result as ResultReact } from '#/components/Result'
 import { Suspense } from '#/components/Suspense'
 import type { Opt } from 'enso-common/src/utilities/data/opt'
 import type { ReactNode } from 'react'
@@ -42,8 +39,3 @@ export function suspendedReactComponent<Props extends object>(
     </Suspense>
   ))
 }
-
-// Common components
-export const Loader = reactComponent(LoaderReact)
-export const ResultComponent = reactComponent(ResultReact)
-export const Dialog = reactComponent(DialogReact)

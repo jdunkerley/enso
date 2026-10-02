@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import KeyboardShortcut from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
 import { CATEGORIES } from '$/configurations/inputBindings'
-import KeyboardShortcutReact from '#/pages/dashboard/components/KeyboardShortcut'
 import { isTextInputEvent } from '$/utils/event'
 import { useActionsStore, type Action } from '$/providers/actions'
 import { useModals } from '$/providers/modals'
@@ -10,11 +10,8 @@ import SvgIcon from '@/components/SvgIcon.vue'
 import { useEvent } from '@/composables/events'
 import { registerHandlers } from '@/providers/action'
 import { injectInteractionHandler } from '@/providers/interactionHandler'
-import { reactComponent } from '@/util/react'
 import { mapEntries } from 'enso-common/src/utilities/data/object'
 import { computed, ref, watchEffect } from 'vue'
-
-const KeyboardShortcut = reactComponent(KeyboardShortcutReact)
 
 const { findActions } = useActionsStore()
 const modals = useModals()

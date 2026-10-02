@@ -9,6 +9,11 @@
  * - It is modal by default, like react-aria's popovers: focus is trapped and the rest of the page
  *   is inert until it closes. `isNonModal` makes it non-modal (focus may leave, the page stays
  *   interactive), as React's `isNonModal` does.
+ * - A modal popover lays a transparent underlay over the page, as react-aria's does: a click
+ *   outside lands on it, so it closes the popover and does nothing else. Reka's own inertness
+ *   (`pointer-events: none` on `body`) is not enough: anything that sets `pointer-events` itself,
+ *   the graph editor's viewport among them, still takes the click, and the graph stops it before
+ *   it reaches the document, where Reka listens for outside clicks.
  * - It focuses itself as it opens, not its first control, as react-aria's dialogs do (Tab goes on
  *   from there); a keyboard user does not see a focus ring appear on the first entry.
  * - `@close` fires whenever it closes, like React's `onClose`.
@@ -120,6 +125,11 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
       <slot name="trigger" />
     </PopoverTrigger>
     <PopoverPortal :to="portalTarget()">
+      <div
+        v-if="open && !isNonModal"
+        class="pointer-events-auto fixed inset-0"
+        data-testid="underlay"
+      />
       <PopoverContent
         v-bind="$attrs"
         :side="sideAlign.side"

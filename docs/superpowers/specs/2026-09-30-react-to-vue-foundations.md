@@ -1017,6 +1017,185 @@ the rulings above: provisionally accepted, for the maintainer to review.
 12. **Not done, by scope:** react-aria's `RouterProvider` and `I18nProvider`
     (they go with #94) and `VersionChecker` (with its feature's port).
 
+## Rulings from #82 (React leaves in Vue hosts, 2026-10-01)
+
+#82 replaced the small React components that Vue mounted through
+`reactComponent`. Delegated like the rulings above: provisionally accepted, for
+the maintainer to review.
+
+1. **Split.** Two parts of the ticket moved elsewhere:
+   - **The devtools are #172.** `EnsoDevtoolsImpl` (666 lines) uses nearly every
+     #78/#79 primitive and needs Vue counterparts of five React hooks; it would
+     have doubled the PR for a panel that only development builds render and no
+     spec covers. The React query panel goes with it: the one `QueryClient` is
+     Vue's, and the Vue DevTools plugin already shows it, so whether
+     `@tanstack/vue-query-devtools` is wanted at all is #172's question.
+   - **`FilePathInput` goes with `JSONSchemaInput` (#92).** Its only user is the
+     React `JSONSchemaInput`, so a Vue `FilePathInput` would just move the
+     Vue-in-React crossing from `FilePathInput` into `JSONSchemaInput`: the same
+     number of bridge points.
+
+   `ProtectedLayout.vue` therefore still calls `reactComponent`, for the
+   devtools (#172) and `AgreementsModal` (#84); `CommandPalette.vue` and
+   `UpsertSecretPanel.vue` no longer do.
+
+2. **`src/project-view/` is React-free.** Its `Result`/`Loader` users and
+   `WithCurrentProject.vue` use `Result.vue` and `Loader.vue`. The bridge itself
+   (`reactComponent`, `suspendedReactComponent`), which lived in
+   `project-view/util/react.tsx` and imported `#/components/Suspense`, moved to
+   `src/utils/react.tsx` (`$/utils/react`), beside `zustand.ts`, until #93.
+
+3. **The `centered` workarounds go, and `Result.vue` gets the bare attribute
+   right.** The comments blamed React, but the cause was Vue's: a prop typed
+   through `VariantProps<…>` is a type the SFC compiler cannot resolve, so it
+   does not know the prop is a boolean, and a bare `centered` arrives as `''`,
+   which names no variant (and so drops `m-auto`). The callers now leave it out
+   (the default, `all`, is `m-auto`), and `Result.vue` spells the prop's type
+   out, `boolean` first, so that a bare `centered` means `true`; a test pins it.
+   The in-app comparison found this: the first port wrote `centered`, and the
+   "No documentation available" result moved to the top of the panel. The same
+   trap applies to any boolean variant prop typed through `VariantProps`.
+
+4. **`Dialog.vue` puts its attributes on the dialog element**
+   (`inheritAttrs: false`, `v-bind="$attrs"` on Reka's `DialogContent`), as
+   React spreads its other props onto react-aria's `Dialog`. The session
+   overlays ("Logging out", "Reconnecting session…") have no title and are named
+   by `aria-label`; Reka's renderless `DialogRoot` had dropped it.
+
+5. **The session overlays are their own component, loaded asynchronously.**
+   `SessionOverlays.vue` holds the two dialogs, and `ProtectedLayout.vue` mounts
+   it through `defineAsyncComponent`. `ProtectedLayout` is the root of every
+   route, the login page included; importing `Dialog.vue` statically put 64 KiB
+   of Reka dialog code (minified, measured) on that critical path, where React's
+   dialog had come with React itself. Now the chunk is fetched just after the
+   layout renders, long before any logout. The overlays sit outside Reka's
+   `ConfigProvider` (`ProtectedLayout` is above `AppContainer.vue`); they show a
+   spinner and a title, nothing locale-dependent, so Reka's default locale
+   changes nothing (as for the About dialog, #156 ruling 7).
+
+6. **`KeyboardShortcut.vue` is a shared primitive** in
+   `src/components/KeyboardShortcut/`: the menus and the keyboard-shortcuts
+   settings tab will use it too. It takes the shortcut string only. React's
+   `action` form reads the user-rebindable bindings from the React
+   `InputBindingsProvider`, which has no Vue counterpart until #170; it comes
+   with it. The React component stays for its three React users (the menus'
+   `MenuEntry`, the settings tab and the capture modal), as #156 kept the React
+   `ConfirmDeleteModal`.
+
+7. **`UpsertSecretForm.vue` is cloud code, in `src/cloud/credentials/`**:
+   secrets exist only in the Enso Cloud. The core `UpsertSecretPanel.vue`
+   imports it directly and says why: decision 6b's lint boundary and registries
+   do not exist yet, and a registry for one panel would be built ahead of its
+   design. A community split needs a slot for the file browser's "New secret"
+   action. React's `doCreate`/`doCancel` callbacks became a `create` event and a
+   `cancel` prop (`'close' | 'reset' | 'emit'`). The React form stays for the
+   drive's `UpsertSecretModal` and the asset panel (#92, #89).
+
+8. **Parity was checked element by element and in the running app.**
+   `vuePortParity.test.tsx` now compares the React and Vue `Result`, `Loader`
+   and `KeyboardShortcut` trees (tags, classes, text; the shortcut on macOS,
+   Windows and Linux), and `upsertSecretFormParity.test.tsx` the two secret
+   forms, allowing only the Vue `Button`'s two known differences (its
+   always-present `focus:` classes and the `display: contents` span around its
+   label). veaury's wrapper element was `display: contents` (`App.vue`), so
+   dropping it leaves the layout as it was; screenshots of each touched screen
+   taken on the base and the branch were compared pixel for pixel (see the PR).
+
+9. **No changelog entry.** Nothing changes for users, so the PR takes
+   `CI: No changelog needed`, though the ticket asked for an entry.
+
+## Rulings from #83 (the top bar, 2026-10-02)
+
+#83 ported the top bar: the user bar with the user menu and the notification
+tray, the info bar and menu of the pages outside the dashboard, and the version
+checker. (The About dialog was already Vue, #156.) Delegated like the rulings
+above: provisionally accepted, for the maintainer to review.
+
+1. **Where the parts went.**
+   - `UserBar`, `UserMenu` and `NotificationTray` are `.vue` files in their
+     React folder, `src/dashboard/pages/dashboard/UserBar/` (decision 6).
+     `AppContainer.vue` imports `UserBar.vue`; its allowlist entry replaces the
+     React one.
+   - `InfoBar` and `InfoMenu` are in `src/components/InfoBar/`: they are the
+     shell of every page outside the dashboard, which the Vue auth pages (#85)
+     will mount. The React `Page` loads the bar on demand, as it does the modal
+     host, so that its popover keeps Reka off the login page's critical path.
+   - Two shared primitives: `MenuEntry.vue` (the button entry of a popover menu,
+     on `MENU_ENTRY_VARIANTS`, now shared) and `ProfilePicture.vue`.
+   - The cloud-only parts are under `src/cloud/`: `billing/` (the trial
+     indicator, "Upgrade" and the "Upgrade Plan" entry), `organization/` (the
+     maintainer's organization switcher) and `versionChecker/` (decision 6b's
+     list). They are imported directly, with a note, as #82 did (ruling 7): a
+     user-menu registry would be designed around two entries, one of which sits
+     between core entries.
+   - **"Invite" stays React** (`InviteUsersButton`, mounted with
+     `reactComponent`): its dialog, `InviteUsersModal`, is also the Members
+     settings' and is #87's (organization) to port.
+2. **The user menu stays a dialog of buttons.** The ticket asks for "menu roles,
+   arrow keys, Escape, matching react-aria behaviour". What react-aria gives
+   here is a dialog ("User Settings") of buttons: the React `Popover` renders a
+   plain `role="dialog"`, and #81's accessibility snapshot pins it. A `menu` of
+   `menuitem`s with arrow keys would change what screen readers announce and how
+   the menu is driven: a feature for its own ticket. The snapshot is unchanged.
+3. **One deliberate difference, for keyboard users: focus goes into the
+   popover.** The React popover is not react-aria's `Dialog`, so it never moved
+   focus: after opening the user menu (by click or Enter) focus stayed on the
+   button, Tab went on to the page beneath, and Escape closed it only once focus
+   had somehow got inside. A Reka popover traps focus. `Popover.vue` now focuses
+   its dialog element as it opens (as react-aria's `useDialog` does), rather
+   than its first control; Tab then moves through the entries, Escape closes it
+   and returns focus to the button. Seen by a keyboard user only: the button
+   loses its focus ring while the menu is open, and the entries show React's
+   focus ring (spelled out under `focus-visible:`, as Tailwind does not generate
+   variants of the multi-selector `focus-ring` class). It is a fix, so it takes
+   no changelog entry.
+4. **Two `Popover.vue` parity fixes, found by screenshot.** React's popover is
+   positioned against the viewport, so its `w-full` is the viewport's width
+   capped by the size's `max-w-*`; Reka's sits in a wrapper as wide as its
+   content and shrank (the user menu was 141px wide, not 206px): the Vue popover
+   uses `w-screen` instead. And it keeps react-aria's 12px from the viewport's
+   edges (`collisionPadding`). It also takes react-aria's `crossOffset`, which
+   the tray uses. With these, the user menu, the tray and the info menu match
+   React's pixel for pixel.
+5. **The shortcuts are the user's, shared with React.** The user menu shows each
+   entry's shortcut and its entries are global actions while the bar is mounted,
+   open or not, as React's `useMenuEntries` made them: in the command palette,
+   with `Mod+,` (Settings) and `Mod+/` (About) attached to `document.body`. So
+   the dashboard's bindings, with the user's changes, are now one instance
+   (`$/providers/dashboardInputBindings`, shared with #86) that the React
+   `InputBindingsProvider` uses too, and `useMenuEntries` has a Vue counterpart
+   (`$/composables/menuEntries`). `MenuEntry.vue` reads its action's shortcut,
+   icon and colour from it, which #82 (ruling 6) left out of
+   `KeyboardShortcut.vue`. One registry for both binding systems is still #170.
+6. **Notifications.** The React hooks are a Vue composable over the uploads
+   store (`notifications.ts`); the ticket's "over vue-query" applied only to
+   `useIsMutatingForBothBackends`, which nothing used, and is gone. An upload's
+   progress now follows each chunk (React re-read it only when something else
+   re-rendered); the messages, toasts and the minute a finished notification
+   stays are unchanged. The tray's list is a plain `role="list"`, where React's
+   was a react-aria `GridList` (`role="grid"`) whose rows the arrow keys moved
+   between; nothing selects them, and each item's one control (its close button)
+   is reached with Tab. Invisible.
+7. **The version checker still checks upstream's releases.** The maintainer's
+   decision was to point it at this fork's releases if that is contained and the
+   fork publishes any: it publishes none (`gh release list` is empty,
+   `releases/latest` answers 404), so it keeps polling
+   `enso-org/enso/releases/latest` exactly as before, and the question went to
+   the maintainer as #180. `App.vue` mounts it where React did (in the React
+   root, on every page), only while the check is enabled (the desktop app, or
+   forced from the devtools), and loads it then. "Remind me later" now marks the
+   cached release as postponed; React wrote its `select`ed view into the cache,
+   so the next `select` threw and the dialog was hidden by that error until the
+   next check. The outcome is the same.
+8. **About.** The user and info menus open the existing Vue dialog through
+   `openAboutModal()`. Its `Mod+/` shortcut now comes from the Vue
+   `useMenuEntries`. In Playwright (Chromium, base and branch alike), About
+   opened with `Mod+/` takes focus and closes with Escape; the installer bug
+   (#170) did not reproduce there and is left to #170.
+9. **No changelog entry.** Nothing changes for a mouse user, and the keyboard
+   change is a fix: the PR takes `CI: No changelog needed`, though the ticket
+   asked for an entry.
+
 ## Rulings from #85 (authentication pages, 2026-10-02)
 
 #85 ported the authentication pages: sign-in (with its one-time-code step),
@@ -1046,13 +1225,12 @@ provisionally accepted, for the maintainer to review.
    keep their React names. The old `src/components/RegistrationPage.vue`, which
    only hosted the React form, is gone: the sign-up page carries its data loader
    (the user-agreements query) itself.
-4. **The info bar stays React.** The React `Page` around each auth page showed
-   the info bar (logo menu: About, and Sign out when signed in) and mounted the
-   modal host. `AuthenticationPage.vue` does both: the React `InfoBar` through
-   `reactComponent` (its module joins `DASHBOARD_IMPORT_ALLOWLIST`, and exports
-   an unmemoized `InfoBar` for it), and `ModalHost.vue` loaded on first use.
-   Porting the info bar belongs with the menus it shares code with
-   (`MenuEntry`), not here. `RestoreAccount` had no `Page`, and still has none.
+4. **The info bar is #83's Vue one.** The React `Page` around each auth page
+   showed the info bar (logo menu: About, and Sign out when signed in) and
+   mounted the modal host. `AuthenticationPage.vue` does both: the Vue `InfoBar`
+   (`$/components/InfoBar/`, ported by #83) and `ModalHost.vue`, each loaded on
+   first use, as the React `Page` loads them. `RestoreAccount` had no `Page`,
+   and still has none.
 5. **Every auth page loads on demand, the sign-in page included.** The React
    `Login` was imported statically by `router.ts`, so it sat in the initial
    chunk. A static Vue sign-in page would pull Reka (through `Button`'s tooltip)
@@ -1156,7 +1334,10 @@ rulings above: provisionally accepted, for the maintainer to review.
    saved record loads with no bindings (only an action added in a later release
    can be missing). A change bumps a counter that Vue tracks and the React
    provider watches, so React's consumers re-read the bindings: the command
-   palette shows a new shortcut at once.
+   palette shows a new shortcut at once. It is the same instance as #83's
+   (ruling 5 there): #83's Vue menus read it through
+   `useDashboardInputBindings`, an alias of `getDashboardInputBindings`, and see
+   a rebinding at once too.
 6. **Rebinding works now; it did not on `develop`.** Comparing the running app
    found that the React capture modal never received a key: its form had the
    focus, yet `Ctrl+Shift+K`, `q` or `Escape` left it at "No shortcut entered"

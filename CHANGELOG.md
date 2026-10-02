@@ -123,6 +123,11 @@
   are about 14% wider on average, so graphs laid out side by side may overlap
   after updating: use Tidy up (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>) to
   re-space them.
+- [Opening a project switches to it straight away][174], with a loading spinner
+  in the graph area until the project is ready, just as when Enso reopens the
+  project you had open last time. Before, the graph area stayed blank until the
+  project had opened, with only the small spinner on the project's tab to show
+  progress. If the project fails to open, the reason is shown in its place.
 
 #### Enso Language & Runtime
 
@@ -255,6 +260,7 @@
 [132]: https://github.com/jdunkerley/enso/pull/132
 [133]: https://github.com/jdunkerley/enso/pull/133
 [135]: https://github.com/jdunkerley/enso/pull/135
+[174]: https://github.com/jdunkerley/enso/pull/174
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

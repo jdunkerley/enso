@@ -9,7 +9,7 @@
  */
 import { ReactModalFrame } from '#/components/ReactModalFrame'
 import { getModalsStore, type Resolution } from '$/providers/modals'
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import { isValidElement, type JSX } from 'react'
 import type { Component } from 'vue'
 

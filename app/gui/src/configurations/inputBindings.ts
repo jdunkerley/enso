@@ -16,7 +16,7 @@ export type DashboardBindingCategory = (typeof CATEGORIES)[number]
 /** The nameof a dashboard binding */
 export type DashboardBindingKey = keyof typeof BINDINGS
 
-/** The text naming a binding's action. */
+/** The text id of the name of a binding's action (`<action>Shortcut`). */
 export function actionToTextId(action: DashboardBindingKey): TextId {
   return `${action}Shortcut`
 }

@@ -56,7 +56,7 @@ vi.mock('$/providers/backends', async () => {
   }
 })
 // The React tabs are not under test: each renders its tab's name.
-vi.mock('@/util/react', async () => {
+vi.mock('$/utils/react', async () => {
   const { h: render } = await import('vue')
   /** Stands for each React tab: its name, and the search query it was given. */
   const ReactTab = (props: { data: { nameId: string }; query: string }) =>
