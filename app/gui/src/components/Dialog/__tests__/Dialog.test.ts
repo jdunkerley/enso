@@ -293,9 +293,25 @@ describe('Popover', () => {
     expect(byTestId('popover')).not.toBeNull()
   })
 
+  test('a modal popover takes outside clicks on its underlay, which closes it', async () => {
+    mountPopover()
+    await openWithKeyboard()
+    // Over the page, so that an element setting its own `pointer-events` (the graph editor's
+    // viewport) cannot take the click and stop it before Reka sees it.
+    const underlay = byTestId('underlay')!
+    expect(env.portalRoot.contains(underlay)).toBe(true)
+    expect(underlay.classList).toContain('pointer-events-auto')
+    expect(underlay.classList).toContain('fixed')
+    await outsideClicker().click(underlay)
+    await flushPromises()
+    expect(byTestId('popover')).toBeNull()
+    expect(byTestId('underlay')).toBeNull()
+  })
+
   test('isNonModal leaves the rest of the page interactive', async () => {
     mountPopover({ isNonModal: true })
     const user = await openWithKeyboard()
+    expect(byTestId('underlay')).toBeNull()
     expect(getComputedStyle(document.body).pointerEvents).not.toBe('none')
     await user.click(byTestId('outside')!)
     await flushPromises()

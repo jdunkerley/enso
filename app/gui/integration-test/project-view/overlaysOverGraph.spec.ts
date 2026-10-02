@@ -80,3 +80,31 @@ test('About opened with its shortcut from the graph closes on Escape', async ({
   await expect(about).toHaveCount(0)
   await expectGraphUntouched(page, node, nodeCount)
 })
+
+test.describe('A click on the graph closes the user menu, and does nothing else', () => {
+  test('on an empty spot', async ({ editorPage, page }) => {
+    await editorPage
+    const node = await selectNode(page)
+    const nodeCount = await locate.graphNode(page).count()
+    const menu = await openUserMenu(page)
+    const graph = await locate.graphEditor(page).boundingBox()
+    expect(graph).not.toBeNull()
+    // `click()` would wait for the underlay to clear, so click by position.
+    await page.mouse.click(graph!.x + graph!.width - 100, graph!.y + graph!.height / 2)
+    await expect(menu).toHaveCount(0)
+    // As with React's menu, the click was the menu's: the selection is kept.
+    await expectGraphUntouched(page, node, nodeCount)
+  })
+
+  test('on a node', async ({ editorPage, page }) => {
+    await editorPage
+    const node = await selectNode(page)
+    const nodeCount = await locate.graphNode(page).count()
+    const menu = await openUserMenu(page)
+    const other = await locate.graphNodeIcon(locate.graphNodeByBinding(page, 'final')).boundingBox()
+    expect(other).not.toBeNull()
+    await page.mouse.click(other!.x + other!.width / 2, other!.y + other!.height / 2)
+    await expect(menu).toHaveCount(0)
+    await expectGraphUntouched(page, node, nodeCount)
+  })
+})
