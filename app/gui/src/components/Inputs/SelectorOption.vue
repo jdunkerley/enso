@@ -54,7 +54,7 @@ function onFocus(event: FocusEvent) {
           isSelected,
         })
       "
-      :data-selected="isSelected"
+      :data-selected="isSelected || undefined"
       @pointerenter="isHovered = !isDisabled"
       @pointerleave="((isHovered = false), (isPressed = false))"
       @pointerdown="isPressed = !isDisabled"

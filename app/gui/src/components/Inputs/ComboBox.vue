@@ -9,8 +9,8 @@
  * `x` button clears the typed text (unless `noResetButton`).
  *
  * The field holds the item itself. Each item needs a unique text: `toKey`, else `toTextValue`,
- * else the item when it is a string. `toTextValue` is what typing filters by; `toTooltip` what the
- * option's tooltip shows. The default slot (`{ item }`) renders an option; without it, the text.
+ * else the item when it is a string. `toTextValue` is what typing filters by; `toOptionText` what
+ * an option shows, if different; `toTooltip` what the option's tooltip shows. The default slot (`{ item }`) renders an option; without it, the text.
  */
 import Button from '$/components/Button/Button.vue'
 import { POPOVER_MOTION, POPOVER_STYLES } from '$/components/Dialog/variants'
@@ -47,6 +47,8 @@ const props = withDefaults(
     toKey?: ((item: T) => string) | undefined
     toTextValue?: ((item: T) => string) | undefined
     toTooltip?: ((item: T) => string) | undefined
+    /** The text an option shows, when not its `toTextValue`. React's `children` returning a string. */
+    toOptionText?: ((item: T) => string) | undefined
     defaultValue?: T | undefined
     label?: string | undefined
     description?: string | undefined
@@ -75,6 +77,23 @@ defineSlots<{
 const slots = useSlots()
 const { getText } = useText()
 const input = ref<InstanceType<typeof ComboboxInput>>()
+const isChevronHovered = ref(false)
+const viewport = ref<InstanceType<typeof ComboboxViewport>>()
+
+/**
+ * On opening, scroll the selected item to the top of the list, as react-aria did. Reka scrolls it
+ * only as far as needed (to the bottom), after the list has rendered.
+ */
+function onOpenChange(open: boolean) {
+  if (!open) return
+  setTimeout(() => {
+    const element: unknown = viewport.value?.$el
+    if (!(element instanceof HTMLElement)) return
+    const selected = element.querySelector<HTMLElement>('[data-state="checked"]')
+    if (selected == null) return
+    element.scrollTop = selected.offsetTop
+  })
+}
 
 const field = useField<T | undefined>({
   name: () => props.name,
@@ -92,6 +111,7 @@ function textOf(item: T): string {
   return text
 }
 const keyOf = (item: T) => props.toKey?.(item) ?? textOf(item)
+const optionText = (item: T) => props.toOptionText?.(item) ?? textOf(item)
 
 const itemsByKey = computed(() => new Map(props.items.map((item) => [keyOf(item), item])))
 
@@ -128,10 +148,23 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
       :disabled="field.isDisabled.value"
       :class="styles.base({ className: props.class })"
       @focusout="field.onBlur"
+      @update:open="onOpenChange"
     >
       <ComboboxAnchor :class="styles.inputContainer()">
+        <!-- The field's `<label>` wraps this button, and it is the first control in it, so hovering
+        anywhere on the field hovers it too (`:hover` reaches a label's control). React styled real
+        pointer hovers only (react-aria's `data-hovered`), and so does this. -->
         <ComboboxTrigger asChild>
-          <Button variant="icon" icon="chevron_right" class="rotate-90" :tooltip="false" />
+          <Button
+            variant="icon"
+            icon="chevron_right"
+            class="rotate-90 data-[hovered]:bg-white hover:bg-transparent"
+            :aria-label="getText('showSuggestions')"
+            :tooltip="false"
+            :data-hovered="isChevronHovered || undefined"
+            @pointerenter="isChevronHovered = $event.pointerType === 'mouse'"
+            @pointerleave="isChevronHovered = false"
+          />
         </ComboboxTrigger>
         <div :class="inputStyles.base()">
           <div :class="inputStyles.content()">
@@ -173,12 +206,20 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
       </ComboboxAnchor>
 
       <ComboboxPortal :to="portalTarget()">
+        <!-- As react-aria's: as wide as the input's box, at its start, and no taller than the space
+        below it (less 12px), the list scrolling inside. React's `--trigger-width` excludes the 48px
+        the shared variants add back. -->
         <ComboboxContent
           position="popper"
+          align="start"
           :sideOffset="8"
-          :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} [--trigger-width:var(--reka-combobox-trigger-width)]`"
+          :collisionPadding="12"
+          :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} flex max-h-[var(--reka-combobox-content-available-height)] flex-col [--trigger-width:calc(var(--reka-combobox-trigger-width)_-_48px)]`"
         >
-          <ComboboxViewport :class="popoverStyles.dialog({ className: styles.listBox() })">
+          <ComboboxViewport
+            ref="viewport"
+            :class="popoverStyles.dialog({ className: styles.listBox() })"
+          >
             <ComboboxItem
               v-for="item in items"
               :key="keyOf(item)"
@@ -197,10 +238,10 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
                 v-else
                 truncate="1"
                 class="w-full"
-                :tooltip="toTooltip?.(item) ?? textOf(item)"
+                :tooltip="toTooltip?.(item) ?? optionText(item)"
                 tooltipPlacement="left"
               >
-                {{ textOf(item) }}
+                {{ optionText(item) }}
               </Text>
             </ComboboxItem>
           </ComboboxViewport>

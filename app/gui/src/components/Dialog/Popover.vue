@@ -89,11 +89,13 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
       <slot name="trigger" />
     </PopoverTrigger>
     <PopoverPortal :to="portalTarget()">
+      <!-- 12px from the window's edges, react-aria's `containerPadding`. -->
       <PopoverContent
         v-bind="$attrs"
         :side="sideAlign.side"
         :align="sideAlign.align"
         :sideOffset="offset"
+        :collisionPadding="12"
         :class="`${styles.base({ className })} ${POPOVER_MOTION}`"
         :data-testid="testId"
         @pointerDownOutside="onPointerDownOutside"
