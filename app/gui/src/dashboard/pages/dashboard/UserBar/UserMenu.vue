@@ -10,6 +10,11 @@
  *
  * The cloud-only parts come from `src/cloud/` (the organization switcher, "Upgrade Plan"); they are
  * imported directly, as the cloud registries of decision 6b do not exist yet.
+ *
+ * In local mode (`isAuthDisabled`: no Cognito, an offline stand-in session) there is no cloud
+ * account to bill, switch or sign out of: "Working locally" stands in for the plan, and the
+ * organization switcher, "Upgrade Plan" and "Logout" are left out, from the menu and from the global
+ * actions alike.
  */
 import { upgradePlanEntry } from '$/cloud/billing/userMenu'
 import OrganizationSwitcher from '$/cloud/organization/OrganizationSwitcher.vue'
@@ -34,8 +39,14 @@ import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-const { user, goToSettingsPage } = defineProps<{
+const {
+  user,
+  isAuthDisabled = false,
+  goToSettingsPage,
+} = defineProps<{
   user: UserSession['user']
+  /** Local mode: authentication is disabled, so there is no cloud account. */
+  isAuthDisabled?: boolean | undefined
   goToSettingsPage: () => void
 }>()
 
@@ -80,11 +91,11 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
         devtools.showEnsoDevtools = !devtools.showEnsoDevtools
       },
     },
-  upgradePlanEntry(user, router, () => emit('signOut')),
+  !isAuthDisabled && upgradePlanEntry(user, router, () => emit('signOut')),
 ])
 
 const tailEntries = useMenuEntries<MenuEntryAction>(() => [
-  {
+  !isAuthDisabled && {
     action: 'signOut',
     doAction: () => {
       emit('signOut')
@@ -93,7 +104,10 @@ const tailEntries = useMenuEntries<MenuEntryAction>(() => [
   },
 ])
 
-const planText = computed(() => getText(user.plan))
+// Local mode has no plan: the synthetic user's ("Community") would mislead.
+const planText = computed(() =>
+  isAuthDisabled ? getText('userMenuWorkingLocally') : getText(user.plan),
+)
 </script>
 
 <template>
@@ -117,7 +131,10 @@ const planText = computed(() => getText(user.plan))
       </div>
     </div>
 
-    <OrganizationSwitcher v-if="user.maintainerAccount" :entries="organizationEntries" />
+    <OrganizationSwitcher
+      v-if="!isAuthDisabled && user.maintainerAccount"
+      :entries="organizationEntries"
+    />
 
     <div class="flex flex-col overflow-hidden">
       <MenuEntry

@@ -23,7 +23,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import UserBar from '../UserBar.vue'
 
-const auth = reactive<{ session: { user: User } | null }>({ session: null })
+const auth = reactive<{ session: { user: User; isAuthDisabled?: boolean } | null }>({
+  session: null,
+})
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
 const signOut = vi.fn(async () => {})
@@ -176,6 +178,45 @@ describe('UserBar', () => {
       getText('aboutThisAppShortcut'),
       getText('signOutShortcut'),
     ])
+  })
+
+  test('local mode: "Working locally", no "Upgrade Plan" or "Logout", in menu or actions', async () => {
+    // The offline stand-in session: a synthetic user on the free plan, with authentication off.
+    auth.session = { user: makeUser({ plan: Plan.free }), isAuthDisabled: true }
+    await mountUserBar()
+    await userEvent.setup().click(userMenuButton())
+    await flushPromises()
+    expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
+    expect(must(userMenu()).textContent).not.toContain(getText(Plan.free))
+    expect(must(userMenu()).textContent).toContain('Working locally')
+    const names = getActionsStore()
+      .findActions('')
+      .map((action) => action.name)
+    expect(names).not.toContain(getText('upgradePlanShortcut'))
+    expect(names).not.toContain(getText('signOutShortcut'))
+  })
+
+  test('local mode: no "Upgrade" for an organization admin on the free plan', async () => {
+    auth.session = {
+      user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }),
+      isAuthDisabled: true,
+    }
+    await mountUserBar()
+    expect([...document.querySelectorAll('a')].map(textOf)).not.toContain(getText('upgrade'))
+  })
+
+  test('signed in to the cloud on the free plan, "Upgrade Plan" and "Logout" are there', async () => {
+    auth.session = { user: makeUser({ plan: Plan.free }) }
+    await mountUserBar()
+    await userEvent.setup().click(userMenuButton())
+    await flushPromises()
+    expect(entryNames()).toEqual([
+      getText('settingsShortcut'),
+      getText('aboutThisAppShortcut'),
+      getText('upgradePlanShortcut'),
+      getText('signOutShortcut'),
+    ])
+    expect(must(userMenu()).textContent).toContain(getText(Plan.free))
   })
 
   test('Settings, About and Logout close the menu and act', async () => {

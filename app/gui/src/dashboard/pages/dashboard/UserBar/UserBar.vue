@@ -6,6 +6,9 @@
  *
  * The cloud-only parts come from `src/cloud/`, imported directly (decision 6b's registries do not
  * exist yet). "Invite" stays a React leaf until the organization port (#87) moves its dialog.
+ *
+ * In local mode (authentication disabled, the offline stand-in session) there is no cloud account:
+ * the trial indicator, "Invite" and "Upgrade" are not shown, nor are the user menu's cloud entries.
  */
 import TrialProgress from '$/cloud/billing/TrialProgress.vue'
 import UpgradeButton from '$/cloud/billing/UpgradeButton.vue'
@@ -33,9 +36,15 @@ const isOnline = useIsOnline()
 const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
 
 const user = computed(() => auth.session?.user)
-const shouldShowInviteButton = computed(() => !isFeatureUnderPaywall('inviteUser'))
+const isAuthDisabled = computed(() => auth.session?.isAuthDisabled === true)
+const shouldShowInviteButton = computed(
+  () => !isAuthDisabled.value && !isFeatureUnderPaywall('inviteUser'),
+)
 const shouldShowUpgradeButton = computed(
-  () => user.value?.isOrganizationAdmin === true && user.value.plan === Plan.free,
+  () =>
+    !isAuthDisabled.value &&
+    user.value?.isOrganizationAdmin === true &&
+    user.value.plan === Plan.free,
 )
 </script>
 
@@ -48,11 +57,16 @@ const shouldShowUpgradeButton = computed(
           {{ getText('youAreOffline') }}
         </Text>
       </div>
-      <TrialProgress :user="user" />
+      <TrialProgress v-if="!isAuthDisabled" :user="user" />
       <InviteUsersButton v-if="shouldShowInviteButton" />
       <UpgradeButton v-if="shouldShowUpgradeButton" />
       <NotificationTray />
-      <UserMenu :user="user" :goToSettingsPage="goToSettingsPage" @signOut="emit('signOut')" />
+      <UserMenu
+        :user="user"
+        :isAuthDisabled="isAuthDisabled"
+        :goToSettingsPage="goToSettingsPage"
+        @signOut="emit('signOut')"
+      />
     </div>
   </div>
 </template>
