@@ -5,12 +5,14 @@
 import VersionChecker from '$/cloud/versionChecker/VersionChecker.vue'
 import { useDevtoolsStore } from '$/providers/devTools'
 import { useText } from '$/providers/text'
+import { getToastsStore } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { isNewerRelease } from '../versionChecker'
 
-const getLatestRelease = vi.fn(async () => ({
+const getLatestRelease = vi.fn<() => Promise<object | null>>(async () => ({
   // GitHub's field names.
   /* eslint-disable camelcase */
   tag_name: '2099.1.1',
@@ -71,5 +73,41 @@ describe('VersionChecker', () => {
     await user.click(closeButtons.at(-1)!)
     await vi.waitFor(() => expect(useDevtoolsStore().showVersionChecker).toBe(false))
     await vi.waitFor(() => expect(dialog()).toBeNull())
+  })
+})
+
+describe('VersionChecker, with nothing to offer', () => {
+  // Forced open as in the tests above, so that only the missing release keeps it closed.
+  test.each([
+    ['no release yet (404)', () => Promise.resolve(null)],
+    ['a failed check (offline, rate-limited)', () => Promise.reject(new Error('quiet'))],
+  ])('%s: no dialog, no toast, no error logged', async (_name, latest) => {
+    getLatestRelease.mockClear()
+    getLatestRelease.mockImplementationOnce(latest)
+    const error = vi.spyOn(console, 'error')
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(getLatestRelease).toHaveBeenCalled())
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    expect(dialog()).toBeNull()
+    expect(getToastsStore().toasts.value).toHaveLength(0)
+    expect(getLatestRelease).toHaveBeenCalledOnce()
+    expect(error).not.toHaveBeenCalled()
+    error.mockRestore()
+  })
+})
+
+describe('isNewerRelease', () => {
+  test('a newer release is offered', () => {
+    expect(isNewerRelease('2099.1.1', '2025.1.1')).toBe(true)
+  })
+  test('the same version, or an older one, is not', () => {
+    expect(isNewerRelease('2025.1.1', '2025.1.1')).toBe(false)
+    expect(isNewerRelease('2024.1.1', '2025.1.1')).toBe(false)
+  })
+  test('nor anything to a development or nightly build, or a tag that is not a version', () => {
+    expect(isNewerRelease('2099.1.1', '2025.1.1-dev')).toBe(false)
+    expect(isNewerRelease('2099.1.1', '2025.1.1-nightly.2025.1.1')).toBe(false)
+    expect(isNewerRelease('latest', '2025.1.1')).toBe(false)
   })
 })

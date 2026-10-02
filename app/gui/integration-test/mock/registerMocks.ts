@@ -284,7 +284,8 @@ async function mockUnneededUrls(page: Page) {
         fulfillWith({ contentType: 'text/css', body: '' }),
       ),
       page.route(
-        'https://api.github.com/repos/enso-org/enso/releases/latest',
+        // The releases the app checks: this fork's (`RELEASES_REPOSITORY`, #180).
+        'https://api.github.com/repos/jdunkerley/enso/releases/latest',
         fulfillWith({ json: LATEST_GITHUB_RELEASES }),
       ),
       page.route(

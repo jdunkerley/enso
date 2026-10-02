@@ -3,7 +3,9 @@
  * @file The "new version available" dialog (#83): the Vue counterpart of the React
  * `VersionChecker`, which `App.vue` mounts while `useVersionCheckerEnabled` holds.
  *
- * It fetches the latest release once a day (every ten minutes after a failure). When it is newer
+ * It fetches the latest release of this fork (`RELEASES_REPOSITORY`, #180) once a day, or ten
+ * minutes after a failed request. When there is none, or the request fails (offline, rate-limited),
+ * it stays quiet: no dialog, no toast, no retry before the next check. When the release is newer
  * than this build (and this build is neither a development nor a nightly one), it asks the user to
  * download it, or to be reminded later, which hides it until the next check. After "Download" it
  * thanks the user and can be closed. The devtools can force it open in development.
@@ -24,29 +26,18 @@ import { download } from '$/utils/download'
 import { getDownloadUrl, getLatestRelease } from '$/utils/github'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, ref, watchEffect } from 'vue'
+import { getVersionNumber, isNewerRelease } from './versionChecker'
 
 const STALE_TIME = 24 * 60 * 60 * 1000 // 1 day
 const STALE_TIME_ERROR = 10 * 60 * 1000 // 10 minutes
 const QUERY_KEY = ['latestRelease']
 
 /** The latest release, as cached: `isPostponed` once the user asked to be reminded later. */
-type CachedRelease = Awaited<ReturnType<typeof getLatestRelease>> & {
+type CachedRelease = NonNullable<Awaited<ReturnType<typeof getLatestRelease>>> & {
   readonly isPostponed: boolean
 }
 
-/**
- * The version number of a version string, or `null` if it is not one. (Only the first dot is
- * removed, so `2025.1.1` is `20251.1`, as it always has been.)
- */
-function getVersionNumber(version: string) {
-  const versionNumber = Number(version.replace('.', ''))
-  return isNaN(versionNumber) ? null : versionNumber
-}
-
 const currentVersion: string = $config.VERSION ?? 'unknown-dev'
-const currentVersionIsDev = currentVersion.endsWith('-dev')
-const currentVersionIsNightly = currentVersion.includes('-nightly')
-const currentVersionNumber = getVersionNumber(currentVersion)
 
 const text = useText()
 const { getText } = text
@@ -58,17 +49,17 @@ const shouldOverride = computed(() => devtools.showVersionChecker ?? false)
 
 const metadataQuery = useQuery({
   queryKey: QUERY_KEY,
-  queryFn: async (): Promise<CachedRelease> => ({
-    ...(await getLatestRelease()),
-    isPostponed: false,
-  }),
-  select: (data: CachedRelease) => {
+  queryFn: async (): Promise<CachedRelease | null> => {
+    const latest = await getLatestRelease()
+    return latest && { ...latest, isPostponed: false }
+  },
+  select: (data: CachedRelease | null) => {
+    if (data == null) return null
     const versionNumber = getVersionNumber(data.tag_name)
     const publishedAt = new Date(data.published_at).toLocaleString(text.locale, {
       dateStyle: 'long',
     })
     return {
-      versionNumber: versionNumber ?? currentVersionNumber,
       publishedAt,
       tagName: versionNumber == null ? currentVersion : data.tag_name,
       htmlUrl: data.html_url,
@@ -76,6 +67,8 @@ const metadataQuery = useQuery({
     }
   },
   meta: { persist: false },
+  // A failed check is retried at the next one (`STALE_TIME_ERROR`), not at once.
+  retry: false,
   staleTime: (query) => (query.state.error ? STALE_TIME_ERROR : STALE_TIME),
 })
 
@@ -87,14 +80,7 @@ const isOpen = ref(false)
 const release = computed(() => {
   const data = metadataQuery.data.value
   if (!metadataQuery.isSuccess.value || data == null || data.isPostponed) return null
-  const shouldBeShown =
-    shouldOverride.value ||
-    (data.versionNumber != null &&
-      currentVersionNumber != null &&
-      !currentVersionIsDev &&
-      !currentVersionIsNightly &&
-      data.versionNumber > currentVersionNumber)
-  return shouldBeShown ? data : null
+  return shouldOverride.value || isNewerRelease(data.tagName, currentVersion) ? data : null
 })
 
 watchEffect(() => {
