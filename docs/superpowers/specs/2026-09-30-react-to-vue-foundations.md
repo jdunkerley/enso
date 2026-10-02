@@ -1110,3 +1110,80 @@ provisionally accepted, for the maintainer to review.
     link and the Login button's content, which carried react-aria's generated
     ids); the pixels are the same, so the baseline keeps them rather than
     claiming a fix. The PR takes `CI: No changelog needed`.
+
+## Rulings from #89 (asset panel: Versions and Activity, 2026-10-02)
+
+#89 ports the right panel's asset tabs. Delegated like the rulings above:
+provisionally accepted, for the maintainer to review.
+
+1. **Split: Versions and Activity first, Properties and Schedule in #183.**
+   Properties leans on React pieces with no Vue counterpart yet (the datalink
+   editor's `JSONSchemaInput`, #92; the secret form, #174; the drive table's
+   "created by" and "shared with" columns; the spotlight), and the Schedule tab
+   brings `NewProjectExecutionModal` (437 lines) and a calendar. Together they
+   would have doubled a PR whose two tabs already stand alone.
+2. **Port, not delete** (decision 7): versions, the diff view and the version
+   tags and comments are all ported.
+3. **Where the code goes.** The Versions tab is cloud-only, so it is
+   `src/cloud/versions/`; `RightPanel.vue` imports it directly and says why,
+   until #179's registry exists (then #183 moves it there and adds `versions` to
+   `CLOUD_AREAS`). The Activity tab also works locally, and its host
+   `RightPanel.vue` is shared code that may not import `#/`, so it is
+   `src/components/AssetPanel/`, not `src/dashboard/`. Two shared pieces came
+   with the port: `UserWithPopover.vue` (the React one stays for the drive table
+   and the settings) and `ProfilePicture.vue`, byte for byte #181's, so the two
+   PRs merge cleanly. `patterns.ts` (`TEXT_WITH_ICON`) moved to
+   `src/components/`, and `Text.vue` exposes its element, which the version row
+   measures as React did through a `ref`.
+4. **The diff view is CodeMirror's merge view, and Monaco is gone.** The ticket
+   asked for it: Monaco was fetched from jsDelivr at run time (there was no
+   `loader.config`), so the diff did not work offline. `@codemirror/merge`
+   6.12.2 replaces `@monaco-editor/react` and `monaco-editor`, and loads with
+   the first comparison, not with the dashboard. It is styled after the Monaco
+   editor it replaces: side by side, read-only, line numbers in Monaco's colour,
+   Monaco's `vs` diff colours for changed lines and text, its 14px monospace
+   font, and hatched spacers where Monaco drew its diagonal fill. **For
+   review:** it is not pixel-identical: Monaco's overview ruler and scrollbars,
+   its gutter +/- markers and its indent guides have no counterpart (the text,
+   line numbers and highlights sit where Monaco's did; see ruling 7). The panel
+   is cloud-only and opened on demand, so the PR still takes
+   `CI: No changelog needed`; say if it should have an entry. The
+   selection-clearing effect's Monaco exemption (`isElementPartOfMonaco`) went
+   with it: the merge view's editors are content-editable, which the effect
+   already exempts.
+5. **"Compare with" opens on the modal stack** (`useModals().open`), where React
+   used `setModal`. As with #156 (ruling 5), the dialog leaves the stack when it
+   closes, so `useModalRef` no longer reports a stale modal afterwards. "See
+   changes" stays a local dialog with a trigger, as React's `Dialog.Trigger`
+   was.
+6. **Queries keep React's keys and options**, in
+   `src/cloud/versions/queries.ts`: `[type, 'listAssetVersions', id]` with a
+   stale time of 0 and persistence on, the version-content key, and the sessions
+   key `['getProjectSessions', id, title]`; the cached and persisted entries
+   stay valid, and `INVALIDATION_MAP` invalidates them as before. The
+   version-tag hooks moved there from `#/hooks/backendHooks` with the same
+   optimistic update. A tab waits for its query in `setup` inside a
+   `SuspenseLoader`, as React's `useSuspenseQuery` suspended, and is keyed by
+   its asset or project, so a new selection shows the loader again.
+7. **Overlays placed as react-aria placed them**, found by comparing screenshots
+   of the base and the branch. `Popover.vue` takes #181's version verbatim
+   (React's width, 12px from the viewport's edges, focusing itself as it opens),
+   so the two PRs merge cleanly. `DropdownMenu.vue` gains an `offset` prop
+   (default unchanged, 4) and, like `MenuSubmenu.vue`, react-aria's 12px
+   `containerPadding`; the version menu passes React's centred `bottom`
+   placement and 8px offset, and a submenu sits 8px from its item. With these,
+   the menu, the submenu, the tag and user popovers and every tab match React to
+   the pixel (the remaining differences are the drive's clock-time column). The
+   diff view's gutter and line highlight were measured against Monaco's and
+   aligned to the pixel; ruling 4 lists what still differs.
+8. **One React class string is not carried over:** each tag's
+   `min-w-[8ch] max-w-[32ch]` was built at run time, so Tailwind never generated
+   it, and it had no effect.
+9. **Tests.** `ProjectSessions.test.tsx` is ported to Vue with the same cases,
+   plus switching projects and the logs button; `AssetVersions.test.ts` covers
+   the placeholders, the list, restore, duplicate-and-open, "Compare with", "See
+   changes" (the diff's two sides, Escape, focus back on the trigger), the
+   comment editor (Enter, Escape) and the tags (suggestions, add, remove,
+   collapse), from the keyboard where react-aria gave React that access.
+10. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
+    for the one visible difference).

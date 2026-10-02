@@ -19,16 +19,19 @@ import {
   DropdownMenuTrigger,
 } from 'reka-ui'
 import { computed } from 'vue'
-import { MENU_STYLES } from './variants'
+import { MENU_CONTAINER_PADDING, MENU_STYLES } from './variants'
 
 const {
   variant = 'light',
   placement = 'bottom-start',
+  offset = 4,
   testId,
   class: className,
 } = defineProps<{
   variant?: 'dark' | 'light' | undefined
   placement?: Placement | undefined
+  /** Distance from the trigger, in pixels. React's menus use react-aria's default, 8. */
+  offset?: number | undefined
   testId?: string | undefined
   class?: string | undefined
 }>()
@@ -48,7 +51,8 @@ const classes = computed(() => MENU_STYLES({ variant, className }))
       <DropdownMenuContent
         :side="sideAlign.side"
         :align="sideAlign.align"
-        :sideOffset="4"
+        :sideOffset="offset"
+        :collisionPadding="MENU_CONTAINER_PADDING"
         :class="classes"
         :data-testid="testId"
         loop
