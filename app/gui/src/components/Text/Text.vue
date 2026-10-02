@@ -113,6 +113,9 @@ const { isOpen, onTooltipEnter, onTooltipLeave } = useVisualTooltip(element, {
   display: () => (tooltipDisplay === 'always' ? 'always' : 'whenOverflowing'),
   isDisabled: isTooltipDisabled,
 })
+
+/** The text's element, for a caller that measures it (React's `ref`). */
+defineExpose({ element })
 </script>
 
 <template>

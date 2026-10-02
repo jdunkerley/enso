@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import {
-  AssetProperties,
-  AssetVersions,
-  ProjectExecutionsCalendar,
-  ProjectSessions,
-} from '$/components/AppContainer/reactTabs'
+// A cloud-only area, imported directly until the right panel's tabs come from the cloud registry
+// (`src/cloud/index.ts`, #179); see decision 6b in the React-to-Vue decision record.
+import AssetVersions from '$/cloud/versions/AssetVersions.vue'
+import { AssetProperties, ProjectExecutionsCalendar } from '$/components/AppContainer/reactTabs'
 import SelectableTab from '$/components/AppContainer/SelectableTab.vue'
+import ProjectSessions from '$/components/AssetPanel/ProjectSessions.vue'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import { useContainerData } from '$/providers/container'
 import { useRightPanelData, type RightPanelTabId } from '$/providers/rightPanel'

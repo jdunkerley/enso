@@ -9,6 +9,8 @@
  * - It is modal by default, like react-aria's popovers: focus is trapped and the rest of the page
  *   is inert until it closes. `isNonModal` makes it non-modal (focus may leave, the page stays
  *   interactive), as React's `isNonModal` does.
+ * - It focuses itself as it opens, not its first control, as react-aria's dialogs do (Tab goes on
+ *   from there); a keyboard user does not see a focus ring appear on the first entry.
  * - `@close` fires whenever it closes, like React's `onClose`.
  * - Attributes (`aria-label`, …) go on the `role="dialog"` element.
  */
@@ -34,6 +36,7 @@ defineOptions({ inheritAttrs: false })
 const {
   placement = 'bottom',
   offset = 8,
+  crossOffset = 0,
   isDismissable = true,
   isNonModal = false,
   size,
@@ -45,6 +48,11 @@ const {
   placement?: Placement | undefined
   /** Distance from the trigger, in pixels. React-aria's default, 8. */
   offset?: number | undefined
+  /**
+   * Shift along the trigger's edge, in pixels, as react-aria's `crossOffset`: positive is to the
+   * right (or down), whatever the alignment.
+   */
+  crossOffset?: number | undefined
   isDismissable?: boolean | undefined
   isNonModal?: boolean | undefined
   size?: PopoverVariants['size']
@@ -69,8 +77,31 @@ function onOpenChange(value: boolean) {
 
 provideDialogContext({ close })
 
+/** How close to the viewport's edges it may go: react-aria's `containerPadding` default. */
+const CONTAINER_PADDING = 12
+
 const sideAlign = computed(() => placementToSideAlign(placement))
+// Reka's `alignOffset` is `@floating-ui`'s `alignmentAxis`, which an `end` alignment inverts.
+const alignOffset = computed(() => (sideAlign.value.align === 'end' ? -crossOffset : crossOffset))
 const styles = computed(() => POPOVER_STYLES({ size, rounded, variant }))
+/**
+ * The content's classes. React's popover is positioned against the viewport, so its `w-full` is the
+ * viewport's width, capped by the size's `max-w-*`; Reka's sits in a wrapper as wide as its content,
+ * so `w-full` would shrink it to fit. `w-screen` gives it React's width.
+ */
+const contentClass = computed(() => {
+  const base = styles.value.base({ className })
+  return `${base.split(' ').includes('w-full') ? base.replace(/(^| )w-full( |$)/, '$1w-screen$2') : base} ${POPOVER_MOTION}`
+})
+
+function onOpenAutoFocus(event: Event) {
+  event.preventDefault()
+  // Dispatched on the focus scope, which wraps the dialog element (`tabindex="-1"`).
+  const scope = event.target
+  if (!(scope instanceof HTMLElement)) return
+  const dialog = scope.matches('[role="dialog"]') ? scope : scope.querySelector('[role="dialog"]')
+  if (dialog instanceof HTMLElement) dialog.focus({ preventScroll: true })
+}
 
 function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }>) {
   const target = event.detail.originalEvent.target
@@ -89,16 +120,17 @@ function onPointerDownOutside(event: CustomEvent<{ originalEvent: PointerEvent }
       <slot name="trigger" />
     </PopoverTrigger>
     <PopoverPortal :to="portalTarget()">
-      <!-- 12px from the window's edges, react-aria's `containerPadding`. -->
       <PopoverContent
         v-bind="$attrs"
         :side="sideAlign.side"
         :align="sideAlign.align"
         :sideOffset="offset"
-        :collisionPadding="12"
-        :class="`${styles.base({ className })} ${POPOVER_MOTION}`"
+        :collisionPadding="CONTAINER_PADDING"
+        :alignOffset="alignOffset"
+        :class="contentClass"
         :data-testid="testId"
         @pointerDownOutside="onPointerDownOutside"
+        @openAutoFocus="onOpenAutoFocus"
       >
         <div :class="styles.dialog()">
           <ErrorBoundary>
