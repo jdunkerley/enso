@@ -14,6 +14,9 @@ import { SEPARATOR_STYLES } from '$/components/Separator/variants'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
 
+/** How close to the viewport's edges a menu may go: react-aria's `containerPadding` default. */
+export const MENU_CONTAINER_PADDING = 12
+
 export const MENU_STYLES = tv({
   base: [
     'z-50 flex min-w-[200px] max-w-[300px] flex-col overflow-x-hidden rounded-3xl p-1.5 shadow-xl',

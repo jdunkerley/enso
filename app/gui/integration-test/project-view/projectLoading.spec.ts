@@ -2,11 +2,11 @@
  * @file The graph pane's loading spinner while a project opens.
  *
  * `WithCurrentProject`'s `loading` slot shows a `Loader` in place of the graph editor while the
- * project's opening or restoring process runs. The pane shows it whenever the project's tab is the
- * current one before the project is ready: when the user selects the tab of a project that is still
- * opening (a fresh open selects the tab only once the project has opened, see `openProjectTab`),
- * and when the app restores the project it had open. The mocked open request is held back, so
- * that the opening lasts long enough to look at.
+ * project's opening or restoring process runs, and its `error` slot a "Failed to open project"
+ * result if that fails. Opening a project from the Drive selects its tab straight away (see
+ * `openProjectTab`), so the pane shows the spinner just as it does when the app restores the
+ * project it had open. The mocked open request is held back, so that the opening lasts long enough
+ * to look at.
  */
 import type { Page } from 'integration-test/base'
 import { expect, test } from 'integration-test/base'
@@ -41,17 +41,74 @@ async function expectGraphAfterLoading(page: Page) {
   await expect(page.locator('.ProjectView').getByTestId('spinner')).toHaveCount(0)
 }
 
-test('Selecting the tab of a project that is still opening shows the spinner', async ({
+test('Opening a project from the Drive shows the spinner in the graph pane', async ({
   drivePage,
   page,
 }) => {
   await delayProjectOpening(page)
   await drivePage.driveTable.openProject('Mock Project')
+  // The tab is selected while the project is still opening, not once it has opened.
+  await expect(page.getByRole('tab', { name: 'Mock Project' })).toHaveClass(/selected/)
+  await expectLoadingSpinner(page)
+  await expectGraphAfterLoading(page)
+})
+
+test('Going back to the tab of a project that is still opening shows the spinner', async ({
+  drivePage,
+  page,
+}) => {
+  await delayProjectOpening(page)
+  await drivePage.driveTable.openProject('Mock Project')
+  await expectLoadingSpinner(page)
+  // Away to the Settings tab, which takes the project's place in the middle panel.
+  await page.keyboard.press('ControlOrMeta+,')
+  await expect(page.getByTestId('settings-panel')).toBeVisible()
+  await expect(page.locator('.ProjectView')).toBeHidden()
   const tab = page.getByTestId('project-view-tab-button')
   await expect(tab).toBeVisible()
   await tab.click()
   await expectLoadingSpinner(page)
   await expectGraphAfterLoading(page)
+})
+
+test('A project that fails to open shows the failure in the graph pane', async ({
+  drivePage,
+  page,
+}) => {
+  await page.route('/api/project-service/project/open', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, OPEN_DELAY_MS))
+    await route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ jsonrpc: '2.0', id: 0, error: { code: 0, message: 'Mock failure' } }),
+    })
+  })
+  await drivePage.driveTable.openProject('Mock Project')
+  await expectLoadingSpinner(page)
+  const pane = page.locator('.ProjectView')
+  await expect(pane.getByText('Failed to open project')).toBeVisible()
+  await expect(pane.getByTestId('spinner')).toHaveCount(0)
+  await expect(locate.graphEditor(page)).toHaveCount(0)
+
+  const tab = page.getByRole('tab', { name: 'Mock Project' })
+  await tab.locator('.CloseButton').click()
+  await expect(tab).toHaveCount(0)
+  await expect(pane).toHaveCount(0)
+})
+
+test('Closing the tab of a project that is still opening leaves it closed', async ({
+  drivePage,
+  page,
+}) => {
+  await delayProjectOpening(page)
+  await drivePage.driveTable.openProject('Mock Project')
+  await expectLoadingSpinner(page)
+  const tab = page.getByRole('tab', { name: 'Mock Project' })
+  await tab.locator('.CloseButton').click()
+  await expect(tab).toHaveCount(0)
+  // Once the held-back open request has gone through, the tab still does not come back.
+  await page.waitForTimeout(OPEN_DELAY_MS + 1_000)
+  await expect(tab).toHaveCount(0)
+  await expect(page.locator('.ProjectView')).toHaveCount(0)
 })
 
 test('Restoring the open project on reload shows the spinner', async ({ editorPage, page }) => {

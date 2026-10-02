@@ -1,9 +1,9 @@
 /** @file A user display with a popover for more information. */
 import { Button, CopyButton } from '#/components/Button'
 import { Popover } from '#/components/Dialog'
-import { TEXT_WITH_ICON } from '#/components/patterns'
 import { ProfilePicture } from '#/components/ProfilePicture'
 import { Text } from '#/components/Text'
+import { TEXT_WITH_ICON } from '$/components/patterns'
 import { useText } from '$/providers/react'
 import type { OtherUser } from 'enso-common/src/services/Backend'
 import { twMerge } from 'tailwind-merge'
