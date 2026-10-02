@@ -123,6 +123,11 @@
   are about 14% wider on average, so graphs laid out side by side may overlap
   after updating: use Tidy up (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>) to
   re-space them.
+- [Settings work when the IDE runs without Enso Cloud][186]. In local-only mode
+  the Account tab used to fail with "Something went wrong"; it now shows you as
+  an offline user, and explains that cloud account settings such as your
+  password, two-factor authentication and organization are not available. The
+  user menu shows the same offline user, and the cloud-only Usage tab is hidden.
 
 #### Enso Language & Runtime
 
@@ -255,6 +260,7 @@
 [132]: https://github.com/jdunkerley/enso/pull/132
 [133]: https://github.com/jdunkerley/enso/pull/133
 [135]: https://github.com/jdunkerley/enso/pull/135
+[186]: https://github.com/jdunkerley/enso/pull/186
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
