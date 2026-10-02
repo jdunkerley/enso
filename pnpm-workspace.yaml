@@ -107,9 +107,6 @@ packageExtensions:
   "@react-types/shared":
     dependencies:
       "@types/react": "*"
-  "@monaco-editor/react":
-    dependencies:
-      "@types/react": "*"
   "@stripe/react-stripe-js":
     dependencies:
       "@types/react": "*"
