@@ -89,7 +89,7 @@ const rightPanel = useRightPanelData()
 const projectStore = useProjectStore()
 const projectNames = useProjectNames()
 const graphStore = useGraphStore()
-const { id: assetId, module } = useCurrentProject()
+const { id: assetId, info: projectInfo, module } = useCurrentProject()
 const widgetRegistry = useWidgetRegistry()
 const suggestionDb = useSuggestionDbStore()
 provideVisualizationStore(projectStore)
@@ -461,6 +461,7 @@ watchEffect(() => {
     { type: 'project', id: assetId.value },
     {
       item: assetId.value,
+      openedProject: projectInfo.value,
       help: { item: displayedDocs.value, aiMode: aiMode.value },
     },
   )

@@ -14,7 +14,7 @@ import {
   DropdownMenuSubTrigger,
 } from 'reka-ui'
 import { computed } from 'vue'
-import { MENU_ITEM_STYLES, MENU_STYLES } from './variants'
+import { MENU_CONTAINER_PADDING, MENU_ITEM_STYLES, MENU_STYLES } from './variants'
 
 const {
   label,
@@ -46,7 +46,13 @@ const menuClasses = computed(() => MENU_STYLES({ variant }))
       </div>
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal :to="portalTarget()">
-      <DropdownMenuSubContent :sideOffset="4" :class="menuClasses" loop>
+      <!-- 8px from its item, as react-aria's submenus are (measured against the React menus). -->
+      <DropdownMenuSubContent
+        :sideOffset="8"
+        :collisionPadding="MENU_CONTAINER_PADDING"
+        :class="menuClasses"
+        loop
+      >
         <slot />
       </DropdownMenuSubContent>
     </DropdownMenuPortal>
