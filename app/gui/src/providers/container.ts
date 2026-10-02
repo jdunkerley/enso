@@ -181,21 +181,21 @@ function createContainerStore() {
   }
 
   /**
-   * Add project tab to list if not already opened.
+   * Add project tab to list if not already opened, and open the project in backend.
    *
-   * If tab is added, the project will be opened in backend, and the tab will be opened once
-   * the project loads.
+   * When the user asked for it (`userAction`), the tab becomes the current one straight away, so
+   * the graph pane shows the project's loading spinner (or its failure) while the project opens,
+   * just as it does for a project restored at startup. Otherwise the tab is only added: the
+   * callers which pass `false` are already navigating to the project's route themselves.
    */
   function openProjectTab(info: ProjectInfo, userAction = true) {
     const tab: Tab = { type: 'project', id: info.id }
-    const project = openedProjects.openProject(info)
+    openedProjects.openProject(info)
     if (!isTabOpened(tab)) {
       tabs.set(panelKey(tab), tab)
       analytics.workflowOpened()
     }
-    if (userAction) {
-      openedProjects.waitForProcess(project).then(() => (currentTab.value = tab))
-    }
+    if (userAction) currentTab.value = tab
   }
 
   /** Add project log tab to list. */

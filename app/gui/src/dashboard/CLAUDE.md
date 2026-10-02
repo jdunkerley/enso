@@ -17,6 +17,8 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 ## Structure (React, legacy shape)
 
 - `pages/` — Route-level components. Top of the component tree for each URL.
+  `pages/dashboard/UserBar/` is Vue (#83): the user bar, user menu and
+  notification tray, mounted by `AppContainer.vue`.
 - `layouts/` — Chromes that wrap multiple pages (protected-route wrappers, split
   panels).
 - `modules/` — Feature-oriented slices (`payments/` for Stripe flows, etc.). A
@@ -30,6 +32,9 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `askModal`, behind the React `ask`) forward to the Vue modal stack
   (`$/providers/modals`). The About dialog is Vue's: open it with
   `openAboutModal()` (`$/components/AboutModal/aboutModal`).
+  `InputBindingsProvider` hands out the one instance of the dashboard's
+  bindings, `$/providers/inputBindings`, which Vue menus read too (the user
+  menu's shortcuts; `$/composables/menuEntries` is the Vue `useMenuEntries`).
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.

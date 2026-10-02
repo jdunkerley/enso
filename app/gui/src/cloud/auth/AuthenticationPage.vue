@@ -8,10 +8,9 @@
  * React. While offline, a notice above the card says that signing in is unavailable, and, with
  * `supportsOffline`, that the local projects still are.
  *
- * Like the React `Page`, it shows the info bar at the top right (still React, mounted through
- * `reactComponent`) and mounts the modal host, loaded on first use.
+ * Like the React `Page`, it shows the info bar at the top right (`$/components/InfoBar`, #83) and
+ * mounts the modal host, both loaded on first use.
  */
-import { InfoBar as InfoBarReact } from '#/layouts/InfoBar'
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import Form from '$/components/Form/Form.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
@@ -19,7 +18,6 @@ import Heading from '$/components/Text/Heading.vue'
 import Text from '$/components/Text/Text.vue'
 import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
-import { reactComponent } from '@/util/react'
 import { defineAsyncComponent } from 'vue'
 
 const {
@@ -35,7 +33,8 @@ const {
   testId?: string | undefined
 }>()
 
-const InfoBar = reactComponent(InfoBarReact)
+/** Loaded on demand, as the React `Page` loads it: its popover pulls in Reka. */
+const InfoBar = defineAsyncComponent(() => import('$/components/InfoBar/InfoBar.vue'))
 /** Loaded on demand, as the React `Page` loads it: its error boundary pulls in Reka. */
 const ModalHost = defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue'))
 

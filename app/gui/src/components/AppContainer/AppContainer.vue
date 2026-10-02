@@ -1,6 +1,6 @@
 <script lang="ts">
 import type { TransferBetweenCategoriesFunction } from '#/layouts/Drive/Categories'
-import { UserBar as UserBarReact } from '#/pages/dashboard/UserBar'
+import UserBar from '#/pages/dashboard/UserBar/UserBar.vue'
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useContainerData } from '$/providers/container'
@@ -20,7 +20,6 @@ import { registerHandlers, type ActionName } from '@/providers/action'
 import { provideAsyncResources } from '@/providers/asyncResources'
 import { provideFullscreenRoot } from '@/providers/fullscreenRoot'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
-import { reactComponent } from '@/util/react'
 import { BackendType, EnsoPath } from 'enso-common/src/services/Backend'
 import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBackend'
 import * as objects from 'enso-common/src/utilities/data/object'
@@ -32,8 +31,6 @@ import LeftPanel from './LeftPanel.vue'
 import MiddlePanel from './MiddlePanel.vue'
 import RightPanel from './RightPanel.vue'
 import TabBar from './TabBar.vue'
-
-const UserBar = reactComponent(UserBarReact)
 </script>
 
 <script setup lang="ts">

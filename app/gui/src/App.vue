@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useVersionCheckerEnabled } from '$/cloud/versionChecker/versionChecker'
 import { openAboutModal, useAboutModal } from '$/components/AboutModal/aboutModal'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import ToastHost from '$/components/Toast/ToastHost.vue'
@@ -22,7 +23,7 @@ import { provideInteractionHandler } from '@/providers/interactionHandler'
 import { provideBubblingKeyboard, provideKeyboard } from '@/providers/keyboard'
 import { provideTooltipRegistry } from '@/providers/tooltipRegistry'
 import { registerAutoBlurHandler, registerGlobalBlurHandler } from '@/util/autoBlur'
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import { useQueryClient } from '@tanstack/vue-query'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Platform, platform } from 'enso-common/src/utilities/detect'
@@ -92,6 +93,15 @@ watch(about.isOpen, (isOpen) => {
   if (isOpen) aboutMounted.value = true
 })
 window.api?.menu.setMenuItemHandler('about', openAboutModal)
+
+// The "new version available" dialog, mounted where the React one was (in the React root, on every
+// page), only while the check is enabled (the desktop app), and loaded then: it brings the dialog
+// and the stepper. It is cloud-area code (decision 6b), imported directly until the registries
+// exist.
+const VersionChecker = defineAsyncComponent(
+  () => import('$/cloud/versionChecker/VersionChecker.vue'),
+)
+const versionCheckerEnabled = useVersionCheckerEnabled()
 </script>
 
 <template>
@@ -107,6 +117,7 @@ window.api?.menu.setMenuItemHandler('about', openAboutModal)
             v-model:open="about.isOpen.value"
             :opener="about.opener.value"
           />
+          <VersionChecker v-if="versionCheckerEnabled" />
           <ErrorBoundary onlyRenderErrors :resetKeys="[route.path]">
             <component :is="Component" />
           </ErrorBoundary>

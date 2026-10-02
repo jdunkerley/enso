@@ -4,7 +4,8 @@
  *
  * The {@link App} component defines the global React context used by child components: the
  * react-aria router and the input bindings. The toasts, the modal stack, the About dialog with its
- * menu handler, and the app-wide effects (theme, selection clearing) are Vue's, in `App.vue`.
+ * menu handler, the version checker and the app-wide effects (theme, selection clearing) are Vue's,
+ * in `App.vue`.
  */
 import * as React from 'react'
 
@@ -12,7 +13,6 @@ import * as z from 'zod'
 
 import InputBindingsProvider from '#/providers/InputBindingsProvider'
 
-import VersionChecker from '#/layouts/VersionChecker'
 import { RouterProvider } from 'react-aria-components'
 
 import LocalStorage from '$/utils/LocalStorage'
@@ -44,10 +44,7 @@ export default function App(props: React.PropsWithChildren) {
   // `InputBindingsProvider` depends on `LocalStorageProvider`.
   return (
     <RouterProvider navigate={navigate}>
-      <InputBindingsProvider>
-        <VersionChecker />
-        {children}
-      </InputBindingsProvider>
+      <InputBindingsProvider>{children}</InputBindingsProvider>
     </RouterProvider>
   )
 }

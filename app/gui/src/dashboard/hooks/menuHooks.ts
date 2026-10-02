@@ -1,8 +1,8 @@
 /** @file Hooks for menus. */
-import { actionToTextId, type MenuEntryProps } from '#/components/MenuEntry'
+import type { MenuEntryProps } from '#/components/MenuEntry'
 import { useBindingFocusScope } from '#/providers/BindingFocusScopeProvider'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
-import type { DashboardBindingKey } from '$/configurations/inputBindings'
+import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import type { Action } from '$/providers/actions'
 import { useActionsStore, useText } from '$/providers/react'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
