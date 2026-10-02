@@ -6,12 +6,13 @@ import { useSyncLocalStorage } from '@/composables/syncLocalStorage'
 import { createContextStore } from '@/providers'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import { useQuery } from '@tanstack/vue-query'
-import { AssetType, ProjectId, type AnyAsset } from 'enso-common/src/services/Backend'
+import { AssetType, BackendType, ProjectId, type AnyAsset } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { encoding } from 'lib0'
 import { computed, reactive, readonly, ref, toValue, type Ref } from 'vue'
 import type { SuggestionId } from 'ydoc-shared/languageServerTypes/suggestions'
 import { panelKey, type Panel } from './container'
+import type { ProjectInfo } from './openedProjects/projectInfo'
 import { useText, type TextStore } from './text'
 
 /** Information about content of "Help" panel. */
@@ -32,6 +33,11 @@ export interface RightPanelContext {
   //  `AnyAsset | undefined`
   item?: AnyAsset | ProjectId | undefined
   defaultItem?: AnyAsset | undefined
+  /**
+   * The project opened in a project tab. The project view sets `item` to the project's id only, so
+   * this carries what is needed to tell which backend holds the project.
+   */
+  openedProject?: Pick<ProjectInfo, 'id' | 'title' | 'mode'> | undefined
   spotlightOn?: AssetPropertiesSpotlight | undefined
   help?: DisplayedHelp
 }
@@ -142,6 +148,35 @@ function useRightPanelTabs(
   ] as const satisfies [string, RightPanelTabInfo][])
 }
 
+/** A project whose sessions the Activity tab lists, and the backend which holds them. */
+export interface SessionsProject {
+  backendType: BackendType
+  id: ProjectId
+  title: string
+}
+
+/**
+ * The project whose sessions the Activity tab lists.
+ *
+ * In the drive, it is the focused project asset, held by the current category's backend. In a
+ * project tab, it is the opened project: a local project's sessions are the local backend's, while
+ * a cloud or hybrid project's are the cloud project's (its `id`, not a hybrid's `runningId`).
+ */
+export function sessionsProjectFromContext(
+  ctx: RightPanelContext | undefined,
+): SessionsProject | undefined {
+  if (ctx == null) return undefined
+  if (ctx.openedProject != null) {
+    const { id, title, mode } = ctx.openedProject
+    return { backendType: mode === 'local' ? BackendType.local : BackendType.remote, id, title }
+  }
+  const asset = ctx.item ?? ctx.defaultItem
+  if (ctx.category == null || typeof asset !== 'object' || asset.type !== AssetType.project) {
+    return undefined
+  }
+  return { backendType: CATEGORY_BACKEND[ctx.category.type], id: asset.id, title: asset.title }
+}
+
 export type RightPanelTabId =
   ReturnType<typeof useRightPanelTabs> extends Map<infer K, any> ? K : never
 
@@ -223,6 +258,8 @@ function useRightPanel(focusedPanel: ToValue<Panel>, textStore: TextStore = useT
     () => context.value?.category && CATEGORY_BACKEND[context.value.category.type],
   )
 
+  const sessionsProject = computed(() => sessionsProjectFromContext(context.value))
+
   const focusedAssetDetailsQuery = useQuery({
     queryKey: [backendType, 'getAssetDetails', focusedAsset] as const,
     queryFn: async (query) => {
@@ -278,6 +315,8 @@ function useRightPanel(focusedPanel: ToValue<Panel>, textStore: TextStore = useT
     focusedAsset,
     /** The details for `focusedAsset`. */
     focusedAssetDetails,
+    /** The project whose sessions the Activity tab lists. */
+    sessionsProject,
   })
 }
 

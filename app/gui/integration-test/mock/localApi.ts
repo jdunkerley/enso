@@ -55,6 +55,7 @@ const INITIAL_CALLS_OBJECT = {
   downloadCloudProject: array<object>(),
   downloadProject: array<{ projectId: backend.ProjectId }>(),
   getFileContent: array<{ path: string }>(),
+  listProjectSessions: array<{ localProjectKey: string }>(),
   createProject: array<CreateProjectParams>(),
   openProject: array<OpenProjectParams>(),
   closeProject: array<CloseProjectParams>(),
@@ -103,6 +104,8 @@ export async function mockLocalApi(page: Page) {
 
   const fileSystem = new Map<string, FileSystemEntryWithData>()
   const openProjects = new Map<UUID, ProjectState>()
+  /** The sessions every local project reports, as the engine's log files would list them. */
+  const projectSessions: { projectSessionId: string; createdAt: string }[] = []
 
   const callsObjects = new Set<typeof INITIAL_CALLS_OBJECT>()
 
@@ -658,6 +661,14 @@ export async function mockLocalApi(page: Page) {
           moveEntry(Path(sourcePath), Path(destinationPath))
           return succeed({})
         }
+        case 'list-project-sessions': {
+          const localProjectKey = cliArguments[0]
+          if (localProjectKey == null) {
+            return fail('No project key provided')
+          }
+          called('listProjectSessions', { localProjectKey })
+          return succeed({ sessions: projectSessions })
+        }
         case 'filesystem-delete': {
           const path = cliArguments[0]
           if (path == null) {
@@ -674,6 +685,11 @@ export async function mockLocalApi(page: Page) {
     })
   })
 
+  /** Add a session that every local project will report. */
+  function addProjectSession(createdAt: string) {
+    projectSessions.push({ projectSessionId: `local-session-${projectSessions.length}`, createdAt })
+  }
+
   async function updateVisualization(preprocessor: string, data: unknown) {
     updateVisualizationData(preprocessor, data)
   }
@@ -685,6 +701,7 @@ export async function mockLocalApi(page: Page) {
     addProject,
     addFile,
     removeEntry,
+    addProjectSession,
     updateVisualization,
   } as const
 
