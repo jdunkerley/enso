@@ -2,10 +2,12 @@
  * @file The Vue user bar (#83): the user menu (a dialog of buttons, as React's), its entries as
  * global actions, the notification tray, the offline notice and the cloud-only buttons.
  */
-import { useAboutModal } from '$/components/AboutModal/aboutModal'
-import { useActionsStore } from '$/providers/actions'
-import { useText } from '$/providers/text'
-import { useToasts } from '$/providers/toasts'
+// The stores are plain objects, not React hooks: renamed so that the dashboard's rules-of-hooks
+// lint does not take them for hooks.
+import { useAboutModal as getAboutModal } from '$/components/AboutModal/aboutModal'
+import { useActionsStore as getActionsStore } from '$/providers/actions'
+import { useText as getTextStore } from '$/providers/text'
+import { getToastsStore } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { onlineManager } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
@@ -51,7 +53,7 @@ vi.mock('#/modals/InviteUsersModal/InviteUsersButton', () => ({
   InviteUsersButton: () => null,
 }))
 
-const { getText } = useText()
+const { getText } = getTextStore()
 
 // The overlays teleport into the portal root that `index.html` provides.
 let portalRoot: HTMLElement
@@ -60,7 +62,21 @@ beforeEach(() => {
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
 })
-afterEach(() => portalRoot.remove())
+afterEach(() => {
+  portalRoot.remove()
+})
+
+/**
+ * The value, which the test requires to be there.
+ * @throws {Error} When it is not.
+ */
+function must<T>(value: T | null | undefined): T {
+  if (value == null) throw new Error('Expected a value.')
+  return value
+}
+
+/** An element's text, trimmed. */
+const textOf = (element: Element | null | undefined) => element?.textContent.trim()
 
 function makeUser(overrides: Partial<User> = {}): User {
   return {
@@ -88,16 +104,18 @@ async function mountUserBar() {
 }
 
 const userMenuButton = () =>
-  document.querySelector<HTMLElement>(`button[aria-label="${getText('userMenuLabel')}"]`)!
+  must(document.querySelector<HTMLElement>(`button[aria-label="${getText('userMenuLabel')}"]`))
 const userMenu = () => document.querySelector<HTMLElement>('[data-testid="user-menu"]')
 const entryNames = () =>
   [...(userMenu()?.querySelectorAll('button') ?? [])].map((button) =>
-    button.querySelector('span')?.textContent?.trim(),
+    textOf(button.querySelector('span')),
   )
 const entry = (name: string) =>
-  [...(userMenu()?.querySelectorAll('button') ?? [])].find(
-    (button) => button.querySelector('span')?.textContent?.trim() === name,
-  )!
+  must(
+    [...(userMenu()?.querySelectorAll('button') ?? [])].find(
+      (button) => textOf(button.querySelector('span')) === name,
+    ),
+  )
 
 beforeEach(() => {
   auth.session = { user: makeUser() }
@@ -106,10 +124,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  useAboutModal().isOpen.value = false
+  getAboutModal().isOpen.value = false
   onlineManager.setOnline(true)
   uploads.clear()
-  useToasts().dismiss()
+  getToastsStore().dismiss()
 })
 
 describe('UserBar', () => {
@@ -125,7 +143,7 @@ describe('UserBar', () => {
     userMenuButton().focus()
     await user.keyboard('{Enter}')
     await flushPromises()
-    const menu = userMenu()!
+    const menu = must(userMenu())
     expect(menu.getAttribute('role')).toBe('dialog')
     expect(menu.getAttribute('aria-label')).toBe(getText('userMenuLabel'))
     // As react-aria's: the dialog itself, then Tab to the entries.
@@ -175,7 +193,7 @@ describe('UserBar', () => {
     await flushPromises()
     await user.click(entry(getText('aboutThisAppShortcut')))
     await flushPromises()
-    expect(useAboutModal().isOpen.value).toBe(true)
+    expect(getAboutModal().isOpen.value).toBe(true)
 
     await user.click(userMenuButton())
     await flushPromises()
@@ -188,7 +206,7 @@ describe('UserBar', () => {
   test('the entries are global actions while the bar is mounted, the menu closed', async () => {
     const { goToSettingsPage, unmount } = await mountUserBar()
     const names = () =>
-      useActionsStore()
+      getActionsStore()
         .findActions('')
         .map((action) => action.name)
     expect(names()).toEqual(
@@ -207,15 +225,15 @@ describe('UserBar', () => {
     await flushPromises()
     // The key of `Mod+,`, after its modifier.
     expect(entry(getText('settingsShortcut')).textContent).toMatch(/,$/)
-    expect(entry(getText('signOutShortcut')).textContent?.trim()).toBe(getText('signOutShortcut'))
+    expect(textOf(entry(getText('signOutShortcut')))).toBe(getText('signOutShortcut'))
   })
 
   test('an organization admin on the free plan gets "Upgrade"', async () => {
     auth.session = { user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }) }
     const { router } = await mountUserBar()
-    const upgrade = [...document.querySelectorAll('a')].find(
-      (link) => link.textContent?.trim() === getText('upgrade'),
-    )!
+    const upgrade = must(
+      [...document.querySelectorAll('a')].find((link) => textOf(link) === getText('upgrade')),
+    )
     expect(upgrade.getAttribute('href')).toBe('/subscribe')
     await userEvent.setup().click(upgrade)
     await flushPromises()
@@ -231,21 +249,21 @@ describe('UserBar', () => {
 
 describe('NotificationTray', () => {
   const trayButton = () =>
-    document.querySelector<HTMLElement>(`button[aria-label="${getText('notifications')}"]`)!
-  const tray = () => document.querySelector<HTMLElement>(`[role="dialog"]`)
+    must(document.querySelector<HTMLElement>(`button[aria-label="${getText('notifications')}"]`))
+  const tray = () => must(document.querySelector<HTMLElement>(`[role="dialog"]`))
 
   test('empty: "You are all caught up"', async () => {
     await mountUserBar()
     await userEvent.setup().click(trayButton())
     await flushPromises()
-    expect(tray()!.getAttribute('aria-label')).toBe(getText('notifications'))
-    expect(tray()!.querySelector('h3')!.textContent!.trim()).toBe(getText('notifications'))
-    expect(tray()!.textContent).toContain(getText('youAreAllCaughtUp'))
+    expect(tray().getAttribute('aria-label')).toBe(getText('notifications'))
+    expect(textOf(tray().querySelector('h3'))).toBe(getText('notifications'))
+    expect(tray().textContent).toContain(getText('youAreAllCaughtUp'))
   })
 
   test('an upload: a notification with a toast, and a badge until the tray is opened', async () => {
     await mountUserBar()
-    const badge = () => trayButton().querySelector('[class*="after:bg-danger"]')!
+    const badge = () => must(trayButton().querySelector('[class*="after:bg-danger"]'))
     uploads.set('upload-1', {
       kind: 'requestedByUser',
       sentBytes: 500_000,
@@ -253,7 +271,7 @@ describe('NotificationTray', () => {
     })
     await flushPromises()
     const message = getText('uploadingXFilesWithProgressNotification', 0, 1, '0.50', '2')
-    const toast = useToasts().toasts.value.find((t) => t.id === 'upload-1')!
+    const toast = must(getToastsStore().toasts.value.find((t) => t.id === 'upload-1'))
     expect(toast.isLoading).toBe(true)
     expect(toast.position).toBe('bottom-right')
     expect(toast.progress).toBe(0.25)
@@ -261,10 +279,11 @@ describe('NotificationTray', () => {
 
     await userEvent.setup().click(trayButton())
     await flushPromises()
-    const items = tray()!.querySelectorAll('[role="listitem"]')
+    const items = [...tray().querySelectorAll('[role="listitem"]')]
     expect(items).toHaveLength(1)
-    expect(items[0]!.textContent).toContain(message)
-    expect(items[0]!.querySelector('[role="progressbar"]')).not.toBeNull()
+    const [item] = items
+    expect(item?.textContent).toContain(message)
+    expect(item?.querySelector('[role="progressbar"]')).not.toBeNull()
     // Seen: the badge goes.
     expect(badge().classList).toContain('invisible')
   })

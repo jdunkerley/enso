@@ -11,10 +11,13 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const getLatestRelease = vi.fn(async () => ({
+  // GitHub's field names.
+  /* eslint-disable camelcase */
   tag_name: '2099.1.1',
   published_at: '2099-01-01T00:00:00Z',
   html_url: 'https://github.com/enso-org/enso/releases/tag/2099.1.1',
   assets: [],
+  /* eslint-enable camelcase */
 }))
 const getDownloadUrl = vi.fn(async () => 'https://example.com/enso.exe')
 vi.mock('$/utils/github', () => ({

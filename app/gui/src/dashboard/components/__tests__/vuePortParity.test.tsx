@@ -263,14 +263,14 @@ describe('the user bar parts render as the React ones (#83)', () => {
     // React's `FocusRing` adds `focus-ring` while the button has visible focus; the Vue button
     // carries its rules as `focus-visible:` classes. Compare without them.
     const vue = byTestId('vue')
-    const button = vue.querySelector('button')!
-    for (const name of [...button.classList]) {
-      if (name.startsWith('focus-visible:')) button.classList.remove(name)
+    const button = vue.querySelector('button')
+    for (const name of [...(button?.classList ?? [])]) {
+      if (name.startsWith('focus-visible:')) button?.classList.remove(name)
     }
     expect(shape(vue)).toEqual(shape(byTestId('react')))
     // The colour of the action (Logout's red), as an inline style on the label.
-    expect(vue.querySelector('button div div')!.getAttribute('style')).toBe(
-      byTestId('react').querySelector('button div div')!.getAttribute('style'),
-    )
+    const labelStyle = (root: HTMLElement) =>
+      root.querySelector('button div div')?.getAttribute('style') ?? null
+    expect(labelStyle(vue)).toBe(labelStyle(byTestId('react')))
   })
 })
