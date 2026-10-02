@@ -123,6 +123,10 @@
   are about 14% wider on average, so graphs laid out side by side may overlap
   after updating: use Tidy up (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd>) to
   re-space them.
+- [Node comments in the graph are handwritten too][187]: with the "Handwritten
+  comments" setting on, the comments above components show in Monaspace Radon,
+  like comments in the code editor, at the same size as before. Turning the
+  setting off keeps the previous typeface.
 
 #### Enso Language & Runtime
 
@@ -255,6 +259,7 @@
 [132]: https://github.com/jdunkerley/enso/pull/132
 [133]: https://github.com/jdunkerley/enso/pull/133
 [135]: https://github.com/jdunkerley/enso/pull/135
+[187]: https://github.com/jdunkerley/enso/pull/187
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
