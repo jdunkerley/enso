@@ -1,9 +1,9 @@
 /* Variable fonts (`wght`/`wdth`/`slnt` axes, per their `fvar` tables); the full upstream
    files are unmodified and unsubset (see `public/font-monaspace/README.md`). Neon is
    `--font-mono` and `--font-code` (node text) in `base.css`, and is preloaded from `index.html`.
-   Radon is the code editor's comment face under the "Handwritten comments" setting
-   (`--font-mono-comment`); it is not preloaded, but loaded from `src/providers/codeFont.ts` only
-   while the setting is on.
+   Radon is the comment face under the "Handwritten comments" setting, in the code editor
+   (`--font-mono-comment`) and in node comments (`--font-node-comment`); it is not preloaded, but
+   loaded from `src/providers/codeFont.ts` only while the setting is on.
 
    `font-style: oblique 0deg 11deg` covers the `slnt` axis's -11..0: CSS oblique angles are
    positive when leaning clockwise, OpenType `slnt` values negative, and browsers map one to

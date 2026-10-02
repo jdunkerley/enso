@@ -1,7 +1,7 @@
 /**
  * @file Screenshot tests for the code font (`--font-mono`): Monaspace Neon, with the "Code
  * ligatures" setting at its default (off) and the "Handwritten comments" setting at its default
- * (on: comments in the code editor use Monaspace Radon).
+ * (on: comments in the code editor and node comments in the graph use Monaspace Radon).
  *
  * The baselines are Linux-only (`*-linux.png`), since CI runs the suite on Ubuntu; on other
  * platforms only the comparisons are skipped (see `integration-test/screenshot.ts`). Regenerate
@@ -301,6 +301,82 @@ test('Code editor caret keeps the Neon grid across a comment boundary', async ({
   for (const [line, column] of positions) await expectCaretOnRuler(page, lines[0]!, line, column)
 })
 
+/** A node comment with texture-healing pairs, descenders and digits. */
+const NODE_COMMENT_SAMPLE = 'Node comment: mlmlml iiii gjpqy 123'
+
+/** Replace the `final` node's comment with {@link NODE_COMMENT_SAMPLE}, by editing it in the graph. */
+async function setNodeCommentSample(page: Page) {
+  const comment = locate.nodeCommentContent(locate.graphNodeByBinding(page, 'final'))
+  await comment.click()
+  await page.keyboard.press('ControlOrMeta+A')
+  await comment.fill(NODE_COMMENT_SAMPLE)
+  await page.keyboard.press('Enter')
+  await expect(comment).not.toBeFocused()
+  await expect(comment).toHaveText(NODE_COMMENT_SAMPLE)
+  return comment
+}
+
+/** The client box of each character of the element's text, in order. */
+function characterBoxes(element: Locator): Promise<Box[]> {
+  return element.evaluate((element) => {
+    const boxes: Box[] = []
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    for (let node = walker.nextNode(); node != null; node = walker.nextNode()) {
+      for (let i = 0; i < node.textContent!.length; i++) {
+        const range = document.createRange()
+        range.setStart(node, i)
+        range.setEnd(node, i + 1)
+        const { x, y, width, height } = range.getBoundingClientRect()
+        boxes.push({ x, y, width, height })
+      }
+    }
+    return boxes
+  })
+}
+
+test('Node comments use Monaspace Radon, at the UI size', async ({ editorPage, page }) => {
+  await editorPage
+  const comment = await setNodeCommentSample(page)
+  await expectMonaspaceLoaded(page, ['Monaspace Neon', 'Monaspace Radon'])
+
+  await expect(comment).toHaveCSS('font-family', /^"Monaspace Radon"/)
+  // The size the UI face had: Radon's x-height matches M PLUS 1's.
+  await expect(comment).toHaveCSS('font-size', '11.5px')
+  await expect(comment).toHaveCSS('font-feature-settings', 'normal')
+
+  // The bubble is exactly as tall in Radon as in the UI face, so it does not move when Radon
+  // finishes loading.
+  const height = async () => (await comment.boundingBox())!.height
+  const radonHeight = await height()
+  await page.evaluate(() => document.documentElement.classList.remove('handwrittenComments'))
+  await expect(comment).toHaveCSS('font-family', /^"M PLUS 1"/)
+  expect(await height()).toBe(radonHeight)
+  await page.evaluate(() => document.documentElement.classList.add('handwrittenComments'))
+  await expect(comment).toHaveCSS('font-family', /^"Monaspace Radon"/)
+
+  // A click on the left half of a character puts the caret before it.
+  const boxes = await characterBoxes(comment)
+  expect(boxes.length).toBe(NODE_COMMENT_SAMPLE.length)
+  for (const column of [0, 1, NODE_COMMENT_SAMPLE.indexOf('mlmlml') + 3, boxes.length - 1]) {
+    const box = boxes[column]!
+    await page.mouse.click(box.x + box.width * 0.25, box.y + box.height / 2)
+    await expect(comment).toBeFocused()
+    await expect
+      .poll(() => page.evaluate(() => window.getSelection()!.focusOffset), {
+        message: `caret at column ${column}`,
+      })
+      .toBe(column)
+  }
+  await page.keyboard.press('Enter')
+  await expect(comment).not.toBeFocused()
+
+  // Nodes sit at fractional graph coordinates, which differ between runs.
+  await alignToPixelGrid(locate.graphNodeByBinding(page, 'final').locator('.GraphNodeComment'))
+  await expectScreenshot(page, 'node-comment.png', {
+    clip: boundingClip(await textBoxes(comment.locator('.cm-line')), 2),
+  })
+})
+
 test.describe('Handwritten comments off', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
@@ -329,6 +405,13 @@ test.describe('Handwritten comments off', () => {
           .map((face) => face.family),
       ),
     ).toEqual([])
+  })
+
+  test('Node comments use the UI face', async ({ editorPage, page }) => {
+    await editorPage
+    const comment = await setNodeCommentSample(page)
+    await expect(comment).toHaveCSS('font-family', /^"M PLUS 1"/)
+    await expect(comment).toHaveCSS('font-size', '11.5px')
   })
 })
 
