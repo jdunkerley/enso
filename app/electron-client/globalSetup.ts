@@ -14,6 +14,10 @@
  *
  * Best-effort: a failure here only means the specs stay slow, so it is logged and swallowed
  * rather than aborting the run.
+ *
+ * Note that the packaged native-image engine has its standard library compiled in ahead of time
+ * ("AOT ready" in its debug log). So this run takes about 2 s and writes no standard-library IR.
+ * It does not speed up a Language Server's first execution of a project (#169).
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'

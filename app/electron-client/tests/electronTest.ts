@@ -169,17 +169,29 @@ export async function loginAsTestUser(page: Page) {
 }
 
 /**
- * Time budget for the first project of a test to become interactive. Each spec launches a fresh
- * Electron process whose Language Server has to JIT-warm and load the standard library on the
- * first project open; the IR cache is pre-warmed in `globalSetup.ts` so this is a load, not a
- * from-source compile, but on a slow CI runner it can still take a while.
+ * Time budget for each stage of a test's first project. Each spec launches a fresh Electron
+ * process, so its first project gets a cold Language Server.
+ *
+ * The two stages differ a lot on the Windows CI runner (2 vCPUs). The graph appears 13-25 s after
+ * the project opens. The first visualization comes only once the Language Server has executed the
+ * project and loaded every library's suggestions: 91-115 s, sometimes more (#169). Most of that is
+ * per-process work, and retries were just as slow, so `globalSetup.ts` cannot warm it away. The
+ * standard library is AOT-compiled into the packaged engine, so there is no IR cache to warm.
+ * Specs that do not need the visualization should pass `waitForVisualization: false`.
  */
 const FIRST_PROJECT_TIMEOUT = 90000
 
-/** Create a new Enso project */
-export async function createNewProject(page: Page) {
+/**
+ * Create a new Enso project, and wait until its graph is shown and, unless `waitForVisualization`
+ * is false, until its "Welcome To Enso!" table visualization has been computed.
+ */
+export async function createNewProject(
+  page: Page,
+  { waitForVisualization = true }: { waitForVisualization?: boolean } = {},
+) {
   await page.getByRole('button', { name: 'New Project' }).click()
   await expect(page.locator('.GraphNode')).toHaveCount(1, { timeout: FIRST_PROJECT_TIMEOUT })
+  if (!waitForVisualization) return
 
   const tableViz = page.locator('.TableVisualization')
   await expect(tableViz).toContainText('Welcome To Enso!', { timeout: FIRST_PROJECT_TIMEOUT })
