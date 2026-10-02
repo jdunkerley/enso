@@ -16,10 +16,15 @@ tab.
   `SettingsTab.vue` lays out their sections; a form entry is
   `SettingsFormEntry.vue`, a component entry reads the page's context with
   `useSettingsContext` (`$/providers/settingsContext`).
-- **The Account tab has no sections of its own.** The cloud contributes them
-  (`$/cloud/account/`, registered by `registerCloud`), through
-  `$/providers/settingsContributions`; the settings route waits for them to
-  load.
+- **The Account tab has one section of its own: the offline user.** In
+  local-only mode (authentication disabled, `isAuthDisabled` in the context) it
+  shows the stand-in user and why the cloud account's settings are missing
+  (`OfflineUserSettingsSection.vue`); it is core, so a build without the cloud
+  has it. Every other section comes from the cloud (`$/cloud/account/`,
+  registered by `registerCloud`), through `$/providers/settingsContributions`;
+  the settings route waits for them to load. They hide themselves in local-only
+  mode and must never reach for Enso Cloud or Cognito there: the stand-in
+  session's access token is empty, not a JWT.
 - **React tabs** (`data.tsx`, `react: true`): organization, billing, members,
   user groups, activity log, API keys and usage. `ReactSettingsTab.tsx` mounts
   them through `reactComponent`, with the React shell they still need (`Tab`,
@@ -39,5 +44,7 @@ bindings.
 `__tests__/`: the shell (`SettingsPage.test.ts`), the Account tab with the
 cloud's sections (`accountTab.test.ts`), and the Keyboard shortcuts tab with its
 capture modal. The Playwright specs are `integration-test/dashboard/`
-`userSettings.spec.ts` and `organizationSettings.spec.ts`, and the settings
-check of `accessibility.spec.ts`.
+`userSettings.spec.ts`, `organizationSettings.spec.ts` and
+`localModeSettings.spec.ts` (local-only mode, which also shows how to start the
+app with authentication disabled), and the settings check of
+`accessibility.spec.ts`.
