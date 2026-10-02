@@ -48,7 +48,7 @@ const RESTRICTED_IMPORT_PATHS = [
   {
     name: 'veaury',
     importNames: ['applyReactInVue', 'applyPureReactInVue'],
-    message: 'Use `reactComponent` in @/util/react',
+    message: 'Use `reactComponent` in $/utils/react',
   },
 ]
 
@@ -65,11 +65,8 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
   'App.tsx',
   'components/Devtools',
-  'components/Dialog/Dialog',
   'components/ErrorBoundary',
-  'components/Loader',
   'components/OfflineNotificationManager',
-  'components/Result',
   'components/Suspense',
   'components/UIProviders',
   'layouts/AssetPanel/components/AssetProperties',
@@ -81,12 +78,10 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/PlanDowngradedModal',
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
-  'modals/UpsertSecretModal',
   'pages/authentication/LoadingScreen',
   'pages/authentication/Login',
   'pages/authentication/Registration',
   'pages/dashboard/UserBar',
-  'pages/dashboard/components/KeyboardShortcut',
   'providers/LoggerProvider',
   // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
   'hooks/mountHooks',

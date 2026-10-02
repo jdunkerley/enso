@@ -1,5 +1,6 @@
 /** @file Actions for the "drive" page. */
 import { expect, type Locator, type Page } from 'integration-test/base'
+import * as locate from '../project-view/locate'
 import type { LocatorCallback } from './BaseActions'
 import { contextMenuActions } from './contextMenuActions'
 import EditorPageActions from './EditorPageActions'
@@ -369,6 +370,9 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       const projectTab = page.getByRole('tab', { name })
       await expect(projectTab).toBeVisible({ timeout: 100000 })
       await expect(projectTab).toHaveClass(/selected/)
+      // A project's tab becomes the current one as soon as the project starts opening, with a
+      // spinner in the graph pane until it is ready: wait for the graph itself.
+      await expect(locate.graphEditor(page)).toBeVisible({ timeout: 100000 })
     }).into(EditorPageActions<Context>)
   }
 

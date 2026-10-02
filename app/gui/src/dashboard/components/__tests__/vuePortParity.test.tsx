@@ -14,18 +14,24 @@ import { Alert } from '#/components/Alert'
 import { Badge } from '#/components/Badge'
 import { Button } from '#/components/Button'
 import { Dialog, DialogStackProvider } from '#/components/Dialog'
+import { Loader } from '#/components/Loader'
+import { Result } from '#/components/Result'
 import { Text } from '#/components/Text'
+import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import AlertVue from '$/components/Alert/Alert.vue'
 import BadgeVue from '$/components/Badge/Badge.vue'
 import ButtonVue from '$/components/Button/Button.vue'
 import DialogVue from '$/components/Dialog/Dialog.vue'
 import { DIALOG_MOTION } from '$/components/Dialog/variants'
+import KeyboardShortcutVue from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
+import ResultVue from '$/components/Result/Result.vue'
+import LoaderVue from '$/components/Spinner/Loader.vue'
 import TextVue from '$/components/Text/Text.vue'
 import { TextContext } from '$/providers/react'
 import { useText } from '$/providers/text'
 import { act, render } from '@testing-library/react'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, test } from 'vitest'
+import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h, type VNodeChild } from 'vue'
 
 enableAutoUnmount(afterEach)
@@ -39,6 +45,22 @@ function byTestId(id: string) {
   if (element == null) throw new Error(`No element with test id ${id}`)
   return element
 }
+/**
+ * An element's tree as tags, classes and text: what a rendering looks like with the same
+ * stylesheet. Other attributes (ids, ARIA, test ids) are left out.
+ */
+function shape(element: Element): unknown {
+  return {
+    tag: element.tagName,
+    class: [...classSet(element)].sort(),
+    children: [...element.childNodes].flatMap((node) =>
+      node instanceof Element ? [shape(node)]
+      : node.nodeType === Node.TEXT_NODE && node.textContent?.trim() ? [node.textContent.trim()]
+      : [],
+    ),
+  }
+}
+
 const classSet = (element: Element | null | undefined) =>
   new Set(
     element
@@ -140,5 +162,67 @@ describe('the Vue ports render the same classes as the React primitives', () => 
     expect(classSet(vue.parentElement)).toEqual(
       classSet(react.closest('[data-testid="modal-dialog"]')),
     )
+  })
+
+  test.each([
+    { status: 'loading', title: 'Logging out' },
+    { status: 'info', title: 'No preview available for this asset', centered: true },
+    { status: 'error', title: 'Failed to open project', subtitle: 'Error: boom' },
+  ] as const)('Result ($status)', (props) => {
+    render(
+      <div data-testid="react">
+        <Result {...props} />
+      </div>,
+    )
+    mountVue(() => h('div', { 'data-testid': 'vue' }, [h(ResultVue, props)]))
+    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+  })
+
+  test('Result with content', () => {
+    render(
+      <div data-testid="react">
+        <Result status="info" title="Project stopped" subtitle="Open it again">
+          <button>Open</button>
+        </Result>
+      </div>,
+    )
+    mountVue(() =>
+      h('div', { 'data-testid': 'vue' }, [
+        h(ResultVue, { status: 'info', title: 'Project stopped', subtitle: 'Open it again' }, () =>
+          h('button', 'Open'),
+        ),
+      ]),
+    )
+    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+  })
+
+  test('Loader', () => {
+    render(
+      <div data-testid="react">
+        <Loader minHeight="full" />
+      </div>,
+    )
+    mountVue(() => h('div', { 'data-testid': 'vue' }, [h(LoaderVue, { minHeight: 'full' })]))
+    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+  })
+
+  describe.each([
+    ['macOS', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'],
+    ['Windows', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
+    ['Linux', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'],
+  ])('KeyboardShortcut on %s', (_platform, userAgent) => {
+    test.each(['Mod+Shift+Enter', 'Mod+,', 'Shift+Alt+ArrowDown', 'Delete'])('%s', (shortcut) => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent)
+      render(
+        <TextContext.Provider value={useText()}>
+          <div data-testid="react">
+            <KeyboardShortcut shortcut={shortcut} />
+          </div>
+        </TextContext.Provider>,
+      )
+      mountVue(() => h('div', { 'data-testid': 'vue' }, [h(KeyboardShortcutVue, { shortcut })]))
+      expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+      vi.restoreAllMocks()
+    })
   })
 })

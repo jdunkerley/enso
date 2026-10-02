@@ -21,7 +21,7 @@ import {
 } from '$/router/dashboardGuards'
 import { withDataLoader } from '$/router/dataLoader'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
-import { reactComponent, suspendedReactComponent } from '@/util/react'
+import { reactComponent, suspendedReactComponent } from '$/utils/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const UNAVAILABLE_PATH = '/UNAVAILABLE'

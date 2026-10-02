@@ -10,21 +10,22 @@ enforces it).
 One folder per primitive, holding its SFCs, its `variants.ts` and its
 `__tests__/`:
 
-| Folder           | Components                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| `Button/`        | `Button`, `ButtonGroup`, `CloseButton`, `CopyButton`                                            |
-| `Text/`          | `Text`, `Heading`, `TextGroup`                                                                  |
-| `Icon/`          | `Icon` (from `icons.svg`)                                                                       |
-| `Dialog/`        | `Dialog`, `Popover`, `DialogClose`                                                              |
-| `AlertDialog/`   | `AlertDialog`, `ConfirmDeleteModal` (asked through the modal stack)                             |
-| `Menu/`          | `DropdownMenu`, `ContextMenu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`        |
-| `Tooltip/`       | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
-| `ErrorBoundary/` | `ErrorBoundary` (`onlyRenderErrors` at route and tab roots), `SuspenseLoader`                   |
-| `Spinner/`       | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
-| `Toast/`         | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
-| `ModalHost/`     | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
-| `AboutModal/`    | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
-| others           | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
+| Folder              | Components                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `Button/`           | `Button`, `ButtonGroup`, `CloseButton`, `CopyButton`                                            |
+| `Text/`             | `Text`, `Heading`, `TextGroup`                                                                  |
+| `Icon/`             | `Icon` (from `icons.svg`)                                                                       |
+| `Dialog/`           | `Dialog`, `Popover`, `DialogClose`                                                              |
+| `AlertDialog/`      | `AlertDialog`, `ConfirmDeleteModal` (asked through the modal stack)                             |
+| `Menu/`             | `DropdownMenu`, `ContextMenu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`        |
+| `Tooltip/`          | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
+| `ErrorBoundary/`    | `ErrorBoundary` (`onlyRenderErrors` at route and tab roots), `SuspenseLoader`                   |
+| `Spinner/`          | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
+| `Toast/`            | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
+| `ModalHost/`        | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
+| `AboutModal/`       | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
+| `KeyboardShortcut/` | `KeyboardShortcut` (a shortcut string drawn as modifier icons and keys)                         |
+| others              | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
 Forms and inputs are #79's.
 

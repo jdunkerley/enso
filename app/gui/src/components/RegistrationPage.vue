@@ -2,7 +2,7 @@
 import RegistrationReact from '#/pages/authentication/Registration'
 import { useUserAgreements } from '$/composables/userAgreements'
 import type { DataLoader } from '$/router'
-import { reactComponent } from '@/util/react'
+import { reactComponent } from '$/utils/react'
 import { useQueryClient } from '@tanstack/vue-query'
 import { Ok } from 'enso-common/src/utilities/data/result'
 
