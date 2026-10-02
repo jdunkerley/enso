@@ -1049,10 +1049,11 @@ provisionally accepted, for the maintainer to review.
    editor it replaces: side by side, read-only, line numbers in Monaco's colour,
    Monaco's `vs` diff colours for changed lines and text, its 14px monospace
    font, and hatched spacers where Monaco drew its diagonal fill. **For
-   review:** it is not pixel-identical, and cannot be: Monaco's overview ruler,
-   its scrollbars and its gutter +/- markers have no counterpart, and the fonts'
-   metrics differ. The panel is cloud-only and opened on demand, so the PR still
-   takes `CI: No changelog needed`; say if it should have an entry. The
+   review:** it is not pixel-identical: Monaco's overview ruler and scrollbars,
+   its gutter +/- markers and its indent guides have no counterpart (the text,
+   line numbers and highlights sit where Monaco's did; see ruling 7). The panel
+   is cloud-only and opened on demand, so the PR still takes
+   `CI: No changelog needed`; say if it should have an entry. The
    selection-clearing effect's Monaco exemption (`isElementPartOfMonaco`) went
    with it: the merge view's editors are content-editable, which the effect
    already exempts.
@@ -1070,14 +1071,25 @@ provisionally accepted, for the maintainer to review.
    optimistic update. A tab waits for its query in `setup` inside a
    `SuspenseLoader`, as React's `useSuspenseQuery` suspended, and is keyed by
    its asset or project, so a new selection shows the loader again.
-7. **One React class string is not carried over:** each tag's
+7. **Overlays placed as react-aria placed them**, found by comparing screenshots
+   of the base and the branch. `Popover.vue` takes #181's version verbatim
+   (React's width, 12px from the viewport's edges, focusing itself as it opens),
+   so the two PRs merge cleanly. `DropdownMenu.vue` gains an `offset` prop
+   (default unchanged, 4) and, like `MenuSubmenu.vue`, react-aria's 12px
+   `containerPadding`; the version menu passes React's centred `bottom`
+   placement and 8px offset, and a submenu sits 8px from its item. With these,
+   the menu, the submenu, the tag and user popovers and every tab match React to
+   the pixel (the remaining differences are the drive's clock-time column). The
+   diff view's gutter and line highlight were measured against Monaco's and
+   aligned to the pixel; ruling 4 lists what still differs.
+8. **One React class string is not carried over:** each tag's
    `min-w-[8ch] max-w-[32ch]` was built at run time, so Tailwind never generated
    it, and it had no effect.
-8. **Tests.** `ProjectSessions.test.tsx` is ported to Vue with the same cases,
+9. **Tests.** `ProjectSessions.test.tsx` is ported to Vue with the same cases,
    plus switching projects and the logs button; `AssetVersions.test.ts` covers
    the placeholders, the list, restore, duplicate-and-open, "Compare with", "See
    changes" (the diff's two sides, Escape, focus back on the trigger), the
    comment editor (Enter, Escape) and the tags (suggestions, add, remove,
    collapse), from the keyboard where react-aria gave React that access.
-9. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
-   for the one visible difference).
+10. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
+    for the one visible difference).
