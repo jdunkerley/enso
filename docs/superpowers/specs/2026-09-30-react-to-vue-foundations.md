@@ -1899,6 +1899,7 @@ provisionally accepted, for the maintainer to review.
     close button, where react-aria focused the dialog itself; the Tab cycle
     inside is the same. Changing it would change every triggered Vue dialog, so
     it is not done here. No changelog entry: the PR takes
+    `CI: No changelog needed`.
 
 ## Rulings from #191 (settings: User groups, Activity log, API keys and Usage, 2026-10-03)
 
