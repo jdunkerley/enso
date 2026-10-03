@@ -8,9 +8,13 @@
 import type { Router } from 'vue-router'
 import { registerAccountSettings } from './account/settings'
 import { registerAuthRoutes } from './auth/routes'
+import { registerBillingSettings } from './billing/settings'
+import { registerOrganizationSettings } from './organization/settings'
 
 /** Contribute the cloud-only areas to the app. Call it before the router's first navigation. */
 export function registerCloud(router: Router) {
   registerAuthRoutes(router)
   registerAccountSettings()
+  registerOrganizationSettings()
+  registerBillingSettings()
 }

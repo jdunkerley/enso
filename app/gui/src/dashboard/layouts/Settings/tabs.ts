@@ -1,7 +1,9 @@
 /**
- * @file The settings tabs, in their sidebar groups. The personal tabs are Vue (`SettingsTab.vue`);
- * the organization tabs are still React (`./data.tsx`, mounted by `ReactSettingsTab`). The Account
- * tab's sections come from the cloud (`$/providers/settingsContributions`).
+ * @file The settings tabs, in their sidebar groups. The personal tabs, Organization and Members are
+ * Vue (`SettingsTab.vue`); the other organization tabs are still React (`./data.tsx`, mounted by
+ * `ReactSettingsTab`). The sections of the Account, Organization and Members tabs come from the
+ * cloud (`$/providers/settingsContributions`); Organization and Members have none of their own, so
+ * a build without the cloud does not list them.
  */
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
 // does), so to ESLint the components imported here have an error type.
@@ -15,7 +17,7 @@ import {
   type SettingsTabSectionData,
 } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
-import { Path } from 'enso-common/src/services/Backend'
+import { isUserOnPlanWithMultipleSeats, Path } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
@@ -56,6 +58,27 @@ const ACCOUNT_TAB: SettingsTabData = {
       ],
     },
   ],
+}
+
+const ORGANIZATION_TAB: SettingsTabData = {
+  nameId: 'organizationSettingsTab',
+  settingsTab: SettingsTabType.organization,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const MEMBERS_TAB: SettingsTabData = {
+  nameId: 'membersSettingsTab',
+  settingsTab: SettingsTabType.members,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
+  feature: 'inviteUser',
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
 }
 
 const LOCAL_TAB: SettingsTabData = {
@@ -156,13 +179,13 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 export const SETTINGS_DATA: readonly SettingsTabSectionData<AnySettingsTabData>[] = [
   {
     nameId: 'generalSettingsTabSection',
-    tabs: [ACCOUNT_TAB, REACT_SETTINGS_TAB_DATA[SettingsTabType.organization], LOCAL_TAB],
+    tabs: [ACCOUNT_TAB, ORGANIZATION_TAB, LOCAL_TAB],
   },
   {
     nameId: 'accessSettingsTabSection',
     tabs: [
       REACT_SETTINGS_TAB_DATA[SettingsTabType.billingAndPlans],
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.members],
+      MEMBERS_TAB,
       REACT_SETTINGS_TAB_DATA[SettingsTabType.userGroups],
     ],
   },
