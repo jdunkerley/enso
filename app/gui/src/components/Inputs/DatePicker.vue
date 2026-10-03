@@ -22,6 +22,7 @@ import {
   DATE_SEGMENT_VUE_STATES,
 } from '$/components/Inputs/dateVariants'
 import { portalTarget } from '$/components/portal'
+import Text from '$/components/Text/Text.vue'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { useText } from '$/providers/text'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
@@ -222,6 +223,8 @@ function segmentClass(part: SegmentPart, text: string) {
                   </DatePickerGridRow>
                 </DatePickerGridBody>
               </DatePickerGrid>
+              <!-- React's calendar ends with its (empty) error message, which gives it 4px more. -->
+              <Text />
             </DatePickerCalendar>
           </div>
         </DatePickerContent>
