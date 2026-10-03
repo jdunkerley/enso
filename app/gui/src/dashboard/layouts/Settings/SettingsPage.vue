@@ -8,7 +8,6 @@
  * through `ReactSettingsTab` until #87 and #88 port them. The Account tab's sections come from the
  * cloud (`$/providers/settingsContributions`).
  */
-import { localRootDirectoryStore } from '#/layouts/Drive/persistentState'
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
@@ -25,6 +24,7 @@ import {
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
+import { localPathsStore } from '$/providers/localDirectories'
 import { useQueryParams } from '$/providers/queryParams'
 import { provideSettingsContext } from '$/providers/settingsContext'
 import { loadSettingsContributions, settingsContributions } from '$/providers/settingsContributions'
@@ -111,11 +111,11 @@ function setPreferredTimeZone(value: string | undefined) {
 }
 
 const storedLocalRootDirectory = useZustandStoreRef(
-  localRootDirectoryStore,
+  localPathsStore,
   (state) => state.localRootDirectory,
 )
 const storedDownloadDirectory = useZustandStoreRef(
-  localRootDirectoryStore,
+  localPathsStore,
   (state) => state.downloadDirectory,
 )
 const defaultDownloadDirectory = inject<Path | null>('defaultDownloadPath', null)

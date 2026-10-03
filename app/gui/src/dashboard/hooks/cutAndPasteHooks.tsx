@@ -1,8 +1,8 @@
 /** @file Events related to changes in the asset list. */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories/transferBetweenCategoriesHooks'
-import type { DrivePastePayload } from '#/providers/DriveProvider'
 import { dropOperationBetweenCategories, type Category } from '$/providers/category'
+import type { DrivePastePayload } from '$/providers/driveStore'
 import type { DirectoryId } from 'enso-common/src/services/Backend'
 /**
  * Options for the paste action.

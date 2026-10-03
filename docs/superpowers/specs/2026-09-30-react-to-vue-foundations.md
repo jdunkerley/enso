@@ -1473,6 +1473,58 @@ provisionally accepted, for the maintainer to review.
 10. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
     for the one visible difference).
 
+## Rulings from #90 (the drive's state, 2026-10-03)
+
+#90 ports the drive's state and data layer. Delegated like the rulings above:
+provisionally accepted, for the maintainer to review.
+
+1. **Split: the state first, the queries and mutations in #192.** The ticket
+   covers about 3,000 lines of React hooks. The state (the `DriveProvider` store
+   and the category switch's pending state) stands alone; the data layer does
+   not split as cleanly, because merging the two sides' query defaults changes
+   when some queries refetch (see #192) and the move mutation asks the React
+   duplicate-assets modal (#92). #192 also deletes `reactApi`, which keeps only
+   `transferBetweenCategories` until then.
+2. **The drive store is framework-free, with thin React adapters**, as
+   `dashboardInputBindings` is (#86). `$/providers/driveStore` holds the
+   selection, the clipboard (`pasteData`), the asset to rename, the context
+   menu, whether the selection can be downloaded and the drag target, as one
+   immutable snapshot in a `shallowRef`: `update(patch)` replaces it, so fields
+   set together reach subscribers together, as zustand's `setState` did, and
+   sets and assets are never wrapped in proxies. It is not a zustand store
+   (decision 6a). The ticket's "expanded directories" no longer exist: the table
+   lists one directory at a time.
+3. **One store per mounted drive, not a global one.** The React drive unmounts
+   when the left panel is hidden, and its selection and clipboard went with it.
+   `DriveProvider` creates the store as before; the Vue drive will provide its
+   own with `provideDriveStore` (`createContextStore`). Nothing outside the
+   drive reads the store.
+4. **React reads it through `storeHooks`' `useStore`, unchanged.** The adapter
+   (`useDriveState`) gives `useStore` a read-only view of the store (`getState`,
+   `subscribe`), so the selectors, their equality functions and the rows'
+   `unsafeEnableTransition` render exactly as before. `useStore` now accepts
+   that read-only shape (`ReadonlyStoreApi`). Consumers write through the
+   store's own setters and `update`, and the three subscribers in `AssetsTable`
+   keep firing on every update, as they did.
+5. **`isNavigating` replaces React's transition state, and React still keeps the
+   old listing on screen.** The drive location (`$/providers/drive`) has an
+   explicit `isNavigating` and a `setNavigationTransition` hook. The React drive
+   (`useDriveNavigationTransition`) installs its `startTransition`, so a change
+   of category or directory still renders in a transition (the old rows stay
+   while the new ones suspend, which the specs rely on through `data-category`),
+   and mirrors the transition's pending state into `isNavigating`, which
+   `CategoryButton.vue` shows as its spinner. The Vue drive (#91) will set
+   `isNavigating` from its query (`placeholderData: keepPreviousData`). The
+   transition moved from `Dashboard.tsx` into the drive, which is the only
+   component reading the location that can suspend; `AppContainer` loses its two
+   React props.
+6. **One query cache already.** `entrypoint.ts` creates one vue-query
+   `QueryClient` and `ReactRoot.tsx` hands the same instance to React's
+   `QueryClientProvider`, so the two sides share keys, cache and persistence;
+   nothing is bridged.
+7. **No changelog entry**: nothing on screen changes, so the PR takes
+   `CI: No changelog needed`.
+
 ## Rulings from #84 (the layouts' modals and the cloud-disabled page, 2026-10-03)
 
 #84 ported the modals the layouts mount (the agreements gate, organization

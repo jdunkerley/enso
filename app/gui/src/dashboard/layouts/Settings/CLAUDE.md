@@ -31,6 +31,22 @@ tab.
   `Section`, `Entry`, `FormEntry`, `CustomEntry`, `Input`, `AriaInput`,
   `Paywall`). #87 and #88 port them; the React files go with the last.
 
+## Local directories
+
+The Local tab writes the root and download directories through
+`$/providers/localDirectories` (`setLocalRootDirectory`,
+`setDownloadDirectory`): the one store that the drive's Local category
+(`useLocalPaths`), the React drive and the local backend read, persisted under
+`enso-local-directory`. A second store once persisted the same entry, so a
+change reached the drive only after a reload (#182); do not add another. The
+React drive must re-render on a change of the stored root (`useDirectoryIds`
+subscribes to `localPathsStore` for that), or it keeps listing the old root
+until something else re-renders it. Do not cache the category's directory id in
+`useVueValue` state instead: that lags a render behind a change of category, and
+the drive then snaps back to the previous category. Tests:
+`__tests__/localTab.test.ts` and
+`integration-test/dashboard/localDirectories.spec.ts`.
+
 ## Keyboard shortcuts
 
 The Keyboard shortcuts tab edits the window's dashboard bindings

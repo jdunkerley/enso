@@ -1,5 +1,5 @@
 /** @file Test the login flow. */
-import { test } from 'integration-test/base'
+import { expect, test } from 'integration-test/base'
 
 import { INVALID_PASSWORD, TEXT, VALID_EMAIL, VALID_PASSWORD } from '../actions'
 
@@ -34,4 +34,14 @@ test('sign up without organization id', async ({ loginPage }) => {
       },
     })
     .register()
+})
+
+test('the email confirmation page is headed by its result', async ({ page, loginPage }) => {
+  await loginPage.do(async () => {
+    await page.goto('/confirmation?email=user%40example.com&verification_code=123')
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      TEXT.confirmRegistrationTitleSuccess,
+    )
+    await expect(page.locator('h1:empty')).toHaveCount(0)
+  })
 })
