@@ -167,6 +167,33 @@ describe('SettingsPage', () => {
     expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
       'hello user name',
     )
+    expect(document.querySelector('[data-testid="offline-user-settings"]')).toBeNull()
+  })
+
+  test('in local-only mode, the Account tab shows the offline user', async () => {
+    const offlineUser = { ...USER, name: getText('offlineUserName'), plan: Plan.free }
+    auth.session = {
+      user: offlineUser,
+      email: 'local@enso.localhost',
+      accessToken: '',
+      isCloudDataUnavailable: true,
+      isAuthDisabled: true,
+    }
+    await mountWithProviders(SettingsPage)
+    expect(document.querySelector('h1.flex')?.textContent).toContain(getText('offlineUserName'))
+    expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
+    const offline = required(
+      document.querySelector<HTMLElement>('[data-testid="offline-user-settings"]'),
+    )
+    expect(headings()[0]).toBe(getText('offlineUserSettingsSection'))
+    expect(offline.querySelector('[data-testid="offline-user-name"]')?.textContent.trim()).toBe(
+      getText('offlineUserName'),
+    )
+    expect(offline.textContent).toContain(getText('offlineUserStatus'))
+    expect(offline.textContent).toContain(getText('offlineUserDescription'))
+    // The default picture: there is no account to have one.
+    expect(offline.querySelector('img')).toBeNull()
+    expect(offline.querySelector('svg')).not.toBeNull()
   })
 
   test('hides the Local tab without a local backend', async () => {

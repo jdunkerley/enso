@@ -46,6 +46,7 @@ function makeContext(overrides: Partial<SettingsContext> = {}) {
     organization: null,
     localBackend: null,
     isCloudDataUnavailable: false,
+    isAuthDisabled: false,
     getText,
     backend: remote as never,
     updateUser: vi.fn(() => Promise.resolve()),
@@ -119,6 +120,28 @@ describe('Account tab', () => {
       getText('setup2FASettingsSection'),
     ])
     expect(document.body.textContent).not.toContain(getText('dangerZone'))
+  })
+
+  test('in local-only mode, every section hides, and none asks anything of the cloud', async () => {
+    await mountTab(
+      makeContext({
+        accessToken: '',
+        user: { ...USER, name: getText('offlineUserName'), plan: Plan.free },
+        isCloudDataUnavailable: true,
+        isAuthDisabled: true,
+      }),
+    )
+    expect(document.querySelectorAll('h2')).toHaveLength(0)
+    expect(document.querySelector('form')).toBeNull()
+    expect(session.getMFAPreference).not.toHaveBeenCalled()
+    expect(remote.usersMe).not.toHaveBeenCalled()
+  })
+
+  test('an access token that is not a JWT hides the password and 2FA, rather than failing', async () => {
+    await mountTab(
+      makeContext({ accessToken: 'header.***.signature', isCloudDataUnavailable: true }),
+    )
+    expect(document.querySelectorAll('h2')).toHaveLength(0)
   })
 
   test('Save and Cancel appear once the profile is edited; Save renames the user', async () => {

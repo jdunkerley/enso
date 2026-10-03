@@ -31,6 +31,12 @@ export interface SettingsBaseContext {
    * Cloud `users/me` call failed. Entries that depend on the real cloud profile hide themselves.
    */
   readonly isCloudDataUnavailable: boolean
+  /**
+   * `true` in local-only mode: authentication is disabled (no Enso Cloud is configured), so `user`
+   * is the offline stand-in and `accessToken` is empty. Implies `isCloudDataUnavailable`. Nothing
+   * that needs Enso Cloud or Cognito can work here, and there is no way to sign in.
+   */
+  readonly isAuthDisabled: boolean
   readonly getText: GetText
 }
 

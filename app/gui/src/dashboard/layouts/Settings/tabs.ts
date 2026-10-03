@@ -24,6 +24,7 @@ import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSec
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection.vue'
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import NoResults from './NoResults.vue'
+import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
 
 /** A settings tab, rendered in Vue or (with `react: true`) in React. */
 export type AnySettingsTabData = ReactSettingsTabData | SettingsTabData
@@ -39,10 +40,22 @@ const ACCOUNT_TAB: SettingsTabData = {
   nameId: 'accountSettingsTab',
   settingsTab: SettingsTabType.account,
   icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
-  // Every section is contributed by `src/cloud/` (`registerCloud`). The tab stays visible in
-  // degraded-auth mode, so that the Cognito-only sections (password change, 2FA setup) remain
-  // reachable; the cloud-dependent sections hide themselves.
-  sections: [],
+  // Every other section is contributed by `src/cloud/` (`registerCloud`), and hides itself in
+  // local-only mode. The tab stays visible in degraded-auth mode, so that the Cognito-only sections
+  // (password change, 2FA setup) remain reachable; the cloud-dependent sections hide themselves.
+  sections: [
+    {
+      nameId: 'offlineUserSettingsSection',
+      entries: [
+        {
+          // No aliases: a search for them would list the tab with nothing in it for a signed-in user.
+          type: 'custom',
+          getVisible: ({ isAuthDisabled }) => isAuthDisabled,
+          component: OfflineUserSettingsSection,
+        },
+      ],
+    },
+  ],
 }
 
 const LOCAL_TAB: SettingsTabData = {

@@ -127,6 +127,7 @@ const context = computed<SettingsContext>(() => ({
   localBackend: backends.localBackend,
   organization: organization.value,
   isCloudDataUnavailable: isCloudDataUnavailable.value,
+  isAuthDisabled: session.value.isAuthDisabled ?? false,
   getText,
   updateUser: async (body) => {
     await updateUserMutation.mutateAsync([body])

@@ -122,14 +122,18 @@ export function createUsersMeQuery(
  *
  * Identifier fields embed the Cognito email so the placeholder is distinct per signed-in
  * user (the Cognito app `clientId` is a deployment-wide constant and would alias users).
+ * The name defaults to the email; local-only mode passes the offline user's name instead.
  */
-export function makeSyntheticUser(cognitoSession: cognitoModule.UserSession): backendModule.User {
+export function makeSyntheticUser(
+  cognitoSession: cognitoModule.UserSession,
+  name: string = cognitoSession.email,
+): backendModule.User {
   const identitySuffix = cognitoSession.email || 'unknown'
   return {
     userId: backendModule.UserId(`user-cloud-unavailable-${identitySuffix}`),
     organizationId: backendModule.OrganizationId('organization-00000000000000000000000000'),
     rootDirectoryId: backendModule.DirectoryId('directory-cloud-unavailable'),
-    name: cognitoSession.email,
+    name,
     email: backendModule.EmailAddress(cognitoSession.email),
     isEnabled: false,
     isOrganizationAdmin: false,
@@ -222,11 +226,14 @@ function createAuthStore(
 
   // Keyed on `email`, not `clientId`: `clientId` is the Cognito app integration ID and is
   // identical across users on the same deployment, so caching on it would surface user A's
-  // placeholder for user B after a sign-out/sign-in.
-  let syntheticUserCache: { email: string; user: backendModule.User } | null = null
+  // placeholder for user B after a sign-out/sign-in. In local-only mode the stand-in is the
+  // offline user, named as such (its email is a placeholder, not something to show).
+  let syntheticUserCache: { email: string; name: string; user: backendModule.User } | null = null
   const getSyntheticUser = (cognitoSession: cognitoModule.UserSession) => {
-    if (syntheticUserCache?.email !== cognitoSession.email) {
-      syntheticUserCache = { email: cognitoSession.email, user: makeSyntheticUser(cognitoSession) }
+    const { email } = cognitoSession
+    const name = isAuthDisabled.value ? getText('offlineUserName') : email
+    if (syntheticUserCache?.email !== email || syntheticUserCache.name !== name) {
+      syntheticUserCache = { email, name, user: makeSyntheticUser(cognitoSession, name) }
     }
     return syntheticUserCache.user
   }

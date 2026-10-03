@@ -53,6 +53,12 @@ describe('makeSyntheticUser', () => {
     expect(user.name).toBe('someone@enso.org')
   })
 
+  it('takes another name, as the offline user of local-only mode has', () => {
+    const user = makeSyntheticUser(fakeCognitoSession({ email: 'local@enso.localhost' }), 'Offline')
+    expect(user.name).toBe('Offline')
+    expect(user.email).toBe('local@enso.localhost')
+  })
+
   it('keys identifiers on email so two users on the same Cognito app are distinct', () => {
     const a = makeSyntheticUser(fakeCognitoSession({ email: 'a@enso.org' }))
     const b = makeSyntheticUser(fakeCognitoSession({ email: 'b@enso.org' }))
