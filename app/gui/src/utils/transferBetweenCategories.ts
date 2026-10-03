@@ -112,7 +112,7 @@ function askToCopyInsteadOfMoving(context: TransferBetweenCategoriesContext, fro
  * category's root. What happens depends on the two categories:
  * - between two cloud categories, the assets are moved or copied; moving out of a team's folder
  *   (to another team, or to the user's own folder) is not allowed, and the user is asked whether
- *   to copy them instead;
+ *   to copy them instead (cancelling does nothing);
  * - into the trash, they are deleted;
  * - from the cloud to a local category, they are downloaded (again asking to copy instead when
  *   they come from a team's folder);
@@ -154,15 +154,15 @@ export async function transferBetweenCategories(
   switch (from.type) {
     case 'team':
     case 'cloud': {
-      // A dismissed "copy instead" question falls through to the move below, here and from a team
-      // to the user's folder: React's behaviour, kept by the port; #200 fixes it.
+      // Moving out of a team's folder is not allowed: the user is asked to copy instead, and a
+      // dismissed question does nothing (#200; React went on to attempt the move).
       if (from.type === 'team' && to.type === 'team' && !categoryEq(from, to)) {
         const resolution =
           method === 'move' ? await askToCopyInsteadOfMoving(context, from) : 'confirm'
         if (resolution === 'confirm') {
           await copyAssets(context, BackendType.remote, keysArray, targetDirectoryId)
-          return
         }
+        return
       }
 
       if (to.type === 'trash') {
@@ -205,8 +205,8 @@ export async function transferBetweenCategories(
           method === 'move' ? await askToCopyInsteadOfMoving(context, from) : 'confirm'
         if (resolution === 'confirm') {
           await copyAssets(context, BackendType.remote, keysArray, targetDirectoryId)
-          return
         }
+        return
       }
 
       // Not awaited, as before: the drop is done once the mutation has started.

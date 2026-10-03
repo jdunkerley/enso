@@ -202,13 +202,18 @@ describe('useTransferBetweenCategories', () => {
     expect(remote.updateAsset).not.toHaveBeenCalled()
   })
 
-  test('cancelling the question still moves, as React did (#200)', async () => {
+  test.each([
+    ['another team', TEAM_B],
+    ["the user's folder", { type: 'cloud' } as Category],
+  ])('cancelling the question moving to %s does nothing (#200)', async (_, to) => {
     const transfer = await setup()
-    const done = transfer(TEAM_A, TEAM_B, [asset('file-1')])
+    const done = transfer(TEAM_A, to, [asset('file-1')])
     await answer('Cancel', 'Moving assets from Team A is unavailable', YOU_CAN_COPY)
     await done
-    expect(remote.copyAsset).not.toHaveBeenCalled()
-    await vi.waitFor(() => expect(remote.updateAsset).toHaveBeenCalledOnce())
+    await flushPromises()
+    for (const mock of [...Object.values(remote), ...Object.values(local), uploadFile]) {
+      expect(mock).not.toHaveBeenCalled()
+    }
   })
 
   test("copying from one team's folder to another does not ask", async () => {

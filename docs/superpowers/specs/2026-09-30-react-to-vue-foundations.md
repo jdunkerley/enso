@@ -1676,9 +1676,13 @@ each key's options are defined once, in framework-free factories.
    `askToCopyInstead`, with React's title, text, alert, icon and buttons. Like
    the React `ask` it replaces, it closes the open modals first. As with #156's
    `ConfirmDeleteModal` (ruling 11 there) it is named by its title, keeps Tab
-   inside, and leaves after its exit animation. One React quirk is kept and
-   pinned by a test: cancelling it between two teams' folders, or from a team's
-   folder to the user's, still attempts the move (#200).
+   inside, and leaves after its exit animation. **Cancel does nothing** (#200,
+   at the maintainer's request on #201): React went on to attempt the move after
+   a cancelled question between two teams' folders, or from a team's folder to
+   the user's, which the backend then refused or carried out. Now nothing is
+   sent and nothing changes; unit tests and
+   `integration-test/dashboard/copyInstead.spec.ts` check it, the spec against
+   the requests the mocked cloud receives. A bug fix, so no changelog entry.
 8. **Toasts: `promise` moved into the store.** The transfer shows the download
    to the local drive as a loading toast that turns into its outcome, as
    react-toastify's `toast.promise` did; `useToasts().promise` now does that,
