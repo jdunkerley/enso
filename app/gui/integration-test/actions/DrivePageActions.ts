@@ -260,7 +260,11 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
         })
       },
       /** Drag a row to a different category. */
-      dragRowToCategory(row: number | string, category: 'Cloud' | 'Local' | 'Recent' | 'Trash') {
+      dragRowToCategory(
+        row: number | string,
+        /** The category button's name: `Cloud`, `Local`, `Recent`, `Trash`, or a team's name. */
+        category: string,
+      ) {
         return self.step(
           `Drag drive table row '${row}' to '${category}' category`,
           async (page) => {
