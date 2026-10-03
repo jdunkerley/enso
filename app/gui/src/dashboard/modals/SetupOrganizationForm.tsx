@@ -3,10 +3,10 @@ import { Dialog } from '#/components/Dialog'
 import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import { Text } from '#/components/Text'
-import { backendMutationOptions } from '#/hooks/backendHooks'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { ORGANIZATION_NAME_MAX_LENGTH, ORGANIZATION_NAME_MIN_LENGTH } from '$/appUtils'
 import { useBackends, useText } from '$/providers/react'
+import { backendMutationOptions } from '$/utils/backendQuery'
 
 /** Modal for setting the organization name. */
 export function SetupOrganizationModal() {

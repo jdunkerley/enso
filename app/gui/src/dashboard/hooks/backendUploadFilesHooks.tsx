@@ -1,5 +1,5 @@
 /** @file Hooks for uploading files. */
-import { backendMutationOptions, useEnsureListDirectory } from '#/hooks/backendHooks'
+import { useEnsureListDirectory } from '#/hooks/backendHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
@@ -11,6 +11,7 @@ import type { Category, CategoryType } from '$/providers/category'
 import type { SelectedAssetInfo } from '$/providers/driveStore'
 import { useBackends, useHttpClient, useText } from '$/providers/react'
 import { useUploadsToCloudStore } from '$/providers/react/upload'
+import { backendMutationOptions } from '$/utils/backendQuery'
 import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import {

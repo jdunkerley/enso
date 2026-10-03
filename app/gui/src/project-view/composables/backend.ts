@@ -1,18 +1,19 @@
+/**
+ * @file The Vue side of the backend's queries and mutations: reactive wrappers over the
+ * framework-free options in `$/utils/backendQuery`, which hold every per-method default, so that a
+ * key means the same here as in React ("Rulings from #192").
+ */
 import { useBackends } from '$/providers/backends'
 import {
-  backendBaseOptions,
+  backendMutationOptions as backendMutationOptionsFor,
+  backendQueryDefaults,
   backendQueryKey,
-  INVALIDATE_ALL_QUERIES,
-  INVALIDATION_MAP,
+  callBackendMethod,
   type BackendMutationMethod,
   type BackendQueryMethod,
 } from '$/utils/backendQuery'
 import type { ToValue } from '$/utils/reactivity'
-import type {
-  UseMutationOptions,
-  UseMutationReturnType,
-  UseQueryOptions,
-} from '@tanstack/vue-query'
+import type { UseMutationOptions, UseMutationReturnType } from '@tanstack/vue-query'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import type { Backend } from 'enso-common/src/services/Backend'
 import type { HttpClient } from 'enso-common/src/services/HttpClient'
@@ -26,25 +27,18 @@ declare module '@vue/reactivity' {
   }
 }
 
-type ExtraOptions = Omit<UseQueryOptions, 'queryKey' | 'queryFn' | 'enabled' | 'networkMode'>
-
-const noPersist = { meta: { persist: false } }
-const noFresh = { staleTime: 0 }
-const methodDefaultOptions: Partial<Record<BackendQueryMethod, ExtraOptions>> = {
-  listDirectory: { ...noPersist, ...noFresh },
-  getFileDetails: { ...noPersist },
-  getAssetDetails: { ...noPersist },
-}
-
-/** Commonly used options for tanstack queries to backend. */
+/**
+ * Options for a query of a backend method, kept up to date with its arguments: the query is
+ * disabled while they are `undefined`. Its network mode, stale time and persistence are the
+ * method's ({@link backendQueryDefaults}).
+ */
 export function backendQueryOptions<Method extends BackendQueryMethod, B extends Backend | null>(
   method: Method,
   args: ToValue<Parameters<Backend[Method]> | undefined>,
   backend: B,
 ) {
   return {
-    ...backendBaseOptions(backend),
-    ...(methodDefaultOptions[method] ?? {}),
+    ...backendQueryDefaults(backend, method),
     queryKey: computed(() => {
       const argsValue = toValue(args)
       return argsValue ? backendQueryKey(backend, method, argsValue) : []
@@ -54,7 +48,7 @@ export function backendQueryOptions<Method extends BackendQueryMethod, B extends
       : Awaited<ReturnType<Backend[Method]>> | null
     > =>
       backend ?
-        (backend[method] as any).apply(backend, toValue(args)!)
+        (callBackendMethod(backend, method, toValue(args)!) as any)
       : (Promise.resolve(null) as any),
     enabled: computed(() => !!backend && !!toValue(args)),
   }
@@ -91,33 +85,21 @@ export function backendMutationOptions<
   Parameters<Backend[Method]>
 > {
   return computed(() => {
-    const opts = toValue(options)
-    const backendVal = toValue(backend)
-    const invalidates =
-      opts?.invalidate === false ?
-        []
-      : (INVALIDATION_MAP[method]?.map((queryMethod) =>
-          queryMethod === INVALIDATE_ALL_QUERIES ?
-            [backendVal?.type]
-          : [backendVal?.type, queryMethod],
-        ) ?? [])
+    const { invalidate, ...opts } = toValue(options) ?? {}
+    const backendValue = toValue(backend)
     return {
-      ...backendBaseOptions(backendVal),
-      ...opts,
-      mutationKey: [backendVal?.type, method, ...(toValue(opts?.mutationKey) ?? [])],
-      mutationFn: (args) =>
-        backendVal ? (backendVal[method] as any)(...args) : (Promise.resolve(null) as any),
-      meta: {
-        invalidates,
-        awaitInvalidates: true,
-        refetchType:
-          invalidates.some((key) => key[1] === 'listDirectory') ?
-            ('all' as const)
-          : ('active' as const),
-        ...opts?.meta,
-      },
+      // The options' refs are unwrapped by vue-query, as before.
+      ...backendMutationOptionsFor(backendValue, method, {
+        ...(opts as any),
+        mutationKey: toValue(opts.mutationKey) ?? [],
+        ...(invalidate != null ? { invalidate } : {}),
+      }),
+      mutationFn: (args: Parameters<Backend[Method]>) =>
+        backendValue ?
+          callBackendMethod(backendValue, method, args)
+        : (Promise.resolve(null) as any),
     }
-  })
+  }) as any
 }
 
 /**

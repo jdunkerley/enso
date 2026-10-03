@@ -1,13 +1,7 @@
 /** @file The context menu for an arbitrary {@link backendModule.Asset}. */
 import type { ContextMenuApi } from '#/components/ContextMenu'
 import { ContextMenu } from '#/components/ContextMenu'
-import {
-  copyAssetsMutationOptions,
-  deleteAssetsMutationOptions,
-  downloadAssetsMutationOptions,
-  restoreAssetsMutationOptions,
-} from '#/hooks/backendBatchedHooks'
-import { backendMutationOptions, useNewProject } from '#/hooks/backendHooks'
+import { useNewProject } from '#/hooks/backendHooks'
 import {
   isUploadableAsset,
   useUploadFileToCloud,
@@ -42,6 +36,13 @@ import {
 } from '$/providers/react/container'
 import * as featureFlagsProvider from '$/providers/react/featureFlags'
 import { useOpenedProjects } from '$/providers/react/openedProjects'
+import { backendMutationOptions } from '$/utils/backendQuery'
+import {
+  copyAssetsMutationOptions,
+  deleteAssetsMutationOptions,
+  downloadAssetsMutationOptions,
+  restoreAssetsMutationOptions,
+} from '$/utils/driveMutations'
 import { getLocalTimeZone, now } from '@internationalized/date'
 import * as backendModule from 'enso-common/src/services/Backend'
 import {

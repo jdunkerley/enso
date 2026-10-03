@@ -1,10 +1,21 @@
-/** @file Framework-independent helpers for constructing backend Tanstack queries. */
+/**
+ * @file The framework-free query and mutation options for the backend's methods. React's
+ * `useQuery`/`useMutation` and vue-query consume the same objects, and every per-method default
+ * (stale time, persistence, invalidations) is defined once, here: the two frameworks share one
+ * `QueryClient`, so they must agree on what a key means ("Rulings from #192").
+ */
+import type {
+  DataTag,
+  Mutation,
+  MutationOptions,
+  NetworkMode,
+  QueryClient,
+  QueryKey,
+  QueryMeta,
+} from '@tanstack/query-core'
 import type { Backend } from 'enso-common/src/services/Backend'
 import * as backendModule from 'enso-common/src/services/Backend'
 import { omit, type ExtractKeys, type MethodOf } from 'enso-common/src/utilities/data/object'
-
-/** Should match `NetworkMode` in TanStack query core. */
-type NetworkMode = 'online' | 'always' | 'offlineFirst'
 
 /** The properties of the Backend type that are methods. */
 export type BackendMethods = ExtractKeys<Backend, MethodOf<Backend>>
@@ -70,12 +81,20 @@ export type BackendMutationMethod = DefineBackendMethods<
 /** Names of methods corresponding to queries. */
 export type BackendQueryMethod = Exclude<BackendMethods, BackendMutationMethod>
 
+/**
+ * The stale time of the methods whose data does not go stale by itself (the default is 0). A
+ * caller's own `staleTime` takes precedence.
+ */
 export const STALE_TIME_MAP: Partial<Record<BackendQueryMethod, number>> = {
   getOrganization: Infinity,
   usersMe: Infinity,
   listUsers: Infinity,
 }
 
+/**
+ * The methods whose results are never persisted (the default is to persist). This takes
+ * precedence over a caller's `meta.persist`.
+ */
 export const PERSISTENCE_MAP: Partial<Record<BackendQueryMethod, false>> = {
   listDirectory: false,
   searchDirectory: false,
@@ -164,20 +183,169 @@ function normalizeMethodQuery<Method extends BackendMethods>(
   return NORMALIZE_METHOD_QUERY[method]?.(...args) ?? args
 }
 
-/** Returns query options to use for the given backend method invocation. */
-export function backendQueryOptions<Method extends BackendMethods>(
+/** What a backend method resolves to. */
+export type BackendMethodResult<Method extends BackendMethods> = Awaited<
+  ReturnType<Backend[Method]>
+>
+
+/**
+ * The options a caller of {@link backendQueryOptions} may add or override. They are the ones whose
+ * types React and vue-query agree on: a function-valued option (`enabled`, `staleTime`, …) means a
+ * getter to vue-query, where React passes it the query.
+ */
+export interface BackendQueryExtraOptions {
+  /** Appended to the method's query key. */
+  readonly queryKey?: QueryKey
+  readonly enabled?: boolean
+  readonly staleTime?: number
+  readonly gcTime?: number
+  readonly refetchInterval?: number | false
+  readonly retry?: boolean | number
+  readonly meta?: QueryMeta
+}
+
+/** The options {@link backendQueryOptions} returns. */
+export interface BackendQueryOptions<TData> extends Omit<BackendQueryExtraOptions, 'queryKey'> {
+  readonly queryKey: DataTag<QueryKey, TData, Error>
+  readonly queryFn: () => Promise<TData>
+  readonly networkMode: NetworkMode
+  readonly staleTime: number
+  readonly meta: QueryMeta
+}
+
+/**
+ * The options every query of the given method gets, whichever framework runs it: its network
+ * mode, stale time and persistence.
+ */
+export function backendQueryDefaults(backend: Backend | null, method: BackendQueryMethod) {
+  return {
+    ...backendBaseOptions(backend),
+    staleTime: STALE_TIME_MAP[method] ?? 0,
+    meta: { persist: PERSISTENCE_MAP[method] ?? true },
+  }
+}
+
+export function backendQueryOptions<Method extends BackendQueryMethod>(
+  backend: Backend,
+  method: Method,
+  args: Readonly<Parameters<Backend[Method]>>,
+  options?: BackendQueryExtraOptions,
+): BackendQueryOptions<BackendMethodResult<Method>>
+export function backendQueryOptions<Method extends BackendQueryMethod>(
   backend: Backend | null,
   method: Method,
   args: Readonly<Parameters<Backend[Method]>>,
-  keyExtra?: readonly unknown[] | undefined,
-): {
-  queryKey: readonly unknown[]
-  networkMode: NetworkMode
-} {
+  options?: BackendQueryExtraOptions,
+): BackendQueryOptions<BackendMethodResult<Method> | undefined>
+/**
+ * Query options for a call of a backend method, for React's `useQuery` and vue-query alike. The
+ * key is `[backendType, method, ...args, ...options.queryKey]`.
+ */
+export function backendQueryOptions<Method extends BackendQueryMethod>(
+  backend: Backend | null,
+  method: Method,
+  args: Readonly<Parameters<Backend[Method]>>,
+  options?: BackendQueryExtraOptions,
+): BackendQueryOptions<BackendMethodResult<Method> | undefined> {
+  const defaults = backendQueryDefaults(backend, method)
+  const queryKey: QueryKey = backendQueryKey(backend, method, args, options?.queryKey)
   return {
-    ...backendBaseOptions(backend),
-    queryKey: backendQueryKey(backend, method, args, keyExtra),
+    ...options,
+    networkMode: defaults.networkMode,
+    // This is SAFE: it is the key this method's data is cached under. React's and vue-query's
+    // `queryOptions` tag the key the same way.
+    queryKey: queryKey as DataTag<QueryKey, BackendMethodResult<Method> | undefined, Error>,
+    staleTime: options?.staleTime ?? defaults.staleTime,
+    meta: {
+      ...options?.meta,
+      persist: PERSISTENCE_MAP[method] ?? options?.meta?.persist ?? defaults.meta.persist,
+    },
+    queryFn: () => callBackendMethod(backend, method, args),
   }
+}
+
+/** Call a backend method by name. Without a backend, the result is `undefined`. */
+export function callBackendMethod<Method extends BackendMethods>(
+  backend: Backend | null,
+  method: Method,
+  args: Readonly<Parameters<Backend[Method]>>,
+): Promise<BackendMethodResult<Method>> {
+  // The method is looked up by name, which TypeScript cannot follow through to its parameters.
+  return (backend?.[method] as any)?.apply(backend, args)
+}
+
+/** The type of the corresponding mutation for the given backend method. */
+export type BackendMutation<Method extends BackendMutationMethod> = Mutation<
+  BackendMethodResult<Method>,
+  Error,
+  Parameters<Backend[Method]>
+>
+
+/** The options a caller of {@link backendMutationOptions} may add or override. */
+export type BackendMutationExtraOptions<Method extends BackendMutationMethod, TData> = Omit<
+  MutationOptions<TData, Error, Parameters<Backend[Method]>>,
+  'mutationFn'
+> & {
+  /** `false` turns off all invalidations, the method's ({@link INVALIDATION_MAP}) included. */
+  readonly invalidate?: boolean | undefined
+}
+
+export function backendMutationOptions<Method extends BackendMutationMethod>(
+  backend: Backend,
+  method: Method,
+  options?: BackendMutationExtraOptions<Method, BackendMethodResult<Method>>,
+): MutationOptions<BackendMethodResult<Method>, Error, Parameters<Backend[Method]>>
+export function backendMutationOptions<Method extends BackendMutationMethod>(
+  backend: Backend | null,
+  method: Method,
+  options?: BackendMutationExtraOptions<Method, BackendMethodResult<Method> | undefined>,
+): MutationOptions<BackendMethodResult<Method> | undefined, Error, Parameters<Backend[Method]>>
+/**
+ * Mutation options for a call of a backend method, for React's `useMutation` and vue-query alike.
+ * The mutation invalidates the queries in `options.meta.invalidates` and those
+ * {@link INVALIDATION_MAP} lists for the method, and by default waits for them to be refetched.
+ */
+export function backendMutationOptions<Method extends BackendMutationMethod>(
+  backend: Backend | null,
+  method: Method,
+  options?: BackendMutationExtraOptions<Method, BackendMethodResult<Method> | undefined>,
+): MutationOptions<BackendMethodResult<Method> | undefined, Error, Parameters<Backend[Method]>> {
+  const { invalidate, ...rest } = options ?? {}
+  const invalidates =
+    invalidate === false ?
+      []
+    : [
+        ...(rest.meta?.invalidates ?? []),
+        ...(INVALIDATION_MAP[method]?.map((queryMethod) =>
+          queryMethod === INVALIDATE_ALL_QUERIES ? [backend?.type] : [backend?.type, queryMethod],
+        ) ?? []),
+      ]
+  return {
+    ...rest,
+    mutationKey: [backend?.type, method, ...(rest.mutationKey ?? [])],
+    mutationFn: (args) => callBackendMethod(backend, method, args),
+    networkMode: backendBaseOptions(backend).networkMode,
+    meta: {
+      ...rest.meta,
+      invalidates,
+      awaitInvalidates: rest.meta?.awaitInvalidates ?? true,
+      refetchType:
+        rest.meta?.refetchType ??
+        (invalidates.some((key) => key[1] === 'listDirectory') ? 'all' : 'active'),
+    },
+  }
+}
+
+/**
+ * Run a mutation through the query client's mutation cache, from outside any component. It is
+ * seen by `useMutationState`, and invalidates its queries, as a mutation from `useMutation` is.
+ */
+export function executeMutation<TData, TError, TVariables, TContext>(
+  queryClient: QueryClient,
+  options: MutationOptions<TData, TError, TVariables, TContext>,
+  variables: TVariables,
+): Promise<TData> {
+  return queryClient.getMutationCache().build(queryClient, options).execute(variables)
 }
 
 /** Returns the QueryKey to use for the given backend method invocation. */

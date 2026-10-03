@@ -7,12 +7,7 @@ import { Dialog } from '#/components/Dialog'
 import { ErrorBoundary, InlineErrorDisplay } from '#/components/ErrorBoundary'
 import { IconDisplay } from '#/components/IconDisplay'
 import { useVisualTooltip, VisualTooltip } from '#/components/VisualTooltip'
-import {
-  deleteAssetsMutationOptions,
-  downloadAssetsMutationOptions,
-  getAllTrashedItems,
-} from '#/hooks/backendBatchedHooks'
-import { backendMutationOptions, useNewFolder, useNewProject } from '#/hooks/backendHooks'
+import { useNewFolder, useNewProject } from '#/hooks/backendHooks'
 import { useUploadFiles } from '#/hooks/backendUploadFilesHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useOffline } from '#/hooks/offlineHooks'
@@ -31,7 +26,9 @@ import { canTransferBetweenCategories } from '$/providers/category'
 import { useCategories, useText } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentCategory } from '$/providers/react/container'
 import type AssetQuery from '$/utils/AssetQuery'
-import { listDirectoryQueryOptions } from '$/utils/driveQueries'
+import { backendMutationOptions } from '$/utils/backendQuery'
+import { deleteAssetsMutationOptions, downloadAssetsMutationOptions } from '$/utils/driveMutations'
+import { getAllTrashedItems, listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import type { Backend } from 'enso-common/src/services/Backend'
 import {

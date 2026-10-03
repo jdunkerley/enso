@@ -5,7 +5,6 @@
 import { Dialog } from '#/components/Dialog'
 import Page from '#/components/Page'
 import { Text } from '#/components/Text'
-import { backendQueryOptions } from '#/hooks/backendHooks'
 import { useBindGlobalActions } from '#/hooks/menuHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
 import * as inputBindingsProvider from '#/providers/InputBindingsProvider'
@@ -17,6 +16,7 @@ import SettingsTabType from '$/configurations/settingsTabs'
 import { useBackends, useFullUserSession, useRouter, useText } from '$/providers/react'
 import { useVueValue } from '$/providers/react/common'
 import { useOpenedProjects } from '$/providers/react/openedProjects'
+import { backendQueryOptions } from '$/utils/backendQuery'
 import * as sanitizedEventTargets from '$/utils/sanitizedEventTargets'
 import { useQuery } from '@tanstack/react-query'
 import * as backendModule from 'enso-common/src/services/Backend'
@@ -54,6 +54,7 @@ export function Dashboard() {
   const closingOnAppExit = useVueValue(
     React.useCallback(() => openedProjects.closingOnAppExit.value, [openedProjects]),
   )
+
   const transferBetweenCategories = useTransferBetweenCategories()
 
   const inputBindingHandlers = React.useMemo(() => {

@@ -6,7 +6,6 @@ import { Breadcrumbs, type BreadcrumbItemProps, type OnDrop } from '#/components
 import { Button } from '#/components/Button'
 import { Menu } from '#/components/Menu'
 import { Scroller } from '#/components/Scroller/Scroller'
-import { moveAssetsMutationOptions } from '#/hooks/backendBatchedHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useStore } from '#/hooks/storeHooks'
 import { useSyncRef } from '#/hooks/syncRefHooks'
@@ -18,6 +17,7 @@ import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import { localPathsStore } from '$/providers/localDirectories'
 import { useCategories, useText } from '$/providers/react'
 import {
@@ -27,6 +27,7 @@ import {
   useDriveLocation,
   useRightPanelData,
 } from '$/providers/react/container'
+import { moveAssetsMutationOptions } from '$/utils/driveMutations'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import {
   AssetDoesNotExistError,
@@ -59,7 +60,7 @@ export function DriveBarNavigation() {
   const { setDefaultCategory } = useDriveLocation()
 
   const moveAssetsMutation = useMutationCallback({
-    ...moveAssetsMutationOptions(associatedBackend),
+    ...moveAssetsMutationOptions(associatedBackend, resolveDuplications),
     onSuccess: () => {
       driveStore.update({ selectedIds: new Set(), visuallySelectedKeys: new Set() })
     },

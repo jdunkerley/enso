@@ -4,7 +4,6 @@ import { Dialog } from '#/components/Dialog'
 import * as paywall from '#/components/Paywall'
 import { Scroller } from '#/components/Scroller'
 import { Text } from '#/components/Text'
-import { backendMutationOptions, backendQueryOptions } from '#/hooks/backendHooks'
 import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import InviteUsersModal from '#/modals/InviteUsersModal'
 import { setModal } from '#/providers/ModalProvider'
@@ -15,6 +14,7 @@ import {
   useIsFeatureUnderPaywall,
   useText,
 } from '$/providers/react'
+import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { useMutation, useSuspenseQueries } from '@tanstack/react-query'
 import type * as backendModule from 'enso-common/src/services/Backend'
 import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'

@@ -1,8 +1,8 @@
 /** @file Plan selector component. */
-import { backendQueryOptions } from '#/hooks/backendHooks'
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import { mapPlanOnPaywall } from '$/composables/paywall/FeaturesConfiguration'
 import { useBackends } from '$/providers/backends'
+import { backendQueryOptions } from '$/utils/backendQuery'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import { tv } from '$/utils/style/tailwindVariants'
 import { useSuspenseQuery } from '@tanstack/react-query'

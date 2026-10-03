@@ -2,17 +2,11 @@
 import { Alert } from '#/components/Alert'
 import { AlertDialog, ask, type Resolution } from '#/components/AlertDialog'
 import { Text } from '#/components/Text'
-import {
-  copyAssetsMutationOptions,
-  deleteAssetsMutationOptions,
-  downloadAssetsMutationOptions,
-  moveAssetsMutationOptions,
-  restoreAssetsMutationOptions,
-} from '#/hooks/backendBatchedHooks'
 import { useUploadFileToCloud } from '#/hooks/backendUploadFilesHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import {
   CATEGORY_BACKEND,
   categoryEq,
@@ -24,6 +18,13 @@ import {
 import { useBackends, useCategories, useText, useUser } from '$/providers/react'
 import type { GetText } from '$/providers/text'
 import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
+import {
+  copyAssetsMutationOptions,
+  deleteAssetsMutationOptions,
+  downloadAssetsMutationOptions,
+  moveAssetsMutationOptions,
+  restoreAssetsMutationOptions,
+} from '$/utils/driveMutations'
 import type { DropOperation } from '@react-types/shared'
 import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
 import invariant from 'tiny-invariant'
@@ -52,8 +53,12 @@ export function useTransferBetweenCategories() {
   }
   const restoreAssets = useMutationCallback(restoreAssetsMutationOptions(remoteBackend))
   const moveAssets = {
-    [BackendType.local]: useMutationCallback(moveAssetsMutationOptions(localBackend)),
-    [BackendType.remote]: useMutationCallback(moveAssetsMutationOptions(remoteBackend)),
+    [BackendType.local]: useMutationCallback(
+      moveAssetsMutationOptions(localBackend, resolveDuplications),
+    ),
+    [BackendType.remote]: useMutationCallback(
+      moveAssetsMutationOptions(remoteBackend, resolveDuplications),
+    ),
   }
 
   return useEventCallback(
