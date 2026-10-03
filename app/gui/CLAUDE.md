@@ -21,8 +21,10 @@ feature:
   Import via `#/…`.
 
 While the migration is in progress the two subtrees are bridged by **`veaury`**
-so Vue can embed React (and vice versa). Stay in one framework per file; only
-cross at the bridge boundary.
+so Vue can embed React (and vice versa): Vue mounts React through
+`reactComponent` (`$/utils/react`), React mounts Vue through `vueComponent`
+(`#/utilities/vue`). Stay in one framework per file; only cross at the bridge
+boundary. `src/project-view/` no longer crosses it at all (#82).
 
 Many commons still sit inside `src/project-view/` for historical reasons. The
 plan is to move genuinely shared UI/utilities **out** of `project-view/` and
@@ -71,12 +73,18 @@ adding an entry. React files may import `$/…` freely.
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
   constants. The Vue primitives themselves live beside them; see
   `src/components/CLAUDE.md`.
-- `src/configurations/` — static configuration: the dashboard's input bindings
-  and the settings tabs.
-- `src/cloud/` — framework-free logic that only makes sense against the Enso
-  Cloud: service-credential recipes, organization-invite email parsing, the
-  Cognito password rule, permission classes. Keep cloud-only code here rather
-  than in `src/utils/`, so a build without the cloud can drop one folder.
+- `src/configurations/` — static configuration: the dashboard's input bindings,
+  the settings tabs, and the settings page's model (`settings.ts`: tabs,
+  sections and entries, their context, and the search over them).
+- `src/cloud/` — code that only makes sense against the Enso Cloud: at the top,
+  framework-free logic (service-credential recipes, organization-invite email
+  parsing, the Cognito password rule, permission classes); in
+  `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
+  and password pages; `account/`: the Account settings tab's sections). Keep
+  cloud-only code here rather than in `src/utils/`, so a build without the cloud
+  can drop one folder. The core reaches the areas only through `registerCloud`
+  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  `src/cloud/CLAUDE.md`.
 
 ## Entry points
 

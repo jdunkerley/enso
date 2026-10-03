@@ -85,7 +85,7 @@ function onBlur() {
   <label
     :class="classes.base()"
     :data-testid="testId"
-    :data-selected="isSelected"
+    :data-selected="isSelected || undefined"
     @pointerenter="isHovered = isInteractive"
     @pointerleave="((isHovered = false), press(false))"
     @pointerdown="press(true)"

@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import Result from '$/components/Result/Result.vue'
 import { useBackends } from '$/providers/backends'
 import { CATEGORY_BACKEND } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import StandaloneButton from '@/components/StandaloneButton.vue'
-import { ResultComponent } from '@/util/react'
 import { useQuery } from '@tanstack/vue-query'
 import { fileExtension } from 'enso-common/src/utilities/file'
 import { computed, ref, watch, watchEffect } from 'vue'
@@ -211,18 +211,12 @@ const projectContents = computed(() => {
         phase="loading-medium"
         :size="20"
       />
-      <ResultComponent
+      <Result
         v-else-if="rightPanel.context?.item"
         status="info"
         title="No preview available for this asset"
-        :centered="true"
       />
-      <ResultComponent
-        v-else
-        status="info"
-        title="Select a single asset to see its preview"
-        :centered="true"
-      />
+      <Result v-else status="info" title="Select a single asset to see its preview" />
     </div>
   </div>
 </template>

@@ -48,7 +48,7 @@ const RESTRICTED_IMPORT_PATHS = [
   {
     name: 'veaury',
     importNames: ['applyReactInVue', 'applyPureReactInVue'],
-    message: 'Use `reactComponent` in @/util/react',
+    message: 'Use `reactComponent` in $/utils/react',
   },
 ]
 
@@ -65,11 +65,8 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
   'App.tsx',
   'components/Devtools',
-  'components/Dialog/Dialog',
   'components/ErrorBoundary',
-  'components/Loader',
   'components/OfflineNotificationManager',
-  'components/Result',
   'components/Suspense',
   'components/UIProviders',
   'layouts/AssetPanel/components/AssetProperties',
@@ -81,21 +78,16 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/PlanDowngradedModal',
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
-  'modals/UpsertSecretModal',
   'pages/authentication/LoadingScreen',
-  'pages/authentication/Login',
-  'pages/authentication/Registration',
-  'pages/dashboard/UserBar',
-  'pages/dashboard/components/KeyboardShortcut',
   'providers/LoggerProvider',
+  // Dashboard features ported to Vue, mounted by the shared app shell.
+  'pages/dashboard/UserBar/UserBar.vue',
   // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
   'hooks/mountHooks',
   'utilities/vue',
   'utilities/zustand',
   // React-owned state that Vue reaches into; each goes with the shell collapse (#93).
-  // `persistentState` is a zustand store; see the zustand decision.
   'layouts/Drive/Categories',
-  'layouts/Drive/persistentState',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',
@@ -103,6 +95,19 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
 
 /** Escape a string for use in a regular expression. */
 const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** The `no-restricted-imports` pattern keeping shared code off the React dashboard. */
+const DASHBOARD_IMPORT_PATTERN = {
+  regex: `^#/(?!(?:${DASHBOARD_IMPORT_ALLOWLIST.map(escapeRegExp).join('|')})$)`,
+  message:
+    'Shared code must not import from the React dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
+}
+
+/**
+ * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
+ * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
+ */
+const CLOUD_AREAS = ['account', 'auth']
 
 // =======================================
 // === Restricted syntactic constructs ===
@@ -385,13 +390,31 @@ const config = [
     rules: {
       'no-restricted-imports': [
         'error',
+        { paths: RESTRICTED_IMPORT_PATHS, patterns: [DASHBOARD_IMPORT_PATTERN] },
+      ],
+    },
+  },
+
+  // === The core must not depend on cloud-only code ===
+  // Decision 6b of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`: cloud-only areas
+  // live in `src/cloud/<area>/`, and the core reaches them only through `src/cloud/index.ts`
+  // (`registerCloud`, which only `entrypoint.ts` imports), so that a community build can drop the
+  // folder.
+  // The React dashboard is exempt while it is ported: it mixes cloud and core code.
+  {
+    files: ['app/gui/**/*.{ts,tsx,mts,cts,vue}'],
+    ignores: ['app/gui/src/dashboard/**', 'app/gui/src/cloud/**', 'app/gui/src/entrypoint.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
         {
           paths: RESTRICTED_IMPORT_PATHS,
           patterns: [
+            DASHBOARD_IMPORT_PATTERN,
             {
-              regex: `^#/(?!(?:${DASHBOARD_IMPORT_ALLOWLIST.map(escapeRegExp).join('|')})$)`,
+              regex: `^\\$/cloud(?:/index)?$|^\\$/cloud/(?:${CLOUD_AREAS.join('|')})(?:/|$)`,
               message:
-                'Shared code must not import from the React dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
+                'The core must not import a cloud-only area (`$/cloud/<area>/`). Register it in `src/cloud/index.ts` instead; see decision 6b in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.',
             },
           ],
         },
@@ -740,6 +763,12 @@ const config = [
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/naming-convention': 'off',
     },
+  },
+  // The Vue component tests of the ported dashboard: their `use…` functions are Vue composables,
+  // which may be called anywhere in a test, not React hooks.
+  {
+    files: ['app/gui/src/dashboard/**/__tests__/*.test.ts'],
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   // === EnsoDevtools Rules ===
   // Allow JSX strings in EnsoDevtools.tsx.

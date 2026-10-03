@@ -35,11 +35,6 @@
     "target": "button[aria-label=\"Versions - Exclusive to Cloud\"]"
   },
   {
-    "rule": "autocomplete-valid",
-    "impact": "serious",
-    "target": "input[name=\"currentPassword\"]"
-  },
-  {
     "rule": "button-name",
     "impact": "critical",
     "target": ".CloseButton"

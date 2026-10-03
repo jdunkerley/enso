@@ -13,22 +13,16 @@ import { tv } from '$/utils/style/tailwindVariants'
 export interface SettingsPaywallProps {
   readonly feature: PaywallFeatureName
   readonly className?: string | undefined
-  readonly onInteracted?: () => void
 }
 
 const PAYWALL_LAYOUT_STYLES = tv({ base: 'mt-1' })
 
 /** A layout that shows a paywall for a feature. */
 export default function SettingsPaywall(props: SettingsPaywallProps) {
-  const { feature, className, onInteracted } = props
+  const { feature, className } = props
 
   return (
-    <div
-      className={PAYWALL_LAYOUT_STYLES({ className })}
-      onMouseDown={onInteracted}
-      onPointerDown={onInteracted}
-      onFocus={onInteracted}
-    >
+    <div className={PAYWALL_LAYOUT_STYLES({ className })}>
       <PaywallScreen feature={feature} />
     </div>
   )

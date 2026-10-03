@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A profile picture, or the default user icon when there is none: the Vue counterpart of the
- * React `#/components/ProfilePicture`, styled by the same `PROFILE_PICTURE_STYLES`.
+ * @file A user's or an organization's picture, or the default user icon when there is none: the
+ * Vue counterpart of the React `ProfilePicture`, styled by the same `PROFILE_PICTURE_STYLES`.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { PROFILE_PICTURE_STYLES } from '$/components/ProfilePicture/variants'
@@ -17,9 +17,9 @@ const {
   rounded,
   class: className,
 } = defineProps<{
-  /** The picture's URL; without one, the default user icon is shown. */
+  /** The picture's URL. Without one, the default user icon is shown. */
   picture: string | null | undefined
-  /** The user's name: the picture's accessible name. */
+  /** Whose picture it is: its alternative text. */
   name: string
   size?: ProfilePictureVariants['size']
   rounded?: ProfilePictureVariants['rounded']

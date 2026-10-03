@@ -15,13 +15,13 @@ import { useGetAsset } from '#/layouts/Drive/assetsTableItemsHooks'
 import * as columnModule from '#/pages/dashboard/components/column'
 import * as columnUtils from '#/pages/dashboard/components/column/columnUtils'
 import {
+  useDriveState,
   useDriveStore,
   useSetDragTargetAssetId,
   useSetSelectedAssets,
 } from '#/providers/DriveProvider'
 import { unsetModal } from '#/providers/ModalProvider'
 import * as drag from '#/utilities/drag'
-import { useStore } from '#/utilities/zustand'
 import { isLocalCategory } from '$/providers/category'
 import { useFullUserSession } from '$/providers/react'
 import {
@@ -106,8 +106,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
   const { user } = useFullUserSession()
   const setSelectedAssets = useSetSelectedAssets()
   const getAsset = useGetAsset()
-  const { isSelected, isMultiSelected } = useStore(
-    driveStore,
+  const { isSelected, isMultiSelected } = useDriveState(
     ({ visuallySelectedKeys, selectedIds }) => {
       const selection = visuallySelectedKeys ?? selectedIds
 
@@ -125,7 +124,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
   const rootRef = React.useRef<HTMLElement | null>(null)
   const grabKeyboardFocusRef = useSyncRef(grabKeyboardFocus)
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
 
   const isDeletingSingleAsset =
     useBackendMutationState(backend, 'deleteAsset', {
@@ -166,7 +165,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
     item.type === backendModule.AssetType.project ? item.id : null,
   )
 
-  const insertionVisibility = useStore(driveStore, (driveState) => {
+  const insertionVisibility = useDriveState((driveState) => {
     return (
         driveState.pasteData?.type === 'move' &&
           driveState.pasteData.data.assets.some((asset) => asset.id === item.id)
@@ -177,7 +176,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
   const visibility = isDeleting || isRestoring || isUpdating ? 'opacity-50' : insertionVisibility
 
   const setSelected = useEventCallback((newSelected: boolean) => {
-    const { selectedAssets } = driveStore.getState()
+    const { selectedAssets } = driveStore.state
     setSelectedAssets(
       newSelected ?
         [...selectedAssets, item]
@@ -311,7 +310,7 @@ export const AssetRow = React.memo(function AssetRowImpl(props: AssetRowProps) {
                 select(item)
               }
 
-              driveStore.setState({
+              driveStore.update({
                 contextMenuData: {
                   triggerRef: rootRef,
                   initialContextMenuPosition: event,

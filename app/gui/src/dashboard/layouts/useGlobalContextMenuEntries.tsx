@@ -6,10 +6,9 @@ import { defineMenuEntries } from '#/hooks/menuHooks'
 import { CreateCredentialModal } from '#/modals/CreateCredentialModal'
 import UpsertDatalinkModal from '#/modals/UpsertDatalinkModal'
 import UpsertSecretModal from '#/modals/UpsertSecretModal'
-import { useDriveStore } from '#/providers/DriveProvider'
+import { useDriveState } from '#/providers/DriveProvider'
 import { setModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
-import { useStore } from '#/utilities/zustand'
 import type { CategoryType } from '$/providers/category'
 import type { Backend } from 'enso-common/src/services/Backend'
 import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
@@ -30,9 +29,7 @@ export function useGlobalContextMenuEntries(options: GlobalContextMenuEntriesOpt
 
   const isCloud = backend.type === BackendType.remote
 
-  const driveStore = useDriveStore()
-  const hasPasteData = useStore(
-    driveStore,
+  const hasPasteData = useDriveState(
     (storeState) => (storeState.pasteData?.data.assets.length ?? 0) > 0,
   )
 

@@ -1,33 +1,10 @@
 /** @file A block of text with a copy button. */
 import { useCopy } from '#/hooks/copyHooks'
-import { TEXT_STYLE } from '$/components/Text/variants'
+import { COPY_BLOCK_STYLES } from '$/components/CopyBlock/variants'
 import { useText } from '$/providers/react'
-import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
+import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { ReactNode } from 'react'
 import { Button } from '../Button'
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const COPY_BLOCK_STYLES = tv({
-  base: TEXT_STYLE({
-    class: 'max-w-full bg-primary/5 border-primary/10',
-  }),
-  variants: {
-    size: {
-      small: 'py-[1.5px] px-[5.5px]',
-      medium: 'py-[3.5px] px-[7.5px]',
-      large: 'py-[5.5px] px-[11.5px]',
-    },
-    rounded: {
-      custom: '',
-      small: 'rounded-sm',
-      medium: 'rounded-md',
-      large: 'rounded-lg',
-      full: 'rounded-full',
-    },
-  },
-  slots: { copyTextBlock: 'flex-auto text-nowrap overflow-x-auto scroll-hidden w-full' },
-  defaultVariants: { size: 'medium', rounded: 'full' },
-})
 
 /** Props for a {@link CopyBlock}. */
 export interface CopyBlockProps extends VariantProps<typeof COPY_BLOCK_STYLES> {

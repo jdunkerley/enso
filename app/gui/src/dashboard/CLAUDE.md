@@ -17,6 +17,8 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 ## Structure (React, legacy shape)
 
 - `pages/` — Route-level components. Top of the component tree for each URL.
+  `pages/dashboard/UserBar/` is Vue (#83): the user bar, user menu and
+  notification tray, mounted by `AppContainer.vue`.
 - `layouts/` — Chromes that wrap multiple pages (protected-route wrappers, split
   panels).
 - `modules/` — Feature-oriented slices (`payments/` for Stripe flows, etc.). A
@@ -30,6 +32,15 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `askModal`, behind the React `ask`) forward to the Vue modal stack
   (`$/providers/modals`). The About dialog is Vue's: open it with
   `openAboutModal()` (`$/components/AboutModal/aboutModal`).
+  `InputBindingsProvider` hands out the one instance of the dashboard's
+  bindings, `$/providers/dashboardInputBindings`, which Vue menus read too (the
+  user menu's shortcuts; `$/composables/menuEntries` is the Vue
+  `useMenuEntries`) and the Vue settings page edits; a change re-renders its
+  consumers. `DriveProvider` is the same pattern for the drive: it creates the
+  framework-free `$/providers/driveStore` (selection, clipboard, rename target)
+  and `useDriveState` reads it through `storeHooks`' `useStore`. The category
+  switch's pending state is `isNavigating` on the Vue drive location, which the
+  React drive feeds from its transition (`useDriveNavigationTransition`).
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.
@@ -60,9 +71,11 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 
 ## Auth / cloud
 
-The Dashboard authenticates against AWS Cognito via `aws-amplify`. Session
-tokens are stored via `accessToken.ts` in `app/common/` and mirrored into the
-Project Manager / LS so the engine can reach Enso Cloud.
+The Dashboard authenticates against AWS Cognito via `aws-amplify`. The logic is
+Vue (`src/authentication/`, `src/providers/{auth,session}.ts`), and so are the
+sign-in, sign-up and password pages, in `src/cloud/auth/` (#85). Session tokens
+are stored via `accessToken.ts` in `app/common/` and mirrored into the Project
+Manager / LS so the engine can reach Enso Cloud.
 
 ## Talking to ProjectView
 
@@ -122,7 +135,12 @@ Every port PR follows this checklist.
    - Features go in `src/dashboard/` as `.vue`, in the same folder the `.tsx`
      was in.
    - Cloud-only features go in `src/cloud/<area>/`, reached only through the
-     registries.
+     registries: `registerCloud` (`src/cloud/index.ts`) adds them, and an ESLint
+     rule keeps the core off them (add the area to `CLOUD_AREAS` in
+     `eslint.config.mjs`). See `src/cloud/CLAUDE.md`.
+   - Give every text field of a ported form a default (`''`): react-hook-form
+     read an untouched input as `''`, the Vue form leaves it `undefined`, which
+     zod reports as "This field is invalid" instead of the field's message.
    - Stores use `createContextStore`, unless non-component code must reach them.
 5. **Reuse the styles.** Build on the existing `variants.ts` (as
    `DashboardDialogContent.vue` and `src/components/Menu/variants.ts` do).

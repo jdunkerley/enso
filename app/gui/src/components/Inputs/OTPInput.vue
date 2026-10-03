@@ -75,7 +75,8 @@ function slotClass(index: number) {
     isActive: activeIndex.value === index,
     isInvalid: field.isInvalid.value,
   })
-  return `${styles.base()} ${styles.char()} text-center bg-transparent`
+  // `w-0`: an `<input>`'s intrinsic width would otherwise stop the boxes from sharing the row.
+  return `${styles.base()} ${styles.char()} w-0 text-center bg-transparent`
 }
 
 function handleComplete(chars: string[]) {

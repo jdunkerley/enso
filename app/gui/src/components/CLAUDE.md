@@ -10,21 +10,31 @@ enforces it).
 One folder per primitive, holding its SFCs, its `variants.ts` and its
 `__tests__/`:
 
-| Folder           | Components                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------------- |
-| `Button/`        | `Button`, `ButtonGroup`, `CloseButton`, `CopyButton`                                            |
-| `Text/`          | `Text`, `Heading`, `TextGroup`                                                                  |
-| `Icon/`          | `Icon` (from `icons.svg`)                                                                       |
-| `Dialog/`        | `Dialog`, `Popover`, `DialogClose`                                                              |
-| `AlertDialog/`   | `AlertDialog`, `ConfirmDeleteModal` (asked through the modal stack)                             |
-| `Menu/`          | `DropdownMenu`, `ContextMenu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`        |
-| `Tooltip/`       | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
-| `ErrorBoundary/` | `ErrorBoundary` (`onlyRenderErrors` at route and tab roots), `SuspenseLoader`                   |
-| `Spinner/`       | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
-| `Toast/`         | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
-| `ModalHost/`     | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
-| `AboutModal/`    | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
-| others           | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
+| Folder              | Components                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| `Button/`           | `Button`, `ButtonGroup`, `CloseButton`, `CopyButton`                                            |
+| `Text/`             | `Text`, `Heading`, `TextGroup`                                                                  |
+| `Icon/`             | `Icon` (from `icons.svg`)                                                                       |
+| `Dialog/`           | `Dialog`, `Popover`, `DialogClose`                                                              |
+| `AlertDialog/`      | `AlertDialog`, `ConfirmDeleteModal` (asked through the modal stack)                             |
+| `Menu/`             | `DropdownMenu`, `ContextMenu`, `MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`        |
+| `Tooltip/`          | `Tooltip` (accessible), `VisualTooltip` (visual only)                                           |
+| `ErrorBoundary/`    | `ErrorBoundary` (`onlyRenderErrors` at route and tab roots), `SuspenseLoader`                   |
+| `Spinner/`          | `Spinner`, `StatelessSpinner`, `Loader`                                                         |
+| `Toast/`            | `ToastHost` (one, in `App.vue`), `ToastItem`; the store is `$/providers/toasts`                 |
+| `ModalHost/`        | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
+| `AboutModal/`       | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
+| `KeyboardShortcut/` | `KeyboardShortcut` (a shortcut string drawn as modifier icons and keys)                         |
+| `MenuEntry/`        | `MenuEntry` (a button entry of a popover menu: the user and info menus)                         |
+| `ProfilePicture/`   | `ProfilePicture` (a user's or organization's picture, or the default user icon)                 |
+| `InfoBar/`          | `InfoBar`, `InfoMenu`: the logo and info menu of the pages outside the dashboard (#83)          |
+| `Link/`             | `Link` (a coloured link with an icon); `useClientNavigation` (`clientNavigation.ts`)            |
+| others              | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
+
+Also, from the settings page's port (#86): `CopyBlock/` (text that copies
+itself; the copy toast is `Button/copy.ts`'s `useCopy`, shared with
+`CopyButton`), `KeyboardShortcut/`, `ProfilePicture/` and `QrCode/` (drawn as
+`qrcode.react` drew it, with `uqr`'s port of the same encoder).
 
 Forms and inputs are #79's.
 
@@ -50,6 +60,11 @@ local `<Dialog>`.
   variant names), with Vue mechanics: `class`, `*Class`, slots, `v-model:open`,
   a `trigger` slot instead of `X.Trigger`. See "Rulings from #78" in
   `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+- **Links navigate in the app.** react-aria's `RouterProvider` turned a plain
+  click on a React link to a page of this app into a router push; `Link` and a
+  `Button` with an `href` do the same through `useClientNavigation`. Use them
+  (or that handler) for an in-app link, not a bare `<a>`, which reloads the
+  page.
 - **Boolean props need an explicit `undefined` default** when `false` means
   something different from "not set" (a variant default, a group's shared
   value): Vue casts an absent `boolean` or `string | false` prop to `false`.

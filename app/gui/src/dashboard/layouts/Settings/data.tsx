@@ -1,56 +1,32 @@
-/** @file Metadata for rendering each settings section. */
+/**
+ * @file The settings tabs that are still React, mounted inside the Vue settings page through
+ * `ReactSettingsTab`.
+ *
+ * TODO: #87 and #88 port the organization tabs (organization, billing, members, user groups, activity
+ * log, API keys, usage) to Vue, under `src/cloud/`; this file goes with the last of them.
+ */
 import { Button } from '#/components/Button'
-import type { TSchema } from '#/components/Form'
-import type { ComboBoxProps } from '#/components/Inputs/ComboBox'
-import { actionToTextId } from '#/components/MenuEntry'
-import { Text } from '#/components/Text'
 import type { ToastAndLogCallback } from '#/hooks/toastAndLogHooks'
-import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { ApiKeySettingsSection } from '#/layouts/Settings/ApiKeysSettingsSection'
-import { passwordWithPatternSchema } from '#/pages/authentication/schemas'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
-import { PASSWORD_REGEX } from '$/cloud/validation'
 import type { PaywallFeatureName } from '$/composables/paywall'
-import { BINDINGS } from '$/configurations/inputBindings'
+import type { SettingsBaseContext, SettingsSearchableTab } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import type { GetText } from '$/providers/text'
-import type { Icon } from '@/util/iconMetadata/iconName'
-import { getLocalTimeZone, now } from '@internationalized/date'
-import type { QueryClient } from '@tanstack/react-query'
 import type { Backend } from 'enso-common/src/services/Backend'
 import {
   EmailAddress,
   HttpsUrl,
   isUserOnPlanWithMultipleSeats,
-  Path,
-  Plan,
   type OrganizationInfo,
-  type User,
 } from 'enso-common/src/services/Backend'
-import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import type { TextId } from 'enso-common/src/text'
-import {
-  getTimeZoneFromDescription,
-  getTimeZoneOffsetStringWithGMT,
-  IanaTimeZone,
-  tryGetDescriptionForTimeZone,
-  tryGetTimeZoneFromDescription,
-  WHITELISTED_TIME_ZONE_DESCRIPTIONS,
-} from 'enso-common/src/utilities/data/dateTime'
-import { pick, unsafeEntries } from 'enso-common/src/utilities/data/object'
-import { normalizePath } from 'enso-common/src/utilities/file'
 import type { HTMLInputAutoCompleteAttribute, HTMLInputTypeAttribute, ReactNode } from 'react'
 import * as z from 'zod'
 import ActivityLogSettingsSection from './ActivityLogSettingsSection'
-import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection'
-import DeleteUserAccountSettingsSection from './DeleteUserAccountSettingsSection'
-import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection'
-import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection'
 import MembersSettingsSection from './MembersSettingsSection'
 import OrganizationProfilePictureInput from './OrganizationProfilePictureInput'
-import ProfilePictureInput from './ProfilePictureInput'
-import { SetupTwoFaForm } from './SetupTwoFaForm'
 import UsageSettingsSection from './UsageSettingsSection'
 import { UserGroupsSettingsSection } from './UserGroupsSettingsSection'
 
@@ -67,195 +43,12 @@ export const SETTINGS_NO_RESULTS_SECTION_DATA: SettingsSectionData = {
   ],
 }
 
-export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData>> = {
-  [SettingsTabType.account]: {
-    nameId: 'accountSettingsTab',
-    settingsTab: SettingsTabType.account,
-    icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
-    // The tab stays visible in degraded-auth mode so the Cognito-only sections
-    // (password change, 2FA setup) remain reachable; the cloud-dependent sections
-    // hide themselves via their own `getVisible`.
-    sections: [
-      {
-        nameId: 'userAccountSettingsSection',
-        entries: [
-          settingsFormEntryData({
-            type: 'form',
-            schema: z.object({
-              name: z.string().min(1),
-              email: z.string().email().or(z.literal('')),
-              timeZone: z.string().optional(),
-            }),
-            getValue: (context) => ({
-              ...pick(context.user, 'name', 'email'),
-              timeZone: tryGetDescriptionForTimeZone(
-                context.preferredTimeZone,
-                IanaTimeZone(getLocalTimeZone()),
-              ),
-            }),
-            getVisible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
-            onSubmit: async (context, { name, timeZone }) => {
-              const newTimeZone = timeZone != null ? tryGetTimeZoneFromDescription(timeZone) : null
-              if (newTimeZone != null) {
-                context.setPreferredTimeZone(newTimeZone)
-              }
-              if (name !== context.user.name) {
-                await context.updateUser([{ username: name }])
-              }
-            },
-            inputs: [
-              { nameId: 'userNameSettingsInput', name: 'name' },
-              { nameId: 'userEmailSettingsInput', name: 'email', editable: false },
-              {
-                nameId: 'userTimeZoneSettingsInput',
-                descriptionId: 'userTimeZoneSettingsInputDescription',
-                name: 'timeZone',
-                type: 'comboBox',
-                comboBoxProps: () => ({
-                  items: WHITELISTED_TIME_ZONE_DESCRIPTIONS,
-                  addonStart: (description: string | null) => {
-                    const timeZone =
-                      description != null ? tryGetTimeZoneFromDescription(description) : null
-                    return (
-                      <Text className="w-20">
-                        {getTimeZoneOffsetStringWithGMT(now(timeZone ?? getLocalTimeZone()))}
-                      </Text>
-                    )
-                  },
-                  toTextValue: (timeZone: string) => timeZone,
-                  children: (description: string) => {
-                    const otherTimeZone = getTimeZoneFromDescription(description)
-                    const timezoneOffsetString = getTimeZoneOffsetStringWithGMT(now(otherTimeZone))
-                    return `${timezoneOffsetString} ${description}`
-                  },
-                }),
-                hidden: (context) =>
-                  context.user.plan === Plan.free || context.user.plan === Plan.solo,
-              },
-            ],
-          }),
-        ],
-      },
-      {
-        nameId: 'changePasswordSettingsSection',
-        entries: [
-          settingsFormEntryData({
-            type: 'form',
-            schema: ({ getText }) =>
-              z
-                .object({
-                  username: z.string().email(getText('invalidEmailValidationError')),
-                  // We don't want to validate the current password.
-                  currentPassword: z.string(),
-                  newPassword: passwordWithPatternSchema(getText),
-                  confirmNewPassword: z.string(),
-                })
-                .superRefine((object, context) => {
-                  if (
-                    PASSWORD_REGEX.test(object.newPassword) &&
-                    object.newPassword !== object.confirmNewPassword
-                  ) {
-                    context.addIssue({
-                      path: ['confirmNewPassword'],
-                      code: 'custom',
-                      message: getText('passwordMismatchError'),
-                    })
-                  }
-                }),
-            getValue: ({ user }) => ({
-              username: user.email,
-              currentPassword: '',
-              newPassword: '',
-              confirmNewPassword: '',
-            }),
-            onSubmit: async ({ changePassword }, { currentPassword, newPassword }) => {
-              await changePassword(currentPassword, newPassword)
-            },
-            inputs: [
-              {
-                nameId: 'userNameSettingsInput',
-                name: 'username',
-                autoComplete: 'username',
-                editable: false,
-                hidden: true,
-              },
-              {
-                nameId: 'userCurrentPasswordSettingsInput',
-                name: 'currentPassword',
-                autoComplete: 'current-assword',
-                type: 'password',
-              },
-              {
-                nameId: 'userNewPasswordSettingsInput',
-                name: 'newPassword',
-                autoComplete: 'new-password',
-                descriptionId: 'passwordValidationMessage',
-                type: 'password',
-              },
-              {
-                nameId: 'userConfirmNewPasswordSettingsInput',
-                name: 'confirmNewPassword',
-                autoComplete: 'new-password',
-                type: 'password',
-              },
-            ],
-            getVisible: (context) => {
-              // The shape of the JWT payload is statically known.
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const username: string | null =
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
-                JSON.parse(atob(context.accessToken.split('.')[1]!)).username
-              return username != null ? !/^Github_|^Google_/.test(username) : false
-            },
-          }),
-        ],
-      },
-      {
-        nameId: 'setup2FASettingsSection',
-        entries: [
-          {
-            type: 'custom',
-            render: SetupTwoFaForm,
-            getVisible: (context) => {
-              // The shape of the JWT payload is statically known.
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-              const username: string | null =
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-non-null-assertion
-                JSON.parse(atob(context.accessToken.split('.')[1]!)).username
-              return username != null ? !/^Github_|^Google_/.test(username) : false
-            },
-          },
-        ],
-      },
-      {
-        nameId: 'deleteUserAccountSettingsSection',
-        heading: false,
-        entries: [
-          {
-            type: 'custom',
-            aliasesId: 'deleteUserAccountSettingsCustomEntryAliases',
-            getVisible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
-            render: () => <DeleteUserAccountSettingsSection />,
-          },
-        ],
-      },
-      {
-        nameId: 'profilePictureSettingsSection',
-        column: 2,
-        entries: [
-          {
-            type: 'custom',
-            aliasesId: 'profilePictureSettingsCustomEntryAliases',
-            getVisible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
-            render: (context) => <ProfilePictureInput backend={context.backend} />,
-          },
-        ],
-      },
-    ],
-  },
+/** The React settings tabs. */
+export const REACT_SETTINGS_TAB_DATA = {
   [SettingsTabType.organization]: {
     nameId: 'organizationSettingsTab',
     settingsTab: SettingsTabType.organization,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
@@ -328,114 +121,10 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
       },
     ],
   },
-  [SettingsTabType.local]: {
-    nameId: 'localSettingsTab',
-    settingsTab: SettingsTabType.local,
-    icon: SETTINGS_TAB_ICONS[SettingsTabType.local],
-    visible: ({ localBackend }) => localBackend != null,
-    sections: [
-      {
-        nameId: 'localSettingsSection',
-        entries: [
-          settingsFormEntryData({
-            type: 'form',
-            schema: z.object({
-              localRootDirectory: z.string(),
-            }),
-            getValue: ({ localRootDirectory }) => ({
-              localRootDirectory: String(localRootDirectory ?? ''),
-            }),
-            onSubmit: (_, { localRootDirectory }) => {
-              setLocalRootDirectory(Path(localRootDirectory))
-            },
-            inputs: [{ nameId: 'localRootPathSettingsInput', name: 'localRootDirectory' }],
-          }),
-          {
-            type: 'custom',
-            aliasesId: 'localRootPathButtonSettingsCustomEntryAliases',
-            render: (context) => (
-              <Button.Group className="grow-0">
-                {window.api && (
-                  <Button
-                    size="small"
-                    variant="outline"
-                    onPress={async () => {
-                      const [newDirectory] =
-                        (await window.api?.fileBrowser.openFileBrowser('directory')) ?? []
-                      if (newDirectory != null) {
-                        setLocalRootDirectory(Path(normalizePath(newDirectory)))
-                      }
-                    }}
-                  >
-                    {context.getText('browseForNewLocalRootDirectory')}
-                  </Button>
-                )}
-                <Button
-                  size="small"
-                  variant="outline"
-                  className="self-start"
-                  onPress={() => {
-                    setLocalRootDirectory(null)
-                  }}
-                >
-                  {context.getText('resetLocalRootDirectory')}
-                </Button>
-              </Button.Group>
-            ),
-          },
-          settingsFormEntryData({
-            type: 'form',
-            schema: z.object({
-              downloadDirectory: z.string(),
-            }),
-            getValue: ({ downloadDirectory }) => ({
-              downloadDirectory: String(downloadDirectory ?? ''),
-            }),
-            onSubmit: (_, { downloadDirectory }) => {
-              setDownloadDirectory(Path(downloadDirectory))
-            },
-            inputs: [{ nameId: 'downloadDirectorySettingsInput', name: 'downloadDirectory' }],
-          }),
-          {
-            type: 'custom',
-            aliasesId: 'downloadDirectoryButtonSettingsCustomEntryAliases',
-            render: (context) => (
-              <Button.Group className="grow-0">
-                {window.api && (
-                  <Button
-                    size="small"
-                    variant="outline"
-                    onPress={async () => {
-                      const [newDirectory] =
-                        (await window.api?.fileBrowser.openFileBrowser('directory')) ?? []
-                      if (newDirectory != null) {
-                        setDownloadDirectory(Path(normalizePath(newDirectory)))
-                      }
-                    }}
-                  >
-                    {context.getText('browseForNewDownloadDirectory')}
-                  </Button>
-                )}
-                <Button
-                  size="small"
-                  variant="outline"
-                  className="self-start"
-                  onPress={() => {
-                    setDownloadDirectory(null)
-                  }}
-                >
-                  {context.getText('resetDownloadDirectory')}
-                </Button>
-              </Button.Group>
-            ),
-          },
-        ],
-      },
-    ],
-  },
   [SettingsTabType.billingAndPlans]: {
     nameId: 'billingAndPlansSettingsTab',
     settingsTab: SettingsTabType.billingAndPlans,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
     organizationOnly: true,
     visible: ({ user, organization }) =>
@@ -487,6 +176,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.members]: {
     nameId: 'membersSettingsTab',
     settingsTab: SettingsTabType.members,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
@@ -502,6 +192,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.userGroups]: {
     nameId: 'userGroupsSettingsTab',
     settingsTab: SettingsTabType.userGroups,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
@@ -514,60 +205,10 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
       },
     ],
   },
-  [SettingsTabType.appearance]: {
-    nameId: 'appearanceSettingsTab',
-    settingsTab: SettingsTabType.appearance,
-    icon: SETTINGS_TAB_ICONS[SettingsTabType.appearance],
-    sections: [
-      {
-        nameId: 'codeSettingsSection',
-        entries: [
-          {
-            type: 'custom',
-            aliasesId: 'codeLigaturesSettingsCustomEntryAliases',
-            render: () => <CodeLigaturesSettingsSection />,
-          },
-          {
-            type: 'custom',
-            aliasesId: 'handwrittenCommentsSettingsCustomEntryAliases',
-            render: () => <HandwrittenCommentsSettingsSection />,
-          },
-        ],
-      },
-    ],
-  },
-  [SettingsTabType.keyboardShortcuts]: {
-    nameId: 'keyboardShortcutsSettingsTab',
-    settingsTab: SettingsTabType.keyboardShortcuts,
-    icon: SETTINGS_TAB_ICONS[SettingsTabType.keyboardShortcuts],
-    sections: [
-      {
-        nameId: 'keyboardShortcutsSettingsSection',
-        columnClassName: 'h-full *:flex-1 *:min-h-0 max-w-[unset]',
-        entries: [
-          {
-            type: 'custom',
-            aliasesId: 'keyboardShortcutsSettingsCustomEntryAliases',
-            getExtraAliases: (context) => {
-              const rebindableBindings = unsafeEntries(BINDINGS).flatMap((kv) => {
-                const [k, v] = kv
-                if (v.rebindable === false) {
-                  return []
-                } else {
-                  return [actionToTextId(k)]
-                }
-              })
-              return rebindableBindings.map((binding) => context.getText(binding))
-            },
-            render: KeyboardShortcutsSettingsSection,
-          },
-        ],
-      },
-    ],
-  },
   [SettingsTabType.activityLog]: {
     nameId: 'activityLogSettingsTab',
     settingsTab: SettingsTabType.activityLog,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
     organizationOnly: true,
     visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
@@ -587,6 +228,7 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.apiKeys]: {
     nameId: 'apiKeysSettingsTab',
     settingsTab: SettingsTabType.apiKeys,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.apiKeys],
     visible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
     sections: [
@@ -606,8 +248,11 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
   [SettingsTabType.usage]: {
     nameId: 'usageSettingsTab',
     settingsTab: SettingsTabType.usage,
+    react: true,
     icon: SETTINGS_TAB_ICONS[SettingsTabType.usage],
     feature: 'scheduler',
+    // Scheduled executions run in Enso Cloud: in local-only mode the tab could only offer a plan.
+    visible: ({ isAuthDisabled }) => !isAuthDisabled,
     sections: [
       {
         nameId: 'usageSettingsSection',
@@ -622,90 +267,26 @@ export const SETTINGS_TAB_DATA: Readonly<Record<SettingsTabType, SettingsTabData
       },
     ],
   },
-}
+} satisfies Partial<Record<SettingsTabType, SettingsTabData>>
 
-export const SETTINGS_DATA: SettingsData = [
-  {
-    nameId: 'generalSettingsTabSection',
-    tabs: [
-      SETTINGS_TAB_DATA[SettingsTabType.account],
-      SETTINGS_TAB_DATA[SettingsTabType.organization],
-      SETTINGS_TAB_DATA[SettingsTabType.local],
-    ],
-  },
-  {
-    nameId: 'accessSettingsTabSection',
-    tabs: [
-      SETTINGS_TAB_DATA[SettingsTabType.billingAndPlans],
-      SETTINGS_TAB_DATA[SettingsTabType.members],
-      SETTINGS_TAB_DATA[SettingsTabType.userGroups],
-    ],
-  },
-  {
-    nameId: 'lookAndFeelSettingsTabSection',
-    tabs: [
-      SETTINGS_TAB_DATA[SettingsTabType.appearance],
-      SETTINGS_TAB_DATA[SettingsTabType.keyboardShortcuts],
-    ],
-  },
-  {
-    nameId: 'securitySettingsTabSection',
-    tabs: [
-      SETTINGS_TAB_DATA[SettingsTabType.activityLog],
-      SETTINGS_TAB_DATA[SettingsTabType.apiKeys],
-    ],
-  },
-  {
-    nameId: 'usageSettingsTabSection',
-    tabs: [SETTINGS_TAB_DATA[SettingsTabType.usage]],
-  },
-]
-
-export const ALL_SETTINGS_TABS = SETTINGS_DATA.flatMap((section) =>
-  section.tabs.map((tab) => tab.settingsTab),
-)
-
-/** Metadata describing inputs passed to every settings entry. */
-export interface SettingsContext {
-  readonly accessToken: string
-  readonly user: User
+/** Metadata describing inputs passed to every React settings entry. */
+export interface SettingsContext extends SettingsBaseContext {
   readonly backend: RemoteBackend
-  readonly localBackend: LocalBackend | null
-  readonly organization: OrganizationInfo | null
-  readonly updateUser: (variables: Parameters<Backend['updateUser']>) => Promise<void>
   readonly updateOrganization: (
     variables: Parameters<Backend['updateOrganization']>,
   ) => Promise<OrganizationInfo | null | undefined>
-  readonly localRootDirectory: Path | null
-  readonly downloadDirectory: Path | null
   readonly toastAndLog: ToastAndLogCallback
   readonly getText: GetText
-  readonly queryClient: QueryClient
-  readonly isMatch: (name: string) => boolean
-  readonly changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>
-  readonly preferredTimeZone: string | undefined
-  readonly setPreferredTimeZone: (preferredTimeZone: string | undefined) => void
-  /**
-   * `true` when running in degraded-auth mode — the `user`/`organization` data is a
-   * placeholder because the Enso Cloud `users/me` call failed. Tabs that depend on the
-   * real cloud profile should hide themselves.
-   */
-  readonly isCloudDataUnavailable: boolean
 }
 
-/**
- * Possible values for the `type` property of {@link SettingsInputData}.
- *
- * TODO: Add support for other types.
- */
-export type SettingsInputType =
-  Extract<HTMLInputTypeAttribute, 'email' | 'password' | 'text'> | 'comboBox'
+/** Possible values for the `type` property of {@link SettingsInputData}. */
+export type SettingsInputType = Extract<HTMLInputTypeAttribute, 'email' | 'password' | 'text'>
 
 /** Either `T`, or a function that returns `T` given a `SettingsContext`. */
 type ToValue<T> = T | ((context: SettingsContext) => T)
 
 /** Metadata describing an input in a {@link SettingsFormEntryData}. */
-interface SettingsInputDataBase<T> {
+export interface SettingsInputData<T> {
   readonly nameId: TextId & `${string}SettingsInput`
   readonly name: string & keyof T
   readonly autoComplete?: HTMLInputAutoCompleteAttribute
@@ -714,25 +295,8 @@ interface SettingsInputDataBase<T> {
   /** Defaults to `true`. */
   readonly editable?: ToValue<boolean>
   readonly descriptionId?: TextId
+  readonly type?: SettingsInputType
 }
-
-/** Metadata describing a native input in a {@link SettingsFormEntryData}. */
-interface SettingsNativeInputData<T> extends SettingsInputDataBase<T> {
-  readonly type?: Extract<HTMLInputTypeAttribute, SettingsInputType>
-}
-
-/** The relevant `ComboBox` props for a {@link SettingsComboBoxInputData}. */
-type ComboBoxPartialProps = Partial<ComboBoxProps<TSchema, string>> &
-  Pick<ComboBoxProps<TSchema, string>, 'items'>
-
-/** Metadata describing a combo box input in a {@link SettingsFormEntryData}. */
-interface SettingsComboBoxInputData<T> extends SettingsInputDataBase<T> {
-  readonly comboBoxProps: ToValue<ComboBoxPartialProps>
-  readonly type: 'comboBox'
-}
-
-/** Metadata describing an input in a {@link SettingsFormEntryData}. */
-export type SettingsInputData<T> = SettingsComboBoxInputData<T> | SettingsNativeInputData<T>
 
 /** Metadata describing a settings entry that is a form. */
 export interface SettingsFormEntryData<T> {
@@ -753,7 +317,7 @@ function settingsFormEntryData<T>(data: SettingsFormEntryData<T>) {
 export interface SettingsCustomEntryData {
   readonly type: 'custom'
   readonly aliasesId?: TextId & `${string}SettingsCustomEntryAliases`
-  readonly getExtraAliases?: (context: SettingsContext) => readonly string[]
+  readonly getExtraAliases?: (getText: GetText) => readonly string[]
   readonly render: (context: SettingsContext) => ReactNode
   readonly getVisible?: (context: SettingsContext) => boolean
 }
@@ -768,32 +332,17 @@ export interface SettingsSectionData {
   /** The first column is column 1, not column 0. */
   readonly column?: number
   readonly heading?: false
-  readonly focusArea?: false
   readonly columnClassName?: string
-  readonly aliases?: TextId[]
   readonly entries: readonly SettingsEntryData[]
 }
 
 /** Metadata describing a settings tab. */
-export interface SettingsTabData {
-  readonly nameId: TextId & `${string}SettingsTab`
-  readonly settingsTab: SettingsTabType
-  readonly icon: Icon
-  readonly visible?: (context: SettingsContext) => boolean
-  readonly organizationOnly?: true
+export interface SettingsTabData extends SettingsSearchableTab<SettingsSectionData> {
+  /** Rendered in React, by `ReactSettingsTab`. */
+  readonly react: true
   /**
    * The feature behind which this settings tab is locked. If the user cannot access the feature,
    * a paywall is shown instead of the settings tab.
    */
   readonly feature?: PaywallFeatureName
-  readonly sections: readonly SettingsSectionData[]
 }
-
-/** Metadata describing a settings tab section. */
-export interface SettingsTabSectionData {
-  readonly nameId: TextId & `${string}SettingsTabSection`
-  readonly tabs: readonly SettingsTabData[]
-}
-
-/** Metadata describing all settings. */
-export type SettingsData = readonly SettingsTabSectionData[]

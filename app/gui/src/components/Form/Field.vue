@@ -98,7 +98,13 @@ function onLabelClick(event: MouseEvent) {
     :aria-errormessage="hasError ? fieldIds.errorId : undefined"
     :aria-required="isRequired"
   >
-    <label :class="classes.fieldContent()" @click.capture="onLabelClick">
+    <!-- Without a label, the label id names the whole content, as React's `aria.Label` does: a
+    `CheckboxGroup` without a label is named by its checkboxes' text. -->
+    <label
+      :id="label == null && !$slots.label ? fieldIds.labelId : undefined"
+      :class="classes.fieldContent()"
+      @click.capture="onLabelClick"
+    >
       <div :class="classes.labelContainer()">
         <span v-if="label != null || $slots.label" :id="fieldIds.labelId" :class="classes.label()">
           <slot name="label">{{ label }}</slot>

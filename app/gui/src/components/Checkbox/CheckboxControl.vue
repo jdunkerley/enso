@@ -63,7 +63,7 @@ defineExpose({ focus: () => input.value?.focus() })
 <template>
   <label
     :class="classes.base({ className, isSelected })"
-    :data-selected="isSelected"
+    :data-selected="isSelected || undefined"
     :data-disabled="isDisabled || undefined"
     :data-invalid="isInvalid || undefined"
     :data-testid="testId"

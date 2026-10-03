@@ -142,7 +142,7 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
 
   const downloadFilesCallback = useEventCallback(() => {
     unsetModal()
-    const { selectedAssets } = driveStore.getState()
+    const { selectedAssets } = driveStore.state
     if (
       selectedAssets.length === 1 &&
       selectedAssets[0] != null &&
