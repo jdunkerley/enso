@@ -38,11 +38,11 @@ describe('createDashboardInputBindings', () => {
     expect(bindings.metadata.duplicate.bindings).toEqual([])
   })
 
-  test('an action missing from the saved bindings has none, as the React provider loaded them', () => {
+  test('an action missing from the saved bindings keeps its defaults (#170)', () => {
     // Every save writes every action, so this only happens to an action added in a later release.
-    // Kept as it was for #170, which unifies the registries.
+    // The React provider (and #86) left it with none.
     const bindings = createDashboardInputBindings(fakeStorage({ rename: ['F2'] }) as never)
-    expect(bindings.metadata.copy.bindings).toEqual([])
+    expect(bindings.metadata.copy.bindings).toEqual(BINDINGS.copy.bindings)
   })
 
   test('ignores saved actions that no longer exist', () => {
@@ -64,7 +64,10 @@ describe('createDashboardInputBindings', () => {
     expect(storage.stored()?.copy).toEqual([])
     bindings.reset('copy')
     expect(storage.stored()?.copy).toEqual(BINDINGS.copy.bindings)
-    expect(Object.keys(storage.stored() ?? {}).sort()).toEqual(Object.keys(BINDINGS).sort())
+    // Every dashboard action, and the format's version (#170).
+    expect(Object.keys(storage.stored() ?? {}).sort()).toEqual(
+      ['$version', ...Object.keys(BINDINGS)].sort(),
+    )
   })
 
   test('changes are seen by Vue', () => {

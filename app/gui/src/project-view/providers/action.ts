@@ -59,22 +59,22 @@ const displayableActions = {
   'components.collapse': {
     icon: 'group',
     description: 'Create User Defined Component from Selected Components',
-    shortcut: graphBindings.bindings['components.collapse'],
+    shortcut: () => graphBindings.bindings['components.collapse'],
   },
   'components.copy': {
     icon: 'copy',
     description: 'Copy Components',
-    shortcut: graphBindings.bindings['components.copy'],
+    shortcut: () => graphBindings.bindings['components.copy'],
   },
   'components.deleteSelected': {
     icon: 'trash',
     description: 'Delete Selected Components',
-    shortcut: graphBindings.bindings['components.deleteSelected'],
+    shortcut: () => graphBindings.bindings['components.deleteSelected'],
   },
   'components.pickColorMulti': {
     icon: 'paint_palette',
     description: 'Color Selected Components',
-    shortcut: graphBindings.bindings['components.pickColorMulti'],
+    shortcut: () => graphBindings.bindings['components.pickColorMulti'],
   },
   'components.alignLeft': {
     icon: 'align_left',
@@ -99,7 +99,7 @@ const displayableActions = {
   'components.tidyUp': {
     icon: 'tidy_up',
     description: 'Tidy Up',
-    shortcut: graphBindings.bindings['components.tidyUp'],
+    shortcut: () => graphBindings.bindings['components.tidyUp'],
   },
   'components.spaceVertical': {
     icon: 'space_default',
@@ -140,7 +140,7 @@ const displayableActions = {
   'component.createNewNode': {
     icon: 'add',
     description: 'Add New Component',
-    shortcut: graphBindings.bindings['graph.openComponentBrowser'],
+    shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },
   'component.toggleDocPanel': {
     icon: 'help',
@@ -149,7 +149,7 @@ const displayableActions = {
   'component.toggleVisualization': {
     icon: 'eye',
     description: 'Show/Hide visualization',
-    shortcut: graphBindings.bindings['graph.toggleVisualization'],
+    shortcut: () => graphBindings.bindings['graph.toggleVisualization'],
   },
   'component.toggleExpanded': {
     icon: 'expanded_node',
@@ -199,17 +199,17 @@ const displayableActions = {
   'graph.addComponent': {
     icon: 'add',
     description: 'Add Component',
-    shortcut: graphBindings.bindings['graph.openComponentBrowser'],
+    shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },
   'graph.toggleCodeEditor': {
     icon: 'bottom_panel',
     description: 'Code Editor',
-    shortcut: graphBindings.bindings['graph.toggleCodeEditor'],
+    shortcut: () => graphBindings.bindings['graph.toggleCodeEditor'],
   },
   'graph.toggleDocumentationEditor': {
     icon: 'right_panel',
     description: 'Documentation Editor',
-    shortcut: graphBindings.bindings['graph.toggleDocumentationEditor'],
+    shortcut: () => graphBindings.bindings['graph.toggleDocumentationEditor'],
   },
   'graph.renameProject': {
     icon: 'edit',
@@ -226,17 +226,17 @@ const displayableActions = {
   'graph.undo': {
     icon: 'undo',
     description: 'Undo',
-    shortcut: graphBindings.bindings['graph.undo'],
+    shortcut: () => graphBindings.bindings['graph.undo'],
   },
   'graph.redo': {
     icon: 'redo',
     description: 'Redo',
-    shortcut: graphBindings.bindings['graph.redo'],
+    shortcut: () => graphBindings.bindings['graph.redo'],
   },
   'graph.fitAll': {
     icon: 'show_all',
     description: 'Show All Components',
-    shortcut: graphBindings.bindings['graph.fitAll'],
+    shortcut: () => graphBindings.bindings['graph.fitAll'],
   },
   'graph.zoomIn': {
     icon: 'add',
@@ -249,17 +249,17 @@ const displayableActions = {
   'graph.navigateUp': {
     icon: 'navigate_up',
     description: 'Navigate Up',
-    shortcut: graphBindings.bindings['graph.navigateUp'],
+    shortcut: () => graphBindings.bindings['graph.navigateUp'],
   },
   'graph.deleteSelectedEdge': {
     icon: 'trash',
     description: 'Delete Selected Connection',
-    shortcut: graphBindings.bindings['graph.deleteSelectedEdge'],
+    shortcut: () => graphBindings.bindings['graph.deleteSelectedEdge'],
   },
   'graph.pasteNode': {
     icon: 'paste',
     description: 'Paste Component',
-    shortcut: graphBindings.bindings['graph.pasteNode'],
+    shortcut: () => graphBindings.bindings['graph.pasteNode'],
   },
 
   // === File Browser ===
@@ -413,25 +413,25 @@ const undisplayableActions = {
   // === Graph Editor ===
 
   'graph.openDocumentation': {
-    shortcut: graphBindings.bindings['graph.openDocumentation'],
+    shortcut: () => graphBindings.bindings['graph.openDocumentation'],
   },
   'graph.openComponentBrowser': {
-    shortcut: graphBindings.bindings['graph.openComponentBrowser'],
+    shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },
   'graph.toggleVisualization': {
-    shortcut: graphBindings.bindings['graph.toggleVisualization'],
+    shortcut: () => graphBindings.bindings['graph.toggleVisualization'],
   },
   'graph.selectAll': {
-    shortcut: graphBindings.bindings['graph.selectAll'],
+    shortcut: () => graphBindings.bindings['graph.selectAll'],
   },
   'graph.deselectAll': {
-    shortcut: graphBindings.bindings['graph.deselectAll'],
+    shortcut: () => graphBindings.bindings['graph.deselectAll'],
   },
   'graph.startProfiling': {
-    shortcut: graphBindings.bindings['graph.startProfiling'],
+    shortcut: () => graphBindings.bindings['graph.startProfiling'],
   },
   'graph.stopProfiling': {
-    shortcut: graphBindings.bindings['graph.stopProfiling'],
+    shortcut: () => graphBindings.bindings['graph.stopProfiling'],
   },
 
   // === Visualizations ===
