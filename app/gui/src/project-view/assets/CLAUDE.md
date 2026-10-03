@@ -36,6 +36,19 @@ Stylesheets, fonts and icons for the project view (the graph editor).
   `tok-comment` (`util/codemirror/highlight.ts`) besides their CSS-module colour
   class. Radon shares Neon's 0.62em advance; never pair it with a face that does
   not, or comments leave the column grid.
+- `--font-node-comment` is the face of node comments (the bubbles above nodes,
+  `GraphNodeComment.vue`): `--font-sans`, or Radon (falling back to
+  `--font-sans`) under the same setting and root class. It is its own token, not
+  `--font-mono-comment`, because the bubble is free text, not on a code grid.
+  The size stays the inherited 11.5px: Radon's x-height (~0.53em at weight 400)
+  matches M PLUS 1's (~0.525em), and the bubble's line height is 1.4 × the font
+  size, so the bubble is equally tall in either face and nothing moves when
+  Radon loads (it only widens: Radon's 0.62em advance is ~25% wider than M PLUS
+  1's average). Node comments sit above their node and are not part of its
+  measured rect, so their size never moves nodes. Under the setting they take
+  the editable ligature values (`--font-node-comment-variant-ligatures` /
+  `-feature-settings`), since the bubble has a caret; with it off they keep the
+  UI face's defaults.
 - Ligatures on `--font-mono` text go through `--font-mono-variant-ligatures` /
   `--font-mono-feature-settings` (the code editor, and anything editable) and
   their `-readonly` variants (docs code, tables, visualizations), which the

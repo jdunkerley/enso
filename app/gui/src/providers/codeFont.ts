@@ -27,8 +27,9 @@ export interface CodeFontSettings {
    */
   readonly codeLigatures: boolean
   /**
-   * Render comments in the code editor in Monaspace Radon, the handwriting face of the Monaspace
-   * superfamily. Radon shares Neon's advance width, so comments stay on the code's column grid.
+   * Render comments in the code editor, and node comments in the graph, in Monaspace Radon, the
+   * handwriting face of the Monaspace superfamily. Radon shares Neon's advance width, so code editor
+   * comments stay on the code's column grid.
    */
   readonly handwrittenComments: boolean
 }
