@@ -5,9 +5,7 @@ import { twMerge } from 'tailwind-merge'
 
 import { ErrorBoundary } from '#/components/ErrorBoundary'
 import { Suspense } from '#/components/Suspense'
-import { useIsFeatureUnderPaywall } from '$/providers/react'
 import type { SettingsContext, SettingsSectionData, SettingsTabData } from './data'
-import SettingsPaywall from './Paywall'
 import SettingsSection from './Section'
 
 /** Props for a {@link SettingsTab}. */
@@ -20,9 +18,6 @@ export interface SettingsTabProps {
 export default function SettingsTab(props: SettingsTabProps) {
   const { context, data } = props
   const { sections } = data
-  const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
-  const paywallFeature =
-    data.feature != null && isFeatureUnderPaywall(data.feature) ? data.feature : null
   const [columns, classes] = useMemo<
     [readonly (readonly SettingsSectionData[])[], readonly string[]]
   >(() => {
@@ -45,10 +40,6 @@ export default function SettingsTab(props: SettingsTabProps) {
     }
     return [resultColumns, resultClasses]
   }, [sections])
-
-  if (paywallFeature) {
-    return <SettingsPaywall feature={paywallFeature} />
-  }
 
   const content =
     columns.length === 1 ?

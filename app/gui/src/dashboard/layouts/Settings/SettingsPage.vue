@@ -4,9 +4,9 @@
  * narrow screens), a search field that narrows the tabs, sections and entries to those matching it,
  * and the current tab, kept in the `SettingsTab` query parameter.
  *
- * The personal tabs, Organization and Members are Vue (`SettingsTab.vue`); the other organization
- * tabs are still React, mounted through `ReactSettingsTab` until #87's follow-up and #88 port them.
- * The sections of the Account, Organization and Members tabs come from the cloud
+ * Every tab but Billing & Plans is Vue (`SettingsTab.vue`); Billing & Plans is still React, mounted
+ * through `ReactSettingsTab` until #88 ports it. The sections of the Account tab and of the cloud's
+ * tabs (Organization, Members, User groups, Activity log, API keys, Usage) come from the cloud
  * (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a tab
  * whose feature the user's plan lacks.
  */

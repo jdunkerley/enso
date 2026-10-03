@@ -1,6 +1,6 @@
 /** @file Kinds of lambda. */
-import type { SvgUseIcon } from '#/components/types'
 import { includesPredicate } from '$/utils/data/array'
+import type { Icon } from '@/util/iconMetadata/iconName'
 import type { TextId } from 'enso-common/src/text'
 
 /** Possible kinds of audit log entry, excluding the "get secret" endpoint. */
@@ -17,7 +17,7 @@ export function normalizeLambdaKind(lambdaKind: string) {
   return { valid: false, invalidKind: lambdaKind } as const
 }
 
-export const DEFAULT_EVENT_ICON = 'log' satisfies SvgUseIcon
+export const DEFAULT_EVENT_ICON = 'log' satisfies Icon
 
 /** Lambda kinds for events, ordered roughly in order of decreasing level of admin access. */
 export const LAMBDA_KINDS = [
@@ -97,10 +97,8 @@ export const LAMBDA_KINDS = [
   'GET /path/resolve',
 ] as const
 
-// eslint-disable-next-line no-restricted-syntax
 export const isLambdaKind = includesPredicate(LAMBDA_KINDS)
 
-/* eslint-disable @typescript-eslint/naming-convention */
 export const IS_EVENT_HIDDEN_BY_DEFAULT: Partial<Record<LambdaKind, true>> = {
   'GET /directories/{DIRECTORY_ID}': true,
   'GET /organizations/me': true,
@@ -118,7 +116,7 @@ export const SELECTABLE_LAMBDA_KINDS = LAMBDA_KINDS.filter(
   (kind) => IS_EVENT_HIDDEN_BY_DEFAULT[kind] !== true,
 )
 
-export const EVENT_TYPE_ICON: Record<LambdaKind, SvgUseIcon> = {
+export const EVENT_TYPE_ICON: Record<LambdaKind, Icon> = {
   'POST /auth': 'lock',
   'GET /organizations/me': 'home',
   'PATCH /organizations/me': 'home',
@@ -271,4 +269,3 @@ export const EVENT_TYPE_NAME_ID: Record<LambdaKind, TextId & `${string}LogEvent`
   'GET /configurations/{CONFIGURATION_ID}': 'getConfigurationLogEvent',
   'GET /path/resolve': 'resolvePathLogEvent',
 }
-/* eslint-enable @typescript-eslint/naming-convention */

@@ -62,10 +62,10 @@ vi.mock('$/providers/backends', async () => {
       }),
   }
 })
-// The React tabs are not under test: each renders its tab's name.
+// The React tab is not under test: it renders its tab's name.
 vi.mock('$/utils/react', async () => {
   const { h: render } = await import('vue')
-  /** Stands for each React tab: its name, and the search query it was given. */
+  /** Stands for the React tab: its name, and the search query it was given. */
   const ReactTab = (props: { data: { nameId: string }; query: string }) =>
     render('div', { 'data-testid': 'react-tab' }, `${props.data.nameId} ${props.query}`)
   ReactTab.props = ['data', 'query']
@@ -84,10 +84,6 @@ vi.mock('../data', async () => {
   return {
     REACT_SETTINGS_TAB_DATA: {
       [TabType.billingAndPlans]: tab(TabType.billingAndPlans, 'billingAndPlansSettingsTab'),
-      [TabType.userGroups]: tab(TabType.userGroups, 'userGroupsSettingsTab', () => false),
-      [TabType.activityLog]: tab(TabType.activityLog, 'activityLogSettingsTab', () => false),
-      [TabType.apiKeys]: tab(TabType.apiKeys, 'apiKeysSettingsTab'),
-      [TabType.usage]: tab(TabType.usage, 'usageSettingsTab'),
     },
   }
 })
@@ -158,15 +154,11 @@ describe('SettingsPage', () => {
       getText('billingAndPlansSettingsTab'),
       getText('appearanceSettingsTab'),
       getText('keyboardShortcutsSettingsTab'),
-      getText('apiKeysSettingsTab'),
-      getText('usageSettingsTab'),
     ])
     expect([...sidebar().querySelectorAll('h1')].map((heading) => heading.textContent)).toEqual([
       getText('generalSettingsTabSection'),
       getText('accessSettingsTabSection'),
       getText('lookAndFeelSettingsTabSection'),
-      getText('securitySettingsTabSection'),
-      getText('usageSettingsTabSection'),
     ])
     expect(document.querySelector('h1.flex')?.textContent).toContain('user name')
     expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
@@ -208,17 +200,35 @@ describe('SettingsPage', () => {
     await mountWithProviders(SettingsPage)
     expect(sidebarTabs()).not.toContain(getText('organizationSettingsTab'))
     expect(sidebarTabs()).not.toContain(getText('membersSettingsTab'))
+    expect(sidebarTabs()).not.toContain(getText('userGroupsSettingsTab'))
+    expect(sidebarTabs()).not.toContain(getText('activityLogSettingsTab'))
+    expect(sidebarTabs()).not.toContain(getText('apiKeysSettingsTab'))
+    expect(sidebarTabs()).not.toContain(getText('usageSettingsTab'))
   })
 
   test("lists the organization's tabs once the cloud fills them", async () => {
     const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
     auth.session = { user: admin, email: admin.email, accessToken: '' }
-    const section = (nameId: 'membersSettingsSection' | 'organizationSettingsSection') => () =>
-      Promise.resolve([
-        { nameId, entries: [{ type: 'custom' as const, component: ContributedEntry }] },
-      ])
+    const section =
+      (
+        nameId:
+          | 'activityLogSettingsSection'
+          | 'apiKeysSettingsSection'
+          | 'membersSettingsSection'
+          | 'organizationSettingsSection'
+          | 'usageSettingsSection'
+          | 'userGroupsSettingsSection',
+      ) =>
+      () =>
+        Promise.resolve([
+          { nameId, entries: [{ type: 'custom' as const, component: ContributedEntry }] },
+        ])
     contributeSettingsSections(SettingsTabType.organization, section('organizationSettingsSection'))
     contributeSettingsSections(SettingsTabType.members, section('membersSettingsSection'))
+    contributeSettingsSections(SettingsTabType.userGroups, section('userGroupsSettingsSection'))
+    contributeSettingsSections(SettingsTabType.activityLog, section('activityLogSettingsSection'))
+    contributeSettingsSections(SettingsTabType.apiKeys, section('apiKeysSettingsSection'))
+    contributeSettingsSections(SettingsTabType.usage, section('usageSettingsSection'))
     await loadSettingsContributions()
     await mountWithProviders(SettingsPage, {
       route: `/settings?${TAB_PARAM}=${encodeURIComponent('"members"')}`,
@@ -229,8 +239,10 @@ describe('SettingsPage', () => {
       getText('localSettingsTab'),
       getText('billingAndPlansSettingsTab'),
       getText('membersSettingsTab'),
+      getText('userGroupsSettingsTab'),
       getText('appearanceSettingsTab'),
       getText('keyboardShortcutsSettingsTab'),
+      getText('activityLogSettingsTab'),
       getText('apiKeysSettingsTab'),
       getText('usageSettingsTab'),
     ])
@@ -299,7 +311,7 @@ describe('SettingsPage', () => {
     expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
   })
 
-  test('mounts the React tabs with the search query', async () => {
+  test('mounts the React tab', async () => {
     await mountWithProviders(SettingsPage)
     await userEvent.setup().click(sidebarButton(getText('billingAndPlansSettingsTab')))
     await flushPromises()
@@ -342,14 +354,14 @@ describe('SettingsPage', () => {
     expect(document.body.textContent).toContain(getText('noResultsFound'))
   })
 
-  test('passes the search on to a React tab', async () => {
+  test('passes the search on to the React tab', async () => {
     await mountWithProviders(SettingsPage, {
-      route: `/settings?${TAB_PARAM}=${encodeURIComponent('"usage"')}`,
+      route: `/settings?${TAB_PARAM}=${encodeURIComponent('"billing-and-plans"')}`,
     })
-    await userEvent.setup().type(searchBox(), 'usage')
+    await userEvent.setup().type(searchBox(), 'billing')
     await flushPromises()
     expect(document.querySelector('[data-testid="react-tab"]')?.textContent).toBe(
-      'usageSettingsTab usage',
+      'billingAndPlansSettingsTab billing',
     )
   })
 })
