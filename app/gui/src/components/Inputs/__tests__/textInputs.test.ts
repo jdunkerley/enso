@@ -86,6 +86,18 @@ describe('ComboBox', () => {
     expect(allByRole('option').map((o) => o.textContent?.trim())).toEqual(['Apple', 'Apricot'])
   })
 
+  test('with no items, opens no list, as react-aria did not', async () => {
+    mountInForm(z.object({ fruit: z.string().optional() }), {}, () =>
+      h(ComboBox<string>, { name: 'fruit', label: 'Fruit', items: [], testId: 'fruit' }),
+    )
+    const input = role('combobox') as HTMLInputElement
+    const user = userEvent.setup()
+    input.focus()
+    await user.keyboard('{ArrowDown}')
+    await flushPromises()
+    expect(role('listbox')).toBeNull()
+  })
+
   test('ArrowDown opens and moves through the options, Enter selects, Escape closes', async () => {
     const form = mountComboBox()
     const input = role('combobox') as HTMLInputElement
