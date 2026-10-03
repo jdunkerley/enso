@@ -4,12 +4,12 @@ import { Icon } from '#/components/Icon'
 import { backendMutationOptions, useRenameAsset } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
-import UpsertSecretModal from '#/modals/UpsertSecretModal'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
 import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
-import { setModal } from '#/providers/ModalProvider'
+import { setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
 import { useText } from '$/providers/react'
 import { useDriveCurrentBackend } from '$/providers/react/container'
 import { isDoubleClick } from '$/utils/event'
@@ -63,19 +63,17 @@ export default function SecretNameColumn(props: SecretNameColumnProps) {
             toast.warning(getText('cannotEditCredentialError'))
           } else {
             event.stopPropagation()
-            setModal(
-              <UpsertSecretModal
-                secretId={item.id}
-                name={item.title}
-                doCreate={async (title, value) => {
-                  try {
-                    await updateSecret([item.id, { title, value }, item.title])
-                  } catch (error) {
-                    toastAndLog(null, error)
-                  }
-                }}
-              />,
-            )
+            setVueModal(UpsertSecretModal, {
+              secretId: item.id,
+              name: item.title,
+              onCreate: async (title: string, value: string) => {
+                try {
+                  await updateSecret([item.id, { title, value }, item.title])
+                } catch (error) {
+                  toastAndLog(null, error)
+                }
+              },
+            })
           }
         }
       }}

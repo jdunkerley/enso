@@ -14,7 +14,6 @@ import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { defineMenuEntry, useMenuEntries } from '#/hooks/menuHooks'
 import { useGetAsset } from '#/layouts/Drive/assetsTableItemsHooks'
 import { useGlobalContextMenuEntries } from '#/layouts/useGlobalContextMenuEntries'
-import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { useExportArchive } from '#/pages/useExportArchive'
 import {
   useDriveState,
@@ -22,8 +21,9 @@ import {
   useSelectedAssets,
   useSetSelectedAssets,
 } from '#/providers/DriveProvider'
-import { setModal } from '#/providers/ModalProvider'
+import { setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { canTransferBetweenCategories, isCloudCategory } from '$/providers/category'
 import { useBackends, useText, useUser } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentCategory } from '$/providers/react/container'
@@ -128,7 +128,6 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
     return (effectivePasteData?.data.assets.length ?? 0) > 0
   })
 
-  // This is not a React component even though it contains JSX.
   const doDeleteAll = useEventCallback(() => {
     const selectedIds = selectedAssets.map((asset) => asset.id)
     const deleteAll = async () => {
@@ -138,17 +137,13 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
     const firstKey = selectedIds[0]
     const soleAssetName =
       firstKey != null ? (getAsset(firstKey)?.title ?? '(unknown)') : '(unknown)'
-    setModal(
-      <ConfirmDeleteModal
-        defaultOpen
-        actionText={
-          selectedIds.length === 1 ?
-            getText('deleteSelectedAssetActionText', soleAssetName)
-          : getText('deleteSelectedAssetsActionText', selectedIds.length)
-        }
-        onConfirm={deleteAll}
-      />,
-    )
+    setVueModal(ConfirmDeleteModal, {
+      actionText:
+        selectedIds.length === 1 ?
+          getText('deleteSelectedAssetActionText', soleAssetName)
+        : getText('deleteSelectedAssetsActionText', selectedIds.length),
+      onConfirm: deleteAll,
+    })
   })
 
   const copyIdsMenuEntry = defineMenuEntry(
@@ -196,20 +191,16 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
             doAction: () => {
               const asset = selectedAssets[0]
               const soleAssetName = asset?.title ?? '(unknown)'
-              setModal(
-                <ConfirmDeleteModal
-                  defaultOpen
-                  actionText={
-                    selectedAssets.length === 1 ?
-                      getText('deleteSelectedAssetForeverActionText', soleAssetName)
-                    : getText('deleteSelectedAssetsForeverActionText', selectedAssets.length)
-                  }
-                  onConfirm={async () => {
-                    setSelectedAssets([])
-                    await deleteAssets([selectedAssets.map((otherAsset) => otherAsset.id), true])
-                  }}
-                />,
-              )
+              setVueModal(ConfirmDeleteModal, {
+                actionText:
+                  selectedAssets.length === 1 ?
+                    getText('deleteSelectedAssetForeverActionText', soleAssetName)
+                  : getText('deleteSelectedAssetsForeverActionText', selectedAssets.length),
+                onConfirm: async () => {
+                  setSelectedAssets([])
+                  await deleteAssets([selectedAssets.map((otherAsset) => otherAsset.id), true])
+                },
+              })
             },
           },
           copyIdsMenuEntry,

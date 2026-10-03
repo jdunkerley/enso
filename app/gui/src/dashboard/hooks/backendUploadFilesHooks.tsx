@@ -1,20 +1,17 @@
 /** @file Hooks for uploading files. */
-import {
-  backendMutationOptions,
-  listDirectoryQueryOptions,
-  useEnsureListDirectory,
-} from '#/hooks/backendHooks'
+import { backendMutationOptions, useEnsureListDirectory } from '#/hooks/backendHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
-import { resolveDuplications } from '#/modals/DuplicateAssetsModal'
 import { useSetSelectedAssets } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import type { Category, CategoryType } from '$/providers/category'
 import type { SelectedAssetInfo } from '$/providers/driveStore'
 import { useBackends, useHttpClient, useText } from '$/providers/react'
 import { useUploadsToCloudStore } from '$/providers/react/upload'
+import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   AssetType,
