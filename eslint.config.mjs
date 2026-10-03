@@ -86,8 +86,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'hooks/mountHooks',
   'utilities/vue',
   'utilities/zustand',
-  // React-owned state that Vue reaches into; each goes with the shell collapse (#93).
-  'layouts/Drive/Categories',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',

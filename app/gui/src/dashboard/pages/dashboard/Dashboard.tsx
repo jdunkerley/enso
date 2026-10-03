@@ -6,7 +6,6 @@ import { Dialog } from '#/components/Dialog'
 import Page from '#/components/Page'
 import { Text } from '#/components/Text'
 import { useBindGlobalActions } from '#/hooks/menuHooks'
-import { useTransferBetweenCategories } from '#/layouts/Drive/Categories'
 import * as inputBindingsProvider from '#/providers/InputBindingsProvider'
 import * as modalProvider from '#/providers/ModalProvider'
 import { vueComponent } from '#/utilities/vue'
@@ -54,8 +53,6 @@ export function Dashboard() {
   const closingOnAppExit = useVueValue(
     React.useCallback(() => openedProjects.closingOnAppExit.value, [openedProjects]),
   )
-
-  const transferBetweenCategories = useTransferBetweenCategories()
 
   const inputBindingHandlers = React.useMemo(() => {
     const hasOrganization = backendModule.isUserOnPlanWithMultipleSeats(user)
@@ -136,7 +133,7 @@ export function Dashboard() {
           modalProvider.unsetModal()
         }}
       >
-        <AppContainerInner transferBetweenCategories={transferBetweenCategories} />
+        <AppContainerInner />
       </div>
     </Page>
   )

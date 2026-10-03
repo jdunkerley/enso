@@ -9,10 +9,6 @@ import { Scroller } from '#/components/Scroller/Scroller'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useStore } from '#/hooks/storeHooks'
 import { useSyncRef } from '#/hooks/syncRefHooks'
-import {
-  parseDirectoriesPath,
-  type PathItem,
-} from '#/layouts/Drive/Categories/parseDirectoriesPath'
 import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
@@ -28,6 +24,7 @@ import {
   useRightPanelData,
 } from '$/providers/react/container'
 import { moveAssetsMutationOptions } from '$/utils/driveMutations'
+import { parseDirectoriesPath, type PathItem } from '$/utils/parseDirectoriesPath'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import {
   AssetDoesNotExistError,

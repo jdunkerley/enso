@@ -1,4 +1,9 @@
-/** @file Events related to changes in the asset list. */
+/**
+ * @file Pasting cut or copied assets: a thin React adapter over the framework-free
+ * `transferBetweenCategories` (`$/utils/transferBetweenCategories`, #192). It goes with the React
+ * drive (#91), whose Vue port calls `useTransferBetweenCategories`
+ * (`$/composables/transferBetweenCategories`) instead.
+ */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useTransferBetweenCategories } from '#/layouts/Drive/Categories/transferBetweenCategoriesHooks'
 import { dropOperationBetweenCategories, type Category } from '$/providers/category'

@@ -12,10 +12,10 @@ import {
   type LocalDirectory,
 } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
+import { useTransferBetweenCategories } from '$/composables/transferBetweenCategories'
 import { useDriveLocation } from '$/providers/drive'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useModals } from '$/providers/modals'
-import { useReactApi } from '$/providers/reactApi'
 import { useText } from '$/providers/text'
 import { debouncedGetter } from '$/utils/reactivity'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
@@ -40,7 +40,7 @@ const { categoryLabel, removeLocalDirectory } = useCategories()
 const drive = useDriveLocation()
 const { currentCategory } = toRefs(drive)
 const { leftPanelShown, leftPanelToggledOn } = toRefs(useContainerData())
-const reactApi = useReactApi()
+const transferBetweenCategories = useTransferBetweenCategories()
 const modals = useModals()
 const { getText } = useText()
 const router = useRouter()
@@ -95,9 +95,7 @@ async function onDrop(event: DragEvent) {
     await Promise.all(
       payloads.map((payload) => {
         const fromCategory = categoryFromKey(payload.category)
-        return (
-          fromCategory && reactApi.transferBetweenCategories(fromCategory, category, payload.items)
-        )
+        return fromCategory && transferBetweenCategories(fromCategory, category, payload.items)
       }),
     )
   }

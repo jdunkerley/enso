@@ -2,11 +2,7 @@
 import type { ContextMenuApi } from '#/components/ContextMenu'
 import { ContextMenu } from '#/components/ContextMenu'
 import { useNewProject } from '#/hooks/backendHooks'
-import {
-  isUploadableAsset,
-  useUploadFileToCloud,
-  useUploadFileToLocal,
-} from '#/hooks/backendUploadFilesHooks'
+import { useUploadFileToCloud, useUploadFileToLocal } from '#/hooks/backendUploadFilesHooks'
 import { useCopy } from '#/hooks/copyHooks'
 import { useLocalStorageState } from '#/hooks/localStoreState'
 import { defineMenuEntry, useMenuEntries } from '#/hooks/menuHooks'
@@ -17,6 +13,7 @@ import { useExportArchive } from '#/pages/useExportArchive'
 import { useDriveStore, usePasteData } from '#/providers/DriveProvider'
 import { setModal, setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import { isUploadableAsset } from '$/cloud/uploadToCloud'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { isCloudCategory } from '$/providers/category'
 import type { Tab } from '$/providers/container'
