@@ -1998,3 +1998,76 @@ maintainer to review.
     loading row (ruling 10), a half-pixel shift of the combo box's list, and a
     1px shift of a tooltip. No changelog entry: the PR takes
     `CI: No changelog needed`.
+
+## Rulings from #92 (the drive's asset modals, 2026-10-03)
+
+#92 ports the modals the drive opens. Delegated like the rulings above:
+provisionally accepted, for the maintainer to review.
+
+1. **Split: the simple modals first, the rest in #198.** This PR ports the
+   duplicate-name dialog (`DuplicateAssetsModal`, which #192's move mutation
+   needs), the secret dialog, the drive's delete confirmations and the drag
+   preview. #198 takes the labels popover (`ManageLabelsModal`, with
+   `ColorPicker`), the credential forms (`CreateCredentialModal` and
+   `data/serviceCredentials/`) and the datalink dialog with `JSONSchemaInput`
+   and `FilePathInput`. Each of those is a large piece of its own: the labels
+   popover is anchored to a React row and nests two popovers and a confirmation;
+   the datalink editor is recursive and schema-driven and shares
+   `reactDatalinkInput.ts` with #190's Properties tab, so it belongs on top of
+   #190.
+2. **Where the code goes.** The duplicate-name dialog, the drag preview and the
+   asset summary and icon they show are shared code, `src/components/Drive/`,
+   not `src/dashboard/`: framework-free callers must open the dialog
+   (`resolveDuplications`), today the React upload and paste hooks and after
+   #192 the Vue mutations, which may not import `#/`. The secret dialog is cloud
+   code, `src/cloud/credentials/UpsertSecretModal.vue`, around #82's form. The
+   two listing query factories the dialog reads moved unchanged, with their
+   keys, to framework-free `$/utils/driveQueries`, so the React drive and the
+   dialog share the cached listings.
+3. **React opens the Vue modals on the stack.** `setVueModal(C, props)`
+   (`ModalProvider.tsx`) replaces the open modals, as `setModal` did; the modal
+   leaves the stack once it has closed, as #156 ruled for asked modals (ruling 5
+   there). A button that was a react-aria `Dialog.Trigger` (the toolbar's New
+   Secret and Clear Trash) opens its modal with `useVueModalTrigger`
+   (`hooks/vueModalHooks.ts`), which keeps the `aria-expanded` react-aria gave
+   it. react-aria's `aria-haspopup` never reached the dashboard's `Button`
+   (measured on the base), so there is none to keep. The delete confirmations
+   use #156's `ConfirmDeleteModal.vue`; the React one stays for the settings and
+   the labels popover.
+4. **The duplicate-name form keeps its values in an array.** React keyed them by
+   asset id, and a local asset's id is an encoded path whose dots read as nested
+   fields; the entries are `entries.N` now. Invisible.
+5. **Three React quirks are kept**, each a visible change to fix, so they are
+   listed in #198 instead:
+   - "Change" keeps the choice: React reset the field to its current value.
+   - "Skip the rest" does nothing: it skips the entries whose conclusion is
+     unset, and none ever is.
+   - Skip All changes what Apply submits (every asset is skipped, as before) but
+     not what the entries show, because React's entries did not re-render when
+     only their conclusion changed. The Vue entries show their last own choice.
+6. **What a keyboard or screen-reader user notices.** The duplicate-name dialog
+   focuses itself as it opens (React's left the focus on the Import button
+   outside the modal, so Tab first walked the page beneath), and every dialog
+   here is named by its title (#156, ruling 11). A dialog leaves after its exit
+   animation (#156, ruling 3), about 200ms after React's did.
+7. **Escape and the dashboard's global binding.** The React dashboard binds
+   Escape on `document.body` to `closeModal`, which closes every modal.
+   react-aria's dialogs and popovers stopped the key before it got there; Reka
+   listens on the document, after it. So, on the page, Escape in a Vue stack
+   modal is first a `closeAll`: the modal leaves the stack without being
+   answered. The duplicate-name dialog therefore reports a cancellation whenever
+   it leaves the stack unanswered (as Escape did in React), and its rename form
+   stops Escape itself and closes only itself: without that, Escape there closed
+   the whole dialog and left the upload waiting forever (found in a keyboard
+   pass against the base). Any Vue popover inside a Vue stack modal needs the
+   same until the binding goes (#170) or `Popover.vue` stops the key as
+   react-aria did; #198's labels popover is the next one.
+8. **The React `UpsertSecretModal.tsx` keeps only its form**, for the React
+   asset panel (`AssetProperties.tsx`) and the form's parity test; #190 deletes
+   the panel, and the file goes with the next PR after both have landed.
+9. **A porter's trap: branded ids as props.** A prop typed with one of the
+   backend's ids (`DirectoryId`, `SecretId`) is a `Newtype` that Vue's prop
+   check sees as an `Object`, and it warns at run time when given the string.
+   Such a prop is declared `DirectoryId & string`.
+10. **No changelog entry.** Nothing changes for a mouse user, so the PR takes
+    `CI: No changelog needed`.

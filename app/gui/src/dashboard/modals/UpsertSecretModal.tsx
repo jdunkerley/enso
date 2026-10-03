@@ -1,4 +1,9 @@
-/** @file A modal for creating and editing a secret. */
+/**
+ * @file The React form creating or editing a secret, kept only for the React asset panel
+ * (`AssetProperties.tsx`) and the parity test. The drive's dialog is Vue now,
+ * `$/cloud/credentials/UpsertSecretModal.vue` (#92), around the Vue form; this file goes when the
+ * Properties tab's port (#190) deletes the panel.
+ */
 import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { Form } from '#/components/Form'
@@ -22,14 +27,7 @@ export interface UpsertSecretFormProps {
   readonly doCancel?: 'close' | 'reset' | (() => void) | null
 }
 
-/** Props for a {@link UpsertSecretModal}. */
-export interface UpsertSecretModalProps extends Omit<UpsertSecretFormProps, 'doCancel'> {
-  readonly defaultOpen?: boolean
-  /** Defaults to `true`. */
-  readonly canCancel?: boolean
-}
-
-/** A modal for creating and editing a secret. */
+/** A form for creating and editing a secret. */
 export function UpsertSecretForm(props: UpsertSecretFormProps) {
   const { secretId, name: nameRaw, doCreate, doCancel } = props
   const { getText } = useText()
@@ -80,23 +78,5 @@ export function UpsertSecretForm(props: UpsertSecretFormProps) {
 
       <Form.FormError />
     </Form>
-  )
-}
-
-/** A modal for creating and editing a secret. */
-export default function UpsertSecretModal(props: UpsertSecretModalProps) {
-  const { defaultOpen, canCancel = true, secretId } = props
-  const { getText } = useText()
-
-  const isCreatingSecret = secretId == null
-
-  return (
-    <Dialog
-      title={isCreatingSecret ? getText('newSecret') : getText('editSecret')}
-      modalProps={defaultOpen == null ? {} : { defaultOpen }}
-      isDismissable={false}
-    >
-      <UpsertSecretForm {...props} doCancel={canCancel ? 'close' : null} />
-    </Dialog>
   )
 }
