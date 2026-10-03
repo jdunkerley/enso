@@ -48,7 +48,7 @@ vi.mock('../reactDatalinkInput', async () => {
   const { defineComponent, h } = await import('vue')
   return {
     DatalinkInput: defineComponent({
-      props: ['value', 'onChange', 'readOnly', 'dropdownTitle'],
+      props: { value: Object, onChange: Function, readOnly: Boolean, dropdownTitle: String },
       setup(props) {
         return () =>
           h('input', {

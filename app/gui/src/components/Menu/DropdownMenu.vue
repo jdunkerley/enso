@@ -65,9 +65,9 @@ const classes = computed(() => MENU_STYLES({ variant, className }))
         :sideOffset="offset"
         :collisionPadding="MENU_CONTAINER_PADDING"
         :class="classes"
-        @closeAutoFocus="onCloseAutoFocus"
         :data-testid="testId"
         loop
+        @closeAutoFocus="onCloseAutoFocus"
       >
         <slot />
       </DropdownMenuContent>
