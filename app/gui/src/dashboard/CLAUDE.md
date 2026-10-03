@@ -33,8 +33,9 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   (`$/providers/modals`). The About dialog is Vue's: open it with
   `openAboutModal()` (`$/components/AboutModal/aboutModal`).
   `InputBindingsProvider` hands out the one instance of the dashboard's
-  bindings, `$/providers/dashboardInputBindings`, which Vue menus read too (the
-  user menu's shortcuts; `$/composables/menuEntries` is the Vue
+  bindings, `$/providers/dashboardInputBindings` (the dashboard half of the
+  window's store, `$/providers/inputBindings`, #170), which Vue menus read too
+  (the user menu's shortcuts; `$/composables/menuEntries` is the Vue
   `useMenuEntries`) and the Vue settings page edits; a change re-renders its
   consumers.
 - `hooks/` — Custom React hooks.

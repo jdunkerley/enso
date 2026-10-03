@@ -217,9 +217,17 @@ export function defaultShortcuts(): Shortcut[] {
  * one, as do `OsDelete` and the platform's Delete key.
  */
 export function canonicalShortcut(binding: string): string {
-  const { bind } = parseKeybindString(binding)
-  return `${bind.type}:${bind.modifierFlags}:${bind.key}`
+  let canonical = canonicalShortcuts.get(binding)
+  if (canonical == null) {
+    const { bind } = parseKeybindString(binding)
+    canonical = `${bind.type}:${bind.modifierFlags}:${bind.key}`
+    canonicalShortcuts.set(binding, canonical)
+  }
+  return canonical
 }
+
+/** {@link canonicalShortcut}'s results: the conflict checks compare every pair of bindings. */
+const canonicalShortcuts = new Map<string, string>()
 
 /** Whether the two actions are one for conflicts: the same, or one follows the other. */
 function isSameAction(a: Shortcut, b: Shortcut) {
