@@ -21,8 +21,11 @@ from the React `AssetPanel/components/AssetVersions` (decision 6b of
 - `AssetDiffView.vue` — the diff, on `@codemirror/merge`, styled after the
   Monaco diff editor it replaced. Loaded asynchronously, with the first
   comparison.
-- `queries.ts` — query options with React's keys and options, and the optimistic
-  tag updates.
+- `queries.ts` — query options with React's keys and options (built with the
+  shared `backendQueryOptions`, #192), and the optimistic tag updates.
+- `projectExecutions.ts` — query options for a project's scheduled executions,
+  moved from the React `#/hooks/backendHooks` (#192) for the Schedule tab
+  (#183).
 
 ## Notes
 
