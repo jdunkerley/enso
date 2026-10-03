@@ -40,6 +40,17 @@ const open = defineModel<boolean>('open', { default: false })
 
 const sideAlign = computed(() => placementToSideAlign(placement))
 const classes = computed(() => MENU_STYLES({ variant, className }))
+
+/**
+ * Return focus to the trigger on closing, unless an item opened a dialog that has taken it (a
+ * confirmation on the modal stack): taking it back would make the dialog's focus trap pull it in
+ * again, without the focus ring the dialog gave its own control. The dialog returns focus to the
+ * trigger when it closes (`$/components/Dialog/focusReturn`).
+ */
+function onCloseAutoFocus(event: Event) {
+  const focused = document.activeElement
+  if (focused?.closest('[role="dialog"], [role="alertdialog"]') != null) event.preventDefault()
+}
 </script>
 
 <template>
@@ -56,6 +67,7 @@ const classes = computed(() => MENU_STYLES({ variant, className }))
         :class="classes"
         :data-testid="testId"
         loop
+        @closeAutoFocus="onCloseAutoFocus"
       >
         <slot />
       </DropdownMenuContent>

@@ -210,14 +210,15 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
       <ComboboxPortal :to="portalTarget()">
         <!-- As react-aria's: as wide as the input's box, at its start, and no taller than the space
         below it (less 12px), the list scrolling inside. React's `--trigger-width` excludes the 48px
-        the shared variants add back. -->
+        the shared variants add back. Hidden while it has no option to show, as react-aria's popover
+        does not open on an empty list. -->
         <ComboboxContent
           position="popper"
           align="start"
           :sideOffset="8"
           :collisionPadding="12"
           :aria-label="accessibleName"
-          :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} flex max-h-[var(--reka-combobox-content-available-height)] flex-col [--trigger-width:calc(var(--reka-combobox-trigger-width)_-_48px)]`"
+          :class="`${popoverStyles.base({ className: styles.popover() })} ${POPOVER_MOTION} flex max-h-[var(--reka-combobox-content-available-height)] flex-col [--trigger-width:calc(var(--reka-combobox-trigger-width)_-_48px)] [&:not(:has([role=option]))]:hidden`"
         >
           <ComboboxViewport
             ref="viewport"

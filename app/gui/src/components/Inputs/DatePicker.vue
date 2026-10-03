@@ -27,6 +27,7 @@ import { useText } from '$/providers/text'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { DateValue } from '@internationalized/date'
 import {
+  DatePickerAnchor,
   DatePickerCalendar,
   DatePickerCell,
   DatePickerCellTrigger,
@@ -133,44 +134,49 @@ function segmentClass(part: SegmentPart, text: string) {
       :closeOnSelect="true"
     >
       <div :class="styles.base({ className: props.class })" :data-invalid="invalid || undefined">
-        <DatePickerField
-          v-slot="{ segments: fieldSegments }"
-          :class="styles.inputContainer()"
-          :aria-label="ariaLabel ?? label"
-          :aria-invalid="invalid || undefined"
-          :aria-describedby="field.error.value != null ? field.ids.errorId : undefined"
-          @focusout="field.onBlur"
-        >
-          <div :class="styles.dateInput()">
-            <template v-for="(segment, i) in isoSegments(fieldSegments as Segment[])" :key="i">
-              <DatePickerInput
-                v-if="shownSegments[segment.part as SegmentPart] !== false"
-                :part="segment.part"
-                :class="segmentClass(segment.part as SegmentPart, segment.value)"
-              >
-                {{ segmentText(segment.part as SegmentPart, segment.value) }}
-              </DatePickerInput>
-            </template>
-          </div>
-          <DatePickerTrigger asChild>
+        <!-- The calendar opens below the field's start, as react-aria's did (its trigger was the
+        whole field), not centred on the chevron. -->
+        <DatePickerAnchor asChild>
+          <DatePickerField
+            v-slot="{ segments: fieldSegments }"
+            :class="styles.inputContainer()"
+            :aria-label="ariaLabel ?? label"
+            :aria-invalid="invalid || undefined"
+            :aria-describedby="field.error.value != null ? field.ids.errorId : undefined"
+            @focusout="field.onBlur"
+          >
+            <div :class="styles.dateInput()">
+              <template v-for="(segment, i) in isoSegments(fieldSegments as Segment[])" :key="i">
+                <DatePickerInput
+                  v-if="shownSegments[segment.part as SegmentPart] !== false"
+                  :part="segment.part"
+                  :class="segmentClass(segment.part as SegmentPart, segment.value)"
+                >
+                  {{ segmentText(segment.part as SegmentPart, segment.value) }}
+                </DatePickerInput>
+              </template>
+            </div>
+            <DatePickerTrigger asChild>
+              <Button
+                variant="icon"
+                icon="chevron_right"
+                :class="styles.calendarButton()"
+                :tooltip="false"
+              />
+            </DatePickerTrigger>
             <Button
+              v-if="showReset"
               variant="icon"
-              icon="chevron_right"
-              :class="styles.calendarButton()"
-              :tooltip="false"
+              icon="close"
+              :aria-label="getText('reset')"
+              :class="styles.resetButton()"
+              @press="value = null"
             />
-          </DatePickerTrigger>
-          <Button
-            v-if="showReset"
-            variant="icon"
-            icon="close"
-            :aria-label="getText('reset')"
-            :class="styles.resetButton()"
-            @press="value = null"
-          />
-        </DatePickerField>
+          </DatePickerField>
+        </DatePickerAnchor>
 
         <DatePickerContent
+          align="start"
           :portal="{ to: portalTarget() }"
           :sideOffset="8"
           :class="`${popoverStyles.base({ className: styles.calendarPopover() })} ${POPOVER_MOTION}`"
@@ -193,12 +199,14 @@ function segmentClass(part: SegmentPart, text: string) {
               >
                 <DatePickerGridHead v-if="!noCalendarHeader" :class="styles.calendarGridHeader()">
                   <DatePickerGridRow>
+                    <!-- React's header cells render no text, so the weekdays are for screen
+                    readers only, and the calendar looks as React's. -->
                     <DatePickerHeadCell
-                      v-for="day in weekDays"
-                      :key="day"
+                      v-for="(day, i) in weekDays"
+                      :key="i"
                       :class="styles.calendarGridHeaderCell()"
                     >
-                      {{ day }}
+                      <span class="sr-only">{{ day }}</span>
                     </DatePickerHeadCell>
                   </DatePickerGridRow>
                 </DatePickerGridHead>
