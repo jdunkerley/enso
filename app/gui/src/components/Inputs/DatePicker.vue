@@ -55,6 +55,8 @@ const props = withDefaults(
     name: string
     form?: AnyFormInstance | undefined
     defaultValue?: DateValue | undefined
+    /** The latest date that may be picked; later days are disabled in the calendar. */
+    maxValue?: DateValue | undefined
     label?: string | undefined
     description?: string | undefined
     contextualHelp?: string | undefined
@@ -122,7 +124,10 @@ function segmentClass(part: SegmentPart, text: string) {
     <DatePickerRoot
       v-model="value"
       :hourCycle="24"
-      v-bind="granularity != null ? { granularity } : {}"
+      v-bind="{
+        ...(granularity != null ? { granularity } : {}),
+        ...(maxValue != null ? { maxValue } : {}),
+      }"
       :disabled="field.isDisabled.value"
       :required="isRequired === true"
       :closeOnSelect="true"

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
  * @file A `PaywallButton.vue` that opens the feature's `PaywallDialog.vue`: the Vue port of the
- * React `PaywallDialogButton`. Attributes (`variant`, `showIcon`, …) go on the button.
+ * React `PaywallDialogButton`. Attributes (`variant`, `showIcon`, …) go on the button, and so
+ * does the default slot, its label.
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import PaywallButton from './PaywallButton.vue'
@@ -15,7 +16,9 @@ const { feature } = defineProps<{ feature: PaywallFeatureName }>()
 <template>
   <PaywallDialog :feature="feature">
     <template #trigger>
-      <PaywallButton :feature="feature" v-bind="$attrs" />
+      <PaywallButton :feature="feature" v-bind="$attrs">
+        <template v-if="$slots.default" #default><slot /></template>
+      </PaywallButton>
     </template>
   </PaywallDialog>
 </template>
