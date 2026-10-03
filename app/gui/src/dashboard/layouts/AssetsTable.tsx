@@ -20,7 +20,6 @@ import { useUploadFiles } from '#/hooks/backendUploadFilesHooks'
 import { usePaste } from '#/hooks/cutAndPasteHooks'
 import { useDerivedDebouncedState } from '#/hooks/debounceCallbackHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { useStore } from '#/hooks/storeHooks'
 import { useSyncRef } from '#/hooks/syncRefHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import type * as assetSearchBar from '#/layouts/AssetSearchBar'
@@ -44,13 +43,13 @@ import { COLUMN_HEADING } from '#/pages/dashboard/components/columnHeading'
 import Label from '#/pages/dashboard/components/Label'
 import { BindingFocusScopeContext } from '#/providers/BindingFocusScopeProvider'
 import {
+  useDriveState,
   useDriveStore,
   useSetAssetToRename,
   useSetCanDownload,
   useSetPasteData,
   useSetSelectedAssets,
   useSetVisuallySelectedKeys,
-  type SelectedAssetInfo,
 } from '#/providers/DriveProvider'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
@@ -58,6 +57,7 @@ import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/ut
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
 import { categoryKey, type Category } from '$/providers/category'
+import type { SelectedAssetInfo } from '$/providers/driveStore'
 import { useCategories, useFullUserSession, useLocalStorage, useText } from '$/providers/react'
 import { useVueValue } from '$/providers/react/common'
 import {
@@ -358,7 +358,7 @@ function AssetsTable(props: AssetsTableProps) {
   const isCloud = backend.type === BackendType.remote
   const rootRef = useRef<HTMLDivElement | null>(null)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
-  const getPasteData = useEventCallback(() => driveStore.getState().pasteData)
+  const getPasteData = useEventCallback(() => driveStore.state.pasteData)
 
   useEffect(() => {
     // Do not request next page while refetching. This causes data not being updated.
@@ -381,7 +381,7 @@ function AssetsTable(props: AssetsTableProps) {
 
   // temporary solution to update the asset panel when the selected asset changes
   useEffect(() => {
-    const selectedIds = driveStore.getState().selectedIds
+    const selectedIds = driveStore.state.selectedIds
 
     if (selectedIds.size === 1) {
       const [soleId] = selectedIds
@@ -577,7 +577,7 @@ function AssetsTable(props: AssetsTableProps) {
         const newCanDownload =
           selectedIds.size !== 0 &&
           Array.from(selectedIds).every((id) => predicate(map.get(id)?.type))
-        const currentCanDownload = driveStore.getState().canDownload
+        const currentCanDownload = driveStore.state.canDownload
         if (currentCanDownload !== newCanDownload) {
           setCanDownload(newCanDownload)
         }
@@ -629,7 +629,7 @@ function AssetsTable(props: AssetsTableProps) {
     if (shouldIgnoreEvent) {
       return
     }
-    const { selectedAssets } = driveStore.getState()
+    const { selectedAssets } = driveStore.state
     const prevIndex = mostRecentlySelectedIndexRef.current
     const item = prevIndex == null ? null : assets[prevIndex]
     if (selectedAssets.length === 1 && item != null) {
@@ -769,7 +769,7 @@ function AssetsTable(props: AssetsTableProps) {
   }, [setMostRecentlySelectedIndex])
 
   const doCopy = useEventCallback(() => {
-    const { selectedIds } = driveStore.getState()
+    const { selectedIds } = driveStore.state
     setPasteData({
       type: 'copy',
       data: {
@@ -783,7 +783,7 @@ function AssetsTable(props: AssetsTableProps) {
   })
 
   const doCut = useEventCallback(() => {
-    const { selectedIds } = driveStore.getState()
+    const { selectedIds } = driveStore.state
     setPasteData({
       type: 'move',
       data: {
@@ -798,7 +798,7 @@ function AssetsTable(props: AssetsTableProps) {
   })
 
   const doPaste = useEventCallback((newParentId: DirectoryId) => {
-    const { pasteData } = driveStore.getState()
+    const { pasteData } = driveStore.state
     if (pasteData == null) return
     if (pasteData.data.assets.some((asset) => asset.id === newParentId)) {
       if (pasteData.data.assets[0] && pasteData.data.assets.length === 1) {
@@ -866,14 +866,14 @@ function AssetsTable(props: AssetsTableProps) {
           result = getRange()
         },
         selectAdditionalRange: () => {
-          const { selectedAssets } = driveStore.getState()
+          const { selectedAssets } = driveStore.state
           const newAssetsMap = new Map(
             [...selectedAssets, ...getRange()].map((asset) => [asset.id, asset]),
           )
           result = [...newAssetsMap.values()]
         },
         selectAdditional: () => {
-          const { selectedIds, selectedAssets } = driveStore.getState()
+          const { selectedIds, selectedAssets } = driveStore.state
           let count = 0
           for (const asset of otherAssets) {
             if (selectedIds.has(asset.id)) {
@@ -1022,7 +1022,7 @@ function AssetsTable(props: AssetsTableProps) {
 
       onMouseEvent(event)
 
-      let newSelectedKeys = driveStore.getState().selectedIds
+      let newSelectedKeys = driveStore.state.selectedIds
 
       if (!newSelectedKeys.has(asset.id)) {
         setMostRecentlySelectedIndex(assets.findIndex((otherAsset) => otherAsset.id === asset.id))
@@ -1397,8 +1397,7 @@ export interface AssetsTableAssetsUnselectorProps {
 export function AssetsTableAssetsUnselector(props: AssetsTableAssetsUnselectorProps) {
   const { className, asChild = false, children } = props
 
-  const driveStore = useDriveStore()
-  const hasSelectedKeys = useStore(driveStore, (state) => state.selectedIds.size > 0, {
+  const hasSelectedKeys = useDriveState((state) => state.selectedIds.size > 0, {
     unsafeEnableTransition: true,
   })
   const setSelectedAssets = useSetSelectedAssets()

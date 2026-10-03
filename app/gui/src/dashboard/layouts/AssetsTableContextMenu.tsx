@@ -16,10 +16,14 @@ import { useGetAsset } from '#/layouts/Drive/assetsTableItemsHooks'
 import { useGlobalContextMenuEntries } from '#/layouts/useGlobalContextMenuEntries'
 import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { useExportArchive } from '#/pages/useExportArchive'
-import { useDriveStore, useSelectedAssets, useSetSelectedAssets } from '#/providers/DriveProvider'
+import {
+  useDriveState,
+  useDriveStore,
+  useSelectedAssets,
+  useSetSelectedAssets,
+} from '#/providers/DriveProvider'
 import { setModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
-import { useStore } from '#/utilities/zustand'
 import { canTransferBetweenCategories, isCloudCategory } from '$/providers/category'
 import { useBackends, useText, useUser } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentCategory } from '$/providers/react/container'
@@ -74,8 +78,7 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
     doPaste,
   })
 
-  const canUploadAllProjectsToCloud = useStore(
-    driveStore,
+  const canUploadAllProjectsToCloud = useDriveState(
     (state) =>
       !isCloud &&
       localBackend != null &&
@@ -83,8 +86,7 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
         (id) => backendModule.getAssetTypeFromId(id) === backendModule.AssetType.project,
       ),
   )
-  const canDownloadAllProjectsToLocal = useStore(
-    driveStore,
+  const canDownloadAllProjectsToLocal = useDriveState(
     (state) =>
       isCloud &&
       localBackend != null &&
@@ -95,7 +97,7 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
 
   const uploadFilesToCloudCallback = useEventCallback(async () => {
     invariant(localBackend != null, 'Cannot upload to cloud when not on Local backend')
-    const selectedIds = [...driveStore.getState().selectedIds]
+    const selectedIds = [...driveStore.state.selectedIds]
     const files = selectedIds.flatMap((id) => {
       const asset = getAsset(id)
       return asset ? [asset] : []
@@ -107,7 +109,7 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
   })
 
   const downloadFilesToLocalCallback = useEventCallback(async () => {
-    const selectedIds = [...driveStore.getState().selectedIds]
+    const selectedIds = [...driveStore.state.selectedIds]
     const files = selectedIds.flatMap((id) => {
       const asset = getAsset(id)
       return asset ? [asset] : []
@@ -115,7 +117,7 @@ export const AssetsTableContextMenu = React.forwardRef(function AssetsTableConte
     await uploadFileToLocal(files)
   })
 
-  const hasPasteData = useStore(driveStore, ({ pasteData }) => {
+  const hasPasteData = useDriveState(({ pasteData }) => {
     const effectivePasteData =
       (
         pasteData?.data.backendType === backend.type &&
