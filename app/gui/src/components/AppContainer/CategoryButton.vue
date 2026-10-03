@@ -37,7 +37,8 @@ const {
 const LOADING_INDICATOR_DELAY_MS = 100
 
 const { categoryLabel, removeLocalDirectory } = useCategories()
-const { currentCategory } = toRefs(useDriveLocation())
+const drive = useDriveLocation()
+const { currentCategory } = toRefs(drive)
 const { leftPanelShown, leftPanelToggledOn } = toRefs(useContainerData())
 const reactApi = useReactApi()
 const modals = useModals()
@@ -46,7 +47,7 @@ const router = useRouter()
 
 const label = computed(() => categoryLabel(category))
 const selected = computed(() => categoryEq(category, currentCategory.value))
-const isLoading = computed(() => selected.value && reactApi.isTransitioning)
+const isLoading = computed(() => selected.value && drive.isNavigating)
 const delayedIsLoading = debouncedGetter(() => isLoading.value, LOADING_INDICATOR_DELAY_MS)
 const showLoading = computed(() => isLoading.value && delayedIsLoading.value)
 

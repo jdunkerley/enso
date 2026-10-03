@@ -26,7 +26,7 @@ export function useExportArchive(options: ExportArchiveOptions) {
   const downloadDirectory = useDownloadDirectory()
 
   return useEventCallback(async () => {
-    const { selectedIds } = driveStore.getState()
+    const { selectedIds } = driveStore.state
     const secondsString = new Date().getSeconds().toString().padStart(2, '0')
     const dateString = `${toReadableIsoString(new Date()).replace(/[:]/g, ' ')} ${secondsString}`
     const [filePathRaw] =
