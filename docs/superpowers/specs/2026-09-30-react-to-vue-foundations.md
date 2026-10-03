@@ -1549,5 +1549,10 @@ provisionally accepted, for the maintainer to review.
     develop's: the differences left are the drive's clock column behind the
     page, the fixes, a 1px sub-pixel shift of the invite field's description
     (the shared `Input.vue`), and native `:hover` on a button that appears under
-    a resting pointer, where react-aria waits for the pointer to move. No
-    changelog entry: the PR takes `CI: No changelog needed`.
+    a resting pointer, where react-aria waits for the pointer to move. One
+    keyboard difference is left to the shared `Dialog.vue`: a dialog opened from
+    its trigger (Invite, the paywall dialog) focuses its first control, the
+    close button, where react-aria focused the dialog itself; the Tab cycle
+    inside is the same. Changing it would change every triggered Vue dialog, so
+    it is not done here. No changelog entry: the PR takes
+    `CI: No changelog needed`.
