@@ -6,7 +6,7 @@ import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import UpsertSecretModal from '#/modals/UpsertSecretModal'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
-import { useDriveStore } from '#/providers/DriveProvider'
+import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
 import { setModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
@@ -14,7 +14,6 @@ import { useText } from '$/providers/react'
 import { useDriveCurrentBackend } from '$/providers/react/container'
 import { isDoubleClick } from '$/utils/event'
 import { isAssetCredential, titleSchema, type SecretAsset } from 'enso-common/src/services/Backend'
-import { useStore } from 'zustand'
 
 /** Props for a {@link SecretNameColumn}. */
 export interface SecretNameColumnProps extends AssetNameColumnProps {
@@ -32,14 +31,14 @@ export default function SecretNameColumn(props: SecretNameColumnProps) {
   const renameAsset = useRenameAsset(backend)
   const driveStore = useDriveStore()
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
   const setIsEditing = (isEditing: boolean) => {
     if (isEditing) {
       if (isEditable) {
-        driveStore.setState({ assetToRename: item.id })
+        driveStore.update({ assetToRename: item.id })
       }
     } else {
-      driveStore.setState({ assetToRename: null })
+      driveStore.update({ assetToRename: null })
     }
   }
 

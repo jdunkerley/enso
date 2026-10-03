@@ -20,6 +20,7 @@ import {
   useDriveCurrentBackend,
   useDriveCurrentCategory,
   useDriveLocation,
+  useDriveNavigationTransition,
 } from '$/providers/react/container'
 import AssetQuery from '$/utils/AssetQuery'
 import * as download from '$/utils/download'
@@ -36,6 +37,7 @@ export interface DriveProperties {
 
 /** Contains directory path and directory contents (projects, folders, secrets and files). */
 export const Drive = React.memo(function DriveImpl(props: DriveProperties) {
+  useDriveNavigationTransition()
   return (
     <ErrorBoundary>
       <DriveProvider>

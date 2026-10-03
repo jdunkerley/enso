@@ -114,6 +114,11 @@ const signInWithApple = signInWith(() => session.signInWithApple())
 const otpForm = useForm({
   schema: z.object({ otp: z.string().min(OTP_LENGTH).max(OTP_LENGTH) }),
   defaultValues: { otp: '' },
+  // A wrong code is cleared for another try, and its error stays under the code until the next
+  // submission: a reset after the submission would clear the error too, and re-validating the code
+  // as it is typed again would replace it.
+  resetOnSubmit: false,
+  reValidateMode: 'onSubmit',
   onSubmit: async ({ otp }, codeForm) => {
     const result = await session.confirmSignIn(otp)
     if (result.ok) {
@@ -126,7 +131,8 @@ const otpForm = useForm({
           break
         }
         case 'CodeMismatchException': {
-          codeForm.setError('otp', { message: result.val.message })
+          codeForm.setValue('otp', '')
+          codeForm.setError('otp', { message: getText('wrongOneTimeCode') })
           break
         }
         default: {
@@ -136,6 +142,15 @@ const otpForm = useForm({
     }
   },
 })
+
+// The code's boxes are disabled while it is checked: back to the first once a wrong one is cleared.
+watch(
+  () => otpForm.formState.isSubmitting,
+  (isSubmitting) => {
+    if (!isSubmitting && otpForm.getFieldState('otp').error != null) otpForm.setFocus('otp')
+  },
+  { flush: 'post' },
+)
 
 // React created the code's form afresh each time its step was shown.
 watch(stepperState.currentStep, (step) => {

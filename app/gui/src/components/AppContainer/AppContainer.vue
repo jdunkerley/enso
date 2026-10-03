@@ -12,7 +12,6 @@ import { ContainerProviderForReact } from '$/providers/react/container'
 import { provideReactApi } from '$/providers/reactApi'
 import { provideRightPanelData } from '$/providers/rightPanel'
 import { useNavigateLink } from '$/utils/links'
-import { proxyRefs } from '$/utils/reactivity'
 import { appContainerBindings } from '@/bindings'
 import PopoverRootProvider from '@/components/PopoverRootProvider.vue'
 import { useEvent } from '@/composables/events'
@@ -25,7 +24,7 @@ import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBack
 import * as objects from 'enso-common/src/utilities/data/object'
 import { normalizeSlashes } from 'enso-common/src/utilities/file'
 import { ConfigProvider } from 'reka-ui'
-import { onMounted, onUnmounted, shallowRef, toRef, toRefs } from 'vue'
+import { onMounted, onUnmounted, shallowRef, toRefs } from 'vue'
 import HeadlessUiSpike from './HeadlessUiSpike.vue'
 import LeftPanel from './LeftPanel.vue'
 import MiddlePanel from './MiddlePanel.vue'
@@ -35,8 +34,6 @@ import TabBar from './TabBar.vue'
 
 <script setup lang="ts">
 const props = defineProps<{
-  startReactTransition: (action: () => void) => void
-  isReactTransitioning: boolean
   transferBetweenCategories: TransferBetweenCategoriesFunction
 }>()
 
@@ -53,14 +50,8 @@ const text = useText()
 provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
-provideDriveLocation(props.startReactTransition)
-provideReactApi(
-  proxyRefs({
-    startTransition: props.startReactTransition,
-    isTransitioning: toRef(props, 'isReactTransitioning'),
-    transferBetweenCategories: props.transferBetweenCategories,
-  }),
-)
+provideDriveLocation()
+provideReactApi({ transferBetweenCategories: props.transferBetweenCategories })
 
 const HELP_URLS: Record<ActionName & `help.${string}`, string> = {
   'help.whatsNew': 'https://community.ensoanalytics.com/c/what-is-new-in-enso/',

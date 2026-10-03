@@ -6,7 +6,7 @@ import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import type { VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { reactive } from 'vue'
+import { nextTick, reactive } from 'vue'
 import CategoryButton from '../CategoryButton.vue'
 
 // `useCategories` and `useContainerData` are global stores (see `mountWithProviders`), so they are
@@ -26,15 +26,11 @@ const containerData = reactive({ leftPanelShown: true, leftPanelToggledOn: false
 vi.mock('$/providers/container', () => ({ useContainerData: () => containerData }))
 
 function makeReactApi(): ReactApi {
-  return {
-    startTransition: (action) => action(),
-    isTransitioning: false,
-    transferBetweenCategories: vi.fn(),
-  }
+  return { transferBetweenCategories: vi.fn() }
 }
 
 function mountCategoryButton(category: Category, props: { extended?: boolean } = {}) {
-  const drive = reactive({ currentCategory: { type: 'local' } as Category })
+  const drive = reactive({ currentCategory: { type: 'local' } as Category, isNavigating: false })
   const reactApi = makeReactApi()
   return mountWithProviders(CategoryButton, {
     props: { category, ...props },
@@ -72,6 +68,37 @@ describe('CategoryButton', () => {
     const { wrapper } = await mountCategoryButton({ type: 'cloud' })
     await press(wrapper)
     expect(containerData.leftPanelToggledOn).toBe(true)
+  })
+
+  test('shows a spinner while the drive navigates to its category, after a delay', async () => {
+    vi.useFakeTimers()
+    try {
+      const { wrapper, drive } = await mountCategoryButton({ type: 'local' })
+      const spinner = () => wrapper.findComponent({ name: 'LoadingSpinner' })
+      expect(spinner().exists()).toBe(false)
+      drive.isNavigating = true
+      await nextTick()
+      expect(spinner().exists()).toBe(false)
+      await vi.advanceTimersByTimeAsync(150)
+      expect(spinner().exists()).toBe(true)
+      drive.isNavigating = false
+      await nextTick()
+      expect(spinner().exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  test("another category's button shows no spinner while the drive navigates", async () => {
+    vi.useFakeTimers()
+    try {
+      const { wrapper, drive } = await mountCategoryButton({ type: 'cloud' })
+      drive.isNavigating = true
+      await vi.advanceTimersByTimeAsync(150)
+      expect(wrapper.findComponent({ name: 'LoadingSpinner' }).exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test("the extended Local button's settings button opens the Local settings tab", async () => {

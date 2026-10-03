@@ -10,7 +10,6 @@
  * (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a tab
  * whose feature the user's plan lacks.
  */
-import { localRootDirectoryStore } from '#/layouts/Drive/persistentState'
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
@@ -27,6 +26,7 @@ import {
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
+import { localPathsStore } from '$/providers/localDirectories'
 import { useQueryParams } from '$/providers/queryParams'
 import { provideSettingsContext } from '$/providers/settingsContext'
 import {
@@ -121,11 +121,11 @@ function setPreferredTimeZone(value: string | undefined) {
 }
 
 const storedLocalRootDirectory = useZustandStoreRef(
-  localRootDirectoryStore,
+  localPathsStore,
   (state) => state.localRootDirectory,
 )
 const storedDownloadDirectory = useZustandStoreRef(
-  localRootDirectoryStore,
+  localPathsStore,
   (state) => state.downloadDirectory,
 )
 const defaultDownloadDirectory = inject<Path | null>('defaultDownloadPath', null)

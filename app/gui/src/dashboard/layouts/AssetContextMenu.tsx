@@ -362,7 +362,7 @@ export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
           !isOtherUserUsingProject && {
             action: 'rename',
             doAction: () => {
-              driveStore.setState({ assetToRename: asset.id })
+              driveStore.update({ assetToRename: asset.id })
             },
           },
         (asset.type === backendModule.AssetType.secret ||
@@ -443,7 +443,7 @@ export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
       entries={entries}
       initialPosition={initialPosition}
       onClose={() => {
-        driveStore.setState({ contextMenuData: null })
+        driveStore.update({ contextMenuData: null })
       }}
     />
   )

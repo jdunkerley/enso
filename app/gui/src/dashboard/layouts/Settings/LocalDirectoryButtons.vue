@@ -3,9 +3,9 @@
  * @file The buttons below a directory of the Local settings tab: browse for a new one (in the
  * desktop app only) and reset it to the default.
  */
-import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
+import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
 import { useText } from '$/providers/text'
 import { Path } from 'enso-common/src/services/Backend'
 import { normalizePath } from 'enso-common/src/utilities/file'
