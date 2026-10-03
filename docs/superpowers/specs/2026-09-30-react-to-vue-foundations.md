@@ -1816,3 +1816,87 @@ the rulings above: provisionally accepted, for the maintainer to review.
    accessibility trees differ as before: the dialogs are named by their titles
    (#156, ruling 11), and react-aria's live-region `log`s and hidden "Dismiss"
    buttons are gone. The PR takes `CI: No changelog needed`.
+
+## Rulings from #87 (settings: Organization, Members and the Invite dialog, 2026-10-03)
+
+#87 ports the Settings organization tabs. Delegated like the rulings above:
+provisionally accepted, for the maintainer to review.
+
+1. **Split.** This PR ports Organization, Members and the Invite dialog (and the
+   paywall pieces they show); User groups (with an accessible drag and drop),
+   Activity log, API keys and Usage follow in their own issue, linked from #87
+   and #75. Each half is about 1k lines of React, and the second brings the drag
+   and drop and the date filters. **Usage is #87's, not #88's:** #88 names the
+   Billing & Plans tab only, and Usage shows scheduled executions. The Billing
+   tab stays React for #88.
+2. **The core declares the tabs; the cloud fills them.** Organization and
+   Members are declared in `tabs.ts` (name, icon, sidebar place, visibility,
+   Members' `inviteUser` feature) with no sections, and
+   `src/cloud/organization/` contributes their sections
+   (`contributeSettingsSections`). A Vue tab with no sections is not listed, so
+   a build without the cloud shows neither. A registry of whole tabs was
+   rejected: it would split the sidebar's order between the core and the cloud.
+3. **The tab-level paywall is a contribution** (`contributeSettingsPaywall`, the
+   third settings registry, decision 6b's "paywall check"). The core decides
+   with `useIsFeatureUnderPaywall`; the cloud supplies the screen
+   (`src/cloud/billing/paywall/SettingsPaywall.vue`). The members tab is behind
+   `inviteUser`, which a plan with several seats always has, so in practice only
+   the devtools' paywall override shows it.
+4. **The paywall pieces the tabs show are ported now**, though the paywall is
+   #88's: `PaywallScreen`, `PaywallDialog`, `PaywallDialogButton`,
+   `PaywallButton`, `PaywallAlert`, `PaywallLock`, `PaywallBulletPoints` and
+   `PaywallUpgradeButton` (the paywall's `UpgradeButton`; the user bar's is
+   `billing/UpgradeButton.vue`), in `src/cloud/billing/paywall/`, with React's
+   markup and classes. The React originals stay for their React callers (user
+   groups, the menus, the React settings `Tab`); `PaywallAlert.tsx` went with
+   its last caller. `billing` and `organization` join `CLOUD_AREAS`: their only
+   direct importers are in the exempt `src/dashboard/`.
+5. **One Invite dialog**, `src/cloud/organization/InviteUsersModal.vue`, for
+   every place that invites users: the Members tab and the user bar's
+   `InviteUsersButton.vue` open it from a `trigger` slot, and an app-level modal
+   (#84) can open it through `v-model:open`. React's `relativeToTrigger` (a
+   popover variant) had no caller and is not ported, nor is the attempt to
+   colour invalid addresses with the CSS Custom Highlight API (it cannot reach
+   an `<input>`'s text).
+6. **Four React faults are fixed, not kept**, each found by comparing the
+   running app with develop's; none changes a working state:
+   - an invalid address made the form's validation throw (the highlight ranges
+     were set on the field's label), and "Send invites" spun for good; the Vue
+     form says "Email is invalid", as React meant to;
+   - an address typed twice was invited twice (React put the parsed objects in a
+     `Set`);
+   - removing or sending an invitation left the Members list stale until it went
+     stale on its own: React invalidated `['listInvitations']`, a key only its
+     form's own query had. `INVALIDATION_MAP` now has `inviteUser` and
+     `deleteInvitation` invalidate `listInvitations`;
+   - "Go to Members Page" set the old `page` query parameter, so from the drive
+     it only closed the dialog; it now opens the Members tab. It still always
+     shows: React's check for "already on the Members tab" read that same stale
+     parameter and never held, and hiding it would move the Close button.
+7. **The Vue `AlertDialog` shows a failed answer's error**, as React's (a
+   `Form`) did with `Form.FormError`: same message, alert and
+   `form-submit-error` test id. Removing a member the backend refuses showed why
+   in React, and nothing in the Vue dialog. #78's ruling 10 stands: there is
+   still no form, only the error.
+8. **Queries keep React's keys and options**: `listUsers` and `listInvitations`
+   persisted, fresh for a minute (`src/cloud/organization/queries.ts`). The
+   invitation form now shares the Members tab's key, but refetches on opening
+   (stale time 0), as its own React query did.
+9. **The React form shell goes.** The React tabs left (billing, user groups,
+   activity log, API keys, usage) have only custom entries, so `FormEntry`,
+   `Input` and `AriaInput` are deleted with the organization form, and the React
+   settings context loses `updateOrganization`, which the Vue one gains.
+10. **What a user notices: the fixes above.** Every state of both tabs and the
+    dialog (list, edit, save, validation and server errors, removal and its
+    confirmation and error, resend, the paywall dialog, the read-only view of a
+    member, no seats left, search, the user bar's Invite) was compared with
+    develop's: the differences left are the drive's clock column behind the
+    page, the fixes, a 1px sub-pixel shift of the invite field's description
+    (the shared `Input.vue`), and native `:hover` on a button that appears under
+    a resting pointer, where react-aria waits for the pointer to move. One
+    keyboard difference is left to the shared `Dialog.vue`: a dialog opened from
+    its trigger (Invite, the paywall dialog) focuses its first control, the
+    close button, where react-aria focused the dialog itself; the Tab cycle
+    inside is the same. Changing it would change every triggered Vue dialog, so
+    it is not done here. No changelog entry: the PR takes
+    `CI: No changelog needed`.

@@ -17,6 +17,17 @@ community build without the cloud can leave it out (decision 6b of
     menu's "Upgrade Plan"), `organization/` (the user menu's organization
     switcher) and `versionChecker/` (the "new version available" dialog, mounted
     by `App.vue`).
+  - `organization/`, since #87: the Organization and Members settings tabs'
+    sections (`settingsSections.ts`, contributed by
+    `registerOrganizationSettings`), and the "Invite" dialog
+    (`InviteUsersModal.vue`, with its form and success step), the one dialog
+    every place that invites users shares: the Members tab, the user bar's
+    `InviteUsersButton.vue`, and any app-level modal that needs it.
+  - `billing/paywall/`, since #87: the Vue paywall pieces (`PaywallScreen`,
+    `PaywallDialog`, `PaywallDialogButton`, `PaywallButton`, `PaywallAlert`,
+    `PaywallLock`, `PaywallBulletPoints`, `PaywallUpgradeButton`), and the
+    settings page's paywall screen, contributed by `registerBillingSettings`.
+    The React originals stay for their React callers until #88.
   - `auth/` — the sign-in (with the one-time-code step), sign-up (with the email
     confirmation step), email confirmation, forgot-password, reset-password and
     account-restoration pages, their layout (`AuthenticationPage.vue`), the
@@ -48,10 +59,11 @@ community build without the cloud can leave it out (decision 6b of
 - **The core never imports an area, nor `$/cloud` itself.** `entrypoint.ts`
   calls `registerCloud` before the router starts, and that is the only way in.
   An ESLint rule enforces it (`CLOUD_AREAS` in `eslint.config.mjs`; add a new
-  area there). The React dashboard is exempt until it is ported. The areas from
-  #82 and #83 predate the registries and are imported directly, with a note
-  (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`, `App.vue`), so they
-  are not in `CLOUD_AREAS` yet.
+  area there). The React dashboard (all of `src/dashboard/`) is exempt until it
+  is ported. The areas from #82 and #83 predate the registries and are imported
+  directly, with a note (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`,
+  `App.vue`); `billing` and `organization` joined `CLOUD_AREAS` with #87, since
+  their only direct importers are in the exempt dashboard.
 - Nothing here imports `#/` (the React dashboard), with one exception until #92:
   `properties/reactDatalinkInput.ts` mounts the React datalink editor
   (`JSONSchemaInput`) through the bridge, and it is on
@@ -63,13 +75,16 @@ community build without the cloud can leave it out (decision 6b of
   (`$/providers/settingsContributions`) appends sections, declared with the
   model in `$/configurations/settings`, to a settings tab; the loader keeps them
   out of the initial chunk, and the settings route waits for them. Their
-  components read the page's context with `useSettingsContext`. Right-panel tabs
-  are the third: `contributeRightPanelTab(tab, loader)`
+  components read the page's context with `useSettingsContext`. A tab the core
+  declares without sections of its own (Organization, Members) is listed only
+  once something is contributed to it. `contributeSettingsPaywall(loader)` is
+  the third: the screen shown in place of a tab locked behind a feature.
+  Right-panel tabs are the fourth: `contributeRightPanelTab(tab, loader)`
   (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
   Versions and Schedule (`executionsCalendar`) tabs their content; the tabs
   themselves (icon, title, enabling, the scheduler's paywall) stay in
   `$/providers/rightPanel`, which hides one that nothing contributed. The
-  layouts' modals are the fourth (`$/providers/layoutContributions`, #84):
+  layouts' modals are the fifth (`$/providers/layoutContributions`, #84):
   `contributeAgreementsGate` gives `ProtectedLayout.vue` its agreements gate,
   and `contributeAppContainerModals` gives `AppContainerLayout.vue` its four
   modals. The layouts still decide when each shows; their data loaders await the

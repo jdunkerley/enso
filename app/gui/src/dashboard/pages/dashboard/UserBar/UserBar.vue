@@ -5,27 +5,24 @@
  * of the React `UserBar` (#83), mounted by `AppContainer.vue`.
  *
  * The cloud-only parts come from `src/cloud/`, imported directly (decision 6b's registries do not
- * exist yet). "Invite" stays a React leaf until the organization port (#87) moves its dialog.
+ * exist yet): the trial indicator and "Upgrade" from `billing/`, "Invite" from `organization/`.
  *
  * In local mode (authentication disabled, the offline stand-in session) there is no cloud account:
  * the trial indicator, "Invite" and "Upgrade" are not shown, nor are the user menu's cloud entries.
  */
 import TrialProgress from '$/cloud/billing/TrialProgress.vue'
 import UpgradeButton from '$/cloud/billing/UpgradeButton.vue'
+import InviteUsersButton from '$/cloud/organization/InviteUsersButton.vue'
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'
 import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useAuth } from '$/providers/auth'
 import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
-import { reactComponent } from '$/utils/react'
-import { InviteUsersButton as InviteUsersButtonReact } from '#/modals/InviteUsersModal/InviteUsersButton'
 import { Plan } from 'enso-common/src/services/Backend'
 import { computed } from 'vue'
 import NotificationTray from './NotificationTray/NotificationTray.vue'
 import UserMenu from './UserMenu.vue'
-
-const InviteUsersButton = reactComponent(InviteUsersButtonReact)
 
 const { goToSettingsPage } = defineProps<{ goToSettingsPage: () => void }>()
 const emit = defineEmits<{ signOut: [] }>()

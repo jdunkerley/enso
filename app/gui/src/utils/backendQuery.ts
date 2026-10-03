@@ -108,6 +108,8 @@ export const INVALIDATION_MAP: Partial<
     'getAssetDetails',
   ],
   restoreUser: ['usersMe'],
+  inviteUser: ['listInvitations'],
+  deleteInvitation: ['listInvitations'],
   uploadUserPicture: ['usersMe'],
   updateOrganization: ['getOrganization'],
   uploadOrganizationPicture: ['getOrganization'],

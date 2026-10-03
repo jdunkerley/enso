@@ -10,7 +10,9 @@ import type { Router } from 'vue-router'
 import { registerAccountSettings } from './account/settings'
 import { registerAgreementsGate } from './agreements/agreements'
 import { registerAuthRoutes } from './auth/routes'
+import { registerBillingSettings } from './billing/settings'
 import { registerCloudBrowserDisabledRoute } from './browserDisabled/routes'
+import { registerOrganizationSettings } from './organization/settings'
 import { registerPropertiesTab } from './properties/rightPanel'
 import { registerVersionsTabs } from './versions/rightPanel'
 
@@ -18,6 +20,8 @@ import { registerVersionsTabs } from './versions/rightPanel'
 export function registerCloud(router: Router) {
   registerAuthRoutes(router)
   registerAccountSettings()
+  registerOrganizationSettings()
+  registerBillingSettings()
   registerCloudBrowserDisabledRoute(router)
   registerAgreementsGate()
   contributeAppContainerModals(loadAppContainerModals)
