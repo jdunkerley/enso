@@ -6,14 +6,13 @@
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Heading from '$/components/Text/Heading.vue'
-import type { SettingsTabSectionData } from '$/configurations/settings'
+import type { SettingsTabData, SettingsTabSectionData } from '$/configurations/settings'
 import type SettingsTabType from '$/configurations/settingsTabs'
 import { useText } from '$/providers/text'
 import { computed } from 'vue'
-import type { AnySettingsTabData } from './tabs'
 
 const { tabSections, tabsToShow, tab } = defineProps<{
-  tabSections: readonly SettingsTabSectionData<AnySettingsTabData>[]
+  tabSections: readonly SettingsTabSectionData<SettingsTabData>[]
   /** The visible tabs that match the search. */
   tabsToShow: readonly SettingsTabType[]
   tab: SettingsTabType
