@@ -7,7 +7,7 @@
 // does), so to ESLint the components imported here have an error type.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/persistentState'
-import { actionToTextId, BINDINGS } from '$/configurations/inputBindings'
+import { defaultShortcuts } from '$/configurations/keyboardShortcuts'
 import {
   settingsFormEntryData,
   type SettingsSectionData,
@@ -16,7 +16,6 @@ import {
 } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import { Path } from 'enso-common/src/services/Backend'
-import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
 import { REACT_SETTINGS_TAB_DATA, type SettingsTabData as ReactSettingsTabData } from './data'
@@ -142,8 +141,8 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
           type: 'custom',
           aliasesId: 'keyboardShortcutsSettingsCustomEntryAliases',
           getExtraAliases: (getText) =>
-            unsafeEntries(BINDINGS).flatMap(([action, info]) =>
-              info.rebindable === false ? [] : [getText(actionToTextId(action))],
+            defaultShortcuts().flatMap((shortcut) =>
+              shortcut.rebindable ? [getText(shortcut.nameTextId)] : [],
             ),
           component: KeyboardShortcutsSettingsSection,
         },

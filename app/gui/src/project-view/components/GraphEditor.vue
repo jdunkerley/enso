@@ -40,6 +40,7 @@ import SceneScroller from '@/components/SceneScroller.vue'
 import TopBar from '@/components/TopBar.vue'
 import { builtinWidgets } from '@/components/widgets'
 import { useDoubleClick } from '@/composables/doubleClick'
+import { useGraphPaletteActions } from '@/composables/graphPaletteActions'
 import { unrefElement, useEventConditional } from '@/composables/events'
 import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
@@ -397,6 +398,8 @@ const actionHandlers = registerHandlers({
 const isActive = ref(true)
 onActivated(() => (isActive.value = true))
 onDeactivated(() => (isActive.value = false))
+
+useGraphPaletteActions(actionHandlers, isActive)
 
 const { globalEventRegistry } = useGlobalEventRegistry()
 useEventConditional(globalEventRegistry, 'keydown', isActive, (e) => {
