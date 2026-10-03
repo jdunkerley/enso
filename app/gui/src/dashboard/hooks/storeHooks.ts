@@ -10,6 +10,15 @@ import type { StoreApi } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
 /**
+ * What the hooks here read of a store: a zustand store, or anything else of the same shape (the
+ * drive store's adapter, `#/providers/DriveProvider`).
+ */
+export type ReadonlyStoreApi<State> = Pick<
+  StoreApi<State>,
+  'getInitialState' | 'getState' | 'subscribe'
+>
+
+/**
  * A type that allows to choose between different equality functions.
  */
 export type AreEqual<T> = EqualityFunction<T> | EqualityFunctionName
@@ -56,7 +65,7 @@ export interface UseStoreOptions<Slice> {
  * # `options.unsafeEnableTransition` must not be changed during the component lifecycle.
  */
 export function useStore<State, Slice>(
-  store: StoreApi<State>,
+  store: ReadonlyStoreApi<State>,
   selector: (state: State) => Slice,
   options: UseStoreOptions<Slice> = {},
 ) {
@@ -74,7 +83,7 @@ export function useStore<State, Slice>(
 
 /** A hook that allows to use React transitions with Zustand store. */
 function useTearingTransitionStore<State, Slice>(
-  store: StoreApi<State>,
+  store: ReadonlyStoreApi<State>,
   selector: (state: State) => Slice,
   areEqual: AreEqual<Slice> = 'shallow',
 ) {
@@ -84,8 +93,8 @@ function useTearingTransitionStore<State, Slice>(
 
   const [[sliceFromReducer, storeFromReducer], rerender] = useReducer<
     Reducer<
-      readonly [Slice, StoreApi<State>, State],
-      readonly [Slice, StoreApi<State>, State] | undefined
+      readonly [Slice, ReadonlyStoreApi<State>, State],
+      readonly [Slice, ReadonlyStoreApi<State>, State] | undefined
     >,
     undefined
   >(
@@ -144,7 +153,7 @@ function resolveAreEqual<Slice>(areEqual: AreEqual<Slice> | null | undefined) {
  * @throws {Error} An error if the `unsafeEnableTransition` option is changed during the component lifecycle.
  */
 function useNonCompilableConditionalStore<State, Slice>(
-  store: StoreApi<State>,
+  store: ReadonlyStoreApi<State>,
   selector: (state: State) => Slice,
   unsafeEnableTransition: boolean,
   equalityFunction: EqualityFunction<Slice>,

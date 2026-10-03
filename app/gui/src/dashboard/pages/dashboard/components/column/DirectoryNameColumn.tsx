@@ -2,10 +2,9 @@
 import { Button } from '#/components/Button'
 import EditableSpan from '#/components/EditableSpan'
 import { useRenameAsset } from '#/hooks/backendHooks'
-import { useStore } from '#/hooks/storeHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
-import { useDriveStore } from '#/providers/DriveProvider'
+import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
 import { useText } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentDirectory } from '$/providers/react/container'
 import { twMerge } from '$/utils/style/tailwindMerge'
@@ -33,13 +32,13 @@ export default function DirectoryNameColumn(props: DirectoryNameColumnProps) {
   const getAssetChildren = useGetAssetChildren()
   const renameAsset = useRenameAsset(backend)
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
   const setIsEditing = (isEditing: boolean) => {
     if (isEditable && isEditing) {
-      driveStore.setState({ assetToRename: item.id })
+      driveStore.update({ assetToRename: item.id })
     }
     if (!isEditing) {
-      driveStore.setState({ assetToRename: null })
+      driveStore.update({ assetToRename: null })
     }
   }
 

@@ -38,14 +38,6 @@ function goToSettingsTab(router: Router, tab: SettingsTabType) {
 
 /** The component that contains the entire UI. */
 export function Dashboard() {
-  const [isTransitioning, startTransition] = React.useTransition()
-  // isTransitioning must be passed to vue as a separate state updated in effect.
-  // if passed directly, the update never reach vue, probably because veaury doesn't handle this
-  // case of background rendering well.
-  const [isTransitioningState, setTransitioningState] = React.useState(false)
-  React.useEffect(() => {
-    setTransitioningState(isTransitioning)
-  }, [isTransitioning])
   const { remoteBackend, localBackend } = useBackends()
   const inputBindings = inputBindingsProvider.useInputBindings()
   const { router } = useRouter()
@@ -143,11 +135,7 @@ export function Dashboard() {
           modalProvider.unsetModal()
         }}
       >
-        <AppContainerInner
-          startReactTransition={startTransition}
-          isReactTransitioning={isTransitioningState}
-          transferBetweenCategories={transferBetweenCategories}
-        />
+        <AppContainerInner transferBetweenCategories={transferBetweenCategories} />
       </div>
     </Page>
   )

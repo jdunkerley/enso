@@ -1,4 +1,3 @@
-import { localRootDirectoryStore } from '#/layouts/Drive/persistentState'
 import { useConfig } from '$/providers/config'
 import { download } from '$/utils/download'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
@@ -12,6 +11,7 @@ import { extractIdFromDirectoryId } from 'enso-common/src/services/RemoteBackend
 import invariant from 'tiny-invariant'
 import { computed, inject, ref, toValue, watch, watchEffect } from 'vue'
 import { useHttpClient } from './httpClient'
+import { localPathsStore } from './localDirectories'
 import { useText, type GetText } from './text'
 
 export type BackendsStore = ReturnType<typeof useBackends>
@@ -38,7 +38,7 @@ function initializeBackends(
         projectManager.value,
         undefined,
         download,
-        () => localRootDirectoryStore.getState().localRootDirectory,
+        () => localPathsStore.getState().localRootDirectory,
         window.api?.system?.getFilePath,
       )
     : null,

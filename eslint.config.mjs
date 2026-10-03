@@ -88,9 +88,7 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'utilities/vue',
   'utilities/zustand',
   // React-owned state that Vue reaches into; each goes with the shell collapse (#93).
-  // `persistentState` is a zustand store; see the zustand decision.
   'layouts/Drive/Categories',
-  'layouts/Drive/persistentState',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',
