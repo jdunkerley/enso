@@ -66,6 +66,28 @@ describe('ConfirmDeleteModal', () => {
     expect(store.stack.value).toEqual([])
   })
 
+  test('a failed deletion keeps the question open, with its error, as React did', async () => {
+    const store = setup()
+    const onConfirm = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Could not delete user: not allowed'))
+      .mockResolvedValueOnce(undefined)
+    const answer = store.ask(ConfirmDeleteModal, { actionText: 'delete it', onConfirm })
+    await flushPromises()
+    const user = userEvent.setup()
+    await user.click(byTestId('alert-dialog-confirm')!)
+    await flushPromises()
+    expect(alertDialog()).not.toBeNull()
+    expect(byTestId('form-submit-error')?.textContent.trim()).toBe(
+      'Could not delete user: not allowed',
+    )
+    // Answering again clears the error, and this time the deletion goes through.
+    await user.click(byTestId('alert-dialog-confirm')!)
+    await flushPromises()
+    await expect(answer).resolves.toBe('confirm')
+    expect(onConfirm).toHaveBeenCalledTimes(2)
+  })
+
   test('cancelling resolves the ask as dismissed, without deleting', async () => {
     const store = setup()
     const onConfirm = vi.fn()

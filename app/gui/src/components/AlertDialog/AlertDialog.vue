@@ -7,14 +7,17 @@
  * `role="alertdialog"`; it opens with focus on the confirm button, as React's `autoFocus` does, and
  * cannot be dismissed by an outside click or Escape: the user must choose. `onConfirm` and
  * `onCancel` may return a promise; the dialog shows the confirm button loading until it settles,
- * then closes. (React routes this through its `Form`; forms are #79, and a yes/no answer does not
- * need one.)
+ * then closes. If it fails, the dialog stays open and shows the error below its buttons, as React's
+ * `Form.FormError` did (with the same message and `form-submit-error` test id; a JavaScript error,
+ * not the backend's, reads "something went wrong" and goes to Sentry). React routes this through
+ * its `Form`; a yes/no answer needs no form.
  *
  * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
  *
  * `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
  * (`$/providers/modals`) leaves it then, so that it does not vanish mid-animation.
  */
+import Alert from '$/components/Alert/Alert.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import {
@@ -27,6 +30,8 @@ import { portalTarget } from '$/components/portal'
 import Heading from '$/components/Text/Heading.vue'
 import Text from '$/components/Text/Text.vue'
 import { useText } from '$/providers/text'
+import * as sentry from '@sentry/vue'
+import * as errorUtils from 'enso-common/src/utilities/errors'
 import {
   AlertDialogContent,
   AlertDialogDescription,
@@ -76,13 +81,21 @@ const slots = useSlots()
 const focus = useDialogFocus(open, () => slots.trigger != null)
 
 const pending = ref<'cancel' | 'confirm'>()
+/** The message of the last failed response, shown as React's `Form.FormError` showed it. */
+const error = ref<string>()
 
 async function respond(response: 'cancel' | 'confirm') {
   if (pending.value != null) return
   pending.value = response
+  error.value = undefined
   try {
     await (response === 'confirm' ? onConfirm : onCancel)?.()
     open.value = false
+  } catch (failure) {
+    const isJSError = errorUtils.isJSError(failure)
+    if (isJSError) sentry.captureException(failure)
+    const fallback = getText('arbitraryFormErrorMessage')
+    error.value = isJSError ? fallback : errorUtils.tryGetMessage(failure, fallback)
   } finally {
     pending.value = undefined
   }
@@ -171,6 +184,17 @@ const styles = computed(() =>
                       {{ confirmLabel ?? getText('confirm') }}
                     </Button>
                   </ButtonGroup>
+                  <Alert v-if="error != null" size="large" variant="error" rounded="xxlarge">
+                    <Text
+                      disableLineHeightCompensation
+                      variant="body"
+                      truncate="3"
+                      color="primary"
+                      testId="form-submit-error"
+                    >
+                      {{ error }}
+                    </Text>
+                  </Alert>
                 </div>
               </div>
             </div>
