@@ -1,4 +1,3 @@
-/** @file Barrel file for `Settings` */
-export * from './Settings'
-import { Settings } from './Settings'
-export default Settings
+/** @file The settings page. */
+import SettingsPage from './SettingsPage.vue'
+export default SettingsPage

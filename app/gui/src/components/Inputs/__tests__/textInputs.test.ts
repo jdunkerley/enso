@@ -124,6 +124,38 @@ describe('ComboBox', () => {
     await user.click(document.querySelector<HTMLElement>(`[aria-label="${getText('reset')}"]`)!)
     expect(input.value).toBe('')
   })
+  test('names its list and buttons as react-aria did; the reset button is in the tab order', async () => {
+    mountComboBox()
+    const input = role('combobox') as HTMLInputElement
+    const user = userEvent.setup()
+    await user.click(input)
+    await user.keyboard('{ArrowDown}')
+    await flushPromises()
+    expect(role('listbox')!.getAttribute('aria-label')).toBe('Fruit')
+    expect(
+      document.querySelector(`button[aria-label="${getText('showSuggestions')}"]`),
+    ).not.toBeNull()
+    expect(
+      document.querySelector(`button[aria-label="${getText('reset')}"]`)!.getAttribute('tabindex'),
+    ).toBe('0')
+  })
+
+  test('`toOptionText` gives the options a text other than the one typing filters by', async () => {
+    mountInForm(z.object({ fruit: z.string().optional() }), {}, () =>
+      h(ComboBox<string>, {
+        name: 'fruit',
+        label: 'Fruit',
+        items: fruits,
+        toOptionText: (fruit: string) => `(${fruit.length}) ${fruit}`,
+      }),
+    )
+    await userEvent.setup().type(role('combobox')!, 'ap')
+    await flushPromises()
+    expect(allByRole('option').map((o) => o.textContent?.trim())).toEqual([
+      '(5) Apple',
+      '(7) Apricot',
+    ])
+  })
 })
 
 describe('Dropdown', () => {

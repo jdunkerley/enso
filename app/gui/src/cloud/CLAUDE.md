@@ -21,7 +21,13 @@ community build without the cloud can leave it out (decision 6b of
     confirmation step), email confirmation, forgot-password, reset-password and
     account-restoration pages, their layout (`AuthenticationPage.vue`), the
     password schemas and their routes (`routes.ts`). The logic they call is
-    shared: `$/providers/session`, `$/providers/auth`, `$/authentication/`.
+    shared: `$/providers/session`, `$/providers/auth`, `$/authentication/`. Also
+    the Account settings tab's two-factor authentication section
+    (`SetupTwoFaForm.vue`, `TwoFaSetup.vue`).
+  - `account/` — the Account settings tab's sections (`settingsSections.ts`: the
+    profile and password forms as data, the 2FA section, the account's deletion
+    and the profile picture), contributed by `registerAccountSettings`
+    (`settings.ts`).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules
@@ -37,9 +43,13 @@ community build without the cloud can leave it out (decision 6b of
 - **An area contributes through registries**, not by being imported. Routes are
   the first: `registerCloud` adds them with `router.addRoute`, under a named
   parent where they need one (`PROTECTED_LAYOUT_ROUTE`, `$/router/routeNames`).
-  Further registries (settings tabs, user-menu entries, right-panel tabs, asset
-  context-menu entries, the paywall check) appear with the first port that needs
-  each.
+  Settings sections are the second: `contributeSettingsSections(tab, loader)`
+  (`$/providers/settingsContributions`) appends sections, declared with the
+  model in `$/configurations/settings`, to a settings tab; the loader keeps them
+  out of the initial chunk, and the settings route waits for them. Their
+  components read the page's context with `useSettingsContext`. Further
+  registries (user-menu entries, right-panel tabs, asset context-menu entries,
+  the paywall check) appear with the first port that needs each.
 - Areas may import the core freely (`$/components`, `$/providers`, …).
 - Pages load on demand (`() => import(…)` in the routes), so that the cloud adds
   nothing to the initial chunk.

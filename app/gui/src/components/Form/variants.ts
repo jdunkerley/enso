@@ -46,3 +46,17 @@ export const FIELD_ERROR_STYLES = tv({
   variants: { fullWidth: { true: 'w-full' } },
   defaultVariants: { fullWidth: true },
 })
+
+/** A field of the settings page: the label beside the input, in a fixed-width column. */
+export const SETTINGS_FIELD_STYLES = tv({
+  extend: FIELD_STYLES,
+  slots: {
+    base: 'flex-row flex-wrap',
+    labelContainer: 'flex min-h-row items-center gap-1.5 w-full',
+    label: TEXT_STYLE({
+      className: 'flex justify-center self-start w-40 h-10 shrink-0',
+      variant: 'body',
+    }),
+    error: 'ml-[180px]',
+  },
+})

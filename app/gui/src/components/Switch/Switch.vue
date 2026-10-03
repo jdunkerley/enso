@@ -69,7 +69,7 @@ const styles = computed(() =>
     :ids="field.ids"
     :testId="testId"
   >
-    <label :class="styles.switch()" :data-selected="isSelected">
+    <label :class="styles.switch()" :data-selected="isSelected || undefined">
       <input
         ref="input"
         v-bind="$attrs"

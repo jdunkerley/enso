@@ -33,8 +33,10 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   (`$/providers/modals`). The About dialog is Vue's: open it with
   `openAboutModal()` (`$/components/AboutModal/aboutModal`).
   `InputBindingsProvider` hands out the one instance of the dashboard's
-  bindings, `$/providers/inputBindings`, which Vue menus read too (the user
-  menu's shortcuts; `$/composables/menuEntries` is the Vue `useMenuEntries`).
+  bindings, `$/providers/dashboardInputBindings`, which Vue menus read too (the
+  user menu's shortcuts; `$/composables/menuEntries` is the Vue
+  `useMenuEntries`) and the Vue settings page edits; a change re-renders its
+  consumers.
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.

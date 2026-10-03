@@ -109,7 +109,7 @@ const DASHBOARD_IMPORT_PATTERN = {
  * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
  * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
  */
-const CLOUD_AREAS = ['auth']
+const CLOUD_AREAS = ['account', 'auth']
 
 // =======================================
 // === Restricted syntactic constructs ===
@@ -765,6 +765,12 @@ const config = [
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/naming-convention': 'off',
     },
+  },
+  // The Vue component tests of the ported dashboard: their `use…` functions are Vue composables,
+  // which may be called anywhere in a test, not React hooks.
+  {
+    files: ['app/gui/src/dashboard/**/__tests__/*.test.ts'],
+    rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   // === EnsoDevtools Rules ===
   // Allow JSX strings in EnsoDevtools.tsx.

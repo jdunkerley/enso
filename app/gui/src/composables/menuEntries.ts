@@ -7,12 +7,12 @@
  * - each entry's shortcut runs it, from anywhere in the document (as React's, which attach to
  *   `document.body` outside a binding focus scope).
  *
- * The shortcuts are the user's (`$/providers/inputBindings`), read when an event arrives, so a
+ * The shortcuts are the user's (`$/providers/dashboardInputBindings`), read when an event arrives, so a
  * rebinding applies at once, as in React.
  */
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import { useActionsStore, type Action } from '$/providers/actions'
-import { useDashboardInputBindings } from '$/providers/inputBindings'
+import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useText } from '$/providers/text'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import type { Icon } from '@/util/iconMetadata/iconName'
