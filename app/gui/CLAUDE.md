@@ -73,9 +73,29 @@ adding an entry. React files may import `$/…` freely.
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
   constants. The Vue primitives themselves live beside them; see
   `src/components/CLAUDE.md`.
-- `src/configurations/` — static configuration: the dashboard's input bindings,
-  the settings tabs, and the settings page's model (`settings.ts`: tabs,
-  sections and entries, their context, and the search over them).
+- `src/configurations/` — static configuration: the keyboard shortcuts (the
+  dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
+  and `keyboardShortcuts.ts`, the one registry over both with their scopes and
+  conflict checks, #170), the settings tabs, and the settings page's model
+  (`settings.ts`: tabs, sections and entries, their context, and the search over
+  them).
+
+## Keyboard shortcuts
+
+One registry and one store cover the dashboard's and the graph editor's
+shortcuts (#170). The definitions are in `src/configurations/`
+(`inputBindings.ts`, `graphInputBindings.ts`); `keyboardShortcuts.ts` lists
+every action with its scope (`app`, `drive`, `graph`), category and name, and
+finds conflicts; `$/providers/inputBindings` holds the user's changes, saved in
+`localStorage` under `inputBindings` (its file comment describes the versioned
+format). Dispatch stays with each part: the dashboard's `defineBindingNamespace`
+handlers, and the graph editor's `graphBindings` (`@/bindings`,
+`defineRebindableKeybinds`), which follows the store. A new graph shortcut goes
+in `graphInputBindings.ts` (and gets a name in `english.json`); a fixed one
+stays in `@/bindings` with the reason it is fixed. The rulings are in
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md` ("Rulings from
+#170").
+
 - `src/cloud/` — code that only makes sense against the Enso Cloud: at the top,
   framework-free logic (service-credential recipes, organization-invite email
   parsing, the Cognito password rule, permission classes); in
@@ -83,10 +103,12 @@ adding an entry. React files may import `$/…` freely.
   and password pages; `account/`: the Account and API keys settings tabs'
   sections; `organization/`: the Organization, Members, User groups and Activity
   log tabs' sections and the "Invite" dialog; `billing/`: the paywall, the Usage
-  tab and the top bar's billing parts). Keep cloud-only code here rather than in
-  `src/utils/`, so a build without the cloud can drop one folder. The core
-  reaches the areas only through `registerCloud` (`src/cloud/index.ts`), which
-  `entrypoint.ts` calls; see `src/cloud/CLAUDE.md`.
+  tab and the top bar's billing parts; `versions/` and `properties/`: the right
+  panel's Versions, Schedule and Properties tabs). Keep cloud-only code here
+  rather than in `src/utils/`, so a build without the cloud can drop one folder.
+  The core reaches the areas only through `registerCloud`
+  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  `src/cloud/CLAUDE.md`.
 
 ## Entry points
 
