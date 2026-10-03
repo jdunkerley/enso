@@ -12,7 +12,9 @@ community build without the cloud can leave it out (decision 6b of
   The React dashboard imports these while it is ported.
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
-    file browser to create a secret.
+    file browser to create a secret, and the drive's secret dialog around it,
+    `UpsertSecretModal.vue` (#92), which the React drive opens on the modal
+    stack (`setVueModal`).
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
     menu's "Upgrade Plan"), `organization/` (the user menu's organization
     switcher) and `versionChecker/` (the "new version available" dialog, mounted
