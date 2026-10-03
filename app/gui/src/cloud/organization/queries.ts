@@ -63,6 +63,20 @@ export type LogEventsFilter = Omit<GetLogEventsRequestParams, 'from'> & {
 }
 
 /**
+ * The offset of the activity log's next page, or `undefined` once there is none. The endpoint
+ * pages by offset and gives no cursor or total, so a page shorter than `pageSize` (empty included)
+ * is the end of the log. Without this end the query always reports a next page, and the tab,
+ * which asks for one while the list does not fill its view, asks forever (#196).
+ */
+export function nextLogEventsPageParam(
+  lastPage: readonly unknown[],
+  allPages: readonly (readonly unknown[])[],
+  pageSize: number,
+) {
+  return lastPage.length < pageSize ? undefined : allPages.length * pageSize
+}
+
+/**
  * Options for the activity log, a page at a time: fresh for a minute and not persisted, under
  * React's key (the request's filters, then `{ infinite: true }`). The filters are reactive, and
  * the key follows them.
@@ -78,8 +92,8 @@ export function logEventsQueryOptions(backend: Backend, filter: () => LogEventsF
     initialPageParam: 0,
     getPreviousPageParam: (currentPage: unknown, allPages: readonly unknown[]) =>
       (allPages.indexOf(currentPage) - 1) * filter().pageSize,
-    getNextPageParam: (currentPage: unknown, allPages: readonly unknown[]) =>
-      (allPages.indexOf(currentPage) + 1) * filter().pageSize,
+    getNextPageParam: (lastPage: readonly unknown[], allPages: readonly (readonly unknown[])[]) =>
+      nextLogEventsPageParam(lastPage, allPages, filter().pageSize),
     staleTime: MINUTE_MS,
     meta: { persist: false },
   }
