@@ -372,6 +372,12 @@ test('Node comments use Monaspace Radon, at the UI size', async ({ editorPage, p
 
   // Nodes sit at fractional graph coordinates, which differ between runs.
   await alignToPixelGrid(locate.graphNodeByBinding(page, 'final').locator('.GraphNodeComment'))
+  // The edge into `final` runs behind the translucent bubble. Its sub-pixel position differed
+  // between CI and a local Linux run, so the graph's SVGs (edges and output ports) are hidden:
+  // the screenshot is about the text.
+  await page.addStyleTag({
+    content: '.GraphEditor svg, .GraphEditor svg * { visibility: hidden !important; }',
+  })
   await expectScreenshot(page, 'node-comment.png', {
     clip: boundingClip(await textBoxes(comment.locator('.cm-line')), 2),
   })
