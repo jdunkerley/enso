@@ -117,7 +117,13 @@ function onPaywallFeatureChange(name: string, value: unknown) {
 
 <template>
   <div :class="DIALOG_BACKGROUND({ className: 'fixed bottom-3 left-3 z-50 rounded-full' })">
-    <Popover testId="enso-devtools" :aria-label="getText('ensoDevtoolsPopoverHeading')">
+    <!-- React's popover was as tall as the window let it be, and scrolled; Reka's is as tall as its
+    content unless limited. -->
+    <Popover
+      testId="enso-devtools"
+      :aria-label="getText('ensoDevtoolsPopoverHeading')"
+      class="max-h-[var(--reka-popover-content-available-height)] overflow-y-auto"
+    >
       <template #trigger>
         <Button
           icon="enso_logo"
