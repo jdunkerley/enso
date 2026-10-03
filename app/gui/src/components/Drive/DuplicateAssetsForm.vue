@@ -41,7 +41,7 @@ import {
   type Backend,
   type DirectoryId,
 } from 'enso-common/src/services/Backend'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import AssetSummary from './AssetSummary.vue'
 import { getUniqueName, type ResolvedDuplication } from './duplicateAssets'
 
@@ -183,7 +183,13 @@ interface EntryValue {
   readonly newName?: string
 }
 
-const entries = computed(() => form.watch('entries') as readonly EntryValue[])
+/**
+ * What each entry shows: its conclusion as last chosen with its own buttons. As in React, where
+ * each entry rendered its controller's value, which a change of `entries.N.conclusion` alone did
+ * not refresh, Skip All (and "Skip the rest") change the values that Apply submits, not what the
+ * entries show.
+ */
+const entries = ref<readonly EntryValue[]>(form.getValues('entries') as readonly EntryValue[])
 
 function entryPath(index: number) {
   return `entries.${index}` as const
@@ -192,11 +198,9 @@ function entryPath(index: number) {
 function setConclusion(index: number, conclusion: EntryValue['conclusion'], newName?: string) {
   const current = entries.value[index]
   if (current == null) return
-  form.setValue(entryPath(index), {
-    ...current,
-    conclusion,
-    ...(newName != null ? { newName } : {}),
-  })
+  const next = { ...current, conclusion, ...(newName != null ? { newName } : {}) }
+  form.setValue(entryPath(index), next)
+  entries.value = entries.value.map((entry, i) => (i === index ? next : entry))
 }
 
 function skipAll() {
@@ -304,7 +308,7 @@ function skipRest() {
         <Button variant="outline" class="min-w-20" @press="skipAll">
           {{ getText('skipAll') }}
         </Button>
-        <DropdownMenu placement="bottom" :offset="8">
+        <DropdownMenu placement="bottom-start" :offset="8">
           <template #trigger>
             <Button variant="outline" icon="chevron_down" />
           </template>

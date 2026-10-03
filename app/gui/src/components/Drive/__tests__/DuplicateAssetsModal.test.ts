@@ -150,6 +150,9 @@ describe('the duplicate-name dialog', () => {
     await userEvent.click(button('Skip', dialog()))
     expect(dialog().textContent).toContain('The new file will be skipped')
     expect(dialog().textContent).toContain('Change')
+    // As in React, "Change" keeps the choice.
+    await userEvent.click(button('Change', dialog()))
+    expect(dialog().textContent).toContain('The new file will be skipped')
     await userEvent.click(button('Apply', dialog()))
     await vi.waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith([{ assetId: NEW_DATA.id, conclusion: 'skip' }]),
@@ -205,9 +208,11 @@ describe('the duplicate-name dialog', () => {
     expect(dialog().textContent).not.toContain('will be renamed')
   })
 
-  test('Skip All skips every asset', async () => {
+  test('Skip All skips every asset, without changing what the entries show', async () => {
     const { onSubmit } = await mountSeeded([NEW_DATA, NEW_NOTES])
     await userEvent.click(button('Skip All', dialog()))
+    // As in React, whose entries did not re-render when only their conclusion changed.
+    expect(dialog().textContent).not.toContain('will be skipped')
     await userEvent.click(button('Apply', dialog()))
     await vi.waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith([
