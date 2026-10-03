@@ -40,8 +40,6 @@ import {
   type UserGroupInfo,
 } from 'enso-common/src/services/Backend'
 
-const PROJECT_EXECUTIONS_STALE_TIME = 60_000
-
 export function backendQueryOptions<Method extends BackendQueryMethod>(
   backend: Backend,
   method: Method,
@@ -370,32 +368,6 @@ export function useRemoveSelfPermissionMutation(backend: Backend) {
   })
 
   return { ...createPermission, mutate, mutateAsync }
-}
-
-/** Build a query options object to list executions for a project. */
-export function listProjectExecutionsQueryOptions(
-  backend: Backend,
-  id: backendModule.ProjectId,
-  title: string,
-  year: number,
-  month: number,
-) {
-  return queryOptions({
-    ...backendQueryOptions(backend, 'listProjectExecutions', [id, title, year, month]),
-    staleTime: PROJECT_EXECUTIONS_STALE_TIME,
-  })
-}
-
-/** Build a query options object to get details for a project execution. */
-export function getProjectExecutionDetailsQueryOptions(
-  backend: Backend,
-  id: backendModule.ProjectExecutionId,
-  title: string,
-) {
-  return queryOptions({
-    ...backendQueryOptions(backend, 'getProjectExecutionDetails', [id, title]),
-    staleTime: PROJECT_EXECUTIONS_STALE_TIME,
-  })
 }
 
 /** Return a function to rename an asset. */

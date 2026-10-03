@@ -41,6 +41,7 @@ import TopBar from '@/components/TopBar.vue'
 import { builtinWidgets } from '@/components/widgets'
 import { useDoubleClick } from '@/composables/doubleClick'
 import { unrefElement, useEventConditional } from '@/composables/events'
+import { useGraphPaletteActions } from '@/composables/graphPaletteActions'
 import { useNodeAppearanceCache } from '@/composables/nodeAppearanceCache'
 import type { PlacementStrategy } from '@/composables/nodeCreation'
 import { registerHandlers, toggledAction, type DisplayableActionName } from '@/providers/action'
@@ -397,6 +398,8 @@ const actionHandlers = registerHandlers({
 const isActive = ref(true)
 onActivated(() => (isActive.value = true))
 onDeactivated(() => (isActive.value = false))
+
+useGraphPaletteActions(actionHandlers, isActive)
 
 const { globalEventRegistry } = useGlobalEventRegistry()
 useEventConditional(globalEventRegistry, 'keydown', isActive, (e) => {

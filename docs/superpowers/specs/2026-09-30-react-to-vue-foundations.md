@@ -1525,6 +1525,298 @@ provisionally accepted, for the maintainer to review.
 7. **No changelog entry**: nothing on screen changes, so the PR takes
    `CI: No changelog needed`.
 
+## Rulings from #170 (one key-binding registry; graph shortcuts rebindable, 2026-10-03)
+
+#170 unifies the two key-binding registries in Vue and, as the maintainer
+decided on 2026-10-02, makes the graph editor's shortcuts rebindable from
+Settings → Keyboard shortcuts. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **One PR, in two commits.** The first commit unifies the registry and the
+   store with no visible change; the second makes the graph's shortcuts editable
+   and puts them in the command palette. Split into two PRs, the first would
+   have carried the graph half of the store, its saved format and the scopes
+   with nothing in the app to exercise them, and the whole would have been
+   reviewed and tested twice.
+2. **One registry and one store; two dispatchers.**
+   - `$/configurations/graphInputBindings` holds the graph editor's shortcuts in
+     the dashboard's definition format (`defineBindings`: bindings, category,
+     icon, `rebindable`), with the same defaults in the same order. A test pins
+     every default as it was on `develop`, and the order, which decides which
+     action a shared key goes to first.
+   - `$/configurations/keyboardShortcuts` is the registry: every action of the
+     dashboard, the graph editor and the app shell, with its scope, category,
+     name and current bindings, and the conflict checks.
+   - `$/providers/inputBindings` is the window's one store: both namespaces,
+     loaded and saved together. `$/providers/dashboardInputBindings` is now its
+     dashboard half, under the same names, so the React provider and #83's Vue
+     menus are unchanged.
+   - Dispatch stays where it was. The dashboard's `defineBindingNamespace`
+     handlers (focus scopes, `DEFAULT_HANDLER`, React and Vue menus) and the
+     graph's `defineKeybinds` handler (`allowRepeat`, first-match order, digits
+     by position) differ in semantics (#156, ruling 1). Both now read the store,
+     so a rebinding applies at once; merging them would touch every keyboard
+     path of the drive and the graph for no visible gain.
+   - `graphBindings` is `defineRebindableKeybinds`: it rebuilds its lookups when
+     the store's bindings change, and its `bindings` (which the shortcut
+     tooltips and menus show) are getters that Vue tracks. `@/providers/action`
+     reads them through getters, so tooltips and context menus show the user's
+     shortcut.
+   - `isMacLike` moved from `@/composables/events` (which re-exports it) to
+     `$/utils/event`, so shared configuration does not import a project-view
+     composable.
+3. **Three scopes.** Every shortcut is active in one:
+   - `app`: anywhere in the window. The dashboard's actions attached to
+     `document.body` (the user menu's Settings and About, Go Back and Forward,
+     the settings tabs, Close Modal, Cancel Cut), and the app shell's (Close
+     Tab, Quit, the command palette, Escape).
+   - `drive`: the dashboard's other actions, attached to the assets table's
+     focus scope, so they act only on a key pressed inside it.
+   - `graph`: the graph editor's, whose handler listens only while its project
+     tab is current (`KeepAlive` deactivates it otherwise).
+
+   `app` overlaps both others; `drive` and `graph` never do, since a project tab
+   and the drive are never current together and focus cannot be inside a hidden
+   tab. So a graph shortcut may share a key with a drive shortcut (both have
+   `Mod+C` for Copy, by default), never with an `app` one. The scopes are
+   documented in `keyboardShortcuts.ts`, which lists the dashboard's `app`
+   actions by name.
+
+4. **Conflicts are checked by scope, and named.** The capture dialog refuses a
+   key that another action has in an overlapping scope, and says which ("This
+   shortcut is already used by 'Undo'."); React's check refused any key of any
+   dashboard action, with "This shortcut already exists.", which is still the
+   message for a key the action itself has. Keys are compared in a canonical
+   form (`OsDelete` is the platform's Delete; case and modifier order do not
+   matter). A non-rebindable shortcut still holds its key: no action can take
+   Escape, `Mod+K`, `Mod+W` or `Mod+Q`. For the dashboard this is slightly
+   stricter (the app shell's keys) and, for its `app` actions, also checks the
+   graph's: About can no longer be given `Mod+Z`.
+5. **A conflict the user makes is shown; a shared default is not.** A reset can
+   bring back a default that the user has since given to another action. The
+   settings tab then draws both bindings in red and names the other action in
+   the row's description column (which was empty: no dashboard action had a
+   description). Keys that two actions share by default are shared on purpose
+   and are not reported: Rename and Restore From Trash (`Mod+R`), each acting
+   only where it applies; and the Escapes.
+6. **What stays fixed, and why** (noted beside each in `@/bindings` and the
+   registry):
+   - Escape: the graph's Deselect All, the app's Cancel, Close Modal and the
+     rest. Escape cancels everywhere.
+   - Delete on a selected connection follows Delete on components
+     (`GRAPH_BINDING_FOLLOWERS`): one key deletes the selection, whichever kind
+     it is, as the defaults have it. It is not listed, and never conflicts with
+     the action it follows. The listed action's name says both: "Delete Selected
+     Components or Connection".
+   - The app shell's Close Tab (its alternatives exist because browsers keep
+     `Mod+W`), Quit and Open Command Palette: they are not the graph's, and stay
+     as they are; they are in the registry so that nothing takes their keys.
+   - The focused widgets inside the project view: the component browser (typing
+     into it), CodeMirror's text and documentation editors, lists, the table's
+     grid and visualizations. They take their keys first while they have the
+     focus, deliberately shadowing the graph's (`Enter` in a list, `Mod+C` in a
+     text editor), so they are no conflict either.
+   - Mouse bindings: the capture dialog takes keys only.
+
+   That leaves 19 graph actions rebindable, in two categories after the
+   dashboard's: Graph Editor and Graph Components.
+
+7. **Saved format, version 2.** The same `localStorage` key (`inputBindings`)
+   and record of action to bindings, extended so that both directions work:
+   - `"$version": ["2"]` marks it. It is a list because a version 1 reader
+     validates the whole record as lists of strings, and would drop everything
+     on any other shape.
+   - Every dashboard action is still written, as in version 1, so a downgraded
+     build keeps the user's dashboard bindings.
+   - A graph action is written only when it differs from its defaults, so a
+     later change to a default reaches everyone who has not changed that action.
+     Graph ids are dotted and dashboard ids are not, so they never collide, and
+     a version 1 reader ignores them.
+   - Loading reads either version. Each action found replaces that action's
+     defaults; an unknown action, or a graph action that is not rebindable, is
+     ignored. Tests load a version 1 record unchanged, round-trip version 2, and
+     read version 2's output with version 1's own schema and loader.
+8. **#86's kept quirk is fixed:** an action missing from the saved record now
+   keeps its defaults, instead of loading with none (#86, ruling 5). Every save
+   writes every dashboard action, so only an action added in a later release can
+   be missing, and it should come with its default.
+9. **The settings tab groups every action by category,** the dashboard's too,
+   under a heading row each, in the registry's order (the dashboard's
+   categories, then the graph's). The rows used to be one list in definition
+   order. Settings search finds the tab by the graph actions' names as well.
+10. **The command palette lists the graph's actions** while the graph editor is
+    the current tab: its enabled rebindable actions, named and grouped as in the
+    settings, with their current shortcuts. They were not in the palette before.
+11. **Digits are captured as the graph editor matches them.** Its handler takes
+    a digit key by position (`event.code`), so `Shift+2` reaches it as `2`, not
+    `@`. The capture dialog does the same for a graph action
+    (`digitsByPosition`), and keeps the character for a dashboard action, whose
+    handlers match `event.key`.
+12. **A graph shortcut may be a plain key,** as Space, Enter and F1 are by
+    default: the capture dialog does not ask for a modifier. Typing does not
+    reach the graph's handler from its text editors; a probe bound `Q` to Show
+    Code Editor and typed `q` into the component browser, a node's text widget
+    and the code editor itself, and the code editor did not toggle in any of
+    them.
+13. **Not done:** one dispatcher for both (ruling 2); rebinding the app shell's
+    shortcuts or mouse bindings; and the React `KeyboardShortcut`'s `action`
+    form in Vue, which nothing in Vue needs yet.
+14. **Changelog entry:** yes. Rebinding graph shortcuts is a feature.
+
+## Rulings from #183 (asset panel: Properties and Schedule, 2026-10-03)
+
+#183 is the second part of #89: the right panel's Properties and Schedule tabs.
+Delegated like the rulings above: provisionally accepted, for the maintainer to
+review.
+
+1. **The third registry: right-panel tabs.** `RightPanel.vue` no longer imports
+   cloud code. `contributeRightPanelTab(tab, loader)`
+   (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
+   Versions and Schedule (`executionsCalendar`) tabs their content;
+   `registerCloud` calls `registerPropertiesTab` and `registerVersionsTabs`. The
+   tabs' definitions (icon, title, order, when they are enabled, the scheduler's
+   paywall) stay in `$/providers/rightPanel`, so their place in the bar, and the
+   axe baseline's `nth-child` targets, are unchanged; a tab that nothing
+   contributed is hidden, so a build without the cloud shows none of the three.
+   A contribution is a loader: each tab's code loads when it first opens,
+   showing meanwhile the loader React's `Suspense` showed around the React tabs.
+   The registry imports no component, since `registerCloud` reaches it from the
+   app's entry. `properties` and `versions` join `CLOUD_AREAS`.
+2. **Where the code goes.** Schedule is `src/cloud/versions/` (decision 6b lists
+   scheduling there); Properties is a new area, `src/cloud/properties/`: every
+   section needs the cloud (the tab says so outside it). `reactTabs.ts` keeps
+   only the drive, and the React `AssetProperties`, `ProjectExecutionsCalendar`,
+   `ProjectExecution`, `AssetPanelPlaceholder`, `NewProjectExecutionModal` and
+   `spotlightHooks` are deleted, with the unused
+   `listProjectExecutionsQueryOptions` and
+   `getProjectExecutionDetailsQueryOptions`.
+3. **The datalink editor stays React, behind the bridge.** `JSONSchemaInput` and
+   its `FilePathInput` are #92's, shared with the drive's datalink dialog (#82,
+   ruling 1). The tab ports the form around it (Vue `Form`, "Update" and "Reset"
+   once changed, `FormError`) and mounts only the React editor (`DatalinkInput`,
+   a controlled value and `onChange`) with `reactComponent`, from
+   `properties/reactDatalinkInput.ts`: the one `#/` import in `src/cloud/`,
+   allowlisted until #92. React's `FieldError` there had no field around it and
+   rendered nothing; the Vue form shows no field error either. The secret's form
+   is #82's `UpsertSecretForm.vue` (`cancel="reset"`); the React one stays for
+   the drive's dialog. The drive table's "created by" and "shared with" cells
+   and the label pill are small Vue copies in `properties/`
+   (`PermissionDisplay.vue`, `AssetLabel.vue`), never pressable, as the tab used
+   them; the drive keeps the React ones until its port.
+4. **One deliberate difference: the spotlight finds its section.** "Edit" on a
+   secret or a datalink dims the window around its configuration. React measured
+   the section only when it was resized, so when "Edit" also opened the right
+   panel, the cutout stayed where the section was as the panel began to slide
+   in, at the window's right edge, and the section itself stayed dim. The Vue
+   overlay follows the section every frame and ends up around it. With the panel
+   already open the two are identical. A fix, so no changelog entry.
+5. **The calendar is Reka's, shaped as react-aria's.** Reka's `Calendar` gives
+   the keyboard (arrows, Enter/Space, paging at the month's edges) and the
+   previous/next buttons. To keep what assistive technology gets: the root is an
+   `application` named by the month with a hidden `h2`, the table a `grid` named
+   by the month, each day a button named "Today, …" / "… selected" as react-aria
+   named it, and a hidden "Next" button ends the calendar, as in React. The
+   header row stays empty: React gave its header cells no content. Days of other
+   months are disabled through `isDateDisabled`, not Reka's
+   `disableDaysOutsideCurrentView`, which marks every cell `aria-disabled`. The
+   chosen day and month are not reset when the selection moves to another
+   project (React's calendar was not keyed). While a month loads, a loader
+   replaces the tab and the calendar keeps its state, as React's suspended query
+   did. "Previous" is a new text id (react-aria supplied it).
+6. **Primitives fixed by comparing the running app.**
+   - `DatePicker`: `minValue` and `hideTimeZone` (React passed them through),
+     and values written as the `sv` locale writes them (`2045-01-26 1:23`: the
+     month and day padded, the hour not), where it showed `2045-1-26 01:23`.
+   - `Dropdown`: the closed field grew by its list's height, clipping its bottom
+     border; and its list takes the first Escape while it has a selection, as
+     react-aria's `ListBox` did, so a dialog around it closes on the second.
+   - `DropdownMenu`: an item that opens a dialog leaves the focus there. Reka
+     returned it to the menu's trigger as the menu's exit animation ended, and
+     the dialog's focus trap took it back without showing it: the deletion
+     question's "Delete" lost its focused colour.
+7. **Kept as React had them:** only the `compact` execution row (the only one
+   the calendar used) is ported; the repeat is described with "monthly on the
+   last weekday" still disabled; the delete question goes on the modal stack
+   (`ask`), and leaves it when answered (#156, ruling 5).
+8. **What still differs, by a few pixels.** The executions' actions menu,
+   centred under a trigger near the window's right edge, sits 4px left of
+   React's: react-aria offset it although it fitted (the Vue menu is centred on
+   its trigger); the date field's digits are rasterised 1px lower within
+   identical boxes. Everything else, every state of both tabs, matches React's
+   pixels apart from the drive's clock columns and antialiasing (see the PR).
+9. **No changelog entry**: the PR takes `CI: No changelog needed` (ruling 4 is a
+   fix).
+
+## Rulings from #84 (the layouts' modals and the cloud-disabled page, 2026-10-03)
+
+#84 ported the modals the layouts mount (the agreements gate, organization
+setup, the pending invitation, the end of a trial, the downgrade warning) and
+the page shown when running projects in the browser is disabled. Delegated like
+the rulings above: provisionally accepted, for the maintainer to review.
+
+1. **Port, not delete, and all here.** Decision 7 keeps every cloud-only area,
+   so the ticket's port-or-delete questions are settled: all five modals and the
+   page are ported. The trial and downgrade dialogs are ported here rather than
+   with billing (#88): they are mounted by the same layout as the others, and
+   moving them later is a file move. The cloud-disabled page still has a job
+   after #3: it is what a browser build shows while `enableCloudExecution` is
+   off, which #3 did not change. One PR, in four commits; the whole is about 500
+   lines of Vue, and a split would have left `reactComponent` in one of the two
+   layouts.
+2. **Where they went.** `src/cloud/agreements/` (the dialog, and the agreement
+   state `userAgreements.ts`, moved unchanged from `$/composables/` — the
+   sign-up page, also cloud code, is its other user), `src/cloud/organization/`
+   (setup, invitation), `src/cloud/billing/` (trial ended, downgraded, and the
+   `downgradeModal` storage key they share) and `src/cloud/browserDisabled/`
+   (the page and its route). `agreements` and `browserDisabled` join
+   `CLOUD_AREAS`; `organization` and `billing` stay out of it, since #83's
+   user-menu parts are imported directly from them.
+3. **A third registry: the layouts' contributions**
+   (`$/providers/layoutContributions`). `registerCloud` contributes the
+   agreements gate (`contributeAgreementsGate`: the agreement state and the
+   dialog) and the four modals over the dashboard
+   (`contributeAppContainerModals`); the page is a route, added like #85's.
+   **The layouts still decide when each shows**, with their logic unchanged; a
+   contribution supplies only what shows. Moving the decision logic (the
+   organization query, the plan and subscription rules) into the cloud would
+   need the data loaders to take contributed loaders that run before their first
+   `await`; that is a change of its own, for the community split. Each
+   contribution is a loader, and the layout's data loader awaits it, so nothing
+   joins the initial chunk and no modal appears a frame late.
+4. **The agreements gate behaves exactly as before.** Same rules (signed-in
+   users on protected pages, not in local-only mode), same queries, same storage
+   keys and values, recorded at the same moment (the submit of a form with both
+   boxes ticked), and the page stays unrendered while it shows. It fails closed:
+   if the gate's chunk or the documents' hashes cannot be loaded, the navigation
+   fails, as a failed hash fetch did. Only a build with no gate contributed at
+   all (no cloud) asks nothing. Tests pin each rule (`ProtectedLayout.test.ts`,
+   `AgreementsModal.test.ts`, `userAgreements.test.ts`,
+   `registerCloud.test.ts`).
+5. **`AlertDialog.vue` answers through a form, as React's did.** React's
+   `AlertDialog` submitted through its `Form`: a failed `onConfirm`/`onCancel`
+   kept the dialog open and showed the error under the buttons
+   (`form-submit-error`), and while offline it showed the offline notice and did
+   not answer. The Vue one showed neither; the invitation and trial dialogs need
+   both. It now lays out and submits as React's form did. `canSubmitOffline`
+   defaults to `true`, so `ConfirmDeleteModal` (#156) keeps answering offline;
+   the #84 dialogs pass `false`, React's default. `cancel: null` leaves out the
+   cancel button, as React's `cancel={null}` did.
+6. **The downgrade warning's clock is a plain interval**, re-read each minute as
+   React's `useCurrentTimestamp` did; `@vueuse/core`'s `useTimestamp` has no
+   interval option in the version the app uses.
+7. **What a user notices: nothing.** Every state (the agreements dialog
+   unticked, focused, with errors, one ticked, both ticked, prefilled; setup,
+   too short, done; invitation; trial ended; downgraded; the page loading and
+   redirected) was compared with develop's in the running app. The agreements
+   dialog and the page match to the pixel. The other dialogs match once the
+   compositing layer Reka's enter animation leaves behind is re-created; with
+   it, some rows rasterize a pixel apart (the shared `Dialog`/`AlertDialog`
+   motion of #78, ruling 6, not this port). The remaining differences are the
+   drive's clock column behind the overlay and the input's caret. The
+   accessibility trees differ as before: the dialogs are named by their titles
+   (#156, ruling 11), and react-aria's live-region `log`s and hidden "Dismiss"
+   buttons are gone. The PR takes `CI: No changelog needed`.
+
 ## Rulings from #92 (the drive's asset modals, 2026-10-03)
 
 #92 ports the modals the drive opens. Delegated like the rulings above:

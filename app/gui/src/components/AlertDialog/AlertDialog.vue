@@ -7,8 +7,11 @@
  * `role="alertdialog"`; it opens with focus on the confirm button, as React's `autoFocus` does, and
  * cannot be dismissed by an outside click or Escape: the user must choose. `onConfirm` and
  * `onCancel` may return a promise; the dialog shows the confirm button loading until it settles,
- * then closes. (React routes this through its `Form`; forms are #79, and a yes/no answer does not
- * need one.)
+ * then closes. The answer is submitted through a form, as in React (#84): if the callback fails,
+ * the dialog stays open and shows why under the buttons, as React's `Form.FormError` did; with
+ * `canSubmitOffline` set to `false` (React's default; `true` here, as for the callers before #84)
+ * it shows the offline notice instead of answering while offline. `cancel` set to `null` leaves
+ * out the cancel button, as React's `cancel={null}` did.
  *
  * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
  *
@@ -17,6 +20,9 @@
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
+import FormError from '$/components/Form/FormError.vue'
+import { FORM_STYLES } from '$/components/Form/variants'
+import { useForm } from '$/components/Form/useForm'
 import {
   DIALOG_MODAL_STYLES,
   DIALOG_MOTION,
@@ -38,6 +44,7 @@ import {
 } from 'reka-ui'
 import { useDialogFocus } from '$/components/Dialog/focusReturn'
 import { computed, ref, useSlots } from 'vue'
+import { z } from 'zod'
 
 const {
   title,
@@ -47,18 +54,21 @@ const {
   isDestructive = false,
   onConfirm,
   onCancel,
+  canSubmitOffline = true,
   testId,
 } = defineProps<{
   title: string
   message?: string | undefined
   /** The confirm button's label. Defaults to "Confirm". */
   confirm?: string | undefined
-  /** The cancel button's label. Defaults to "Cancel". */
-  cancel?: string | undefined
+  /** The cancel button's label. Defaults to "Cancel"; `null` leaves the button out. */
+  cancel?: string | null | undefined
   /** Styles the confirm button as a delete. */
   isDestructive?: boolean | undefined
   onConfirm?: (() => unknown) | undefined
   onCancel?: (() => unknown) | undefined
+  /** Whether it may answer while offline. Defaults to `true`; React's form defaulted to `false`. */
+  canSubmitOffline?: boolean | undefined
   testId?: string | undefined
 }>()
 
@@ -77,12 +87,22 @@ const focus = useDialogFocus(open, () => slots.trigger != null)
 
 const pending = ref<'cancel' | 'confirm'>()
 
+const form = useForm({
+  schema: z.object({ response: z.enum(['cancel', 'confirm']) }),
+  defaultValues: { response: 'confirm' as 'cancel' | 'confirm' },
+  canSubmitOffline,
+  onSubmit: ({ response }) => (response === 'confirm' ? onConfirm : onCancel)?.(),
+  onSubmitSuccess: () => {
+    open.value = false
+  },
+})
+
 async function respond(response: 'cancel' | 'confirm') {
   if (pending.value != null) return
   pending.value = response
   try {
-    await (response === 'confirm' ? onConfirm : onCancel)?.()
-    open.value = false
+    form.setValue('response', response)
+    await form.submit()
   } finally {
     pending.value = undefined
   }
@@ -142,35 +162,41 @@ const styles = computed(() =>
             </div>
             <div :class="styles.scroller()">
               <div :class="styles.measurerWrapper()">
-                <div :class="styles.content()" class="flex flex-col gap-4">
-                  <!-- Laid out as React's form is: a column, items at the start, 1rem apart. -->
-                  <AlertDialogDescription asChild>
-                    <div class="flex flex-col items-start gap-4">
-                      <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
-                        <Text v-if="message != null">{{ message }}</Text>
-                      </slot>
-                    </div>
-                  </AlertDialogDescription>
-                  <ButtonGroup align="end">
-                    <Button
-                      variant="ghost"
-                      :isDisabled="pending != null"
-                      :isLoading="false"
-                      testId="alert-dialog-cancel"
-                      @press="respond('cancel')"
-                    >
-                      {{ cancelLabel ?? getText('cancel') }}
-                    </Button>
-                    <Button
-                      :variant="isDestructive ? 'delete' : 'primary'"
-                      :isLoading="pending === 'confirm'"
-                      testId="alert-dialog-confirm"
-                      data-alert-dialog-confirm
-                      @press="respond('confirm')"
-                    >
-                      {{ confirmLabel ?? getText('confirm') }}
-                    </Button>
-                  </ButtonGroup>
+                <div :class="styles.content()">
+                  <!-- React's form, with its layout: a column, items at the start, 1rem apart. The
+                  message is laid out among them (`contents`), as React's was, which keeps every
+                  line where React painted it. -->
+                  <form :class="FORM_STYLES({ gap: 'medium' })" novalidate @submit.prevent>
+                    <AlertDialogDescription asChild>
+                      <div class="contents">
+                        <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
+                          <Text v-if="message != null">{{ message }}</Text>
+                        </slot>
+                      </div>
+                    </AlertDialogDescription>
+                    <ButtonGroup align="end">
+                      <Button
+                        v-if="cancelLabel !== null"
+                        variant="ghost"
+                        :isDisabled="pending != null"
+                        :isLoading="false"
+                        testId="alert-dialog-cancel"
+                        @press="respond('cancel')"
+                      >
+                        {{ cancelLabel ?? getText('cancel') }}
+                      </Button>
+                      <Button
+                        :variant="isDestructive ? 'delete' : 'primary'"
+                        :isLoading="pending === 'confirm'"
+                        testId="alert-dialog-confirm"
+                        data-alert-dialog-confirm
+                        @press="respond('confirm')"
+                      >
+                        {{ confirmLabel ?? getText('confirm') }}
+                      </Button>
+                    </ButtonGroup>
+                    <FormError :form="form" />
+                  </form>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 /** @file Vue composables for listening to DOM events. */
 
+import { isMacLike } from '$/utils/event'
 import type { ToValue } from '$/utils/reactivity'
 import { proxyRefs } from '$/utils/reactivity'
 import { useRaf } from '@/composables/animation'
@@ -135,9 +136,7 @@ export function focusIsIn(el: Element | undefined | null) {
   return el && el.contains(document.activeElement)
 }
 
-const hasWindow = typeof window !== 'undefined'
-const platform = hasWindow ? (window.navigator?.platform ?? '') : ''
-export const isMacLike = /(Mac|iPhone|iPod|iPad)/i.test(platform)
+export { isMacLike }
 
 /** Platform-dependant property name for Mod modifier key. */
 export const modKeyProp = isMacLike ? 'metaKey' : 'ctrlKey'

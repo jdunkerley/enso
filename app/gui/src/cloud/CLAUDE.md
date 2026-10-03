@@ -30,6 +30,19 @@ community build without the cloud can leave it out (decision 6b of
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
     (`settings.ts`).
+  - `versions/` — the right panel's Versions tab (#89) and Schedule tab
+    (executions calendar, #183), contributed by `registerVersionsTabs`
+    (`rightPanel.ts`).
+  - `properties/` — the right panel's Properties tab (#183), with the secret and
+    datalink configuration, contributed by `registerPropertiesTab`.
+  - From the layouts (#84): `agreements/` (the Terms of Service and Privacy
+    Policy gate: `AgreementsModal.vue` and the agreement state,
+    `userAgreements.ts`, which the sign-up page uses too; contributed by
+    `agreements.ts`), `organization/` (`SetupOrganizationModal.vue`,
+    `AcceptInvitationModal.vue`), `billing/` (`TrialEndedModal.vue`,
+    `PlanDowngradedModal.vue` and their `downgradeModalState.ts`) and
+    `browserDisabled/` (the page shown when running projects in the browser is
+    disabled, and its route).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules
@@ -41,7 +54,10 @@ community build without the cloud can leave it out (decision 6b of
   #82 and #83 predate the registries and are imported directly, with a note
   (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`, `App.vue`), so they
   are not in `CLOUD_AREAS` yet.
-- Nothing here imports `#/` (the React dashboard).
+- Nothing here imports `#/` (the React dashboard), with one exception until #92:
+  `properties/reactDatalinkInput.ts` mounts the React datalink editor
+  (`JSONSchemaInput`) through the bridge, and it is on
+  `DASHBOARD_IMPORT_ALLOWLIST`.
 - **An area contributes through registries**, not by being imported. Routes are
   the first: `registerCloud` adds them with `router.addRoute`, under a named
   parent where they need one (`PROTECTED_LAYOUT_ROUTE`, `$/router/routeNames`).
@@ -49,9 +65,20 @@ community build without the cloud can leave it out (decision 6b of
   (`$/providers/settingsContributions`) appends sections, declared with the
   model in `$/configurations/settings`, to a settings tab; the loader keeps them
   out of the initial chunk, and the settings route waits for them. Their
-  components read the page's context with `useSettingsContext`. Further
-  registries (user-menu entries, right-panel tabs, asset context-menu entries,
-  the paywall check) appear with the first port that needs each.
+  components read the page's context with `useSettingsContext`. Right-panel tabs
+  are the third: `contributeRightPanelTab(tab, loader)`
+  (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
+  Versions and Schedule (`executionsCalendar`) tabs their content; the tabs
+  themselves (icon, title, enabling, the scheduler's paywall) stay in
+  `$/providers/rightPanel`, which hides one that nothing contributed. The
+  layouts' modals are the fourth (`$/providers/layoutContributions`, #84):
+  `contributeAgreementsGate` gives `ProtectedLayout.vue` its agreements gate,
+  and `contributeAppContainerModals` gives `AppContainerLayout.vue` its four
+  modals. The layouts still decide when each shows; their data loaders await the
+  loaders, so a modal never appears late. Without a contribution nothing shows,
+  so a build without the cloud asks for no agreement. Further registries
+  (user-menu entries, asset context-menu entries, the paywall check) appear with
+  the first port that needs each.
 - Areas may import the core freely (`$/components`, `$/providers`, …).
 - Pages load on demand (`() => import(…)` in the routes), so that the cloud adds
   nothing to the initial chunk.

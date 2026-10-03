@@ -2,9 +2,13 @@ import { modKeyProp } from '@/composables/events'
 import {
   decomposeKeybindString,
   defineKeybinds,
+  defineRebindableKeybinds,
+  keybindKeyOverride,
   normalizedKeyboardSegmentLookup,
 } from '@/util/shortcuts'
-import { beforeAll, expect, test, vi, type MockInstance } from 'vitest'
+import { mapEntries } from 'enso-common/src/utilities/data/object'
+import { beforeAll, describe, expect, test, vi, type MockInstance } from 'vitest'
+import { computed, shallowRef } from 'vue'
 
 // See https://github.com/thymikee/jest-preset-angular/issues/245#issuecomment-576296325
 class MockPointerEvent extends MouseEvent {}
@@ -148,3 +152,72 @@ test.each([
     }
   },
 )
+
+describe('defineRebindableKeybinds', () => {
+  function rebindable(initial: Record<'undo' | 'redo', readonly string[]>) {
+    const current = shallowRef(mapEntries(initial, (_key, bindings) => ({ bindings })))
+    const keybinds = defineRebindableKeybinds<'undo' | 'redo'>(
+      `rebindable-${Math.random()}`,
+      () => current.value,
+    )
+    const set = (key: 'undo' | 'redo', bindings: readonly string[]) => {
+      current.value = { ...current.value, [key]: { bindings } }
+    }
+    return { keybinds, set }
+  }
+  const keydown = (key: string, init: KeyboardEventInit = {}) =>
+    new KeyboardEvent('keydown', { key, [modKeyProp]: true, ...init })
+
+  test('follows a change of the bindings at once', () => {
+    const { keybinds, set } = rebindable({ undo: ['Mod+Z'], redo: ['Mod+Y'] })
+    const undo = vi.fn()
+    const handler = keybinds.handler({ undo })
+    expect(handler(keydown('z'))).toBe(true)
+    set('undo', ['Mod+U'])
+    expect(handler(keydown('z'))).toBe(false)
+    expect(handler(keydown('u'))).toBe(true)
+    expect(undo).toHaveBeenCalledTimes(2)
+  })
+
+  test('its `bindings` follow too, and Vue sees them change', () => {
+    const { keybinds, set } = rebindable({ undo: ['Mod+Z'], redo: ['Mod+Y', 'Mod+Shift+Z'] })
+    const undo = computed(() => keybinds.bindings.undo?.humanReadable)
+    expect(Object.keys(keybinds.bindings)).toEqual(['undo', 'redo'])
+    expect(keybinds.bindings.redo?.key).toBe('Y')
+    expect(undo.value).toBe(`${modKeyProp === 'metaKey' ? 'Cmd' : 'Ctrl'} + Z`)
+    set('undo', ['Mod+U'])
+    expect(undo.value).toBe(`${modKeyProp === 'metaKey' ? 'Cmd' : 'Ctrl'} + U`)
+    set('undo', [])
+    expect(undo.value).toBeUndefined()
+  })
+
+  test('offers a key to the actions in their order, and ignores repeats', () => {
+    const { keybinds } = rebindable({ undo: ['Mod+Z'], redo: ['Mod+Z'] })
+    const calls: string[] = []
+    const handler = keybinds.handler({
+      undo: () => {
+        calls.push('undo')
+        return false
+      },
+      redo: () => void calls.push('redo'),
+    })
+    expect(handler(keydown('z'))).toBe(true)
+    expect(calls).toEqual(['undo', 'redo'])
+    expect(handler(keydown('z', { repeat: true }))).toBe(false)
+  })
+
+  test('an action without bindings never matches', () => {
+    const { keybinds } = rebindable({ undo: [], redo: ['Mod+Y'] })
+    const undo = vi.fn()
+    expect(keybinds.handler({ undo })(keydown('z', { repeat: true }))).toBe(false)
+    expect(keybinds.bindings.undo).toBeUndefined()
+  })
+})
+
+test.each([
+  { code: 'Digit2', expected: '2' },
+  { code: 'KeyA', expected: undefined },
+  { code: 'Numpad2', expected: undefined },
+])('keybindKeyOverride($code) is $expected', ({ code, expected }) => {
+  expect(keybindKeyOverride({ code })).toBe(expected)
+})

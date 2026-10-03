@@ -1,3 +1,10 @@
+/**
+ * @file The user's agreement to the current Terms of Service and Privacy Policy: the latest
+ * versions' hashes, fetched from the Enso Cloud web host (`$config.HOST`), against the hashes the
+ * user last accepted, kept in `LocalStorage`. The protected layout's agreements gate
+ * (`./AgreementsModal.vue`, contributed in `./agreements.ts`) and the sign-up page use it.
+ * Moved unchanged from `$/composables/userAgreements` (#84).
+ */
 import LocalStorage from '$/utils/LocalStorage'
 import { proxyRefs } from '$/utils/reactivity'
 import * as vueQuery from '@tanstack/vue-query'
