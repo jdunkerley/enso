@@ -50,11 +50,6 @@ vi.mock('$/providers/backends', async () => {
 const uploads = reactive(new Map<string, object>())
 vi.mock('$/providers/upload', () => ({ useUploadsToCloudStore: () => ({ uploads }) }))
 
-// The "Invite" button is a React leaf (#87); React's providers are not mounted here.
-vi.mock('#/modals/InviteUsersModal/InviteUsersButton', () => ({
-  InviteUsersButton: () => null,
-}))
-
 const { getText } = getTextStore()
 
 // The overlays teleport into the portal root that `index.html` provides.
