@@ -1472,3 +1472,73 @@ provisionally accepted, for the maintainer to review.
    collapse), from the keyboard where react-aria gave React that access.
 10. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
     for the one visible difference).
+
+## Rulings from #84 (the layouts' modals and the cloud-disabled page, 2026-10-03)
+
+#84 ported the modals the layouts mount (the agreements gate, organization
+setup, the pending invitation, the end of a trial, the downgrade warning) and
+the page shown when running projects in the browser is disabled. Delegated like
+the rulings above: provisionally accepted, for the maintainer to review.
+
+1. **Port, not delete, and all here.** Decision 7 keeps every cloud-only area,
+   so the ticket's port-or-delete questions are settled: all five modals and the
+   page are ported. The trial and downgrade dialogs are ported here rather than
+   with billing (#88): they are mounted by the same layout as the others, and
+   moving them later is a file move. The cloud-disabled page still has a job
+   after #3: it is what a browser build shows while `enableCloudExecution` is
+   off, which #3 did not change. One PR, in four commits; the whole is about 500
+   lines of Vue, and a split would have left `reactComponent` in one of the two
+   layouts.
+2. **Where they went.** `src/cloud/agreements/` (the dialog, and the agreement
+   state `userAgreements.ts`, moved unchanged from `$/composables/` — the
+   sign-up page, also cloud code, is its other user), `src/cloud/organization/`
+   (setup, invitation), `src/cloud/billing/` (trial ended, downgraded, and the
+   `downgradeModal` storage key they share) and `src/cloud/browserDisabled/`
+   (the page and its route). `agreements` and `browserDisabled` join
+   `CLOUD_AREAS`; `organization` and `billing` stay out of it, since #83's
+   user-menu parts are imported directly from them.
+3. **A third registry: the layouts' contributions**
+   (`$/providers/layoutContributions`). `registerCloud` contributes the
+   agreements gate (`contributeAgreementsGate`: the agreement state and the
+   dialog) and the four modals over the dashboard
+   (`contributeAppContainerModals`); the page is a route, added like #85's.
+   **The layouts still decide when each shows**, with their logic unchanged; a
+   contribution supplies only what shows. Moving the decision logic (the
+   organization query, the plan and subscription rules) into the cloud would
+   need the data loaders to take contributed loaders that run before their first
+   `await`; that is a change of its own, for the community split. Each
+   contribution is a loader, and the layout's data loader awaits it, so nothing
+   joins the initial chunk and no modal appears a frame late.
+4. **The agreements gate behaves exactly as before.** Same rules (signed-in
+   users on protected pages, not in local-only mode), same queries, same storage
+   keys and values, recorded at the same moment (the submit of a form with both
+   boxes ticked), and the page stays unrendered while it shows. It fails closed:
+   if the gate's chunk or the documents' hashes cannot be loaded, the navigation
+   fails, as a failed hash fetch did. Only a build with no gate contributed at
+   all (no cloud) asks nothing. Tests pin each rule (`ProtectedLayout.test.ts`,
+   `AgreementsModal.test.ts`, `userAgreements.test.ts`,
+   `registerCloud.test.ts`).
+5. **`AlertDialog.vue` answers through a form, as React's did.** React's
+   `AlertDialog` submitted through its `Form`: a failed `onConfirm`/`onCancel`
+   kept the dialog open and showed the error under the buttons
+   (`form-submit-error`), and while offline it showed the offline notice and did
+   not answer. The Vue one showed neither; the invitation and trial dialogs need
+   both. It now lays out and submits as React's form did. `canSubmitOffline`
+   defaults to `true`, so `ConfirmDeleteModal` (#156) keeps answering offline;
+   the #84 dialogs pass `false`, React's default. `cancel: null` leaves out the
+   cancel button, as React's `cancel={null}` did.
+6. **The downgrade warning's clock is a plain interval**, re-read each minute as
+   React's `useCurrentTimestamp` did; `@vueuse/core`'s `useTimestamp` has no
+   interval option in the version the app uses.
+7. **What a user notices: nothing.** Every state (the agreements dialog
+   unticked, focused, with errors, one ticked, both ticked, prefilled; setup,
+   too short, done; invitation; trial ended; downgraded; the page loading and
+   redirected) was compared with develop's in the running app. The agreements
+   dialog and the page match to the pixel. The other dialogs match once the
+   compositing layer Reka's enter animation leaves behind is re-created; with
+   it, some rows rasterize a pixel apart (the shared `Dialog`/`AlertDialog`
+   motion of #78, ruling 6, not this port). The remaining differences are the
+   drive's clock column behind the overlay and the input's caret. The
+   accessibility trees differ as before: the dialogs are named by their titles
+   (#156, ruling 11), and react-aria's live-region `log`s and hidden "Dismiss"
+   buttons are gone. The PR takes `CI: No changelog needed`.

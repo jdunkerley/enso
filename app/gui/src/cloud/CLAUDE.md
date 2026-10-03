@@ -28,6 +28,14 @@ community build without the cloud can leave it out (decision 6b of
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
     (`settings.ts`).
+  - From the layouts (#84): `agreements/` (the Terms of Service and Privacy
+    Policy gate: `AgreementsModal.vue` and the agreement state,
+    `userAgreements.ts`, which the sign-up page uses too; contributed by
+    `agreements.ts`), `organization/` (`SetupOrganizationModal.vue`,
+    `AcceptInvitationModal.vue`), `billing/` (`TrialEndedModal.vue`,
+    `PlanDowngradedModal.vue` and their `downgradeModalState.ts`) and
+    `browserDisabled/` (the page shown when running projects in the browser is
+    disabled, and its route).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules
@@ -47,9 +55,15 @@ community build without the cloud can leave it out (decision 6b of
   (`$/providers/settingsContributions`) appends sections, declared with the
   model in `$/configurations/settings`, to a settings tab; the loader keeps them
   out of the initial chunk, and the settings route waits for them. Their
-  components read the page's context with `useSettingsContext`. Further
-  registries (user-menu entries, right-panel tabs, asset context-menu entries,
-  the paywall check) appear with the first port that needs each.
+  components read the page's context with `useSettingsContext`. The layouts'
+  modals are the third (`$/providers/layoutContributions`, #84):
+  `contributeAgreementsGate` gives `ProtectedLayout.vue` its agreements gate,
+  and `contributeAppContainerModals` gives `AppContainerLayout.vue` its four
+  modals. The layouts still decide when each shows; their data loaders await the
+  loaders, so a modal never appears late. Without a contribution nothing shows,
+  so a build without the cloud asks for no agreement. Further registries
+  (user-menu entries, right-panel tabs, asset context-menu entries, the paywall
+  check) appear with the first port that needs each.
 - Areas may import the core freely (`$/components`, `$/providers`, …).
 - Pages load on demand (`() => import(…)` in the routes), so that the cloud adds
   nothing to the initial chunk.
