@@ -264,6 +264,10 @@ describe('User groups tab', () => {
     expect(dialog.textContent).toContain(
       getText('confirmPrompt', getText('deleteUserGroupActionText', 'Analysts')),
     )
+    // The closing menu leaves the focus on the confirmation's button.
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull())
+    await flushPromises()
+    expect(document.activeElement).toBe(dialog.querySelector('[data-alert-dialog-confirm]'))
     await user.click(required(buttonIn(dialog, getText('delete'))))
     await flushPromises()
     expect(remote.deleteUserGroup).toHaveBeenCalledWith(GROUP.id, 'Analysts')

@@ -2,7 +2,8 @@
 /**
  * @file A row of the user groups: the group's name, the pictures of its first members (with how
  * many more there are), and, for an admin, "Manage Users" joined to a menu that deletes the group
- * once confirmed. The Vue port of React's `UserGroupRow`.
+ * once confirmed (below the chevron's start, 8px off, where React's `Menu.Trigger` put it). The Vue
+ * port of React's `UserGroupRow`.
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
@@ -86,7 +87,7 @@ function confirmDelete() {
         <Button icon="people_settings" @press="emit('manage')">
           {{ getText('manageUsers') }}
         </Button>
-        <DropdownMenu placement="bottom" :offset="8">
+        <DropdownMenu placement="bottom-start" :offset="8">
           <template #trigger>
             <Button icon="chevron_down" iconPosition="end" variant="outline" />
           </template>
