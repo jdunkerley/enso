@@ -1,6 +1,6 @@
 /** @file Hooks to do batched backend operations. */
 import { backendQueryOptions, mutationOptions } from '#/hooks/backendHooks'
-import { resolveDuplications } from '#/modals/DuplicateAssetsModal'
+import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import {
   useMutationState,
   type Mutation,

@@ -12,29 +12,26 @@ import {
   downloadAssetsMutationOptions,
   getAllTrashedItems,
 } from '#/hooks/backendBatchedHooks'
-import {
-  backendMutationOptions,
-  listDirectoryQueryOptions,
-  useNewFolder,
-  useNewProject,
-} from '#/hooks/backendHooks'
+import { backendMutationOptions, useNewFolder, useNewProject } from '#/hooks/backendHooks'
 import { useUploadFiles } from '#/hooks/backendUploadFilesHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useOffline } from '#/hooks/offlineHooks'
+import { useVueModalTrigger } from '#/hooks/vueModalHooks'
 import { AssetSearchBar } from '#/layouts/AssetSearchBar'
 import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
-import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { CreateCredentialModal } from '#/modals/CreateCredentialModal'
 import UpsertDatalinkModal from '#/modals/UpsertDatalinkModal'
-import UpsertSecretModal from '#/modals/UpsertSecretModal'
 import { useExportArchive } from '#/pages/useExportArchive'
 import { useCanDownload, useDriveStore, usePasteData } from '#/providers/DriveProvider'
 import { unsetModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { canTransferBetweenCategories } from '$/providers/category'
 import { useCategories, useText } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentCategory } from '$/providers/react/container'
 import type AssetQuery from '$/utils/AssetQuery'
+import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query'
 import type { Backend } from 'enso-common/src/services/Backend'
 import {
@@ -120,6 +117,7 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
     return await newCredential([{ name, value, parentDirectoryId: currentDirectoryId }])
   })
 
+  const newSecretTrigger = useVueModalTrigger()
   const newSecretCallback = useEventCallback(async (name: string, value: string) => {
     await newSecret([{ name, value, parentDirectoryId: currentDirectoryId }])
   })
@@ -221,16 +219,17 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
                 aria-label={getText('newFolder')}
                 onPress={newFolderCallback}
               />
-              <Dialog.Trigger>
-                <Button
-                  isDisabled={!isCloud}
-                  variant="icon"
-                  size="medium"
-                  icon="key_add"
-                  aria-label={isCloud ? getText('newSecret') : getText('newSecret.cloudOnly')}
-                />
-                <UpsertSecretModal doCreate={newSecretCallback} />
-              </Dialog.Trigger>
+              <Button
+                isDisabled={!isCloud}
+                variant="icon"
+                size="medium"
+                icon="key_add"
+                aria-label={isCloud ? getText('newSecret') : getText('newSecret.cloudOnly')}
+                {...newSecretTrigger.triggerProps}
+                onPress={() => {
+                  newSecretTrigger.open(UpsertSecretModal, { onCreate: newSecretCallback })
+                }}
+              />
               <Dialog.Trigger>
                 <Button
                   isDisabled={!isCloud}
@@ -315,6 +314,7 @@ function TrashFolderToolbar(props: TrashFolderToolbarProps) {
   })
 
   const queryClient = useQueryClient()
+  const clearTrashTrigger = useVueModalTrigger()
   const deleteAssetsMutation = useMutationCallback(deleteAssetsMutationOptions(backend))
 
   const clearTrash = useEventCallback(async () => {
@@ -328,18 +328,22 @@ function TrashFolderToolbar(props: TrashFolderToolbarProps) {
 
   return (
     <Button.Group className="grow-0" buttonVariants={{ isDisabled: shouldBeDisabled }}>
-      <Dialog.Trigger>
-        <Button size="medium" variant="outline" isDisabled={isEmpty}>
-          {getText('clearTrash')}
-        </Button>
-
-        <ConfirmDeleteModal
-          actionText={getText('allTrashedItemsForever')}
-          onConfirm={async () => {
-            await clearTrash()
-          }}
-        />
-      </Dialog.Trigger>
+      <Button
+        size="medium"
+        variant="outline"
+        isDisabled={isEmpty}
+        {...clearTrashTrigger.triggerProps}
+        onPress={() => {
+          clearTrashTrigger.open(ConfirmDeleteModal, {
+            actionText: getText('allTrashedItemsForever'),
+            onConfirm: async () => {
+              await clearTrash()
+            },
+          })
+        }}
+      >
+        {getText('clearTrash')}
+      </Button>
 
       {children}
     </Button.Group>

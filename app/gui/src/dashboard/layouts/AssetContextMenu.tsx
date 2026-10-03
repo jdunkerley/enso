@@ -18,12 +18,12 @@ import { useLocalStorageState } from '#/hooks/localStoreState'
 import { defineMenuEntry, useMenuEntries } from '#/hooks/menuHooks'
 import { useGetAsset } from '#/layouts/Drive/assetsTableItemsHooks'
 import { useGlobalContextMenuEntries } from '#/layouts/useGlobalContextMenuEntries'
-import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import ManageLabelsModal from '#/modals/ManageLabelsModal'
 import { useExportArchive } from '#/pages/useExportArchive'
 import { useDriveStore, usePasteData } from '#/providers/DriveProvider'
-import { setModal } from '#/providers/ModalProvider'
+import { setModal, setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { isCloudCategory } from '$/providers/category'
 import type { Tab } from '$/providers/container'
 import {
@@ -224,16 +224,13 @@ export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
             action: 'delete',
             label: getText('deleteForeverShortcut'),
             doAction: () => {
-              setModal(
-                <ConfirmDeleteModal
-                  defaultOpen
-                  cannotUndo
-                  actionText={getText('deleteTheAssetTypeTitleForever', asset.type, asset.title)}
-                  onConfirm={async () => {
-                    await deleteAssets([[asset.id], true])
-                  }}
-                />,
-              )
+              setVueModal(ConfirmDeleteModal, {
+                cannotUndo: true,
+                actionText: getText('deleteTheAssetTypeTitleForever', asset.type, asset.title),
+                onConfirm: async () => {
+                  await deleteAssets([[asset.id], true])
+                },
+              })
             },
           },
           copyIdEntry,
@@ -404,19 +401,16 @@ export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
             label: isCloud ? getText('moveToTrashShortcut') : getText('deleteShortcut'),
             doAction: () => {
               const textId = isCloud ? 'trashTheAssetTypeTitle' : 'deleteTheAssetTypeTitle'
-              setModal(
-                <ConfirmDeleteModal
-                  defaultOpen
-                  actionText={getText(
-                    textId,
-                    getText(backendModule.ASSET_TYPE_TO_TEXT_ID[asset.type]),
-                    asset.title,
-                  )}
-                  onConfirm={async () => {
-                    await deleteAssets([[asset.id], false])
-                  }}
-                />,
-              )
+              setVueModal(ConfirmDeleteModal, {
+                actionText: getText(
+                  textId,
+                  getText(backendModule.ASSET_TYPE_TO_TEXT_ID[asset.type]),
+                  asset.title,
+                ),
+                onConfirm: async () => {
+                  await deleteAssets([[asset.id], false])
+                },
+              })
             },
           },
         !isCloud &&

@@ -2,7 +2,7 @@
 /**
  * @file The form creating or updating a cloud secret: the Vue counterpart of the React
  * `UpsertSecretForm` (`#/modals/UpsertSecretModal`), with the same fields, labels, buttons and
- * `data-testid="upsert-secret-modal"`.
+ * `data-testid="upsert-secret-modal"`. The drive's dialog, `UpsertSecretModal.vue`, wraps it.
  *
  * A new secret (no `secretId`) asks for a name and a value; an existing one only for a new value.
  * A successful submission emits `create` with the name and the value, and closes the enclosing
