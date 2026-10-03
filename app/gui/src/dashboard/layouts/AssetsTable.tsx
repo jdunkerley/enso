@@ -9,12 +9,7 @@ import { StatelessSpinner } from '#/components/StatelessSpinner'
 import { Text } from '#/components/Text'
 import { UserWithPopover } from '#/components/UserWithPopover'
 import { useAutoScroll } from '#/hooks/autoScrollHooks'
-import {
-  backendMutationOptions,
-  backendQueryOptions,
-  searchDirectoryQueryOptions,
-  useListDirectoryRefetchInterval,
-} from '#/hooks/backendHooks'
+import { useListDirectoryRefetchInterval } from '#/hooks/backendHooks'
 import { useUploadFiles } from '#/hooks/backendUploadFilesHooks'
 import { usePaste } from '#/hooks/cutAndPasteHooks'
 import { useDerivedDebouncedState } from '#/hooks/debounceCallbackHooks'
@@ -68,8 +63,9 @@ import {
 import { useFeatureFlag } from '$/providers/react/featureFlags'
 import AssetQuery from '$/utils/AssetQuery'
 import type { AssetsDataTransferPayload } from '$/utils/assetsDataTransfer'
+import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { withPresence } from '$/utils/data/set'
-import { listDirectoryQueryOptions } from '$/utils/driveQueries'
+import { listDirectoryQueryOptions, searchDirectoryQueryOptions } from '$/utils/driveQueries'
 import { isElementTextInput, isTextInputEvent } from '$/utils/event'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import LocalStorage from '$/utils/LocalStorage'

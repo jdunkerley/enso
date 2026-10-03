@@ -8,12 +8,12 @@ import { Input } from '#/components/Inputs/Input'
 import { Selector } from '#/components/Inputs/Selector'
 import { Scroller } from '#/components/Scroller'
 import { Text } from '#/components/Text'
-import { backendMutationOptions, backendQueryOptions } from '#/hooks/backendHooks'
 import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { setModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { useBackends, useText } from '$/providers/react'
 import { useFeatureFlag } from '$/providers/react/featureFlags'
+import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import {
   API_KEY_EXPIRES_IN_VALUES,

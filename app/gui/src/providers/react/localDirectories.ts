@@ -11,7 +11,10 @@ export function useLocalRootDirectory() {
   return useVueValue(react.useCallback(() => store.localRootDirectory, [store]))
 }
 
-/** A hook reading local "downloads" directory . */
+/**
+ * A hook reading the local "downloads" directory: the one chosen in the settings, or else the
+ * system's, which `entrypoint.ts` fetches once at start-up.
+ */
 export function useDownloadDirectory() {
   const store = useLocalDirectories()
   return useVueValue(react.useCallback(() => store.downloadDirectory, [store]))

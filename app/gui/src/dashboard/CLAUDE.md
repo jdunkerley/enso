@@ -66,9 +66,12 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `tailwindcss-react-aria-components` for matching selectors.
 - **Forms**: `react-hook-form` + `zod` resolvers. Schemas live with the form,
   not in `data/`.
-- **Async/data**: `@tanstack/react-query` throughout. Keys, queries, and
-  mutations should go through the factories in `data/` — don't call `useQuery`
-  with a literal key inside a component.
+- **Async/data**: `@tanstack/react-query` throughout, over the framework-free
+  options in `$/utils/backendQuery`, `$/utils/driveQueries` and
+  `$/utils/driveMutations` (#192), which Vue uses too — don't call `useQuery`
+  with a literal key inside a component, and don't give a key options of its
+  own. `hooks/backendHooks`, `backendBatchedHooks` and `backendUploadFilesHooks`
+  only adapt them to the React drive, and go with it (#91).
 - **Routing**: `vue-router` (yes, really — the dashboard lives inside a Vue
   shell; React components consume routing via the bridge).
 - **Error boundaries**: wrap new features with `ErrorBoundary` from

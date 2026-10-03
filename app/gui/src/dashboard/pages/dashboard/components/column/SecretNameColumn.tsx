@@ -1,7 +1,7 @@
 /** @file The icon and name of a {@link SecretAsset}. */
 import EditableSpan from '#/components/EditableSpan'
 import { Icon } from '#/components/Icon'
-import { backendMutationOptions, useRenameAsset } from '#/hooks/backendHooks'
+import { useRenameAsset } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
@@ -12,6 +12,7 @@ import { toast } from '#/utilities/toast'
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
 import { useText } from '$/providers/react'
 import { useDriveCurrentBackend } from '$/providers/react/container'
+import { backendMutationOptions } from '$/utils/backendQuery'
 import { isDoubleClick } from '$/utils/event'
 import { isAssetCredential, titleSchema, type SecretAsset } from 'enso-common/src/services/Backend'
 

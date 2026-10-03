@@ -4,7 +4,6 @@
  *
  * TODO: #87 and #88 port the organization tabs; this bridge goes with the last of them.
  */
-import { backendMutationOptions, backendQueryOptions } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import {
@@ -13,6 +12,7 @@ import {
   settingsQueryMatcher,
 } from '$/configurations/settings'
 import { useBackends, useFullUserSession, useText } from '$/providers/react'
+import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import {

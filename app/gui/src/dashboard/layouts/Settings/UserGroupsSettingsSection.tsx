@@ -12,7 +12,6 @@ import { Scroller } from '#/components/Scroller'
 import { Text } from '#/components/Text'
 import { UserWithPopover } from '#/components/UserWithPopover'
 import { VisualTooltip } from '#/components/VisualTooltip'
-import { backendMutationOptions, backendQueryOptions } from '#/hooks/backendHooks'
 import ConfirmDeleteModal from '#/modals/ConfirmDeleteModal'
 import { setModal, unsetModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
@@ -22,6 +21,7 @@ import {
   useIsFeatureUnderPaywall,
   useText,
 } from '$/providers/react'
+import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
 import { normalizeName } from '$/utils/data/string'
 import { tv } from '$/utils/style/tailwindVariants'
 import { useSuspenseQuery } from '@tanstack/react-query'
