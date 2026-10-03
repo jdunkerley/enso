@@ -2,11 +2,10 @@
  * @file A settings tab that is still React, mounted by the Vue settings page (`SettingsPage.vue`)
  * through `reactComponent`.
  *
- * TODO: #87 and #88 port the organization tabs; this bridge goes with the last of them.
+ * TODO: #87's follow-up and #88 port the React tabs left; this bridge goes with the last of them.
  */
-import { backendMutationOptions, backendQueryOptions } from '#/hooks/backendHooks'
+import { backendQueryOptions } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
-import { useMutationCallback } from '#/utilities/tanstackQuery'
 import {
   filterSettingsSections,
   isSettingsQueryBlank,
@@ -42,9 +41,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
   const { data: organization = null } = useQuery(
     backendQueryOptions(backend, 'getOrganization', [], { enabled: !isCloudDataUnavailable }),
   )
-  const updateOrganization = useMutationCallback(
-    backendMutationOptions(backend, 'updateOrganization'),
-  )
 
   const context = useMemo<SettingsContext>(
     () => ({
@@ -53,7 +49,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       backend,
       localBackend,
       organization,
-      updateOrganization,
       toastAndLog,
       getText,
       isCloudDataUnavailable,
@@ -65,7 +60,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       backend,
       localBackend,
       organization,
-      updateOrganization,
       toastAndLog,
       getText,
       isCloudDataUnavailable,

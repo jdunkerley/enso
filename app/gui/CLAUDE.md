@@ -101,11 +101,13 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   parsing, the Cognito password rule, permission classes); in
   `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
   and password pages; `account/`: the Account settings tab's sections;
-  `versions/` and `properties/`: the right panel's Versions, Schedule and
-  Properties tabs). Keep cloud-only code here rather than in `src/utils/`, so a
-  build without the cloud can drop one folder. The core reaches the areas only
-  through `registerCloud` (`src/cloud/index.ts`), which `entrypoint.ts` calls;
-  see `src/cloud/CLAUDE.md`.
+  `organization/`: the Organization and Members tabs' sections and the "Invite"
+  dialog; `billing/`: the paywall and the top bar's billing parts; `versions/`
+  and `properties/`: the right panel's Versions, Schedule and Properties tabs).
+  Keep cloud-only code here rather than in `src/utils/`, so a build without the
+  cloud can drop one folder. The core reaches the areas only through
+  `registerCloud` (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  `src/cloud/CLAUDE.md`.
 
 ## Entry points
 

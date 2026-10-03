@@ -1,6 +1,5 @@
 /** @file Barrel file for Paywall components. */
 export { PaywallButton, type PaywallButtonProps } from './components'
-export * from './PaywallAlert'
 export * from './PaywallDialog'
 export * from './PaywallDialogButton'
 export * from './PaywallScreen'

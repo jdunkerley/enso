@@ -8,7 +8,9 @@
  * cannot be dismissed by an outside click or Escape: the user must choose. `onConfirm` and
  * `onCancel` may return a promise; the dialog shows the confirm button loading until it settles,
  * then closes. The answer is submitted through a form, as in React (#84): if the callback fails,
- * the dialog stays open and shows why under the buttons, as React's `Form.FormError` did; with
+ * the dialog stays open and shows why under the buttons, as React's `Form.FormError` did (with the
+ * same message and `form-submit-error` test id; a JavaScript error, not the backend's, reads
+ * "something went wrong" and goes to Sentry); with
  * `canSubmitOffline` set to `false` (React's default; `true` here, as for the callers before #84)
  * it shows the offline notice instead of answering while offline. `cancel` set to `null` leaves
  * out the cancel button, as React's `cancel={null}` did.
