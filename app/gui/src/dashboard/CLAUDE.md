@@ -45,7 +45,15 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.
-- `modals/` — Global-modal registry and renderer.
+- `modals/` — The React modals still opened with `setModal` or a
+  `Dialog.Trigger`. The drive's simple modals are Vue (#92), opened on the modal
+  stack: `setVueModal(C, props)` (`ModalProvider.tsx`) replaces the open modals
+  as `setModal` does, and `useVueModalTrigger` (`hooks/vueModalHooks.ts`) opens
+  one from a React button that was a `Dialog.Trigger`, keeping the trigger's
+  `aria-expanded`. The duplicate-name dialog, the drag preview and the asset
+  summary are in `$/components/Drive/`; the secret dialog in
+  `$/cloud/credentials/`; delete confirmations use
+  `$/components/AlertDialog/ConfirmDeleteModal.vue`.
 - `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
   `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
   `toast.tsx` is the React shim over the Vue toast store (`$/providers/toasts`):
