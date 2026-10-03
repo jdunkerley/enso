@@ -133,6 +133,12 @@
   project you had open last time. Before, the graph area stayed blank until the
   project had opened, with only the small spinner on the project's tab to show
   progress. If the project fails to open, the reason is shown in its place.
+- [Graph editor shortcuts can be changed][188]. Settings → Keyboard shortcuts
+  now lists the graph editor's actions beside the dashboard's, grouped by
+  category, and a new shortcut works at once in an open project. A key that
+  another action already uses in the same place is refused, with that action
+  named. The command palette lists the graph editor's actions too, with your
+  shortcuts. Shortcuts you changed before are kept.
 
 #### Enso Language & Runtime
 
@@ -267,6 +273,7 @@
 [135]: https://github.com/jdunkerley/enso/pull/135
 [186]: https://github.com/jdunkerley/enso/pull/186
 [174]: https://github.com/jdunkerley/enso/pull/174
+[188]: https://github.com/jdunkerley/enso/pull/188
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
