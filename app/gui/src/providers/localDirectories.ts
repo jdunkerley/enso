@@ -1,25 +1,63 @@
+/**
+ * @file The local directories: the root directory of local projects, and the download directory.
+ *
+ * One store holds both, persisted under `enso-local-directory`, and everything reads and writes
+ * them through it: the settings page's Local tab, the drive's Local category (Vue, through
+ * {@link useLocalPaths}), the React drive (through {@link localPathsStore}) and the local backend.
+ * There used to be two stores persisting the same entry, each loading it once at start-up, so a
+ * change in Settings reached the Local category only after a reload (#182).
+ */
+import LocalStorage from '$/utils/LocalStorage'
 import { proxyRefs } from '$/utils/reactivity'
 import { useZustandStoreRef } from '$/utils/zustand'
 import { createGlobalState } from '@vueuse/core'
-import type { Path } from 'enso-common/src/services/Backend'
+import { Path } from 'enso-common/src/services/Backend'
 import { computed, inject } from 'vue'
+import { z } from 'zod'
 import { createStore } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface LocalPathsStoreState {
+declare module '$/utils/LocalStorage' {
+  /** */
+  interface LocalStorageData {
+    /** @deprecated Read only to migrate it: use {@link localPathsStore}. */
+    readonly localRootDirectory: string
+  }
+}
+LocalStorage.registerKey('localRootDirectory', { schema: z.string() })
+
+/** State for {@link localPathsStore}. */
+export interface LocalPathsStoreState {
   readonly localRootDirectory: Path | null
   readonly downloadDirectory: Path | null
 }
 
-const localPathsStore = createStore<LocalPathsStoreState>()(
+/**
+ * The saved local directories; `null` means the default. A root directory saved under the legacy
+ * `localRootDirectory` key is the initial value, which a value saved by this store overrides.
+ */
+export const localPathsStore = createStore<LocalPathsStoreState>()(
   persist(
     (): LocalPathsStoreState => ({
-      localRootDirectory: null,
+      localRootDirectory: (() => {
+        const oldPath = LocalStorage.getInstance().get('localRootDirectory')
+        return oldPath != null ? Path(oldPath) : null
+      })(),
       downloadDirectory: null,
     }),
     { name: 'enso-local-directory', version: 1 },
   ),
 )
+
+/** Update the saved local root directory; `null` restores the default. */
+export function setLocalRootDirectory(localRootDirectory: Path | null) {
+  localPathsStore.setState({ localRootDirectory })
+}
+
+/** Update the saved download directory; `null` restores the default. */
+export function setDownloadDirectory(downloadDirectory: Path | null) {
+  localPathsStore.setState({ downloadDirectory })
+}
 
 export type LocalPathsStore = ReturnType<typeof createLocalPathsStore>
 
@@ -36,16 +74,6 @@ function createLocalPathsStore() {
   )
 
   const downloadDirectory = computed(() => storedDownloadDirectory.value ?? defaultDownloadPath)
-
-  /** Update the saved local root directory. */
-  function setLocalRootDirectory(localRootDirectory: Path | null) {
-    localPathsStore.setState({ localRootDirectory })
-  }
-
-  /** Update the saved local root directory. */
-  function setDownloadDirectory(downloadDirectory: Path | null) {
-    localPathsStore.setState({ downloadDirectory })
-  }
 
   return proxyRefs({
     localRootDirectory,
