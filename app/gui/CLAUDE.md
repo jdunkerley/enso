@@ -80,7 +80,9 @@ adding an entry. React files may import `$/…` freely.
   framework-free logic (service-credential recipes, organization-invite email
   parsing, the Cognito password rule, permission classes); in
   `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
-  and password pages; `account/`: the Account settings tab's sections). Keep
+  and password pages; `account/`: the Account settings tab's sections;
+  `organization/`: the Organization and Members tabs' sections and the "Invite"
+  dialog; `billing/`: the paywall and the top bar's billing parts). Keep
   cloud-only code here rather than in `src/utils/`, so a build without the cloud
   can drop one folder. The core reaches the areas only through `registerCloud`
   (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
