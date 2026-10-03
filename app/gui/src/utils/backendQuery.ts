@@ -82,12 +82,20 @@ export type BackendMutationMethod = DefineBackendMethods<
 export type BackendQueryMethod = Exclude<BackendMethods, BackendMutationMethod>
 
 /**
- * The stale time of the methods whose data does not go stale by itself (the default is 0). A
- * caller's own `staleTime` takes precedence.
+ * How long the organization and the signed-in user stay fresh: long enough that the screens
+ * reading them do not refetch on every mount, short enough that a subscription or profile changed
+ * elsewhere (another device, the billing page) shows within minutes (the maintainer's choice on
+ * #201).
+ */
+export const ACCOUNT_STALE_TIME_MS = 5 * 60 * 1000
+
+/**
+ * The stale time of the methods whose data does not go stale as soon as it arrives (the default
+ * is 0). A caller's own `staleTime` takes precedence.
  */
 export const STALE_TIME_MAP: Partial<Record<BackendQueryMethod, number>> = {
-  getOrganization: Infinity,
-  usersMe: Infinity,
+  getOrganization: ACCOUNT_STALE_TIME_MS,
+  usersMe: ACCOUNT_STALE_TIME_MS,
   listUsers: Infinity,
 }
 

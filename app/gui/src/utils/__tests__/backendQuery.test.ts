@@ -3,11 +3,13 @@
  * defined once and the same from React and Vue, and how a caller's options merge with them.
  */
 import {
+  ACCOUNT_STALE_TIME_MS,
   backendMutationOptions,
   backendQueryDefaults,
   backendQueryOptions,
   executeMutation,
   INVALIDATION_MAP,
+  STALE_TIME_MAP,
   type BackendQueryMethod,
 } from '$/utils/backendQuery'
 import {
@@ -24,14 +26,15 @@ const local = { type: BackendType.local } as Backend
 
 /**
  * The keys whose options React and Vue set differently before #192, and the options both get now:
- * the React drive's, per the ruling on #192.
+ * the React drive's, per the ruling on #192, except the organization and the signed-in user, which
+ * stay fresh for five minutes (the maintainer's choice on #201).
  */
 const RULED: Record<string, { staleTime: number; persist: boolean }> = {
   getFileDetails: { staleTime: 0, persist: true },
   searchDirectory: { staleTime: 0, persist: false },
   listTags: { staleTime: 0, persist: false },
-  getOrganization: { staleTime: Infinity, persist: true },
-  usersMe: { staleTime: Infinity, persist: true },
+  getOrganization: { staleTime: 5 * 60 * 1000, persist: true },
+  usersMe: { staleTime: 5 * 60 * 1000, persist: true },
   listUsers: { staleTime: Infinity, persist: true },
 }
 
@@ -50,6 +53,12 @@ describe('backendQueryOptions', () => {
       expect(toValue(vue.queryKey)).toEqual(react.queryKey)
     },
   )
+
+  test('the organization and the signed-in user stay fresh for exactly five minutes', () => {
+    expect(ACCOUNT_STALE_TIME_MS).toBe(300_000)
+    expect(STALE_TIME_MAP.getOrganization).toBe(300_000)
+    expect(STALE_TIME_MAP.usersMe).toBe(300_000)
+  })
 
   test('the other keys keep the defaults: fresh for no time, persisted', () => {
     expect(backendQueryDefaults(remote, 'listSecrets')).toEqual({

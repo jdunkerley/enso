@@ -1627,12 +1627,12 @@ each key's options are defined once, in framework-free factories.
 3. **Per-key options, and what changes.** Six keys differed. All now have the
    React drive's options:
 
-   | Key                           | Before: React / Vue       | Now           | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-   | ----------------------------- | ------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-   | `getFileDetails`              | persisted / not           | persisted     | None today: nothing queries it through the factories (the asset preview, `AssetContentsEditor.vue`, has its own key and options).                                                                                                                                                                                                                                                                                                                      |
-   | `searchDirectory`, `listTags` | not persisted / persisted | not persisted | None: only React queries them.                                                                                                                                                                                                                                                                                                                                                                                                                         |
-   | `listUsers`                   | stale time ∞ / 0          | ∞             | None: only React queries it.                                                                                                                                                                                                                                                                                                                                                                                                                           |
-   | `getOrganization`, `usersMe`  | stale time ∞ / 0          | ∞             | **Vue users relied on 0.** `AppContainerLayout.vue` (the trial-ended and organization-setup modals), `TrialProgress.vue`, `SettingsPage.vue` and the file browser widget (and `ProfilePictureInput.vue` for `usersMe`) refetched on mount; they now use the cached value until a mutation invalidates it. The organization is persisted, so after a reload it is the persisted one (up to 30 days, until sign-out clears the persister). See ruling 4. |
+   | Key                           | Before: React / Vue       | Now           | Effect                                                                                                                                                                                                                                                                                                                                                                 |
+   | ----------------------------- | ------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `getFileDetails`              | persisted / not           | persisted     | None today: nothing queries it through the factories (the asset preview, `AssetContentsEditor.vue`, has its own key and options).                                                                                                                                                                                                                                      |
+   | `searchDirectory`, `listTags` | not persisted / persisted | not persisted | None: only React queries them.                                                                                                                                                                                                                                                                                                                                         |
+   | `listUsers`                   | stale time ∞ / 0          | ∞             | None: only React queries it.                                                                                                                                                                                                                                                                                                                                           |
+   | `getOrganization`, `usersMe`  | stale time ∞ / 0          | 5 minutes     | **The maintainer's choice, not React's** (ruling 4). `AppContainerLayout.vue` (the trial-ended and organization-setup modals), `TrialProgress.vue`, `SettingsPage.vue`, the file browser widget and `ProfilePictureInput.vue` no longer refetch on every mount, only once the cached value is five minutes old; the React drive now refetches too, where it never did. |
 
    Mutations follow React's semantics too: a caller's `meta.invalidates` is
    added to the method's (Vue replaced them), and the network mode is the
@@ -1640,14 +1640,20 @@ each key's options are defined once, in framework-free factories.
    changes. `listDirectory` (stale time 0, not persisted) and `getAssetDetails`
    (not persisted) were already the same on both sides.
 
-4. **For review: the organization's freshness.** Before, a Vue observer with
-   stale time 0 on the shared `getOrganization` key refetched it each time the
-   dashboard's layout mounted, which is what picked up a subscription that
+4. **The organization and the user stay fresh for five minutes** (the
+   maintainer's choice on #201, option B). The React drive's ∞ would have ended
+   the Vue screens' refetch on mount, which is what picked up a subscription
    changed elsewhere (a trial that ended while the app was closed, a plan bought
-   on another device). With the React drive's ∞ that refetch is gone, as it
-   always was in React alone. If that freshness matters, give `getOrganization`
-   and `usersMe` a finite stale time in `STALE_TIME_MAP`: one line, and both
-   frameworks follow.
+   on another device); Vue's 0 refetched on every mount. `getOrganization` and
+   `usersMe` now get `ACCOUNT_STALE_TIME_MS` (5 minutes) in `STALE_TIME_MAP`, on
+   both sides. It differs from both old behaviours: unlike React's ∞, a value
+   older than five minutes is refetched when a screen mounts or the window
+   regains focus, so an outside change shows within minutes; unlike Vue's 0,
+   mounting a screen within five minutes of the last fetch uses the cache
+   without a request. Persistence and the mutations' invalidations are
+   unchanged, so an edit in the app still refetches at once, and a persisted
+   value restored on start-up older than five minutes is refetched as soon as it
+   is read. A unit test pins the value.
 5. **The batched mutations are framework-free**, in `$/utils/driveMutations`
    (delete, restore, copy, move, download), with their keys and invalidations
    unchanged. The move asks how to resolve name conflicts through an injected
