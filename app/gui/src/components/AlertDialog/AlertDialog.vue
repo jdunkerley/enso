@@ -21,6 +21,7 @@
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import FormError from '$/components/Form/FormError.vue'
+import { FORM_STYLES } from '$/components/Form/variants'
 import { useForm } from '$/components/Form/useForm'
 import {
   DIALOG_MODAL_STYLES,
@@ -161,37 +162,41 @@ const styles = computed(() =>
             </div>
             <div :class="styles.scroller()">
               <div :class="styles.measurerWrapper()">
-                <div :class="styles.content()" class="flex flex-col gap-4">
-                  <!-- Laid out as React's form is: a column, items at the start, 1rem apart. -->
-                  <AlertDialogDescription asChild>
-                    <div class="flex flex-col items-start gap-4">
-                      <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
-                        <Text v-if="message != null">{{ message }}</Text>
-                      </slot>
-                    </div>
-                  </AlertDialogDescription>
-                  <ButtonGroup align="end">
-                    <Button
-                      v-if="cancelLabel !== null"
-                      variant="ghost"
-                      :isDisabled="pending != null"
-                      :isLoading="false"
-                      testId="alert-dialog-cancel"
-                      @press="respond('cancel')"
-                    >
-                      {{ cancelLabel ?? getText('cancel') }}
-                    </Button>
-                    <Button
-                      :variant="isDestructive ? 'delete' : 'primary'"
-                      :isLoading="pending === 'confirm'"
-                      testId="alert-dialog-confirm"
-                      data-alert-dialog-confirm
-                      @press="respond('confirm')"
-                    >
-                      {{ confirmLabel ?? getText('confirm') }}
-                    </Button>
-                  </ButtonGroup>
-                  <FormError :form="form" />
+                <div :class="styles.content()">
+                  <!-- React's form, with its layout: a column, items at the start, 1rem apart. The
+                  message is laid out among them (`contents`), as React's was, which keeps every
+                  line where React painted it. -->
+                  <form :class="FORM_STYLES({ gap: 'medium' })" novalidate @submit.prevent>
+                    <AlertDialogDescription asChild>
+                      <div class="contents">
+                        <slot :confirm="() => respond('confirm')" :cancel="() => respond('cancel')">
+                          <Text v-if="message != null">{{ message }}</Text>
+                        </slot>
+                      </div>
+                    </AlertDialogDescription>
+                    <ButtonGroup align="end">
+                      <Button
+                        v-if="cancelLabel !== null"
+                        variant="ghost"
+                        :isDisabled="pending != null"
+                        :isLoading="false"
+                        testId="alert-dialog-cancel"
+                        @press="respond('cancel')"
+                      >
+                        {{ cancelLabel ?? getText('cancel') }}
+                      </Button>
+                      <Button
+                        :variant="isDestructive ? 'delete' : 'primary'"
+                        :isLoading="pending === 'confirm'"
+                        testId="alert-dialog-confirm"
+                        data-alert-dialog-confirm
+                        @press="respond('confirm')"
+                      >
+                        {{ confirmLabel ?? getText('confirm') }}
+                      </Button>
+                    </ButtonGroup>
+                    <FormError :form="form" />
+                  </form>
                 </div>
               </div>
             </div>
