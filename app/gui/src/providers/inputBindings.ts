@@ -191,7 +191,7 @@ export function createInputBindingsStore(
   const shortcutById = (id: ShortcutId): Shortcut | undefined =>
     shortcuts.value.find((shortcut) => shortcut.id === id)
 
-  /** Apply `change` to the action's namespace; `false` when the action is not rebindable. */
+  /** Apply `change` to the action's namespace, if the user may change the action. */
   function onAction(
     id: ShortcutId,
     change: {
@@ -200,9 +200,9 @@ export function createInputBindingsStore(
     },
   ) {
     const shortcut = shortcutById(id)
-    if (shortcut == null) return
+    if (shortcut == null || !shortcut.rebindable) return
     if (shortcut.owner === 'dashboard') change.dashboard(id as DashboardBindingKey)
-    else if (shortcut.owner === 'graph' && shortcut.rebindable) change.graph(id as GraphBindingKey)
+    else if (shortcut.owner === 'graph') change.graph(id as GraphBindingKey)
   }
 
   return {
@@ -265,6 +265,3 @@ export function getInputBindingsStore(): InputBindingsStore {
   instance ??= createInputBindingsStore()
   return instance
 }
-
-/** {@link getInputBindingsStore}, under the name Vue code uses. */
-export const useInputBindingsStore = getInputBindingsStore

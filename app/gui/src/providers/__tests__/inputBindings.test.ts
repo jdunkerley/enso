@@ -186,18 +186,20 @@ describe('saving', () => {
 })
 
 describe('editing', () => {
-  test('a graph action that is not rebindable cannot be changed', () => {
+  test('an action that is not rebindable cannot be changed', () => {
     const storage = fakeStorage()
     const store = create(storage)
     store.add('graph.deselectAll', 'Q')
     store.delete('graph.deselectAll', 'Escape')
     store.add('graph.deleteSelectedEdge', 'Q')
     store.add('app.cancel', 'Q')
+    store.add('closeModal', 'Q')
     expect(store.graph.metadata['graph.deselectAll'].bindings).toEqual(['Escape'])
     expect(store.graph.metadata['graph.deleteSelectedEdge'].bindings).toEqual([
       'Delete',
       'Backspace',
     ])
+    expect(store.dashboard.metadata.closeModal.bindings).toEqual(['Escape'])
     expect(storage.stored()).toBeUndefined()
   })
 
