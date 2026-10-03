@@ -61,6 +61,8 @@ interface PlaceholderOverrides {
   readonly removeTheLocalDirectoryXFromFavorites: [directoryName: string]
   readonly upgradeTo: [planName: string]
   readonly enterTheNewKeyboardShortcutFor: [actionName: string]
+  readonly shortcutAlreadyUsedBy: [actionNames: string]
+  readonly shortcutConflictsWith: [actionNames: string]
   readonly downloadProjectError: [projectName: string]
   readonly downloadFileError: [fileName: string]
   readonly downloadDatalinkError: [datalinkName: string]

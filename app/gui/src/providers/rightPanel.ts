@@ -1,6 +1,7 @@
 import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useBackends } from '$/providers/backends'
 import { CATEGORY_BACKEND, isCloudCategory, type Category } from '$/providers/category'
+import { rightPanelTabContribution } from '$/providers/rightPanelContributions'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import { useSyncLocalStorage } from '@/composables/syncLocalStorage'
 import { createContextStore } from '@/providers'
@@ -90,6 +91,7 @@ function useRightPanelTabs(
       {
         icon: 'properties',
         enabled: enabledInCloudOnly,
+        hidden: () => rightPanelTabContribution('settings') == null,
         title: textRef('properties'),
       },
     ],
@@ -98,6 +100,7 @@ function useRightPanelTabs(
       {
         icon: 'history',
         enabled: enabledInCloudOnly,
+        hidden: () => rightPanelTabContribution('versions') == null,
         title: textRef('versions'),
       },
     ],
@@ -119,6 +122,7 @@ function useRightPanelTabs(
             return Err(getText('assetProjectExecutionsCalendar.teamPlanOnly'))
           return Ok()
         }),
+        hidden: () => rightPanelTabContribution('executionsCalendar') == null,
         title: textRef('executionsCalendar'),
       },
     ],

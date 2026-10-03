@@ -65,6 +65,10 @@ const props = withDefaults(
     noResetButton?: boolean | undefined
     noCalendarHeader?: boolean | undefined
     granularity?: 'day' | 'hour' | 'minute' | 'second' | undefined
+    /** The earliest date that may be chosen: earlier days are disabled in the calendar. */
+    minValue?: DateValue | undefined
+    /** Leave out a zoned value's time zone segment. */
+    hideTimeZone?: boolean | undefined
     /** Segments to leave out, as `{ day: false }`. */
     segments?: Partial<Record<SegmentPart, boolean>> | undefined
     size?: DatePickerVariants['size']
@@ -122,7 +126,11 @@ function segmentClass(part: SegmentPart, text: string) {
     <DatePickerRoot
       v-model="value"
       :hourCycle="24"
-      v-bind="granularity != null ? { granularity } : {}"
+      v-bind="{
+        ...(granularity != null ? { granularity } : {}),
+        ...(minValue != null ? { minValue } : {}),
+      }"
+      :hideTimeZone="hideTimeZone === true"
       :disabled="field.isDisabled.value"
       :required="isRequired === true"
       :closeOnSelect="true"
