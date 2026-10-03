@@ -4,9 +4,9 @@ import { Button } from '#/components/Button'
 import { Dialog } from '#/components/Dialog'
 import { Text } from '#/components/Text'
 import { getSalesEmail } from '$/appUtils'
+import { PLAN_TO_UPGRADE_LABEL_ID, TRIAL_DURATION_DAYS } from '$/cloud/billing/plans'
 import { useText } from '$/providers/react'
 import { Plan } from 'enso-common/src/services/Backend'
-import { PLAN_TO_UPGRADE_LABEL_ID, TRIAL_DURATION_DAYS } from '../../../constants'
 import { PlanSelectorDialog, type PlanSelectorDialogProps } from './PlanSelectorDialog'
 
 /** Props for a {@link SubscribeButton}. */
