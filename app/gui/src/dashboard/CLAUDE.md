@@ -36,7 +36,11 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   bindings, `$/providers/dashboardInputBindings`, which Vue menus read too (the
   user menu's shortcuts; `$/composables/menuEntries` is the Vue
   `useMenuEntries`) and the Vue settings page edits; a change re-renders its
-  consumers.
+  consumers. `DriveProvider` is the same pattern for the drive: it creates the
+  framework-free `$/providers/driveStore` (selection, clipboard, rename target)
+  and `useDriveState` reads it through `storeHooks`' `useStore`. The category
+  switch's pending state is `isNavigating` on the Vue drive location, which the
+  React drive feeds from its transition (`useDriveNavigationTransition`).
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.
