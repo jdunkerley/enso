@@ -2,17 +2,18 @@
 import * as aria from '#/components/aria'
 import { useDialogContext } from '#/components/Dialog'
 import { Icon } from '#/components/Icon'
-import { PaywallDialog } from '#/components/Paywall'
 import FocusRing from '#/components/styled/FocusRing'
 import { Text, type TextProps } from '#/components/Text'
 import type { SvgUseIcon } from '#/components/types'
 import { useVisualTooltip } from '#/components/VisualTooltip'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import * as inputBindingsProvider from '#/providers/InputBindingsProvider'
-import { setModal, unsetModal } from '#/providers/ModalProvider'
+import { unsetModal } from '#/providers/ModalProvider'
+import PaywallModal from '$/cloud/billing/paywall/PaywallModal.vue'
 import { MENU_ENTRY_VARIANTS } from '$/components/MenuEntry/variants'
 import type { PaywallFeatureName } from '$/composables/paywall'
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
+import { getModalsStore } from '$/providers/modals'
 import { useText } from '$/providers/react'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import type * as tailwindVariants from '$/utils/style/tailwindVariants'
@@ -96,7 +97,11 @@ export default function MenuEntry(props: MenuEntryProps) {
               unsetModal()
             }
             if (isUnderPaywall && feature != null) {
-              setModal(<PaywallDialog modalProps={{ defaultOpen: true }} feature={feature} />)
+              // The Vue paywall dialog replaces every open modal, as `setModal` put the React one
+              // (#88). It leaves the stack once closed (#156, ruling 5).
+              const modals = getModalsStore()
+              modals.closeAll()
+              modals.open(PaywallModal, { feature })
             } else {
               doAction()
             }
