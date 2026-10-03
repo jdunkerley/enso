@@ -1525,6 +1525,144 @@ provisionally accepted, for the maintainer to review.
 7. **No changelog entry**: nothing on screen changes, so the PR takes
    `CI: No changelog needed`.
 
+## Rulings from #170 (one key-binding registry; graph shortcuts rebindable, 2026-10-03)
+
+#170 unifies the two key-binding registries in Vue and, as the maintainer
+decided on 2026-10-02, makes the graph editor's shortcuts rebindable from
+Settings → Keyboard shortcuts. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **One PR, in two commits.** The first commit unifies the registry and the
+   store with no visible change; the second makes the graph's shortcuts editable
+   and puts them in the command palette. Split into two PRs, the first would
+   have carried the graph half of the store, its saved format and the scopes
+   with nothing in the app to exercise them, and the whole would have been
+   reviewed and tested twice.
+2. **One registry and one store; two dispatchers.**
+   - `$/configurations/graphInputBindings` holds the graph editor's shortcuts in
+     the dashboard's definition format (`defineBindings`: bindings, category,
+     icon, `rebindable`), with the same defaults in the same order. A test pins
+     every default as it was on `develop`, and the order, which decides which
+     action a shared key goes to first.
+   - `$/configurations/keyboardShortcuts` is the registry: every action of the
+     dashboard, the graph editor and the app shell, with its scope, category,
+     name and current bindings, and the conflict checks.
+   - `$/providers/inputBindings` is the window's one store: both namespaces,
+     loaded and saved together. `$/providers/dashboardInputBindings` is now its
+     dashboard half, under the same names, so the React provider and #83's Vue
+     menus are unchanged.
+   - Dispatch stays where it was. The dashboard's `defineBindingNamespace`
+     handlers (focus scopes, `DEFAULT_HANDLER`, React and Vue menus) and the
+     graph's `defineKeybinds` handler (`allowRepeat`, first-match order, digits
+     by position) differ in semantics (#156, ruling 1). Both now read the store,
+     so a rebinding applies at once; merging them would touch every keyboard
+     path of the drive and the graph for no visible gain.
+   - `graphBindings` is `defineRebindableKeybinds`: it rebuilds its lookups when
+     the store's bindings change, and its `bindings` (which the shortcut
+     tooltips and menus show) are getters that Vue tracks. `@/providers/action`
+     reads them through getters, so tooltips and context menus show the user's
+     shortcut.
+   - `isMacLike` moved from `@/composables/events` (which re-exports it) to
+     `$/utils/event`, so shared configuration does not import a project-view
+     composable.
+3. **Three scopes.** Every shortcut is active in one:
+   - `app`: anywhere in the window. The dashboard's actions attached to
+     `document.body` (the user menu's Settings and About, Go Back and Forward,
+     the settings tabs, Close Modal, Cancel Cut), and the app shell's (Close
+     Tab, Quit, the command palette, Escape).
+   - `drive`: the dashboard's other actions, attached to the assets table's
+     focus scope, so they act only on a key pressed inside it.
+   - `graph`: the graph editor's, whose handler listens only while its project
+     tab is current (`KeepAlive` deactivates it otherwise).
+
+   `app` overlaps both others; `drive` and `graph` never do, since a project tab
+   and the drive are never current together and focus cannot be inside a hidden
+   tab. So a graph shortcut may share a key with a drive shortcut (both have
+   `Mod+C` for Copy, by default), never with an `app` one. The scopes are
+   documented in `keyboardShortcuts.ts`, which lists the dashboard's `app`
+   actions by name.
+
+4. **Conflicts are checked by scope, and named.** The capture dialog refuses a
+   key that another action has in an overlapping scope, and says which ("This
+   shortcut is already used by 'Undo'."); React's check refused any key of any
+   dashboard action, with "This shortcut already exists.", which is still the
+   message for a key the action itself has. Keys are compared in a canonical
+   form (`OsDelete` is the platform's Delete; case and modifier order do not
+   matter). A non-rebindable shortcut still holds its key: no action can take
+   Escape, `Mod+K`, `Mod+W` or `Mod+Q`. For the dashboard this is slightly
+   stricter (the app shell's keys) and, for its `app` actions, also checks the
+   graph's: About can no longer be given `Mod+Z`.
+5. **A conflict the user makes is shown; a shared default is not.** A reset can
+   bring back a default that the user has since given to another action. The
+   settings tab then draws both bindings in red and names the other action in
+   the row's description column (which was empty: no dashboard action had a
+   description). Keys that two actions share by default are shared on purpose
+   and are not reported: Rename and Restore From Trash (`Mod+R`), each acting
+   only where it applies; and the Escapes.
+6. **What stays fixed, and why** (noted beside each in `@/bindings` and the
+   registry):
+   - Escape: the graph's Deselect All, the app's Cancel, Close Modal and the
+     rest. Escape cancels everywhere.
+   - Delete on a selected connection follows Delete on components
+     (`GRAPH_BINDING_FOLLOWERS`): one key deletes the selection, whichever kind
+     it is, as the defaults have it. It is not listed, and never conflicts with
+     the action it follows. The listed action's name says both: "Delete Selected
+     Components or Connection".
+   - The app shell's Close Tab (its alternatives exist because browsers keep
+     `Mod+W`), Quit and Open Command Palette: they are not the graph's, and stay
+     as they are; they are in the registry so that nothing takes their keys.
+   - The focused widgets inside the project view: the component browser (typing
+     into it), CodeMirror's text and documentation editors, lists, the table's
+     grid and visualizations. They take their keys first while they have the
+     focus, deliberately shadowing the graph's (`Enter` in a list, `Mod+C` in a
+     text editor), so they are no conflict either.
+   - Mouse bindings: the capture dialog takes keys only.
+
+   That leaves 19 graph actions rebindable, in two categories after the
+   dashboard's: Graph Editor and Graph Components.
+
+7. **Saved format, version 2.** The same `localStorage` key (`inputBindings`)
+   and record of action to bindings, extended so that both directions work:
+   - `"$version": ["2"]` marks it. It is a list because a version 1 reader
+     validates the whole record as lists of strings, and would drop everything
+     on any other shape.
+   - Every dashboard action is still written, as in version 1, so a downgraded
+     build keeps the user's dashboard bindings.
+   - A graph action is written only when it differs from its defaults, so a
+     later change to a default reaches everyone who has not changed that action.
+     Graph ids are dotted and dashboard ids are not, so they never collide, and
+     a version 1 reader ignores them.
+   - Loading reads either version. Each action found replaces that action's
+     defaults; an unknown action, or a graph action that is not rebindable, is
+     ignored. Tests load a version 1 record unchanged, round-trip version 2, and
+     read version 2's output with version 1's own schema and loader.
+8. **#86's kept quirk is fixed:** an action missing from the saved record now
+   keeps its defaults, instead of loading with none (#86, ruling 5). Every save
+   writes every dashboard action, so only an action added in a later release can
+   be missing, and it should come with its default.
+9. **The settings tab groups every action by category,** the dashboard's too,
+   under a heading row each, in the registry's order (the dashboard's
+   categories, then the graph's). The rows used to be one list in definition
+   order. Settings search finds the tab by the graph actions' names as well.
+10. **The command palette lists the graph's actions** while the graph editor is
+    the current tab: its enabled rebindable actions, named and grouped as in the
+    settings, with their current shortcuts. They were not in the palette before.
+11. **Digits are captured as the graph editor matches them.** Its handler takes
+    a digit key by position (`event.code`), so `Shift+2` reaches it as `2`, not
+    `@`. The capture dialog does the same for a graph action
+    (`digitsByPosition`), and keeps the character for a dashboard action, whose
+    handlers match `event.key`.
+12. **A graph shortcut may be a plain key,** as Space, Enter and F1 are by
+    default: the capture dialog does not ask for a modifier. Typing does not
+    reach the graph's handler from its text editors; a probe bound `Q` to Show
+    Code Editor and typed `q` into the component browser, a node's text widget
+    and the code editor itself, and the code editor did not toggle in any of
+    them.
+13. **Not done:** one dispatcher for both (ruling 2); rebinding the app shell's
+    shortcuts or mouse bindings; and the React `KeyboardShortcut`'s `action`
+    form in Vue, which nothing in Vue needs yet.
+14. **Changelog entry:** yes. Rebinding graph shortcuts is a feature.
+
 ## Rulings from #183 (asset panel: Properties and Schedule, 2026-10-03)
 
 #183 is the second part of #89: the right panel's Properties and Schedule tabs.

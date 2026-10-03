@@ -21,6 +21,14 @@ export function isDoubleClick(event: ClickEventLike) {
   return event.detail === 2
 }
 
+const hasWindow = typeof window !== 'undefined'
+const platform = hasWindow ? (window.navigator?.platform ?? '') : ''
+/**
+ * Whether the platform is Apple's, by `navigator.platform`: the graph editor's test for the order of
+ * its `Redo` shortcuts and its `Mod+F4`. (The `Mod` modifier itself follows `detect.isOnMacOS`.)
+ */
+export const isMacLike = /(Mac|iPhone|iPod|iPad)/i.test(platform)
+
 /**
  * Returns `true` if and only if the event has the modifier key set
  * (`Ctrl` on Windows/Linux; `Cmd` on macOS).
