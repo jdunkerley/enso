@@ -1,8 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The invitation dialog's last step: who was invited, the invitation link to copy, and the
- * buttons to go to the Members settings tab (unless it is open already) and to close. The Vue port
- * of the React `InviteUsersSuccess`.
+ * buttons to go to the Members settings tab and to close. The Vue port of the React
+ * `InviteUsersSuccess`.
+ *
+ * React meant to hide "Go to Members Page" on the Members tab, but tested for a query parameter the
+ * app no longer sets, so the button always showed; it still does. It now opens the Members tab
+ * from anywhere: React's only switched the tab when the settings page was already open.
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
@@ -41,10 +45,6 @@ const title = computed(() =>
     ),
 )
 
-const isUserOnMembersPage = computed(
-  () => route.name === 'settings' && route.query[SETTINGS_TAB_PARAM] === MEMBERS_TAB_VALUE,
-)
-
 function goToMembersPage() {
   onClose?.()
   void router.push({
@@ -57,9 +57,8 @@ function goToMembersPage() {
 <template>
   <Result status="success" :subtitle="getText('inviteUserLinkCopyDescription')" :title="title">
     <CopyBlock :copyText="invitationLink" class="mb-6 mt-1" />
-    <ButtonGroup v-if="onClose" gap="medium" :align="isUserOnMembersPage ? 'center' : 'end'">
+    <ButtonGroup v-if="onClose" gap="medium" align="end">
       <Button
-        v-if="!isUserOnMembersPage"
         variant="outline"
         icon="arrow_right"
         size="medium"

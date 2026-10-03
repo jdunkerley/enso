@@ -34,6 +34,9 @@ const invitationLink = computed(() => {
 
 <template>
   <Stepper :state="stepperState">
+    <!-- No step markers, but their (empty) row, as React's `renderStep={() => null}` rendered it:
+    the stepper's gap below it sets the form 1rem lower in the dialog. -->
+    <template #step />
     <StepContent :index="0">
       <InviteUsersForm @submitted="onSubmitted" />
     </StepContent>
