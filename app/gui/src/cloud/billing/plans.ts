@@ -1,7 +1,8 @@
-/** @file Constants for the subscribe page. */
+/**
+ * @file The Enso Cloud's plans: their names, prices, seats and trial. Moved from the React
+ * `#/modules/payments` (#192) with the subscription price query (`subscriptionPrice.ts`).
+ */
 import { Plan } from 'enso-common/src/services/Backend'
-
-/* eslint-disable @typescript-eslint/no-magic-numbers */
 
 /** The text id for the plan name. */
 export const PLAN_TO_TEXT_ID: { readonly [PlanVariant in Plan]: `${PlanVariant}PlanName` } = {

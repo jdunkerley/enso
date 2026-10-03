@@ -1,4 +1,3 @@
-import { PAYMENTS_SUCCESS_PATH, SUBSCRIBE_PATH } from '$/appUtils'
 import { useAuth } from '$/providers/auth'
 import { useConfig } from '$/providers/config'
 import { flagsStore } from '$/providers/featureFlags'
@@ -10,7 +9,11 @@ import {
   redirectFromPath,
 } from '$/router/dashboardGuards'
 import { withDataLoader } from '$/router/dataLoader'
-import { CLOUD_DISABLED_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
+import {
+  APP_CONTAINER_LAYOUT_ROUTE,
+  CLOUD_DISABLED_ROUTE,
+  PROTECTED_LAYOUT_ROUTE,
+} from '$/router/routeNames'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
 import { reactComponent } from '$/utils/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
@@ -25,9 +28,9 @@ function requireCloudBrowserEnabled() {
   }
 }
 
-// The cloud's authentication pages (sign-in, sign-up, password reset, …) and the page shown when
-// running projects in the browser is disabled are not listed here: `registerCloud` (`$/cloud`)
-// adds them, some as children of the protected layout.
+// The cloud's authentication pages (sign-in, sign-up, password reset, …), the page shown when
+// running projects in the browser is disabled, and the subscription and payments success pages are
+// not listed here: `registerCloud` (`$/cloud`) adds them, some as children of the layouts.
 const routes = [
   {
     name: PROTECTED_LAYOUT_ROUTE,
@@ -35,6 +38,7 @@ const routes = [
     component: withDataLoader(() => import('$/components/ProtectedLayout.vue')),
     children: [
       {
+        name: APP_CONTAINER_LAYOUT_ROUTE,
         path: UNAVAILABLE_PATH,
         meta: { access: 'anyLoggedIn' },
         component: withDataLoader(() => import('$/components/AppContainerLayout.vue')),
@@ -76,20 +80,9 @@ const routes = [
               },
             ],
           },
-          {
-            path: SUBSCRIBE_PATH,
-            component: () =>
-              import('#/pages/subscribe/Subscribe').then((mod) => reactComponent(mod.Subscribe)),
-          },
         ],
       },
     ],
-  },
-  {
-    path: PAYMENTS_SUCCESS_PATH,
-    meta: { access: 'anyLoggedIn' },
-    component: () =>
-      import('#/pages/PaymentsSuccess').then((mod) => reactComponent(mod.PaymentsSuccess)),
   },
   {
     path: '/:anyPath(.*)*',
