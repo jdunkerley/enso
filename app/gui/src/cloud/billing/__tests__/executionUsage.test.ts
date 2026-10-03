@@ -1,6 +1,6 @@
 /** @file Tests for `executionUsage.ts`. */
 import * as v from 'vitest'
-import { formatUptime } from './executionUsage'
+import { formatUptime } from '../executionUsage'
 
 v.test.each([
   [0, '0s'],

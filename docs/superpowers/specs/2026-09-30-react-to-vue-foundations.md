@@ -1900,6 +1900,104 @@ provisionally accepted, for the maintainer to review.
     inside is the same. Changing it would change every triggered Vue dialog, so
     it is not done here. No changelog entry: the PR takes
 
+## Rulings from #191 (settings: User groups, Activity log, API keys and Usage, 2026-10-03)
+
+#191 is #87's second half: the User groups, Activity log, API keys and Usage
+tabs. Delegated like the rulings above: provisionally accepted, for the
+maintainer to review.
+
+1. **The same pattern as #87.** The core declares the four tabs in `tabs.ts`
+   (name, icon, sidebar place, visibility, User groups' `userGroups` and Usage's
+   `scheduler` paywall features) with no sections, and the cloud fills them
+   through `contributeSettingsSections`. A build without the cloud lists none of
+   them, and local-only mode (#186) still hides them by their visibility
+   predicates.
+2. **Where each tab went.** User groups and Activity log are the organization's:
+   `src/cloud/organization/` (with `lambdaKinds.ts`). API keys belong to the
+   user's account, not the organization (the tab is not `organizationOnly`):
+   `src/cloud/account/`, beside the Account tab's sections. Usage summarises
+   what the scheduler ran and is behind its paywall, and React called its props
+   `Finances…`: `src/cloud/billing/` (with `executionUsage.ts` and its test). No
+   new area, so `CLOUD_AREAS` is unchanged.
+3. **`ReactSettingsTab` is needed for Billing & Plans only**, until #88. The
+   React shell left (`Tab`, `Section`, `Entry`, `CustomEntry`) has only that
+   tab, which has no paywall feature, so the React settings `Paywall` went, and
+   with it the React `PaywallScreen`, `PaywallDialogButton` and `PaywallButton`,
+   which had no other caller. `PaywallDialog` (and what it uses) stays for the
+   React menus.
+4. **There is no drag and drop to port.** The ticket names a drag and drop of
+   users onto groups; the React tab lost it upstream (#13111, "Update User
+   Groups settings section"). Users join a group through "Add Users", a combo
+   box of the organization's other members, which is a keyboard path as much as
+   a pointer one; a unit test drives it from the keyboard end to end (Manage
+   Users, Add Users, choose, add, Done, Remove, back).
+5. **Tables are plain tables.** React's user-group and API-key tables were
+   react-aria `Table`s (`role="grid"`: one Tab stop, rows and cells reached with
+   the arrow keys); the Vue ones are `<table>`s with the same `aria-label`,
+   header cells, classes and rows, as the Members tab's always was. Each button
+   in them is now its own Tab stop. Invisible to a pointer user; the same trade
+   as the notification tray's list (#83, ruling 6).
+6. **Queries keep React's keys and options**: `listUserGroups` and `listApiKeys`
+   stale at once and persisted; `listUsers` fresh for good (React's
+   `STALE_TIME_MAP`) where the user groups and the activity log read it, a
+   minute on the Members tab as before; the activity log's pages under
+   `[…, 'getLogEvents', filters, { infinite: true }]`, fresh for a minute and
+   not persisted; `listExecutionsSummary` by month, the same. The user groups
+   ask for the members only once there is a group, as React's rows did.
+7. **Confirmations go on the modal stack** (`useModals().ask` with
+   `ConfirmDeleteModal`). Deleting a group and removing a member from one close
+   the confirmation at once and run the mutation behind it, as React's
+   `unsetModal()` before `await` did; deleting an API key waits for the
+   deletion, with the button loading, as React's awaited `onConfirm` did. A new
+   key's secret opens in `ApiKeyDialog.vue` on the stack, where React used
+   `setModal`, once the "New API Key" popover has closed.
+8. **Two primitives grew a prop.** `DatePicker.vue` takes `maxValue` (the
+   activity log's dates stop at today, later days disabled in the calendar, as
+   React's did), and `PaywallDialogButton.vue` passes its default slot on as the
+   button's label ("New User Group" at the team plan's limit).
+9. **Primitive fixes, found by comparing screenshots.** These tabs are the first
+   Vue screens to use a date picker, an empty combo box, and a confirmation
+   opened from a menu item:
+   - `DatePicker.vue`: the calendar opens below the field's start (react-aria's
+     trigger was the whole field), not centred on the chevron; its weekday
+     headers are screen-reader only, since React's header cells rendered no text
+     (Vue's squashed seven letters into one cell's width and pushed the first
+     column right); and it ends with React's empty error text, 4px. Measured
+     afterwards: the same box and grid, to the pixel.
+   - `ComboBox.vue`: with no items it opens no list; it showed an empty strip
+     ("Add Users" when every member is in the group).
+   - `DropdownMenu.vue`: closing, it leaves the focus in a dialog an item
+     opened. It took the focus back to its trigger, the confirmation's trap
+     pulled it in again without the focus ring, and "Delete" showed its resting
+     colour where React's showed its focused one. The dialog still returns focus
+     to the trigger when it closes.
+   - The user groups' row menu opens below the chevron's start, 8px off, where
+     react-aria's `Menu.Trigger` put it (#89's version menu is centred because
+     React's passed `bottom`).
+10. **React quirks kept.** The activity log asks for its next page whenever the
+    list does not fill its view, and its pages never run out (React's
+    `getNextPageParam` always returns one), so a short log is asked for again
+    and again: measured on the mocked backend, about 150 requests in 3 s on the
+    base and about 370 on the branch (the Vue list re-renders faster). It is the
+    same loop, and worth an issue of its own. Sorting by timestamp applies the
+    direction to one operand only; a picked day filters from that day's local
+    midnight (React called `toDate()` on a `CalendarDate`, which falls back to
+    the local time zone).
+11. **One keyboard difference, left to the shared primitives.** In "Add Users",
+    Escape with the combo box's list open closes the list; React's closed the
+    whole popover at once. Pressed again, it closes the popover, but only once
+    the list's exit animation has ended (about 150 ms): Reka's list keeps its
+    dismissable layer until then. Changing it means changing the shared
+    `ComboBox` and `Popover` for every caller.
+12. **What a user notices: nothing.** 26 screenshots of every state (each tab,
+    the popovers, menus, confirmations, the paywall at the limit and its dialog,
+    the new key's secret, the empty states, the Usage paywall on the free plan)
+    were compared with the base on a mocked team-plan account: the differences
+    left are the drive's clock column behind the page, the activity log's
+    loading row (ruling 10), a half-pixel shift of the combo box's list, and a
+    1px shift of a tooltip. No changelog entry: the PR takes
+    `CI: No changelog needed`.
+
 ## Rulings from #92 (the drive's asset modals, 2026-10-03)
 
 #92 ports the modals the drive opens. Delegated like the rulings above:

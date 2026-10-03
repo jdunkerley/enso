@@ -21,15 +21,22 @@ community build without the cloud can leave it out (decision 6b of
     by `App.vue`).
   - `organization/`, since #87: the Organization and Members settings tabs'
     sections (`settingsSections.ts`, contributed by
-    `registerOrganizationSettings`), and the "Invite" dialog
-    (`InviteUsersModal.vue`, with its form and success step), the one dialog
-    every place that invites users shares: the Members tab, the user bar's
-    `InviteUsersButton.vue`, and any app-level modal that needs it.
+    `registerOrganizationSettings`), and since #191 the User groups tab's
+    (`UserGroupsSettingsSection.vue`: the list, a group's members, and the "New
+    User Group" and "Add Users" popovers) and the Activity log tab's
+    (`ActivityLogSettingsSection.vue`, with `lambdaKinds.ts`); and the "Invite"
+    dialog (`InviteUsersModal.vue`, with its form and success step), the one
+    dialog every place that invites users shares: the Members tab, the user
+    bar's `InviteUsersButton.vue`, and any app-level modal that needs it.
   - `billing/paywall/`, since #87: the Vue paywall pieces (`PaywallScreen`,
     `PaywallDialog`, `PaywallDialogButton`, `PaywallButton`, `PaywallAlert`,
     `PaywallLock`, `PaywallBulletPoints`, `PaywallUpgradeButton`), and the
     settings page's paywall screen, contributed by `registerBillingSettings`.
-    The React originals stay for their React callers until #88.
+    The React originals left (`PaywallDialog`, `UpgradeButton`, `PaywallLock`,
+    `PaywallBulletPoints`) stay for their React callers until #88.
+  - `billing/`, since #191: the Usage settings tab's section
+    (`UsageSettingsSection.vue`, with `executionUsage.ts`), contributed by
+    `registerBillingSettings`.
   - `auth/` — the sign-in (with the one-time-code step), sign-up (with the email
     confirmation step), email confirmation, forgot-password, reset-password and
     account-restoration pages, their layout (`AuthenticationPage.vue`), the
@@ -40,7 +47,9 @@ community build without the cloud can leave it out (decision 6b of
   - `account/` — the Account settings tab's sections (`settingsSections.ts`: the
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
-    (`settings.ts`).
+    (`settings.ts`); since #191 also the API keys tab's
+    (`ApiKeysSettingsSection.vue`, the "New API Key" popover and the dialog
+    showing a new key's secret).
   - `versions/` — the right panel's Versions tab (#89) and Schedule tab
     (executions calendar, #183), contributed by `registerVersionsTabs`
     (`rightPanel.ts`).
@@ -79,9 +88,10 @@ community build without the cloud can leave it out (decision 6b of
   out of the initial chunk, and the settings route waits for them. Their
   components read the page's context with `useSettingsContext`. A tab the core
   declares without sections of its own (Organization, Members) is listed only
-  once something is contributed to it. `contributeSettingsPaywall(loader)` is
-  the third: the screen shown in place of a tab locked behind a feature.
-  Right-panel tabs are the fourth: `contributeRightPanelTab(tab, loader)`
+  once something is contributed to it (Organization, Members, User groups,
+  Activity log, API keys, Usage). `contributeSettingsPaywall(loader)` is the
+  third: the screen shown in place of a tab locked behind a feature. Right-panel
+  tabs are the fourth: `contributeRightPanelTab(tab, loader)`
   (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
   Versions and Schedule (`executionsCalendar`) tabs their content; the tabs
   themselves (icon, title, enabling, the scheduler's paywall) stay in

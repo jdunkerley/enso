@@ -1,8 +1,9 @@
 /**
- * @file A settings tab that is still React, mounted by the Vue settings page (`SettingsPage.vue`)
- * through `reactComponent`.
+ * @file The settings tab that is still React (Billing & Plans), mounted by the Vue settings page
+ * (`SettingsPage.vue`) through `reactComponent`.
  *
- * TODO: #87's follow-up and #88 port the React tabs left; this bridge goes with the last of them.
+ * TODO: #88 ports Billing & Plans; this bridge, `data.tsx` and the React shell (`Tab`, `Section`,
+ * `Entry`, `CustomEntry`) go with it.
  */
 import { backendQueryOptions } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
