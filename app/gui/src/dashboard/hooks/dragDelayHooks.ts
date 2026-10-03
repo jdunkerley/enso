@@ -1,4 +1,7 @@
-/** @file Hooks to trigger an action on drag delay. */
+/**
+ * @file Hooks to trigger an action on drag delay, for the React drive's drop targets. React-only
+ * DOM glue with no data of its own: it goes with the React drive (#91).
+ */
 import type { DropEnterEvent, DropOptions } from '#/components/aria'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useUnmount } from '#/hooks/unmountHooks'

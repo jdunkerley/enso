@@ -1,4 +1,8 @@
-/** @file A hook returning the root directory id and expanded directory ids. */
+/**
+ * @file A hook returning the root directory id and expanded directory ids: a React adapter over
+ * the Vue stores (`$/providers/category`, the drive location), which goes with the React drive
+ * (#91).
+ */
 import { useStore } from '#/hooks/storeHooks'
 import type { Category } from '$/providers/category'
 import { localPathsStore } from '$/providers/localDirectories'

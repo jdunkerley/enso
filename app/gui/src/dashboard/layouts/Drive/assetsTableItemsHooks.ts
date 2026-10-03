@@ -1,4 +1,8 @@
-/** @file A hook to return the items in the assets table. */
+/**
+ * @file A hook to return the items in the assets table: the React table's rows, kept so that its
+ * row components can look an asset up. It goes with the React drive (#91); the Vue table reads its
+ * listing query (`listDirectoryQueryOptions`, `$/utils/driveQueries`) instead.
+ */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { createStore, useStore } from '#/utilities/zustand.ts'
 import type { AnyAsset, AssetId } from 'enso-common/src/services/Backend'
