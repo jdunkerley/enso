@@ -273,22 +273,29 @@ function skipRest() {
               <template #trigger>
                 <Button variant="primary" class="min-w-16">{{ getText('rename') }}</Button>
               </template>
-              <Form
-                method="dialog"
-                :defaultValues="{ newName: String(form.getValues(`${entryPath(index)}.newName`)) }"
-                :schema="
-                  (z) =>
-                    z.object({
-                      newName: titleSchema({ id: asset.id, siblings: siblingFiles.siblings }),
-                    })
-                "
-                @submit="({ newName }) => setConclusion(index, 'rename', newName)"
-              >
-                <Text>{{ getText('newNameDescription') }}</Text>
-                <Input :label="getText('newName')" name="newName" autoFocus="select" />
-                <Submit>{{ getText('apply') }}</Submit>
-                <FormError />
-              </Form>
+              <template #default="{ close }">
+                <!-- Escape closes only this form, as react-aria's popover stopped it: on the page
+                it would reach the dashboard's global Escape binding, which closes every modal. -->
+                <Form
+                  method="dialog"
+                  :defaultValues="{
+                    newName: String(form.getValues(`${entryPath(index)}.newName`)),
+                  }"
+                  :schema="
+                    (z) =>
+                      z.object({
+                        newName: titleSchema({ id: asset.id, siblings: siblingFiles.siblings }),
+                      })
+                  "
+                  @keydown.esc.stop="close()"
+                  @submit="({ newName }) => setConclusion(index, 'rename', newName)"
+                >
+                  <Text>{{ getText('newNameDescription') }}</Text>
+                  <Input :label="getText('newName')" name="newName" autoFocus="select" />
+                  <Submit>{{ getText('apply') }}</Submit>
+                  <FormError />
+                </Form>
+              </template>
             </Popover>
           </ButtonGroup>
         </ButtonGroup>

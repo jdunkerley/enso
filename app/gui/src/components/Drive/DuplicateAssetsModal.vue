@@ -11,7 +11,7 @@ import Dialog from '$/components/Dialog/Dialog.vue'
 import type { Category } from '$/providers/category'
 import { useText } from '$/providers/text'
 import type { AssetId, Backend, DirectoryId } from 'enso-common/src/services/Backend'
-import { ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
 import DuplicateAssetsForm from './DuplicateAssetsForm.vue'
 import type { ResolvedDuplication } from './duplicateAssets'
 
@@ -45,6 +45,10 @@ function cancel() {
   isAnswered = true
   props.onCancel()
 }
+
+// Taken off the stack unanswered (the dashboard's global Escape binding closes every modal before
+// the dialog sees the key): that is a cancellation, as React's dialog reported Escape.
+onUnmounted(cancel)
 
 /** Nothing actually conflicts: answer at once, and close without asking. */
 function resolveWithoutAsking() {

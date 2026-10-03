@@ -5,6 +5,7 @@
  */
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
+import { flushPromises } from '@vue/test-utils'
 import {
   AssetType,
   BackendType,
@@ -92,7 +93,7 @@ describe('the duplicate-name dialog', () => {
     const onSubmit = vi.fn()
     const onCancel = vi.fn()
     const onClose = vi.fn()
-    await mountWithProviders(DuplicateAssetsModal, {
+    const { unmount } = await mountWithProviders(DuplicateAssetsModal, {
       queryClient,
       props: {
         targetId: TARGET_ID,
@@ -106,7 +107,7 @@ describe('the duplicate-name dialog', () => {
       },
     })
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"] form')).not.toBeNull())
-    return { onSubmit, onCancel, onClose, queryClient }
+    return { onSubmit, onCancel, onClose, queryClient, unmount }
   }
 
   test('one conflict: the title, the prompt, and the new and existing assets', async () => {
@@ -193,6 +194,22 @@ describe('the duplicate-name dialog', () => {
     )
   })
 
+  test('Escape in the rename form closes only the form', async () => {
+    const { onCancel } = await mountSeeded([NEW_DATA])
+    await userEvent.click(button('Rename', dialog()))
+    const input = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLInputElement>('input[name="newName"]')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
+    await userEvent.keyboard('{Escape}')
+    await vi.waitFor(() => expect(document.querySelector('input[name="newName"]')).toBeNull())
+    await flushPromises()
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(dialog().textContent).toContain('1 conflicting file found')
+  })
+
   test('the new name must be unique among the siblings', async () => {
     await mountSeeded([NEW_DATA])
     await userEvent.click(button('Rename', dialog()))
@@ -233,6 +250,17 @@ describe('the duplicate-name dialog', () => {
     const { onCancel } = await mountSeeded([NEW_DATA])
     await userEvent.keyboard('{Escape}')
     expect(onCancel).toHaveBeenCalledTimes(1)
+  })
+
+  test('taken off the stack unanswered, it cancels; answered, it does not', async () => {
+    const first = await mountSeeded([NEW_DATA])
+    first.unmount()
+    expect(first.onCancel).toHaveBeenCalledOnce()
+    const second = await mountSeeded([NEW_DATA])
+    await userEvent.click(button('Apply', dialog()))
+    await vi.waitFor(() => expect(second.onSubmit).toHaveBeenCalled())
+    second.unmount()
+    expect(second.onCancel).not.toHaveBeenCalled()
   })
 
   test('no actual conflict: it answers at once with nothing, without asking', async () => {
