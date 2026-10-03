@@ -15,6 +15,8 @@ import { Badge } from '#/components/Badge'
 import { Button } from '#/components/Button'
 import { Dialog, DialogStackProvider } from '#/components/Dialog'
 import { Loader } from '#/components/Loader'
+import MenuEntry from '#/components/MenuEntry'
+import { ProfilePicture } from '#/components/ProfilePicture'
 import { Result } from '#/components/Result'
 import { Text } from '#/components/Text'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
@@ -24,6 +26,8 @@ import ButtonVue from '$/components/Button/Button.vue'
 import DialogVue from '$/components/Dialog/Dialog.vue'
 import { DIALOG_MOTION } from '$/components/Dialog/variants'
 import KeyboardShortcutVue from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
+import MenuEntryVue from '$/components/MenuEntry/MenuEntry.vue'
+import ProfilePictureVue from '$/components/ProfilePicture/ProfilePicture.vue'
 import ResultVue from '$/components/Result/Result.vue'
 import LoaderVue from '$/components/Spinner/Loader.vue'
 import TextVue from '$/components/Text/Text.vue'
@@ -224,5 +228,49 @@ describe('the Vue ports render the same classes as the React primitives', () => 
       expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
       vi.restoreAllMocks()
     })
+  })
+})
+
+describe('the user bar parts render as the React ones (#83)', () => {
+  test.each([
+    { picture: null, name: 'Ada Lovelace' },
+    { picture: 'https://example.com/ada.png', name: 'Ada Lovelace', size: 'xsmall' },
+  ] as const)('ProfilePicture %o', (props) => {
+    render(
+      <div data-testid="react">
+        <ProfilePicture {...props} />
+      </div>,
+    )
+    mountVue(() => h('div', { 'data-testid': 'vue' }, [h(ProfilePictureVue, props)]))
+    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+  })
+
+  test.each([
+    { action: 'settings' },
+    { action: 'signOut' },
+    { action: 'switchOrganization', label: 'Acme (current)', truncateLabel: true },
+  ] as const)('MenuEntry %o', (props) => {
+    render(
+      <TextContext.Provider value={useText()}>
+        <div data-testid="react">
+          <MenuEntry {...props} doAction={() => {}} />
+        </div>
+      </TextContext.Provider>,
+    )
+    mountVue(() =>
+      h('div', { 'data-testid': 'vue' }, [h(MenuEntryVue, { ...props, onPress: () => {} })]),
+    )
+    // React's `FocusRing` adds `focus-ring` while the button has visible focus; the Vue button
+    // carries its rules as `focus-visible:` classes. Compare without them.
+    const vue = byTestId('vue')
+    const button = vue.querySelector('button')
+    for (const name of [...(button?.classList ?? [])]) {
+      if (name.startsWith('focus-visible:')) button?.classList.remove(name)
+    }
+    expect(shape(vue)).toEqual(shape(byTestId('react')))
+    // The colour of the action (Logout's red), as an inline style on the label.
+    const labelStyle = (root: HTMLElement) =>
+      root.querySelector('button div div')?.getAttribute('style') ?? null
+    expect(labelStyle(vue)).toBe(labelStyle(byTestId('react')))
   })
 })

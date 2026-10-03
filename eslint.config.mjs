@@ -81,8 +81,9 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'pages/authentication/LoadingScreen',
   'pages/authentication/Login',
   'pages/authentication/Registration',
-  'pages/dashboard/UserBar',
   'providers/LoggerProvider',
+  // Dashboard features ported to Vue, mounted by the shared app shell.
+  'pages/dashboard/UserBar/UserBar.vue',
   // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
   'hooks/mountHooks',
   'utilities/vue',

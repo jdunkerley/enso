@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The Reka UI spike for #76: a Vue {@link DropdownMenu} mounted in the app container, beside the
- * React `UserBar`, behind the `enableHeadlessUiSpike` feature flag.
+ * user bar, behind the `enableHeadlessUiSpike` feature flag.
  *
  * It exists to prove, in the running app rather than in isolation, that a Reka primitive styled
  * with the dashboard's `variants.ts` gets focus management, Escape and keyboard navigation right
@@ -9,8 +9,8 @@
  * (`integration-test/dashboard/headlessUiSpike.spec.ts`). It is not a user-facing feature and goes
  * away once the `DropdownMenu` primitive has a real mount site.
  *
- * #78 added a Vue `Popover` beside it, so that the spec can compare it, in a real browser with the
- * real stylesheet, against the React user menu's popover next to it.
+ * #78 added a Vue `Popover` beside it, to compare it in a real browser against the React user menu's
+ * popover next to it; since #83 the user menu is a Vue `Popover` itself.
  */
 import Popover from '$/components/Dialog/Popover.vue'
 import DropdownMenu from '$/components/Menu/DropdownMenu.vue'

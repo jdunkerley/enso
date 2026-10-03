@@ -27,6 +27,33 @@ export const [provideGlobalEventRegistry, useGlobalEventRegistry] = createContex
   },
 )
 
+/**
+ * Marks every open Reka UI overlay: the content of a dialog, popover, menu, select or combobox
+ * (`DismissableLayer`).
+ */
+const OVERLAY_LAYER_SELECTOR = '[data-dismissable-layer]'
+
+/**
+ * Whether the event is a key press inside an open overlay (a dialog, popover or menu).
+ *
+ * Such a key belongs to the overlay, so none of these window-level handlers runs for it. They are
+ * the app's global shortcuts (the graph's `Enter`, `Escape`, `Delete`, arrows and so on), and
+ * overlays are portalled outside the graph's DOM, so without this a key pressed in a menu reached
+ * both: `Enter` on a user-menu entry also opened the component browser. Worse, Reka listens for
+ * `Escape` on `window` too, after these handlers, so the graph's `Escape` (deselect all, which
+ * stops the event) kept every overlay from closing on `Escape` while a project was open (#170).
+ * React's overlays never let these keys reach `window` in the first place.
+ *
+ * `keyup` is not filtered, so modifier state (`useGlobalKeyboard`) cannot stick.
+ */
+function isKeydownInOverlay(event: Event) {
+  return (
+    event.type === 'keydown' &&
+    event.target instanceof Element &&
+    event.target.closest(OVERLAY_LAYER_SELECTOR) != null
+  )
+}
+
 export type EventRegistryPhase = 'pre' | 'main'
 export type EventRegistryOptions = {
   capture: boolean
@@ -78,6 +105,7 @@ function eventRegistry(source?: EventTarget) {
   }
 
   function dispatchEvent(event: Event) {
+    if (isKeydownInOverlay(event)) return true
     const registry = event.eventPhase === Event.CAPTURING_PHASE ? registryCapture : registryBubble
     const handlers = registry.get(event.type as any)
     for (const handler of handlers?.pre ?? []) handler(event)

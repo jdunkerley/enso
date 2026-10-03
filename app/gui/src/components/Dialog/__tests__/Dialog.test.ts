@@ -249,10 +249,18 @@ describe('Popover', () => {
     expect(popover.getAttribute('data-side')).toBe('bottom')
     expect(popover.getAttribute('data-align')).toBe('start')
     expect(env.portalRoot.contains(popover)).toBe(true)
-    expect(popover.contains(document.activeElement)).toBe(true)
+    // The dialog itself, as react-aria's: Tab goes on to its first control.
+    expect(document.activeElement).toBe(popover)
     // `POPOVER_STYLES` defaults: `size: 'small'`, `rounded: 'xxlarge'`.
     expect(popover.classList).toContain('max-w-sm')
     expect(popover.classList).toContain('rounded-2xl')
+  })
+
+  test('Tab moves from the dialog to its first control', async () => {
+    mountPopover()
+    const user = await openWithKeyboard()
+    await user.tab()
+    expect(document.activeElement).toBe(byTestId('first'))
   })
 
   test('Escape closes it and returns focus to the trigger', async () => {
@@ -285,9 +293,25 @@ describe('Popover', () => {
     expect(byTestId('popover')).not.toBeNull()
   })
 
+  test('a modal popover takes outside clicks on its underlay, which closes it', async () => {
+    mountPopover()
+    await openWithKeyboard()
+    // Over the page, so that an element setting its own `pointer-events` (the graph editor's
+    // viewport) cannot take the click and stop it before Reka sees it.
+    const underlay = byTestId('underlay')!
+    expect(env.portalRoot.contains(underlay)).toBe(true)
+    expect(underlay.classList).toContain('pointer-events-auto')
+    expect(underlay.classList).toContain('fixed')
+    await outsideClicker().click(underlay)
+    await flushPromises()
+    expect(byTestId('popover')).toBeNull()
+    expect(byTestId('underlay')).toBeNull()
+  })
+
   test('isNonModal leaves the rest of the page interactive', async () => {
     mountPopover({ isNonModal: true })
     const user = await openWithKeyboard()
+    expect(byTestId('underlay')).toBeNull()
     expect(getComputedStyle(document.body).pointerEvents).not.toBe('none')
     await user.click(byTestId('outside')!)
     await flushPromises()

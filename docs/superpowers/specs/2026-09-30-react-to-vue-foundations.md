@@ -1104,6 +1104,98 @@ the maintainer to review.
 9. **No changelog entry.** Nothing changes for users, so the PR takes
    `CI: No changelog needed`, though the ticket asked for an entry.
 
+## Rulings from #83 (the top bar, 2026-10-02)
+
+#83 ported the top bar: the user bar with the user menu and the notification
+tray, the info bar and menu of the pages outside the dashboard, and the version
+checker. (The About dialog was already Vue, #156.) Delegated like the rulings
+above: provisionally accepted, for the maintainer to review.
+
+1. **Where the parts went.**
+   - `UserBar`, `UserMenu` and `NotificationTray` are `.vue` files in their
+     React folder, `src/dashboard/pages/dashboard/UserBar/` (decision 6).
+     `AppContainer.vue` imports `UserBar.vue`; its allowlist entry replaces the
+     React one.
+   - `InfoBar` and `InfoMenu` are in `src/components/InfoBar/`: they are the
+     shell of every page outside the dashboard, which the Vue auth pages (#85)
+     will mount. The React `Page` loads the bar on demand, as it does the modal
+     host, so that its popover keeps Reka off the login page's critical path.
+   - Two shared primitives: `MenuEntry.vue` (the button entry of a popover menu,
+     on `MENU_ENTRY_VARIANTS`, now shared) and `ProfilePicture.vue`.
+   - The cloud-only parts are under `src/cloud/`: `billing/` (the trial
+     indicator, "Upgrade" and the "Upgrade Plan" entry), `organization/` (the
+     maintainer's organization switcher) and `versionChecker/` (decision 6b's
+     list). They are imported directly, with a note, as #82 did (ruling 7): a
+     user-menu registry would be designed around two entries, one of which sits
+     between core entries.
+   - **"Invite" stays React** (`InviteUsersButton`, mounted with
+     `reactComponent`): its dialog, `InviteUsersModal`, is also the Members
+     settings' and is #87's (organization) to port.
+2. **The user menu stays a dialog of buttons.** The ticket asks for "menu roles,
+   arrow keys, Escape, matching react-aria behaviour". What react-aria gives
+   here is a dialog ("User Settings") of buttons: the React `Popover` renders a
+   plain `role="dialog"`, and #81's accessibility snapshot pins it. A `menu` of
+   `menuitem`s with arrow keys would change what screen readers announce and how
+   the menu is driven: a feature for its own ticket. The snapshot is unchanged.
+3. **One deliberate difference, for keyboard users: focus goes into the
+   popover.** The React popover is not react-aria's `Dialog`, so it never moved
+   focus: after opening the user menu (by click or Enter) focus stayed on the
+   button, Tab went on to the page beneath, and Escape closed it only once focus
+   had somehow got inside. A Reka popover traps focus. `Popover.vue` now focuses
+   its dialog element as it opens (as react-aria's `useDialog` does), rather
+   than its first control; Tab then moves through the entries, Escape closes it
+   and returns focus to the button. Seen by a keyboard user only: the button
+   loses its focus ring while the menu is open, and the entries show React's
+   focus ring (spelled out under `focus-visible:`, as Tailwind does not generate
+   variants of the multi-selector `focus-ring` class). It is a fix, so it takes
+   no changelog entry.
+4. **Two `Popover.vue` parity fixes, found by screenshot.** React's popover is
+   positioned against the viewport, so its `w-full` is the viewport's width
+   capped by the size's `max-w-*`; Reka's sits in a wrapper as wide as its
+   content and shrank (the user menu was 141px wide, not 206px): the Vue popover
+   uses `w-screen` instead. And it keeps react-aria's 12px from the viewport's
+   edges (`collisionPadding`). It also takes react-aria's `crossOffset`, which
+   the tray uses. With these, the user menu, the tray and the info menu match
+   React's pixel for pixel.
+5. **The shortcuts are the user's, shared with React.** The user menu shows each
+   entry's shortcut and its entries are global actions while the bar is mounted,
+   open or not, as React's `useMenuEntries` made them: in the command palette,
+   with `Mod+,` (Settings) and `Mod+/` (About) attached to `document.body`. So
+   the dashboard's bindings, with the user's changes, are now one instance
+   (`$/providers/inputBindings`) that the React `InputBindingsProvider` uses
+   too, and `useMenuEntries` has a Vue counterpart
+   (`$/composables/menuEntries`). `MenuEntry.vue` reads its action's shortcut,
+   icon and colour from it, which #82 (ruling 6) left out of
+   `KeyboardShortcut.vue`. One registry for both binding systems is still #170.
+6. **Notifications.** The React hooks are a Vue composable over the uploads
+   store (`notifications.ts`); the ticket's "over vue-query" applied only to
+   `useIsMutatingForBothBackends`, which nothing used, and is gone. An upload's
+   progress now follows each chunk (React re-read it only when something else
+   re-rendered); the messages, toasts and the minute a finished notification
+   stays are unchanged. The tray's list is a plain `role="list"`, where React's
+   was a react-aria `GridList` (`role="grid"`) whose rows the arrow keys moved
+   between; nothing selects them, and each item's one control (its close button)
+   is reached with Tab. Invisible.
+7. **The version checker still checks upstream's releases.** The maintainer's
+   decision was to point it at this fork's releases if that is contained and the
+   fork publishes any: it publishes none (`gh release list` is empty,
+   `releases/latest` answers 404), so it keeps polling
+   `enso-org/enso/releases/latest` exactly as before, and the question went to
+   the maintainer as #180. `App.vue` mounts it where React did (in the React
+   root, on every page), only while the check is enabled (the desktop app, or
+   forced from the devtools), and loads it then. "Remind me later" now marks the
+   cached release as postponed; React wrote its `select`ed view into the cache,
+   so the next `select` threw and the dialog was hidden by that error until the
+   next check. The outcome is the same.
+8. **About.** The user and info menus open the existing Vue dialog through
+   `openAboutModal()`. Its `Mod+/` shortcut now comes from the Vue
+   `useMenuEntries`. In Playwright (Chromium, base and branch alike), About
+   opened with `Mod+/` takes focus and closes with Escape; the installer bug
+   (#170) did not reproduce there and is left to #170.
+9. **No changelog entry.** Nothing changes for a mouse user, and the keyboard
+   change is a fix: the PR takes `CI: No changelog needed`, though the ticket
+   asked for an entry.
+
 ## Rulings from #89 (asset panel: Versions and Activity, 2026-10-02)
 
 #89 ports the right panel's asset tabs. Delegated like the rulings above:
