@@ -5,6 +5,7 @@
  * and that one call. See decision 6b in
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
  */
+import { contributeAppContainerModals } from '$/providers/layoutContributions'
 import type { Router } from 'vue-router'
 import { registerAccountSettings } from './account/settings'
 import { registerAgreementsGate } from './agreements/agreements'
@@ -15,4 +16,24 @@ export function registerCloud(router: Router) {
   registerAuthRoutes(router)
   registerAccountSettings()
   registerAgreementsGate()
+  contributeAppContainerModals(loadAppContainerModals)
+}
+
+/**
+ * The modals over the dashboard (organization setup and invitations, the end of a trial and a
+ * downgrade), loaded with its layout.
+ */
+async function loadAppContainerModals() {
+  const [setupOrganization, acceptInvitation, trialEnded, planDowngraded] = await Promise.all([
+    import('./organization/SetupOrganizationModal.vue'),
+    import('./organization/AcceptInvitationModal.vue'),
+    import('./billing/TrialEndedModal.vue'),
+    import('./billing/PlanDowngradedModal.vue'),
+  ])
+  return {
+    SetupOrganizationModal: setupOrganization.default,
+    AcceptInvitationModal: acceptInvitation.default,
+    TrialEndedModal: trialEnded.default,
+    PlanDowngradedModal: planDowngraded.default,
+  }
 }

@@ -1,37 +1,30 @@
 <script lang="ts">
-import {
-  AcceptInvitationModal as AcceptInvitationModalReact,
-  type AcceptInvitationModalProps,
-} from '#/modals/AcceptInvitationModal'
-import {
-  PlanDowngradedModal as PlanDowngradedModalReact,
-  type PlanDowngradedModalProps,
-} from '#/modals/PlanDowngradedModal'
-import { SetupOrganizationModal as SetupOrganizationModalReact } from '#/modals/SetupOrganizationForm'
-import {
-  TrialEndedModal as TrialEndedModalReact,
-  type TrialEndedModalProps,
-} from '#/modals/TrialEndedModal'
 import { DAY_MS } from '$/utils/time'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
+import { appContainerModals, loadAppContainerModals } from '$/providers/layoutContributions'
 import type { DataLoader } from '$/router'
 import { proxyRefs } from '$/utils/reactivity'
 import { backendQueryOptions } from '@/composables/backend'
 import { useEvent } from '@/composables/events'
-import { reactComponent } from '$/utils/react'
 import { waitForData } from '@/util/tanstack'
 import { useQuery } from '@tanstack/vue-query'
 import * as backendModule from 'enso-common/src/services/Backend'
 import { Ok } from 'enso-common/src/utilities/data/result'
 import { computed, onMounted, onUnmounted } from 'vue'
 
-const SetupOrganizationModal = reactComponent(SetupOrganizationModalReact)
-const TrialEndedModal = reactComponent(TrialEndedModalReact)
-const PlanDowngradedModal = reactComponent(PlanDowngradedModalReact)
-const AcceptInvitationModal = reactComponent(AcceptInvitationModalReact)
-
 const PLANS_TO_SPECIFY_ORG_NAME = [backendModule.Plan.team, backendModule.Plan.enterprise]
+
+/** The props of the contributed modals (`AppContainerModals`); this layout decides when they show. */
+interface TrialEndedModalProps {
+  readonly subscriptionId: backendModule.SubscriptionId
+}
+interface PlanDowngradedModalProps {
+  readonly deletionDeadlineTimestamp: number
+}
+interface AcceptInvitationModalProps {
+  readonly invitation: backendModule.Invitation
+}
 
 type Props = {
   shouldSetupOrganization: boolean
@@ -69,7 +62,11 @@ export const dataLoader: DataLoader<Props> = {
       // query auto-fires once `users/me` recovers without re-running the data loader.
       enabled: computed(() => !cloudDataUnavailable.value),
     })
-    if (!cloudDataUnavailable.value) await waitForData(organizationQuery)
+    // The modals come from the cloud (`registerCloud`), loaded before the layout renders.
+    await Promise.all([
+      cloudDataUnavailable.value ? undefined : waitForData(organizationQuery),
+      loadAppContainerModals(),
+    ])
 
     const acceptInvitationModalProps = computed(() => (invitation ? { invitation } : undefined))
 
@@ -114,6 +111,8 @@ export const dataLoader: DataLoader<Props> = {
 <script setup lang="ts">
 defineProps<Props>()
 
+const modals = computed(appContainerModals)
+
 const { remoteBackend } = useBackends()
 const logUserOpen = () => remoteBackend.logEvent('open_app')
 const logUserClose = () => remoteBackend.logEvent('close_app')
@@ -123,9 +122,23 @@ useEvent(window, 'beforeunload', logUserClose)
 </script>
 
 <template>
-  <SetupOrganizationModal v-if="shouldSetupOrganization" />
-  <TrialEndedModal v-if="trialEndedModalProps" v-bind="trialEndedModalProps" />
-  <PlanDowngradedModal v-if="planDowngradedModalProps" v-bind="planDowngradedModalProps" />
-  <AcceptInvitationModal v-if="acceptInvitationModalProps" v-bind="acceptInvitationModalProps" />
+  <template v-if="modals">
+    <component :is="modals.SetupOrganizationModal" v-if="shouldSetupOrganization" />
+    <component
+      :is="modals.TrialEndedModal"
+      v-if="trialEndedModalProps"
+      v-bind="trialEndedModalProps"
+    />
+    <component
+      :is="modals.PlanDowngradedModal"
+      v-if="planDowngradedModalProps"
+      v-bind="planDowngradedModalProps"
+    />
+    <component
+      :is="modals.AcceptInvitationModal"
+      v-if="acceptInvitationModalProps"
+      v-bind="acceptInvitationModalProps"
+    />
+  </template>
   <RouterView />
 </template>
