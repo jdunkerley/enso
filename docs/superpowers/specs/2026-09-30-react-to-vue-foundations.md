@@ -1472,3 +1472,87 @@ provisionally accepted, for the maintainer to review.
    collapse), from the keyboard where react-aria gave React that access.
 10. **No changelog entry**: the PR takes `CI: No changelog needed` (see ruling 4
     for the one visible difference).
+
+## Rulings from #183 (asset panel: Properties and Schedule, 2026-10-03)
+
+#183 is the second part of #89: the right panel's Properties and Schedule tabs.
+Delegated like the rulings above: provisionally accepted, for the maintainer to
+review.
+
+1. **The third registry: right-panel tabs.** `RightPanel.vue` no longer imports
+   cloud code. `contributeRightPanelTab(tab, loader)`
+   (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
+   Versions and Schedule (`executionsCalendar`) tabs their content;
+   `registerCloud` calls `registerPropertiesTab` and `registerVersionsTabs`. The
+   tabs' definitions (icon, title, order, when they are enabled, the scheduler's
+   paywall) stay in `$/providers/rightPanel`, so their place in the bar, and the
+   axe baseline's `nth-child` targets, are unchanged; a tab that nothing
+   contributed is hidden, so a build without the cloud shows none of the three.
+   A contribution is a loader: each tab's code loads when it first opens,
+   showing meanwhile the loader React's `Suspense` showed around the React tabs.
+   The registry imports no component, since `registerCloud` reaches it from the
+   app's entry. `properties` and `versions` join `CLOUD_AREAS`.
+2. **Where the code goes.** Schedule is `src/cloud/versions/` (decision 6b lists
+   scheduling there); Properties is a new area, `src/cloud/properties/`: every
+   section needs the cloud (the tab says so outside it). `reactTabs.ts` keeps
+   only the drive, and the React `AssetProperties`, `ProjectExecutionsCalendar`,
+   `ProjectExecution`, `AssetPanelPlaceholder`, `NewProjectExecutionModal` and
+   `spotlightHooks` are deleted, with the unused
+   `listProjectExecutionsQueryOptions` and
+   `getProjectExecutionDetailsQueryOptions`.
+3. **The datalink editor stays React, behind the bridge.** `JSONSchemaInput` and
+   its `FilePathInput` are #92's, shared with the drive's datalink dialog (#82,
+   ruling 1). The tab ports the form around it (Vue `Form`, "Update" and "Reset"
+   once changed, `FormError`) and mounts only the React editor (`DatalinkInput`,
+   a controlled value and `onChange`) with `reactComponent`, from
+   `properties/reactDatalinkInput.ts`: the one `#/` import in `src/cloud/`,
+   allowlisted until #92. React's `FieldError` there had no field around it and
+   rendered nothing; the Vue form shows no field error either. The secret's form
+   is #82's `UpsertSecretForm.vue` (`cancel="reset"`); the React one stays for
+   the drive's dialog. The drive table's "created by" and "shared with" cells
+   and the label pill are small Vue copies in `properties/`
+   (`PermissionDisplay.vue`, `AssetLabel.vue`), never pressable, as the tab used
+   them; the drive keeps the React ones until its port.
+4. **One deliberate difference: the spotlight finds its section.** "Edit" on a
+   secret or a datalink dims the window around its configuration. React measured
+   the section only when it was resized, so when "Edit" also opened the right
+   panel, the cutout stayed where the section was as the panel began to slide
+   in, at the window's right edge, and the section itself stayed dim. The Vue
+   overlay follows the section every frame and ends up around it. With the panel
+   already open the two are identical. A fix, so no changelog entry.
+5. **The calendar is Reka's, shaped as react-aria's.** Reka's `Calendar` gives
+   the keyboard (arrows, Enter/Space, paging at the month's edges) and the
+   previous/next buttons. To keep what assistive technology gets: the root is an
+   `application` named by the month with a hidden `h2`, the table a `grid` named
+   by the month, each day a button named "Today, …" / "… selected" as react-aria
+   named it, and a hidden "Next" button ends the calendar, as in React. The
+   header row stays empty: React gave its header cells no content. Days of other
+   months are disabled through `isDateDisabled`, not Reka's
+   `disableDaysOutsideCurrentView`, which marks every cell `aria-disabled`. The
+   chosen day and month are not reset when the selection moves to another
+   project (React's calendar was not keyed). While a month loads, a loader
+   replaces the tab and the calendar keeps its state, as React's suspended query
+   did. "Previous" is a new text id (react-aria supplied it).
+6. **Primitives fixed by comparing the running app.**
+   - `DatePicker`: `minValue` and `hideTimeZone` (React passed them through),
+     and values written as the `sv` locale writes them (`2045-01-26 1:23`: the
+     month and day padded, the hour not), where it showed `2045-1-26 01:23`.
+   - `Dropdown`: the closed field grew by its list's height, clipping its bottom
+     border; and its list takes the first Escape while it has a selection, as
+     react-aria's `ListBox` did, so a dialog around it closes on the second.
+   - `DropdownMenu`: an item that opens a dialog leaves the focus there. Reka
+     returned it to the menu's trigger as the menu's exit animation ended, and
+     the dialog's focus trap took it back without showing it: the deletion
+     question's "Delete" lost its focused colour.
+7. **Kept as React had them:** only the `compact` execution row (the only one
+   the calendar used) is ported; the repeat is described with "monthly on the
+   last weekday" still disabled; the delete question goes on the modal stack
+   (`ask`), and leaves it when answered (#156, ruling 5).
+8. **What still differs, by a few pixels.** The executions' actions menu,
+   centred under a trigger near the window's right edge, sits 4px left of
+   React's: react-aria offset it although it fitted (the Vue menu is centred on
+   its trigger); the date field's digits are rasterised 1px lower within
+   identical boxes. Everything else, every state of both tabs, matches React's
+   pixels apart from the drive's clock columns and antialiasing (see the PR).
+9. **No changelog entry**: the PR takes `CI: No changelog needed` (ruling 4 is a
+   fix).
