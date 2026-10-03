@@ -207,11 +207,11 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
         </ComboboxCancel>
       </ComboboxAnchor>
 
-      <ComboboxPortal :to="portalTarget()">
+      <!-- No list without items: react-aria's popover does not open on an empty list. -->
+      <ComboboxPortal v-if="items.length > 0" :to="portalTarget()">
         <!-- As react-aria's: as wide as the input's box, at its start, and no taller than the space
         below it (less 12px), the list scrolling inside. React's `--trigger-width` excludes the 48px
-        the shared variants add back. Hidden while it has no option to show, as react-aria's popover
-        does not open on an empty list. -->
+        the shared variants add back. -->
         <ComboboxContent
           position="popper"
           align="start"
