@@ -19,12 +19,24 @@ const PLACEHOLDERS: Partial<Record<SegmentPart, string>> = {
 }
 
 /**
- * The text to show for a segment: its value, or the English placeholder while it is empty. An
- * empty segment is one whose text has no digits (the locale's own placeholder, such as `åååå`).
+ * The text to show for a segment: its value written as the `sv` locale writes it (the month and
+ * day with two digits, the hour without a leading zero: `2026-09-05 9:05`), or the English
+ * placeholder while it is empty. An empty segment is one whose text has no digits (the locale's own
+ * placeholder, such as `åååå`).
  */
 export function segmentText(part: SegmentPart, value: string): string {
   const placeholder = PLACEHOLDERS[part]
-  return placeholder != null && !/\d/.test(value) ? placeholder : value
+  if (!/\d/.test(value)) return placeholder ?? value
+  if (!/^\d+$/.test(value)) return value
+  switch (part) {
+    case 'month':
+    case 'day':
+      return value.padStart(2, '0')
+    case 'hour':
+      return String(Number(value))
+    default:
+      return value
+  }
 }
 
 /** A segment as Reka's date fields list them. */

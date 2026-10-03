@@ -280,23 +280,99 @@ export function defineKeybinds<
   T extends Record<BindingName, [] | KeybindDefinition[]>,
   BindingName extends keyof T = keyof T,
 >(namespace: string, bindings: Keybinds<T>) {
+  registerNamespace(namespace)
+  const lookups = buildLookups<BindingName>(
+    Object.entries(bindings) as [BindingName, KeybindDefinition[]][],
+  )
+  const handler = makeHandler(namespace, () => lookups)
+  return { handler, bindings: lookups.bindingsInfo }
+}
+
+/**
+ * {@link defineKeybinds} for a namespace whose bindings the user may change (#170): `current`
+ * returns the current bindings of every action, and the handler and `bindings` follow it. It is
+ * read when an event arrives and when `bindings` is read, and the lookups are rebuilt when it
+ * returns a new object. So a rebinding applies at once, and a Vue `computed` (or template) that
+ * reads `bindings` updates when `current` is reactive.
+ *
+ * The bindings are plain strings, without {@link KeybindOptions}. The action names, and the order
+ * in which a handler offers a key to them, are `current`'s keys when this is first used.
+ *
+ * An action may have no bindings at all, so `bindings` (each action's first binding, as
+ * {@link defineKeybinds} gives) may be `undefined`.
+ */
+export function defineRebindableKeybinds<BindingName extends string>(
+  namespace: string,
+  current: () => Readonly<Record<BindingName, { readonly bindings: readonly string[] }>>,
+) {
+  registerNamespace(namespace)
+  let source: ReturnType<typeof current> | undefined
+  let lookups: Lookups<BindingName> | undefined
+  const currentLookups = () => {
+    const newSource = current()
+    if (lookups == null || newSource !== source) {
+      source = newSource
+      lookups = buildLookups<BindingName>(
+        Object.entries<{ readonly bindings: readonly string[] }>(newSource).map(
+          ([name, info]) => [name as BindingName, info.bindings] as const,
+        ),
+      )
+    }
+    return lookups
+  }
+  const handler = makeHandler(namespace, currentLookups)
+  const bindings = {} as Record<BindingName, BindingInfo | undefined>
+  let names: BindingName[] | undefined
+  const defineGetters = () => {
+    names = Object.keys(current()) as BindingName[]
+    for (const name of names) {
+      Object.defineProperty(bindings, name, {
+        enumerable: true,
+        get: () => currentLookups().bindingsInfo[name],
+      })
+    }
+  }
+  return {
+    handler,
+    /** The first binding of each action, or `undefined` for one without any. */
+    get bindings(): Readonly<Record<BindingName, BindingInfo | undefined>> {
+      if (names == null) defineGetters()
+      return bindings
+    },
+  }
+}
+
+function registerNamespace(namespace: string) {
   if (definedNamespaces.has(namespace)) {
     console.warn(`The keybind namespace '${namespace}' has already been defined.`)
   } else {
     definedNamespaces.add(namespace)
   }
+}
+
+/** The tables a handler looks a key up in, and what is shown of each action's bindings. */
+interface Lookups<BindingName extends PropertyKey> {
+  readonly keyboardShortcuts: Partial<Record<Key_, Record<ModifierFlags, Set<BindingName>>>>
+  readonly mouseShortcuts: Record<PointerButtonFlags, Record<ModifierFlags, Set<BindingName>>>
+  /** The first binding of each action. */
+  readonly bindingsInfo: Record<BindingName, BindingInfo>
+  /** The options of the first binding of each action. */
+  readonly bindingsOptions: Record<BindingName, KeybindOptions>
+}
+
+function fullKeybind(keybind: KeybindDefinition): FullKeybindDefinition {
+  return typeof keybind === 'string' ? { key: keybind } : keybind
+}
+
+function buildLookups<BindingName extends PropertyKey>(
+  entries: readonly (readonly [BindingName, readonly KeybindDefinition[]])[],
+): Lookups<BindingName> {
   const keyboardShortcuts: Partial<Record<Key_, Record<ModifierFlags, Set<BindingName>>>> = {}
   const mouseShortcuts: Record<PointerButtonFlags, Record<ModifierFlags, Set<BindingName>>> = []
-
-  function fullKeybind(keybind: KeybindDefinition): FullKeybindDefinition {
-    return typeof keybind === 'string' ? { key: keybind } : keybind
-  }
-
   const bindingsInfo = {} as Record<BindingName, BindingInfo>
   const bindingsOptions = {} as Record<BindingName, KeybindOptions>
-  for (const [name_, keybindValues] of Object.entries(bindings)) {
-    const name = name_ as BindingName
-    for (const keybindValue of keybindValues as KeybindDefinition[]) {
+  for (const [name, keybindValues] of entries) {
+    for (const keybindValue of keybindValues) {
       const keybindDef = fullKeybind(keybindValue)
       const { bind: keybind, info } = parseKeybindString(keybindDef.key)
       if (bindingsInfo[name] == null) {
@@ -319,30 +395,51 @@ export function defineKeybinds<
       }
     }
   }
+  return { keyboardShortcuts, mouseShortcuts, bindingsInfo, bindingsOptions }
+}
 
-  function eventKey(event: KeyboardEvent): Key_ {
-    // On OS X, the `option` modifier causes keys to be interpreted as language-specific alternative
-    // characters. Ideally, we would identify the key pressed if `option` were not held, since we
-    // treat `option` as a modifier of the base key; however, the event API does not provide a way
-    // to do this.
-    // As a workaround to support `Alt+Digit` bindings, in case the physical key pressed is a digit,
-    // we use the physical key code instead. This would not be a suitable solution for most keys,
-    // since the physical key `code` doesn't respect the user's layout, but very few users are
-    // likely to use keyboard layouts that change the interpretation of the digits (the "original"
-    // Dvorak layout does this, but even Dvorak users mostly use a variant that leaves the digits in
-    // numeric order).
-    const digit = event.code.match(/Digit(\d)/)
-    if (digit) return digit[1] as Key_
-    // If the physical key is not a digit, we use the `key` field, which respects the user's layout.
-    return event.key.toLowerCase() as Key_
-  }
+/** The physical digit of a digit key's event, which `defineKeybinds` handlers match on. */
+function physicalDigit(event: Pick<KeyboardEvent, 'code'>): string | undefined {
+  return event.code.match(/^Digit(\d)$/)?.[1]
+}
 
-  function handler<Event_ extends AnyHandlerEvent>(
+function eventKey(event: KeyboardEvent): Key_ {
+  // On OS X, the `option` modifier causes keys to be interpreted as language-specific alternative
+  // characters. Ideally, we would identify the key pressed if `option` were not held, since we
+  // treat `option` as a modifier of the base key; however, the event API does not provide a way
+  // to do this.
+  // As a workaround to support `Alt+Digit` bindings, in case the physical key pressed is a digit,
+  // we use the physical key code instead. This would not be a suitable solution for most keys,
+  // since the physical key `code` doesn't respect the user's layout, but very few users are
+  // likely to use keyboard layouts that change the interpretation of the digits (the "original"
+  // Dvorak layout does this, but even Dvorak users mostly use a variant that leaves the digits in
+  // numeric order).
+  const digit = physicalDigit(event)
+  if (digit != null) return digit as Key_
+  // If the physical key is not a digit, we use the `key` field, which respects the user's layout.
+  return event.key.toLowerCase() as Key_
+}
+
+/**
+ * The key of a keyboard event as a `defineKeybinds` handler names it, when that differs from
+ * `event.key`: a digit key is its digit whatever the modifiers make of it (`Shift+2` is `2`, not
+ * `@`). For capturing a new binding that such a handler is to match.
+ */
+export function keybindKeyOverride(event: Pick<KeyboardEvent, 'code'>): string | undefined {
+  return physicalDigit(event)
+}
+
+function makeHandler<BindingName extends PropertyKey>(
+  namespace: string,
+  getLookups: () => Lookups<BindingName>,
+) {
+  return function handler<Event_ extends AnyHandlerEvent>(
     handlers: Partial<
       Record<BindingName | typeof DefaultHandler, (event: Event_) => boolean | void>
     >,
   ): (event: Event_) => boolean {
     return (event) => {
+      const { keyboardShortcuts, mouseShortcuts, bindingsOptions } = getLookups()
       const eventModifierFlags = modifierFlagsForEvent(event)
       const keybinds =
         event instanceof KeyboardEvent ? keyboardShortcuts[eventKey(event)]?.[eventModifierFlags]
@@ -356,10 +453,11 @@ export function defineKeybinds<
       let handled = false
       if (keybinds != null) {
         for (const bindingName of unsafeKeys(handlers)) {
-          if (isRepeat && !bindingsOptions[bindingName].allowRepeat) continue
-          if (keybinds.has(bindingName)) {
-            const handle = handlers[bindingName as BindingName]
-            handled = handle && handle(event) !== false
+          const name = bindingName as BindingName
+          if (isRepeat && !bindingsOptions[name]?.allowRepeat) continue
+          if (keybinds.has(name)) {
+            const handle = handlers[name]
+            handled = handle != null && handle(event) !== false
             if (DEBUG_LOG)
               console.log(
                 `Event ${event.type} (${event instanceof KeyboardEvent ? event.key : buttonFlagsForEvent(event)})`,
@@ -382,8 +480,6 @@ export function defineKeybinds<
       return handled
     }
   }
-
-  return { handler, bindings: bindingsInfo }
 }
 
 /** A type predicate that narrows the potential child of the array. */

@@ -1,18 +1,18 @@
 /**
- * @file A settings tab that is still React, mounted by the Vue settings page (`SettingsPage.vue`)
- * through `reactComponent`.
+ * @file The settings tab that is still React (Billing & Plans), mounted by the Vue settings page
+ * (`SettingsPage.vue`) through `reactComponent`.
  *
- * TODO: #87 and #88 port the organization tabs; this bridge goes with the last of them.
+ * TODO: #88 ports Billing & Plans; this bridge, `data.tsx` and the React shell (`Tab`, `Section`,
+ * `Entry`, `CustomEntry`) go with it.
  */
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
-import { useMutationCallback } from '#/utilities/tanstackQuery'
 import {
   filterSettingsSections,
   isSettingsQueryBlank,
   settingsQueryMatcher,
 } from '$/configurations/settings'
 import { useBackends, useFullUserSession, useText } from '$/providers/react'
-import { backendMutationOptions, backendQueryOptions } from '$/utils/backendQuery'
+import { backendQueryOptions } from '$/utils/backendQuery'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import {
@@ -42,9 +42,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
   const { data: organization = null } = useQuery(
     backendQueryOptions(backend, 'getOrganization', [], { enabled: !isCloudDataUnavailable }),
   )
-  const updateOrganization = useMutationCallback(
-    backendMutationOptions(backend, 'updateOrganization'),
-  )
 
   const context = useMemo<SettingsContext>(
     () => ({
@@ -53,7 +50,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       backend,
       localBackend,
       organization,
-      updateOrganization,
       toastAndLog,
       getText,
       isCloudDataUnavailable,
@@ -65,7 +61,6 @@ export default function ReactSettingsTab(props: ReactSettingsTabProps) {
       backend,
       localBackend,
       organization,
-      updateOrganization,
       toastAndLog,
       getText,
       isCloudDataUnavailable,

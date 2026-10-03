@@ -1,13 +1,15 @@
 <script setup lang="ts">
-// A cloud-only area, imported directly until the right panel's tabs come from the cloud registry
-// (`src/cloud/index.ts`, #179); see decision 6b in the React-to-Vue decision record.
-import AssetVersions from '$/cloud/versions/AssetVersions.vue'
-import { AssetProperties, ProjectExecutionsCalendar } from '$/components/AppContainer/reactTabs'
 import SelectableTab from '$/components/AppContainer/SelectableTab.vue'
 import ProjectSessions from '$/components/AssetPanel/ProjectSessions.vue'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
+import Loader from '$/components/Spinner/Loader.vue'
 import { useContainerData } from '$/providers/container'
 import { useRightPanelData, type RightPanelTabId } from '$/providers/rightPanel'
+import {
+  rightPanelTabContribution,
+  type ContributedRightPanelTab,
+  type RightPanelTabLoader,
+} from '$/providers/rightPanelContributions'
 import { optPx } from '$/utils/dom'
 import type { ToValue } from '$/utils/reactivity'
 import AssetContentsEditor from '@/components/AssetContentsEditor.vue'
@@ -20,7 +22,15 @@ import SizeTransition from '@/components/SizeTransition.vue'
 import { useResizeObserver } from '@/composables/events'
 import { registerHandlers } from '@/providers/action'
 import type { Result } from 'enso-common/src/utilities/data/result'
-import { computed, toRef, toValue, useTemplateRef } from 'vue'
+import {
+  computed,
+  defineAsyncComponent,
+  h,
+  toRef,
+  toValue,
+  useTemplateRef,
+  type Component,
+} from 'vue'
 import PanelContents from './PanelContents.vue'
 
 const width = toRef(useContainerData(), 'rightPanelWidth')
@@ -28,6 +38,29 @@ const data = useRightPanelData()
 const PANEL_BACKGROUND_COLOR = 'white'
 // Inner container inside `PanelContents` component needs separate style, because it's teleported.
 const CONTAINER_STYLE = { backgroundColor: PANEL_BACKGROUND_COLOR }
+
+/**
+ * The content of a tab contributed from elsewhere (the cloud's Properties, Versions and Schedule
+ * tabs; `$/providers/rightPanelContributions`), loaded when the tab first opens. Meanwhile it shows
+ * the loader React's `Suspense` showed around the React tabs.
+ */
+const contributedComponents = new Map<RightPanelTabLoader, Component>()
+function contributedTab(tab: ContributedRightPanelTab) {
+  const loader = rightPanelTabContribution(tab)
+  if (loader == null) return undefined
+  let component = contributedComponents.get(loader)
+  if (component == null) {
+    component = defineAsyncComponent({
+      loader,
+      loadingComponent: () => h(Loader, { minHeight: 'h24', size: 'medium' }),
+      delay: 0,
+      // The tab shows its own loader, rather than suspending an enclosing `<Suspense>`.
+      suspensible: false,
+    })
+    contributedComponents.set(loader, component)
+  }
+  return component
+}
 
 // Not a part of RightPanelTabInfo, because it would create cyclic imports.
 const component = computed(() => {
@@ -37,13 +70,11 @@ const component = computed(() => {
     case 'contents':
       return AssetContentsEditor
     case 'settings':
-      return AssetProperties
     case 'versions':
-      return AssetVersions
+    case 'executionsCalendar':
+      return contributedTab(data.displayedTab)
     case 'sessions':
       return ProjectSessions
-    case 'executionsCalendar':
-      return ProjectExecutionsCalendar
     case 'documentation':
       return DocumentationEditor
     case 'help':

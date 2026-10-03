@@ -9,7 +9,7 @@
  * email, which signs them in here within five seconds, or by typing its code. It can send the
  * email again. A `redirect_to` parameter is kept as the `loginRedirect` for after signing in.
  */
-import { useUserAgreements } from '$/composables/userAgreements'
+import { useUserAgreements } from '$/cloud/agreements/userAgreements'
 import type { DataLoader } from '$/router'
 import { useQueryClient } from '@tanstack/vue-query'
 import { Ok } from 'enso-common/src/utilities/data/result'

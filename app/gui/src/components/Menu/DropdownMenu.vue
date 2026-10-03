@@ -9,6 +9,10 @@
  *
  * The trigger is the `trigger` slot, replacing React's `Menu.Trigger` wrapper; the items
  * (`MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`) are the default slot.
+ *
+ * An item that opens a dialog keeps the focus in that dialog, as react-aria's menus do: Reka would
+ * return the focus to the trigger once the menu's exit animation ended, and the dialog's focus trap
+ * then took it back without showing it (an `AlertDialog`'s confirm button lost its focused look).
  */
 import { placementToSideAlign, type Placement } from '$/components/placement'
 import { portalTarget } from '$/components/portal'
@@ -39,6 +43,13 @@ const {
 const open = defineModel<boolean>('open', { default: false })
 
 const sideAlign = computed(() => placementToSideAlign(placement))
+
+/** Leave the focus where it is when an item opened a dialog that now has it. */
+function onCloseAutoFocus(event: Event) {
+  if (document.activeElement?.closest('[role="dialog"], [role="alertdialog"]') != null) {
+    event.preventDefault()
+  }
+}
 const classes = computed(() => MENU_STYLES({ variant, className }))
 </script>
 
@@ -56,6 +67,7 @@ const classes = computed(() => MENU_STYLES({ variant, className }))
         :class="classes"
         :data-testid="testId"
         loop
+        @closeAutoFocus="onCloseAutoFocus"
       >
         <slot />
       </DropdownMenuContent>

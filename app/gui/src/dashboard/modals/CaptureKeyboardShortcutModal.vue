@@ -2,8 +2,8 @@
 /**
  * @file A modal capturing a keyboard shortcut: the Vue port of the React
  * `CaptureKeyboardShortcutModal`. The shortcut is the last key pressed with its modifiers; Enter
- * confirms it, unless it is already bound to something. It is meant for the modal stack
- * (`useModals().open`), and emits `close` once it has closed.
+ * confirms it, unless it is already bound to something (`conflictsWith` names what, #170). It is
+ * meant for the modal stack (`useModals().open`), and emits `close` once it has closed.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
@@ -15,6 +15,7 @@ import Text from '$/components/Text/Text.vue'
 import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import {
+  keybindKeyOverride,
   modifierFlagsForEvent,
   modifiersForModifierFlags,
   normalizedKeyboardSegmentLookup,
@@ -22,10 +23,19 @@ import {
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import { computed, onMounted, ref, type ComponentPublicInstance } from 'vue'
 
-const { description, existingShortcuts, onSubmit } = defineProps<{
+const { description, conflictsWith, digitsByPosition, onSubmit } = defineProps<{
   /** What the shortcut is for, quoted in the prompt. */
   description: string
-  existingShortcuts: ReadonlySet<string>
+  /**
+   * What already has the shortcut: `true` when the action itself has it, the names of the other
+   * actions that have it where this one is active, or nothing.
+   */
+  conflictsWith: (shortcut: string) => true | readonly string[]
+  /**
+   * Whether a digit key is captured as its digit whatever the modifiers make of it (`Shift+2`, not
+   * `Shift+@`), as the graph editor's shortcuts match digits (`@/util/shortcuts`).
+   */
+  digitsByPosition?: boolean
   onSubmit: (shortcut: string) => void
 }>()
 
@@ -37,6 +47,7 @@ const DELETE_KEY = isOnMacOS() ? 'Backspace' : 'Delete'
 /** The key and modifiers of a keyboard event, as a shortcut's parts. */
 function eventToPartialShortcut(event: KeyboardEvent) {
   const modifiers = modifiersForModifierFlags(modifierFlagsForEvent(event)).join('+')
+  const digit = digitsByPosition ? keybindKeyOverride(event) : undefined
   // `Tab` and `Shift+Tab` are reserved for keyboard navigation.
   const key =
     (
@@ -46,6 +57,7 @@ function eventToPartialShortcut(event: KeyboardEvent) {
       null
     : event.key === ' ' ? 'Space'
     : event.key === DELETE_KEY ? 'OsDelete'
+    : digit != null ? digit
     : (normalizedKeyboardSegmentLookup[event.key.toLowerCase()] ?? event.key)
   return { key, modifiers }
 }
@@ -61,7 +73,14 @@ const shortcut = computed(() =>
   : modifiers.value === '' ? key.value
   : `${modifiers.value}+${key.value}`,
 )
-const doesAlreadyExist = computed(() => key.value != null && existingShortcuts.has(shortcut.value))
+const conflict = computed(() => (key.value == null ? [] : conflictsWith(shortcut.value)))
+const doesAlreadyExist = computed(() => conflict.value === true || conflict.value.length !== 0)
+const conflictMessage = computed(() =>
+  conflict.value === true ? getText('shortcutAlreadyExists')
+  : conflict.value.length !== 0 ?
+    getText('shortcutAlreadyUsedBy', conflict.value.map((name) => `'${name}'`).join(', '))
+  : '',
+)
 const canSubmit = computed(() => key.value != null && !doesAlreadyExist.value)
 
 function formElement() {
@@ -130,9 +149,7 @@ function submit() {
         <Text v-if="shortcut === ''">{{ getText('noShortcutEntered') }}</Text>
         <KeyboardShortcut v-else :shortcut="shortcut" />
       </div>
-      <Text class="relative text-red-600">
-        {{ doesAlreadyExist ? 'This shortcut already exists.' : '' }}
-      </Text>
+      <Text class="relative text-red-600">{{ conflictMessage }}</Text>
       <ButtonGroup>
         <Submit :isDisabled="!canSubmit">{{ getText('confirm') }}</Submit>
         <DialogClose variant="outline">{{ getText('cancel') }}</DialogClose>

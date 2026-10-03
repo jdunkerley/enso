@@ -41,7 +41,10 @@ ask first: is this ProjectView-specific, or would another feature want it too?
 - `util/` — Pure TS utilities (no Vue imports in most files). Move to
   `src/util/` when something stops being ProjectView-specific.
 - `bindings.ts` — Keyboard shortcuts for ProjectView (see `app/gui/shortcuts.md`
-  for the user-facing list).
+  for the user-facing list). The graph editor's (`graphBindings`) are
+  user-rebindable: defined in `$/configurations/graphInputBindings`, they follow
+  the window's store, `$/providers/inputBindings` (#170). Every other namespace
+  there is fixed, with the reason noted above it.
 
 ## Interop with the Dashboard subtree
 

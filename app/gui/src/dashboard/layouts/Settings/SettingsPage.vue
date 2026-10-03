@@ -4,9 +4,11 @@
  * narrow screens), a search field that narrows the tabs, sections and entries to those matching it,
  * and the current tab, kept in the `SettingsTab` query parameter.
  *
- * The personal tabs are Vue (`SettingsTab.vue`); the organization tabs are still React, mounted
- * through `ReactSettingsTab` until #87 and #88 port them. The Account tab's sections come from the
- * cloud (`$/providers/settingsContributions`).
+ * Every tab but Billing & Plans is Vue (`SettingsTab.vue`); Billing & Plans is still React, mounted
+ * through `ReactSettingsTab` until #88 ports it. The sections of the Account tab and of the cloud's
+ * tabs (Organization, Members, User groups, Activity log, API keys, Usage) come from the cloud
+ * (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a tab
+ * whose feature the user's plan lacks.
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
@@ -27,9 +29,14 @@ import { useBackends } from '$/providers/backends'
 import { localPathsStore } from '$/providers/localDirectories'
 import { useQueryParams } from '$/providers/queryParams'
 import { provideSettingsContext } from '$/providers/settingsContext'
-import { loadSettingsContributions, settingsContributions } from '$/providers/settingsContributions'
+import {
+  loadSettingsContributions,
+  settingsContributions,
+  settingsPaywall,
+} from '$/providers/settingsContributions'
 import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
+import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { includesPredicate } from '$/utils/data/array'
 import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
@@ -98,6 +105,9 @@ const organizationQuery = useQuery(
 const organization = computed(() => organizationQuery.data.value ?? null)
 
 const updateUserMutation = useMutation(backendMutationOptions('updateUser', backends.remoteBackend))
+const updateOrganizationMutation = useMutation(
+  backendMutationOptions('updateOrganization', backends.remoteBackend),
+)
 
 const localStorage = LocalStorage.getInstance()
 const preferredTimeZone = ref(localStorage.get('preferredTimeZone'))
@@ -131,6 +141,9 @@ const context = computed<SettingsContext>(() => ({
   getText,
   updateUser: async (body) => {
     await updateUserMutation.mutateAsync([body])
+  },
+  updateOrganization: async (body) => {
+    await updateOrganizationMutation.mutateAsync([body])
   },
   changePassword: sessionStore.changePassword,
   preferredTimeZone: preferredTimeZone.value,
@@ -168,6 +181,8 @@ const tabSections = computed(() =>
 const tabsToShow = computed(() =>
   tabSections.value.flatMap((tabSection) =>
     tabSection.tabs
+      // A Vue tab with no sections has nothing contributed to it: a build without the cloud.
+      .filter((tabData) => 'react' in tabData || tabData.sections.length > 0)
       .filter((tabData) => tabData.visible?.(context.value) ?? true)
       .filter(
         (tabData) =>
@@ -190,6 +205,14 @@ const vueSections = computed((): readonly SettingsSectionData[] => {
   if ('react' in data) return []
   if (isQueryBlank.value) return data.sections
   return filterSettingsSections(data, isMatch.value, getText, SETTINGS_NO_RESULTS_SECTION_DATA)
+})
+
+const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
+/** The feature the current tab is locked behind, while the user's plan lacks it. */
+const paywallFeature = computed(() => {
+  const data = tabData.value
+  if ('react' in data || data.feature == null) return null
+  return isFeatureUnderPaywall(data.feature) ? data.feature : null
 })
 
 const title = computed(() =>
@@ -252,6 +275,9 @@ const title = computed(() =>
         </aside>
         <main class="flex flex-1 flex-col overflow-y-auto pb-12 pl-1 scrollbar-gutter-stable">
           <ReactSettingsTab v-if="'react' in tabData" :data="tabData" :query="query" />
+          <template v-else-if="paywallFeature != null">
+            <component :is="settingsPaywall()" v-if="settingsPaywall()" :feature="paywallFeature" />
+          </template>
           <SettingsTab v-else :key="effectiveTab" :sections="vueSections" />
         </main>
       </div>
