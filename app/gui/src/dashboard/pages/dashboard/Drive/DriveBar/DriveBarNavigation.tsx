@@ -8,16 +8,17 @@ import { Menu } from '#/components/Menu'
 import { Scroller } from '#/components/Scroller/Scroller'
 import { moveAssetsMutationOptions } from '#/hooks/backendBatchedHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
+import { useStore } from '#/hooks/storeHooks'
 import { useSyncRef } from '#/hooks/syncRefHooks'
 import {
   parseDirectoriesPath,
   type PathItem,
 } from '#/layouts/Drive/Categories/parseDirectoriesPath'
 import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
-import { useLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import { localPathsStore } from '$/providers/localDirectories'
 import { useCategories, useText } from '$/providers/react'
 import {
   useDriveCurrentBackend,
@@ -49,7 +50,8 @@ export function DriveBarNavigation() {
   const [, setDirectory] = useDriveCurrentDirectory()
   const currentRootPath = categoryRootPath(category)
   const associatedBackend = useDriveCurrentBackend()
-  const localRootDirectory = useLocalRootDirectory() ?? undefined
+  const localRootDirectory =
+    useStore(localPathsStore, (state) => state.localRootDirectory) ?? undefined
   const { rootDirectoryId, currentDirectoryId } = useDirectoryIds({ category })
   const currentDirectoryIdRef = useSyncRef(currentDirectoryId)
   const rightPanel = useRightPanelData()

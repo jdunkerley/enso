@@ -6,7 +6,6 @@
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
 // does), so to ESLint the components imported here have an error type.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { setDownloadDirectory, setLocalRootDirectory } from '#/layouts/Drive/persistentState'
 import { actionToTextId, BINDINGS } from '$/configurations/inputBindings'
 import {
   settingsFormEntryData,
@@ -15,6 +14,7 @@ import {
   type SettingsTabSectionData,
 } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
+import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
 import { Path } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { z } from 'zod'
