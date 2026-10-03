@@ -1576,12 +1576,24 @@ provisionally accepted, for the maintainer to review.
    outside the modal, so Tab first walked the page beneath), and every dialog
    here is named by its title (#156, ruling 11). A dialog leaves after its exit
    animation (#156, ruling 3), about 200ms after React's did.
-7. **The React `UpsertSecretModal.tsx` keeps only its form**, for the React
+7. **Escape and the dashboard's global binding.** The React dashboard binds
+   Escape on `document.body` to `closeModal`, which closes every modal.
+   react-aria's dialogs and popovers stopped the key before it got there; Reka
+   listens on the document, after it. So, on the page, Escape in a Vue stack
+   modal is first a `closeAll`: the modal leaves the stack without being
+   answered. The duplicate-name dialog therefore reports a cancellation whenever
+   it leaves the stack unanswered (as Escape did in React), and its rename form
+   stops Escape itself and closes only itself: without that, Escape there closed
+   the whole dialog and left the upload waiting forever (found in a keyboard
+   pass against the base). Any Vue popover inside a Vue stack modal needs the
+   same until the binding goes (#170) or `Popover.vue` stops the key as
+   react-aria did; #198's labels popover is the next one.
+8. **The React `UpsertSecretModal.tsx` keeps only its form**, for the React
    asset panel (`AssetProperties.tsx`) and the form's parity test; #190 deletes
    the panel, and the file goes with the next PR after both have landed.
-8. **A porter's trap: branded ids as props.** A prop typed with one of the
+9. **A porter's trap: branded ids as props.** A prop typed with one of the
    backend's ids (`DirectoryId`, `SecretId`) is a `Newtype` that Vue's prop
    check sees as an `Object`, and it warns at run time when given the string.
    Such a prop is declared `DirectoryId & string`.
-9. **No changelog entry.** Nothing changes for a mouse user, so the PR takes
-   `CI: No changelog needed`.
+10. **No changelog entry.** Nothing changes for a mouse user, so the PR takes
+    `CI: No changelog needed`.
