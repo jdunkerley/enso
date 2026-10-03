@@ -33,6 +33,14 @@ community build without the cloud can leave it out (decision 6b of
     (`rightPanel.ts`).
   - `properties/` — the right panel's Properties tab (#183), with the secret and
     datalink configuration, contributed by `registerPropertiesTab`.
+  - From the layouts (#84): `agreements/` (the Terms of Service and Privacy
+    Policy gate: `AgreementsModal.vue` and the agreement state,
+    `userAgreements.ts`, which the sign-up page uses too; contributed by
+    `agreements.ts`), `organization/` (`SetupOrganizationModal.vue`,
+    `AcceptInvitationModal.vue`), `billing/` (`TrialEndedModal.vue`,
+    `PlanDowngradedModal.vue` and their `downgradeModalState.ts`) and
+    `browserDisabled/` (the page shown when running projects in the browser is
+    disabled, and its route).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules
@@ -60,9 +68,15 @@ community build without the cloud can leave it out (decision 6b of
   (`$/providers/rightPanelContributions`) gives the Properties (`settings`),
   Versions and Schedule (`executionsCalendar`) tabs their content; the tabs
   themselves (icon, title, enabling, the scheduler's paywall) stay in
-  `$/providers/rightPanel`, which hides one that nothing contributed. Further
-  registries (user-menu entries, asset context-menu entries, the paywall check)
-  appear with the first port that needs each.
+  `$/providers/rightPanel`, which hides one that nothing contributed. The
+  layouts' modals are the fourth (`$/providers/layoutContributions`, #84):
+  `contributeAgreementsGate` gives `ProtectedLayout.vue` its agreements gate,
+  and `contributeAppContainerModals` gives `AppContainerLayout.vue` its four
+  modals. The layouts still decide when each shows; their data loaders await the
+  loaders, so a modal never appears late. Without a contribution nothing shows,
+  so a build without the cloud asks for no agreement. Further registries
+  (user-menu entries, asset context-menu entries, the paywall check) appear with
+  the first port that needs each.
 - Areas may import the core freely (`$/components`, `$/providers`, …).
 - Pages load on demand (`() => import(…)` in the routes), so that the cloud adds
   nothing to the initial chunk.

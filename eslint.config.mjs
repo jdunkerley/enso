@@ -108,7 +108,7 @@ const DASHBOARD_IMPORT_PATTERN = {
  * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
  * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
  */
-const CLOUD_AREAS = ['account', 'auth', 'properties', 'versions']
+const CLOUD_AREAS = ['account', 'agreements', 'auth', 'browserDisabled', 'properties', 'versions']
 
 // =======================================
 // === Restricted syntactic constructs ===
