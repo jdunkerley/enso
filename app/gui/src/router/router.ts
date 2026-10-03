@@ -1,4 +1,4 @@
-import { DASHBOARD_PATH, PAYMENTS_SUCCESS_PATH, SUBSCRIBE_PATH } from '$/appUtils'
+import { PAYMENTS_SUCCESS_PATH, SUBSCRIBE_PATH } from '$/appUtils'
 import { useAuth } from '$/providers/auth'
 import { useConfig } from '$/providers/config'
 import { flagsStore } from '$/providers/featureFlags'
@@ -10,7 +10,7 @@ import {
   redirectFromPath,
 } from '$/router/dashboardGuards'
 import { withDataLoader } from '$/router/dataLoader'
-import { PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
+import { CLOUD_DISABLED_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
 import { reactComponent } from '$/utils/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
@@ -19,11 +19,15 @@ const UNAVAILABLE_PATH = '/UNAVAILABLE'
 
 function requireCloudBrowserEnabled() {
   const isCloudExecutionEnabled = flagsStore.getState().featureFlags.enableCloudExecution
-  if (!isCloudExecutionEnabled) return { name: 'cloudDisabled' }
+  // The page is the cloud's (`registerCloud` adds it); a build without it has nowhere to send to.
+  if (!isCloudExecutionEnabled && router.hasRoute(CLOUD_DISABLED_ROUTE)) {
+    return { name: CLOUD_DISABLED_ROUTE }
+  }
 }
 
-// The cloud's authentication pages (sign-in, sign-up, password reset, …) are not listed here:
-// `registerCloud` (`$/cloud`) adds them, some as children of the protected layout.
+// The cloud's authentication pages (sign-in, sign-up, password reset, …) and the page shown when
+// running projects in the browser is disabled are not listed here: `registerCloud` (`$/cloud`)
+// adds them, some as children of the protected layout.
 const routes = [
   {
     name: PROTECTED_LAYOUT_ROUTE,
@@ -78,16 +82,6 @@ const routes = [
               import('#/pages/subscribe/Subscribe').then((mod) => reactComponent(mod.Subscribe)),
           },
         ],
-      },
-      {
-        path: '/cloudDisabled',
-        name: 'cloudDisabled',
-        meta: { access: 'anyLoggedIn' },
-        component: () =>
-          import('#/layouts/CloudBrowserDisabled').then((mod) =>
-            reactComponent(mod.CloudBrowserDisabledPage),
-          ),
-        props: { redirectPath: DASHBOARD_PATH },
       },
     ],
   },
