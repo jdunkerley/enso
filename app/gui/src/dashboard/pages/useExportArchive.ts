@@ -1,10 +1,10 @@
 /** @file A React hook returning a function to export an archive. */
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
-import { useDownloadDirectory } from '#/layouts/Drive/useDownloadDirectory'
 import { useDriveStore } from '#/providers/DriveProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
 import { useText } from '$/providers/react'
+import { useDownloadDirectory } from '$/providers/react/localDirectories'
 import { backendMutationOptions } from '$/utils/backendQuery'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 import type { Backend } from 'enso-common/src/services/Backend'
