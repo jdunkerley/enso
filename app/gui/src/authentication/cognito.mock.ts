@@ -48,6 +48,11 @@ const TEN_HOURS_S = 36_000
 
 const MOCK_ORGANIZATION_ID_KEY = 'mock_organization_id'
 const MOCK_EMAIL_KEY = 'mock_email'
+/**
+ * When set, signing in with a password asks for a one-time code, and this is the right one. Tests set
+ * it before the app loads, to reach the sign-in page's one-time-code step.
+ */
+const MOCK_TOTP_CODE_KEY = 'mock_totp_code'
 
 let mockOrganizationId = localStorage.getItem(MOCK_ORGANIZATION_ID_KEY)
 let mockEmail = localStorage.getItem(MOCK_EMAIL_KEY)
@@ -59,6 +64,8 @@ let mockEmail = localStorage.getItem(MOCK_EMAIL_KEY)
  */
 export class Cognito {
   isSignedIn = false
+  /** The user whose one-time code {@link confirmSignIn} expects. */
+  private pendingTotpUsername: string | null = null
 
   /** Create a new Cognito wrapper. */
   constructor(
@@ -244,6 +251,34 @@ export class Cognito {
    * Does not rely on external identity providers (e.g., Google or GitHub).
    */
   async signInWithPassword(username: string, _password: string) {
+    if (localStorage.getItem(MOCK_TOTP_CODE_KEY) != null) {
+      this.pendingTotpUsername = username
+      return results.Ok({
+        isSignedIn: false,
+        nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' as const },
+      })
+    }
+    return this.completeSignIn(username)
+  }
+
+  /**
+   * Answer the one-time-code challenge of {@link signInWithPassword}. A wrong code fails as
+   * Amplify 6 fails it: with an error named, not coded, `CodeMismatchException`.
+   */
+  async confirmSignIn(challengeResponse: string) {
+    const username = this.pendingTotpUsername
+    if (username == null || challengeResponse !== localStorage.getItem(MOCK_TOTP_CODE_KEY)) {
+      const error = new Error('Invalid code or auth state for the user.')
+      error.name = 'CodeMismatchException'
+      return results.Err(original.intoConfirmSignInErrorOrThrow(error))
+    }
+    this.pendingTotpUsername = null
+    await this.completeSignIn(username)
+    return results.Ok({ isSignedIn: true, nextStep: { signInStep: 'DONE' as const } })
+  }
+
+  /** Sign in as the given user. */
+  private async completeSignIn(username: string) {
     this.isSignedIn = true
     mockEmail = username
     localStorage.setItem(MOCK_EMAIL_KEY, username)

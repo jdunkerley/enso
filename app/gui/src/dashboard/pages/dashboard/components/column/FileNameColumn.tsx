@@ -4,8 +4,7 @@ import { Icon } from '#/components/Icon'
 import { useRenameAsset } from '#/hooks/backendHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
-import { useDriveStore } from '#/providers/DriveProvider'
-import { useStore } from '#/utilities/zustand'
+import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
 import { useDriveCurrentBackend } from '$/providers/react/container'
 import { fileIcon } from '$/utils/fileIcon'
 import { titleSchema, type FileAsset } from 'enso-common/src/services/Backend'
@@ -28,14 +27,14 @@ export default function FileNameColumn(props: FileNameColumnProps) {
   const driveStore = useDriveStore()
   const renameAsset = useRenameAsset(backend)
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
   const setIsEditing = (isEditing: boolean) => {
     if (isEditing) {
       if (isEditable) {
-        driveStore.setState({ assetToRename: item.id })
+        driveStore.update({ assetToRename: item.id })
       }
     } else {
-      driveStore.setState({ assetToRename: null })
+      driveStore.update({ assetToRename: null })
     }
   }
 

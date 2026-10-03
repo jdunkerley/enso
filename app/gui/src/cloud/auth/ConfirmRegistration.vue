@@ -4,10 +4,14 @@
  * `ConfirmRegistration`. It confirms the account with the link's `email` and `verification_code`
  * at once, then sends the user to `redirect_url` (by default the dashboard) after five seconds.
  * Without either parameter it returns to the sign-in page.
+ *
+ * The result's title (confirming, confirmed, failed) is the page's only, level-1, heading. The React
+ * page had an empty `h1` above it instead (#178).
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Button from '$/components/Button/Button.vue'
 import Result from '$/components/Result/Result.vue'
+import Heading from '$/components/Text/Heading.vue'
 import { DASHBOARD_PATH, LOGIN_PATH } from '$/appUtils'
 import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
@@ -69,12 +73,12 @@ const texts = computed(() => {
 </script>
 
 <template>
-  <AuthenticationPage v-if="hasParams" title="">
-    <Result
-      :status="confirmRegistration.status.value"
-      :title="texts.title"
-      :subtitle="texts.subtitle"
-    >
+  <!-- No page title: the result's title is the page's heading, at level 1 but in its own style. -->
+  <AuthenticationPage v-if="hasParams">
+    <Result :status="confirmRegistration.status.value" :subtitle="texts.subtitle">
+      <template #title>
+        <Heading :level="1" variant="subtitle">{{ texts.title }}</Heading>
+      </template>
       <ButtonGroup align="center" :buttonVariants="{ variant: 'submit' }">
         <Button v-if="confirmRegistration.isIdle.value" @press="confirm">
           {{ getText('confirm') }}

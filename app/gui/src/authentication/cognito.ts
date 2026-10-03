@@ -138,6 +138,22 @@ export function intoAmplifyErrorOrThrow(error: unknown): AmplifyError {
   }
 }
 
+/**
+ * Convert an error of `confirmSignIn` into an {@link AmplifyError}, or re-throw it.
+ *
+ * Amplify 6 names a Cognito service error by its `name` (`CodeMismatchException`), and gives it no
+ * `code`, so {@link intoAmplifyErrorOrThrow} alone re-throws it, and the sign-in page's handling of
+ * a wrong one-time code or an expired session never runs. The `name` becomes the `code` here.
+ * @throws {Error} If the error is neither an Amplify error nor a named Cognito exception.
+ */
+export function intoConfirmSignInErrorOrThrow(error: unknown): AmplifyError {
+  if (error instanceof Error && !('code' in error) && error.name.endsWith('Exception')) {
+    return intoAmplifyErrorOrThrow(Object.assign(error, { code: error.name }))
+  } else {
+    return intoAmplifyErrorOrThrow(error)
+  }
+}
+
 /** Object returned by the AWS Amplify library when an auth error occurs. */
 interface AuthError {
   readonly name: string
@@ -576,7 +592,7 @@ export class Cognito implements ISessionProvider {
     const result = await results.Result.wrapAsync(() =>
       amplify.confirmSignIn({ challengeResponse }),
     )
-    return result.mapErr(intoAmplifyErrorOrThrow)
+    return result.mapErr(intoConfirmSignInErrorOrThrow)
   }
 
   /**

@@ -1,5 +1,9 @@
-import { useDriveLocation as useDriveStoreVue, type DriveLocationStore } from '$/providers//drive'
 import { useContainerData as useContainerDataVue, type ContainerData } from '$/providers/container'
+import {
+  useDriveLocation as useDriveStoreVue,
+  type DriveLocationStore,
+  type NavigationTransition,
+} from '$/providers/drive'
 import { useInReactFunction, useVueRef, useVueValue } from '$/providers/react/common'
 import {
   useRightPanelData as useRightPanelDataVue,
@@ -17,10 +21,12 @@ export const useRightPanelData = useInReactFunction(RightPanelDataContext)
 const ContainerDataContext = react.createContext<ContainerData | null>(null)
 export const useContainerData = useInReactFunction(ContainerDataContext)
 
-const DriveLocationStoreContext = react.createContext<{
+export const DriveLocationStoreContext = react.createContext<{
   currentCategory: [Category, (newCategory: Category) => void]
   currentDirectory: [DirectoryId | null, (newDir: DirectoryId | null) => void]
   associatedBackend: Backend
+  setNavigationTransition: (transition: NavigationTransition | undefined) => void
+  setIsNavigating: (isNavigating: boolean) => void
   setDefaultCategory: () => void
 } | null>(null)
 export const useDriveLocation = useInReactFunction(DriveLocationStoreContext)
@@ -45,6 +51,13 @@ export const ContainerProviderForReact = reactComponent(
       ),
       associatedBackend: useVueValue(
         react.useCallback(() => driveStore.associatedBackend, [driveStore]),
+      ),
+      setNavigationTransition: driveStore.setNavigationTransition,
+      setIsNavigating: react.useCallback(
+        (isNavigating: boolean) => {
+          driveStore.isNavigating = isNavigating
+        },
+        [driveStore],
       ),
       setDefaultCategory: driveStore.setDefaultCategory,
     }
@@ -102,4 +115,30 @@ export function useDriveCurrentBackend() {
 export function useDriveCurrentDirectory() {
   const drive = useDriveLocation()
   return drive.currentDirectory
+}
+
+/**
+ * Run the drive's changes of location in a React transition, so the drive keeps showing the old
+ * location while the new one suspends, and report the transition as the drive store's
+ * `isNavigating` (which the category buttons show as a spinner). For the React drive, until #91.
+ */
+export function useDriveNavigationTransition() {
+  const { setNavigationTransition, setIsNavigating } = useDriveLocation()
+  const [isPending, startTransition] = react.useTransition()
+  react.useEffect(() => {
+    setNavigationTransition(startTransition)
+    return () => {
+      setNavigationTransition(undefined)
+    }
+  }, [setNavigationTransition, startTransition])
+  // Set once React has committed the pending state, as the dashboard passed it to Vue before.
+  react.useEffect(() => {
+    setIsNavigating(isPending)
+  }, [isPending, setIsNavigating])
+  react.useEffect(
+    () => () => {
+      setIsNavigating(false)
+    },
+    [setIsNavigating],
+  )
 }

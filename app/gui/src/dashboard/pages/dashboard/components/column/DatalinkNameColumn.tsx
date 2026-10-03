@@ -4,11 +4,10 @@ import { Icon } from '#/components/Icon'
 import { useRenameAsset } from '#/hooks/backendHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
-import { useDriveStore } from '#/providers/DriveProvider'
+import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
 import { useDriveCurrentBackend, useRightPanelData } from '$/providers/react/container'
 import { isDoubleClick } from '$/utils/event'
 import { titleSchema, type DatalinkAsset } from 'enso-common/src/services/Backend'
-import { useStore } from 'zustand'
 
 /** Props for a {@link DatalinkNameColumn}. */
 export interface DatalinkNameColumnProps extends AssetNameColumnProps {
@@ -29,14 +28,14 @@ export default function DatalinkNameColumn(props: DatalinkNameColumnProps) {
   const rightPanel = useRightPanelData()
   const driveStore = useDriveStore()
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
   const setIsEditing = (isEditing: boolean) => {
     if (isEditing) {
       if (isEditable) {
-        driveStore.setState({ assetToRename: item.id })
+        driveStore.update({ assetToRename: item.id })
       }
     } else {
-      driveStore.setState({ assetToRename: null })
+      driveStore.update({ assetToRename: null })
     }
   }
 

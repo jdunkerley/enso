@@ -4,7 +4,7 @@ import { useRenameAsset } from '#/hooks/backendHooks'
 import { useGetAssetChildren } from '#/layouts/Drive/assetsTableItemsHooks'
 import type { AssetNameColumnProps } from '#/pages/dashboard/components/column'
 import ProjectIcon, { CLOSED_PROJECT_STATE } from '#/pages/dashboard/components/ProjectIcon'
-import { useDriveStore } from '#/providers/DriveProvider'
+import { useDriveState, useDriveStore } from '#/providers/DriveProvider'
 import { useFullUserSession } from '$/providers/react'
 import { useContainerData, useDriveCurrentBackend } from '$/providers/react/container'
 import { isDoubleClick } from '$/utils/event'
@@ -15,7 +15,6 @@ import {
   PERMISSION_ACTION_CAN_EXECUTE,
   tryFindSelfPermission,
 } from 'enso-common/src/utilities/permissions'
-import { useStore } from 'zustand'
 
 /** Props for a {@link ProjectNameColumn}. */
 export interface ProjectNameColumnProps extends AssetNameColumnProps {
@@ -33,14 +32,14 @@ export default function ProjectNameColumn(props: ProjectNameColumnProps) {
   const driveStore = useDriveStore()
   const { openProjectLocally } = useContainerData()
 
-  const isEditingName = useStore(driveStore, ({ assetToRename }) => assetToRename === item.id)
+  const isEditingName = useDriveState(({ assetToRename }) => assetToRename === item.id)
   const setIsEditing = (isEditing: boolean) => {
     if (isEditing) {
       if (isEditable) {
-        driveStore.setState({ assetToRename: item.id })
+        driveStore.update({ assetToRename: item.id })
       }
     } else {
-      driveStore.setState({ assetToRename: null })
+      driveStore.update({ assetToRename: null })
     }
   }
 

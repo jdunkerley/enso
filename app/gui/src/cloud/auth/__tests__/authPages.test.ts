@@ -168,20 +168,28 @@ describe('LoginPage', () => {
       expect(router.currentRoute.value.path).toBe('/')
     })
 
-    test('clears a wrong code for another try', async () => {
-      // As in React, the form's reset after the submission also clears the error it set.
-      session.confirmSignIn.mockResolvedValue({
+    test('a wrong code shows an error under the code, and is cleared for another try', async () => {
+      session.confirmSignIn.mockResolvedValueOnce({
         ok: false,
         val: { code: 'CodeMismatchException', message: 'Invalid code.' },
       })
       await reachCodeStep()
       await enterCode('123456')
-      expect(session.confirmSignIn).toHaveBeenCalledWith('123456')
-      const inputs = document.querySelectorAll<HTMLInputElement>(
-        '[data-testid="otp-input"] input:not([type="hidden"])',
-      )
+      const otpInput = document.querySelector('[data-testid="otp-input"]')!
+      const inputs = otpInput.querySelectorAll<HTMLInputElement>('input:not([type="hidden"])')
       expect([...inputs].map((input) => input.value).join('')).toBe('')
-      expect(document.body.textContent).toContain(getText('enterTotp'))
+      expect(otpInput.textContent).toContain(getText('wrongOneTimeCode'))
+      expect(inputs[0]!.getAttribute('aria-invalid')).toBe('true')
+      await vi.waitFor(() => expect(document.activeElement).toBe(inputs[0]))
+
+      // The error stays while the next code is typed, and goes once it is submitted.
+      session.confirmSignIn.mockResolvedValueOnce({ ok: true })
+      await userEvent.setup().keyboard('654')
+      expect(otpInput.textContent).toContain(getText('wrongOneTimeCode'))
+      await userEvent.setup().keyboard('321')
+      await vi.waitFor(() => expect(session.confirmSignIn).toHaveBeenLastCalledWith('654321'))
+      await flushPromises()
+      expect(document.body.textContent).not.toContain(getText('wrongOneTimeCode'))
     })
 
     test('an expired session returns to the first step, with the error', async () => {
@@ -284,6 +292,20 @@ describe('ConfirmRegistration', () => {
     await flushPromises()
     expect(session.confirmSignUp).toHaveBeenCalledWith('user@example.com', '123')
     expect(document.body.textContent).toContain(getText('confirmRegistrationTitleSuccess'))
+  })
+
+  test('is headed by its result, with no empty heading', async () => {
+    let confirm: () => void = () => {}
+    session.confirmSignUp.mockReturnValue(new Promise<void>((resolve) => (confirm = resolve)))
+    await mountWithProviders(ConfirmRegistration, {
+      route: '/confirmation?email=user%40example.com&verification_code=123',
+    })
+    const headings = () => [...document.querySelectorAll('h1')].map((h1) => h1.textContent.trim())
+    expect(headings()).toEqual([getText('confirmRegistrationTitlePending')])
+    confirm()
+    await flushPromises()
+    expect(headings()).toEqual([getText('confirmRegistrationTitleSuccess')])
+    expect(document.querySelectorAll('h2')).toHaveLength(0)
   })
 
   test('returns to sign-in without the link’s parameters', async () => {
