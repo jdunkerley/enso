@@ -326,6 +326,12 @@
   /* Comments in the code editor. The "Handwritten comments" setting switches it to Monaspace Radon
      (`.handwrittenComments` below). */
   --font-mono-comment: var(--font-mono);
+  /* Node comments, the bubbles above graph nodes (`GraphNodeComment.vue`): the UI face, which the
+     "Handwritten comments" setting switches to Monaspace Radon (`.handwrittenComments` below). A
+     token of their own, not `--font-mono-comment`: the bubble is free text, not on a code grid. */
+  --font-node-comment: var(--font-sans);
+  --font-node-comment-variant-ligatures: normal;
+  --font-node-comment-feature-settings: normal;
   /* Default resize handle widths, used for panels. */
   --resize-handle-inside: 3px;
   --resize-handle-outside: 3px;
@@ -347,9 +353,17 @@
 /* The "Handwritten comments" setting (#111): comments in the code editor in Monaspace Radon, which
    shares Neon's 0.62em advance, so that comments keep the code's column grid. Ligature settings are
    inherited from the surrounding code, so texture healing (`calt`) stays on and coding ligatures
-   off. */
+   off.
+
+   Node comments (#175) switch to Radon too, at the UI face's size: Radon's x-height (~0.53em) matches
+   M PLUS 1's, and the bubble's line height is a multiple of the font size, so the bubble keeps its
+   height and nothing moves vertically when Radon finishes loading. They fall back to the UI face,
+   not to Neon, and take the editable `--font-mono-*` ligature values, since the bubble has a caret. */
 :root.handwrittenComments {
   --font-mono-comment: "Monaspace Radon", var(--font-mono);
+  --font-node-comment: "Monaspace Radon", var(--font-sans);
+  --font-node-comment-variant-ligatures: var(--font-mono-variant-ligatures);
+  --font-node-comment-feature-settings: var(--font-mono-feature-settings);
 }
 
 @keyframes s1 {

@@ -69,8 +69,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'components/OfflineNotificationManager',
   'components/Suspense',
   'components/UIProviders',
-  'layouts/AssetPanel/components/AssetProperties',
-  'layouts/AssetPanel/components/ProjectExecutionsCalendar',
   'layouts/Drive',
   'layouts/Settings',
   'modals/AcceptInvitationModal',
@@ -79,6 +77,9 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
   'pages/authentication/LoadingScreen',
+  // The datalink editor, inside the cloud's Vue Properties tab until `JSONSchemaInput` is ported
+  // (#92).
+  'pages/dashboard/components/DatalinkInput',
   'providers/LoggerProvider',
   // Dashboard features ported to Vue, mounted by the shared app shell.
   'pages/dashboard/UserBar/UserBar.vue',
@@ -107,7 +108,7 @@ const DASHBOARD_IMPORT_PATTERN = {
  * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
  * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
  */
-const CLOUD_AREAS = ['account', 'agreements', 'auth', 'browserDisabled']
+const CLOUD_AREAS = ['account', 'agreements', 'auth', 'browserDisabled', 'properties', 'versions']
 
 // =======================================
 // === Restricted syntactic constructs ===

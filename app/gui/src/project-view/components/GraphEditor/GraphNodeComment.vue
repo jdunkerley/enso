@@ -42,6 +42,14 @@ syncRef(editing, useFocusDelayed(textEditorContent).focused)
 </template>
 
 <style scoped>
+/* `--font-node-comment` is the UI face, or Monaspace Radon under the "Handwritten comments" setting
+   (`project-view/assets/base.css`). The size is inherited either way. */
+.GraphNodeComment {
+  font-family: var(--font-node-comment);
+  font-variant-ligatures: var(--font-node-comment-variant-ligatures);
+  font-feature-settings: var(--font-node-comment-feature-settings);
+}
+
 :deep(.cm-content) {
   min-width: 22px;
   border-radius: var(--radius-default);

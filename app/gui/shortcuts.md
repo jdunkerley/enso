@@ -1,3 +1,6 @@
+The keyboard shortcuts of the graph editor and of the dashboard can be changed
+in Settings → Keyboard shortcuts. The tables below list the defaults.
+
 ## General Assumptions
 
 #### The <kbd>Meta</kbd> key.

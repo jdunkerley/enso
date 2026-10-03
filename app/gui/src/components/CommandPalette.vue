@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import KeyboardShortcut from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
-import { CATEGORIES } from '$/configurations/inputBindings'
+import { categoryToTextId, SHORTCUT_CATEGORIES } from '$/configurations/keyboardShortcuts'
 import { isTextInputEvent } from '$/utils/event'
 import { useActionsStore, type Action } from '$/providers/actions'
 import { useModals } from '$/providers/modals'
@@ -79,8 +79,8 @@ const actions = computed(() => findActions(query))
 
 const groupedActions = computed(() => {
   const actionsValue = actions.value
-  return CATEGORIES.flatMap((category) => {
-    const categoryName = getText(`${category}BindingCategory`)
+  return SHORTCUT_CATEGORIES.flatMap((category) => {
+    const categoryName = getText(categoryToTextId(category))
     const actionsInThisCategory = actionsValue.filter((action) => action.category === categoryName)
     if (actionsInThisCategory.length === 0) {
       return []

@@ -13,7 +13,7 @@ import {
 import Form from '$/components/Form/Form.vue'
 import type { FormInstance } from '$/components/Form/types'
 import { useText } from '$/providers/text'
-import { CalendarDate, Time } from '@internationalized/date'
+import { CalendarDate, CalendarDateTime, Time } from '@internationalized/date'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import { beforeAll, describe, expect, test, vi } from 'vitest'
@@ -225,6 +225,27 @@ describe('Dropdown', () => {
     expect(root.hasAttribute('data-focused')).toBe(false)
   })
 
+  test('the list takes the first Escape while it has a selection, as in React', async () => {
+    const onKeydown = vi.fn()
+    mountWithProviders(() =>
+      h('div', { onKeydown }, [
+        h(
+          Dropdown<string>,
+          { items, ariaLabel: 'Size', selectedIndex: 1 },
+          {
+            default: ({ item }: { item: string }) => item,
+          },
+        ),
+      ]),
+    )
+    const user = userEvent.setup()
+    allByRole('option')[1]!.focus()
+    await user.keyboard('{Escape}')
+    expect(onKeydown).not.toHaveBeenCalled()
+    await user.keyboard('{Escape}')
+    expect(onKeydown).toHaveBeenCalledTimes(1)
+  })
+
   test('with multiple, options toggle and the list stays open', async () => {
     const selected = ref<readonly number[]>([])
     mountWithProviders(() =>
@@ -281,6 +302,31 @@ describe('DatePicker', () => {
     mountDatePicker()
     expect(segments().map((s) => s.textContent?.trim())).toEqual(['yyyy', 'mm', 'dd'])
     expect(segments().every((s) => s.hasAttribute('data-placeholder'))).toBe(true)
+  })
+
+  test('writes a value as the `sv` locale does: two-digit month and day, the hour unpadded', () => {
+    mountInForm(z.object({ date: z.any() }), { date: new CalendarDateTime(2026, 9, 5, 9, 5) }, () =>
+      h(DatePicker, { name: 'date', label: 'Date', granularity: 'minute' }),
+    )
+    expect(segments().map((s) => s.textContent?.trim())).toEqual(['2026', '09', '05', '9', '05'])
+  })
+
+  test('days before `minValue` are disabled in the calendar', async () => {
+    mountInForm(z.object({ date: z.any() }), { date: new CalendarDate(2026, 9, 15) }, () =>
+      h(DatePicker, {
+        name: 'date',
+        label: 'Date',
+        testId: 'date',
+        minValue: new CalendarDate(2026, 9, 10),
+      }),
+    )
+    await userEvent
+      .setup()
+      .click(byTestId('date')!.querySelector<HTMLElement>('button[aria-haspopup="dialog"]')!)
+    await flushPromises()
+    const cell = (day: string) => role('dialog')!.querySelector(`[data-value="${day}"]`)!
+    expect(cell('2026-09-09').hasAttribute('data-disabled')).toBe(true)
+    expect(cell('2026-09-10').hasAttribute('data-disabled')).toBe(false)
   })
 
   test('typing digits fills the segments and sets the value; arrow keys step a segment', async () => {

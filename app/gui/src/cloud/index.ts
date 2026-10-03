@@ -11,6 +11,8 @@ import { registerAccountSettings } from './account/settings'
 import { registerAgreementsGate } from './agreements/agreements'
 import { registerAuthRoutes } from './auth/routes'
 import { registerCloudBrowserDisabledRoute } from './browserDisabled/routes'
+import { registerPropertiesTab } from './properties/rightPanel'
+import { registerVersionsTabs } from './versions/rightPanel'
 
 /** Contribute the cloud-only areas to the app. Call it before the router's first navigation. */
 export function registerCloud(router: Router) {
@@ -19,6 +21,8 @@ export function registerCloud(router: Router) {
   registerCloudBrowserDisabledRoute(router)
   registerAgreementsGate()
   contributeAppContainerModals(loadAppContainerModals)
+  registerPropertiesTab()
+  registerVersionsTabs()
 }
 
 /**
