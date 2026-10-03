@@ -30,11 +30,20 @@ community build without the cloud can leave it out (decision 6b of
     `PaywallDialog`, `PaywallDialogButton`, `PaywallButton`, `PaywallAlert`,
     `PaywallLock`, `PaywallBulletPoints`, `PaywallUpgradeButton`), and the
     settings page's paywall screen, contributed by `registerBillingSettings`.
-    The React originals left (`PaywallDialog`, `UpgradeButton`, `PaywallLock`,
-    `PaywallBulletPoints`) stay for their React callers until #88.
+    Since #88 also `PaywallModal.vue`, the dialog on the modal stack, which the
+    React menus' paywalled entries open; no React paywall code is left.
   - `billing/`, since #191: the Usage settings tab's section
     (`UsageSettingsSection.vue`, with `executionUsage.ts`), contributed by
     `registerBillingSettings`.
+  - `billing/`, since #88: the Billing & Plans tab's section
+    (`BillingSettingsSection.vue`, the Stripe customer portal), the plans
+    (`plans.ts`), their price (`subscriptionPrice.ts`) and the plan a checkout
+    is for (`pendingCheckout.ts`); and in `billing/subscribe/` the subscription
+    page (`SubscribePage.vue`: the plan cards, the Solo confirmation, the plan
+    dialog with its seats and price), the Stripe checkout (`checkout.ts`) and
+    the payments success page. Their routes are `billing/routes.ts`
+    (`registerBillingRoutes`), the subscription page under the main app's layout
+    (`APP_CONTAINER_LAYOUT_ROUTE`).
   - `auth/` — the sign-in (with the one-time-code step), sign-up (with the email
     confirmation step), email confirmation, forgot-password, reset-password and
     account-restoration pages, their layout (`AuthenticationPage.vue`), the

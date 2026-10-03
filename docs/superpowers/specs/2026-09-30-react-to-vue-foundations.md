@@ -1998,3 +1998,84 @@ maintainer to review.
     loading row (ruling 10), a half-pixel shift of the combo box's list, and a
     1px shift of a tooltip. No changelog entry: the PR takes
     `CI: No changelog needed`.
+
+## Rulings from #88 (billing, plans and the paywall, 2026-10-03)
+
+#88 ports the rest of billing: the Billing & Plans settings tab, the
+subscription page with its plan cards and dialogs, the Stripe checkout, the
+payments success page, and the last React paywall component. Delegated like the
+rulings above: provisionally accepted, for the maintainer to review.
+
+1. **Port, not delete, in one PR.** Decision 7 keeps billing, so the ticket's
+   "remove" option is closed. The whole is about 1,500 lines of React and 1,000
+   of Vue behind three mount sites (two routes and a settings tab) that share
+   the plan model; split, the checkout would have been reviewed without the page
+   that starts it. The trial and downgrade dialogs were already Vue (#84), as
+   were the paywall pieces the settings tabs show (#87) and the top bar's
+   billing parts (#83).
+2. **Where it went.** `src/cloud/billing/`: the tab's section
+   (`BillingSettingsSection.vue`), the plans (`plans.ts`), their price
+   (`subscriptionPrice.ts`) and the pending checkout (`pendingCheckout.ts`);
+   `src/cloud/billing/subscribe/`: the subscription page, the cards
+   (`PlanCard.vue`, React's `Card`, renamed for
+   `vue/multi-word-component-names`), the Solo confirmation and the plan dialog
+   (`SubscribeButton.vue`, `PlanSelectorDialog.vue`, `SubscriptionSummary.vue`,
+   the dialog's `Summary`), the checkout (`checkout.ts`) and the payments
+   success page. `plans.ts` and `subscriptionPrice.ts` are byte for byte #192's
+   (#201), so the two PRs merge cleanly whichever lands first.
+3. **Routes are the cloud's.** `registerBillingRoutes` adds `/subscribe` under
+   the main app's layout, now a named route (`APP_CONTAINER_LAYOUT_ROUTE`,
+   `$/router/routeNames`), and `/payments/success` at the top level, where the
+   React routes were, with the same paths and access. A build without the cloud
+   has neither: both paths then fall to the catch-all and land on the dashboard,
+   as a link to them should.
+4. **Billing & Plans is declared by the core and filled by the cloud,** like
+   #87's tabs: `tabs.ts` keeps its name, icon, place and visibility (an
+   organization admin whose organization has a subscription), and
+   `registerBillingSettings` contributes its section. `ReactSettingsTab`, the
+   React tab data and the React settings shell (`Tab`, `Section`, `Entry`,
+   `CustomEntry`) are deleted: nothing else used them. The settings page has one
+   kind of tab again.
+5. **The checkout is unchanged, request for request.** Measured by recording
+   every request, every `window.open` call, every popup and every navigation in
+   the running app, on develop and on the branch, for the Team checkout (three
+   seats), the Solo checkout, the customer portal and the paywall dialog: the
+   logs are identical. The same `POST payments/checkout/sessions` with
+   `{ price, quantity, interval }`; the same
+   `POST payments/customer-portal-sessions/create?ignored=` with a `null` body;
+   Stripe opened with `window.open(url, '_blank')` (the desktop app hands it to
+   the system browser), then focused; the same pending plan in local storage,
+   and the same move to `/payments/success`. Both run as vue-query mutations, as
+   React's did, so the cache's global handlers (the unauthorized-session
+   recovery) still see them; the portal's keeps its key,
+   `['billing', 'customerPortalSession']`.
+6. **The last React paywall component goes.** The React menus' `MenuEntry.tsx`
+   opened the React `PaywallDialog` with `setModal` for a paywalled entry
+   ("Upload To Cloud" on the free plan). It now opens the Vue one on the modal
+   stack (`PaywallModal.vue`), replacing every open modal as `setModal` did;
+   like every Vue-opened modal, it leaves the stack when it closes (#156, ruling
+   5). `#/components/Paywall` is deleted.
+7. **One React quirk kept: no `*` on Seats.** React passed `isRequired`, but its
+   field let the schema's reading (not required) win, so the label had no
+   asterisk; the Vue input leaves `isRequired` out, so it looks the same. The
+   React input also leaked a `label` attribute onto the `<input>` and set
+   `aria-invalid="false"`; the Vue one has neither, which changes nothing a
+   screen reader announces (the accessibility trees are identical).
+8. **A failed price would show the error display** (`ErrorDisplay.vue`), as
+   React's `Summary` did. The price is computed locally, so it never fails; the
+   path is kept for parity rather than tested.
+9. **What a user notices: nothing.** Every state was compared with develop's in
+   the running app: the subscription page on each plan (free, Solo, Team,
+   enterprise) and for a member who is not the admin, the Solo confirmation, the
+   Team dialog with one, three and eleven seats (the limit's error), the `plan`
+   parameter opening a dialog, the payments success page, the Billing tab and
+   its failure toast, and the paywall dialog from a menu. The page, its cards
+   and every state outside a dialog match to the pixel; inside the plan dialog
+   some text rasterizes a pixel apart while every box measures the same (the
+   shared `Dialog` motion, as in #84, ruling 7). The accessibility trees differ
+   only as in #84: the dialogs are named by their titles, and react-aria's
+   live-region `log`s are gone. A new Playwright spec, `billing.spec.ts`, drives
+   both checkouts, the portal and the paywall dialog against the mocked cloud
+   (which gains the payments configuration and the customer portal), and passes
+   on develop and on the branch. No changelog entry: the PR takes
+   `CI: No changelog needed`.

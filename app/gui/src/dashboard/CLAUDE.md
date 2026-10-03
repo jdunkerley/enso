@@ -1,9 +1,8 @@
 # dashboard/
 
 The **Dashboard feature** subtree: sign-up/sign-in, cloud project browser,
-settings, billing, subscription management. Everything whose meaning is tied to
-the Enso Cloud shell (before a project is opened, or alongside it) lives here.
-Import via the `#/` path alias.
+settings. Everything whose meaning is tied to the Enso Cloud shell (before a
+project is opened, or alongside it) lives here. Import via the `#/` path alias.
 
 **Currently implemented in React, legacy.** Vue is the main GUI framework; this
 subtree was built as an independent React effort and is being progressively
@@ -21,8 +20,6 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   notification tray, mounted by `AppContainer.vue`.
 - `layouts/` — Chromes that wrap multiple pages (protected-route wrappers, split
   panels).
-- `modules/` — Feature-oriented slices (`payments/` for Stripe flows, etc.). A
-  module owns its state and components.
 - `components/` — Reusable UI atoms/molecules. Sub-folders group related parts
   (`Button/`, `Form/`, `Dialog/`, `Menu/`). The `aria/` folder re-exports
   `react-aria-components` with project-level styling applied. Truly shared UI
