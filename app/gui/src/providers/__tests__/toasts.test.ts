@@ -107,4 +107,53 @@ describe('toast store', () => {
       [{ id: 'a', status: 'removed' }],
     ])
   })
+
+  test('promise: a loading toast while pending, which turns into the outcome', async () => {
+    const store = createToastsStore()
+    let resolve!: (value: string) => void
+    const running = new Promise<string>((done) => (resolve = done))
+    const returned = store.promise(running, {
+      pending: 'Working…',
+      success: (data) => `Done: ${String(data)}`,
+      error: 'Failed',
+    })
+    expect(returned).toBe(running)
+    expect(store.toasts.value).toEqual([
+      expect.objectContaining({
+        content: 'Working…',
+        isLoading: true,
+        autoClose: false,
+        closeButton: false,
+      }),
+    ])
+    resolve('report.csv')
+    await running
+    await Promise.resolve()
+    expect(store.toasts.value).toEqual([
+      expect.objectContaining({
+        content: 'Done: report.csv',
+        type: 'success',
+        isLoading: false,
+        autoClose: DEFAULT_AUTO_CLOSE_MS,
+        closeButton: true,
+      }),
+    ])
+  })
+
+  test('promise: an error toast on failure; no content only dismisses the loading toast', async () => {
+    const store = createToastsStore()
+    const failing = Promise.reject(new Error('nope'))
+    store.promise(failing, { pending: 'Working…', error: 'Failed' }).catch(() => {})
+    await failing.catch(() => {})
+    await Promise.resolve()
+    expect(store.toasts.value).toEqual([
+      expect.objectContaining({ content: 'Failed', type: 'error' }),
+    ])
+
+    const quiet = createToastsStore()
+    const succeeding = Promise.resolve()
+    await quiet.promise(succeeding, { pending: 'Working…', error: 'Failed' })
+    await Promise.resolve()
+    expect(quiet.toasts.value).toEqual([expect.objectContaining({ isIn: false })])
+  })
 })
