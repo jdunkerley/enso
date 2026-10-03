@@ -1196,6 +1196,99 @@ above: provisionally accepted, for the maintainer to review.
    change is a fix: the PR takes `CI: No changelog needed`, though the ticket
    asked for an entry.
 
+## Rulings from #85 (authentication pages, 2026-10-02)
+
+#85 ported the authentication pages: sign-in (with its one-time-code step),
+sign-up (with its email-confirmation step), email confirmation, forgot password,
+reset password and account restoration. Delegated like the rulings above:
+provisionally accepted, for the maintainer to review.
+
+1. **One PR, not split.** The six pages and their layout were about 1.1k lines
+   of React and are about 1k of Vue, behind one mount site (the router); a split
+   would have kept the React `AuthenticationPage`, `Link` and Form layer on the
+   auth path for a second PR with nothing to gain.
+2. **The first cloud area, and its entry point.** The pages are in
+   `src/cloud/auth/` (decision 6b), and the core reaches them only through
+   `registerCloud(router)` in `src/cloud/index.ts`, which `entrypoint.ts` calls
+   before the router starts. Routes are the first registry: `registerCloud` adds
+   them with `router.addRoute`, the sign-in, sign-up and restore pages under the
+   protected layout, which is now a named route (`PROTECTED_LAYOUT_ROUTE`,
+   `src/router/routeNames.ts`). The ESLint boundary decision 6b asked for exists
+   now: outside `src/cloud/`, importing `$/cloud` or an area (`CLOUD_AREAS` in
+   `eslint.config.mjs`) is an error. Two exemptions: `entrypoint.ts`, and the
+   React dashboard while it is ported (it mixes cloud and core code). The
+   framework-free helpers at the top of `src/cloud/` (`validation.ts`, …) are
+   not areas and stay importable. A community build drops the folder and the one
+   call.
+3. **Names.** `Login` and `Registration` became `LoginPage.vue` and
+   `RegistrationPage.vue` (`vue/multi-word-component-names`); the other pages
+   keep their React names. The old `src/components/RegistrationPage.vue`, which
+   only hosted the React form, is gone: the sign-up page carries its data loader
+   (the user-agreements query) itself.
+4. **The info bar is #83's Vue one.** The React `Page` around each auth page
+   showed the info bar (logo menu: About, and Sign out when signed in) and
+   mounted the modal host. `AuthenticationPage.vue` does both: the Vue `InfoBar`
+   (`$/components/InfoBar/`, ported by #83) and `ModalHost.vue`, each loaded on
+   first use, as the React `Page` loads them. `RestoreAccount` had no `Page`,
+   and still has none.
+5. **Every auth page loads on demand, the sign-in page included.** The React
+   `Login` was imported statically by `router.ts`, so it sat in the initial
+   chunk. A static Vue sign-in page would pull Reka (through `Button`'s tooltip)
+   into the initial chunk, which #78 and #80 kept out, so it is a lazy route
+   like the others. Measured with `corepack pnpm run build`: the initial chunk
+   shrinks by 69.2 KB minified (24.0 KB gzip); all JavaScript grows by 55.0 KB
+   (26.6 KB gzip), as the Vue primitives the pages share land in chunks of their
+   own while the React form layer stays for the dashboard's other forms.
+6. **Links navigate in the app.** react-aria's `RouterProvider` made a plain
+   click on a React link to a page of this app a router push. A Vue `<a>` would
+   reload the page. `useClientNavigation` (`src/components/Link/`) applies
+   react-aria's rule (same window, same origin, no download, no modifier key),
+   and both the new `Link.vue` and `Button.vue` with an `href` use it. This
+   changes `Button.vue` for every caller: none had an in-app `href` before.
+7. **Query parameters are read from `useRoute()`** (`queryParam`), not from the
+   global `useQueryParams` store the React pages used. The pages only read them;
+   the values are the same; and a global store keeps the first router it saw,
+   which component tests cannot replace.
+8. **Toasts that outlive the page use the global store.** `useToast` dismisses
+   its toast when its component goes, so "Check your email" after a password
+   reset request (shown as the page returns to sign-in), the reset success, the
+   missing-link-parameter errors and the federated sign-in errors call
+   `useToasts().show`, as the React `toast` did.
+9. **Two React quirks are kept.** A wrong one-time code shows no message: the
+   React form reset itself after `onSubmit` returned, which cleared the error
+   `onSubmit` had just set, and emptied the code for another try; the Vue form
+   does the same. And `ConfirmRegistration` renders an empty `h1` (its title is
+   `''`). Either fix is a visible change, so it is left for a separate issue.
+10. **A porter's trap: untouched fields.** react-hook-form read an untouched
+    uncontrolled input as `''`; the Vue `useForm` leaves a field without a
+    default `undefined`, which zod reports as "This field is invalid" instead of
+    the field's own message (a too-short password, a mismatched confirmation).
+    Every text field of the auth forms has an `''` default; the playbook says so
+    now.
+11. **Fixes to the primitives, found by comparing the running pages.**
+    - React's `Field` puts its label id on the whole field content when it has
+      no label, so a label-less `Checkbox.Group` is named by its checkboxes'
+      text: `group "I agree to the Enso Terms of Service"` is how the sign-up
+      page object and the agreements dialog locate it. The Vue `Field` does the
+      same, and `CheckboxGroup` is always labelled by that id.
+    - The pages now mount a little later than React's statically loaded sign-in
+      page did, so an `autoFocus` input's delayed focus (100 ms, as in React)
+      could fire while a test, or a fast user, was already typing in the next
+      field, and take the keystrokes. The delayed focus now leaves a text field
+      that already has the focus alone.
+    - `CheckboxGroup` has a `description` slot, for a description with markup
+      (the Terms of Service link).
+12. **What a user notices: nothing.** Every state of every page was compared
+    with develop's in the running app (18 screenshots, accessibility trees, DOM,
+    focus and tab order; see the PR), with no differing pixel. The accessibility
+    trees differ only by react-aria's live-region announcer (`log` elements),
+    which the Vue buttons do not add; the one-time-code step, which the mocked
+    Cognito cannot reach, is covered by unit tests instead. axe no longer
+    reports two `color-contrast` nodes on the login screen (the Forgot password
+    link and the Login button's content, which carried react-aria's generated
+    ids); the pixels are the same, so the baseline keeps them rather than
+    claiming a fix. The PR takes `CI: No changelog needed`.
+
 ## Rulings from #89 (asset panel: Versions and Activity, 2026-10-02)
 
 #89 ports the right panel's asset tabs. Delegated like the rulings above:

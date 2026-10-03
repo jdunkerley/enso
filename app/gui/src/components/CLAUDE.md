@@ -28,6 +28,7 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `MenuEntry/`        | `MenuEntry` (a button entry of a popover menu: the user and info menus)                         |
 | `ProfilePicture/`   | `ProfilePicture` (a user's or organization's picture, or the default user icon)                 |
 | `InfoBar/`          | `InfoBar`, `InfoMenu`: the logo and info menu of the pages outside the dashboard (#83)          |
+| `Link/`             | `Link` (a coloured link with an icon); `useClientNavigation` (`clientNavigation.ts`)            |
 | others              | `Alert`, `Badge`/`StatusBadge`, `Breadcrumbs`, `ProgressBar`, `Result`, `Scroller`, `Separator` |
 
 Forms and inputs are #79's.
@@ -54,6 +55,11 @@ local `<Dialog>`.
   variant names), with Vue mechanics: `class`, `*Class`, slots, `v-model:open`,
   a `trigger` slot instead of `X.Trigger`. See "Rulings from #78" in
   `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+- **Links navigate in the app.** react-aria's `RouterProvider` turned a plain
+  click on a React link to a page of this app into a router push; `Link` and a
+  `Button` with an `href` do the same through `useClientNavigation`. Use them
+  (or that handler) for an in-app link, not a bare `<a>`, which reloads the
+  page.
 - **Boolean props need an explicit `undefined` default** when `false` means
   something different from "not set" (a variant default, a group's shared
   value): Vue casts an absent `boolean` or `string | false` prop to `false`.

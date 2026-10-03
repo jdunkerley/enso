@@ -11,7 +11,9 @@
  * seen: while a returned promise is pending the button shows its loader and is disabled, as in
  * React.
  *
- * - With `href` it renders an `<a>` (external links open in a new tab), otherwise a `<button>`.
+ * - With `href` it renders an `<a>` (external links open in a new tab), otherwise a `<button>`. A
+ *   plain click on a link to a page of this app navigates through the router, as react-aria's
+ *   `RouterProvider` made React's links do (`$/components/Link/clientNavigation`).
  * - An icon-only button (an `icon` and no default slot) gets a tooltip from `tooltip` or its
  *   `aria-label`. Any button gets one from `tooltip`; `tooltip: false` turns it off. A disabled
  *   button cannot be hovered for an accessible tooltip, so it shows the text as a visual tooltip
@@ -20,6 +22,7 @@
  */
 import { BUTTON_STYLES, type ButtonVariants } from '$/components/Button/variants'
 import Icon from '$/components/Icon/Icon.vue'
+import { useClientNavigation } from '$/components/Link/clientNavigation'
 import type { Placement } from '$/components/placement'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import Tooltip from '$/components/Tooltip/Tooltip.vue'
@@ -186,6 +189,8 @@ watch(
   { flush: 'post' },
 )
 
+const navigate = useClientNavigation()
+
 function onClick(event: MouseEvent) {
   if (disabled.value) {
     event.preventDefault()
@@ -196,6 +201,7 @@ function onClick(event: MouseEvent) {
     implicitlyLoading.value = true
     void result.finally(() => (implicitlyLoading.value = false))
   }
+  if (isLink.value) navigate(event)
 }
 
 const linkAttrs = computed(() =>

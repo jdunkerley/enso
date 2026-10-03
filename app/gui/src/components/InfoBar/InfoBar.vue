@@ -2,7 +2,8 @@
 /**
  * @file The bar with the Enso logo at the top right of the pages outside the dashboard (login,
  * registration and the like), which opens the {@link InfoMenu}: the Vue counterpart of the React
- * `#/layouts/InfoBar` (#83). The React `Page` mounts it.
+ * `#/layouts/InfoBar` (#83). The React `Page` and the Vue authentication pages
+ * (`AuthenticationPage.vue`) mount it.
  */
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'

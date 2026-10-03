@@ -3,6 +3,7 @@ import './beforeMain' // Keep newline below to ensure that this import is always
 import '#/styles.css'
 import '#/tailwind.css'
 import App from '$/App.vue'
+import { registerCloud } from '$/cloud'
 import { setupLogger } from '$/log'
 import { widgetDevtools } from '$/providers/openedProjects/widgetRegistry/devtools'
 import router from '$/router'
@@ -32,6 +33,7 @@ async function main() {
   const app = createApp(App)
   setupSentry(app)
   app.use(VueQueryPlugin, { queryClient, enableDevtoolsV6Plugin: true })
+  registerCloud(router)
   app.use(router)
   app.use(widgetDevtools)
   app.provide('rootDirPath', rootDirPath)

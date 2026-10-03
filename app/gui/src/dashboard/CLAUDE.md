@@ -65,9 +65,11 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
 
 ## Auth / cloud
 
-The Dashboard authenticates against AWS Cognito via `aws-amplify`. Session
-tokens are stored via `accessToken.ts` in `app/common/` and mirrored into the
-Project Manager / LS so the engine can reach Enso Cloud.
+The Dashboard authenticates against AWS Cognito via `aws-amplify`. The logic is
+Vue (`src/authentication/`, `src/providers/{auth,session}.ts`), and so are the
+sign-in, sign-up and password pages, in `src/cloud/auth/` (#85). Session tokens
+are stored via `accessToken.ts` in `app/common/` and mirrored into the Project
+Manager / LS so the engine can reach Enso Cloud.
 
 ## Talking to ProjectView
 
@@ -127,7 +129,12 @@ Every port PR follows this checklist.
    - Features go in `src/dashboard/` as `.vue`, in the same folder the `.tsx`
      was in.
    - Cloud-only features go in `src/cloud/<area>/`, reached only through the
-     registries.
+     registries: `registerCloud` (`src/cloud/index.ts`) adds them, and an ESLint
+     rule keeps the core off them (add the area to `CLOUD_AREAS` in
+     `eslint.config.mjs`). See `src/cloud/CLAUDE.md`.
+   - Give every text field of a ported form a default (`''`): react-hook-form
+     read an untouched input as `''`, the Vue form leaves it `undefined`, which
+     zod reports as "This field is invalid" instead of the field's message.
    - Stores use `createContextStore`, unless non-component code must reach them.
 5. **Reuse the styles.** Build on the existing `variants.ts` (as
    `DashboardDialogContent.vue` and `src/components/Menu/variants.ts` do).
