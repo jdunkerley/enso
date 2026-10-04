@@ -40,12 +40,15 @@ test('Project Duplicate', async ({ page }) => {
   // Close the project before duplicating it. This stops its Language Server, which would otherwise
   // keep the Windows CI runner's two CPUs busy for another minute or more. While it ran, the
   // dashboard reacted too slowly and the right-click below timed out (#169).
-  // (`project-view-tab-button` is on the tab's label, not on the tab around its close button.)
-  const projectTab = page.getByRole('tab', { name: 'New Project 1', exact: true })
-  await projectTab.locator('.CloseButton').click()
-  await expect(projectTab).toHaveCount(0)
+  // Close it with the drive row's stop button, not the tab's close button. The project view shows
+  // "Initializing the project…" until the first execution finishes, and that toast sits at the top
+  // centre of the window, right over the tab's close button. On the Windows CI runner it can still
+  // be there when the graph appears, and then the click times out (#212).
+  const driveView = page.getByTestId('drive-view')
+  await driveView.getByTestId('stop-project').click()
+  await expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0)
   // The project's play button is enabled again only once the project has finished closing.
-  await expect(page.getByTestId('drive-view').getByTestId('open-project')).toBeEnabled()
+  await expect(driveView.getByTestId('open-project')).toBeEnabled()
 
   // Finding all of the 'New projects'
   const newest = await getNewestProject(page)
