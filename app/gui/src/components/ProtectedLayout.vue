@@ -4,10 +4,6 @@
  * if user lost privileges to see them. Also makes sure user will agree with Terms of Service and
  * privacy policy.
  */
-import {
-  EnsoDevtools as EnsoDevToolsReact,
-  ReactQueryDevtools as ReactQueryDevtoolsReact,
-} from '#/components/Devtools'
 import LocalStorage from '$/utils/LocalStorage'
 import { DASHBOARD_PATH, LOGIN_PATH, RESTORE_USER_PATH } from '$/appUtils'
 import { useAppTitle } from '$/composables/appTitle'
@@ -15,13 +11,13 @@ import { useAuth, type AuthStore } from '$/providers/auth'
 import { useFeatureFlag } from '$/providers/featureFlags'
 import {
   agreementsModal,
+  devtools,
   hasAgreementsGate,
   loadAgreementsGate,
   type UserAgreements,
 } from '$/providers/layoutContributions'
 import type { DataLoader } from '$/router'
 import { useAppClass } from '@/providers/appClass'
-import { reactComponent } from '$/utils/react'
 import * as vueQuery from '@tanstack/vue-query'
 import { useQueryClient } from '@tanstack/vue-query'
 import { Err, Ok } from 'enso-common/src/utilities/data/result'
@@ -153,8 +149,8 @@ const auth = useAuth()
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
-const EnsoDevtools = reactComponent(EnsoDevToolsReact)
-const ReactQueryDevtools = reactComponent(ReactQueryDevtoolsReact)
+// The developer tools, contributed in development builds only (`src/cloud/devtools/`, #172).
+const Devtools = computed(devtools)
 
 // Needed by devtools - act on feature flag changes
 const debugHoverAreas = useFeatureFlag('debugHoverAreas')
@@ -215,6 +211,5 @@ useAppTitle(computed(() => auth.session))
   <RouterView v-else-if="allowed || route.meta.access == null || route.meta.access === 'guest'" />
   <div v-else data-testid="content-not-allowed"></div>
 
-  <EnsoDevtools v-if="displayDevTools" />
-  <ReactQueryDevtools v-if="displayDevTools" />
+  <component :is="Devtools" v-if="displayDevTools && Devtools" />
 </template>

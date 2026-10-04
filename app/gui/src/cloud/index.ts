@@ -12,6 +12,7 @@ import { registerAgreementsGate } from './agreements/agreements'
 import { registerAuthRoutes } from './auth/routes'
 import { registerBillingSettings } from './billing/settings'
 import { registerCloudBrowserDisabledRoute } from './browserDisabled/routes'
+import { registerDevtools } from './devtools/devtools'
 import { registerOrganizationSettings } from './organization/settings'
 import { registerPropertiesTab } from './properties/rightPanel'
 import { registerVersionsTabs } from './versions/rightPanel'
@@ -27,6 +28,9 @@ export function registerCloud(router: Router) {
   contributeAppContainerModals(loadAppContainerModals)
   registerPropertiesTab()
   registerVersionsTabs()
+  // Spelled out rather than `IS_DEV_MODE`, so that the production build replaces it with `false`
+  // in this very module and drops the devtools (and their chunks) entirely.
+  if (process.env.NODE_ENV === 'development') registerDevtools()
 }
 
 /**

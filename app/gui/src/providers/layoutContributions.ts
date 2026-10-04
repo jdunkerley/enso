@@ -1,7 +1,8 @@
 /**
  * @file What other parts of the app add to the layouts: the contribution point through which the
- * cloud-only areas (`src/cloud/`) give `ProtectedLayout.vue` its agreements gate and
- * `AppContainerLayout.vue` its modals, without the core importing them (decision 6b of
+ * cloud-only areas (`src/cloud/`) give `ProtectedLayout.vue` its agreements gate (and, in
+ * development builds, the developer tools) and `AppContainerLayout.vue` its modals, without the
+ * core importing them (decision 6b of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  *
  * The layouts keep deciding *when* each one shows, as before; a contribution supplies *what*
@@ -11,7 +12,13 @@
  * set up.
  */
 import type { QueryClient } from '@tanstack/vue-query'
-import { markRaw, shallowRef, type Component } from 'vue'
+import {
+  defineAsyncComponent,
+  markRaw,
+  shallowRef,
+  type AsyncComponentLoader,
+  type Component,
+} from 'vue'
 
 /** The user's agreement to the current Terms of Service and Privacy Policy. Reactive. */
 export interface UserAgreements {
@@ -52,6 +59,7 @@ let appContainerModalsLoader: Loader<AppContainerModals> | undefined
 let appContainerModalsPromise: Promise<AppContainerModals | undefined> | undefined
 const loadedAgreementsModal = shallowRef<Component>()
 const loadedAppContainerModals = shallowRef<AppContainerModals>()
+const loadedDevtools = shallowRef<Component>()
 
 /** Give the protected layout its agreements gate. Call it before the router starts. */
 export function contributeAgreementsGate(load: Loader<AgreementsGate>) {
@@ -125,8 +133,22 @@ export function appContainerModals(): AppContainerModals | undefined {
   return loadedAppContainerModals.value
 }
 
+/**
+ * Give the protected layout its developer tools (#172), shown over every page while signed in.
+ * `registerCloud` contributes them in development builds only, so that a production build has none.
+ */
+export function contributeDevtools(load: AsyncComponentLoader) {
+  loadedDevtools.value = markRaw(defineAsyncComponent(load))
+}
+
+/** The contributed developer tools, loaded on first render; `undefined` when none were contributed. */
+export function devtools(): Component | undefined {
+  return loadedDevtools.value
+}
+
 /** Forget every contribution. For tests. */
 export function resetLayoutContributions() {
+  loadedDevtools.value = undefined
   agreementsGateLoader = undefined
   agreementsGatePromise = undefined
   loadedAgreementsModal.value = undefined
