@@ -81,6 +81,8 @@ const INITIAL_CALLS_OBJECT = {
   uploadFileEnd: array<backend.UploadFileEndRequestBody>(),
   createSecret: array<backend.CreateSecretRequestBody>(),
   createCheckoutSession: array<backend.CreateCheckoutSessionRequestBody>(),
+  getPaymentsConfig: array<object>(),
+  createCustomerPortalSession: array<object>(),
   updateAsset: array<{ assetId: backend.AssetId } & backend.UpdateAssetRequestBody>(),
   associateTag: array<{ assetId: backend.AssetId; labels: readonly backend.LabelName[] }>(),
   updateDirectory: array<
@@ -575,6 +577,47 @@ export async function mockCloudApi(page: Page) {
       }
     }
   }
+
+  /** The plans the subscription page offers, as the backend's payments configuration lists them. */
+  const paymentsConfig: backend.PaymentsConfig = {
+    cards: [
+      {
+        plan: backend.Plan.free,
+        period: 12,
+        title: 'Free',
+        subtitle: 'For individuals getting started',
+        pricing: '$0',
+        features: ['Local projects', 'Community support'],
+      },
+      {
+        plan: backend.Plan.solo,
+        period: 12,
+        title: 'Solo',
+        subtitle: 'For individual analysts',
+        pricing: '$75 per month, billed annually',
+        features: ['Cloud storage', 'Scheduled executions', 'Version history'],
+      },
+      {
+        plan: backend.Plan.team,
+        period: 12,
+        title: 'Team',
+        subtitle: 'For teams of up to 10',
+        pricing: '$150 per user per month, billed annually',
+        features: ['Everything in Solo', 'User groups', 'Shared folders'],
+      },
+      {
+        plan: backend.Plan.enterprise,
+        period: 12,
+        title: 'Enterprise',
+        subtitle: 'For organizations',
+        pricing: 'Contact us',
+        features: ['Everything in Team', 'Unlimited seats', 'Dedicated support'],
+      },
+    ],
+  }
+
+  /** The Stripe customer portal session's URL. */
+  const customerPortalSessionUrl = 'https://billing.stripe.com/p/session/mock'
 
   const createCheckoutSession = (_body: backend.CreateCheckoutSessionRequestBody) => {
     return {
@@ -1139,6 +1182,18 @@ export async function mockCloudApi(page: Page) {
       return createCheckoutSession(body)
     })
 
+    await get(paths.PAYMENTS_CONFIG_PATH, () => {
+      called('getPaymentsConfig', {})
+      return paymentsConfig
+    })
+
+    await post(paths.CUSTOMER_PORTAL_SESSION_CREATE_PATH, () => {
+      called('createCustomerPortalSession', {})
+      return {
+        url: customerPortalSessionUrl,
+      } satisfies backend.CreateCustomerPortalSessionResponse
+    })
+
     await patch(paths.updateAssetPath(GLOB_ASSET_ID), (route, request, [id]) => {
       if (!id) throw new Error('updateAssetPath: Missing asset ID')
       const assetId = id as backend.AssetId
@@ -1509,6 +1564,8 @@ export async function mockCloudApi(page: Page) {
     addLabel,
     setLabels,
     createCheckoutSession,
+    paymentsConfig,
+    customerPortalSessionUrl,
     addUser,
     deleteUser,
     addUserGroup,

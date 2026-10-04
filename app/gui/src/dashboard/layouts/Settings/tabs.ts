@@ -1,9 +1,8 @@
 /**
- * @file The settings tabs, in their sidebar groups. Every tab but Billing & Plans is Vue
- * (`SettingsTab.vue`); Billing & Plans is still React (`./data.tsx`, mounted by `ReactSettingsTab`)
- * until #88. The sections of the Account tab and of the cloud's tabs (Organization, Members, User
- * groups, Activity log, API keys, Usage) come from the cloud (`$/providers/settingsContributions`);
- * the cloud's tabs have none of their own, so a build without the cloud does not list them.
+ * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`. The sections
+ * of the Account tab and of the cloud's tabs (Organization, Billing & Plans, Members, User groups,
+ * Activity log, API keys, Usage) come from the cloud (`$/providers/settingsContributions`); the
+ * cloud's tabs have none of their own, so a build without the cloud does not list them.
  */
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
 // does), so to ESLint the components imported here have an error type.
@@ -20,15 +19,11 @@ import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDi
 import { isUserOnPlanWithMultipleSeats, Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
-import { REACT_SETTINGS_TAB_DATA, type SettingsTabData as ReactSettingsTabData } from './data'
 import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection.vue'
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection.vue'
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import NoResults from './NoResults.vue'
 import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
-
-/** A settings tab, rendered in Vue or (with `react: true`) in React. */
-export type AnySettingsTabData = ReactSettingsTabData | SettingsTabData
 
 /** The section shown when nothing in a tab matches the search. */
 export const SETTINGS_NO_RESULTS_SECTION_DATA: SettingsSectionData = {
@@ -66,6 +61,17 @@ const ORGANIZATION_TAB: SettingsTabData = {
   organizationOnly: true,
   visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
   // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const BILLING_AND_PLANS_TAB: SettingsTabData = {
+  nameId: 'billingAndPlansSettingsTab',
+  settingsTab: SettingsTabType.billingAndPlans,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
+  organizationOnly: true,
+  visible: ({ user, organization }) =>
+    user.isOrganizationAdmin && organization?.subscription != null,
+  // Contributed by `src/cloud/billing/`.
   sections: [],
 }
 
@@ -216,14 +222,14 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 }
 
 /** The settings tabs, in their sidebar groups. */
-export const SETTINGS_DATA: readonly SettingsTabSectionData<AnySettingsTabData>[] = [
+export const SETTINGS_DATA: readonly SettingsTabSectionData<SettingsTabData>[] = [
   {
     nameId: 'generalSettingsTabSection',
     tabs: [ACCOUNT_TAB, ORGANIZATION_TAB, LOCAL_TAB],
   },
   {
     nameId: 'accessSettingsTabSection',
-    tabs: [REACT_SETTINGS_TAB_DATA[SettingsTabType.billingAndPlans], MEMBERS_TAB, USER_GROUPS_TAB],
+    tabs: [BILLING_AND_PLANS_TAB, MEMBERS_TAB, USER_GROUPS_TAB],
   },
   { nameId: 'lookAndFeelSettingsTabSection', tabs: [APPEARANCE_TAB, KEYBOARD_SHORTCUTS_TAB] },
   {
