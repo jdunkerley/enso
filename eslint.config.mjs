@@ -432,6 +432,17 @@ const config = [
     },
   },
 
+  // === Integration tests must await every Playwright call ===
+  // An unawaited `expect.poll`, assertion or locator action races the rest of the test: it can
+  // pass by luck, fail a later step, or reject after the test has ended (`Test ended.`), as the
+  // editor panels' "Lists" test did (#202).
+  {
+    files: ['app/gui/integration-test/**/*.ts', 'app/gui/playwright.config.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+    },
+  },
+
   // === Dashboard Rules ===
   {
     ...reactRefresh.configs.vite,
