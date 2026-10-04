@@ -12,8 +12,9 @@ secret or a datalink. Vue, ported from the React
 - `AssetProperties.vue` — placeholders (outside the cloud, nothing selected),
   then `AssetPropertiesContent.vue`, keyed by asset in its own error boundary.
 - `PermissionDisplay.vue`, `AssetLabel.vue` — the drive table's permission pill
-  and label, as the tab shows them (never pressable). The drive keeps the React
-  ones.
+  and label, as the tab shows them (never pressable). The drive's table uses
+  `PermissionDisplay.vue` too; its pressable labels are its own `DriveLabel.vue`
+  (#91).
 - `UpsertSecretForm.vue` (from `../credentials/`, #82) edits a secret's value.
 - `DatalinkConfiguration.vue` — the datalink's form, around the datalink editor
   (`../datalinks/DatalinkFormInput.vue`, ported with the drive's datalink dialog

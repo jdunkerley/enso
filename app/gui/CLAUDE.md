@@ -15,10 +15,9 @@ feature:
   component browser, code editor, visualizations, documentation editor). Vue.
   Uses `@vueuse/core`, `@tanstack/vue-query`, `yjs`. Import via `@/…`.
 - `src/dashboard/` — the **Dashboard** feature subtree (auth, cloud storage,
-  project browser, settings, billing). Still **React** as a historical artifact;
-  being progressively migrated to Vue. Uses `react-aria`,
-  `@tanstack/react-query`, `react-hook-form`, `zod`. TailwindCSS for styling.
-  Import via `#/…`.
+  project browser, settings). Still **React** as a historical artifact; being
+  progressively migrated to Vue. Uses `react-aria`, `@tanstack/react-query`,
+  `react-hook-form`, `zod`. TailwindCSS for styling. Import via `#/…`.
 
 While the migration is in progress the two subtrees are bridged by **`veaury`**
 so Vue can embed React (and vice versa): Vue mounts React through
@@ -73,6 +72,18 @@ adding an entry. React files may import `$/…` freely.
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
   constants. The Vue primitives themselves live beside them; see
   `src/components/CLAUDE.md`.
+- **The backend's queries and mutations** (#192): `src/utils/backendQuery.ts`
+  defines every backend method's query and mutation options once (key, stale
+  time, persistence, invalidations), typed with `@tanstack/query-core`, so that
+  React's `useQuery` and vue-query consume the same objects in the one shared
+  `QueryClient`; `executeMutation` runs one from outside any component.
+  `driveQueries.ts` (listings, search, new names), `driveMutations.ts` (the
+  batched delete, restore, copy, move and download; the move's duplicate
+  resolver is injected) and `transferBetweenCategories.ts` (with its context
+  injected) build on it. The Vue wrappers are `@/composables/backend` and
+  `$/composables/transferBetweenCategories`; the drive's own (mutation state,
+  new folder and project, rename, uploads) are in `#/layouts/Drive/driveActions`
+  (#91). Never give a key different options on the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and
@@ -102,13 +113,15 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
   and password pages; `account/`: the Account and API keys settings tabs'
   sections; `organization/`: the Organization, Members, User groups and Activity
-  log tabs' sections and the "Invite" dialog; `billing/`: the paywall, the Usage
-  tab and the top bar's billing parts; `versions/` and `properties/`: the right
-  panel's Versions, Schedule and Properties tabs; `credentials/`, `labels/` and
-  `datalinks/`: the drive's secret, credential, labels and datalink dialogs).
-  Keep cloud-only code here rather than in `src/utils/`, so a build without the
-  cloud can drop one folder. The core reaches the areas only through
-  `registerCloud` (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  log tabs' sections and the "Invite" dialog; `billing/`: the paywall, the
+  Billing & Plans and Usage tabs, the subscription page with the Stripe
+  checkout, the payments success page and the top bar's billing parts;
+  `versions/` and `properties/`: the right panel's Versions, Schedule and
+  Properties tabs; `credentials/`, `labels/` and `datalinks/`: the drive's
+  secret, credential, labels and datalink dialogs). Keep cloud-only code here
+  rather than in `src/utils/`, so a build without the cloud can drop one folder.
+  The core reaches the areas only through `registerCloud`
+  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
   `src/cloud/CLAUDE.md`.
 
 ## Entry points

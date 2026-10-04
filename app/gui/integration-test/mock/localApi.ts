@@ -386,11 +386,12 @@ export async function mockLocalApi(page: Page) {
       }
       send(data: Uint8Array, cb?: (err?: Error) => void): void {
         this.wsRoute.send(Buffer.from(data))
-        if (cb) Promise.resolve().then(() => cb())
+        if (cb) queueMicrotask(() => cb())
       }
       ping(): void {}
       close(): void {
-        this.wsRoute.close()
+        // Fire-and-forget, like a real socket's `close()`, whose synchronous signature this mirrors.
+        void this.wsRoute.close()
       }
     }
 

@@ -40,23 +40,17 @@ test.describe('Main method documentation rendering', () => {
     const { docsContent } = await goToGraphAndGetDocs(editorPage)
 
     // Nested lists are rendered with hierarchical indentation
-    const listItemPos = (text: string) =>
-      docsContent
-        .locator('span.cm-BulletList-item span')
-        .getByText(text, { exact: true })
-        .boundingBox()
-    const listLevel0 = () => listItemPos('Outer list element')
-    const listLevel1 = () => listItemPos('Nested list element')
-    const listLevel2 = () => listItemPos('Very nested list element')
-    expect(listLevel0).not.toBeNull()
-    expect(listLevel1).not.toBeNull()
-    expect(listLevel2).not.toBeNull()
-    expect
-      .poll(async () => ((await listLevel1())?.x ?? NaN) - ((await listLevel0())?.x ?? NaN))
-      .toBeGreaterThan(0)
-    expect
-      .poll(async () => ((await listLevel2())?.x ?? NaN) - ((await listLevel1())?.x ?? NaN))
-      .toBeGreaterThan(0)
+    const listItem = (text: string) =>
+      docsContent.locator('span.cm-BulletList-item span').getByText(text, { exact: true })
+    const listLevel0 = listItem('Outer list element')
+    const listLevel1 = listItem('Nested list element')
+    const listLevel2 = listItem('Very nested list element')
+    await expect(listLevel0).toBeVisible()
+    await expect(listLevel1).toBeVisible()
+    await expect(listLevel2).toBeVisible()
+    const x = async (item: Locator) => (await item.boundingBox())?.x ?? NaN
+    await expect.poll(async () => (await x(listLevel1)) - (await x(listLevel0))).toBeGreaterThan(0)
+    await expect.poll(async () => (await x(listLevel2)) - (await x(listLevel1))).toBeGreaterThan(0)
   })
 
   test('Link (rendered and interactive)', async ({ editorPage, page, context }) => {

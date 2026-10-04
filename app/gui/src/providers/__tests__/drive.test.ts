@@ -42,33 +42,9 @@ function mountDriveLocation() {
 const CHILD = 'directory-child' as DirectoryId
 
 describe('the drive location', () => {
-  test('without a transition, a change applies at once', () => {
+  test('a change applies at once', () => {
     const drive = mountDriveLocation()
     drive.currentDirectory = CHILD
-    expect(drive.currentDirectory).toBe(CHILD)
-  })
-
-  test("with the drive's transition, the category and the directory change inside it", () => {
-    const drive = mountDriveLocation()
-    const changes: (() => void)[] = []
-    drive.setNavigationTransition((change) => changes.push(change))
-    drive.currentCategory = { type: 'cloud' }
-    drive.currentDirectory = CHILD
-    expect(changes).toHaveLength(2)
-    expect(drive.currentCategory).toEqual({ type: 'local' })
-    changes[0]!()
-    expect(drive.currentCategory).toEqual({ type: 'cloud' })
-    changes[1]!()
-    expect(drive.currentDirectory).toBe(CHILD)
-  })
-
-  test('removing the transition makes changes immediate again', () => {
-    const drive = mountDriveLocation()
-    const transition = vi.fn()
-    drive.setNavigationTransition(transition)
-    drive.setNavigationTransition(undefined)
-    drive.currentDirectory = CHILD
-    expect(transition).not.toHaveBeenCalled()
     expect(drive.currentDirectory).toBe(CHILD)
   })
 

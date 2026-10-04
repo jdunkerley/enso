@@ -1,8 +1,8 @@
 /**
  * @file The declarative model of the settings page: its tabs, sections and entries, the context
- * their predicates and callbacks receive, and the search over them. Shared by the Vue settings page
- * (`#/layouts/Settings`), the React tabs it still mounts, and the cloud-only sections registered
- * from `src/cloud/` (`$/providers/settingsContributions`).
+ * their predicates and callbacks receive, and the search over them. Shared by the settings page
+ * (`#/layouts/Settings`) and the cloud-only sections registered from `src/cloud/`
+ * (`$/providers/settingsContributions`).
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import type SettingsTabType from '$/configurations/settingsTabs'
@@ -22,7 +22,7 @@ import type { TextId } from 'enso-common/src/text'
 import type { Component } from 'vue'
 import type { z } from 'zod'
 
-/** What the visibility predicates of every tab, React or Vue, are given. */
+/** What the visibility predicates of every tab are given. */
 export interface SettingsBaseContext {
   readonly accessToken: string
   readonly user: User

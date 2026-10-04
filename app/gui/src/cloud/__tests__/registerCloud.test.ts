@@ -1,10 +1,11 @@
 /**
  * @file `registerCloud` contributes what #84 moved to the cloud: the agreements gate (a legal gate,
  * which must not silently go missing), the modals over the dashboard, and the page shown when
- * running projects in the browser is disabled.
+ * running projects in the browser is disabled; and the developer tools, in development only (#172).
  */
 import { registerCloud } from '$/cloud'
 import {
+  devtools,
   hasAgreementsGate,
   loadAgreementsGate,
   loadAppContainerModals,
@@ -12,7 +13,7 @@ import {
 } from '$/providers/layoutContributions'
 import { resetSettingsContributions } from '$/providers/settingsContributions'
 import { CLOUD_DISABLED_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
-import { beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 function setup() {
@@ -27,6 +28,9 @@ function setup() {
 beforeEach(() => {
   resetLayoutContributions()
   resetSettingsContributions()
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
 })
 
 describe('registerCloud', () => {
@@ -67,5 +71,14 @@ describe('registerCloud', () => {
     ])
     expect(route.meta.access).toBe('anyLoggedIn')
     expect(route.matched[1]!.props).toEqual({ default: { redirectPath: '/' } })
+  })
+
+  test('contributes the developer tools in development builds only', async () => {
+    setup()
+    expect(devtools()).toBeUndefined()
+    resetLayoutContributions()
+    vi.stubEnv('NODE_ENV', 'development')
+    setup()
+    expect(devtools()).toBeDefined()
   })
 })

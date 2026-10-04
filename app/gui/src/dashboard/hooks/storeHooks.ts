@@ -10,8 +10,7 @@ import type { StoreApi } from 'zustand'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 
 /**
- * What the hooks here read of a store: a zustand store, or anything else of the same shape (the
- * drive store's adapter, `#/providers/DriveProvider`).
+ * What the hooks here read of a store: a zustand store, or anything else of the same shape.
  */
 export type ReadonlyStoreApi<State> = Pick<
   StoreApi<State>,

@@ -49,6 +49,8 @@ const props = withDefaults(
     /** React's `fieldVariants`: a `FIELD_STYLES` extension for the field. */
     fieldVariants?: ExtractFunction<typeof FIELD_STYLES> | undefined
     fieldClass?: string | undefined
+    /** Overrides the field's error message under the input; `null` shows none, as React's `error`. */
+    error?: string | null | undefined
     testId?: string | undefined
     /** Classes for the `<input>`. */
     class?: string | undefined
@@ -62,6 +64,7 @@ const props = withDefaults(
     readOnly: undefined,
     hidden: undefined,
     autoFocus: undefined,
+    error: undefined,
   },
 )
 
@@ -120,6 +123,7 @@ const describedBy = computed(
     :fullWidth="true"
     :variants="fieldVariants"
     :ids="field.ids"
+    :error="error"
     :testId="testId"
     :class="fieldClass"
   >

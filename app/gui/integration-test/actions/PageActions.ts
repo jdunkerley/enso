@@ -10,6 +10,13 @@ function locateRightPanel(page: Page) {
   return page.getByTestId('right-panel').locator('visible=true')
 }
 
+/** Wait until the Right Panel has finished opening or closing. */
+async function expectRightPanelSettled(page: Page) {
+  // `SizeTransition` marks the element it is animating with `data-transitioning`, synchronously
+  // within the click's own task, so this cannot pass before the animation has started.
+  await expect(page.getByTestId('right-panel').locator('[data-transitioning]')).toHaveCount(0)
+}
+
 /** Actions common to all pages. */
 export default class PageActions<
   Context,
@@ -46,10 +53,19 @@ export default class PageActions<
     })
   }
 
-  /** Show the Docs tab of the Right Panel. */
+  /**
+   * Show the Docs tab of the Right Panel, or hide the panel if it is already showing it.
+   *
+   * Waits for the panel's open or close animation to finish. The animation resizes the graph
+   * editor's viewport for about 250 ms, and while it runs the SVG layer holding the edges and the
+   * output ports' hover areas lags the nodes by a frame, so a node's output port can briefly sit
+   * over empty background. A press that lands there starts dragging an edge instead of whatever
+   * the test meant to do.
+   */
   toggleDocsAssetPanel() {
     return this.step('Toggle docs asset panel', async (page) => {
       await page.getByRole('tab', { name: 'Documentation' }).click()
+      await expectRightPanelSettled(page)
     })
   }
 

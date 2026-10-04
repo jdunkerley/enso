@@ -9,6 +9,8 @@ import { cloneElement, type JSX } from 'react'
 /** Props for a {@link ReactModalFrame}. */
 export interface ReactModalFrameProps extends Confirmable {
   readonly modal: JSX.Element
+  /** Called when the dialog opens or closes; `openReactModal` closes its stack entry with it. */
+  readonly onOpenChange?: ((isOpen: boolean) => void) | undefined
 }
 
 /**
@@ -23,7 +25,10 @@ export function ReactModalFrame(props: ReactModalFrameProps) {
     <ErrorBoundary>
       <Portal>
         <div className="select-none text-xs text-primary">
-          <Dialog.Trigger defaultOpen>
+          <Dialog.Trigger
+            defaultOpen
+            {...(props.onOpenChange != null ? { onOpenChange: props.onOpenChange } : {})}
+          >
             {/* This component suppresses the warning about the target not being pressable element. */}
             <Pressable>
               <></>

@@ -29,7 +29,18 @@ import {
   type RequiredImport,
 } from './imports'
 
-const AST_LOAD_TIMEOUT_MS = 30000
+/**
+ * How long to wait for the module's first AST before giving up with "Failed to open project".
+ *
+ * The module's document arrives over its own `y-websocket` connection. On a slow machine that
+ * connection sometimes receives nothing at all after it opens. `y-websocket` recovers by itself:
+ * it reconnects once a socket has been silent for 30 s (`messageReconnectTimeout`, checked every
+ * 3 s), and the new connection syncs. On the Windows CI runner the reconnect came 32.8-33.2 s
+ * after the document was first requested, every time (#212). With a 30 s limit, the project
+ * failed for good just before it could recover. 75 s leaves room for two reconnects. A normal
+ * load takes 13-25 s on that runner.
+ */
+const AST_LOAD_TIMEOUT_MS = 75_000
 
 /**
  * Module Store

@@ -9,8 +9,10 @@
  * metadata (`$/configurations/inputBindings`), the shortcut as the user has bound it. Pressing it
  * closes the enclosing popover or dialog (or every modal, outside one), then calls `onPress`.
  *
- * Not ported, as no Vue menu uses them yet: React's `tooltip` and its paywall lock
- * (`isUnderPaywall`, `feature`).
+ * `tooltip` shows a visual tooltip to the right of the entry (#91, for the drive's context menus).
+ * React's paywall lock (`isUnderPaywall`, `feature`) is not here: the paywall is cloud code, which
+ * the core may not import, so the drive's menus (which are dashboard code) give a locked entry the
+ * lock icon, the "upgrade" tooltip and an `onPress` opening the paywall dialog themselves.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { injectDialogContext } from '$/components/Dialog/dialogContext'
@@ -18,6 +20,8 @@ import KeyboardShortcut from '$/components/KeyboardShortcut/KeyboardShortcut.vue
 import { MENU_ENTRY_VARIANTS } from '$/components/MenuEntry/variants'
 import Text from '$/components/Text/Text.vue'
 import type { TEXT_STYLE } from '$/components/Text/variants'
+import { useVisualTooltip } from '$/components/Tooltip/useVisualTooltip'
+import VisualTooltipPopup from '$/components/Tooltip/VisualTooltipPopup.vue'
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useModals } from '$/providers/modals'
@@ -27,7 +31,7 @@ import type { VariantProps } from '$/utils/style/tailwindVariants'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'
 import type { TextId } from 'enso-common/src/text'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -39,6 +43,8 @@ const props = withDefaults(
     truncateLabel?: boolean | undefined
     isDisabled?: boolean | undefined
     title?: string | undefined
+    /** A visual tooltip, shown to the right of the entry. */
+    tooltip?: string | null | undefined
     color?: VariantProps<typeof TEXT_STYLE>['color']
     hasHoverBackground?: boolean | undefined
     variant?: 'context-menu' | undefined
@@ -89,6 +95,13 @@ const labelClass = computed(() =>
   ),
 )
 
+const content = ref<HTMLElement>()
+const {
+  isOpen: isTooltipOpen,
+  onTooltipEnter,
+  onTooltipLeave,
+} = useVisualTooltip(content, { isDisabled: () => props.tooltip == null })
+
 function press() {
   if (dialog) {
     // Closing a dialog takes precedence over closing the modals.
@@ -107,7 +120,7 @@ function press() {
     :disabled="isDisabled"
     @click="press"
   >
-    <div :class="contentClass">
+    <div ref="content" :class="contentClass">
       <div :title="title" :class="labelClass" :style="{ color: info.color }">
         <slot v-if="$slots.picture" name="picture" />
         <!-- An empty placeholder keeps the labels of entries without an icon aligned. -->
@@ -129,5 +142,15 @@ function press() {
       </div>
       <KeyboardShortcut v-if="shortcut != null" :shortcut="shortcut" />
     </div>
+    <VisualTooltipPopup
+      v-if="tooltip != null"
+      :target="content"
+      :open="isTooltipOpen"
+      placement="right"
+      @pointerenter="onTooltipEnter"
+      @pointerleave="onTooltipLeave"
+    >
+      {{ tooltip }}
+    </VisualTooltipPopup>
   </button>
 </template>

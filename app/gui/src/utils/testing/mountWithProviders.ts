@@ -70,7 +70,7 @@ export type MountWithProvidersOptions<C extends Component> = Pick<
   readonly language?: Language
   /**
    * Context stores to provide, keyed by the name given to `createContextStore` (e.g. `drive`,
-   * `reactApi`). The value is the store instance the component's `useX()` will receive.
+   * `driveStore`). The value is the store instance the component's `useX()` will receive.
    */
   readonly stores?: Readonly<Record<string, unknown>>
 }

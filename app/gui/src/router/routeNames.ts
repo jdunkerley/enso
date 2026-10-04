@@ -7,6 +7,12 @@
 export const PROTECTED_LAYOUT_ROUTE = 'protectedLayout'
 
 /**
+ * The layout of the main app's pages (`AppContainerLayout.vue`), under the protected layout: the
+ * dashboard, and the cloud's subscription page (`$/cloud/billing/routes`).
+ */
+export const APP_CONTAINER_LAYOUT_ROUTE = 'appContainerLayout'
+
+/**
  * The page shown when running projects in the browser is disabled, added by the cloud
  * (`$/cloud/browserDisabled/routes`). The dashboard's route redirects to it while the
  * `enableCloudExecution` feature flag is off, when it exists.

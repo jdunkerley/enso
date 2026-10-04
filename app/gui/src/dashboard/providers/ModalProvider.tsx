@@ -12,7 +12,6 @@ import { getModalsStore, type Resolution } from '$/providers/modals'
 import { reactComponent } from '$/utils/react'
 import { isValidElement, type JSX } from 'react'
 import type { Component } from 'vue'
-import type { ComponentProps } from 'vue-component-type-helpers'
 
 /** The type of a modal. */
 export type Modal = JSX.Element
@@ -48,13 +47,20 @@ export function setModal(modal: ModalOrCallback) {
 }
 
 /**
- * Replace every open modal with a Vue modal, as {@link setModal} does with a React one. Unlike a
- * {@link setModal} entry, it leaves the stack once it has closed (it emits `close`).
+ * Push a React modal on the stack over the open ones, as a react-aria `Dialog.Trigger` opened its
+ * dialog without closing others: for a Vue button that opens a React dialog still waiting for its
+ * port (the drive's toolbar and labels column, #91, until #198). Unlike a {@link setModal} entry,
+ * it leaves the stack once the dialog closes, as the trigger's own dialog went.
  */
-export function setVueModal<C extends Component>(component: C, props: ComponentProps<C>) {
+export function openReactModal(modal: Modal) {
   const modals = getModalsStore()
-  modals.closeAll()
-  return modals.open(component, props)
+  const entry = modals.open(getReactModalEntry(), {
+    modal,
+    onOpenChange: (isOpen: boolean) => {
+      if (!isOpen) entry.close()
+    },
+  })
+  return entry
 }
 
 /**

@@ -8,26 +8,29 @@ community build without the cloud can leave it out (decision 6b of
 ## Layout
 
 - Top level: framework-free helpers (`validation.ts` with the Cognito password
-  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`).
-  The React dashboard imports these while it is ported.
+  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`,
+  and `uploadToCloud.ts`, which packs local projects and uploads them to the
+  cloud when assets move from a local category to a cloud one, #192). The React
+  dashboard imports these while it is ported, and the core may import them.
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
-    `UpsertSecretModal.vue` (#92), which the React drive opens on the modal
-    stack (`setVueModal`); since #198 also the "New Credential" dialog
-    (`CreateCredentialModal.vue`) and its forms, one per service
-    (`credentialInfos.ts`), over the recipes in `serviceCredentials/`.
+    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack;
+    since #198 also the "New Credential" dialog (`CreateCredentialModal.vue`)
+    and its forms, one per service (`credentialInfos.ts`), over the recipes in
+    `serviceCredentials/`.
   - `labels/`, since #198: the drive's labels popover (`ManageLabelsModal.vue`,
     with `ManageLabelsForm.vue`, `NotFoundLabel.vue` and `ColorPicker.vue`), on
-    the modal stack and anchored to the React row or button that opened it.
+    the modal stack and anchored to the button that opened it.
   - `datalinks/`, since #198: the datalink editor (`JSONSchemaInput.vue` over
     the datalink schema, with `FilePathInput.vue` and the cloud file browser),
     its form field (`DatalinkFormInput.vue`, which the Properties tab uses too)
     and the "Create Datalink" dialog (`UpsertDatalinkModal.vue`).
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
-    menu's "Upgrade Plan"), `organization/` (the user menu's organization
-    switcher) and `versionChecker/` (the "new version available" dialog, mounted
-    by `App.vue`).
+    menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
+    the subscription price query, `subscriptionPrice.ts`), `organization/` (the
+    user menu's organization switcher) and `versionChecker/` (the "new version
+    available" dialog, mounted by `App.vue`).
   - `organization/`, since #87: the Organization and Members settings tabs'
     sections (`settingsSections.ts`, contributed by
     `registerOrganizationSettings`), and since #191 the User groups tab's
@@ -41,11 +44,20 @@ community build without the cloud can leave it out (decision 6b of
     `PaywallDialog`, `PaywallDialogButton`, `PaywallButton`, `PaywallAlert`,
     `PaywallLock`, `PaywallBulletPoints`, `PaywallUpgradeButton`), and the
     settings page's paywall screen, contributed by `registerBillingSettings`.
-    The React originals left (`PaywallDialog`, `UpgradeButton`, `PaywallLock`,
-    `PaywallBulletPoints`) stay for their React callers until #88.
+    Since #88 also `PaywallModal.vue`, the dialog on the modal stack, which the
+    React menus' paywalled entries open; no React paywall code is left.
   - `billing/`, since #191: the Usage settings tab's section
     (`UsageSettingsSection.vue`, with `executionUsage.ts`), contributed by
     `registerBillingSettings`.
+  - `billing/`, since #88: the Billing & Plans tab's section
+    (`BillingSettingsSection.vue`, the Stripe customer portal), the plans
+    (`plans.ts`), their price (`subscriptionPrice.ts`) and the plan a checkout
+    is for (`pendingCheckout.ts`); and in `billing/subscribe/` the subscription
+    page (`SubscribePage.vue`: the plan cards, the Solo confirmation, the plan
+    dialog with its seats and price), the Stripe checkout (`checkout.ts`) and
+    the payments success page. Their routes are `billing/routes.ts`
+    (`registerBillingRoutes`), the subscription page under the main app's layout
+    (`APP_CONTAINER_LAYOUT_ROUTE`).
   - `auth/` — the sign-in (with the one-time-code step), sign-up (with the email
     confirmation step), email confirmation, forgot-password, reset-password and
     account-restoration pages, their layout (`AuthenticationPage.vue`), the
@@ -53,6 +65,10 @@ community build without the cloud can leave it out (decision 6b of
     shared: `$/providers/session`, `$/providers/auth`, `$/authentication/`. Also
     the Account settings tab's two-factor authentication section
     (`SetupTwoFaForm.vue`, `TwoFaSetup.vue`).
+  - `versions/` — the right panel's Versions tab (#89), and the query options of
+    a project's scheduled executions (`projectExecutions.ts`, #192) for the
+    Schedule tab (#183). Imported directly by `RightPanel.vue`; see its
+    `CLAUDE.md`.
   - `account/` — the Account settings tab's sections (`settingsSections.ts`: the
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
@@ -72,6 +88,11 @@ community build without the cloud can leave it out (decision 6b of
     `PlanDowngradedModal.vue` and their `downgradeModalState.ts`) and
     `browserDisabled/` (the page shown when running projects in the browser is
     disabled, and its route).
+  - `devtools/` (#172): the Enso devtools (the floating Enso button and its
+    panel: plan override, version checker, feature flags, paywall toggles, local
+    storage editor) and the list of active overrides, contributed with
+    `contributeDevtools` in development builds only (`registerCloud` checks
+    `process.env.NODE_ENV`, so a production build carries none of it).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules

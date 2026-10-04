@@ -41,6 +41,9 @@ export interface ToastOptions {
   readonly position?: ToastPosition | null | undefined
 }
 
+/** The content of an outcome of {@link ToastsStore.promise}: rendered from the result, if a function. */
+export type PromiseToastContent = ToastContent | ((data: unknown) => ToastContent)
+
 /** A toast, as the host renders it. */
 export interface Toast {
   readonly id: ToastId
@@ -191,7 +194,61 @@ export function createToastsStore() {
     }
   }
 
-  return { toasts, show, update, dismiss, isActive, remove, onChange }
+  /**
+   * Show a loading toast while the promise is pending, then turn it into a success or an error
+   * toast, as react-toastify's `toast.promise` did. An outcome without content only dismisses the
+   * loading toast; content given as a function is rendered from the promise's result or error.
+   * Returns the promise.
+   */
+  function promise<T>(
+    running: Promise<T>,
+    messages: {
+      readonly pending?: ToastContent | undefined
+      readonly success?: PromiseToastContent | undefined
+      readonly error?: PromiseToastContent | undefined
+    },
+    options: ToastOptions = {},
+  ) {
+    const id =
+      messages.pending != null ?
+        show(messages.pending, {
+          isLoading: true,
+          autoClose: false,
+          closeOnClick: false,
+          closeButton: false,
+          ...options,
+        })
+      : null
+    const settle = (
+      type: 'error' | 'success',
+      content: PromiseToastContent | undefined,
+      data: unknown,
+    ) => {
+      if (content == null) {
+        if (id != null) dismiss(id)
+        return
+      }
+      // `null` returns what the loading toast changed to the defaults.
+      const outcome: ToastOptions = {
+        ...options,
+        type,
+        isLoading: null,
+        autoClose: null,
+        closeOnClick: null,
+        closeButton: null,
+      }
+      const render = typeof content === 'function' ? content(data) : content
+      if (id != null) update(id, { ...outcome, render })
+      else show(render, outcome)
+    }
+    running.then(
+      (data) => settle('success', messages.success, data),
+      (error: unknown) => settle('error', messages.error, error),
+    )
+    return running
+  }
+
+  return { toasts, show, update, dismiss, isActive, remove, onChange, promise }
 }
 
 /** The app's toasts, reachable from any code: Vue components, stores, and the React shim. */

@@ -1,11 +1,15 @@
 /**
- * @file The Vue paywall pieces (`src/cloud/billing/paywall/`): the screen, the alert, and the button
- * that opens the dialog, with the plan each feature needs and where its upgrade button leads.
+ * @file The Vue paywall pieces (`src/cloud/billing/paywall/`): the screen, the alert, the button
+ * that opens the dialog, and the dialog on the modal stack (the React menus' paywalled entries),
+ * with the plan each feature needs and where its upgrade button leads.
  */
 import { SUBSCRIBE_PATH } from '$/appUtils'
 import PaywallAlert from '$/cloud/billing/paywall/PaywallAlert.vue'
 import PaywallDialogButton from '$/cloud/billing/paywall/PaywallDialogButton.vue'
+import PaywallModal from '$/cloud/billing/paywall/PaywallModal.vue'
 import PaywallScreen from '$/cloud/billing/paywall/PaywallScreen.vue'
+import ModalHost from '$/components/ModalHost/ModalHost.vue'
+import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
@@ -56,5 +60,21 @@ describe('paywall', () => {
     await user.keyboard('{Escape}')
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')).toBeNull())
     expect(document.activeElement).toBe(trigger)
+  })
+
+  test('on the modal stack, it opens at once and leaves the stack once closed', async () => {
+    await mountWithProviders(ModalHost)
+    const modals = useModals()
+    modals.open(PaywallModal, { feature: 'uploadToCloud' })
+    await flushPromises()
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
+    expect(dialog?.textContent).toContain(getText('uploadToCloudFeatureLabel'))
+    expect(dialog?.textContent).toContain(getText('uploadToCloudFeatureDescription'))
+    expect(link(getText('upgradeTo', getText('soloPlanName')))?.getAttribute('href')).toBe(
+      `${SUBSCRIBE_PATH}?plan=solo`,
+    )
+    await userEvent.setup().keyboard('{Escape}')
+    await vi.waitFor(() => expect(modals.stack.value).toHaveLength(0))
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })

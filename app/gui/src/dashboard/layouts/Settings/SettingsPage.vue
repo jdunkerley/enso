@@ -4,11 +4,10 @@
  * narrow screens), a search field that narrows the tabs, sections and entries to those matching it,
  * and the current tab, kept in the `SettingsTab` query parameter.
  *
- * Every tab but Billing & Plans is Vue (`SettingsTab.vue`); Billing & Plans is still React, mounted
- * through `ReactSettingsTab` until #88 ports it. The sections of the Account tab and of the cloud's
- * tabs (Organization, Members, User groups, Activity log, API keys, Usage) come from the cloud
- * (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a tab
- * whose feature the user's plan lacks.
+ * Every tab is laid out by `SettingsTab.vue`. The sections of the Account tab and of the cloud's tabs
+ * (Organization, Billing & Plans, Members, User groups, Activity log, API keys, Usage) come from the
+ * cloud (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a
+ * tab whose feature the user's plan lacks.
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
@@ -42,17 +41,13 @@ import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
 import { useZustandStoreRef } from '$/utils/zustand'
 import { backendMutationOptions, backendQueryOptions } from '@/composables/backend'
-import { reactComponent } from '$/utils/react'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import type { Path } from 'enso-common/src/services/Backend'
 import { computed, inject, onScopeDispose, ref, watch } from 'vue'
-import ReactSettingsTabComponent from './ReactSettingsTab'
 import SettingsSearchBar from './SettingsSearchBar.vue'
 import SettingsSidebar from './SettingsSidebar.vue'
 import SettingsTab from './SettingsTab.vue'
-import { SETTINGS_DATA, SETTINGS_NO_RESULTS_SECTION_DATA, type AnySettingsTabData } from './tabs'
-
-const ReactSettingsTab = reactComponent(ReactSettingsTabComponent)
+import { SETTINGS_DATA, SETTINGS_NO_RESULTS_SECTION_DATA } from './tabs'
 
 const auth = useAuth()
 const backends = useBackends()
@@ -163,26 +158,22 @@ const query = ref('')
 const isQueryBlank = computed(() => isSettingsQueryBlank(query.value))
 const isMatch = computed(() => settingsQueryMatcher(query.value))
 
-/** The tabs in their groups, with the sections contributed to the Vue ones. */
+/** The tabs in their groups, with the sections contributed to them. */
 const tabSections = computed(() =>
   SETTINGS_DATA.map((tabSection) => ({
     ...tabSection,
-    tabs: tabSection.tabs.map((tabData): AnySettingsTabData =>
-      'react' in tabData ? tabData : (
-        {
-          ...tabData,
-          sections: [...tabData.sections, ...settingsContributions(tabData.settingsTab)],
-        }
-      ),
-    ),
+    tabs: tabSection.tabs.map((tabData) => ({
+      ...tabData,
+      sections: [...tabData.sections, ...settingsContributions(tabData.settingsTab)],
+    })),
   })),
 )
 
 const tabsToShow = computed(() =>
   tabSections.value.flatMap((tabSection) =>
     tabSection.tabs
-      // A Vue tab with no sections has nothing contributed to it: a build without the cloud.
-      .filter((tabData) => 'react' in tabData || tabData.sections.length > 0)
+      // A tab with no sections has nothing contributed to it: a build without the cloud.
+      .filter((tabData) => tabData.sections.length > 0)
       .filter((tabData) => tabData.visible?.(context.value) ?? true)
       .filter(
         (tabData) =>
@@ -200,9 +191,8 @@ const tabData = computed(() =>
     .flatMap((tabSection) => tabSection.tabs)
     .find((tabData) => tabData.settingsTab === effectiveTab.value)!,
 )
-const vueSections = computed((): readonly SettingsSectionData[] => {
+const sections = computed((): readonly SettingsSectionData[] => {
   const data = tabData.value
-  if ('react' in data) return []
   if (isQueryBlank.value) return data.sections
   return filterSettingsSections(data, isMatch.value, getText, SETTINGS_NO_RESULTS_SECTION_DATA)
 })
@@ -211,7 +201,7 @@ const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
 /** The feature the current tab is locked behind, while the user's plan lacks it. */
 const paywallFeature = computed(() => {
   const data = tabData.value
-  if ('react' in data || data.feature == null) return null
+  if (data.feature == null) return null
   return isFeatureUnderPaywall(data.feature) ? data.feature : null
 })
 
@@ -274,11 +264,10 @@ const title = computed(() =>
           />
         </aside>
         <main class="flex flex-1 flex-col overflow-y-auto pb-12 pl-1 scrollbar-gutter-stable">
-          <ReactSettingsTab v-if="'react' in tabData" :data="tabData" :query="query" />
-          <template v-else-if="paywallFeature != null">
+          <template v-if="paywallFeature != null">
             <component :is="settingsPaywall()" v-if="settingsPaywall()" :feature="paywallFeature" />
           </template>
-          <SettingsTab v-else :key="effectiveTab" :sections="vueSections" />
+          <SettingsTab v-else :key="effectiveTab" :sections="sections" />
         </main>
       </div>
     </div>

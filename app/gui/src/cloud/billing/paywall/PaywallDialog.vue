@@ -21,12 +21,22 @@ const { feature, title } = defineProps<{
 
 const open = defineModel<boolean>('open', { default: false })
 
+const emit = defineEmits<{
+  /** It closed, and its exit animation has ended. */
+  closed: []
+}>()
+
 const { getText } = useText()
 const configuration = computed(() => getFeatureConfiguration(feature))
 </script>
 
 <template>
-  <Dialog v-model:open="open" type="modal" :title="title ?? getText(configuration.label)">
+  <Dialog
+    v-model:open="open"
+    type="modal"
+    :title="title ?? getText(configuration.label)"
+    @closed="emit('closed')"
+  >
     <template v-if="$slots.trigger" #trigger><slot name="trigger" /></template>
     <div class="flex flex-col">
       <PaywallLock :feature="feature" class="mb-2" />

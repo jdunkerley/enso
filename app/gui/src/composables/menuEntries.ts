@@ -9,6 +9,10 @@
  *
  * The shortcuts are the user's (`$/providers/dashboardInputBindings`), read when an event arrives, so a
  * rebinding applies at once, as in React.
+ *
+ * A `target` scopes the shortcuts to an element and its descendants, as React's binding focus scope
+ * (`BindingFocusScopeContext`) did for the drive's context menus: their shortcuts act only on a key
+ * pressed inside the assets table.
  */
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import { useActionsStore, type Action } from '$/providers/actions'
@@ -16,7 +20,7 @@ import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useText } from '$/providers/text'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import { computed, onMounted, onUnmounted, toRef, toValue, type MaybeRefOrGetter } from 'vue'
+import { computed, onMounted, onUnmounted, toRef, toValue, watch, type MaybeRefOrGetter } from 'vue'
 
 /** What {@link useMenuEntries} needs of an entry: its action, and how to run it. */
 export interface MenuEntryAction {
@@ -33,6 +37,7 @@ export interface MenuEntryAction {
  */
 export function useMenuEntries<Entry extends MenuEntryAction>(
   entries: MaybeRefOrGetter<readonly (Entry | false | null | undefined)[]>,
+  target?: MaybeRefOrGetter<HTMLElement | null | undefined>,
 ) {
   const inputBindings = useDashboardInputBindings()
   const { getText } = useText()
@@ -62,9 +67,9 @@ export function useMenuEntries<Entry extends MenuEntryAction>(
 
   let unbind: (() => void) | undefined
   let detach: (() => void) | undefined
-  onMounted(() => {
-    unbind = bindGlobalActions(actions)
-    detach = inputBindings.attach(document.body, 'keydown', {
+  function attachTo(element: HTMLElement) {
+    detach?.()
+    detach = inputBindings.attach(element, 'keydown', {
       [DEFAULT_HANDLER]: (_event, matchingBindings) => {
         for (const binding of matchingBindings) {
           // The last entry for an action wins, as in React's map of entries by action.
@@ -77,6 +82,22 @@ export function useMenuEntries<Entry extends MenuEntryAction>(
         return false
       },
     })
+  }
+  onMounted(() => {
+    unbind = bindGlobalActions(actions)
+    if (target == null) {
+      attachTo(document.body)
+    } else {
+      watch(
+        () => toValue(target),
+        (element) => {
+          detach?.()
+          detach = undefined
+          if (element != null) attachTo(element)
+        },
+        { immediate: true },
+      )
+    }
   })
   onUnmounted(() => {
     unbind?.()

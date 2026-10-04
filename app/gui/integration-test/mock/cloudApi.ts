@@ -81,6 +81,8 @@ const INITIAL_CALLS_OBJECT = {
   uploadFileEnd: array<backend.UploadFileEndRequestBody>(),
   createSecret: array<backend.CreateSecretRequestBody>(),
   createCheckoutSession: array<backend.CreateCheckoutSessionRequestBody>(),
+  getPaymentsConfig: array<object>(),
+  createCustomerPortalSession: array<object>(),
   updateAsset: array<{ assetId: backend.AssetId } & backend.UpdateAssetRequestBody>(),
   associateTag: array<{ assetId: backend.AssetId; labels: readonly backend.LabelName[] }>(),
   updateDirectory: array<
@@ -576,6 +578,47 @@ export async function mockCloudApi(page: Page) {
     }
   }
 
+  /** The plans the subscription page offers, as the backend's payments configuration lists them. */
+  const paymentsConfig: backend.PaymentsConfig = {
+    cards: [
+      {
+        plan: backend.Plan.free,
+        period: 12,
+        title: 'Free',
+        subtitle: 'For individuals getting started',
+        pricing: '$0',
+        features: ['Local projects', 'Community support'],
+      },
+      {
+        plan: backend.Plan.solo,
+        period: 12,
+        title: 'Solo',
+        subtitle: 'For individual analysts',
+        pricing: '$75 per month, billed annually',
+        features: ['Cloud storage', 'Scheduled executions', 'Version history'],
+      },
+      {
+        plan: backend.Plan.team,
+        period: 12,
+        title: 'Team',
+        subtitle: 'For teams of up to 10',
+        pricing: '$150 per user per month, billed annually',
+        features: ['Everything in Solo', 'User groups', 'Shared folders'],
+      },
+      {
+        plan: backend.Plan.enterprise,
+        period: 12,
+        title: 'Enterprise',
+        subtitle: 'For organizations',
+        pricing: 'Contact us',
+        features: ['Everything in Team', 'Unlimited seats', 'Dedicated support'],
+      },
+    ],
+  }
+
+  /** The Stripe customer portal session's URL. */
+  const customerPortalSessionUrl = 'https://billing.stripe.com/p/session/mock'
+
   const createCheckoutSession = (_body: backend.CreateCheckoutSessionRequestBody) => {
     return {
       url: backend.HttpsUrl('http://stripe.com/checkout/session'),
@@ -622,6 +665,23 @@ export async function mockCloudApi(page: Page) {
     }
     userGroups.push(userGroup)
     return userGroup
+  }
+
+  /**
+   * Add a user group with a home directory (a "team"), and make the default user a member, so that
+   * the drive shows it as a category. Assets go into its folder with `parentId: team.homeDirectoryId`.
+   * Call it before signing in: the user's groups come with `users/me`.
+   */
+  const addTeam = (name: string) => {
+    const userGroup = addUserGroup(name)
+    const team: backend.UserGroup = {
+      id: userGroup.id,
+      name,
+      homeDirectoryId: userGroupIdToDirectoryId(userGroup.id),
+    }
+    object.unsafeMutable(defaultUser).groups = [...(defaultUser.groups ?? []), team]
+    object.unsafeMutable(defaultUser).userGroups = [...(defaultUser.userGroups ?? []), team.id]
+    return team
   }
 
   const deleteUserGroup = (userGroupId: backend.UserGroupId) => {
@@ -747,7 +807,7 @@ export async function mockCloudApi(page: Page) {
 
     // === Endpoints returning arrays ===
 
-    await get(paths.LIST_DIRECTORY_PATH, (route, _req, _, params) => {
+    await get(paths.LIST_DIRECTORY_PATH, async (route, _req, _, params) => {
       const query = Object.fromEntries(params.entries()) as ListDirectoryQuery
       called('listDirectory', query)
       const assets = listDirectory(query)
@@ -756,9 +816,9 @@ export async function mockCloudApi(page: Page) {
         assets,
         paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
       }
-      route.fulfill({ json })
+      await route.fulfill({ json })
     })
-    await get(paths.SEARCH_DIRECTORY_PATH, (route, _req, _, params) => {
+    await get(paths.SEARCH_DIRECTORY_PATH, async (route, _req, _, params) => {
       const query = Object.fromEntries(params.entries()) as SearchDirectoryQuery
       called('searchDirectory', query)
       const assets = searchDirectory(query)
@@ -767,7 +827,7 @@ export async function mockCloudApi(page: Page) {
         assets,
         paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
       }
-      route.fulfill({ json })
+      await route.fulfill({ json })
     })
     await get(paths.LIST_SECRETS_PATH, () => {
       called('listSecrets', {})
@@ -972,7 +1032,7 @@ export async function mockCloudApi(page: Page) {
         object.unsafeMutable(project.projectState).type = backend.ProjectState.opened
       }
 
-      route.fulfill()
+      await route.fulfill()
     })
     await post(
       paths.getHybridSetOpenInProgressPath(GLOB_PROJECT_ID),
@@ -1015,7 +1075,7 @@ export async function mockCloudApi(page: Page) {
         object.unsafeMutable(project.projectState).type = backend.ProjectState.opened
       }
 
-      route.fulfill()
+      await route.fulfill()
     })
     await delete_(paths.deleteTagPath(GLOB_TAG_ID), async (route, _, [id]) => {
       if (!id) return
@@ -1120,6 +1180,18 @@ export async function mockCloudApi(page: Page) {
       totalSeats = body.quantity
       subscriptionDuration = body.interval
       return createCheckoutSession(body)
+    })
+
+    await get(paths.PAYMENTS_CONFIG_PATH, () => {
+      called('getPaymentsConfig', {})
+      return paymentsConfig
+    })
+
+    await post(paths.CUSTOMER_PORTAL_SESSION_CREATE_PATH, () => {
+      called('createCustomerPortalSession', {})
+      return {
+        url: customerPortalSessionUrl,
+      } satisfies backend.CreateCustomerPortalSessionResponse
     })
 
     await patch(paths.updateAssetPath(GLOB_ASSET_ID), (route, request, [id]) => {
@@ -1404,11 +1476,14 @@ export async function mockCloudApi(page: Page) {
       })
     })
 
-    await get(paths.RESOLVE_ENSO_PATH, (route, _request, _captures, params) => {
+    await get(paths.RESOLVE_ENSO_PATH, async (route, _request, _captures, params) => {
       const path = params.get('path')
       const userRoot = `enso://Users/${currentUser?.name}`
       if (!path?.startsWith(userRoot)) {
-        route.fulfill({ status: HTTP_STATUS_BAD_REQUEST, json: { message: 'Invalid enso path' } })
+        await route.fulfill({
+          status: HTTP_STATUS_BAD_REQUEST,
+          json: { message: 'Invalid enso path' },
+        })
         return
       }
       for (const asset of assetMap.values()) {
@@ -1417,7 +1492,7 @@ export async function mockCloudApi(page: Page) {
           return rest
         }
       }
-      route.fulfill({
+      await route.fulfill({
         status: HTTP_STATUS_NOT_FOUND,
         json: {
           message: `Path '${path}' does not resolve to any asset. Available paths: ${assets.map((asset) => `'${asset.ensoPath}'`).join(', ')}`,
@@ -1489,9 +1564,12 @@ export async function mockCloudApi(page: Page) {
     addLabel,
     setLabels,
     createCheckoutSession,
+    paymentsConfig,
+    customerPortalSessionUrl,
     addUser,
     deleteUser,
     addUserGroup,
+    addTeam,
     deleteUserGroup,
     createUserPermission,
     createUserGroupPermission,
