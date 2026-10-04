@@ -43,17 +43,17 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   switch's pending state is `isNavigating` on the Vue drive location, which the
   React drive feeds from its transition (`useDriveNavigationTransition`).
 - `hooks/` — Custom React hooks.
-- `data/serviceCredentials/` — the React forms for creating service credentials.
-  Their framework-free recipes live in `src/cloud/`.
 - `modals/` — The React modals still opened with `setModal` or a
   `Dialog.Trigger`. The drive's simple modals are Vue (#92), opened on the modal
   stack: `setVueModal(C, props)` (`ModalProvider.tsx`) replaces the open modals
   as `setModal` does, and `useVueModalTrigger` (`hooks/vueModalHooks.ts`) opens
   one from a React button that was a `Dialog.Trigger`, keeping the trigger's
   `aria-expanded`. The duplicate-name dialog, the drag preview and the asset
-  summary are in `$/components/Drive/`; the secret dialog in
-  `$/cloud/credentials/`; delete confirmations use
-  `$/components/AlertDialog/ConfirmDeleteModal.vue`.
+  summary are in `$/components/Drive/`; the secret and "New Credential" dialogs
+  in `$/cloud/credentials/`, the labels popover in `$/cloud/labels/` and the
+  "Create Datalink" dialog in `$/cloud/datalinks/` (#198); delete confirmations
+  use `$/components/AlertDialog/ConfirmDeleteModal.vue`. No drive code calls
+  `setModal` with a React element any more.
 - `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
   `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
   `toast.tsx` is the React shim over the Vue toast store (`$/providers/toasts`):

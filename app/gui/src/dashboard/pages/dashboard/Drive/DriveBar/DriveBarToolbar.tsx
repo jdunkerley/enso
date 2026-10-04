@@ -3,7 +3,6 @@
  * the current directory and some configuration options.
  */
 import { Button } from '#/components/Button'
-import { Dialog } from '#/components/Dialog'
 import { ErrorBoundary, InlineErrorDisplay } from '#/components/ErrorBoundary'
 import { IconDisplay } from '#/components/IconDisplay'
 import { useVisualTooltip, VisualTooltip } from '#/components/VisualTooltip'
@@ -19,13 +18,13 @@ import { useOffline } from '#/hooks/offlineHooks'
 import { useVueModalTrigger } from '#/hooks/vueModalHooks'
 import { AssetSearchBar } from '#/layouts/AssetSearchBar'
 import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
-import { CreateCredentialModal } from '#/modals/CreateCredentialModal'
-import UpsertDatalinkModal from '#/modals/UpsertDatalinkModal'
 import { useExportArchive } from '#/pages/useExportArchive'
 import { useCanDownload, useDriveStore, usePasteData } from '#/providers/DriveProvider'
 import { unsetModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { canTransferBetweenCategories } from '$/providers/category'
 import { useCategories, useText } from '$/providers/react'
@@ -118,6 +117,8 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
   })
 
   const newSecretTrigger = useVueModalTrigger()
+  const newCredentialTrigger = useVueModalTrigger()
+  const newDatalinkTrigger = useVueModalTrigger()
   const newSecretCallback = useEventCallback(async (name: string, value: string) => {
     await newSecret([{ name, value, parentDirectoryId: currentDirectoryId }])
   })
@@ -230,28 +231,30 @@ export function DriveBarToolbar(props: DriveBarToolbarProps) {
                   newSecretTrigger.open(UpsertSecretModal, { onCreate: newSecretCallback })
                 }}
               />
-              <Dialog.Trigger>
-                <Button
-                  isDisabled={!isCloud}
-                  variant="icon"
-                  size="medium"
-                  icon="credential_add"
-                  aria-label={
-                    isCloud ? getText('newCredential') : getText('newCredential.cloudOnly')
-                  }
-                />
-                <CreateCredentialModal doCreate={newCredentialCallback} />
-              </Dialog.Trigger>
-              <Dialog.Trigger>
-                <Button
-                  isDisabled={!isCloud}
-                  variant="icon"
-                  size="medium"
-                  icon="connector_add"
-                  aria-label={isCloud ? getText('newDatalink') : getText('newDatalink.cloudOnly')}
-                />
-                <UpsertDatalinkModal doCreate={newDatalinkCallback} />
-              </Dialog.Trigger>
+              <Button
+                isDisabled={!isCloud}
+                variant="icon"
+                size="medium"
+                icon="credential_add"
+                aria-label={isCloud ? getText('newCredential') : getText('newCredential.cloudOnly')}
+                {...newCredentialTrigger.triggerProps}
+                onPress={() => {
+                  newCredentialTrigger.open(CreateCredentialModal, {
+                    doCreate: newCredentialCallback,
+                  })
+                }}
+              />
+              <Button
+                isDisabled={!isCloud}
+                variant="icon"
+                size="medium"
+                icon="connector_add"
+                aria-label={isCloud ? getText('newDatalink') : getText('newDatalink.cloudOnly')}
+                {...newDatalinkTrigger.triggerProps}
+                onPress={() => {
+                  newDatalinkTrigger.open(UpsertDatalinkModal, { doCreate: newDatalinkCallback })
+                }}
+              />
             </div>
 
             <div className="flex h-row items-center gap-4 rounded-full border-0.5 border-primary/20 px-[11px]">

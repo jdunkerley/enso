@@ -15,13 +15,12 @@ secret or a datalink. Vue, ported from the React
   and label, as the tab shows them (never pressable). The drive keeps the React
   ones.
 - `UpsertSecretForm.vue` (from `../credentials/`, #82) edits a secret's value.
-- `DatalinkConfiguration.vue` and `DatalinkFormInput.vue` — the datalink's form,
-  around the **React** editor (`reactDatalinkInput.ts`, `JSONSchemaInput`), the
-  one bridge into `#/` from `src/cloud/`. Porting `JSONSchemaInput` (and
-  `FilePathInput`) is #92's, with the drive's datalink dialog; then this bridge
-  and its `DASHBOARD_IMPORT_ALLOWLIST` entry go.
+- `DatalinkConfiguration.vue` — the datalink's form, around the datalink editor
+  (`../datalinks/DatalinkFormInput.vue`, ported with the drive's datalink dialog
+  in #198).
 - `SpotlightOverlay.vue` — the dimming overlay that "Edit" on a secret or a
   datalink (the asset context menu sets `spotlightOn`) opens around its section.
   It follows the section every frame (React measured it only on resize).
-- `queries.ts` — the datalink and labels queries, with React's keys and options.
-- Tests: `__tests__/AssetProperties.test.ts`, with the React editor stubbed.
+- `queries.ts` — the datalink and labels queries, with React's keys and options
+  (the labels popover, `../labels/`, shares the labels query).
+- Tests: `__tests__/AssetProperties.test.ts`, with the datalink editor stubbed.

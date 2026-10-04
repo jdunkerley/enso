@@ -3,15 +3,19 @@ import { backendMutationOptions, useNewFolder, useNewProject } from '#/hooks/bac
 import { useUploadFiles } from '#/hooks/backendUploadFilesHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { defineMenuEntries } from '#/hooks/menuHooks'
-import { CreateCredentialModal } from '#/modals/CreateCredentialModal'
-import UpsertDatalinkModal from '#/modals/UpsertDatalinkModal'
 import { useDriveState } from '#/providers/DriveProvider'
-import { setModal, setVueModal } from '#/providers/ModalProvider'
+import { setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
 import type { CategoryType } from '$/providers/category'
 import type { Backend } from 'enso-common/src/services/Backend'
-import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
+import {
+  BackendType,
+  type CredentialConfig,
+  type DirectoryId,
+} from 'enso-common/src/services/Backend'
 import { readUserSelectedFile } from 'enso-common/src/utilities/file'
 
 /** Props for a {@link GlobalContextMenuEntries}. */
@@ -81,34 +85,29 @@ export function useGlobalContextMenuEntries(options: GlobalContextMenuEntriesOpt
     isCloud && {
       action: 'newCredential',
       doAction: () => {
-        setModal(
-          <CreateCredentialModal
-            doCreate={async (name, value) =>
-              await newCredential([
-                { name, value, parentDirectoryId: directoryId ?? currentDirectoryId },
-              ])
-            }
-          />,
-        )
+        setVueModal(CreateCredentialModal, {
+          doCreate: async (name: string, value: CredentialConfig) =>
+            await newCredential([
+              { name, value, parentDirectoryId: directoryId ?? currentDirectoryId },
+            ]),
+        })
       },
     },
     isCloud && {
       action: 'newDatalink',
       doAction: () => {
-        setModal(
-          <UpsertDatalinkModal
-            doCreate={async (name, value) => {
-              await newDatalink([
-                {
-                  name,
-                  value,
-                  parentDirectoryId: directoryId ?? currentDirectoryId,
-                  datalinkId: null,
-                },
-              ])
-            }}
-          />,
-        )
+        setVueModal(UpsertDatalinkModal, {
+          doCreate: async (name: string, value: unknown) => {
+            await newDatalink([
+              {
+                name,
+                value,
+                parentDirectoryId: directoryId ?? currentDirectoryId,
+                datalinkId: null,
+              },
+            ])
+          },
+        })
       },
     },
     hasPasteData &&
