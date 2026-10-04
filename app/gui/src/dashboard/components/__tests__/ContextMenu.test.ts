@@ -41,24 +41,37 @@ function setup() {
 
 const menu = () => byTestId('context-menu')
 
+/**
+ * An element that must be there.
+ * @throws {Error} When it is not.
+ */
+function present<T extends Element>(element: T | null | undefined): T {
+  if (element == null) throw new Error('Expected the element to be present.')
+  return element
+}
+
+const openMenu = () => present(menu())
+const entryButton = (index: number) => present(openMenu().querySelectorAll('button')[index])
+const outside = () => present(byTestId('outside'))
+
 describe('ContextMenu', () => {
   test("has React's DOM: a dialog named by the label, of buttons, at the point", async () => {
     setup()
     await flushPromises()
     expect(menu()).not.toBeNull()
-    expect(menu()!.style.left).toBe('40px')
-    expect(menu()!.style.top).toBe('50px')
-    expect(menu()!.querySelector('[role="dialog"]')).not.toBeNull()
-    expect(menu()!.querySelector('[aria-label="Asset menu"]')).not.toBeNull()
-    expect(menu()!.querySelectorAll('button')).toHaveLength(2)
+    expect(openMenu().style.left).toBe('40px')
+    expect(openMenu().style.top).toBe('50px')
+    expect(openMenu().querySelector('[role="dialog"]')).not.toBeNull()
+    expect(openMenu().querySelector('[aria-label="Asset menu"]')).not.toBeNull()
+    expect(openMenu().querySelectorAll('button')).toHaveLength(2)
     // It does not take focus on opening.
-    expect(menu()!.contains(document.activeElement)).toBe(false)
+    expect(openMenu().contains(document.activeElement)).toBe(false)
   })
 
   test('pressing an entry runs it and closes the menu', async () => {
     const { open, onClose, copy } = setup()
     await flushPromises()
-    await userEvent.setup().click(menu()!.querySelectorAll('button')[0]!)
+    await userEvent.setup().click(entryButton(0))
     expect(copy).toHaveBeenCalledOnce()
     expect(open.value).toBe(false)
     expect(onClose).toHaveBeenCalledOnce()
@@ -67,7 +80,7 @@ describe('ContextMenu', () => {
   test('a disabled entry does nothing', async () => {
     const { open, paste } = setup()
     await flushPromises()
-    await userEvent.setup().click(menu()!.querySelectorAll('button')[1]!)
+    await userEvent.setup().click(entryButton(1))
     expect(paste).not.toHaveBeenCalled()
     expect(open.value).toBe(true)
   })
@@ -82,7 +95,7 @@ describe('ContextMenu', () => {
   test('a press outside closes it', async () => {
     const { open } = setup()
     await flushPromises()
-    await userEvent.setup().click(byTestId('outside')!)
+    await userEvent.setup().click(outside())
     expect(open.value).toBe(false)
     await flushPromises()
     expect(menu()).toBeNull()
@@ -91,7 +104,7 @@ describe('ContextMenu', () => {
   test('a right-click elsewhere closes it', async () => {
     const { open } = setup()
     await flushPromises()
-    await userEvent.setup().pointer({ keys: '[MouseRight]', target: byTestId('outside')! })
+    await userEvent.setup().pointer({ keys: '[MouseRight]', target: outside() })
     expect(open.value).toBe(false)
   })
 })
