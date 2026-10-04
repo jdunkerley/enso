@@ -15,7 +15,17 @@ community build without the cloud can leave it out (decision 6b of
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
-    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack.
+    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack;
+    since #198 also the "New Credential" dialog (`CreateCredentialModal.vue`)
+    and its forms, one per service (`credentialInfos.ts`), over the recipes in
+    `serviceCredentials/`.
+  - `labels/`, since #198: the drive's labels popover (`ManageLabelsModal.vue`,
+    with `ManageLabelsForm.vue`, `NotFoundLabel.vue` and `ColorPicker.vue`), on
+    the modal stack and anchored to the button that opened it.
+  - `datalinks/`, since #198: the datalink editor (`JSONSchemaInput.vue` over
+    the datalink schema, with `FilePathInput.vue` and the cloud file browser),
+    its form field (`DatalinkFormInput.vue`, which the Properties tab uses too)
+    and the "Create Datalink" dialog (`UpsertDatalinkModal.vue`).
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
     menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
     the subscription price query, `subscriptionPrice.ts`), `organization/` (the
@@ -95,10 +105,8 @@ community build without the cloud can leave it out (decision 6b of
   directly, with a note (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`,
   `App.vue`); `billing` and `organization` joined `CLOUD_AREAS` with #87, since
   their only direct importers are in the exempt dashboard.
-- Nothing here imports `#/` (the React dashboard), with one exception until #92:
-  `properties/reactDatalinkInput.ts` mounts the React datalink editor
-  (`JSONSchemaInput`) through the bridge, and it is on
-  `DASHBOARD_IMPORT_ALLOWLIST`.
+- Nothing here imports `#/` (the React dashboard). The last exception, the
+  Properties tab's React datalink editor, went with #198.
 - **An area contributes through registries**, not by being imported. Routes are
   the first: `registerCloud` adds them with `router.addRoute`, under a named
   parent where they need one (`PROTECTED_LAYOUT_ROUTE`, `$/router/routeNames`).
@@ -134,5 +142,5 @@ Component tests live in `<area>/__tests__/` and mount with `mountWithProviders`
 (`$/utils/testing/`), mocking the global stores they use (`useSession`,
 `useAuth`, `useBackends`) and the pieces not under test (the info bar, the modal
 host). A side-by-side check against a React original lives in `src/dashboard/`
-(it imports `#/`), e.g.
-`dashboard/modals/__tests__/upsertSecretFormParity.test.tsx`.
+(it imports `#/`), e.g. `dashboard/components/__tests__/vuePortParity.test.tsx`;
+it goes with its React original.

@@ -79,17 +79,25 @@ export function useDialogFocus(
   /** Return focus to the opener, or to the trigger of the popup it was in. */
   function onCloseAutoFocus(event: Event) {
     if (hasTrigger() || target == null) return
-    const element =
-      target.opener instanceof HTMLElement && target.opener.isConnected ? target.opener
-      : target.trigger?.isConnected ? target.trigger
-      : null
-    if (element != null) {
-      event.preventDefault()
-      // After Reka's own clean-up, which runs in a timeout of its own: until then the dialog's focus
-      // trap is still active, and would take the focus back.
-      setTimeout(() => setTimeout(() => element.focus({ preventScroll: true })))
-    }
+    returnFocus(event, target)
   }
 
   return { onOpenAutoFocus, onCloseAutoFocus }
+}
+
+/**
+ * On a Reka overlay's `closeAutoFocus`: return focus to `target`'s opener, or to the trigger of the
+ * popup it was in, instead of Reka's own target.
+ */
+export function returnFocus(event: Event, target: FocusReturnTarget) {
+  const element =
+    target.opener instanceof HTMLElement && target.opener.isConnected ? target.opener
+    : target.trigger?.isConnected ? target.trigger
+    : null
+  if (element != null) {
+    event.preventDefault()
+    // After Reka's own clean-up, which runs in a timeout of its own: until then the dialog's focus
+    // trap is still active, and would take the focus back.
+    setTimeout(() => setTimeout(() => element.focus({ preventScroll: true })))
+  }
 }

@@ -7,7 +7,7 @@
 import { CHECKBOX_STYLES, CHECKBOX_VUE_STATES } from '$/components/Checkbox/variants'
 import Text from '$/components/Text/Text.vue'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
-import { computed, ref } from 'vue'
+import { computed, ref, useId, useSlots } from 'vue'
 import Check from './Check.vue'
 
 type CheckboxVariants = VariantProps<typeof CHECKBOX_STYLES>
@@ -43,6 +43,13 @@ const {
 const emit = defineEmits<{ change: [selected: boolean]; blur: [] }>()
 
 const input = ref<HTMLInputElement>()
+const slots = useSlots()
+/**
+ * The input is named by its own text, as react-aria names it. A checkbox in a labelled
+ * `CheckboxGroup` sits inside its field's `<label>` too, which would otherwise name the group's
+ * first checkbox by the whole group's text.
+ */
+const textId = useId()
 
 const classes = computed(() =>
   CHECKBOX_STYLES({ isReadOnly, isInvalid, isDisabled, size, isSelected }),
@@ -79,6 +86,7 @@ defineExpose({ focus: () => input.value?.focus() })
       :required="isRequired"
       :aria-readonly="isReadOnly || undefined"
       :aria-invalid="isInvalid || undefined"
+      :aria-labelledby="slots.default != null ? textId : undefined"
       :name="name"
       :value="value"
       @change="onChange"
@@ -90,6 +98,6 @@ defineExpose({ focus: () => input.value?.focus() })
       :isIndeterminate="isIndeterminate"
       :class="`${classes.icon({ isSelected })} ${CHECKBOX_VUE_STATES}`"
     />
-    <Text variant="body" color="current"><slot /></Text>
+    <Text :id="textId" variant="body" color="current"><slot /></Text>
   </label>
 </template>

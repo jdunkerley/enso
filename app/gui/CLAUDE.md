@@ -62,11 +62,11 @@ adding an entry. React files may import `$/…` freely.
 ## Where framework-free shared code lives
 
 - `src/utils/` — general helpers (`LocalStorage`, `LruCache`, `event`,
-  `inputBindings`, `download`, `mimeTypes`, `datalinkValidator`, …);
-  `src/utils/data/` for small data-structure helpers; `src/utils/style/` for
-  Tailwind class composition (`tailwindVariants`, `tailwindMerge`);
-  `src/utils/testing/` for test-only helpers (`mountWithProviders`, the Vue
-  component-test harness).
+  `inputBindings`, `inputModality`, `download`, `mimeTypes`,
+  `datalinkValidator`, …); `src/utils/data/` for small data-structure helpers;
+  `src/utils/style/` for Tailwind class composition (`tailwindVariants`,
+  `tailwindMerge`); `src/utils/testing/` for test-only helpers
+  (`mountWithProviders`, the Vue component-test harness).
 - `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
   component of that name and its Vue port (`Button`, `Dialog`, `Text`, `Icon`,
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
@@ -117,10 +117,12 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   Billing & Plans and Usage tabs, the subscription page with the Stripe
   checkout, the payments success page and the top bar's billing parts;
   `versions/` and `properties/`: the right panel's Versions, Schedule and
-  Properties tabs). Keep cloud-only code here rather than in `src/utils/`, so a
-  build without the cloud can drop one folder. The core reaches the areas only
-  through `registerCloud` (`src/cloud/index.ts`), which `entrypoint.ts` calls;
-  see `src/cloud/CLAUDE.md`.
+  Properties tabs; `credentials/`, `labels/` and `datalinks/`: the drive's
+  secret, credential, labels and datalink dialogs). Keep cloud-only code here
+  rather than in `src/utils/`, so a build without the cloud can drop one folder.
+  The core reaches the areas only through `registerCloud`
+  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
+  `src/cloud/CLAUDE.md`.
 
 ## Entry points
 

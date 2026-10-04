@@ -24,8 +24,8 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   search bar and the context menus; `layouts/Drive/` has its composables
   (`driveView.ts`, the shown-versus-target location that stands in for React's
   navigation transition; `driveActions.ts`; `assetItems.ts`; `suggestions.ts`;
-  drag and drop) and `reactModals.tsx`, which opens the React labels, credential
-  and datalink dialogs (#198) through `openReactModal`. The rows, cells, column
+  drag and drop). Its dialogs are Vue and open on the modal stack, the labels,
+  credential and datalink ones from `$/cloud/` (#198). The rows, cells, column
   headings and the drive bar are under `pages/dashboard/`. Buttons inside a row
   bind `STOP_PRESS_PROPAGATION` (`layouts/Drive/pressPropagation.ts`), as
   react-aria's `usePress` stopped a press reaching the row.
@@ -45,16 +45,14 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `useMenuEntries`) and the Vue settings page edits; a change re-renders its
   consumers.
 - `hooks/` — Custom React hooks.
-- `data/serviceCredentials/` — the React forms for creating service credentials.
-  Their framework-free recipes live in `src/cloud/`.
 - `modals/` — The React modals still opened with `setModal` or a
   `Dialog.Trigger`. The drive's simple modals are Vue (#92), opened on the modal
-  stack (`useModals()`); the Vue drive opens the React ones that are left with
-  `openReactModal` (`ModalProvider.tsx`), which leaves the stack once the dialog
-  closes itself. The duplicate-name dialog, the drag preview and the asset
-  summary are in `$/components/Drive/`; the secret dialog in
-  `$/cloud/credentials/`; delete confirmations use
-  `$/components/AlertDialog/ConfirmDeleteModal.vue`.
+  stack (`useModals()`). The duplicate-name dialog, the drag preview and the
+  asset summary are in `$/components/Drive/`; the secret and "New Credential"
+  dialogs in `$/cloud/credentials/`, the labels popover in `$/cloud/labels/` and
+  the "Create Datalink" dialog in `$/cloud/datalinks/` (#198); delete
+  confirmations use `$/components/AlertDialog/ConfirmDeleteModal.vue`. No drive
+  code calls `setModal` with a React element any more.
 - `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
   `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
   `toast.tsx` is the React shim over the Vue toast store (`$/providers/toasts`):

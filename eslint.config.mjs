@@ -76,9 +76,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
   'pages/authentication/LoadingScreen',
-  // The datalink editor, inside the cloud's Vue Properties tab until `JSONSchemaInput` is ported
-  // (#92).
-  'pages/dashboard/components/DatalinkInput',
   'providers/LoggerProvider',
   // Dashboard features ported to Vue, mounted by the shared app shell.
   'pages/dashboard/UserBar/UserBar.vue',
@@ -111,7 +108,9 @@ const CLOUD_AREAS = [
   'auth',
   'billing',
   'browserDisabled',
+  'datalinks',
   'devtools',
+  'labels',
   'organization',
   'properties',
   'versions',

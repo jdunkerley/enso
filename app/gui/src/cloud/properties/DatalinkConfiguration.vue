@@ -11,7 +11,7 @@ import Reset from '$/components/Form/Reset.vue'
 import Submit from '$/components/Form/Submit.vue'
 import { useText } from '$/providers/text'
 import { validateDatalink } from '$/utils/datalinkValidator'
-import DatalinkFormInput from './DatalinkFormInput.vue'
+import DatalinkFormInput from '../datalinks/DatalinkFormInput.vue'
 
 const { datalink, canEdit, onSubmit } = defineProps<{
   datalink: unknown

@@ -1,19 +1,25 @@
 /**
  * @file The context-menu entries available everywhere in a directory (upload, new project, folder,
  * secret, credential and datalink, and paste): the Vue port of React's
- * `useGlobalContextMenuEntries`. The credential and datalink dialogs are still React's (#198).
+ * `useGlobalContextMenuEntries`.
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
+import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
 import type { CategoryType } from '$/providers/category'
 import { useDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
 import { backendMutationOptions } from '$/utils/backendQuery'
-import { BackendType, type Backend, type DirectoryId } from 'enso-common/src/services/Backend'
+import {
+  BackendType,
+  type Backend,
+  type CredentialConfig,
+  type DirectoryId,
+} from 'enso-common/src/services/Backend'
 import { readUserSelectedFile } from 'enso-common/src/utilities/file'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useMutationCallback, useNewFolder, useNewProject, useUploadFiles } from './driveActions'
-import { openCreateCredentialModal, openUpsertDatalinkModal } from './reactModals'
 
 /** Options of {@link useGlobalContextMenuEntries}. */
 export interface GlobalContextMenuEntriesOptions {
@@ -83,16 +89,21 @@ export function useGlobalContextMenuEntries(options: GlobalContextMenuEntriesOpt
       isCloud && {
         action: 'newCredential',
         doAction: () => {
-          openCreateCredentialModal('replace', (name, value) =>
-            newCredential([{ name, value, parentDirectoryId: target() }]),
-          )
+          modals.closeAll()
+          modals.open(CreateCredentialModal, {
+            doCreate: (name: string, value: CredentialConfig) =>
+              newCredential([{ name, value, parentDirectoryId: target() }]),
+          })
         },
       },
       isCloud && {
         action: 'newDatalink',
         doAction: () => {
-          openUpsertDatalinkModal('replace', async (name, value) => {
-            await newDatalink([{ name, value, parentDirectoryId: target(), datalinkId: null }])
+          modals.closeAll()
+          modals.open(UpsertDatalinkModal, {
+            doCreate: async (name: string, value: unknown) => {
+              await newDatalink([{ name, value, parentDirectoryId: target(), datalinkId: null }])
+            },
           })
         },
       },

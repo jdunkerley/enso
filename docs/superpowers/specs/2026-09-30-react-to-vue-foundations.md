@@ -2410,3 +2410,111 @@ rulings above: provisionally accepted, for the maintainer to review.
    (which gains the payments configuration and the customer portal), and passes
    on develop and on the branch. No changelog entry: the PR takes
    `CI: No changelog needed`.
+
+## Rulings from #198 (the drive's labels popover, credentials and datalink dialog, 2026-10-04)
+
+#198 is #92's second part: the labels popover (`ManageLabelsModal`, with
+`ColorPicker`), the "New Credential" dialog and its forms, and the "Create
+Datalink" dialog with the datalink editor (`JSONSchemaInput`, `FilePathInput`).
+Delegated like the rulings above: provisionally accepted, for the maintainer to
+review.
+
+1. **One PR, in logical commits.** The three pieces share the React drive's
+   mount sites (the toolbar, the context menus) and two primitive fixes; with
+   them no drive code calls `setModal` with a React element any more (#92's
+   first acceptance criterion). The React `UpsertSecretModal.tsx` (its form
+   only, kept for the React asset panel that #190 deleted) and its parity test
+   go too, as do `data/serviceCredentials/` and every React file the three
+   replaced.
+2. **Where the code goes.** All three are cloud-only: `src/cloud/labels/`,
+   `src/cloud/credentials/` (beside the secret dialog) and
+   `src/cloud/datalinks/` (the editor, its form field and the dialog). The
+   Properties tab's datalink form now uses `datalinks/DatalinkFormInput.vue`, so
+   `properties/reactDatalinkInput.ts` and its `DASHBOARD_IMPORT_ALLOWLIST` entry
+   are gone: nothing in `src/cloud/` imports `#/`. `labels` and `datalinks` join
+   `CLOUD_AREAS` (only the exempt React dashboard imports them); `credentials`
+   stays out, as the core's `UpsertSecretPanel.vue` imports it (#82, ruling 7).
+3. **A popover on the modal stack, anchored to what React rendered.**
+   `Popover.vue` gains an `anchor` (Reka's `PopoverAnchor` with a `reference`:
+   an element it does not render, React's `triggerRef`), an `opener` (where
+   focus returns when it has no trigger; by default the element focused as it
+   opened, as react-aria's focus scope restores it) and a `closed` event (after
+   the exit animation, as `Dialog`'s). The labels column's two edit buttons were
+   `Dialog.Trigger`s: they open the popover with `useVueModalTrigger`, anchored
+   to the pressed button (`aria-expanded` kept, #92 ruling 3). The context
+   menu's "Label" uses `setVueModal`.
+4. **The Escape gap, fixed where it is contained.** The labels popover and its
+   nested "Create Label" form each stop Escape and close themselves, as #92's
+   rename form does (ruling 7 there), so Escape closes the innermost one only
+   and never reaches the dashboard's global binding. `Popover.vue` itself does
+   not stop the key: a popover holding a combo box or a dropdown would then
+   close before the list (#191, ruling 11, pins today's order), which is a
+   change for every caller. A confirmation asked over the popover is a stack
+   `AlertDialog`: Escape there still reaches the binding and closes both, as
+   React's `setModal` path did.
+5. **Seven React quirks are kept**, each a visible change to fix, listed for a
+   separate decision (with #92's three in #198):
+   - the popover opened from the context menu sits at the window's top-left
+     corner: React anchored it to the row through a ref that is cleared as the
+     menu closes. The Vue one is anchored to that corner on purpose
+     (`anchor: null`);
+   - the "Next color" swatch beside "Create <search>" does nothing visible: it
+     set the colour on the popover's form, not its own, so the label is created
+     in the least used colour;
+   - Enter in the search field submits the popover's form, which resets it: the
+     search clears and the checks go back to what the assets had when it opened;
+   - the label pills show every label, checked or not;
+   - the labels written to an asset are computed from what it had when the
+     popover opened, so creating two labels in a row keeps only the second;
+   - the datalink editor shows an invalid secret's description twice;
+   - its `boolean` case is a plain checkbox (React's was a form field named
+     `input` whose state replaced the value given; no datalink schema reaches
+     it, as every boolean there is a `const`).
+6. **What changes for assistive technology.** react-aria's `TagGroup` (a `grid`
+   of focusable rows) is a `list` of `listitem`s (decision 1): nothing acts on a
+   pill, so each was a Tab stop for nothing. The popover traps focus, as #83
+   ruled for `Popover.vue` (React's let Tab walk out to the page). The dialogs
+   are named by their titles (#156, ruling 11). Each credential checkbox is
+   named by its own text: `CheckboxControl.vue` now sets `aria-labelledby` on
+   its input, because inside a labelled `CheckboxGroup` the field's `<label>`
+   also labelled the first checkbox, naming it "Scopes Sheets Analytics" (React
+   named it "Sheets"; its group was named by the whole text through a duplicated
+   id, and the Vue group keeps "Scopes").
+7. **Two more primitive fixes, found by comparing the running app.**
+   - `Tooltip.vue` opens on focus only when the keyboard put the focus there
+     (`$/utils/inputModality`, react-aria's `useFocusVisible` modality): a
+     confirmation cancelled with the mouse returns focus to the trash button,
+     and the Vue tooltip "Delete" opened there, where React's did not.
+     `:focus-visible` (Reka's `ignoreNonKeyboardFocus`) could not do it: a text
+     field matches it on every focus, and jsdom does not support it.
+   - `Dropdown.vue`'s list root is `contents`, so that the grid row's item is
+     the list itself (`overflow-auto`), as React's was. With the root as the
+     item (#183's `min-h-0`), the closed list overflowed it; the field geometry
+     was the same, but nested lists at fractional positions painted differently.
+     Deleting a label removes the button that asked; focus then goes to the
+     search field, as React's focus scope moved it.
+8. **The datalink editor is one recursive component.** `JSONSchemaInput.vue`
+   keeps React's structure part for part (a lone part unwrapped, several in a
+   `flex flex-col gap-1` column), its classes, react-aria's keyboard-only focus
+   ring (`focusRing.ts`) and React's choice of the `anyOf` member that the value
+   matches. `FilePathInput.vue` mounts the project view's
+   `FileBrowserWidget.vue` directly, where React crossed the bridge. The secrets
+   query keeps React's key and options.
+9. **Credential forms as React had them**: every text field has a `''` default
+   (the playbook's rule), the Microsoft 365 name defaults to "Microsoft365", the
+   Google form shows a failure under the form while the others toast it, and the
+   list is in React's order (`credentialInfos.ts`).
+10. **What a user notices: nothing.** Every state (the popover from the menu and
+    from the column, search, no match, the swatch, hover, a toggled label,
+    "Create Label" with a colour and its error, Escape in each, the delete
+    question, creating and deleting; each credential form, its errors, the type
+    list, a permission's description; the datalink dialog with each type, the
+    type list, invalid values, a secret, an optional property, the file path
+    with its file browser; the Properties tab's editor) was compared with
+    develop's. The differences left are antialiasing, a sub-pixel shift of the
+    popover's text where Reka centres it on the edit button, and the dropdown
+    fields of the two dialogs, rasterized a pixel apart until the compositing
+    layer of the dialog's enter animation is re-created (#84, ruling 7): the
+    geometry and computed styles are the same, and the datalink dialog's fields,
+    measured, are pixel-identical once the layer is re-created. No changelog
+    entry: the PR takes `CI: No changelog needed`.

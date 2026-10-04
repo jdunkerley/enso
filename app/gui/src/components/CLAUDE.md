@@ -54,6 +54,13 @@ the graph editor's brush) and, on `Breadcrumbs/`, the drive bar's needs
 that Enter presses). `$/composables/dragDelay` (an action after a drag hovers
 for two seconds) and `$/composables/focusRing` came with them.
 
+From the drive's labels popover (#198): `Popover` can be positioned against an
+element it does not render (`anchor`, React's `triggerRef`), returns focus to
+its opener when it has no trigger (`opener`, or the element focused as it
+opened), and emits `closed` after its exit animation, so it can sit on the modal
+stack. `Tooltip` opens on focus only when the keyboard put the focus there
+(`$/utils/inputModality`), as react-aria's did.
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:

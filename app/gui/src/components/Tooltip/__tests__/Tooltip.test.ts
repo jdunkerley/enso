@@ -47,6 +47,21 @@ describe('Tooltip', () => {
     expect(byTestId('trigger')!.hasAttribute('aria-describedby')).toBe(false)
   })
 
+  test('focus that the keyboard did not put there (a click, then focus moved back by code) does not show it', async () => {
+    mountTooltip()
+    const user = userEvent.setup()
+    // A click elsewhere: the pointer is the modality now.
+    await user.click(document.body)
+    // A dialog that this click closed returns focus to its trigger.
+    byTestId('trigger')!.focus()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await flushPromises()
+    expect(tooltip()).toBeNull()
+    // Hovering it still shows it.
+    await user.hover(byTestId('trigger')!)
+    await vi.waitFor(() => expect(tooltip()).not.toBeNull())
+  })
+
   test('isDisabled keeps it closed, without remounting the trigger', async () => {
     mountTooltip({ isDisabled: true })
     const trigger = byTestId('trigger')

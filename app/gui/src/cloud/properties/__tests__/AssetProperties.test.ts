@@ -1,7 +1,7 @@
 /**
  * @file The right panel's Properties tab (#183): what it shows for each selection, the secret and
- * datalink configuration, and the spotlight the asset's "Edit" opens. The React datalink editor is
- * replaced by a stub, as it is #92's to port.
+ * datalink configuration, and the spotlight the asset's "Edit" opens. The datalink editor is
+ * replaced by a stub: it has tests of its own (`$/cloud/datalinks/__tests__/`).
  */
 import type { Category } from '$/providers/category'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
@@ -43,13 +43,14 @@ vi.mock('$/providers/auth', () => ({
   }),
 }))
 
-// The React datalink editor, stubbed: an input holding the datalink's `uri`.
-vi.mock('../reactDatalinkInput', async () => {
+// The datalink editor, stubbed: an input holding the datalink's `uri`.
+vi.mock('../../datalinks/DatalinkInput.vue', async () => {
   const { defineComponent, h } = await import('vue')
   return {
-    DatalinkInput: defineComponent({
-      props: { value: Object, onChange: Function, readOnly: Boolean, dropdownTitle: String },
-      setup(props) {
+    default: defineComponent({
+      props: { value: Object, readOnly: Boolean, dropdownTitle: String },
+      emits: ['change'],
+      setup(props, { emit }) {
         return () =>
           h('input', {
             'data-testid': 'datalink-stub',
@@ -57,7 +58,7 @@ vi.mock('../reactDatalinkInput', async () => {
             readOnly: props.readOnly,
             value: (props.value as { uri?: string } | null)?.uri ?? '',
             onInput: (event: Event) =>
-              props.onChange({
+              emit('change', {
                 ...(props.value as object),
                 uri: (event.target as HTMLInputElement).value,
               }),
