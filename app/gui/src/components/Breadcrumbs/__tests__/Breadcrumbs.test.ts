@@ -58,3 +58,35 @@ test('dropping onto an item reports its id and the event', async () => {
   expect(onDrop.mock.calls[0]![0]).toBe('Home')
   expect(item.getAttribute('data-drop-target')).toBe('false')
 })
+
+test("Enter on an item's focusable container presses it, calling its own onPress too", async () => {
+  const onAction = vi.fn()
+  const onPress = vi.fn()
+  mountWithProviders(() =>
+    h(Breadcrumbs, { testId: 'trail', onAction }, () => [
+      h(BreadcrumbItem, { id: 'Home', key: 'Home', testId: 'Home', onPress }, () => 'Home'),
+      h(BreadcrumbItem, { id: 'Report', key: 'Report', testId: 'Report' }, () => 'Report'),
+    ]),
+  )
+  const container = byTestId('Home')!.querySelector<HTMLElement>('[role="link"]')!
+  expect(container.tabIndex).toBe(0)
+  container.focus()
+  await userEvent.setup().keyboard('{Enter}')
+  expect(onAction).toHaveBeenCalledExactlyOnceWith('Home')
+  expect(onPress).toHaveBeenCalledOnce()
+})
+
+test('isLoading shows the spinner in place of the icon', async () => {
+  mountWithProviders(() =>
+    h(Breadcrumbs, { testId: 'trail' }, () => [
+      h(
+        BreadcrumbItem,
+        { id: 'Home', key: 'Home', testId: 'Home', icon: 'folder', isLoading: true },
+        () => 'Home',
+      ),
+      h(BreadcrumbItem, { id: 'Report', key: 'Report', testId: 'Report' }, () => 'Report'),
+    ]),
+  )
+  await flushPromises()
+  expect(byTestId('Home')!.querySelector('button')!.getAttribute('aria-busy')).toBe('true')
+})
