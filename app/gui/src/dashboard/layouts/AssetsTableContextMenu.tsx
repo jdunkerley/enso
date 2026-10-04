@@ -4,10 +4,6 @@
  */
 import type { ContextMenuApi } from '#/components/ContextMenu'
 import { ContextMenu } from '#/components/ContextMenu'
-import {
-  deleteAssetsMutationOptions,
-  restoreAssetsMutationOptions,
-} from '#/hooks/backendBatchedHooks'
 import { useUploadFileToCloud, useUploadFileToLocal } from '#/hooks/backendUploadFilesHooks'
 import { useCopy } from '#/hooks/copyHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
@@ -28,6 +24,7 @@ import { canTransferBetweenCategories, isCloudCategory } from '$/providers/categ
 import { useBackends, useText, useUser } from '$/providers/react'
 import { useDriveCurrentBackend, useDriveCurrentCategory } from '$/providers/react/container'
 import { useFeatureFlag } from '$/providers/react/featureFlags'
+import { deleteAssetsMutationOptions, restoreAssetsMutationOptions } from '$/utils/driveMutations'
 import * as backendModule from 'enso-common/src/services/Backend'
 import * as React from 'react'
 import invariant from 'tiny-invariant'

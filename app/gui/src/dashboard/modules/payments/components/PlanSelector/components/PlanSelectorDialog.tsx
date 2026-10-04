@@ -6,19 +6,19 @@ import { Form } from '#/components/Form'
 import { Input } from '#/components/Inputs/Input'
 import { Suspense } from '#/components/Suspense'
 import { Text } from '#/components/Text'
+import {
+  MAX_SEATS_BY_PLAN,
+  PRICE_BY_PLAN,
+  PRICE_CURRENCY,
+  TRIAL_DURATION_DAYS,
+} from '$/cloud/billing/plans'
+import { createSubscriptionPriceQuery } from '$/cloud/billing/subscriptionPrice'
 import { useText } from '$/providers/react'
 import type { GetText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useQuery } from '@tanstack/react-query'
 import type { Plan, PlanBillingPeriod } from 'enso-common/src/services/Backend'
 import type { TextId } from 'enso-common/src/text'
-import {
-  MAX_SEATS_BY_PLAN,
-  PRICE_BY_PLAN,
-  PRICE_CURRENCY,
-  TRIAL_DURATION_DAYS,
-} from '../../../constants'
-import { createSubscriptionPriceQuery } from '../../../useSubscriptionPrice'
 import { PlanFeatures } from './PlanFeatures'
 
 const PLAN_TO_SEATS_DESCRIPTION_ID = {

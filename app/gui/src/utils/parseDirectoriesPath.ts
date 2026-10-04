@@ -32,7 +32,6 @@ export function parseDirectoriesPath(options: ParsedDirectoriesPathOptions) {
 
   // e.g: parentsPath = 'directory-id1adsf/directory-id2adsf/directory-id3adsf'
 
-  // eslint-disable-next-line no-restricted-syntax
   const splitPath = parentsPath.split('/') as DirectoryId[]
   const rootDirectoryInPath = splitPath[0] || rootDirectoryId
 

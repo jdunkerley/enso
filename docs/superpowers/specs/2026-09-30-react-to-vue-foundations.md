@@ -2072,6 +2072,124 @@ provisionally accepted, for the maintainer to review.
 10. **No changelog entry.** Nothing changes for a mouse user, so the PR takes
     `CI: No changelog needed`.
 
+## Rulings from #192 (the drive's queries and mutations, 2026-10-03)
+
+#192 is the second half of #90: the drive's data layer. Delegated like the
+rulings above: provisionally accepted, for the maintainer to review. The ruling
+on #192 itself (a comment there) settled the main question: where React and Vue
+gave the same query key different options, the React drive's options win, and
+each key's options are defined once, in framework-free factories.
+
+1. **One PR, not split.** The factories, the batched mutations, the transfer
+   between categories and the uploads depend on each other (the transfer runs
+   the batched mutations and the upload to the cloud), and the React drive hooks
+   left over are adapters; the work is in reviewable commits instead.
+2. **The options live in `$/utils/backendQuery`**, typed with
+   `@tanstack/query-core`, and both frameworks consume the same objects:
+   `backendQueryOptions(backend, method, args, extra?)` and
+   `backendMutationOptions(backend, method, extra?)`, with every per-method
+   default (`STALE_TIME_MAP`, `PERSISTENCE_MAP`, `INVALIDATION_MAP`) read
+   through `backendQueryDefaults`. The Vue `@/composables/backend` keeps its
+   reactive signature (arguments as a getter, the query disabled while they are
+   `undefined`) and builds on the same defaults. A caller's extra options are
+   limited to those whose types React and vue-query agree on (`enabled` as a
+   boolean, numeric `staleTime`, `gcTime`, `refetchInterval`, `retry`, `meta`):
+   vue-query reads a function-valued option as a getter, where React passes it
+   the query. `executeMutation(queryClient, options, variables)` runs a mutation
+   through the mutation cache from outside any component, as React's
+   `useMutationCallback` did, so `useMutationState` still sees it.
+3. **Per-key options, and what changes.** Six keys differed. All now have the
+   React drive's options:
+
+   | Key                           | Before: React / Vue       | Now           | Effect                                                                                                                                                                                                                                                                                                                                                                 |
+   | ----------------------------- | ------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `getFileDetails`              | persisted / not           | persisted     | None today: nothing queries it through the factories (the asset preview, `AssetContentsEditor.vue`, has its own key and options).                                                                                                                                                                                                                                      |
+   | `searchDirectory`, `listTags` | not persisted / persisted | not persisted | None: only React queries them.                                                                                                                                                                                                                                                                                                                                         |
+   | `listUsers`                   | stale time ∞ / 0          | ∞             | None: only React queries it.                                                                                                                                                                                                                                                                                                                                           |
+   | `getOrganization`, `usersMe`  | stale time ∞ / 0          | 5 minutes     | **The maintainer's choice, not React's** (ruling 4). `AppContainerLayout.vue` (the trial-ended and organization-setup modals), `TrialProgress.vue`, `SettingsPage.vue`, the file browser widget and `ProfilePictureInput.vue` no longer refetch on every mount, only once the cached value is five minutes old; the React drive now refetches too, where it never did. |
+
+   Mutations follow React's semantics too: a caller's `meta.invalidates` is
+   added to the method's (Vue replaced them), and the network mode is the
+   backend's whatever the caller passes. No Vue caller passed either, so nothing
+   changes. `listDirectory` (stale time 0, not persisted) and `getAssetDetails`
+   (not persisted) were already the same on both sides.
+
+4. **The organization and the user stay fresh for five minutes** (the
+   maintainer's choice on #201, option B). The React drive's ∞ would have ended
+   the Vue screens' refetch on mount, which is what picked up a subscription
+   changed elsewhere (a trial that ended while the app was closed, a plan bought
+   on another device); Vue's 0 refetched on every mount. `getOrganization` and
+   `usersMe` now get `ACCOUNT_STALE_TIME_MS` (5 minutes) in `STALE_TIME_MAP`, on
+   both sides. It differs from both old behaviours: unlike React's ∞, a value
+   older than five minutes is refetched when a screen mounts or the window
+   regains focus, so an outside change shows within minutes; unlike Vue's 0,
+   mounting a screen within five minutes of the last fetch uses the cache
+   without a request. Persistence and the mutations' invalidations are
+   unchanged, so an edit in the app still refetches at once, and a persisted
+   value restored on start-up older than five minutes is refetched as soon as it
+   is read. A unit test pins the value.
+5. **The batched mutations are framework-free**, in `$/utils/driveMutations`
+   (delete, restore, copy, move, download), with their keys and invalidations
+   unchanged. The move asks how to resolve name conflicts through an injected
+   `DuplicationResolver`; callers pass `resolveDuplications`
+   (`$/components/Drive/duplicateAssets`, #92), and tests pass a stub.
+   `#/hooks/backendBatchedHooks` keeps only the React drive's
+   `use*MutationState` adapters. Dead code went with the move: the copy's
+   mutation-state hook, `useRemoveSelfPermissionMutation`,
+   `getProjectExecutionDetailsQueryOptions` and `UserGroupInfoWithUsers` had no
+   callers.
+6. **Transferring between categories** is `$/utils/transferBetweenCategories`,
+   with its context injected (backends, the user's root, the categories store,
+   the query client, the duplicate resolver, the "copy instead" question, the
+   upload to the cloud, the toast). `CategoryButton.vue` calls the Vue
+   composable, `$/composables/transferBetweenCategories`; the React drive's
+   paste and "download to local" call the React adapter. `$/providers/reactApi`
+   is deleted, and `AppContainer.vue` has no React props left.
+7. **The "copy instead" question is Vue, from both frameworks:**
+   `CopyInsteadModal.vue` in `$/components/Drive/`, asked with
+   `askToCopyInstead`, with React's title, text, alert, icon and buttons. Like
+   the React `ask` it replaces, it closes the open modals first. As with #156's
+   `ConfirmDeleteModal` (ruling 11 there) it is named by its title, keeps Tab
+   inside, and leaves after its exit animation. **Cancel does nothing** (#200,
+   at the maintainer's request on #201): React went on to attempt the move after
+   a cancelled question between two teams' folders, or from a team's folder to
+   the user's, which the backend then refused or carried out. Now nothing is
+   sent and nothing changes; unit tests and
+   `integration-test/dashboard/copyInstead.spec.ts` check it, the spec against
+   the requests the mocked cloud receives. A bug fix, so no changelog entry.
+8. **Toasts: `promise` moved into the store.** The transfer shows the download
+   to the local drive as a loading toast that turns into its outcome, as
+   react-toastify's `toast.promise` did; `useToasts().promise` now does that,
+   and the React shim's `toast.promise` forwards to it.
+9. **Uploads.** `uploadFiles` (the drive's upload of picked or dropped files, on
+   either backend) moved into `$/providers/upload`, beside the uploads store it
+   drives. The upload of local projects to the cloud is cloud-only, so it is
+   `src/cloud/uploadToCloud.ts`: a top-level helper, not an area, because the
+   core's transfer calls it. `#/hooks/backendUploadFilesHooks` keeps only React
+   adapters.
+10. **Cloud-only queries are under `src/cloud/`:** a project's scheduled
+    executions in `versions/projectExecutions.ts` (for #183's Schedule tab), and
+    the subscription price with the plans' constants in `billing/`
+    (`subscriptionPrice.ts`, `plans.ts`), which the React plan selector imports.
+    The organization's queries have no factories of their own: they are the
+    generic `getOrganization` and `listUsers`, whose options are the shared
+    table's, and the core reads the organization too.
+11. **The download directory is the Vue store's.** The React
+    `useDownloadDirectory` had its own suspending query of
+    `/api/download-directory-path`, which `entrypoint.ts` already fetches at
+    start-up for `useLocalPaths`. React now reads `useLocalPaths` through a
+    context, and the second request and the suspension are gone.
+12. **What stays React, for #91.** The adapters above, and the React-only drive
+    hooks with no data of their own (`cutAndPasteHooks`, `copyHooks`,
+    `dragAndDropHooks`, `dragDelayHooks`, `assetsTableItemsHooks`,
+    `directoryIdsHooks`), say so in their file comments; each goes when the Vue
+    drive replaces its caller. The Vue drive's hooks (mutation state, new folder
+    and project, rename, upload) come with their first Vue caller, in #91: until
+    then they would be dead code, and vue-query consumes the factories directly.
+13. **No changelog entry.** The only change on screen is the "copy instead"
+    dialog being the Vue `AlertDialog` (ruling 7), which #156 compared class for
+    class with React's; the PR takes `CI: No changelog needed`.
+
 ## Rulings from #172 (the Enso devtools, 2026-10-03)
 
 #172 ports the Enso devtools that `ProtectedLayout.vue` mounted through

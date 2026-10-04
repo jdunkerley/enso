@@ -1,4 +1,7 @@
-/** @file Hooks related to the HTML5 Drag and Drop API. */
+/**
+ * @file Hooks related to the HTML5 Drag and Drop API, for the React drive's rows. React-only DOM
+ * glue with no data of its own: it goes with the React drive (#91).
+ */
 import * as React from 'react'
 
 import * as eventModule from '$/utils/event'

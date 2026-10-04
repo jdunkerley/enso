@@ -624,6 +624,23 @@ export async function mockCloudApi(page: Page) {
     return userGroup
   }
 
+  /**
+   * Add a user group with a home directory (a "team"), and make the default user a member, so that
+   * the drive shows it as a category. Assets go into its folder with `parentId: team.homeDirectoryId`.
+   * Call it before signing in: the user's groups come with `users/me`.
+   */
+  const addTeam = (name: string) => {
+    const userGroup = addUserGroup(name)
+    const team: backend.UserGroup = {
+      id: userGroup.id,
+      name,
+      homeDirectoryId: userGroupIdToDirectoryId(userGroup.id),
+    }
+    object.unsafeMutable(defaultUser).groups = [...(defaultUser.groups ?? []), team]
+    object.unsafeMutable(defaultUser).userGroups = [...(defaultUser.userGroups ?? []), team.id]
+    return team
+  }
+
   const deleteUserGroup = (userGroupId: backend.UserGroupId) => {
     const index = userGroups.findIndex((userGroup) => userGroup.id === userGroupId)
     if (index === -1) {
@@ -1495,6 +1512,7 @@ export async function mockCloudApi(page: Page) {
     addUser,
     deleteUser,
     addUserGroup,
+    addTeam,
     deleteUserGroup,
     createUserPermission,
     createUserGroupPermission,

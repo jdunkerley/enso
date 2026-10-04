@@ -5,7 +5,6 @@
  * TODO: #88 ports Billing & Plans; this bridge, `data.tsx` and the React shell (`Tab`, `Section`,
  * `Entry`, `CustomEntry`) go with it.
  */
-import { backendQueryOptions } from '#/hooks/backendHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
 import {
   filterSettingsSections,
@@ -13,6 +12,7 @@ import {
   settingsQueryMatcher,
 } from '$/configurations/settings'
 import { useBackends, useFullUserSession, useText } from '$/providers/react'
+import { backendQueryOptions } from '$/utils/backendQuery'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import {

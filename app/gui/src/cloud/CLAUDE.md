@@ -8,17 +8,20 @@ community build without the cloud can leave it out (decision 6b of
 ## Layout
 
 - Top level: framework-free helpers (`validation.ts` with the Cognito password
-  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`).
-  The React dashboard imports these while it is ported.
+  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`,
+  and `uploadToCloud.ts`, which packs local projects and uploads them to the
+  cloud when assets move from a local category to a cloud one, #192). The React
+  dashboard imports these while it is ported, and the core may import them.
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
     `UpsertSecretModal.vue` (#92), which the React drive opens on the modal
     stack (`setVueModal`).
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
-    menu's "Upgrade Plan"), `organization/` (the user menu's organization
-    switcher) and `versionChecker/` (the "new version available" dialog, mounted
-    by `App.vue`).
+    menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
+    the subscription price query, `subscriptionPrice.ts`), `organization/` (the
+    user menu's organization switcher) and `versionChecker/` (the "new version
+    available" dialog, mounted by `App.vue`).
   - `organization/`, since #87: the Organization and Members settings tabs'
     sections (`settingsSections.ts`, contributed by
     `registerOrganizationSettings`), and since #191 the User groups tab's

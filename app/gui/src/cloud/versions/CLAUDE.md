@@ -24,8 +24,8 @@ opens.
 - `AssetDiffView.vue` — the diff, on `@codemirror/merge`, styled after the
   Monaco diff editor it replaced. Loaded asynchronously, with the first
   comparison.
-- `queries.ts` — query options with React's keys and options, and the optimistic
-  tag updates.
+- `queries.ts` — query options with React's keys and options (built with the
+  shared `backendQueryOptions`, #192), and the optimistic tag updates.
 - `ProjectExecutionsCalendar.vue` — the Schedule tab: placeholders (outside the
   cloud, nothing selected, not a project), then
   `ProjectExecutionsCalendarContent.vue`, not keyed by project (React's was not:

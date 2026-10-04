@@ -42,7 +42,9 @@ From the drive's modals (#92): `Drive/` holds `AssetIcon`, `AssetSummary`,
 (`duplicateAssets.ts`). They are shared code, not `src/dashboard/`, so that
 callers outside the React dashboard (#192's drive mutations) can open them; the
 directory listings they read come from `$/utils/driveQueries`, with the React
-drive's query keys.
+drive's query keys. From #192, `Drive/` also holds `CopyInsteadModal` (the "copy
+instead?" question when assets cannot be moved or restored between categories),
+asked with `askToCopyInstead` (`copyInstead.ts`).
 
 Forms and inputs are #79's.
 

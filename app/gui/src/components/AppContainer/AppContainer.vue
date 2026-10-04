@@ -1,5 +1,4 @@
 <script lang="ts">
-import type { TransferBetweenCategoriesFunction } from '#/layouts/Drive/Categories'
 import UserBar from '#/pages/dashboard/UserBar/UserBar.vue'
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
@@ -9,7 +8,6 @@ import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { ContainerProviderForReact } from '$/providers/react/container'
-import { provideReactApi } from '$/providers/reactApi'
 import { provideRightPanelData } from '$/providers/rightPanel'
 import { useNavigateLink } from '$/utils/links'
 import { appContainerBindings } from '@/bindings'
@@ -33,10 +31,6 @@ import TabBar from './TabBar.vue'
 </script>
 
 <script setup lang="ts">
-const props = defineProps<{
-  transferBetweenCategories: TransferBetweenCategoriesFunction
-}>()
-
 // NOTE: This cannot be `useTemplateRef`, because that creates a **readonly** ref, and it interferes
 // with veaury's ref assignment implementation that runs during parent React component lifecycle.
 const fullscreenRoot = shallowRef<HTMLElement>()
@@ -51,7 +45,6 @@ provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
 provideDriveLocation()
-provideReactApi({ transferBetweenCategories: props.transferBetweenCategories })
 
 const HELP_URLS: Record<ActionName & `help.${string}`, string> = {
   'help.whatsNew': 'https://community.ensoanalytics.com/c/what-is-new-in-enso/',

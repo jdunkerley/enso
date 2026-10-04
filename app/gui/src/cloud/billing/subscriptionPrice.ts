@@ -1,7 +1,9 @@
-/** @file Return the subscription price. */
-import { queryOptions } from '@tanstack/react-query'
+/**
+ * @file The query computing a subscription's price, for the plan selector. Framework-free (typed
+ * with `@tanstack/query-core`), moved from the React `#/modules/payments` (#192) with the same key.
+ */
 import type { Plan } from 'enso-common/src/services/Backend'
-import { PRICE_BY_PLAN } from './constants'
+import { PRICE_BY_PLAN } from './plans'
 
 /** Options for {@link createSubscriptionPriceQuery}. */
 export interface SubscriptionPriceQueryOptions {
@@ -12,10 +14,10 @@ export interface SubscriptionPriceQueryOptions {
 
 /** Create a query to fetch the subscription price. */
 export function createSubscriptionPriceQuery(options: SubscriptionPriceQueryOptions) {
-  return queryOptions({
+  return {
     queryKey: ['getPrice', options] as const,
-    queryFn: ({ queryKey }) => {
-      const [, { seats, period, plan }] = queryKey
+    queryFn: () => {
+      const { seats, period, plan } = options
 
       const price = PRICE_BY_PLAN[plan]
 
@@ -25,5 +27,5 @@ export function createSubscriptionPriceQuery(options: SubscriptionPriceQueryOpti
         totalPrice: price * seats * period,
       })
     },
-  })
+  }
 }
