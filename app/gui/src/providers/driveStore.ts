@@ -1,7 +1,7 @@
 /**
  * @file The drive's state: the selection, the clipboard (cut or copied assets), the asset being
- * renamed, the context menu and the drag target. Framework-free, so the React drive reads it
- * through `#/providers/DriveProvider` and its Vue port provides it with {@link provideDriveStore}.
+ * renamed, the context menu and the drag target. Framework-free (it began as the React drive's);
+ * the Vue drive, `#/layouts/DriveView.vue`, provides it with {@link provideDriveStore}.
  */
 import type { Category } from '$/providers/category'
 import type { TransferrableAsset } from '$/utils/assetsDataTransfer'

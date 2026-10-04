@@ -112,8 +112,8 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       // toolbar/table buttons and intercepts subsequent clicks.
       await page.mouse.move(0, 0)
       await this.expectCategory(category)
-      // The sidebar marks the new category at once, but the drive view switches inside a React
-      // transition: until the new category has loaded, the previous one's rows stay on screen and
+      // The sidebar marks the new category at once, but the drive view keeps showing the old one
+      // (as React's transition did; `layouts/Drive/driveView.ts`): until the new category has loaded, the previous one's rows stay on screen and
       // take clicks. Wait for no drive view still showing another category (the check passes when
       // there is no drive view at all, e.g. the "cloud unavailable" stub).
       await expect(

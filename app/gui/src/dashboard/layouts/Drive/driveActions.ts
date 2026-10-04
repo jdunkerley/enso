@@ -304,7 +304,7 @@ export function useExportArchive(backend: MaybeRefOrGetter<Backend>, driveStore:
 
 /**
  * A function opening the secret dialog to change a secret's value, replacing the open modals, as
- * the React drive's `setVueModal(UpsertSecretModal, …)` did.
+ * the React drive opened it.
  */
 export function useEditSecret(backend: MaybeRefOrGetter<Backend>) {
   const modals = useModals()

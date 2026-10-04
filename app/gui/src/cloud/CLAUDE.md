@@ -15,8 +15,7 @@ community build without the cloud can leave it out (decision 6b of
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
-    `UpsertSecretModal.vue` (#92), which the React drive opens on the modal
-    stack (`setVueModal`).
+    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack.
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
     menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
     the subscription price query, `subscriptionPrice.ts`), `organization/` (the
