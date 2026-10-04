@@ -5,13 +5,14 @@ organization's labels for the selected assets. Vue, ported from the React
 `ManageLabelsModal` and `ColorPicker` ("Rulings from #198" in
 `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
 
-- `ManageLabelsModal.vue` — the popover, meant for the modal stack: the React
-  drive opens it with `setVueModal` (the row's context menu) or
-  `useVueModalTrigger` (the labels column's edit buttons), passing the element
-  it is anchored to (`anchor`, through `Popover.vue`'s `PopoverAnchor`) and,
-  where React's focus scope knew it, where focus returns (`opener`). Escape
-  closes only the innermost popover and is stopped there, so that the
-  dashboard's global Escape binding does not close every modal.
+- `ManageLabelsModal.vue` — the popover, meant for the modal stack: the Vue
+  drive opens it with `useModals()` (the row's context menu,
+  `AssetContextMenu.vue`, and the labels column's edit button,
+  `LabelsColumn.vue`), passing the element it is anchored to (`anchor`, through
+  `Popover.vue`'s `PopoverAnchor`) and, where React's focus scope knew it, where
+  focus returns (`opener`). Escape closes only the innermost popover and is
+  stopped there, so that the dashboard's global Escape binding does not close
+  every modal.
 - `ManageLabelsForm.vue` — its content (loaded inside the popover's
   `SuspenseLoader`): the search, the label pills, the list, "Create Label" (a
   nested popover with `ColorPicker.vue`) and the delete confirmations

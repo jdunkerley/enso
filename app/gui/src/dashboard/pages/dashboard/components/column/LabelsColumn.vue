@@ -9,16 +9,16 @@
  * base: eight labels in a 348px cell). The port leaves both out rather than show them for the
  * first time; restoring them is a visible change, for its own issue.
  *
- * The labels popover is still React's (`ManageLabelsModal`, #198); it opens on the modal stack,
- * anchored to the button, as its `Dialog.Trigger` opened it. The button has no accessible name, as
+ * The labels popover (`ManageLabelsModal.vue`, #198) opens on the modal stack over the open
+ * modals, anchored to the button, as React's `Dialog.Trigger` opened it. The button has no accessible name, as
  * React's had none (axe's `button-name`, in the drive's baseline); it keeps an id, as react-aria
  * gave it one, so that axe names it by that (normalized) id as before.
  */
 import { useMutationCallback, useToastAndLog } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
-import { openManageLabelsModal } from '#/layouts/Drive/reactModals'
 import DriveLabel from '#/pages/dashboard/components/DriveLabel.vue'
+import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
 import Button from '$/components/Button/Button.vue'
 import { useDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
@@ -78,13 +78,12 @@ const isLabelsModalOpen = computed(
 
 function openLabelsModal(event: MouseEvent) {
   const trigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null
-  const entry = openManageLabelsModal(
-    'trigger',
-    driveView.location.backend,
-    labelsItems.value,
-    trigger,
-  )
-  labelsModalKey.value = entry?.key ?? null
+  const { key } = modals.open(ManageLabelsModal, {
+    backend: driveView.location.backend,
+    items: labelsItems.value,
+    anchor: trigger,
+  })
+  labelsModalKey.value = key
 }
 </script>
 

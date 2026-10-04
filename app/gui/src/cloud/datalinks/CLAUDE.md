@@ -17,6 +17,6 @@ ported from the React `JSONSchemaInput`, `FilePathInput`, `DatalinkInput` and
   validated by `$/utils/datalinkValidator`'s compiled validators.
 - `DatalinkFormInput.vue` — the editor as a form field; the Properties tab
   (`../properties/DatalinkConfiguration.vue`) uses it too.
-- `UpsertDatalinkModal.vue` — the dialog, for the modal stack (`setVueModal`,
-  `useVueModalTrigger` from the React drive).
+- `UpsertDatalinkModal.vue` — the dialog, for the modal stack (`useModals()`
+  from the Vue drive).
 - Tests: `__tests__/`, with the file browser stubbed.

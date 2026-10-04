@@ -14,6 +14,6 @@ Secrets and service credentials, which exist only in the Enso Cloud. Vue.
   service needs a recipe, a form and an entry in `credentialInfos.ts`.
 - `toastAndLog.ts` — React's `toastAndLog(null, error)`, for the forms that
   report a failure as a toast.
-- The dialogs are meant for the modal stack: the React drive opens them with
-  `setVueModal` or `useVueModalTrigger`.
+- The dialogs are meant for the modal stack: the Vue drive opens them with
+  `useModals().open`.
 - Tests: `__tests__/`.

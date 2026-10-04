@@ -4,12 +4,12 @@
  * button of the drive's labels column): the Vue port of the React `ManageLabelsModal`, with the
  * same classes, texts and behaviour. The form inside is `ManageLabelsForm.vue`.
  *
- * It is meant for the modal stack (`useModals().open`, or `setVueModal` and `useVueModalTrigger`
- * from React), and opens as it mounts, positioned against `anchor`: the element that opened it,
- * which it does not render (React's `triggerRef`). Without one it sits at the window's top-left
- * corner, where React's popover ended up when its anchor had gone (the context menu's row ref is
- * cleared as the menu closes). It emits `close` once it has closed and its exit animation has
- * ended. An outside click closes it.
+ * It is meant for the modal stack (`useModals().open`, as the Vue drive opens it), and opens as it
+ * mounts, positioned against `anchor`: the element that opened it, which it does not render
+ * (React's `triggerRef`). Without one it sits at the window's top-left corner, where React's
+ * popover ended up when its anchor had gone (the context menu's row ref is cleared as the menu
+ * closes). It emits `close` once it has closed and its exit animation has ended. An outside click
+ * closes it.
  *
  * Escape closes only this popover, as react-aria's stopped the key: on the page it would otherwise
  * reach the dashboard's global Escape binding, which closes every modal on the stack (see "Rulings

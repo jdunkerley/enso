@@ -18,8 +18,9 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
-import { openCreateCredentialModal, openUpsertDatalinkModal } from '#/layouts/Drive/reactModals'
+import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -120,19 +121,22 @@ function openNewSecret() {
 }
 
 function openNewCredential() {
-  const entry = openCreateCredentialModal('trigger', (name: string, value: CredentialConfig) =>
-    newCredential([{ name, value, parentDirectoryId: currentDirectoryId.value }]),
-  )
-  if (entry != null) openedModals.value = { ...openedModals.value, credential: entry.key }
+  const { key } = modals.open(CreateCredentialModal, {
+    doCreate: (name: string, value: CredentialConfig) =>
+      newCredential([{ name, value, parentDirectoryId: currentDirectoryId.value }]),
+  })
+  openedModals.value = { ...openedModals.value, credential: key }
 }
 
 function openNewDatalink() {
-  const entry = openUpsertDatalinkModal('trigger', async (name: string, value: unknown) => {
-    await newDatalink([
-      { name, value, parentDirectoryId: currentDirectoryId.value, datalinkId: null },
-    ])
+  const { key } = modals.open(UpsertDatalinkModal, {
+    doCreate: async (name: string, value: unknown) => {
+      await newDatalink([
+        { name, value, parentDirectoryId: currentDirectoryId.value, datalinkId: null },
+      ])
+    },
   })
-  if (entry != null) openedModals.value = { ...openedModals.value, datalink: entry.key }
+  openedModals.value = { ...openedModals.value, datalink: key }
 }
 
 async function uploadFilesFromDialog() {

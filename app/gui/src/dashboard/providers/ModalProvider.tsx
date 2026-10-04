@@ -47,23 +47,6 @@ export function setModal(modal: ModalOrCallback) {
 }
 
 /**
- * Push a React modal on the stack over the open ones, as a react-aria `Dialog.Trigger` opened its
- * dialog without closing others: for a Vue button that opens a React dialog still waiting for its
- * port (the drive's toolbar and labels column, #91, until #198). Unlike a {@link setModal} entry,
- * it leaves the stack once the dialog closes, as the trigger's own dialog went.
- */
-export function openReactModal(modal: Modal) {
-  const modals = getModalsStore()
-  const entry = modals.open(getReactModalEntry(), {
-    modal,
-    onOpenChange: (isOpen: boolean) => {
-      if (!isOpen) entry.close()
-    },
-  })
-  return entry
-}
-
-/**
  * Replace every open modal with this one, as {@link setModal} does, and ask the user through it:
  * the modal stack's `ask` passes it `onConfirm`/`onCancel`, and its answer resolves the promise.
  * Every modal is closed once it has answered, as the React `ask` always did.

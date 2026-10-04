@@ -16,7 +16,7 @@ import {
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
-import { openManageLabelsModal } from '#/layouts/Drive/reactModals'
+import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
 import { isUploadableAsset } from '$/cloud/uploadToCloud'
 import { usePreferredTimeZone } from '$/cloud/versions/schedule'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
@@ -300,12 +300,17 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
     isCloud.value && {
       action: 'label',
       doAction: () => {
-        openManageLabelsModal(
-          'replace',
-          backend.value,
-          [asset],
-          driveStore.contextMenuData?.triggerRef.current,
-        )
+        // It replaces the open modals, as React's `setModal` did. No anchor: React's popover sat at
+        // the window's top-left corner, its row ref cleared as the menu closed (#198). Focus
+        // returns to the row.
+        const row = driveStore.contextMenuData?.triggerRef.current ?? null
+        modals.closeAll()
+        modals.open(ManageLabelsModal, {
+          backend: backend.value,
+          items: [asset],
+          anchor: null,
+          opener: row,
+        })
       },
     },
     isUploadableAsset(asset) &&

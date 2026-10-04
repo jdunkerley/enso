@@ -4,10 +4,10 @@
  * (`credentialInfos.ts`). The Vue port of the React `CreateCredentialModal`, with the same title,
  * size, list and forms.
  *
- * It is meant for the modal stack (`useModals().open`, or `setVueModal` and `useVueModalTrigger`
- * from React), and opens as it mounts; it emits `close` once it has closed and its exit animation
- * has ended. As in React an outside click does not close it; Escape does. Submitting a form creates
- * the credential with `doCreate`, opens the provider's sign-in page in the browser, and closes it.
+ * It is meant for the modal stack (`useModals().open`, as the Vue drive opens it), and opens as it
+ * mounts; it emits `close` once it has closed and its exit animation has ended. As in React an
+ * outside click does not close it; Escape does. Submitting a form creates the credential with
+ * `doCreate`, opens the provider's sign-in page in the browser, and closes it.
  */
 import { makeCredentialCreationHandler } from '$/cloud/serviceCredentials/logic'
 import Dialog from '$/components/Dialog/Dialog.vue'

@@ -3,11 +3,11 @@
  * @file The "Create Datalink" dialog: a name and the datalink editor. The Vue port of the React
  * `UpsertDatalinkModal`, with the same title, fields and buttons.
  *
- * It is meant for the modal stack (`useModals().open`, or `setVueModal` and `useVueModalTrigger`
- * from React), and opens as it mounts; it emits `close` once it has closed and its exit animation
- * has ended. As in React an outside click does not close it; Escape and Cancel do. The datalink
- * starts as the schema's first type with its defaults; `doCreate` gets the name and the datalink
- * once the form is submitted with a valid one.
+ * It is meant for the modal stack (`useModals().open`, as the Vue drive opens it), and opens as it
+ * mounts; it emits `close` once it has closed and its exit animation has ended. As in React an
+ * outside click does not close it; Escape and Cancel do. The datalink starts as the schema's first
+ * type with its defaults; `doCreate` gets the name and the datalink once the form is submitted with
+ * a valid one.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
