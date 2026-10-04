@@ -147,15 +147,23 @@ export const expect = baseExpect.extend({
     }
   },
 
-  async toBeSelected(locator: Locator) {
+  /**
+   * Ensures that the graph node the Locator points to is selected (or, negated, is not). Retries
+   * like the built-in assertions: a custom matcher is not retried by Playwright, so it has to
+   * delegate to one that is, in the requested direction. Checking once (as this used to, with a
+   * 50 ms timeout) made the result depend on whether the app had caught up by then.
+   */
+  async toBeSelected(locator: Locator, options?: { timeout?: number }) {
     const assertionName = 'toBeSelected'
+    const selectedClass = /(?<=^| )selected(?=$| )/
     let pass: boolean
     try {
-      await baseExpect(locator).toHaveClass(/(?<=^| )selected(?=$| )/, { timeout: 50 })
-      pass = true
+      const expectation = this.isNot ? baseExpect(locator).not : baseExpect(locator)
+      await expectation.toHaveClass(selectedClass, { timeout: options?.timeout ?? this.timeout })
+      pass = !this.isNot
     } catch {
       // Do not log the error.
-      pass = false
+      pass = this.isNot
     }
 
     const message = () =>

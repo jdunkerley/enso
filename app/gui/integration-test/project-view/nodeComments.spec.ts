@@ -87,7 +87,7 @@ test('URL added to comment is rendered as link', async ({ editorPage, page, cont
   await page.keyboard.press(`Enter`)
   await expect(commentContent).not.toBeFocused()
   await expect(page.locator('.LinkEditPopup')).toBeHidden()
-  context.route('https://example.com', (route) => route.fulfill({ status: 200, body: 'YAY' }))
+  await context.route('https://example.com', (route) => route.fulfill({ status: 200, body: 'YAY' }))
   const newPagePromise = context.waitForEvent('page', { timeout: 10000 })
   await commentContent.locator('a').click({ modifiers: ['ControlOrMeta'] })
   await expect(newPagePromise).resolves.toHaveURL('https://example.com')

@@ -42,9 +42,13 @@ export default class BaseActions<Context, ParentClass extends BaseActionsClass<C
     private readonly promise = Promise.resolve(),
     private readonly parentClass: ParentClass = null!,
   ) {
-    promise.then(() => {
-      this.isResolved = true
-    })
+    promise.then(
+      () => {
+        this.isResolved = true
+      },
+      // A rejection is reported to whoever awaits the chain; this only tracks completion.
+      () => {},
+    )
   }
 
   /**

@@ -13,7 +13,7 @@ export interface PaywallDevtoolsFeatureConfiguration {
   readonly isForceEnabled: boolean | null
 }
 
-/** A store keeping state of Enso and React devtools. */
+/** A store keeping state of the Enso devtools. */
 export type EnsoDevtoolsStore = ReturnType<typeof createDevtoolsStore>
 
 /** create {@link EnsoDevtoolsStore} */
@@ -28,7 +28,6 @@ export function createDevtoolsStore() {
   }
 
   return reactive({
-    showDevtools: IS_DEV_MODE,
     showEnsoDevtools: IS_DEV_MODE,
     showVersionChecker: false as boolean | null,
     paywallFeatures,

@@ -15,20 +15,14 @@ import { Badge } from '#/components/Badge'
 import { Button } from '#/components/Button'
 import { Dialog, DialogStackProvider } from '#/components/Dialog'
 import { Loader } from '#/components/Loader'
-import MenuEntry from '#/components/MenuEntry'
 import { ProfilePicture } from '#/components/ProfilePicture'
 import { Result } from '#/components/Result'
 import { Text } from '#/components/Text'
-import AssetIcon from '#/pages/dashboard/components/AssetIcon'
-import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import AlertVue from '$/components/Alert/Alert.vue'
 import BadgeVue from '$/components/Badge/Badge.vue'
 import ButtonVue from '$/components/Button/Button.vue'
 import DialogVue from '$/components/Dialog/Dialog.vue'
 import { DIALOG_MOTION } from '$/components/Dialog/variants'
-import AssetIconVue from '$/components/Drive/AssetIcon.vue'
-import KeyboardShortcutVue from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
-import MenuEntryVue from '$/components/MenuEntry/MenuEntry.vue'
 import ProfilePictureVue from '$/components/ProfilePicture/ProfilePicture.vue'
 import ResultVue from '$/components/Result/Result.vue'
 import LoaderVue from '$/components/Spinner/Loader.vue'
@@ -37,8 +31,7 @@ import { TextContext } from '$/providers/react'
 import { useText } from '$/providers/text'
 import { act, render } from '@testing-library/react'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { AssetType } from 'enso-common/src/services/Backend'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, describe, expect, test } from 'vitest'
 import { defineComponent, h, type VNodeChild } from 'vue'
 
 enableAutoUnmount(afterEach)
@@ -212,26 +205,6 @@ describe('the Vue ports render the same classes as the React primitives', () => 
     mountVue(() => h('div', { 'data-testid': 'vue' }, [h(LoaderVue, { minHeight: 'full' })]))
     expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
   })
-
-  describe.each([
-    ['macOS', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'],
-    ['Windows', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
-    ['Linux', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'],
-  ])('KeyboardShortcut on %s', (_platform, userAgent) => {
-    test.each(['Mod+Shift+Enter', 'Mod+,', 'Shift+Alt+ArrowDown', 'Delete'])('%s', (shortcut) => {
-      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent)
-      render(
-        <TextContext.Provider value={useText()}>
-          <div data-testid="react">
-            <KeyboardShortcut shortcut={shortcut} />
-          </div>
-        </TextContext.Provider>,
-      )
-      mountVue(() => h('div', { 'data-testid': 'vue' }, [h(KeyboardShortcutVue, { shortcut })]))
-      expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
-      vi.restoreAllMocks()
-    })
-  })
 })
 
 describe('the user bar parts render as the React ones (#83)', () => {
@@ -246,55 +219,5 @@ describe('the user bar parts render as the React ones (#83)', () => {
     )
     mountVue(() => h('div', { 'data-testid': 'vue' }, [h(ProfilePictureVue, props)]))
     expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
-  })
-
-  test.each([
-    { action: 'settings' },
-    { action: 'signOut' },
-    { action: 'switchOrganization', label: 'Acme (current)', truncateLabel: true },
-  ] as const)('MenuEntry %o', (props) => {
-    render(
-      <TextContext.Provider value={useText()}>
-        <div data-testid="react">
-          <MenuEntry {...props} doAction={() => {}} />
-        </div>
-      </TextContext.Provider>,
-    )
-    mountVue(() =>
-      h('div', { 'data-testid': 'vue' }, [h(MenuEntryVue, { ...props, onPress: () => {} })]),
-    )
-    // React's `FocusRing` adds `focus-ring` while the button has visible focus; the Vue button
-    // carries its rules as `focus-visible:` classes. Compare without them.
-    const vue = byTestId('vue')
-    const button = vue.querySelector('button')
-    for (const name of [...(button?.classList ?? [])]) {
-      if (name.startsWith('focus-visible:')) button?.classList.remove(name)
-    }
-    expect(shape(vue)).toEqual(shape(byTestId('react')))
-    // The colour of the action (Logout's red), as an inline style on the label.
-    const labelStyle = (root: HTMLElement) =>
-      root.querySelector('button div div')?.getAttribute('style') ?? null
-    expect(labelStyle(vue)).toBe(labelStyle(byTestId('react')))
-  })
-})
-
-describe('the drive parts render as the React ones (#92)', () => {
-  test.each([
-    { type: AssetType.directory, title: 'Folder' },
-    { type: AssetType.project, title: 'Project' },
-    { type: AssetType.file, title: 'data.csv' },
-    { type: AssetType.file, title: 'picture.png' },
-    { type: AssetType.datalink, title: 'Link' },
-    { type: AssetType.secret, title: 'Secret' },
-  ] as const)('AssetIcon %o', (asset) => {
-    render(
-      <div data-testid="react">
-        <AssetIcon asset={asset} />
-      </div>,
-    )
-    mountVue(() => h('div', { 'data-testid': 'vue' }, [h(AssetIconVue, { asset })]))
-    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
-    const icon = (root: HTMLElement) => root.querySelector('use')?.getAttribute('data-icon')
-    expect(icon(byTestId('vue'))).toBe(icon(byTestId('react')))
   })
 })

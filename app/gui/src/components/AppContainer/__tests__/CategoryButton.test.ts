@@ -1,8 +1,8 @@
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import type { Category } from '$/providers/category'
 import { useModals } from '$/providers/modals'
-import type { ReactApi } from '$/providers/reactApi'
 import { useText } from '$/providers/text'
+import { ASSETS_MIME_TYPE } from '$/utils/mimeTypes'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import type { VueWrapper } from '@vue/test-utils'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
@@ -25,18 +25,19 @@ vi.mock('$/providers/category', async (importOriginal) => ({
 const containerData = reactive({ leftPanelShown: true, leftPanelToggledOn: false })
 vi.mock('$/providers/container', () => ({ useContainerData: () => containerData }))
 
-function makeReactApi(): ReactApi {
-  return { transferBetweenCategories: vi.fn() }
-}
+// The transfer itself is tested with its composable (`$/composables/__tests__`).
+const transferBetweenCategories = vi.fn()
+vi.mock('$/composables/transferBetweenCategories', () => ({
+  useTransferBetweenCategories: () => transferBetweenCategories,
+}))
 
 function mountCategoryButton(category: Category, props: { extended?: boolean } = {}) {
   const drive = reactive({ currentCategory: { type: 'local' } as Category, isNavigating: false })
-  const reactApi = makeReactApi()
   return mountWithProviders(CategoryButton, {
     props: { category, ...props },
-    stores: { drive, reactApi },
+    stores: { drive },
     routes: [{ path: '/settings', component: { render: () => null } }],
-  }).then((mounted) => ({ ...mounted, drive, reactApi }))
+  }).then((mounted) => ({ ...mounted, drive }))
 }
 
 /** Press a `MenuButton`: it acts on the state it saw at `pointerdown`, as a real click has one. */
@@ -127,5 +128,34 @@ describe('CategoryButton', () => {
     await (entry.props.onConfirm as () => Promise<void>)()
     expect(removeLocalDirectory).toHaveBeenCalledWith('/home/projects')
     modals.closeAll()
+  })
+
+  test('moves the assets dropped on it into its category', async () => {
+    transferBetweenCategories.mockClear()
+    const { wrapper } = await mountCategoryButton({ type: 'cloud' })
+    const item = {
+      id: 'directory-1',
+      title: 'Data',
+      type: 'directory',
+      parentId: 'directory-root',
+      parentsPath: '',
+      virtualParentsPath: '',
+    }
+    const payload = JSON.stringify({ category: 'local', items: [item] })
+    await wrapper.find('button').trigger('drop', {
+      dataTransfer: {
+        items: [
+          {
+            kind: 'string',
+            type: ASSETS_MIME_TYPE,
+            getAsString: (callback: (text: string) => void) => callback(payload),
+          },
+        ],
+      },
+    })
+    await vi.waitFor(() => expect(transferBetweenCategories).toHaveBeenCalledOnce())
+    expect(transferBetweenCategories).toHaveBeenCalledWith({ type: 'local' }, { type: 'cloud' }, [
+      item,
+    ])
   })
 })

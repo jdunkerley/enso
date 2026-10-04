@@ -64,12 +64,11 @@ const RESTRICTED_IMPORT_PATHS = [
 const DASHBOARD_IMPORT_ALLOWLIST = [
   // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
   'App.tsx',
-  'components/Devtools',
   'components/ErrorBoundary',
   'components/OfflineNotificationManager',
   'components/Suspense',
   'components/UIProviders',
-  'layouts/Drive',
+  'layouts/DriveView.vue',
   'layouts/Settings',
   'modals/AcceptInvitationModal',
   'modals/AgreementsModal',
@@ -87,8 +86,6 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'hooks/mountHooks',
   'utilities/vue',
   'utilities/zustand',
-  // React-owned state that Vue reaches into; each goes with the shell collapse (#93).
-  'layouts/Drive/Categories',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',
@@ -114,6 +111,7 @@ const CLOUD_AREAS = [
   'auth',
   'billing',
   'browserDisabled',
+  'devtools',
   'organization',
   'properties',
   'versions',
@@ -429,6 +427,17 @@ const config = [
           ],
         },
       ],
+    },
+  },
+
+  // === Integration tests must await every Playwright call ===
+  // An unawaited `expect.poll`, assertion or locator action races the rest of the test: it can
+  // pass by luck, fail a later step, or reject after the test has ended (`Test ended.`), as the
+  // editor panels' "Lists" test did (#202).
+  {
+    files: ['app/gui/integration-test/**/*.ts', 'app/gui/playwright.config.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
     },
   },
 
@@ -779,20 +788,6 @@ const config = [
   {
     files: ['app/gui/src/dashboard/**/__tests__/*.test.ts'],
     rules: { 'react-hooks/rules-of-hooks': 'off' },
-  },
-  // === EnsoDevtools Rules ===
-  // Allow JSX strings in EnsoDevtools.tsx.
-  {
-    files: ['app/gui/src/dashboard/**/EnsoDevtools*.tsx'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...RESTRICTED_SYNTAXES.filter(
-          (syntax) =>
-            syntax.message !== 'Use a `getText()` from `useText` instead of a literal string',
-        ),
-      ],
-    },
   },
   // === Index Files ===
   {

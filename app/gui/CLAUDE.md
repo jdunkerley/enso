@@ -72,6 +72,18 @@ adding an entry. React files may import `$/…` freely.
   `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
   constants. The Vue primitives themselves live beside them; see
   `src/components/CLAUDE.md`.
+- **The backend's queries and mutations** (#192): `src/utils/backendQuery.ts`
+  defines every backend method's query and mutation options once (key, stale
+  time, persistence, invalidations), typed with `@tanstack/query-core`, so that
+  React's `useQuery` and vue-query consume the same objects in the one shared
+  `QueryClient`; `executeMutation` runs one from outside any component.
+  `driveQueries.ts` (listings, search, new names), `driveMutations.ts` (the
+  batched delete, restore, copy, move and download; the move's duplicate
+  resolver is injected) and `transferBetweenCategories.ts` (with its context
+  injected) build on it. The Vue wrappers are `@/composables/backend` and
+  `$/composables/transferBetweenCategories`; the drive's own (mutation state,
+  new folder and project, rename, uploads) are in `#/layouts/Drive/driveActions`
+  (#91). Never give a key different options on the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and

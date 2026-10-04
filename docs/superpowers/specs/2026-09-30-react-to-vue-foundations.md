@@ -2072,6 +2072,264 @@ provisionally accepted, for the maintainer to review.
 10. **No changelog entry.** Nothing changes for a mouse user, so the PR takes
     `CI: No changelog needed`.
 
+## Rulings from #192 (the drive's queries and mutations, 2026-10-03)
+
+#192 is the second half of #90: the drive's data layer. Delegated like the
+rulings above: provisionally accepted, for the maintainer to review. The ruling
+on #192 itself (a comment there) settled the main question: where React and Vue
+gave the same query key different options, the React drive's options win, and
+each key's options are defined once, in framework-free factories.
+
+1. **One PR, not split.** The factories, the batched mutations, the transfer
+   between categories and the uploads depend on each other (the transfer runs
+   the batched mutations and the upload to the cloud), and the React drive hooks
+   left over are adapters; the work is in reviewable commits instead.
+2. **The options live in `$/utils/backendQuery`**, typed with
+   `@tanstack/query-core`, and both frameworks consume the same objects:
+   `backendQueryOptions(backend, method, args, extra?)` and
+   `backendMutationOptions(backend, method, extra?)`, with every per-method
+   default (`STALE_TIME_MAP`, `PERSISTENCE_MAP`, `INVALIDATION_MAP`) read
+   through `backendQueryDefaults`. The Vue `@/composables/backend` keeps its
+   reactive signature (arguments as a getter, the query disabled while they are
+   `undefined`) and builds on the same defaults. A caller's extra options are
+   limited to those whose types React and vue-query agree on (`enabled` as a
+   boolean, numeric `staleTime`, `gcTime`, `refetchInterval`, `retry`, `meta`):
+   vue-query reads a function-valued option as a getter, where React passes it
+   the query. `executeMutation(queryClient, options, variables)` runs a mutation
+   through the mutation cache from outside any component, as React's
+   `useMutationCallback` did, so `useMutationState` still sees it.
+3. **Per-key options, and what changes.** Six keys differed. All now have the
+   React drive's options:
+
+   | Key                           | Before: React / Vue       | Now           | Effect                                                                                                                                                                                                                                                                                                                                                                 |
+   | ----------------------------- | ------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `getFileDetails`              | persisted / not           | persisted     | None today: nothing queries it through the factories (the asset preview, `AssetContentsEditor.vue`, has its own key and options).                                                                                                                                                                                                                                      |
+   | `searchDirectory`, `listTags` | not persisted / persisted | not persisted | None: only React queries them.                                                                                                                                                                                                                                                                                                                                         |
+   | `listUsers`                   | stale time ∞ / 0          | ∞             | None: only React queries it.                                                                                                                                                                                                                                                                                                                                           |
+   | `getOrganization`, `usersMe`  | stale time ∞ / 0          | 5 minutes     | **The maintainer's choice, not React's** (ruling 4). `AppContainerLayout.vue` (the trial-ended and organization-setup modals), `TrialProgress.vue`, `SettingsPage.vue`, the file browser widget and `ProfilePictureInput.vue` no longer refetch on every mount, only once the cached value is five minutes old; the React drive now refetches too, where it never did. |
+
+   Mutations follow React's semantics too: a caller's `meta.invalidates` is
+   added to the method's (Vue replaced them), and the network mode is the
+   backend's whatever the caller passes. No Vue caller passed either, so nothing
+   changes. `listDirectory` (stale time 0, not persisted) and `getAssetDetails`
+   (not persisted) were already the same on both sides.
+
+4. **The organization and the user stay fresh for five minutes** (the
+   maintainer's choice on #201, option B). The React drive's ∞ would have ended
+   the Vue screens' refetch on mount, which is what picked up a subscription
+   changed elsewhere (a trial that ended while the app was closed, a plan bought
+   on another device); Vue's 0 refetched on every mount. `getOrganization` and
+   `usersMe` now get `ACCOUNT_STALE_TIME_MS` (5 minutes) in `STALE_TIME_MAP`, on
+   both sides. It differs from both old behaviours: unlike React's ∞, a value
+   older than five minutes is refetched when a screen mounts or the window
+   regains focus, so an outside change shows within minutes; unlike Vue's 0,
+   mounting a screen within five minutes of the last fetch uses the cache
+   without a request. Persistence and the mutations' invalidations are
+   unchanged, so an edit in the app still refetches at once, and a persisted
+   value restored on start-up older than five minutes is refetched as soon as it
+   is read. A unit test pins the value.
+5. **The batched mutations are framework-free**, in `$/utils/driveMutations`
+   (delete, restore, copy, move, download), with their keys and invalidations
+   unchanged. The move asks how to resolve name conflicts through an injected
+   `DuplicationResolver`; callers pass `resolveDuplications`
+   (`$/components/Drive/duplicateAssets`, #92), and tests pass a stub.
+   `#/hooks/backendBatchedHooks` keeps only the React drive's
+   `use*MutationState` adapters. Dead code went with the move: the copy's
+   mutation-state hook, `useRemoveSelfPermissionMutation`,
+   `getProjectExecutionDetailsQueryOptions` and `UserGroupInfoWithUsers` had no
+   callers.
+6. **Transferring between categories** is `$/utils/transferBetweenCategories`,
+   with its context injected (backends, the user's root, the categories store,
+   the query client, the duplicate resolver, the "copy instead" question, the
+   upload to the cloud, the toast). `CategoryButton.vue` calls the Vue
+   composable, `$/composables/transferBetweenCategories`; the React drive's
+   paste and "download to local" call the React adapter. `$/providers/reactApi`
+   is deleted, and `AppContainer.vue` has no React props left.
+7. **The "copy instead" question is Vue, from both frameworks:**
+   `CopyInsteadModal.vue` in `$/components/Drive/`, asked with
+   `askToCopyInstead`, with React's title, text, alert, icon and buttons. Like
+   the React `ask` it replaces, it closes the open modals first. As with #156's
+   `ConfirmDeleteModal` (ruling 11 there) it is named by its title, keeps Tab
+   inside, and leaves after its exit animation. **Cancel does nothing** (#200,
+   at the maintainer's request on #201): React went on to attempt the move after
+   a cancelled question between two teams' folders, or from a team's folder to
+   the user's, which the backend then refused or carried out. Now nothing is
+   sent and nothing changes; unit tests and
+   `integration-test/dashboard/copyInstead.spec.ts` check it, the spec against
+   the requests the mocked cloud receives. A bug fix, so no changelog entry.
+8. **Toasts: `promise` moved into the store.** The transfer shows the download
+   to the local drive as a loading toast that turns into its outcome, as
+   react-toastify's `toast.promise` did; `useToasts().promise` now does that,
+   and the React shim's `toast.promise` forwards to it.
+9. **Uploads.** `uploadFiles` (the drive's upload of picked or dropped files, on
+   either backend) moved into `$/providers/upload`, beside the uploads store it
+   drives. The upload of local projects to the cloud is cloud-only, so it is
+   `src/cloud/uploadToCloud.ts`: a top-level helper, not an area, because the
+   core's transfer calls it. `#/hooks/backendUploadFilesHooks` keeps only React
+   adapters.
+10. **Cloud-only queries are under `src/cloud/`:** a project's scheduled
+    executions in `versions/schedule.ts` (`projectExecutionsQueryOptions`, for
+    #183's Schedule tab), and the subscription price with the plans' constants
+    in `billing/` (`subscriptionPrice.ts`, `plans.ts`), which the React plan
+    selector imports. The organization's queries have no factories of their own:
+    they are the generic `getOrganization` and `listUsers`, whose options are
+    the shared table's, and the core reads the organization too.
+11. **The download directory is the Vue store's.** The React
+    `useDownloadDirectory` had its own suspending query of
+    `/api/download-directory-path`, which `entrypoint.ts` already fetches at
+    start-up for `useLocalPaths`. React now reads `useLocalPaths` through a
+    context, and the second request and the suspension are gone.
+12. **What stays React, for #91.** The adapters above, and the React-only drive
+    hooks with no data of their own (`cutAndPasteHooks`, `copyHooks`,
+    `dragAndDropHooks`, `dragDelayHooks`, `assetsTableItemsHooks`,
+    `directoryIdsHooks`), say so in their file comments; each goes when the Vue
+    drive replaces its caller. The Vue drive's hooks (mutation state, new folder
+    and project, rename, upload) come with their first Vue caller, in #91: until
+    then they would be dead code, and vue-query consumes the factories directly.
+13. **No changelog entry.** The only change on screen is the "copy instead"
+    dialog being the Vue `AlertDialog` (ruling 7), which #156 compared class for
+    class with React's; the PR takes `CI: No changelog needed`.
+
+## Rulings from #91 (the drive table, drive bar and asset search, 2026-10-04)
+
+#91 ports the drive itself. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **One PR, the table first.** The table, its rows and cells, the context
+   menus, the drive bar and the search bar share one view state (the location
+   being shown, the listing, the selection), so the slices of the ticket would
+   each have needed the reverse bridge (`vueComponent`) both ways. The work is
+   in reviewable commits instead: the shared primitives, the Vue drive, the
+   React deletions, the tests. `LeftPanel.vue` mounts `DriveView.vue` directly
+   and imports no React; `reactTabs.ts` is gone.
+2. **A faithful port, not a redesign.** React had no `treegrid` role, no roving
+   tabindex and no ARIA drag and drop: the table is a `<table>` whose rows carry
+   `aria-selected`, its keyboard model is the hand-rolled one of
+   `AssetsTable.tsx` (arrows, Shift and Ctrl ranges, Ctrl+Space, Enter,
+   bindings), and its drag and drop was already native HTML5 events. All three
+   are ported as they were; the ticket's richer accessibility (a `treegrid`,
+   drag and drop announcements) is a follow-up, so that this PR changes nothing
+   a user can see or a spec can tell. The table stays paged, not virtualised.
+3. **React's navigation transition is emulated, not dropped.** React switched
+   category and directory inside `startTransition`, so the old listing stayed on
+   screen, the pressed control showed a spinner, and the page objects wait for
+   that (`drive-view`'s `data-category`). `layouts/Drive/driveView.ts` keeps a
+   _target_ location and a _shown_ one: the shown one moves only when the
+   target's directory details (and, in the trash, its listing) have loaded.
+   `navigate(source, change)` records which control started it, for its spinner,
+   and the drive location's `isNavigating` is fed from it. `providers/drive`
+   lost the React-only `setNavigationTransition`.
+4. **The context menu keeps React's DOM**, not the shared Reka
+   `$/components/Menu/ContextMenu.vue` (a `menu` of `menuitem`s, which takes
+   focus): a non-modal popover with the `context-menu` test id, a `dialog` named
+   by its label, `MenuEntry.vue` buttons, no focus taken on opening. It closes
+   on Escape, a press outside, a right-click elsewhere, and a scroll outside —
+   the last only once it has been open for two frames, since the focus a
+   right-click gives a row scrolls the table a pixel on the next frame, which
+   React's menu, mounted in a transition, never saw.
+5. **react-aria's press semantics are kept where the specs depend on them.**
+   `usePress` stopped a press propagating, so a button in a row never selected
+   the row; Vue's buttons do not, so buttons in rows and headings bind
+   `STOP_PRESS_PROPAGATION` (`layouts/Drive/pressPropagation.ts`). Likewise
+   react-aria's interact-outside (a press that starts _and_ ends outside) is
+   what closes the rename form and the context menu.
+6. **React's quirks are kept, each noted where it lives:** Ctrl+Space toggles
+   against the selection as it was at the key press; the search bar focuses the
+   highlighted suggestion, restores its value on focus and shows suggestions a
+   tick late; the path column sets the directory and then the category (which
+   resets it); the rename form checks `min(1)` before `trim()`, so whitespace
+   alone is accepted. Each is pinned by a probe against the base or a unit test.
+7. **What was dead in React is not ported.** The labels column's overflow ("show
+   all labels") never appeared: its measurement never ran. It is left out, and a
+   follow-up restores it on purpose if wanted. The edit button keeps a generated
+   id (no name), as React's did, so the axe baseline is unchanged.
+8. **The labels, credential and datalink dialogs stay React (#198)**, opened
+   from Vue through `openReactModal` (`ModalProvider.tsx`), which puts a React
+   element on the modal stack and takes it off when the dialog closes itself.
+   `layouts/Drive/reactModals.tsx` is the one place that does it, and goes when
+   #198 lands. `setVueModal` had no caller left and is gone.
+9. **Shared primitives, additively.** `EditableSpan/` and `SelectionBrush/` are
+   new in `src/components/`; `Breadcrumbs/` gains `isLoading`, `onPress`,
+   `onDragDelay` and a focusable `role="link"` container; `MenuEntry` a
+   `tooltip`; `Input` an `error` override; `useMenuEntries` an optional target
+   element. No existing caller changes.
+10. **Paging stops at the end.** React's effect fetching the next page while the
+    table was not full re-ran harmlessly; the same loop in Vue's microtasks hung
+    the page on a short directory, so it is guarded by `hasNextPage`.
+11. **Tests.** The specs pass unedited; only a page object's comment changed.
+    Unit tests pin what react-aria gave the primitives (the rename form, the
+    context menu, the breadcrumbs). The table's keyboard model, drag and drop
+    and rubber band need layout and pointer capture, which jsdom lacks, so the
+    Playwright specs and the probes against the base cover them.
+12. **No changelog entry**: nothing a user can see changed; the PR takes
+    `CI: No changelog needed`.
+
+## Rulings from #172 (the Enso devtools, 2026-10-03)
+
+#172 ports the Enso devtools that `ProtectedLayout.vue` mounted through
+`reactComponent`, and settles whether the React query devtools panel stays.
+Delegated like the rulings above: provisionally accepted, for the maintainer to
+review.
+
+1. **The query devtools panel is dropped, not ported.** The React panel
+   (`@tanstack/react-query-devtools`, behind `showDevtools`, which only
+   `IS_DEV_MODE` ever set) showed the one `QueryClient`, which is Vue's.
+   `vite-plugin-vue-devtools` already shows that client in development builds:
+   `entrypoint.ts` installs vue-query with `enableDevtoolsV6Plugin: true`, and
+   the running dev build registers its "vue-query" plugin with the Vue DevTools
+   (checked in WSL, beside the router's and the widget registry's). One
+   inspector, in the place the rest of the app's state already is, with no new
+   dependency: `@tanstack/vue-query-devtools` is not added. The store's
+   `showDevtools` and the dialogs' `.tsqd-parent-container` exemption went with
+   the panel. `@tanstack/react-query-devtools` itself stays in `package.json`
+   until #94 removes the React packages.
+2. **Everything else is kept** (decision 7): the plan override, the version
+   checker switch, every feature flag, the paywall toggles, the local storage
+   viewer and editor, "Clear cache and reload", and the overrides list with its
+   resets. Same sections, order, texts and classes.
+3. **Where it went: `src/cloud/devtools/`** (decision 6b's list):
+   `EnsoDevtools.vue` (the mount), `DevtoolsPanel.vue` (the button and popover),
+   `EnsoDevStatus.vue` (the overrides list) and `LocalStorageSection.vue`.
+   `devtools` joins `CLOUD_AREAS`. The core reaches it through one more layout
+   contribution, `contributeDevtools` in `$/providers/layoutContributions`;
+   `ProtectedLayout.vue` renders what was contributed, while signed in, as
+   before, and neither layout calls `reactComponent` any more. A build without
+   the cloud has no devtools; the panel is mostly about the cloud (plan,
+   paywall), and its feature flags can still be set through
+   `window.setFeatureFlags`.
+4. **Development builds only, decided at build time.** `registerCloud` calls
+   `registerDevtools()` under `process.env.NODE_ENV === 'development'`, spelled
+   out rather than `IS_DEV_MODE`, so that Vite replaces it with `false` in that
+   module and Rollup drops the call, the import and the lazily loaded chunk.
+   Measured with `corepack pnpm run build` (WSL, develop against the branch): no
+   devtools code in any production chunk (searched for the panel's literal
+   strings and component names), and four chunks fewer. Develop shipped the
+   React query devtools' lazily loaded production bundle and its dependencies
+   though nothing ever rendered them: all JavaScript shrinks by 261 KiB (78 KiB
+   gzip).
+5. **The panel scrolls, as React's did.** react-aria limits a popover to the
+   space the window leaves; Reka's grows with its content, which pushed the
+   panel's top off screen. The panel's popover is capped at Reka's
+   `--reka-popover-content-available-height` and scrolls.
+6. **Small differences, none visible to users** (the panel is never in a
+   production build): an emptied number field no longer writes `NaN` to its flag
+   (a value is written only once the flag's schema accepts it); the feature
+   flags form is no longer nested inside the "Feature Flags" heading's `span`;
+   the popover is named "Enso Devtools"; "Excecution" is spelled right; the edit
+   dialog writes through `setFromUntrustedSource`, so the key's schema checks
+   the value twice.
+7. **Tests:** `cloud/devtools/__tests__/EnsoDevtools.test.ts` opens the panel
+   from the keyboard, closes it with Escape (focus back on the button), and
+   drives each section: a feature flag and its reset in the overrides list, a
+   number flag, the plan override and its reset, the plan section's absence when
+   signed out, the version checker, a paywall toggle against
+   `useIsFeatureUnderPaywall`, "Hide Devtools", "Clear cache and reload", and
+   editing (with a schema error) and deleting a local storage entry.
+   `registerCloud.test.ts` pins that the devtools are contributed in development
+   only, and `ProtectedLayout.test.ts` that they show only while signed in.
+8. **No changelog entry**: a development-only tool, invisible to users; the PR
+   takes `CI: No changelog needed`.
+
 ## Rulings from #88 (billing, plans and the paywall, 2026-10-03)
 
 #88 ports the rest of billing: the Billing & Plans settings tab, the

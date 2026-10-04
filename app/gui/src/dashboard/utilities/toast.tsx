@@ -98,33 +98,15 @@ toast.promise = <T,>(
 ) => {
   const unwrap = (content: PromiseContent) =>
     typeof content === 'object' && content != null && 'render' in content ? content.render : content
-  const id = messages.pending != null ? toast.loading(unwrap(messages.pending), options) : null
-  const settle = (
-    type: 'error' | 'success',
-    content: PromiseContent | undefined,
-    data: unknown,
-  ) => {
-    if (content == null) {
-      if (id != null) toast.dismiss(id)
-      return
-    }
-    // `null` returns what the loading toast changed to the defaults.
-    const outcome: ToastOptions = {
-      ...options,
-      type,
-      isLoading: null,
-      autoClose: null,
-      closeOnClick: null,
-      closeButton: null,
-    }
-    const render = toContent(unwrap(content), data)
-    if (id != null) getToastsStore().update(id, { ...outcome, render })
-    else getToastsStore().show(render, outcome)
-  }
-  const running = typeof promise === 'function' ? promise() : promise
-  running.then(
-    (data) => settle('success', messages.success, data),
-    (error: unknown) => settle('error', messages.error, error),
+  const outcome = (content: PromiseContent | undefined) =>
+    content == null ? undefined : (data: unknown) => toContent(unwrap(content), data)
+  return getToastsStore().promise(
+    typeof promise === 'function' ? promise() : promise,
+    {
+      pending: messages.pending != null ? toContent(unwrap(messages.pending)) : undefined,
+      success: outcome(messages.success),
+      error: outcome(messages.error),
+    },
+    options,
   )
-  return running
 }

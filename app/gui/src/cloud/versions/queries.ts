@@ -2,12 +2,12 @@
  * @file The queries behind the right panel's Versions tab: an asset's versions, and the contents of
  * a project version's `Main.enso`, plus the optimistic tag updates. The Vue port of the React
  * `AssetPanel/components/queries.ts` and of the version-tag hooks in `#/hooks/backendHooks`, with
- * the same query keys and options, so that the cache, its persistence and the invalidations of
- * `INVALIDATION_MAP` behave as before.
+ * the same query keys and options (the shared `backendQueryOptions`, #192), so that the cache, its
+ * persistence and the invalidations of `INVALIDATION_MAP` behave as before.
  */
-import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'
+import { backendQueryKey, backendQueryOptions } from '$/utils/backendQuery'
 import { backendMutationOptions } from '@/composables/backend'
-import { queryOptions, useMutation, useQueryClient } from '@tanstack/vue-query'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type {
   AssetId,
   AssetVersions,
@@ -29,26 +29,12 @@ export function assetVersionsQueryOptions(
   backend: Backend,
   assetId: DatalinkId | FileId | ProjectId,
 ) {
-  return queryOptions({
-    ...backendBaseOptions(backend),
-    queryKey: assetVersionsQueryKey(backend, assetId),
-    queryFn: () => backend.listAssetVersions(assetId),
-    // As React's `backendQueryOptions` sets them for this method.
-    staleTime: 0,
-    meta: { persist: true },
-  })
+  return backendQueryOptions(backend, 'listAssetVersions', [assetId])
 }
 
 /** Options for a query of the organization's version tags, offered as suggestions. */
 export function versionTagsQueryOptions(backend: Backend) {
-  return queryOptions({
-    ...backendBaseOptions(backend),
-    queryKey: backendQueryKey(backend, 'listAssetVersionTags', []),
-    queryFn: () => backend.listAssetVersionTags(),
-    // As React's `backendQueryOptions` sets them for this method.
-    staleTime: 0,
-    meta: { persist: true },
-  })
+  return backendQueryOptions(backend, 'listAssetVersionTags', [])
 }
 
 /** Options for a query of the contents of a project version's `Main.enso`. */

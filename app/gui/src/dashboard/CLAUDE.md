@@ -19,7 +19,16 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `pages/dashboard/UserBar/` is Vue (#83): the user bar, user menu and
   notification tray, mounted by `AppContainer.vue`.
 - `layouts/` — Chromes that wrap multiple pages (protected-route wrappers, split
-  panels).
+  panels). The drive is Vue (#91): `DriveView.vue` (mounted by `LeftPanel.vue`)
+  provides the drive store and its view state and holds `AssetsTable.vue`, the
+  search bar and the context menus; `layouts/Drive/` has its composables
+  (`driveView.ts`, the shown-versus-target location that stands in for React's
+  navigation transition; `driveActions.ts`; `assetItems.ts`; `suggestions.ts`;
+  drag and drop) and `reactModals.tsx`, which opens the React labels, credential
+  and datalink dialogs (#198) through `openReactModal`. The rows, cells, column
+  headings and the drive bar are under `pages/dashboard/`. Buttons inside a row
+  bind `STOP_PRESS_PROPAGATION` (`layouts/Drive/pressPropagation.ts`), as
+  react-aria's `usePress` stopped a press reaching the row.
 - `components/` — Reusable UI atoms/molecules. Sub-folders group related parts
   (`Button/`, `Form/`, `Dialog/`, `Menu/`). The `aria/` folder re-exports
   `react-aria-components` with project-level styling applied. Truly shared UI
@@ -34,20 +43,15 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   window's store, `$/providers/inputBindings`, #170), which Vue menus read too
   (the user menu's shortcuts; `$/composables/menuEntries` is the Vue
   `useMenuEntries`) and the Vue settings page edits; a change re-renders its
-  consumers. `DriveProvider` is the same pattern for the drive: it creates the
-  framework-free `$/providers/driveStore` (selection, clipboard, rename target)
-  and `useDriveState` reads it through `storeHooks`' `useStore`. The category
-  switch's pending state is `isNavigating` on the Vue drive location, which the
-  React drive feeds from its transition (`useDriveNavigationTransition`).
+  consumers.
 - `hooks/` — Custom React hooks.
 - `data/serviceCredentials/` — the React forms for creating service credentials.
   Their framework-free recipes live in `src/cloud/`.
 - `modals/` — The React modals still opened with `setModal` or a
   `Dialog.Trigger`. The drive's simple modals are Vue (#92), opened on the modal
-  stack: `setVueModal(C, props)` (`ModalProvider.tsx`) replaces the open modals
-  as `setModal` does, and `useVueModalTrigger` (`hooks/vueModalHooks.ts`) opens
-  one from a React button that was a `Dialog.Trigger`, keeping the trigger's
-  `aria-expanded`. The duplicate-name dialog, the drag preview and the asset
+  stack (`useModals()`); the Vue drive opens the React ones that are left with
+  `openReactModal` (`ModalProvider.tsx`), which leaves the stack once the dialog
+  closes itself. The duplicate-name dialog, the drag preview and the asset
   summary are in `$/components/Drive/`; the secret dialog in
   `$/cloud/credentials/`; delete confirmations use
   `$/components/AlertDialog/ConfirmDeleteModal.vue`.
@@ -64,9 +68,11 @@ Dashboard-specific Vue code — common UI primitives / utilities should live at
   `tailwindcss-react-aria-components` for matching selectors.
 - **Forms**: `react-hook-form` + `zod` resolvers. Schemas live with the form,
   not in `data/`.
-- **Async/data**: `@tanstack/react-query` throughout. Keys, queries, and
-  mutations should go through the factories in `data/` — don't call `useQuery`
-  with a literal key inside a component.
+- **Async/data**: `@tanstack/react-query` throughout, over the framework-free
+  options in `$/utils/backendQuery`, `$/utils/driveQueries` and
+  `$/utils/driveMutations` (#192), which Vue uses too — don't call `useQuery`
+  with a literal key inside a component, and don't give a key options of its
+  own. The React drive's adapters went with it (#91).
 - **Routing**: `vue-router` (yes, really — the dashboard lives inside a Vue
   shell; React components consume routing via the bridge).
 - **Error boundaries**: wrap new features with `ErrorBoundary` from
@@ -124,10 +130,10 @@ They are:
 Every port PR follows this checklist.
 
 1. **One mount site per PR.** Port a slice, switch the single place that mounts
-   it (a `reactComponent(...)` wrapper, a route, a `reactTabs.ts` entry), and
-   **delete the React file in the same PR**. There are no feature flags and no
-   parallel copies, and the app ships after every PR. If the React file has
-   other importers, it is not ready to delete, so port a smaller slice.
+   it (a `reactComponent(...)` wrapper, a route, a tab entry), and **delete the
+   React file in the same PR**. There are no feature flags and no parallel
+   copies, and the app ships after every PR. If the React file has other
+   importers, it is not ready to delete, so port a smaller slice.
 2. **Keep every `data-testid` and accessible name**, identical: role, label,
    `aria-*`, visible text. The specs must pass **unedited**; only page objects
    (`integration-test/actions/`) may change.

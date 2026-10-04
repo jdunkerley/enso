@@ -1,7 +1,7 @@
 /**
- * @file
- *
- * A hook for copying text to the clipboard.
+ * @file A hook for copying text to the clipboard, for the React copy buttons. The Vue counterpart
+ * is `useCopy` in `$/components/Button/copy`; this one goes with its last React caller (the React
+ * `CopyButton` and `CopyBlock`, and the drive's context menu, #91).
  */
 
 import * as React from 'react'

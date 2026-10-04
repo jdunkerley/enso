@@ -1,11 +1,12 @@
 /**
- * @file Framework-free options for the drive's directory listings, and for reading an asset back
- * from the query cache. Moved out of the React `#/hooks/backendHooks` (#92) so that the Vue
- * modals share them, with the same keys: the React and Vue sides share one `QueryClient`, so both
- * read the same cached listings.
+ * @file Framework-free query options for the drive: its directory listings and searches, and
+ * reading an asset back from the query cache, plus the names the drive gives new assets. Moved out
+ * of the React `#/hooks/backendHooks` (#92, #192), with the same keys: the React and Vue sides
+ * share one `QueryClient`, so both read the same cached listings.
  */
 import type { Category, CategoryType } from '$/providers/category'
-import type { QueryClient, QueryFunctionContext } from '@tanstack/query-core'
+import { backendQueryOptions } from '$/utils/backendQuery'
+import type { QueryClient, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import type { Backend } from 'enso-common/src/services/Backend'
 import * as backendModule from 'enso-common/src/services/Backend'
 import {
@@ -36,7 +37,8 @@ export interface ListDirectoryQueryOptions {
   readonly sortExpression: backendModule.AssetSortExpression | null
   readonly sortDirection: backendModule.AssetSortDirection | null
   /**
-   * In React, `useListDirectoryRefetchInterval` (`#/hooks/backendHooks`) gives the correct value.
+   * {@link listDirectoryRefetchInterval} gives it from the feature flags (in the drive,
+   * `useListDirectoryRefetchInterval`, `#/layouts/Drive/driveActions`).
    * `undefined` is intentionally excluded as this value should be explicitly given.
    */
   readonly refetchInterval: number | null
@@ -164,4 +166,149 @@ export function unsafe_assetFromCacheQueryOptions(options: AssetFromCacheQueryOp
         })
         .filter((asset) => asset != null)[0],
   }
+}
+
+/** Options for {@link searchDirectoryQueryOptions}. */
+export interface SearchDirectoryQueryOptions {
+  readonly backend: Backend
+  readonly parentId: DirectoryId | null
+  readonly query: string | null
+  readonly title: string | null
+  readonly description: string | null
+  readonly type: string | null
+  readonly extension: string | null
+  readonly labels: readonly backendModule.LabelName[] | null
+  readonly sortExpression: backendModule.AssetSortExpression | null
+  readonly sortDirection: backendModule.AssetSortDirection | null
+  readonly infinite?: boolean
+}
+
+/** Build a query options object to search the descendants of a directory. */
+export function searchDirectoryQueryOptions(options: SearchDirectoryQueryOptions) {
+  const { backend, infinite = false, ...rest } = options
+  const queryKey: QueryKey = [backend.type, 'searchDirectory', { ...rest, infinite }]
+  return {
+    // Even though the default stale time is 0, we want to ensure that the query is not cached.
+    staleTime: 0,
+    meta: { persist: false },
+    queryKey,
+    queryFn: (
+      _context: QueryFunctionContext,
+      { from, pageSize }: Pick<backendModule.SearchDirectoryRequestParams, 'from' | 'pageSize'> = {
+        from: null,
+        pageSize: null,
+      },
+    ) => backend.searchDirectory({ ...rest, from, pageSize }),
+  }
+}
+
+/** The refetch interval of the drive's listings: the background refresh's, when it is on. */
+export function listDirectoryRefetchInterval(
+  enableBackgroundRefresh: boolean,
+  backgroundRefreshInterval: number,
+) {
+  return enableBackgroundRefresh ? backgroundRefreshInterval : Infinity
+}
+
+/**
+ * Query options for the children of a directory in a category, as the drive's actions (new folder,
+ * new project, uploads) read them to choose new names.
+ */
+export function categoryListDirectoryQueryOptions(
+  backend: Backend,
+  category: CategoryType,
+  parentId: DirectoryId,
+) {
+  return backendQueryOptions(backend, 'listDirectory', [
+    {
+      parentId,
+      labels: null,
+      filterBy: CATEGORY_TO_FILTER_BY[category],
+      recentProjects: category === 'recent',
+      sortExpression: null,
+      sortDirection: null,
+      from: null,
+      pageSize: null,
+    },
+    '(unknown)',
+  ])
+}
+
+/** The children of a directory in a category, from the cache if they are there. */
+export async function ensureListDirectory(
+  queryClient: QueryClient,
+  backend: Backend,
+  category: CategoryType,
+  parentId: DirectoryId,
+): Promise<readonly AnyAsset[]> {
+  return (
+    await queryClient.ensureQueryData(
+      categoryListDirectoryQueryOptions(backend, category, parentId),
+    )
+  ).assets
+}
+
+/** All the items in a directory of the trash, from the cache if they are there. */
+export async function getAllTrashedItems(
+  queryClient: QueryClient,
+  backend: Backend,
+  parentId: DirectoryId | null,
+): Promise<readonly AnyAsset[]> {
+  return (
+    await queryClient.ensureQueryData(
+      backendQueryOptions(backend, 'listDirectory', [
+        {
+          parentId,
+          labels: null,
+          filterBy: FilterBy.trashed,
+          recentProjects: false,
+          from: null,
+          pageSize: null,
+          sortExpression: null,
+          sortDirection: null,
+        },
+        '(unknown)',
+      ]),
+    )
+  ).assets
+}
+
+/** The title of a new folder among the given siblings: "New Folder N", N one above the highest. */
+export function newFolderTitle(siblings: readonly AnyAsset[]) {
+  const directoryIndices = siblings
+    .filter(backendModule.assetIsDirectory)
+    .map((item) => /^New Folder (?<directoryIndex>\d+)$/.exec(item.title))
+    .map((match) => match?.groups?.directoryIndex)
+    .map((maybeIndex) => (maybeIndex != null ? parseInt(maybeIndex, 10) : 0))
+  return `New Folder ${Math.max(0, ...directoryIndices) + 1}`
+}
+
+/**
+ * The name of a new project among the given siblings: "<template or New Project> N", N one above
+ * the highest.
+ */
+export function newProjectName(
+  siblings: readonly AnyAsset[],
+  templateName: string | null | undefined,
+) {
+  const prefix = `${templateName ?? 'New Project'} `
+  const projectNameTemplate = new RegExp(`^${prefix}(?<projectIndex>\\d+)$`)
+  const projectIndices = siblings
+    .filter(backendModule.assetIsProject)
+    .map((item) => projectNameTemplate.exec(item.title)?.groups?.projectIndex)
+    .map((maybeIndex) => (maybeIndex != null ? parseInt(maybeIndex, 10) : 0))
+  return `${prefix}${Math.max(0, ...projectIndices) + 1}`
+}
+
+/** The variables of the `updateAsset` mutation that renames an asset. */
+export function renameAssetVariables(
+  assetId: AssetId,
+  newTitle: string,
+  metadataId?: backendModule.MetadataId,
+): Parameters<Backend['updateAsset']> {
+  return [
+    assetId,
+    { title: newTitle, parentDirectoryId: null, description: null, metadataId: metadataId ?? null },
+    assetId,
+  ]
 }

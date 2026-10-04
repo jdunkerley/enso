@@ -25,7 +25,7 @@ One folder per primitive, holding its SFCs, its `variants.ts` and its
 | `ModalHost/`        | `ModalHost`, rendering the modal stack `$/providers/modals`                                     |
 | `AboutModal/`       | `AboutModal` (one, in `App.vue`), opened by `openAboutModal()`                                  |
 | `KeyboardShortcut/` | `KeyboardShortcut` (a shortcut string drawn as modifier icons and keys)                         |
-| `MenuEntry/`        | `MenuEntry` (a button entry of a popover menu: the user and info menus)                         |
+| `MenuEntry/`        | `MenuEntry` (a button entry of a popover menu: the user and info menus, the drive's menus)      |
 | `ProfilePicture/`   | `ProfilePicture` (a user's or organization's picture, or the default user icon)                 |
 | `InfoBar/`          | `InfoBar`, `InfoMenu`: the logo and info menu of the pages outside the dashboard (#83)          |
 | `Link/`             | `Link` (a coloured link with an icon); `useClientNavigation` (`clientNavigation.ts`)            |
@@ -42,7 +42,17 @@ From the drive's modals (#92): `Drive/` holds `AssetIcon`, `AssetSummary`,
 (`duplicateAssets.ts`). They are shared code, not `src/dashboard/`, so that
 callers outside the React dashboard (#192's drive mutations) can open them; the
 directory listings they read come from `$/utils/driveQueries`, with the React
-drive's query keys.
+drive's query keys. From #192, `Drive/` also holds `CopyInsteadModal` (the "copy
+instead?" question when assets cannot be moved or restored between categories),
+asked with `askToCopyInstead` (`copyInstead.ts`).
+
+From the drive's table (#91): `EditableSpan/` (a text that becomes a one-field
+rename form: Enter submits, Escape or a press outside cancels),
+`SelectionBrush/` (the table's rubber-band selection, in page coordinates; not
+the graph editor's brush) and, on `Breadcrumbs/`, the drive bar's needs
+(`isLoading`, `onPress`, `onDragDelay`, and a focusable `role="link"` container
+that Enter presses). `$/composables/dragDelay` (an action after a drag hovers
+for two seconds) and `$/composables/focusRing` came with them.
 
 Forms and inputs are #79's.
 

@@ -55,7 +55,7 @@ public class WebSocketServerTest extends ExecutorSetup {
     var code =
         """
         const onconnect = (ws, url) => {
-            res.set(0, ws.readyState === WebSocket.CONNECTING);
+            res.set(0, ws.readyState === WebSocket.OPEN);
             res.set(1, url.pathname);
             res.set(2, url.searchParams.toString());
             lock.release();
