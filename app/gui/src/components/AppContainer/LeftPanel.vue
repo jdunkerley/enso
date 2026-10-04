@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import DriveView from '#/layouts/DriveView.vue'
 import HelpBar from '$/components/AppContainer/HelpBar.vue'
-import { Drive } from '$/components/AppContainer/reactTabs'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { categoryKey, useCategories } from '$/providers/category'
@@ -19,8 +19,7 @@ import SvgIcon from '@/components/SvgIcon.vue'
 import { useResizeObserver } from '@/composables/events'
 import { registerHandlers, type DisplayableActionName } from '@/providers/action'
 import { Path } from 'enso-common/src/services/Backend'
-import React from 'react'
-import { computed, ref, toRef, toRefs, useTemplateRef } from 'vue'
+import { computed, ref, shallowRef, toRef, toRefs, useTemplateRef } from 'vue'
 import CategoryButton from './CategoryButton.vue'
 import PanelContents from './PanelContents.vue'
 
@@ -50,7 +49,7 @@ const {
 } = toRefs(containerData)
 const currentCategory = toRef(useDriveLocation(), 'currentCategory')
 const fullscreen = ref(false)
-const driveToolbarReact: React.MutableRefObject<HTMLElement | null> = { current: null }
+const driveToolbar = shallowRef<HTMLElement | null>(null)
 
 const cloudDisabledReason = computed(() => {
   if (!isOnline.value) {
@@ -161,9 +160,9 @@ registerHandlers({
           <HelpBar />
           <PanelContents
             v-model:fullscreen="fullscreen"
-            @update:toolbarElement="driveToolbarReact.current = $event"
+            @update:toolbarElement="driveToolbar = $event"
           >
-            <Drive :toolbar="driveToolbarReact" />
+            <DriveView :toolbar="driveToolbar" />
           </PanelContents>
           <ResizeHandles v-if="middlePanelShown" right v-on="resizeHandles.events" />
         </div>
