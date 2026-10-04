@@ -69,6 +69,11 @@ community build without the cloud can leave it out (decision 6b of
     `PlanDowngradedModal.vue` and their `downgradeModalState.ts`) and
     `browserDisabled/` (the page shown when running projects in the browser is
     disabled, and its route).
+  - `devtools/` (#172): the Enso devtools (the floating Enso button and its
+    panel: plan override, version checker, feature flags, paywall toggles, local
+    storage editor) and the list of active overrides, contributed with
+    `contributeDevtools` in development builds only (`registerCloud` checks
+    `process.env.NODE_ENV`, so a production build carries none of it).
 - `index.ts`: `registerCloud(router)`, the one entry point.
 
 ## Rules

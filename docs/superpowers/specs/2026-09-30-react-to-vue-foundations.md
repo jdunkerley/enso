@@ -2263,3 +2263,69 @@ accepted, for the maintainer to review.
     Playwright specs and the probes against the base cover them.
 12. **No changelog entry**: nothing a user can see changed; the PR takes
     `CI: No changelog needed`.
+
+## Rulings from #172 (the Enso devtools, 2026-10-03)
+
+#172 ports the Enso devtools that `ProtectedLayout.vue` mounted through
+`reactComponent`, and settles whether the React query devtools panel stays.
+Delegated like the rulings above: provisionally accepted, for the maintainer to
+review.
+
+1. **The query devtools panel is dropped, not ported.** The React panel
+   (`@tanstack/react-query-devtools`, behind `showDevtools`, which only
+   `IS_DEV_MODE` ever set) showed the one `QueryClient`, which is Vue's.
+   `vite-plugin-vue-devtools` already shows that client in development builds:
+   `entrypoint.ts` installs vue-query with `enableDevtoolsV6Plugin: true`, and
+   the running dev build registers its "vue-query" plugin with the Vue DevTools
+   (checked in WSL, beside the router's and the widget registry's). One
+   inspector, in the place the rest of the app's state already is, with no new
+   dependency: `@tanstack/vue-query-devtools` is not added. The store's
+   `showDevtools` and the dialogs' `.tsqd-parent-container` exemption went with
+   the panel. `@tanstack/react-query-devtools` itself stays in `package.json`
+   until #94 removes the React packages.
+2. **Everything else is kept** (decision 7): the plan override, the version
+   checker switch, every feature flag, the paywall toggles, the local storage
+   viewer and editor, "Clear cache and reload", and the overrides list with its
+   resets. Same sections, order, texts and classes.
+3. **Where it went: `src/cloud/devtools/`** (decision 6b's list):
+   `EnsoDevtools.vue` (the mount), `DevtoolsPanel.vue` (the button and popover),
+   `EnsoDevStatus.vue` (the overrides list) and `LocalStorageSection.vue`.
+   `devtools` joins `CLOUD_AREAS`. The core reaches it through one more layout
+   contribution, `contributeDevtools` in `$/providers/layoutContributions`;
+   `ProtectedLayout.vue` renders what was contributed, while signed in, as
+   before, and neither layout calls `reactComponent` any more. A build without
+   the cloud has no devtools; the panel is mostly about the cloud (plan,
+   paywall), and its feature flags can still be set through
+   `window.setFeatureFlags`.
+4. **Development builds only, decided at build time.** `registerCloud` calls
+   `registerDevtools()` under `process.env.NODE_ENV === 'development'`, spelled
+   out rather than `IS_DEV_MODE`, so that Vite replaces it with `false` in that
+   module and Rollup drops the call, the import and the lazily loaded chunk.
+   Measured with `corepack pnpm run build` (WSL, develop against the branch): no
+   devtools code in any production chunk (searched for the panel's literal
+   strings and component names), and four chunks fewer. Develop shipped the
+   React query devtools' lazily loaded production bundle and its dependencies
+   though nothing ever rendered them: all JavaScript shrinks by 261 KiB (78 KiB
+   gzip).
+5. **The panel scrolls, as React's did.** react-aria limits a popover to the
+   space the window leaves; Reka's grows with its content, which pushed the
+   panel's top off screen. The panel's popover is capped at Reka's
+   `--reka-popover-content-available-height` and scrolls.
+6. **Small differences, none visible to users** (the panel is never in a
+   production build): an emptied number field no longer writes `NaN` to its flag
+   (a value is written only once the flag's schema accepts it); the feature
+   flags form is no longer nested inside the "Feature Flags" heading's `span`;
+   the popover is named "Enso Devtools"; "Excecution" is spelled right; the edit
+   dialog writes through `setFromUntrustedSource`, so the key's schema checks
+   the value twice.
+7. **Tests:** `cloud/devtools/__tests__/EnsoDevtools.test.ts` opens the panel
+   from the keyboard, closes it with Escape (focus back on the button), and
+   drives each section: a feature flag and its reset in the overrides list, a
+   number flag, the plan override and its reset, the plan section's absence when
+   signed out, the version checker, a paywall toggle against
+   `useIsFeatureUnderPaywall`, "Hide Devtools", "Clear cache and reload", and
+   editing (with a schema error) and deleting a local storage entry.
+   `registerCloud.test.ts` pins that the devtools are contributed in development
+   only, and `ProtectedLayout.test.ts` that they show only while signed in.
+8. **No changelog entry**: a development-only tool, invisible to users; the PR
+   takes `CI: No changelog needed`.

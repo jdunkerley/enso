@@ -3,10 +3,12 @@
  * page stays hidden behind the dialog until both agreements are given. The gate is the cloud's,
  * reached through `$/providers/layoutContributions`; here a stand-in is contributed, so that only
  * the layout's own rules are under test (`$/cloud/agreements/` has the dialog's and the state's).
+ * Also where the contributed developer tools show (#172).
  */
 import ProtectedLayout, { dataLoader } from '$/components/ProtectedLayout.vue'
 import {
   contributeAgreementsGate,
+  contributeDevtools,
   loadAgreementsGate,
   resetLayoutContributions,
   type UserAgreements,
@@ -31,9 +33,7 @@ vi.mock('$/providers/auth', async () => {
   const store = reactive(auth)
   return { useAuth: () => store }
 })
-// The React devtools and the session overlays are not under test.
-vi.mock('$/utils/react', () => ({ reactComponent: () => ({ render: () => null }) }))
-vi.mock('#/components/Devtools', () => ({ EnsoDevtools: {}, ReactQueryDevtools: {} }))
+// The session overlays are not under test.
 vi.mock('$/components/SessionOverlays.vue', () => ({
   __esModule: true,
   default: { render: () => null },
@@ -182,5 +182,41 @@ describe('while the gate is shown', () => {
     await mount(undefined)
     expect(shown('gate')).toBe(false)
     expect(shown('page')).toBe(true)
+  })
+})
+
+describe('the developer tools', () => {
+  async function mount() {
+    const queryClient = createTestQueryClient()
+    // Called when signed out; the app's client has it (`$/utils/queryClient`).
+    Object.defineProperty(queryClient, 'nukePersister', { value: async () => {} })
+    return mountWithProviders(ProtectedLayout, {
+      queryClient,
+      props: { agreementsModalProps: undefined },
+      routes: [{ path: '/', meta: { access: 'anyLoggedIn' }, component: Page }],
+    })
+  }
+  const Devtools: Component = { render: () => h('div', { 'data-testid': 'devtools' }) }
+  const shown = () => document.querySelector('[data-testid="devtools"]') != null
+
+  test('show over the page once contributed, while signed in', async () => {
+    contributeDevtools(async () => Devtools)
+    await mount()
+    await vi.waitFor(() => expect(shown()).toBe(true))
+    expect(document.querySelector('[data-testid="page"]')).not.toBeNull()
+  })
+
+  test('do not show while signed out', async () => {
+    contributeDevtools(async () => Devtools)
+    auth.session = null
+    await mount()
+    await flushPromises()
+    expect(shown()).toBe(false)
+  })
+
+  test('do not show when nothing contributed them (a production build)', async () => {
+    await mount()
+    await flushPromises()
+    expect(shown()).toBe(false)
   })
 })

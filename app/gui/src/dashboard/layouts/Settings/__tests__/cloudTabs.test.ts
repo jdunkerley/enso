@@ -168,11 +168,9 @@ beforeEach(() => {
   remote.createUserGroup.mockResolvedValue({ ...GROUP, id: UserGroupId('usergroup-2') })
   remote.deleteUserGroup.mockResolvedValue(undefined)
   remote.changeUserGroup.mockResolvedValue(undefined)
-  // As in React, the log asks for the next page while it does not fill its view, which in jsdom
-  // (no layout) is always: the second page never answers, so that the tests see one request.
-  remote.getLogEvents.mockImplementation(({ from }: { from: number }) =>
-    from === 0 ? Promise.resolve([]) : new Promise(() => {}),
-  )
+  // The log asks for the next page while it does not fill its view, which in jsdom (no layout) is
+  // always — but only while there is one: a short page is the end of the log (#196).
+  remote.getLogEvents.mockResolvedValue([])
   remote.listApiKeys.mockResolvedValue([API_KEY])
   remote.deleteApiKey.mockResolvedValue(undefined)
   remote.listExecutionsSummary.mockResolvedValue([])
@@ -350,10 +348,13 @@ describe('Activity log tab', () => {
 
   test('lists the events, and sorts them by user', async () => {
     remote.getLogEvents.mockImplementation(({ from }: { from: number }) =>
-      from === 0 ? Promise.resolve(EVENTS) : new Promise(() => {}),
+      Promise.resolve(from === 0 ? EVENTS : []),
     )
     await mountTab(ACTIVITY_LOG_SETTINGS_SECTIONS)
     await vi.waitFor(() => expect(rowTexts()).toHaveLength(2))
+    await flushPromises()
+    // The one short page is the whole log, although it does not fill the view (#196).
+    expect(remote.getLogEvents).toHaveBeenCalledOnce()
     expect(remote.getLogEvents).toHaveBeenCalledWith(expect.objectContaining({ from: 0 }))
     expect(rowTexts()[0]).toContain('member name')
     const sortByUser = required(buttonIn(document, getText('sortByEmail')))

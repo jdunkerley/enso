@@ -270,7 +270,8 @@ final class WebSocket implements ProxyExecutable {
     private final Value handlePong;
     private final Value handleUpgrade;
 
-    private WsSession session;
+    // Written by Helidon's thread in `onOpen`, read by the executor's.
+    private volatile WsSession session;
     private final List<byte[]> fragments = new ArrayList<>();
 
     private WebSocketConnection(

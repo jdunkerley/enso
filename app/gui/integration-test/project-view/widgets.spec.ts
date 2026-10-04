@@ -853,7 +853,7 @@ test('Manage aggregates in `aggregate` node', async ({ editorPage, page }) => {
   })
 
   // Hide drive panel to not obscure long node.
-  page.locator('.LeftPanel').getByRole('button', { name: 'Close Panel' }).click()
+  await page.locator('.LeftPanel').getByRole('button', { name: 'Close Panel' }).click()
 
   await editorPage
     // Check initially visible arguments
