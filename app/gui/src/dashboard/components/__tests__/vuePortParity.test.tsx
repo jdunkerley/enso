@@ -19,12 +19,14 @@ import MenuEntry from '#/components/MenuEntry'
 import { ProfilePicture } from '#/components/ProfilePicture'
 import { Result } from '#/components/Result'
 import { Text } from '#/components/Text'
+import AssetIcon from '#/pages/dashboard/components/AssetIcon'
 import KeyboardShortcut from '#/pages/dashboard/components/KeyboardShortcut'
 import AlertVue from '$/components/Alert/Alert.vue'
 import BadgeVue from '$/components/Badge/Badge.vue'
 import ButtonVue from '$/components/Button/Button.vue'
 import DialogVue from '$/components/Dialog/Dialog.vue'
 import { DIALOG_MOTION } from '$/components/Dialog/variants'
+import AssetIconVue from '$/components/Drive/AssetIcon.vue'
 import KeyboardShortcutVue from '$/components/KeyboardShortcut/KeyboardShortcut.vue'
 import MenuEntryVue from '$/components/MenuEntry/MenuEntry.vue'
 import ProfilePictureVue from '$/components/ProfilePicture/ProfilePicture.vue'
@@ -35,6 +37,7 @@ import { TextContext } from '$/providers/react'
 import { useText } from '$/providers/text'
 import { act, render } from '@testing-library/react'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { AssetType } from 'enso-common/src/services/Backend'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h, type VNodeChild } from 'vue'
 
@@ -272,5 +275,26 @@ describe('the user bar parts render as the React ones (#83)', () => {
     const labelStyle = (root: HTMLElement) =>
       root.querySelector('button div div')?.getAttribute('style') ?? null
     expect(labelStyle(vue)).toBe(labelStyle(byTestId('react')))
+  })
+})
+
+describe('the drive parts render as the React ones (#92)', () => {
+  test.each([
+    { type: AssetType.directory, title: 'Folder' },
+    { type: AssetType.project, title: 'Project' },
+    { type: AssetType.file, title: 'data.csv' },
+    { type: AssetType.file, title: 'picture.png' },
+    { type: AssetType.datalink, title: 'Link' },
+    { type: AssetType.secret, title: 'Secret' },
+  ] as const)('AssetIcon %o', (asset) => {
+    render(
+      <div data-testid="react">
+        <AssetIcon asset={asset} />
+      </div>,
+    )
+    mountVue(() => h('div', { 'data-testid': 'vue' }, [h(AssetIconVue, { asset })]))
+    expect(shape(byTestId('vue'))).toEqual(shape(byTestId('react')))
+    const icon = (root: HTMLElement) => root.querySelector('use')?.getAttribute('data-icon')
+    expect(icon(byTestId('vue'))).toBe(icon(byTestId('react')))
   })
 })

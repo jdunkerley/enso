@@ -12,6 +12,7 @@ import { getModalsStore, type Resolution } from '$/providers/modals'
 import { reactComponent } from '$/utils/react'
 import { isValidElement, type JSX } from 'react'
 import type { Component } from 'vue'
+import type { ComponentProps } from 'vue-component-type-helpers'
 
 /** The type of a modal. */
 export type Modal = JSX.Element
@@ -44,6 +45,16 @@ export function setModal(modal: ModalOrCallback) {
   const modals = getModalsStore()
   modals.closeAll()
   if (next != null) modals.open(getReactModalEntry(), { modal: next })
+}
+
+/**
+ * Replace every open modal with a Vue modal, as {@link setModal} does with a React one. Unlike a
+ * {@link setModal} entry, it leaves the stack once it has closed (it emits `close`).
+ */
+export function setVueModal<C extends Component>(component: C, props: ComponentProps<C>) {
+  const modals = getModalsStore()
+  modals.closeAll()
+  return modals.open(component, props)
 }
 
 /**

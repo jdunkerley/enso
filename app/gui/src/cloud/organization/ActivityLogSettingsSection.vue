@@ -141,19 +141,22 @@ const isFetching = computed(() => logsPages.isLoading.value || logsPages.isFetch
 const scroller = ref<InstanceType<typeof Scroller>>()
 const scrollerContent = computed(() => scroller.value?.content)
 
-/** Load the next page once the list is scrolled to its end, or when it does not fill the view. */
+/**
+ * Load the next page once the list is scrolled to its end, or when it does not fill the view —
+ * if there is one, and no request is already on its way. A log that ends before filling the view
+ * stays "at its end", so without the `hasNextPage` check this would ask again for every page that
+ * comes back, empty or not (#196).
+ */
 function fetchNextPageAtEnd() {
   const element = scrollerContent.value
-  if (element == null) return
+  if (element == null || !logsPages.hasNextPage.value || logsPages.isFetching.value) return
   if (element.scrollTop + element.clientHeight >= element.scrollHeight) {
     void logsPages.fetchNextPage()
   }
 }
 
 watch(() => logsPages.data.value?.pages, fetchNextPageAtEnd, { flush: 'post' })
-useEventListener(scrollerContent, 'scroll', () => {
-  if (!isFetching.value) fetchNextPageAtEnd()
-})
+useEventListener(scrollerContent, 'scroll', fetchNextPageAtEnd)
 
 const sortedLogs = computed(() => {
   const filteredLogs = logs.value?.filter((log) => {

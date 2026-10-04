@@ -5,10 +5,10 @@ import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { defineMenuEntries } from '#/hooks/menuHooks'
 import { CreateCredentialModal } from '#/modals/CreateCredentialModal'
 import UpsertDatalinkModal from '#/modals/UpsertDatalinkModal'
-import UpsertSecretModal from '#/modals/UpsertSecretModal'
 import { useDriveState } from '#/providers/DriveProvider'
-import { setModal } from '#/providers/ModalProvider'
+import { setModal, setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
 import type { CategoryType } from '$/providers/category'
 import type { Backend } from 'enso-common/src/services/Backend'
 import { BackendType, type DirectoryId } from 'enso-common/src/services/Backend'
@@ -71,15 +71,11 @@ export function useGlobalContextMenuEntries(options: GlobalContextMenuEntriesOpt
     isCloud && {
       action: 'newSecret',
       doAction: () => {
-        setModal(
-          <UpsertSecretModal
-            doCreate={async (name, value) => {
-              await newSecret([
-                { name, value, parentDirectoryId: directoryId ?? currentDirectoryId },
-              ])
-            }}
-          />,
-        )
+        setVueModal(UpsertSecretModal, {
+          onCreate: async (name: string, value: string) => {
+            await newSecret([{ name, value, parentDirectoryId: directoryId ?? currentDirectoryId }])
+          },
+        })
       },
     },
     isCloud && {

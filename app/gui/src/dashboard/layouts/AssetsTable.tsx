@@ -12,7 +12,6 @@ import { useAutoScroll } from '#/hooks/autoScrollHooks'
 import {
   backendMutationOptions,
   backendQueryOptions,
-  listDirectoryQueryOptions,
   searchDirectoryQueryOptions,
   useListDirectoryRefetchInterval,
 } from '#/hooks/backendHooks'
@@ -27,9 +26,6 @@ import { useSetSuggestions } from '#/layouts/AssetSearchBar'
 import { AssetsTableCombinedContextMenu } from '#/layouts/AssetsTableCombinedContextMenu'
 import { useAssetsTableItems } from '#/layouts/Drive/assetsTableItemsHooks'
 import { useDirectoryIds } from '#/layouts/Drive/directoryIdsHooks'
-import DragModal from '#/modals/DragModal'
-import UpsertSecretModal from '#/modals/UpsertSecretModal'
-import AssetIcon from '#/pages/dashboard/components/AssetIcon'
 import type { AssetRowInnerProps } from '#/pages/dashboard/components/AssetRow'
 import { AssetRow } from '#/pages/dashboard/components/AssetRow'
 import {
@@ -52,10 +48,12 @@ import {
   useSetVisuallySelectedKeys,
 } from '#/providers/DriveProvider'
 import { useInputBindings } from '#/providers/InputBindingsProvider'
-import { setModal, unsetModal } from '#/providers/ModalProvider'
+import { setVueModal, unsetModal } from '#/providers/ModalProvider'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/utilities/drag'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
 import { toast } from '#/utilities/toast'
+import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
+import DragModal from '$/components/Drive/DragModal.vue'
 import { categoryKey, type Category } from '$/providers/category'
 import type { SelectedAssetInfo } from '$/providers/driveStore'
 import { useCategories, useFullUserSession, useLocalStorage, useText } from '$/providers/react'
@@ -71,6 +69,7 @@ import { useFeatureFlag } from '$/providers/react/featureFlags'
 import AssetQuery from '$/utils/AssetQuery'
 import type { AssetsDataTransferPayload } from '$/utils/assetsDataTransfer'
 import { withPresence } from '$/utils/data/set'
+import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { isElementTextInput, isTextInputEvent } from '$/utils/event'
 import { DEFAULT_HANDLER } from '$/utils/inputBindings'
 import LocalStorage from '$/utils/LocalStorage'
@@ -669,19 +668,17 @@ function AssetsTable(props: AssetsTableProps) {
                   event.preventDefault()
                   event.stopPropagation()
                   const id = item.id
-                  setModal(
-                    <UpsertSecretModal
-                      secretId={item.id}
-                      name={item.title}
-                      doCreate={async (title, value) => {
-                        try {
-                          await updateSecretMutation([id, { title, value }, item.title])
-                        } catch (error) {
-                          toastAndLog(null, error)
-                        }
-                      }}
-                    />,
-                  )
+                  setVueModal(UpsertSecretModal, {
+                    secretId: item.id,
+                    name: item.title,
+                    onCreate: async (title: string, value: string) => {
+                      try {
+                        await updateSecretMutation([id, { title, value }, item.title])
+                      } catch (error) {
+                        toastAndLog(null, error)
+                      }
+                    },
+                  })
                 }
                 break
               }
@@ -1061,22 +1058,14 @@ function AssetsTable(props: AssetsTableProps) {
       )
       setDragImageToBlank(event)
       ASSET_ROWS.bind(event, payload)
-      setModal(
-        <DragModal
-          event={event}
-          className="flex flex-col rounded-default bg-selected-frame backdrop-blur-default"
-          onDragEnd={() => {
-            ASSET_ROWS.unbind(payload)
-          }}
-        >
-          {nodes.map((otherAsset) => (
-            <div key={otherAsset.id} className="flex h-[34px] items-center gap-2 px-2">
-              <AssetIcon asset={otherAsset} />
-              <Text>{otherAsset.title}</Text>
-            </div>
-          ))}
-        </DragModal>,
-      )
+      setVueModal(DragModal, {
+        assets: nodes,
+        pageX: event.pageX,
+        pageY: event.pageY,
+        onDragEnd: () => {
+          ASSET_ROWS.unbind(payload)
+        },
+      })
     },
   )
 

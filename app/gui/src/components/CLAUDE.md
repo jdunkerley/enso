@@ -36,6 +36,14 @@ itself; the copy toast is `Button/copy.ts`'s `useCopy`, shared with
 `CopyButton`), `KeyboardShortcut/`, `ProfilePicture/` and `QrCode/` (drawn as
 `qrcode.react` drew it, with `uqr`'s port of the same encoder).
 
+From the drive's modals (#92): `Drive/` holds `AssetIcon`, `AssetSummary`,
+`DragModal` (the preview following a drag of assets) and `DuplicateAssetsModal`
+(the duplicate-name dialog), opened with `resolveDuplications`
+(`duplicateAssets.ts`). They are shared code, not `src/dashboard/`, so that
+callers outside the React dashboard (#192's drive mutations) can open them; the
+directory listings they read come from `$/utils/driveQueries`, with the React
+drive's query keys.
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:
