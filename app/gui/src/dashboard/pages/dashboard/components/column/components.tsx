@@ -1,12 +1,12 @@
 /** @file Components for column cells. */
 import { Button } from '#/components/Button'
-import { Dialog, Popover } from '#/components/Dialog'
+import { Popover } from '#/components/Dialog'
 import { Text } from '#/components/Text'
 import { backendMutationOptions } from '#/hooks/backendHooks'
 import { useEventCallback } from '#/hooks/eventCallbackHooks'
 import { useMeasureCallback } from '#/hooks/measureHooks'
 import { useToastAndLog } from '#/hooks/toastAndLogHooks'
-import ManageLabelsModal from '#/modals/ManageLabelsModal'
+import { useVueModalTrigger } from '#/hooks/vueModalHooks'
 import type { AssetColumnProps, AssetNameColumnProps } from '#/pages/dashboard/components/column'
 import DatalinkNameColumn from '#/pages/dashboard/components/column/DatalinkNameColumn'
 import DirectoryNameColumn from '#/pages/dashboard/components/column/DirectoryNameColumn'
@@ -19,6 +19,7 @@ import { useSelectedAssets } from '#/providers/DriveProvider'
 import { unsetModal } from '#/providers/ModalProvider'
 import { mergeRefs } from '#/utilities/mergeRefs'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
 import { useText } from '$/providers/react'
 import { useDriveCurrentBackend } from '$/providers/react/container'
 import {
@@ -63,6 +64,9 @@ export function LabelsColumn(props: AssetColumnProps) {
   })
 
   const associateTag = useMutationCallback(backendMutationOptions(backend, 'associateTag'))
+  // The edit buttons were `Dialog.Trigger`s of the labels popover, anchored to the button.
+  const manageLabelsTrigger = useVueModalTrigger()
+  const manageLabelsInPopoverTrigger = useVueModalTrigger()
 
   const doDelete = useEventCallback(async (label: string) => {
     unsetModal()
@@ -120,30 +124,40 @@ export function LabelsColumn(props: AssetColumnProps) {
               <div className="flex flex-wrap items-center gap-1">
                 {labelsList}
 
-                <Dialog.Trigger>
-                  <Button
-                    variant="icon"
-                    tooltip={getText('manageLabels')}
-                    tooltipPlacement="top"
-                    icon="edit"
-                  />
-                  <ManageLabelsModal backend={backend} items={labelsItems} />
-                </Dialog.Trigger>
+                <Button
+                  variant="icon"
+                  tooltip={getText('manageLabels')}
+                  tooltipPlacement="top"
+                  icon="edit"
+                  {...manageLabelsInPopoverTrigger.triggerProps}
+                  onPress={(event) => {
+                    manageLabelsInPopoverTrigger.open(ManageLabelsModal, {
+                      backend,
+                      items: labelsItems,
+                      anchor: event.target,
+                    })
+                  }}
+                />
               </div>
             </Popover>
           </Popover.Trigger>
         )}
 
-        <Dialog.Trigger>
-          <Button
-            variant="icon"
-            showIconOnHover
-            tooltip={getText('manageLabels')}
-            tooltipPlacement="top"
-            icon="edit"
-          />
-          <ManageLabelsModal backend={backend} items={labelsItems} />
-        </Dialog.Trigger>
+        <Button
+          variant="icon"
+          showIconOnHover
+          tooltip={getText('manageLabels')}
+          tooltipPlacement="top"
+          icon="edit"
+          {...manageLabelsTrigger.triggerProps}
+          onPress={(event) => {
+            manageLabelsTrigger.open(ManageLabelsModal, {
+              backend,
+              items: labelsItems,
+              anchor: event.target,
+            })
+          }}
+        />
       </div>
     </div>
   )

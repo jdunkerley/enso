@@ -18,11 +18,11 @@ import { useLocalStorageState } from '#/hooks/localStoreState'
 import { defineMenuEntry, useMenuEntries } from '#/hooks/menuHooks'
 import { useGetAsset } from '#/layouts/Drive/assetsTableItemsHooks'
 import { useGlobalContextMenuEntries } from '#/layouts/useGlobalContextMenuEntries'
-import ManageLabelsModal from '#/modals/ManageLabelsModal'
 import { useExportArchive } from '#/pages/useExportArchive'
 import { useDriveStore, usePasteData } from '#/providers/DriveProvider'
-import { setModal, setVueModal } from '#/providers/ModalProvider'
+import { setVueModal } from '#/providers/ModalProvider'
 import { useMutationCallback } from '#/utilities/tanstackQuery'
+import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { isCloudCategory } from '$/providers/category'
 import type { Tab } from '$/providers/container'
@@ -301,9 +301,15 @@ export const AssetContextMenu = React.forwardRef(function AssetContextMenuImpl(
         isCloud && {
           action: 'label',
           doAction: () => {
-            setModal(
-              <ManageLabelsModal backend={backend} items={[asset]} triggerRef={triggerRef} />,
-            )
+            // No anchor: React's popover was anchored to the row through `triggerRef`, which is
+            // cleared as the menu closes, so it sat at the window's top-left corner. Kept (#198).
+            // Focus returns to the row, as React's focus scope returned it.
+            setVueModal(ManageLabelsModal, {
+              backend,
+              items: [asset],
+              anchor: null,
+              opener: triggerRef.current,
+            })
           },
         },
         isUploadableAsset(asset) &&
