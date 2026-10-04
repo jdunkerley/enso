@@ -23,7 +23,8 @@ import {
   TooltipRoot,
   TooltipTrigger,
 } from 'reka-ui'
-import { computed, useSlots } from 'vue'
+import { hasNonKeyboardFocus } from '$/utils/inputModality'
+import { computed, ref, useSlots } from 'vue'
 
 const {
   tooltip,
@@ -55,6 +56,20 @@ const {
 
 const open = defineModel<boolean>('open', { default: false })
 
+const trigger = ref<InstanceType<typeof TooltipTrigger>>()
+const isPointerOver = ref(false)
+
+/**
+ * Open on focus only when the keyboard put the focus there, as react-aria's `useTooltipTrigger`
+ * does: a focus that a closing dialog returns to its trigger after a click shows no tooltip.
+ */
+function onOpenChange(value: boolean) {
+  const element: unknown = trigger.value?.$el
+  if (value && !isPointerOver.value && element instanceof Element && hasNonKeyboardFocus(element))
+    return
+  open.value = value
+}
+
 const slots = useSlots()
 const hasTooltip = computed(() => tooltip != null || slots.tooltip != null)
 const sideAlign = computed(() => placementToSideAlign(placement))
@@ -71,8 +86,13 @@ const CONTAINER_PADDING = 6
   <TooltipProvider v-if="hasTooltip" :delayDuration="delay" :skipDelayDuration="closeDelay">
     <!-- Disabled rather than unwrapped, so that toggling it does not remount the trigger (and drop
     its focus), e.g. a `Button` that disables itself while its action runs. -->
-    <TooltipRoot v-model:open="open" :disabled="isDisabled">
-      <TooltipTrigger asChild>
+    <TooltipRoot :open="open" :disabled="isDisabled" @update:open="onOpenChange">
+      <TooltipTrigger
+        ref="trigger"
+        asChild
+        @pointerenter="isPointerOver = true"
+        @pointerleave="isPointerOver = false"
+      >
         <slot />
       </TooltipTrigger>
       <TooltipPortal :to="portalTarget()">

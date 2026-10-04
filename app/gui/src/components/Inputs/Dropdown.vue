@@ -160,12 +160,13 @@ function onFocusOut(event: FocusEvent) {
         <!-- Spacing. -->
         <div :class="styles.input()">&nbsp;</div>
         <div :class="styles.optionsContainer()">
-          <!-- The grid row's item: `min-h-0` lets the closed row collapse, as React's list (the item
-          there, with `overflow-auto`) did. Otherwise the closed field grew by the list's height and
-          its bottom border was clipped. -->
+          <!-- `contents`, so that the grid row's item is the list itself, with `overflow-auto`, as in
+          React: a scroll container, which the closed row collapses (its minimum height is 0). With
+          the root as the item (`min-h-0`, before #198), the closed list overflowed it, and a nested
+          dropdown at a fractional position lost its bottom border (the datalink editor's lists). -->
           <ListboxRoot
             v-model="listModel"
-            class="min-h-0"
+            class="contents"
             :multiple="multiple"
             :selectionBehavior="multiple ? 'toggle' : 'replace'"
             :disabled="readOnly"

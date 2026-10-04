@@ -44,6 +44,13 @@ callers outside the React dashboard (#192's drive mutations) can open them; the
 directory listings they read come from `$/utils/driveQueries`, with the React
 drive's query keys.
 
+From the drive's labels popover (#198): `Popover` can be positioned against an
+element it does not render (`anchor`, React's `triggerRef`), returns focus to
+its opener when it has no trigger (`opener`, or the element focused as it
+opened), and emits `closed` after its exit animation, so it can sit on the modal
+stack. `Tooltip` opens on focus only when the keyboard put the focus there
+(`$/utils/inputModality`), as react-aria's did.
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:
