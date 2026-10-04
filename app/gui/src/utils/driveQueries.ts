@@ -37,8 +37,8 @@ export interface ListDirectoryQueryOptions {
   readonly sortExpression: backendModule.AssetSortExpression | null
   readonly sortDirection: backendModule.AssetSortDirection | null
   /**
-   * {@link listDirectoryRefetchInterval} gives it from the feature flags (in React,
-   * `useListDirectoryRefetchInterval`, `#/hooks/backendHooks`).
+   * {@link listDirectoryRefetchInterval} gives it from the feature flags (in the drive,
+   * `useListDirectoryRefetchInterval`, `#/layouts/Drive/driveActions`).
    * `undefined` is intentionally excluded as this value should be explicitly given.
    */
   readonly refetchInterval: number | null

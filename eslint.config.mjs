@@ -68,7 +68,7 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'components/OfflineNotificationManager',
   'components/Suspense',
   'components/UIProviders',
-  'layouts/Drive',
+  'layouts/DriveView.vue',
   'layouts/Settings',
   'modals/AcceptInvitationModal',
   'modals/AgreementsModal',

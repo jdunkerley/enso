@@ -1175,6 +1175,8 @@
   "termsAndConditions": "Terms and Conditions",
   "back": "Back",
   "up": "Up",
+  "upButtonLongPressDescription": "Long press or press Alt + ArrowDown to open menu",
+  "breadcrumbs": "Breadcrumbs",
   "next": "Next",
   "previous": "Previous",
   "skip": "Skip",

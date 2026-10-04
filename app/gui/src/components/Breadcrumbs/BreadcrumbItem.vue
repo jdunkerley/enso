@@ -8,10 +8,15 @@
  * `addonEnd` slots are joined to it, as in React.
  *
  * Dropping onto an item reports it to the trail's `@drop` (native drag and drop; React used
- * react-aria's `useDrop`). React's `onDragDelay` (open on hover while dragging) is left to the drive
- * port that needs it.
+ * react-aria's `useDrop`).
+ *
+ * For the drive's breadcrumbs (#91): `onPress` is called on a press too (with the trail's
+ * `@action`), `isLoading` shows the icon's spinner (React's transition), and `onDragDelay` is called
+ * when a drag stays over the item for two seconds. Each item's content sits in a focusable
+ * `role="link"` container that Enter presses, as react-aria's `useBreadcrumbItem` made it.
  */
 import { BREADCRUMB_ITEM_STYLES } from '$/components/Breadcrumbs/variants'
+import { useDragDelayAction } from '$/composables/dragDelay'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Icon from '$/components/Icon/Icon.vue'
@@ -31,6 +36,9 @@ const {
   href,
   isDisabled = false,
   isDroppable = true,
+  isLoading = false,
+  onPress,
+  onDragDelay,
   testId,
   class: className,
 } = defineProps<{
@@ -39,6 +47,12 @@ const {
   href?: string | undefined
   isDisabled?: boolean | undefined
   isDroppable?: boolean | undefined
+  /** Show the icon's spinner, as while a press's navigation is pending. */
+  isLoading?: boolean | undefined
+  /** Called on a press, besides the trail's `@action`. */
+  onPress?: (() => unknown) | undefined
+  /** Called when a drag stays over the item for a while. */
+  onDragDelay?: (() => void) | undefined
   testId?: string | undefined
   class?: string | undefined
 }>()
@@ -56,7 +70,25 @@ const canDrop = computed(
 
 function press() {
   if (id == null) return
-  return toValue(handlers)?.onAction?.(id)
+  return Promise.all([toValue(handlers)?.onAction?.(id), onPress?.()])
+}
+
+function onContainerKeyDown(event: KeyboardEvent) {
+  if (event.key === 'Enter' && event.target === event.currentTarget) {
+    event.preventDefault()
+    void press()
+  }
+}
+
+const dragDelay = useDragDelayAction(() => onDragDelay?.())
+
+function onDragEnter(event: DragEvent) {
+  dragDelay.onDragEnter(event)
+}
+
+function onDragLeave(event: DragEvent) {
+  isDropTarget.value = false
+  dragDelay.onDragLeave(event)
 }
 
 function onDragOver(event: DragEvent) {
@@ -67,6 +99,7 @@ function onDragOver(event: DragEvent) {
 
 function onDrop(event: DragEvent) {
   isDropTarget.value = false
+  dragDelay.onDrop(event)
   if (!canDrop.value || id == null) return
   event.preventDefault()
   const result = toValue(handlers)?.onDrop?.(id, event)
@@ -86,11 +119,12 @@ const iconDisplayStyles = ICON_DISPLAY_STYLES({ variant: 'custom', align: 'cente
     :class="styles.base({ className })"
     :data-drop-target="isDropTarget"
     :data-testid="testId"
+    @dragenter="onDragEnter"
     @dragover="onDragOver"
-    @dragleave="isDropTarget = false"
+    @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <div :class="styles.container()">
+    <div :class="styles.container()" tabindex="0" role="link" @keydown="onContainerKeyDown">
       <ButtonGroup
         gap="joined"
         verticalAlign="center"
@@ -116,7 +150,7 @@ const iconDisplayStyles = ICON_DISPLAY_STYLES({ variant: 'custom', align: 'cente
           v-else
           :href="href"
           :icon="icon"
-          :isLoading="isTransitioning"
+          :isLoading="isTransitioning || isLoading"
           loaderPosition="icon"
           @press="press"
         >

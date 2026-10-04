@@ -2168,12 +2168,12 @@ each key's options are defined once, in framework-free factories.
    core's transfer calls it. `#/hooks/backendUploadFilesHooks` keeps only React
    adapters.
 10. **Cloud-only queries are under `src/cloud/`:** a project's scheduled
-    executions in `versions/projectExecutions.ts` (for #183's Schedule tab), and
-    the subscription price with the plans' constants in `billing/`
-    (`subscriptionPrice.ts`, `plans.ts`), which the React plan selector imports.
-    The organization's queries have no factories of their own: they are the
-    generic `getOrganization` and `listUsers`, whose options are the shared
-    table's, and the core reads the organization too.
+    executions in `versions/schedule.ts` (`projectExecutionsQueryOptions`, for
+    #183's Schedule tab), and the subscription price with the plans' constants
+    in `billing/` (`subscriptionPrice.ts`, `plans.ts`), which the React plan
+    selector imports. The organization's queries have no factories of their own:
+    they are the generic `getOrganization` and `listUsers`, whose options are
+    the shared table's, and the core reads the organization too.
 11. **The download directory is the Vue store's.** The React
     `useDownloadDirectory` had its own suspending query of
     `/api/download-directory-path`, which `entrypoint.ts` already fetches at
@@ -2189,6 +2189,80 @@ each key's options are defined once, in framework-free factories.
 13. **No changelog entry.** The only change on screen is the "copy instead"
     dialog being the Vue `AlertDialog` (ruling 7), which #156 compared class for
     class with React's; the PR takes `CI: No changelog needed`.
+
+## Rulings from #91 (the drive table, drive bar and asset search, 2026-10-04)
+
+#91 ports the drive itself. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **One PR, the table first.** The table, its rows and cells, the context
+   menus, the drive bar and the search bar share one view state (the location
+   being shown, the listing, the selection), so the slices of the ticket would
+   each have needed the reverse bridge (`vueComponent`) both ways. The work is
+   in reviewable commits instead: the shared primitives, the Vue drive, the
+   React deletions, the tests. `LeftPanel.vue` mounts `DriveView.vue` directly
+   and imports no React; `reactTabs.ts` is gone.
+2. **A faithful port, not a redesign.** React had no `treegrid` role, no roving
+   tabindex and no ARIA drag and drop: the table is a `<table>` whose rows carry
+   `aria-selected`, its keyboard model is the hand-rolled one of
+   `AssetsTable.tsx` (arrows, Shift and Ctrl ranges, Ctrl+Space, Enter,
+   bindings), and its drag and drop was already native HTML5 events. All three
+   are ported as they were; the ticket's richer accessibility (a `treegrid`,
+   drag and drop announcements) is a follow-up, so that this PR changes nothing
+   a user can see or a spec can tell. The table stays paged, not virtualised.
+3. **React's navigation transition is emulated, not dropped.** React switched
+   category and directory inside `startTransition`, so the old listing stayed on
+   screen, the pressed control showed a spinner, and the page objects wait for
+   that (`drive-view`'s `data-category`). `layouts/Drive/driveView.ts` keeps a
+   _target_ location and a _shown_ one: the shown one moves only when the
+   target's directory details (and, in the trash, its listing) have loaded.
+   `navigate(source, change)` records which control started it, for its spinner,
+   and the drive location's `isNavigating` is fed from it. `providers/drive`
+   lost the React-only `setNavigationTransition`.
+4. **The context menu keeps React's DOM**, not the shared Reka
+   `$/components/Menu/ContextMenu.vue` (a `menu` of `menuitem`s, which takes
+   focus): a non-modal popover with the `context-menu` test id, a `dialog` named
+   by its label, `MenuEntry.vue` buttons, no focus taken on opening. It closes
+   on Escape, a press outside, a right-click elsewhere, and a scroll outside —
+   the last only once it has been open for two frames, since the focus a
+   right-click gives a row scrolls the table a pixel on the next frame, which
+   React's menu, mounted in a transition, never saw.
+5. **react-aria's press semantics are kept where the specs depend on them.**
+   `usePress` stopped a press propagating, so a button in a row never selected
+   the row; Vue's buttons do not, so buttons in rows and headings bind
+   `STOP_PRESS_PROPAGATION` (`layouts/Drive/pressPropagation.ts`). Likewise
+   react-aria's interact-outside (a press that starts _and_ ends outside) is
+   what closes the rename form and the context menu.
+6. **React's quirks are kept, each noted where it lives:** Ctrl+Space toggles
+   against the selection as it was at the key press; the search bar focuses the
+   highlighted suggestion, restores its value on focus and shows suggestions a
+   tick late; the path column sets the directory and then the category (which
+   resets it); the rename form checks `min(1)` before `trim()`, so whitespace
+   alone is accepted. Each is pinned by a probe against the base or a unit test.
+7. **What was dead in React is not ported.** The labels column's overflow ("show
+   all labels") never appeared: its measurement never ran. It is left out, and a
+   follow-up restores it on purpose if wanted. The edit button keeps a generated
+   id (no name), as React's did, so the axe baseline is unchanged.
+8. **The labels, credential and datalink dialogs stay React (#198)**, opened
+   from Vue through `openReactModal` (`ModalProvider.tsx`), which puts a React
+   element on the modal stack and takes it off when the dialog closes itself.
+   `layouts/Drive/reactModals.tsx` is the one place that does it, and goes when
+   #198 lands. `setVueModal` had no caller left and is gone.
+9. **Shared primitives, additively.** `EditableSpan/` and `SelectionBrush/` are
+   new in `src/components/`; `Breadcrumbs/` gains `isLoading`, `onPress`,
+   `onDragDelay` and a focusable `role="link"` container; `MenuEntry` a
+   `tooltip`; `Input` an `error` override; `useMenuEntries` an optional target
+   element. No existing caller changes.
+10. **Paging stops at the end.** React's effect fetching the next page while the
+    table was not full re-ran harmlessly; the same loop in Vue's microtasks hung
+    the page on a short directory, so it is guarded by `hasNextPage`.
+11. **Tests.** The specs pass unedited; only a page object's comment changed.
+    Unit tests pin what react-aria gave the primitives (the rename form, the
+    context menu, the breadcrumbs). The table's keyboard model, drag and drop
+    and rubber band need layout and pointer capture, which jsdom lacks, so the
+    Playwright specs and the probes against the base cover them.
+12. **No changelog entry**: nothing a user can see changed; the PR takes
+    `CI: No changelog needed`.
 
 ## Rulings from #172 (the Enso devtools, 2026-10-03)
 

@@ -8,12 +8,14 @@
  * `@drop` the `id` of the item something was dropped on, with the drop event. Items are icon
  * buttons, as React's `Button.GroupProvider variant="icon"` makes them.
  *
- * `getItemsWithCollapsedItem` (`./utilities`) collapses a long trail into a "more" item.
+ * `getItemsWithCollapsedItem` (`./utilities`) collapses a long trail into a "more" item. The list is
+ * named "Breadcrumbs", as react-aria's `useBreadcrumbs` named it (#91).
  */
 import { provideButtonGroup } from '$/components/Button/buttonGroup'
 import { flattenSlotChildren } from '$/components/Button/buttonGroup'
 import { BREADCRUMBS_STYLES } from '$/components/Breadcrumbs/variants'
 import Icon from '$/components/Icon/Icon.vue'
+import { useText } from '$/providers/text'
 import { useSlots, type VNode } from 'vue'
 import { BreadcrumbPosition, provideBreadcrumbs, type BreadcrumbKey } from './breadcrumbsContext'
 
@@ -31,6 +33,8 @@ const {
   onDrop?: ((key: BreadcrumbKey, event: DragEvent) => unknown) | undefined
 }>()
 
+const { getText } = useText()
+
 provideButtonGroup({ variant: 'icon' })
 provideBreadcrumbs(() => ({ onAction, onDrop }))
 
@@ -45,7 +49,11 @@ function items(): { node: VNode; isCurrent: boolean }[] {
 </script>
 
 <template>
-  <ol :class="styles.base({ className })" :data-testid="testId">
+  <ol
+    :aria-label="getText('breadcrumbs')"
+    :class="styles.base({ className })"
+    :data-testid="testId"
+  >
     <template v-for="({ node, isCurrent }, index) in items()" :key="node.key ?? index">
       <BreadcrumbPosition :isCurrent="isCurrent">
         <component :is="node" />

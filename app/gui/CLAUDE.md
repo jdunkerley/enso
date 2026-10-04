@@ -82,9 +82,9 @@ adding an entry. React files may import `$/…` freely.
   batched delete, restore, copy, move and download; the move's duplicate
   resolver is injected) and `transferBetweenCategories.ts` (with its context
   injected) build on it. The Vue wrappers are `@/composables/backend` and
-  `$/composables/transferBetweenCategories`; the React ones are the
-  `#/hooks/backend*Hooks` adapters, which go with the React drive (#91). Never
-  give a key different options on the two sides.
+  `$/composables/transferBetweenCategories`; the drive's own (mutation state,
+  new folder and project, rename, uploads) are in `#/layouts/Drive/driveActions`
+  (#91). Never give a key different options on the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and

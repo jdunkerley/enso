@@ -15,8 +15,7 @@ community build without the cloud can leave it out (decision 6b of
 - `<area>/`: a ported cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
-    `UpsertSecretModal.vue` (#92), which the React drive opens on the modal
-    stack (`setVueModal`).
+    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack.
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
     menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
     the subscription price query, `subscriptionPrice.ts`), `organization/` (the
@@ -47,6 +46,10 @@ community build without the cloud can leave it out (decision 6b of
     shared: `$/providers/session`, `$/providers/auth`, `$/authentication/`. Also
     the Account settings tab's two-factor authentication section
     (`SetupTwoFaForm.vue`, `TwoFaSetup.vue`).
+  - `versions/` — the right panel's Versions tab (#89), and the query options of
+    a project's scheduled executions (`projectExecutions.ts`, #192) for the
+    Schedule tab (#183). Imported directly by `RightPanel.vue`; see its
+    `CLAUDE.md`.
   - `account/` — the Account settings tab's sections (`settingsSections.ts`: the
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
