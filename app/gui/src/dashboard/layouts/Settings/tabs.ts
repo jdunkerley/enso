@@ -1,12 +1,14 @@
 /**
- * @file The settings tabs, in their sidebar groups. The personal tabs are Vue (`SettingsTab.vue`);
- * the organization tabs are still React (`./data.tsx`, mounted by `ReactSettingsTab`). The Account
- * tab's sections come from the cloud (`$/providers/settingsContributions`).
+ * @file The settings tabs, in their sidebar groups. Every tab but Billing & Plans is Vue
+ * (`SettingsTab.vue`); Billing & Plans is still React (`./data.tsx`, mounted by `ReactSettingsTab`)
+ * until #88. The sections of the Account tab and of the cloud's tabs (Organization, Members, User
+ * groups, Activity log, API keys, Usage) come from the cloud (`$/providers/settingsContributions`);
+ * the cloud's tabs have none of their own, so a build without the cloud does not list them.
  */
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
 // does), so to ESLint the components imported here have an error type.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-import { actionToTextId, BINDINGS } from '$/configurations/inputBindings'
+import { defaultShortcuts } from '$/configurations/keyboardShortcuts'
 import {
   settingsFormEntryData,
   type SettingsSectionData,
@@ -15,8 +17,7 @@ import {
 } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
-import { Path } from 'enso-common/src/services/Backend'
-import { unsafeEntries } from 'enso-common/src/utilities/data/object'
+import { isUserOnPlanWithMultipleSeats, Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
 import { REACT_SETTINGS_TAB_DATA, type SettingsTabData as ReactSettingsTabData } from './data'
@@ -56,6 +57,68 @@ const ACCOUNT_TAB: SettingsTabData = {
       ],
     },
   ],
+}
+
+const ORGANIZATION_TAB: SettingsTabData = {
+  nameId: 'organizationSettingsTab',
+  settingsTab: SettingsTabType.organization,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const MEMBERS_TAB: SettingsTabData = {
+  nameId: 'membersSettingsTab',
+  settingsTab: SettingsTabType.members,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
+  feature: 'inviteUser',
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const USER_GROUPS_TAB: SettingsTabData = {
+  nameId: 'userGroupsSettingsTab',
+  settingsTab: SettingsTabType.userGroups,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
+  feature: 'userGroups',
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const ACTIVITY_LOG_TAB: SettingsTabData = {
+  nameId: 'activityLogSettingsTab',
+  settingsTab: SettingsTabType.activityLog,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
+  organizationOnly: true,
+  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
+  // Contributed by `src/cloud/organization/`.
+  sections: [],
+}
+
+const API_KEYS_TAB: SettingsTabData = {
+  nameId: 'apiKeysSettingsTab',
+  settingsTab: SettingsTabType.apiKeys,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.apiKeys],
+  visible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
+  // Contributed by `src/cloud/account/`.
+  sections: [],
+}
+
+const USAGE_TAB: SettingsTabData = {
+  nameId: 'usageSettingsTab',
+  settingsTab: SettingsTabType.usage,
+  icon: SETTINGS_TAB_ICONS[SettingsTabType.usage],
+  feature: 'scheduler',
+  // Scheduled executions run in Enso Cloud: in local-only mode the tab could only offer a plan.
+  visible: ({ isAuthDisabled }) => !isAuthDisabled,
+  // Contributed by `src/cloud/billing/`.
+  sections: [],
 }
 
 const LOCAL_TAB: SettingsTabData = {
@@ -142,8 +205,8 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
           type: 'custom',
           aliasesId: 'keyboardShortcutsSettingsCustomEntryAliases',
           getExtraAliases: (getText) =>
-            unsafeEntries(BINDINGS).flatMap(([action, info]) =>
-              info.rebindable === false ? [] : [getText(actionToTextId(action))],
+            defaultShortcuts().flatMap((shortcut) =>
+              shortcut.rebindable ? [getText(shortcut.nameTextId)] : [],
             ),
           component: KeyboardShortcutsSettingsSection,
         },
@@ -156,23 +219,16 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 export const SETTINGS_DATA: readonly SettingsTabSectionData<AnySettingsTabData>[] = [
   {
     nameId: 'generalSettingsTabSection',
-    tabs: [ACCOUNT_TAB, REACT_SETTINGS_TAB_DATA[SettingsTabType.organization], LOCAL_TAB],
+    tabs: [ACCOUNT_TAB, ORGANIZATION_TAB, LOCAL_TAB],
   },
   {
     nameId: 'accessSettingsTabSection',
-    tabs: [
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.billingAndPlans],
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.members],
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.userGroups],
-    ],
+    tabs: [REACT_SETTINGS_TAB_DATA[SettingsTabType.billingAndPlans], MEMBERS_TAB, USER_GROUPS_TAB],
   },
   { nameId: 'lookAndFeelSettingsTabSection', tabs: [APPEARANCE_TAB, KEYBOARD_SHORTCUTS_TAB] },
   {
     nameId: 'securitySettingsTabSection',
-    tabs: [
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.activityLog],
-      REACT_SETTINGS_TAB_DATA[SettingsTabType.apiKeys],
-    ],
+    tabs: [ACTIVITY_LOG_TAB, API_KEYS_TAB],
   },
-  { nameId: 'usageSettingsTabSection', tabs: [REACT_SETTINGS_TAB_DATA[SettingsTabType.usage]] },
+  { nameId: 'usageSettingsTabSection', tabs: [USAGE_TAB] },
 ]

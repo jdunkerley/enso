@@ -1,7 +1,8 @@
 /**
  * @file The sections of the Account settings tab: the user's profile, the password change, two-factor
- * authentication, the account's deletion and the profile picture. Loaded with the settings page
- * (`registerAccountSettings`).
+ * authentication, the account's deletion and the profile picture; and the API keys tab's. Loaded
+ * with the settings page (`registerAccountSettings`). The API keys tab itself (name, icon,
+ * visibility) is declared by the core, in `#/layouts/Settings/tabs.ts`.
  */
 import { passwordWithPatternSchema } from '$/cloud/auth/schemas'
 import SetupTwoFaForm from '$/cloud/auth/SetupTwoFaForm.vue'
@@ -21,6 +22,7 @@ import {
   WHITELISTED_TIME_ZONE_DESCRIPTIONS,
 } from 'enso-common/src/utilities/data/dateTime'
 import { z } from 'zod'
+import ApiKeysSettingsSection from './ApiKeysSettingsSection.vue'
 import DeleteUserAccountSettingsSection from './DeleteUserAccountSettingsSection.vue'
 import ProfilePictureInput from './ProfilePictureInput.vue'
 
@@ -191,6 +193,20 @@ export const ACCOUNT_SETTINGS_SECTIONS: readonly SettingsSectionData[] = [
         aliasesId: 'profilePictureSettingsCustomEntryAliases',
         getVisible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
         component: ProfilePictureInput,
+      },
+    ],
+  },
+]
+
+export const API_KEYS_SETTINGS_SECTIONS: readonly SettingsSectionData[] = [
+  {
+    nameId: 'apiKeysSettingsSection',
+    columnClass: 'h-full *:flex-1 *:min-h-0 max-w-[unset]',
+    entries: [
+      {
+        type: 'custom',
+        aliasesId: 'apiKeysSettingsCustomEntryAliases',
+        component: ApiKeysSettingsSection,
       },
     ],
   },

@@ -231,3 +231,18 @@ description and ticks it off. The flake baseline it compares against is
   — but only when the next click lands more than ~550ms later, i.e. on a loaded
   CI runner (#146). Every helper that clicks or drops on the bar ends with
   `page.mouse.move(0, 0)`; do the same in new ones.
+- **Await every Playwright call.** `@typescript-eslint/no-floating-promises` is
+  on for this directory (#202): an unawaited `expect.poll`, assertion or action
+  races the rest of the test, and one still running when the test returns fails
+  it as `locator.boundingBox: Test ended.`
+- **A custom matcher is not retried.** Playwright retries only its own
+  assertions, so a matcher in `base.ts` must delegate to one, honouring
+  `this.isNot` and `this.timeout` (see `toBeSelected`). A single check with a
+  short timeout passes or fails depending on whether the app has caught up.
+- **Let a panel finish animating before pointing at the graph.** Opening or
+  closing the right panel resizes the graph viewport for 250 ms, and meanwhile
+  the SVG layer of edges and output-port hover areas lags the nodes, so a port's
+  hover area can sit over empty background: a press there drags an edge instead
+  of starting a selection brush. `toggleDocsAssetPanel` (and so the `editorPage`
+  fixture) waits for the panel's `data-transitioning` marker to clear; do the
+  same after anything else that resizes the viewport.

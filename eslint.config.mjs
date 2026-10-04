@@ -64,13 +64,10 @@ const RESTRICTED_IMPORT_PATHS = [
 const DASHBOARD_IMPORT_ALLOWLIST = [
   // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
   'App.tsx',
-  'components/Devtools',
   'components/ErrorBoundary',
   'components/OfflineNotificationManager',
   'components/Suspense',
   'components/UIProviders',
-  'layouts/AssetPanel/components/AssetProperties',
-  'layouts/AssetPanel/components/ProjectExecutionsCalendar',
   'layouts/Drive',
   'layouts/Settings',
   'modals/AcceptInvitationModal',
@@ -79,6 +76,9 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
   'modals/SetupOrganizationForm',
   'modals/TrialEndedModal',
   'pages/authentication/LoadingScreen',
+  // The datalink editor, inside the cloud's Vue Properties tab until `JSONSchemaInput` is ported
+  // (#92).
+  'pages/dashboard/components/DatalinkInput',
   'providers/LoggerProvider',
   // Dashboard features ported to Vue, mounted by the shared app shell.
   'pages/dashboard/UserBar/UserBar.vue',
@@ -105,7 +105,17 @@ const DASHBOARD_IMPORT_PATTERN = {
  * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
  * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
  */
-const CLOUD_AREAS = ['account', 'auth']
+const CLOUD_AREAS = [
+  'account',
+  'agreements',
+  'auth',
+  'billing',
+  'browserDisabled',
+  'devtools',
+  'organization',
+  'properties',
+  'versions',
+]
 
 // =======================================
 // === Restricted syntactic constructs ===
@@ -417,6 +427,17 @@ const config = [
           ],
         },
       ],
+    },
+  },
+
+  // === Integration tests must await every Playwright call ===
+  // An unawaited `expect.poll`, assertion or locator action races the rest of the test: it can
+  // pass by luck, fail a later step, or reject after the test has ended (`Test ended.`), as the
+  // editor panels' "Lists" test did (#202).
+  {
+    files: ['app/gui/integration-test/**/*.ts', 'app/gui/playwright.config.ts'],
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
     },
   },
 
@@ -767,20 +788,6 @@ const config = [
   {
     files: ['app/gui/src/dashboard/**/__tests__/*.test.ts'],
     rules: { 'react-hooks/rules-of-hooks': 'off' },
-  },
-  // === EnsoDevtools Rules ===
-  // Allow JSX strings in EnsoDevtools.tsx.
-  {
-    files: ['app/gui/src/dashboard/**/EnsoDevtools*.tsx'],
-    rules: {
-      'no-restricted-syntax': [
-        'error',
-        ...RESTRICTED_SYNTAXES.filter(
-          (syntax) =>
-            syntax.message !== 'Use a `getText()` from `useText` instead of a literal string',
-        ),
-      ],
-    },
   },
   // === Index Files ===
   {

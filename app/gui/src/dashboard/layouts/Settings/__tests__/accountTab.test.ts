@@ -50,6 +50,7 @@ function makeContext(overrides: Partial<SettingsContext> = {}) {
     getText,
     backend: remote as never,
     updateUser: vi.fn(() => Promise.resolve()),
+    updateOrganization: vi.fn(() => Promise.resolve()),
     changePassword: vi.fn(() => Promise.resolve(true)),
     preferredTimeZone: undefined,
     setPreferredTimeZone: vi.fn(),

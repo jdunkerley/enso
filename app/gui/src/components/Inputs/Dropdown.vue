@@ -122,10 +122,25 @@ function onMouseDown(event: MouseEvent) {
   isMouseFocused.value = !wasFocused
 }
 
+/**
+ * React's list (react-aria's `ListBox`) takes the first Escape while it has a selection: it clears
+ * the list's own selection (the field keeps its value) and stops the key there, so an enclosing
+ * dialog closes only on the second Escape. The same here, without the clearing, which changed
+ * nothing visible.
+ */
+let escapeTaken = false
+watch([selectedIndex, selectedIndices], () => (escapeTaken = false))
+function onEscape(event: KeyboardEvent) {
+  if (escapeTaken || currentIndices.value.length === 0) return
+  escapeTaken = true
+  event.stopPropagation()
+}
+
 function onFocusOut(event: FocusEvent) {
   if (!(event.relatedTarget instanceof Node) || !root.value?.contains(event.relatedTarget)) {
     isFocusWithin.value = false
     isMouseFocused.value = false
+    escapeTaken = false
   }
 }
 </script>
@@ -145,13 +160,21 @@ function onFocusOut(event: FocusEvent) {
         <!-- Spacing. -->
         <div :class="styles.input()">&nbsp;</div>
         <div :class="styles.optionsContainer()">
+          <!-- The grid row's item: `min-h-0` lets the closed row collapse, as React's list (the item
+          there, with `overflow-auto`) did. Otherwise the closed field grew by the list's height and
+          its bottom border was clipped. -->
           <ListboxRoot
             v-model="listModel"
+            class="min-h-0"
             :multiple="multiple"
             :selectionBehavior="multiple ? 'toggle' : 'replace'"
             :disabled="readOnly"
           >
-            <ListboxContent :class="styles.optionsList()" :aria-label="ariaLabel">
+            <ListboxContent
+              :class="styles.optionsList()"
+              :aria-label="ariaLabel"
+              @keydown.escape="onEscape"
+            >
               <ListboxItem
                 v-for="(item, i) in items"
                 :key="i"

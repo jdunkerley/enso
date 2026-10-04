@@ -764,7 +764,7 @@ export async function mockCloudApi(page: Page) {
 
     // === Endpoints returning arrays ===
 
-    await get(paths.LIST_DIRECTORY_PATH, (route, _req, _, params) => {
+    await get(paths.LIST_DIRECTORY_PATH, async (route, _req, _, params) => {
       const query = Object.fromEntries(params.entries()) as ListDirectoryQuery
       called('listDirectory', query)
       const assets = listDirectory(query)
@@ -773,9 +773,9 @@ export async function mockCloudApi(page: Page) {
         assets,
         paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
       }
-      route.fulfill({ json })
+      await route.fulfill({ json })
     })
-    await get(paths.SEARCH_DIRECTORY_PATH, (route, _req, _, params) => {
+    await get(paths.SEARCH_DIRECTORY_PATH, async (route, _req, _, params) => {
       const query = Object.fromEntries(params.entries()) as SearchDirectoryQuery
       called('searchDirectory', query)
       const assets = searchDirectory(query)
@@ -784,7 +784,7 @@ export async function mockCloudApi(page: Page) {
         assets,
         paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
       }
-      route.fulfill({ json })
+      await route.fulfill({ json })
     })
     await get(paths.LIST_SECRETS_PATH, () => {
       called('listSecrets', {})
@@ -989,7 +989,7 @@ export async function mockCloudApi(page: Page) {
         object.unsafeMutable(project.projectState).type = backend.ProjectState.opened
       }
 
-      route.fulfill()
+      await route.fulfill()
     })
     await post(
       paths.getHybridSetOpenInProgressPath(GLOB_PROJECT_ID),
@@ -1032,7 +1032,7 @@ export async function mockCloudApi(page: Page) {
         object.unsafeMutable(project.projectState).type = backend.ProjectState.opened
       }
 
-      route.fulfill()
+      await route.fulfill()
     })
     await delete_(paths.deleteTagPath(GLOB_TAG_ID), async (route, _, [id]) => {
       if (!id) return
@@ -1421,11 +1421,14 @@ export async function mockCloudApi(page: Page) {
       })
     })
 
-    await get(paths.RESOLVE_ENSO_PATH, (route, _request, _captures, params) => {
+    await get(paths.RESOLVE_ENSO_PATH, async (route, _request, _captures, params) => {
       const path = params.get('path')
       const userRoot = `enso://Users/${currentUser?.name}`
       if (!path?.startsWith(userRoot)) {
-        route.fulfill({ status: HTTP_STATUS_BAD_REQUEST, json: { message: 'Invalid enso path' } })
+        await route.fulfill({
+          status: HTTP_STATUS_BAD_REQUEST,
+          json: { message: 'Invalid enso path' },
+        })
         return
       }
       for (const asset of assetMap.values()) {
@@ -1434,7 +1437,7 @@ export async function mockCloudApi(page: Page) {
           return rest
         }
       }
-      route.fulfill({
+      await route.fulfill({
         status: HTTP_STATUS_NOT_FOUND,
         json: {
           message: `Path '${path}' does not resolve to any asset. Available paths: ${assets.map((asset) => `'${asset.ensoPath}'`).join(', ')}`,
