@@ -7,6 +7,7 @@ import static org.junit.Assert.assertTrue;
 import io.helidon.webclient.websocket.WsClient;
 import io.helidon.websocket.WsListener;
 import io.helidon.websocket.WsSession;
+import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.BlockingDeque;
@@ -49,20 +50,29 @@ public class WebSocketConnectionInterruptedTest {
 
     {
       var cdl = new CountDownLatch(1);
-      WsClient.builder()
-          .build()
-          .connect(
-              "ws://localhost:33455",
-              new WsListener() {
-                @Override
-                public void onOpen(WsSession session) {
-                  cdl.countDown();
-                }
-              });
+      var listener =
+          new WsListener() {
+            @Override
+            public void onOpen(WsSession session) {
+              cdl.countDown();
+            }
+          };
+      // The server starts on the executor, so it may not be listening yet.
+      for (var connected = false; !connected; ) {
+        try {
+          WsClient.builder().build().connect("ws://localhost:33455", listener);
+          connected = true;
+        } catch (UncheckedIOException notListeningYet) {
+          Thread.sleep(50);
+        }
+      }
       cdl.await();
     }
-    {
+    // `onconnect` runs once the server side has opened the socket, which may be just after the
+    // client sees it open, so poll.
+    for (var attempt = 0; attempt < 100; attempt++) {
       var cdl = new CountDownLatch(1);
+      var connected = new String[1];
       mockExecutor.execute(
           () -> {
             assertNotNull("Result set", res[0]);
@@ -70,11 +80,15 @@ public class WebSocketConnectionInterruptedTest {
             var v = (Value) res[0];
             assertTrue("It is an array", v.hasArrayElements());
             assertEquals(1, v.getArraySize());
-            res[0] = v.getArrayElement(0).asString();
+            connected[0] = v.getArrayElement(0).asString();
             cdl.countDown();
           });
       cdl.await();
-      assertEquals("Successfully connected", res[0]);
+      if (connected[0] != null || attempt == 99) {
+        assertEquals("Successfully connected", connected[0]);
+        break;
+      }
+      Thread.sleep(50);
     }
   }
 
