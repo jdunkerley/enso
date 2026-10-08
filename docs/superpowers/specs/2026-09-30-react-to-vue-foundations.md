@@ -2213,6 +2213,7 @@ accepted, for the maintainer to review.
    are ported as they were; the ticket's richer accessibility (a `treegrid`,
    drag and drop announcements) is a follow-up, so that this PR changes nothing
    a user can see or a spec can tell. The table stays paged, not virtualised.
+   (The follow-up is #208: see "Rulings from #208".)
 3. **React's navigation transition is emulated, not dropped.** React switched
    category and directory inside `startTransition`, so the old listing stayed on
    screen, the pressed control showed a spinner, and the page objects wait for
@@ -2521,3 +2522,40 @@ review.
     geometry and computed styles are the same, and the datalink dialog's fields,
     measured, are pixel-identical once the layer is re-created. No changelog
     entry: the PR takes `CI: No changelog needed`.
+
+## Rulings from #208 (the drive table's grid semantics and drag and drop announcements, 2026-10-08)
+
+#208 is the follow-up ruling 2 of #91 left: the accessibility React's table
+never had. Delegated like the rulings above: provisionally accepted, for the
+maintainer to review. The details are in `layouts/Drive/CLAUDE.md`.
+
+1. **`grid`, not `treegrid`.** A directory opens in place of the listing; no row
+   expands, so there are no levels, sets or expanded states to expose. The table
+   is a multi-selectable `grid` named "Drive contents", with `aria-rowcount`
+   (`-1` while more pages may load) and `aria-rowindex` on every row.
+2. **The tab stop roves over rows, and a row's controls go with it.** Only the
+   row focused last is tabbable; the buttons in the other rows are taken out of
+   the Tab sequence as well, so the grid is one stop, not one per button. The
+   row's controls follow it in the Tab order. There is no cell-by-cell
+   navigation: the table's controls are reached by Tab within the focused row,
+   as before.
+3. **The keyboard model is unchanged and not duplicated.** `AssetsTable.vue`
+   keeps React's handler. The roving tab stop only gives it a starting point
+   when no row was selected last, so that the arrow keys continue from the
+   focused row after Escape or on tabbing back in.
+4. **A keyboard focus ring on rows is new** (`:focus-visible` only, so a click
+   shows none). It is drawn on the cells, since the sticky name cell hides an
+   outline on the `<tr>`.
+5. **Drag and drop is announced in a polite live region**: what is moving, where
+   it landed (a folder by its title, the current folder, or a target outside the
+   table by its accessible name, such as "Trash"), or that it was cancelled.
+   `aria-grabbed` and `aria-dropeffect` are deprecated and unused. Cut and paste
+   stays the keyboard route for moves.
+6. **Tests.** Unit tests cover the tab stop and the announcements; the
+   accessibility spec gains a snapshot of the grid (name, row groups, the
+   selected row), the keyboard walk, and the announcements of a drop on a folder
+   and on Trash. The drive header snapshot did not change: the header row is the
+   same `rowgroup` of `columnheader`s inside a `grid` as inside a `table`. axe
+   reports nothing new.
+7. **Changelog entry**: screen reader support and a visible focus ring are
+   features a user can notice.

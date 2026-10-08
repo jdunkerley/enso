@@ -7,10 +7,14 @@
  *
  * It lists the shown directory (`useDriveView`) in pages as it is scrolled, or the search results
  * while the query has text, and gives the search bar its suggestions. React's behaviour is kept
- * where the specs or a user could see it: the keyboard model is a plain table's (the arrow keys
- * move the selection, Shift extends it, Enter opens; no `treegrid`), the root takes the focus when
- * nothing else has it while the drive is the focused panel, and the drag selection measures rows
- * against the root, which does not scroll.
+ * where the specs or a user could see it: the arrow keys move the selection, Shift extends it, Enter
+ * opens; the root takes the focus when nothing else has it while the drive is the focused panel; and
+ * the drag selection measures rows against the root, which does not scroll.
+ *
+ * To assistive technology the table is an ARIA `grid` (a flat one: a directory opens in place of
+ * the listing rather than expanding, so it is not a `treegrid`), multi-selectable, with one tab
+ * stop that roves with the focus (`Drive/rovingTabStop.ts`) and row positions; drags of rows are
+ * announced in a live region (`Drive/dragAnnouncements.ts`).
  */
 import { Column } from '#/pages/dashboard/components/column/columnUtils'
 import LocalStorage from '$/utils/LocalStorage'
@@ -44,6 +48,7 @@ interface DragSelectionInfo {
 import AssetsTableCombinedContextMenu from '#/layouts/AssetsTableCombinedContextMenu.vue'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useAutoScroll } from '#/layouts/Drive/autoScroll'
+import { useDragAnnouncements } from '#/layouts/Drive/dragAnnouncements'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/layouts/Drive/drag'
 import {
   useEditSecret,
@@ -53,6 +58,7 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
+import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import { SUGGESTIONS_FOR_TYPE, useSuggestions, type Suggestion } from '#/layouts/Drive/suggestions'
 import AssetRow from '#/pages/dashboard/components/AssetRow.vue'
@@ -660,6 +666,30 @@ function setMostRecentlySelectedIndex(index: number | null, isKeyboard = false) 
 
 const editSecret = useEditSecret(backend)
 
+/** The grid's one tab stop: the row focused last (or the first selected, or the first). */
+const rovingTabStop = useRovingTabStop(
+  () => assets.value.map((asset) => asset.id),
+  (id) => driveStore.selectedIds.has(id),
+)
+
+function onRowFocus(item: AnyAsset) {
+  rovingTabStop.setTabStop(item.id)
+}
+
+/**
+ * Where the keyboard acts from: the row selected last, or, with none (after Escape, or on tabbing
+ * back into the grid), the focused row, so that the arrow keys continue from where the focus is.
+ */
+function keyboardAnchorIndex() {
+  if (mostRecentlySelectedIndex != null) return mostRecentlySelectedIndex
+  const isRowFocused =
+    document.activeElement instanceof Element &&
+    document.activeElement.closest('[data-testid="asset-row"]') != null &&
+    root.value?.contains(document.activeElement) === true
+  const tabStopIndex = rovingTabStop.index.value
+  return isRowFocused && tabStopIndex !== -1 ? tabStopIndex : null
+}
+
 /**
  * Add the asset to the selection, or remove it if it is in it, from the selection as it was when
  * the key was pressed. (Ctrl+Space toggles twice from that same selection, as React's handler did,
@@ -678,7 +708,7 @@ function onKeyDown(event: KeyboardEvent) {
   const isEventTextInputEvent = isTextInputEvent(event) || event.key === 'Enter'
   if (isTextInputFocused && isEventTextInputEvent) return
   const { selectedAssets } = driveStore.state
-  const prevIndex = mostRecentlySelectedIndex
+  const prevIndex = keyboardAnchorIndex()
   const item = prevIndex == null ? null : assets.value[prevIndex]
   if (selectedAssets.length === 1 && item != null) {
     switch (event.key) {
@@ -949,6 +979,22 @@ function selectRow(asset: AnyAsset) {
 
 // === Drag and drop ===
 
+const dragAnnouncements = useDragAnnouncements()
+// The document's, not the rows': the row a drag started from may be gone when it ends (holding the
+// drag over a directory opens it).
+useEventListener(
+  document,
+  'drop',
+  (event: DragEvent) => dragAnnouncements.droppedElsewhere(event.target),
+  { capture: true },
+)
+useEventListener(
+  document,
+  'dragend',
+  (event: DragEvent) => dragAnnouncements.ended(event.dataTransfer?.dropEffect),
+  { capture: true },
+)
+
 function onRowDragStart(event: DragEvent, asset: AnyAsset) {
   startAutoScroll()
   onMouseEvent(event)
@@ -987,6 +1033,7 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
   )
   setDragImageToBlank(event)
   ASSET_ROWS.bind(event, payload)
+  dragAnnouncements.started(nodes)
   modals.closeAll()
   modals.open(DragModal, {
     assets: nodes,
@@ -999,7 +1046,10 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
 }
 
 function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
-  if (category.value.type === 'trash' || category.value.type === 'recent') return
+  if (category.value.type === 'trash' || category.value.type === 'recent') {
+    dragAnnouncements.rejected()
+    return
+  }
   endAutoScroll()
   const directoryId = item?.type === AssetType.directory ? item.id : currentDirectoryId.value
   const payload = ASSET_ROWS.lookup(event)
@@ -1009,15 +1059,22 @@ function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
     event.preventDefault()
     event.stopPropagation()
     modals.closeAll()
+    const moved = items
+      .filter(({ asset }) => asset.parentId !== directoryId)
+      .map(({ asset }) => asset)
+    dragAnnouncements.droppedInTable(
+      moved,
+      item?.type === AssetType.directory ?
+        { type: 'directory', title: item.title }
+      : { type: 'current' },
+    )
     void paste({
       fromCategory: payload.category,
       toCategory: category.value,
       newParentId: directoryId,
       pasteData: {
         backendType: backend.value.type,
-        assets: items
-          .filter(({ asset }) => asset.parentId !== directoryId)
-          .map(({ asset }) => asset),
+        assets: moved,
         category: category.value,
       },
       method: 'move',
@@ -1028,7 +1085,10 @@ function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
     event.preventDefault()
     event.stopPropagation()
     void uploadFiles(Array.from(event.dataTransfer.files), directoryId)
+    return
   }
+  // Rows dropped where they cannot go (a directory onto itself) stay where they were.
+  dragAnnouncements.rejected()
 }
 
 function onDropzoneDragOver(event: DragEvent) {
@@ -1119,6 +1179,9 @@ const isLoadingRow = computed(
 
 <template>
   <div class="relative grow contain-strict">
+    <div role="status" class="sr-only" data-testid="drive-drag-announcement">
+      {{ dragAnnouncements.message.value }}
+    </div>
     <AssetsTableCombinedContextMenu
       ref="contextMenu"
       :currentDirectoryId="currentDirectoryId"
@@ -1171,12 +1234,16 @@ const isLoadingRow = computed(
                   <!-- `max-w-[calc(100cqw_-_0.5rem)]` keeps it from shifting while scrolled
                   horizontally. -->
                   <table
+                    role="grid"
+                    aria-multiselectable="true"
+                    :aria-label="getText('assetsTableLabel')"
+                    :aria-rowcount="assetsPages.hasNextPage.value ? -1 : assets.length + 1"
                     class="isolate max-w-[calc(100cqw_-_0.5rem)] table-fixed border-collapse rounded-rows"
                   >
                     <thead
                       class="sticky top-0 isolate z-1 bg-dashboard before:absolute before:-inset-1 before:bottom-0 before:bg-dashboard"
                     >
-                      <tr class="rounded-none text-sm font-semibold">
+                      <tr aria-rowindex="1" class="rounded-none text-sm font-semibold">
                         <th
                           v-for="column in columns"
                           :key="column"
@@ -1199,6 +1266,9 @@ const isLoadingRow = computed(
                         :columns="columns"
                         :labels="labels"
                         :isKeyboardSelected="keyboardSelectedIndex === index"
+                        :isTabStop="rovingTabStop.index.value === index"
+                        :rowIndex="index + 2"
+                        :onRowFocus="onRowFocus"
                         :isDeleting="deletingIds.has(item.id)"
                         :isRestoring="restoringIds.has(item.id)"
                         :isUpdating="updatingIds.has(item.id)"

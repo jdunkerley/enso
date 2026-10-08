@@ -197,6 +197,15 @@ interface PlaceholderOverrides {
   readonly confirmRegistrationInstruction: [userEmail: string]
 
   readonly xTags: [count: number]
+
+  readonly dragAnnouncementOneAsset: [assetTitle: string]
+  readonly dragAnnouncementAssets: [count: number]
+  readonly dragAnnouncementStarted: [assets: string]
+  readonly dragAnnouncementDroppedInto: [assets: string, directoryTitle: string]
+  readonly dragAnnouncementDroppedHere: [assets: string]
+  readonly dragAnnouncementDroppedOn: [assets: string, targetName: string]
+  readonly dragAnnouncementDropped: [assets: string]
+  readonly dragAnnouncementCancelled: [assets: string]
 }
 
 // This is intentionally unused. This line throws an error if `PlaceholderOverrides` ever becomes
