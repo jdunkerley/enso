@@ -7,7 +7,6 @@ import { useFeatureFlag } from '$/providers/featureFlags'
 import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
-import { ContainerProviderForReact } from '$/providers/react/container'
 import { provideRightPanelData } from '$/providers/rightPanel'
 import { useNavigateLink } from '$/utils/links'
 import { appContainerBindings } from '@/bindings'
@@ -31,8 +30,6 @@ import TabBar from './TabBar.vue'
 </script>
 
 <script setup lang="ts">
-// NOTE: This cannot be `useTemplateRef`, because that creates a **readonly** ref, and it interferes
-// with veaury's ref assignment implementation that runs during parent React component lifecycle.
 const fullscreenRoot = shallowRef<HTMLElement>()
 
 const openedProjects = useOpenedProjects()
@@ -110,33 +107,31 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <ContainerProviderForReact>
-    <!-- The locale for the Reka UI primitives (`$/components/`), as react-aria's `I18nProvider`
-    gives the React ones. Mounted here rather than in `App.vue`, so that Reka stays out of the
-    initial chunk: this is the lazily loaded dashboard, where the primitives are used. -->
-    <ConfigProvider :locale="text.locale">
-      <div class="AppContainer">
-        <PopoverRootProvider>
-          <div class="topBarBackground" />
-          <CommandPalette />
-          <ModalHost />
-          <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
-          <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
-            <div class="bar">
-              <TabBar />
-              <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
-              <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
-            </div>
-            <div class="belowBar">
-              <MiddlePanel v-if="middlePanelShown" />
-              <RightPanel />
-            </div>
+  <!-- The locale for the Reka UI primitives (`$/components/`). Mounted here rather than in
+  `App.vue`, so that Reka stays out of the initial chunk: this is the lazily loaded dashboard,
+  where the primitives are used. -->
+  <ConfigProvider :locale="text.locale">
+    <div class="AppContainer">
+      <PopoverRootProvider>
+        <div class="topBarBackground" />
+        <CommandPalette />
+        <ModalHost />
+        <LeftPanel :class="{ noMiddlePanel: !middlePanelShown }" />
+        <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
+          <div class="bar">
+            <TabBar />
+            <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
+            <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
           </div>
-          <div ref="fullscreenRoot" class="FullscreenRoot" @wheel.stop />
-        </PopoverRootProvider>
-      </div>
-    </ConfigProvider>
-  </ContainerProviderForReact>
+          <div class="belowBar">
+            <MiddlePanel v-if="middlePanelShown" />
+            <RightPanel />
+          </div>
+        </div>
+        <div ref="fullscreenRoot" class="FullscreenRoot" @wheel.stop />
+      </PopoverRootProvider>
+    </div>
+  </ConfigProvider>
 </template>
 
 <style scoped>

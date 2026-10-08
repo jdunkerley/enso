@@ -53,8 +53,8 @@ the old root. Tests: `__tests__/localTab.test.ts` and
 ## Keyboard shortcuts
 
 The Keyboard shortcuts tab edits the window's bindings
-(`$/providers/inputBindings`): the dashboard's, which the React dashboard reads
-through `InputBindingsProvider`, and the graph editor's (#170), listed by
+(`$/providers/inputBindings`): the dashboard's, which Vue reads through
+`$/providers/dashboardInputBindings`, and the graph editor's (#170), listed by
 category from the registry (`$/configurations/keyboardShortcuts`). A change
 applies at once, in the open graph editor too. They are saved to `localStorage`
 under `inputBindings`, in a versioned extension of the format the React provider

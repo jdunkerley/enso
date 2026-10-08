@@ -55,34 +55,17 @@ const RESTRICTED_IMPORT_PATHS = [
 /**
  * The `#/` (React dashboard) modules that code outside `src/dashboard/` may still import. Shared
  * code must not depend on the dashboard: framework-free code belongs in `src/` (see #77). What is
- * left is React itself, reached across the veaury bridge. Remove an entry when the ticket that
- * ports its module lands; never add framework-free code here - move it to `src/` instead.
+ * left are the dashboard's Vue features that the shell mounts. Never add framework-free code here -
+ * move it to `src/` instead.
  *
  * `import()` expressions (the lazily loaded routes in `router.ts`) are not checked by
  * `no-restricted-imports`, so they need no entry.
  */
 const DASHBOARD_IMPORT_ALLOWLIST = [
-  // React components mounted from Vue through `reactComponent`, or by `ReactRoot.tsx`.
-  'App.tsx',
-  'components/ErrorBoundary',
-  'components/OfflineNotificationManager',
-  'components/Suspense',
-  'components/UIProviders',
+  // Dashboard features ported to Vue, mounted by the shared app shell.
   'layouts/DriveView.vue',
   'layouts/Settings',
-  'modals/AcceptInvitationModal',
-  'modals/AgreementsModal',
-  'modals/PlanDowngradedModal',
-  'modals/SetupOrganizationForm',
-  'modals/TrialEndedModal',
-  'pages/authentication/LoadingScreen',
-  'providers/LoggerProvider',
-  // Dashboard features ported to Vue, mounted by the shared app shell.
   'pages/dashboard/UserBar/UserBar.vue',
-  // React glue used only by the bridge files (`ReactRoot.tsx`, `providers/react/`).
-  'hooks/mountHooks',
-  'utilities/vue',
-  'utilities/zustand',
   // The dashboard's global stylesheets.
   'styles.css',
   'tailwind.css',

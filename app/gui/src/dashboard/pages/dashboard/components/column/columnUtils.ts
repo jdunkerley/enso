@@ -1,6 +1,6 @@
 /** @file Types and constants related to `Column`s. */
-import type { SvgUseIcon } from '#/components/types'
 import type { CategoryType } from '$/providers/category'
+import type { Icon } from '@/util/iconMetadata/iconName'
 import * as backend from 'enso-common/src/services/Backend'
 
 /** Column type. */
@@ -28,7 +28,7 @@ export const DEFAULT_ENABLED_COLUMNS: ReadonlySet<Column> = new Set([
   Column.createdBy,
 ])
 
-export const COLUMN_ICONS: Readonly<Record<Column, SvgUseIcon>> = {
+export const COLUMN_ICONS: Readonly<Record<Column, Icon>> = {
   /* The file column does not have an icon, however this does not matter as it is not
    * collapsible. */
   [Column.name]: 'ghost',

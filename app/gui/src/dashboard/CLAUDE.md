@@ -4,77 +4,50 @@ The **Dashboard feature** subtree: sign-up/sign-in, cloud project browser,
 settings. Everything whose meaning is tied to the Enso Cloud shell (before a
 project is opened, or alongside it) lives here. Import via the `#/` path alias.
 
-**Currently implemented in React, legacy.** Vue is the main GUI framework; this
-subtree was built as an independent React effort and is being progressively
-migrated to Vue. Prefer porting a component to Vue over extending it here. New
-features default to Vue.
+**Vue.** This subtree was built as an independent React effort and has been
+ported to Vue (#75); no React code is left in it (#93). Removing React and its
+dependencies from the toolchain is #94. Common UI primitives and utilities live
+at `src/` directly (see the sibling project-view structure for the same
+principle); this directory holds only Dashboard-specific code.
 
-Once the migration completes, this directory is expected to hold only
-Dashboard-specific Vue code — common UI primitives / utilities should live at
-`src/` directly (see the sibling project-view structure for the same principle).
+## Structure
 
-## Structure (React, legacy shape)
-
-- `pages/` — Route-level components. Top of the component tree for each URL.
-  `pages/dashboard/UserBar/` is Vue (#83): the user bar, user menu and
-  notification tray, mounted by `AppContainer.vue`.
-- `layouts/` — Chromes that wrap multiple pages (protected-route wrappers, split
-  panels). The drive is Vue (#91): `DriveView.vue` (mounted by `LeftPanel.vue`)
+- `pages/` — Route-level parts. `pages/dashboard/UserBar/` is the user bar, user
+  menu and notification tray (#83), mounted by `AppContainer.vue`; the drive's
+  rows, cells, column headings and drive bar are under `pages/dashboard/`. The
+  `dashboard` route itself renders `$/components/DashboardPage.vue`, which holds
+  the dashboard's global shortcuts and mounts `AppContainer.vue`.
+- `layouts/` — The drive (#91): `DriveView.vue` (mounted by `LeftPanel.vue`)
   provides the drive store and its view state and holds `AssetsTable.vue`, the
   search bar and the context menus; `layouts/Drive/` has its composables
   (`driveView.ts`, the shown-versus-target location that stands in for React's
   navigation transition; `driveActions.ts`; `assetItems.ts`; `suggestions.ts`;
-  drag and drop). Its dialogs are Vue and open on the modal stack, the labels,
-  credential and datalink ones from `$/cloud/` (#198). The rows, cells, column
-  headings and the drive bar are under `pages/dashboard/`. Buttons inside a row
-  bind `STOP_PRESS_PROPAGATION` (`layouts/Drive/pressPropagation.ts`), as
-  react-aria's `usePress` stopped a press reaching the row.
-- `components/` — Reusable UI atoms/molecules. Sub-folders group related parts
-  (`Button/`, `Form/`, `Dialog/`, `Menu/`). The `aria/` folder re-exports
-  `react-aria-components` with project-level styling applied. Truly shared UI
-  will move to `src/` proper as it's ported.
-- `providers/` — React context providers (auth, text/i18n, input bindings,
-  etc.). `ModalProvider.tsx` is only a shim now: `setModal`/`unsetModal` (and
-  `askModal`, behind the React `ask`) forward to the Vue modal stack
-  (`$/providers/modals`). The About dialog is Vue's: open it with
-  `openAboutModal()` (`$/components/AboutModal/aboutModal`).
-  `InputBindingsProvider` hands out the one instance of the dashboard's
-  bindings, `$/providers/dashboardInputBindings` (the dashboard half of the
-  window's store, `$/providers/inputBindings`, #170), which Vue menus read too
-  (the user menu's shortcuts; `$/composables/menuEntries` is the Vue
-  `useMenuEntries`) and the Vue settings page edits; a change re-renders its
-  consumers.
-- `hooks/` — Custom React hooks.
-- `modals/` — The React modals still opened with `setModal` or a
-  `Dialog.Trigger`. The drive's simple modals are Vue (#92), opened on the modal
-  stack (`useModals()`). The duplicate-name dialog, the drag preview and the
-  asset summary are in `$/components/Drive/`; the secret and "New Credential"
-  dialogs in `$/cloud/credentials/`, the labels popover in `$/cloud/labels/` and
-  the "Create Datalink" dialog in `$/cloud/datalinks/` (#198); delete
-  confirmations use `$/components/AlertDialog/ConfirmDeleteModal.vue`. No drive
-  code calls `setModal` with a React element any more.
-- `utilities/` — React-bound helpers only (`jsx`, `mergeRefs`, `reactQuery`,
-  `tanstackQuery`, `zustand`, `vue`, …), plus `debug` and `equalities`.
-  `toast.tsx` is the React shim over the Vue toast store (`$/providers/toasts`):
-  import `toast` from there, never from a toast library.
+  drag and drop). Its dialogs open on the modal stack (`$/providers/modals`),
+  the labels, credential and datalink ones from `$/cloud/` (#198). Buttons
+  inside a row bind `STOP_PRESS_PROPAGATION`
+  (`layouts/Drive/pressPropagation.ts`), as react-aria's `usePress` stopped a
+  press reaching the row. `layouts/Settings/` is the settings page.
+- `components/` — The drive's `ContextMenu.vue`. Shared primitives are in
+  `src/components/`.
+- `modals/` — `CaptureKeyboardShortcutModal.vue`. The drive's other dialogs are
+  in `$/components/Drive/`, `$/components/AlertDialog/` and `$/cloud/`.
 - `styles.css`, `tailwind.css`, `typings.d.ts` — Tailwind plus global resets.
 
-## Conventions (current React stack)
+The dashboard's keyboard shortcuts are the window's
+(`$/providers/dashboardInputBindings`, the dashboard half of
+`$/providers/inputBindings`, #170): menus read them through
+`$/composables/menuEntries`, and the settings page edits them. Toasts go through
+the Vue toast store (`$/providers/toasts`), modals through the modal stack
+(`$/providers/modals`); the About dialog opens with `openAboutModal()`
+(`$/components/AboutModal/aboutModal`).
 
-- **UI lib**: `react-aria-components` for accessibility primitives,
-  `tailwind-variants` and `tailwind-merge` for class composition,
-  `tailwindcss-react-aria-components` for matching selectors.
-- **Forms**: `react-hook-form` + `zod` resolvers. Schemas live with the form,
-  not in `data/`.
-- **Async/data**: `@tanstack/react-query` throughout, over the framework-free
-  options in `$/utils/backendQuery`, `$/utils/driveQueries` and
-  `$/utils/driveMutations` (#192), which Vue uses too — don't call `useQuery`
-  with a literal key inside a component, and don't give a key options of its
-  own. The React drive's adapters went with it (#91).
-- **Routing**: `vue-router` (yes, really — the dashboard lives inside a Vue
-  shell; React components consume routing via the bridge).
-- **Error boundaries**: wrap new features with `ErrorBoundary` from
-  `components/`; don't catch errors with try/catch for render-time failures.
+## Conventions
+
+- **Async/data**: vue-query over the framework-free options in
+  `$/utils/backendQuery`, `$/utils/driveQueries` and `$/utils/driveMutations`
+  (#192) — don't call `useQuery` with a literal key inside a component, and
+  don't give a key options of its own.
+- **Routing**: `vue-router`.
 - **Styling**: Tailwind + CSS nesting (enabled via `postcss-nesting`). Prefer
   class utilities over ad-hoc CSS; if you need a component class, use
   `tailwind-variants`.
@@ -95,8 +68,7 @@ alias), and each side subscribes.
 
 ## Tests
 
-- Unit: `vitest` + `@testing-library/react`. Vue ports of dashboard components
-  use plain `@vue/test-utils` through `mountWithProviders`
+- Unit: `vitest` with `@vue/test-utils`, through `mountWithProviders`
   (`src/utils/testing/`).
 - Integration: Playwright specs in `app/gui/integration-test/dashboard/`. A port
   follows the parity checklist in `app/gui/integration-test/CLAUDE.md`.
@@ -128,10 +100,10 @@ They are:
 Every port PR follows this checklist.
 
 1. **One mount site per PR.** Port a slice, switch the single place that mounts
-   it (a `reactComponent(...)` wrapper, a route, a tab entry), and **delete the
-   React file in the same PR**. There are no feature flags and no parallel
-   copies, and the app ships after every PR. If the React file has other
-   importers, it is not ready to delete, so port a smaller slice.
+   it (a route, a tab entry, a component), and **delete the React file in the
+   same PR**. There are no feature flags and no parallel copies, and the app
+   ships after every PR. If the React file has other importers, it is not ready
+   to delete, so port a smaller slice.
 2. **Keep every `data-testid` and accessible name**, identical: role, label,
    `aria-*`, visible text. The specs must pass **unedited**; only page objects
    (`integration-test/actions/`) may change.

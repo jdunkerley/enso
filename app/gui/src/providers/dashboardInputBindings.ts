@@ -1,8 +1,7 @@
 /**
  * @file The dashboard's keyboard and mouse bindings (`$/configurations/inputBindings`), one set per
- * window, with the user's changes to them. The React dashboard reads them through its
- * `InputBindingsProvider`, and Vue menus read them too (the user menu's shortcuts, #83), so all
- * see the same set. They are the dashboard's half of the window's bindings,
+ * window, with the user's changes to them: the dashboard's global shortcuts
+ * (`$/components/DashboardPage.vue`), the menus and the drive all read the same set. They are the dashboard's half of the window's bindings,
  * `$/providers/inputBindings` (#170), which also holds the graph editor's, loads and saves both,
  * and is what the Keyboard shortcuts settings tab edits.
  */
@@ -28,8 +27,5 @@ export function getDashboardInputBindings(): DashboardInputBindings {
   return getInputBindingsStore().dashboard
 }
 
-/**
- * {@link getDashboardInputBindings}, under the name Vue code uses: the instance is a plain object,
- * the same for React and Vue.
- */
+/** {@link getDashboardInputBindings}, under the name Vue code uses. */
 export const useDashboardInputBindings = getDashboardInputBindings

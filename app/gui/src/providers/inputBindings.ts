@@ -1,8 +1,8 @@
 /**
  * @file The window's keyboard and mouse bindings, with the user's changes (#170): one store for the
  * dashboard's (`$/configurations/inputBindings`) and the graph editor's
- * (`$/configurations/graphInputBindings`). The React dashboard reads the dashboard's through
- * `InputBindingsProvider`, Vue menus through `$/providers/dashboardInputBindings`, the graph editor
+ * (`$/configurations/graphInputBindings`). The dashboard reads its half through
+ * `$/providers/dashboardInputBindings`, the graph editor
  * through `graphBindings` (`@/bindings`), and the Keyboard shortcuts settings tab edits both. A
  * change applies at once everywhere, and is saved.
  *
@@ -170,10 +170,6 @@ export function createInputBindingsStore(
         namespace.delete(key, binding)
         save()
       },
-      /** A counter of the changes, for the React provider to re-render its consumers. */
-      get revision() {
-        return revision.value
-      },
       get metadata(): Namespace['metadata'] {
         // Read for Vue's dependency tracking: `metadata` is a new object after every change.
         void revision.value
@@ -206,7 +202,7 @@ export function createInputBindingsStore(
   }
 
   return {
-    /** The dashboard's bindings, as the React provider and Vue menus use them. */
+    /** The dashboard's bindings. */
     dashboard,
     /** The graph editor's bindings, which `graphBindings` (`@/bindings`) dispatches. */
     graph,

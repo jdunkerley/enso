@@ -70,7 +70,7 @@ beforeEach(() => {
   })
   associateTag.mockReset().mockResolvedValue(undefined)
   deleteTag.mockReset().mockResolvedValue(undefined)
-  // The dashboard's global key bindings listen on the body, as `Dashboard.tsx` attaches them.
+  // The dashboard's global key bindings listen on the body, as `DashboardPage.vue` attaches them.
   bodyEscapes = 0
   document.body.addEventListener('keydown', onBodyKeyDown)
 })
