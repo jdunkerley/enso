@@ -39,7 +39,6 @@ import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { includesPredicate } from '$/utils/data/array'
 import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
-import { useZustandStoreRef } from '$/utils/zustand'
 import { backendMutationOptions, backendQueryOptions } from '@/composables/backend'
 import { useMutation, useQuery } from '@tanstack/vue-query'
 import type { Path } from 'enso-common/src/services/Backend'
@@ -115,14 +114,8 @@ function setPreferredTimeZone(value: string | undefined) {
   preferredTimeZone.value = value
 }
 
-const storedLocalRootDirectory = useZustandStoreRef(
-  localPathsStore,
-  (state) => state.localRootDirectory,
-)
-const storedDownloadDirectory = useZustandStoreRef(
-  localPathsStore,
-  (state) => state.downloadDirectory,
-)
+const storedLocalRootDirectory = computed(() => localPathsStore.state.value.localRootDirectory)
+const storedDownloadDirectory = computed(() => localPathsStore.state.value.downloadDirectory)
 const defaultDownloadDirectory = inject<Path | null>('defaultDownloadPath', null)
 
 const context = computed<SettingsContext>(() => ({

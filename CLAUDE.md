@@ -8,9 +8,8 @@ monorepo**:
   interpreter (Truffle/GraalVM), language server, and the Enso standard library.
   Written in Scala, Java, and Rust.
 - **Enso IDE** — a desktop application (Electron) with a visual graph editor and
-  a dashboard for project/cloud management. Written in TypeScript; Vue is the
-  main UI framework. The Dashboard feature is still in React as a historical
-  artifact and is being progressively migrated to Vue.
+  a dashboard for project/cloud management. Written in TypeScript; the UI is Vue
+  throughout (the Dashboard feature was React until #75 ported it).
 
 The two products are glued together by several generated/shared artifacts: the
 Rust parser is compiled to **both** WASM (for the GUI) and a JNI `cdylib` (for
@@ -19,9 +18,8 @@ deserialize parser output.
 
 ## Top-level layout
 
-- `app/` — Desktop app (Electron), GUI (Vue; the Dashboard feature is still
-  React while it's being ported), ydoc server, markdown/table CodeMirror
-  grammars, Rust→WASM bindings. pnpm monorepo.
+- `app/` — Desktop app (Electron), GUI (Vue), ydoc server, markdown/table
+  CodeMirror grammars, Rust→WASM bindings. pnpm monorepo.
 - `engine/` — The Enso language engine. Mixed Scala/Java under `sbt`. Runtime
   uses GraalVM Truffle.
 - `lib/rust/` — Rust workspace libraries (parser, prelude, reflect/metamodel,

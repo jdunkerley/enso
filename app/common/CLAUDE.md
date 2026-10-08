@@ -1,9 +1,8 @@
 # app/common
 
 Published as package `enso-common`. Pure-TS utilities shared across the Electron
-client, the GUI (both halves), and other app-side packages. Meant to be the
-boundary-crossing neutral ground — anything Vue- or React-specific belongs in
-its own package.
+client, the GUI, and other app-side packages. Meant to be the boundary-crossing
+neutral ground — anything Vue-specific belongs in its own package.
 
 ## Contents
 
@@ -19,8 +18,8 @@ its own package.
 
 ## Rules
 
-- No Vue, React, DOM, or Node-specific APIs at module top level (dynamic imports
-  / runtime checks are OK).
+- No Vue, DOM, or Node-specific APIs at module top level (dynamic imports /
+  runtime checks are OK).
 - Every dep must be either isomorphic or explicitly scoped to a single entry
   point.
 - Breaking changes ripple into `enso-gui` and `enso` (Electron client) — compile

@@ -83,7 +83,6 @@ jobs:
             **/*.md
             app/gui/**/__tests__/**
             app/gui/**/*.test.ts
-            app/gui/**/*.test.tsx
             app/gui/integration-test/**
             app/gui/src/dashboard/test/**
             app/gui/vitest.config.ts

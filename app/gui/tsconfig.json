@@ -14,7 +14,6 @@
     "strictNullChecks": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "jsx": "react-jsx",
     "paths": {
       "@/*": ["./src/project-view/*"],
       "#/*": ["./src/dashboard/*"],

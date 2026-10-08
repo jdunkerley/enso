@@ -13,7 +13,7 @@ const config = mergeConfig(
       env: loadEnv('testing', '../gui', 'ENSO_IDE_'),
       reporters: process.env.CI ? ['dot', 'github-actions'] : ['default'],
       environment: 'jsdom',
-      includeSource: ['./src/**/*.{ts,tsx,vue}'],
+      includeSource: ['./src/**/*.{ts,vue}'],
       exclude: [...configDefaults.exclude, 'integration-test/**/*'],
       root: fileURLToPath(new URL('./', import.meta.url)),
       restoreMocks: true,

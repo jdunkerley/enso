@@ -15,9 +15,8 @@ feature:
   component browser, code editor, visualizations, documentation editor). Vue.
   Uses `@vueuse/core`, `@tanstack/vue-query`, `yjs`. Import via `@/…`.
 - `src/dashboard/` — the **Dashboard** feature subtree (cloud storage, project
-  browser, settings). Vue: it was React, and no React code is mounted any more
-  (#93); removing React and its dependencies from the toolchain is #94.
-  TailwindCSS for styling. Import via `#/…`.
+  browser, settings). Vue, ported from React (#75; React itself was removed in
+  #94). TailwindCSS for styling. Import via `#/…`.
 
 Many commons still sit inside `src/project-view/` for historical reasons. The
 plan is to move genuinely shared UI/utilities **out** of `project-view/` and
@@ -26,9 +25,7 @@ code. When you add something new, ask: is it ProjectView-only, Dashboard-only,
 or shared? Shared goes at `src/`.
 
 **Rule of thumb for new work:** default to Vue, put cross-feature code at
-`src/`, put feature-specific code in the matching subtree. When a Dashboard
-component needs non-trivial changes, consider porting it to Vue rather than
-extending the React version.
+`src/`, put feature-specific code in the matching subtree.
 
 `entrypoint.ts` creates the app; `App.vue` is the shell (the router view, the
 toasts, the About dialog, the tooltips). The `dashboard` route renders
@@ -40,7 +37,7 @@ and mounts `AppContainer.vue`.
 Defined in `vite.config.ts`:
 
 - `@/…` → `src/project-view/…` (ProjectView feature subtree, Vue)
-- `#/…` → `src/dashboard/…` (Dashboard feature subtree, currently React)
+- `#/…` → `src/dashboard/…` (Dashboard feature subtree, Vue)
 - `$/…` → `src/…` (shared/cross-feature code: app shell, providers, common
   components, i18n)
 
@@ -62,23 +59,27 @@ framework-free, move it to `src/` (as #77 did) rather than adding an entry.
   `src/utils/style/` for Tailwind class composition (`tailwindVariants`,
   `tailwindMerge`); `src/utils/testing/` for test-only helpers
   (`mountWithProviders`, the Vue component-test harness).
-- `src/components/<Name>/variants.ts` — Tailwind variants shared by the React
-  component of that name and its Vue port (`Button`, `Dialog`, `Text`, `Icon`,
-  `Menu`, `Tooltip`, `Inputs`, …), plus other framework-free component
-  constants. The Vue primitives themselves live beside them; see
-  `src/components/CLAUDE.md`.
+- `src/utils/persistedStore.ts` — a reactive state object saved to
+  `localStorage`, behind the feature flags, the code-font settings and the local
+  directories (`src/providers/`). Its entry format (`{ state, version }`) is the
+  one zustand's `persist` used, so settings saved before #94 still load; keep
+  it.
+- `src/components/<Name>/variants.ts` — Tailwind variants of the component of
+  that name (`Button`, `Dialog`, `Text`, `Icon`, `Menu`, `Tooltip`, `Inputs`,
+  …), plus other framework-free component constants. The Vue primitives
+  themselves live beside them; see `src/components/CLAUDE.md`.
 - **The backend's queries and mutations** (#192): `src/utils/backendQuery.ts`
   defines every backend method's query and mutation options once (key, stale
-  time, persistence, invalidations), typed with `@tanstack/query-core`, so that
-  React's `useQuery` and vue-query consume the same objects in the one shared
-  `QueryClient`; `executeMutation` runs one from outside any component.
-  `driveQueries.ts` (listings, search, new names), `driveMutations.ts` (the
-  batched delete, restore, copy, move and download; the move's duplicate
-  resolver is injected) and `transferBetweenCategories.ts` (with its context
-  injected) build on it. The Vue wrappers are `@/composables/backend` and
-  `$/composables/transferBetweenCategories`; the drive's own (mutation state,
-  new folder and project, rename, uploads) are in `#/layouts/Drive/driveActions`
-  (#91). Never give a key different options on the two sides.
+  time, persistence, invalidations), typed with `@tanstack/query-core`, which
+  vue-query consumes in the one shared `QueryClient`; `executeMutation` runs one
+  from outside any component. `driveQueries.ts` (listings, search, new names),
+  `driveMutations.ts` (the batched delete, restore, copy, move and download; the
+  move's duplicate resolver is injected) and `transferBetweenCategories.ts`
+  (with its context injected) build on it. The Vue wrappers are
+  `@/composables/backend` and `$/composables/transferBetweenCategories`; the
+  drive's own (mutation state, new folder and project, rename, uploads) are in
+  `#/layouts/Drive/driveActions` (#91). Never give a key different options on
+  the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and
@@ -206,8 +207,8 @@ Node-side code occasionally needs a type or small pure-TS helper from `src/`
 then need listing too. **Resist the urge to fix a resulting `TS6307` by adding a
 broad `"./src/**/*.ts"` glob** — that pulls in `entrypoint.ts`, which imports
 `App.vue`, which cascades into the whole Vue app and produces hundreds of
-unrelated errors (every `.vue`/`.tsx` file is then "reachable but not
-included"). Instead add the exact file(s) TypeScript names in the error to
+unrelated errors (every `.vue` file is then "reachable but not included").
+Instead add the exact file(s) TypeScript names in the error to
 `tsconfig.node.json`'s `include` list, one by one, until the error is gone — the
 closure is small and finite in practice (it was 13 files for #141, listed in the
 file with a comment explaining why).

@@ -8,9 +8,6 @@ import eslintJs from '@eslint/js'
 import tsEslint from '@typescript-eslint/eslint-plugin'
 import vueTsEslintConfig from '@vue/eslint-config-typescript'
 import jsdoc from 'eslint-plugin-jsdoc'
-import react from 'eslint-plugin-react'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
 import pluginVue from 'eslint-plugin-vue'
 import globals from 'globals'
 import * as path from 'node:path'
@@ -29,12 +26,12 @@ const NAME = 'enso'
  * `node:process` is here because `process.on` does not exist on the namespace import.
  */
 const DEFAULT_IMPORT_ONLY_MODULES =
-  '@vitejs\\u002Fplugin-react|node:process|chalk|string-length|yargs|yargs\\u002Fyargs|sharp|to-ico|connect|morgan|serve-static|tiny-invariant|react-keyed-flatten-children|clsx|create-servers|electron-is-dev|fast-glob|esbuild-plugin-.+|opener|tailwindcss.*|@modyfi\\u002Fvite-plugin-yaml|build-info|is-network-error|validator.+|.*[.]json|.*[.]svg|.*[.]vue$'
+  'node:process|chalk|string-length|yargs|yargs\\u002Fyargs|sharp|to-ico|connect|morgan|serve-static|tiny-invariant|clsx|create-servers|electron-is-dev|fast-glob|esbuild-plugin-.+|opener|tailwindcss.*|@modyfi\\u002Fvite-plugin-yaml|build-info|is-network-error|validator.+|.*[.]json|.*[.]svg|.*[.]vue$'
 const RELATIVE_MODULES =
   'projectManager|server|configParser|authentication|config|debug|detect|fileAssociations|index|ipc|log|naming|paths|preload|projectManagement|security|urlAssociations|contentConfig|desktopEnvironment|#\\u002F.*|\\$\\u002F.*'
 const ALLOWED_DEFAULT_IMPORT_MODULES = `${DEFAULT_IMPORT_ONLY_MODULES}|postcss|ajv\\u002Fdist\\u002F2020|${RELATIVE_MODULES}`
 const STRING_LITERAL = ':matches(Literal[raw=/^["\']/], TemplateLiteral)'
-const NOT_CAMEL_CASE = '/^(?!_?[a-z][a-z0-9*]*([A-Z0-9][a-z0-9]*)*$)(?!React$)/'
+const NOT_CAMEL_CASE = '/^(?!_?[a-z][a-z0-9*]*([A-Z0-9][a-z0-9]*)*$)/'
 const WHITELISTED_CONSTANTS = 'logger|.+Context|interpolationFunction.+'
 const NOT_CONSTANT_CASE = `/^(?!${WHITELISTED_CONSTANTS}$|_?[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$)/`
 
@@ -45,15 +42,10 @@ const RESTRICTED_IMPORT_PATHS = [
     importNames: ['proxyRefs'],
     message: 'Use more type-safe alternative in @/util/reactivity',
   },
-  {
-    name: 'veaury',
-    importNames: ['applyReactInVue', 'applyPureReactInVue'],
-    message: 'Use `reactComponent` in $/utils/react',
-  },
 ]
 
 /**
- * The `#/` (React dashboard) modules that code outside `src/dashboard/` may still import. Shared
+ * The `#/` (dashboard) modules that code outside `src/dashboard/` may still import. Shared
  * code must not depend on the dashboard: framework-free code belongs in `src/` (see #77). What is
  * left are the dashboard's Vue features that the shell mounts. Never add framework-free code here -
  * move it to `src/` instead.
@@ -74,11 +66,11 @@ const DASHBOARD_IMPORT_ALLOWLIST = [
 /** Escape a string for use in a regular expression. */
 const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** The `no-restricted-imports` pattern keeping shared code off the React dashboard. */
+/** The `no-restricted-imports` pattern keeping shared code off the dashboard. */
 const DASHBOARD_IMPORT_PATTERN = {
   regex: `^#/(?!(?:${DASHBOARD_IMPORT_ALLOWLIST.map(escapeRegExp).join('|')})$)`,
   message:
-    'Shared code must not import from the React dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
+    'Shared code must not import from the dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
 }
 
 /**
@@ -156,7 +148,7 @@ const RESTRICTED_SYNTAXES = [
   },
   {
     // Matches non-functions.
-    selector: `:matches(Program, ExportNamedDeclaration, TSModuleBlock) > VariableDeclaration[kind=const] > VariableDeclarator[id.name=${NOT_CONSTANT_CASE}]:not(:matches([init.callee.object.name=React][init.callee.property.name=forwardRef], [init.callee.object.name=React][init.callee.property.name=memo], :has(CallExpression[callee.name=memo]), :has(CallExpression[callee.name=forwardRef]), :has(ArrowFunctionExpression), :has(CallExpression[callee.object.name=newtype][callee.property.name=newtypeConstructor]), :has(CallExpression[callee.name=newtypeConstructor])))`,
+    selector: `:matches(Program, ExportNamedDeclaration, TSModuleBlock) > VariableDeclaration[kind=const] > VariableDeclarator[id.name=${NOT_CONSTANT_CASE}]:not(:matches(:has(ArrowFunctionExpression), :has(CallExpression[callee.object.name=newtype][callee.property.name=newtypeConstructor]), :has(CallExpression[callee.name=newtypeConstructor])))`,
     message: 'Use `CONSTANT_CASE` for top-level constants that are not functions',
   },
   {
@@ -205,25 +197,6 @@ const RESTRICTED_SYNTAXES = [
   {
     selector: ':matches(ForStatement[test=null], ForStatement[test.value=true])',
     message: 'Use `while (true)` instead of `for (;;)`',
-  },
-  {
-    selector: `:matches(\
-            JSXAttribute[name.name=/^(?:alt|error|label|placeholder|text|title|actionButtonLabel|actionText|aria-label)$/][value.raw=/^'|^"|^\`/], \
-            JSXText[value=/\\S/], \
-            JSXAttribute[name.name=/^(?:alt|error|label|placeholder|text|title|actionButtonLabel|actionText|aria-label)$/] ConditionalExpression:matches(\
-                [consequent.raw=/^'|^"|^\`/], \
-                [alternate.raw=/^'|^"|^\`/]\
-            )\
-        )`,
-    message: 'Use a `getText()` from `useText` instead of a literal string',
-  },
-  {
-    selector: 'JSXOpeningElement[name.name=button] > JSXIdentifier',
-    message: 'Use `Button` or `UnstyledButton` instead of `button`',
-  },
-  {
-    selector: 'JSXOpeningElement[name.name=/^h[123456]$/] > JSXIdentifier',
-    message: 'Use `aria.Heading` instead of `h1`-`h6`',
   },
 ]
 
@@ -336,8 +309,7 @@ const config = [
     },
   },
   {
-    // The shared primitives keep the React dashboard's component names (`Button`, `Text`,
-    // `Dialog`, …) so that ports stay mechanical (#78). They are always imported, never registered
+    // The shared primitives have short component names (`Button`, `Text`, `Dialog`, …) (#78). They are always imported, never registered
     // globally, so a PascalCase `<Button>` is never resolved as the HTML `<button>`.
     files: ['app/gui/src/components/*/*.vue'],
     rules: {
@@ -375,7 +347,7 @@ const config = [
 
   // === Shared code must not depend on the dashboard ===
   {
-    files: ['app/gui/**/*.{ts,tsx,mts,cts,vue}'],
+    files: ['app/gui/**/*.{ts,mts,cts,vue}'],
     ignores: ['app/gui/src/dashboard/**'],
     rules: {
       'no-restricted-imports': [
@@ -390,9 +362,9 @@ const config = [
   // live in `src/cloud/<area>/`, and the core reaches them only through `src/cloud/index.ts`
   // (`registerCloud`, which only `entrypoint.ts` imports), so that a community build can drop the
   // folder.
-  // The React dashboard is exempt while it is ported: it mixes cloud and core code.
+  // The dashboard is exempt: it mixes cloud and core code.
   {
-    files: ['app/gui/**/*.{ts,tsx,mts,cts,vue}'],
+    files: ['app/gui/**/*.{ts,mts,cts,vue}'],
     ignores: ['app/gui/src/dashboard/**', 'app/gui/src/cloud/**', 'app/gui/src/entrypoint.ts'],
     rules: {
       'no-restricted-imports': [
@@ -425,32 +397,10 @@ const config = [
 
   // === Dashboard Rules ===
   {
-    ...reactRefresh.configs.vite,
-    files: ['app/gui/src/dashboard/**/*.ts', 'app/gui/src/dashboard/**/*.tsx'],
-    rules: {
-      ...reactRefresh.configs.vite.rules,
-      // `createHideableComponent` is a local HOC (`components/aria`), so the plugin cannot know
-      // that what it returns is a component. `extraHOCs` is the rule's own mechanism for that —
-      // eslint-plugin-react-refresh 0.5 began reporting these, and naming the HOC is the fix it
-      // documents.
-      'react-refresh/only-export-components': [
-        'error',
-        { allowConstantExport: true, extraHOCs: ['createHideableComponent'] },
-      ],
-    },
-  },
-  {
-    files: ['app/gui/src/dashboard/**/*.ts', 'app/gui/src/dashboard/**/*.tsx'],
-    settings: {
-      react: {
-        version: '18.2',
-      },
-    },
+    files: ['app/gui/src/dashboard/**/*.ts'],
     plugins: {
       jsdoc: jsdoc,
       '@typescript-eslint': tsEslint,
-      react: react,
-      'react-hooks': reactHooks,
     },
     languageOptions: {
       parserOptions: {
@@ -468,7 +418,6 @@ const config = [
       ...tsEslint.configs.recommended?.rules,
       ...tsEslint.configs['recommended-requiring-type-checking']?.rules,
       ...tsEslint.configs.strict?.rules,
-      ...react.configs['jsx-runtime'].rules,
       eqeqeq: ['error', 'always', { null: 'never' }],
       // Any extra semicolons that exist, are required by Prettier.
       'no-extra-semi': 'off',
@@ -529,16 +478,6 @@ const config = [
         },
       ],
       'prefer-const': 'error',
-      'react/forbid-elements': [
-        'error',
-        { forbid: [{ element: 'Debug', message: DEBUG_STATEMENTS_MESSAGE }] },
-      ],
-      // Not relevant because TypeScript checks types.
-      'react/prop-types': 'off',
-      'react/self-closing-comp': 'error',
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': ['error', { additionalHooks: 'useOnScroll|useLazyMemoHooks' }],
-      'react/jsx-pascal-case': ['error', { allowNamespace: true }],
 
       // Prefer `interface` over `type`.
       '@typescript-eslint/consistent-type-definitions': 'error',
@@ -551,7 +490,7 @@ const config = [
         'error',
         {
           selector: ['function'],
-          // PascalCase for React components, camelCase for all other situations
+          // PascalCase for components, camelCase for all other situations
           format: ['camelCase', 'PascalCase'],
         },
         {
@@ -594,8 +533,8 @@ const config = [
       '@typescript-eslint/no-empty-interface': 'off',
       '@typescript-eslint/no-extraneous-class': 'error',
       '@typescript-eslint/no-invalid-void-type': ['error', { allowAsThisParameter: true }],
-      // React 17 and later supports async functions as event handlers, so we need to disable this
-      // rule to avoid false positives.
+      // Async functions are fine as event handlers, so this is disabled for attributes to avoid
+      // false positives.
       //
       // See: https://github.com/typescript-eslint/typescript-eslint/pull/4623
       '@typescript-eslint/no-misused-promises': [
@@ -689,7 +628,7 @@ const config = [
     },
   },
   {
-    files: ['**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
+    files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
     ignores: ['**/build.mjs'],
     rules: {
       '@typescript-eslint/no-var-requires': 'off',
@@ -722,9 +661,6 @@ const config = [
       'app/gui/src/dashboard/**/*.ts',
       'app/gui/src/dashboard/**/*.mts',
       'app/gui/src/dashboard/**/*.cts',
-      'app/gui/src/dashboard/**/*.tsx',
-      'app/gui/src/dashboard/**/*.mtsx',
-      'app/gui/src/dashboard/**/*.ctsx',
     ],
     ignores: ['**/*.d.ts'],
     rules: {
@@ -741,20 +677,7 @@ const config = [
     },
   },
   {
-    files: ['app/gui/src/dashboard/**/*.stories.tsx'],
-    rules: {
-      'no-restricted-syntax': 'off',
-      'jsdoc/require-jsdoc': 'off',
-      'jsdoc/require-param-type': 'off',
-      'jsdoc/require-file-overview': 'off',
-      '@typescript-eslint/no-magic-numbers': 'off',
-      '@typescript-eslint/unbound-method': 'off',
-      '@typescript-eslint/naming-convention': 'off',
-      'react-hooks/rules-of-hooks': 'off',
-    },
-  },
-  {
-    files: ['app/gui/src/dashboard/**/*.test.tsx', 'app/gui/src/dashboard/**/*.test.ts'],
+    files: ['app/gui/src/dashboard/**/*.test.ts'],
     rules: {
       'no-restricted-syntax': 'off',
       'jsdoc/require-jsdoc': 'off',
@@ -764,12 +687,6 @@ const config = [
       '@typescript-eslint/unbound-method': 'off',
       '@typescript-eslint/naming-convention': 'off',
     },
-  },
-  // The Vue component tests of the ported dashboard: their `use…` functions are Vue composables,
-  // which may be called anywhere in a test, not React hooks.
-  {
-    files: ['app/gui/src/dashboard/**/__tests__/*.test.ts'],
-    rules: { 'react-hooks/rules-of-hooks': 'off' },
   },
   // === Index Files ===
   {

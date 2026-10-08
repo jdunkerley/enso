@@ -1,9 +1,9 @@
 # src/components/
 
 Shared Vue UI: the app shell (`AppContainer/`, `CommandPalette.vue`, …) and the
-**UI primitives** the React dashboard is being ported onto (#75). Import via
-`$/components/…`. Nothing here may import `#/` (the React dashboard; ESLint
-enforces it).
+**UI primitives** the dashboard was ported onto (#75). Import via
+`$/components/…`. Nothing here may import `#/` (the dashboard; ESLint enforces
+it).
 
 ## The primitives
 
@@ -75,10 +75,11 @@ local `<Dialog>`.
 
 ## Rules
 
-- **Same styles as React.** Each primitive renders the `variants.ts` its React
-  counterpart uses; `src/dashboard/components/__tests__/vuePortParity.test.tsx`
-  checks the classes match. Only react-aria-only modifiers are respelled, as
-  `data-[…]:`/`aria-*:` (`*_MOTION` constants beside the variants).
+- **Styles live in `variants.ts`.** Each primitive renders the `variants.ts`
+  beside it. Its state variants (`selected:`, `pressed:`, `placement-*:`, …)
+  match the `data-*` attributes the primitive sets; they are defined in
+  `tailwind.config.ts` (`STATE_VARIANTS`), whose order decides which state wins.
+  Motion uses `data-[…]:`/`aria-*:` (`*_MOTION` constants beside the variants).
 - **Reka UI** (`reka-ui`, exact pin) provides the behaviour: focus, keyboard,
   dismissal, ARIA. Overlays teleport to `portalTarget()` (`#enso-portal-root`).
 - **Prop names follow React** (`isDisabled`, `isLoading`, `testId`, `tooltip`,

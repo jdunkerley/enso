@@ -11,8 +11,7 @@ here imports a type or helper from `src/` that isn't already reachable,
 file; add it to `tsconfig.node.json`'s `include` list (see the gotcha in
 `app/gui/CLAUDE.md` — do not widen it to a `src/**` glob).
 
-- `dashboard/` — Dashboard feature flows (sign-in, project list, settings). The
-  Dashboard subtree is still React, legacy.
+- `dashboard/` — Dashboard feature flows (sign-in, project list, settings).
 - `project-view/` — ProjectView feature flows (create nodes, connect edges, open
   visualization).
 - `actions/` — Reusable test actions (page-object-style helpers).
@@ -150,33 +149,32 @@ ordinary suite.
   the same PR.
 - **Accessibility-tree snapshots** (`toMatchAriaSnapshot`) pin the roles, names
   and states of the drive table header, the user menu and the settings sidebar.
-  They are partial on purpose — no unnamed icons, no react-aria-only nodes such
-  as its hidden "Dismiss" buttons — so they hold a port to the contract, not to
-  React's DOM. When a port changes a tree deliberately (e.g. the user menu
-  becoming a `menu` of `menuitem`s), update the snapshot in the same PR
+  They are partial on purpose — no unnamed icons or other incidental nodes — so
+  they hold the dashboard to the contract, not to its DOM. When a change alters
+  a tree deliberately (e.g. the user menu becoming a `menu` of `menuitem`s),
+  update the snapshot in the same PR
   (`--update-snapshots --update-source-method=overwrite`) and say why.
 
 ## Framework-neutral locators
 
-The page objects must survive the port unchanged, so they locate things only by
-role, accessible name, text, or an explicit `data-testid`. Do not use:
+The page objects locate things only by role, accessible name, text, or an
+explicit `data-testid`, so that they survive a change of implementation. Do not
+use:
 
-- react-aria's state attributes and classes (`data-selected`, `data-focused`,
-  `data-pressed`, `data-entering`/`data-exiting`, `react-aria-*` classes) — use
-  the ARIA state instead (e.g. `getByRole('row', { selected: true })`: drive
+- state attributes and styling classes (`data-selected`, `data-pressed`, …) —
+  use the ARIA state instead (e.g. `getByRole('row', { selected: true })`: drive
   rows carry `aria-selected`);
-- react-toastify's classes (`.Toastify__*`) — toasts are inside
-  `getByTestId('toast-host')`;
-- generated or framework ids (`#react-aria-…`, `:r1:`) — `#agreements-modal`
-  became `getByTestId('agreements-modal')`;
+- toast library classes — toasts are inside `getByTestId('toast-host')`;
+- generated or framework ids — `#agreements-modal` became
+  `getByTestId('agreements-modal')`;
 - waits for an animation's duration — wait for the resulting state
   (`toBeHidden()`, `toHaveCount(0)`) instead.
 
-A `data-testid` is a contract with the Vue port: keep it on the equivalent
-element. The ones the page objects rely on include `drive-view`, `asset-row`,
-`asset-row-name`, `dummy-row`, `context-menu`, `modal-dialog`,
-`agreements-modal`, `user-menu`, `right-panel`, `asset-search-bar`,
-`upsert-secret-modal`, `directory-row-navigate-button` and `toast-host`.
+A `data-testid` is a contract: keep it on the equivalent element. The ones the
+page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
+`dummy-row`, `context-menu`, `modal-dialog`, `agreements-modal`, `user-menu`,
+`right-panel`, `asset-search-bar`, `upsert-secret-modal`,
+`directory-row-navigate-button` and `toast-host`.
 
 ## Port parity checklist
 
