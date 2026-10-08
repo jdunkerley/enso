@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The dialog warning that a downgraded plan's assets will be deleted: the Vue port of the
- * React `#/modals/PlanDowngradedModal`, with the same title, text, alert and button.
+ * @file The dialog warning that a downgraded plan's assets will be deleted.
  *
  * `AppContainerLayout.vue` mounts it for a free plan whose subscription is paused (through the
  * modals `registerCloud` contributes), with the deletion deadline. It opens while the deadline is

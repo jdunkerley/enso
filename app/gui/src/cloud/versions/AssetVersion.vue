@@ -5,7 +5,7 @@
  * any other one (the "Compare with" submenu).
  *
  * The tags collapse into one "N tags" tag when they would not fit beside the title at their minimum
- * width. That is measured on hidden copies of the title and of one tag, as React did.
+ * width. That is measured on hidden copies of the title and of one tag.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -117,7 +117,7 @@ const shouldCollapseTags = computed(() => {
     versionComment.value == null ? COMMENT_ACTION_BUTTON_WIDTH_BUDGET_PX : 0
   const requiredWidth =
     fullTitleBounds.width.value + HEADER_GAP_PX + addCommentButtonWidth + minimumTagsWidth
-  // Before the first measurement every width is 0, and the tags start collapsed, as in React.
+  // Before the first measurement every width is 0, and the tags start collapsed.
   return headerBounds.width.value === 0 || requiredWidth > headerBounds.width.value
 })
 </script>
@@ -165,8 +165,6 @@ const shouldCollapseTags = computed(() => {
                 </VersionTag>
               </div>
               <div v-else class="flex min-w-0 items-center gap-1">
-                <!-- React also gave each tag `min-w-[8ch] max-w-[32ch]`, but built those class
-                names at run time, so Tailwind never generated them: they had no effect. -->
                 <div
                   v-for="(tag, index) in version.tags"
                   :key="`${version.versionId}-${tag}-${index}`"

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A QR code on a canvas: the Vue replacement of `qrcode.react`'s `QRCodeCanvas`, drawn the
- * same way (`./qrCode.ts`).
+ * @file A QR code on a canvas, drawn by `./qrCode.ts`.
  */
 import { onMounted, ref, watch } from 'vue'
 import { drawQrCode, type QrCodeLevel } from './qrCode'

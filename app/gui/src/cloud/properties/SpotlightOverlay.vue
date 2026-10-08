@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * @file A dimming overlay over the whole window, with a cutout around one element: the Vue port of
- * the React `useSpotlight`'s `Spotlight`. The cutout's corners follow the element's border radius. A
- * click on the overlay emits `close`.
+ * @file A dimming overlay over the whole window, with a cutout around one element. The cutout's
+ * corners follow the element's border radius. A click on the overlay emits `close`.
  *
- * It follows the element every frame. React measured the element only when it was resized, so when
- * "Edit" opened the right panel, the cutout stayed where the section was as the panel began to
- * slide in, near the window's right edge; this one ends up around the section (see "Rulings from
- * #183").
+ * It follows the element every frame, not only when the element is resized: when "Edit" opens the
+ * right panel, the section moves as the panel slides in, and the cutout ends up around it (see
+ * "Rulings from #183").
  *
- * Like React's, it renders only while `index.html`'s `.enso-spotlight` element exists, and goes
+ * It renders only while `index.html`'s `.enso-spotlight` element exists, and goes
  * into the overlays' root. The element it highlights must be raised above the overlay: give it
  * {@link SPOTLIGHT_TARGET_STYLE}.
  */
@@ -18,7 +16,7 @@ import { convertCSSUnitString } from '$/utils/convertCSSUnits'
 import { useRafFn } from '@vueuse/core'
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 
-// React's default padding around the element.
+// The default padding around the element.
 const { element, paddingPx = 8 } = defineProps<{
   element: HTMLElement | undefined
   paddingPx?: number | undefined
@@ -87,7 +85,7 @@ const clipPath = computed(() => {
 </script>
 
 <script lang="ts">
-/** The style of the element a spotlight highlights: above the overlay, as React's `useSpotlight` gave it. */
+/** The style of the element a spotlight highlights: above the overlay. */
 export const SPOTLIGHT_TARGET_STYLE = { position: 'relative', zIndex: 3 } as const
 </script>
 

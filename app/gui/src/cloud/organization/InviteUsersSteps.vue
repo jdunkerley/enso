@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The content of the "Invite" dialog (`InviteUsersModal.vue`): the form, then the success
- * step. It is mounted anew each time the dialog opens, so it always starts at the form, as React's
- * `InviteUsersModalContent` did.
+ * step. It is mounted anew each time the dialog opens, so it always starts at the form.
  */
 import StepContent from '$/components/Stepper/StepContent.vue'
 import Stepper from '$/components/Stepper/Stepper.vue'
@@ -34,8 +33,8 @@ const invitationLink = computed(() => {
 
 <template>
   <Stepper :state="stepperState">
-    <!-- No step markers, but their (empty) row, as React's `renderStep={() => null}` rendered it:
-    the stepper's gap below it sets the form 1rem lower in the dialog. -->
+    <!-- No step markers, but their (empty) row: the stepper's gap below it sets the form 1rem
+    lower in the dialog. -->
     <template #step />
     <StepContent :index="0">
       <InviteUsersForm @submitted="onSubmitted" />

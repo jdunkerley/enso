@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file An alert that a feature is limited on the user's plan, with a link-style upgrade button:
- * the Vue port of the React `PaywallAlert`.
+ * @file An alert that a feature is limited on the user's plan, with a link-style upgrade button.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import Icon from '$/components/Icon/Icon.vue'

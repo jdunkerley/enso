@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * @file One action in a `DropdownMenu` or `ContextMenu`: the Vue counterpart of the React
- * `Menu.Item`.
+ * @file One action in a `DropdownMenu` or `ContextMenu`.
  *
- * The title is the default slot. `icon`, `shortcut` and `description` add the same parts as in
- * React. It works in both menus because Reka's `DropdownMenuItem` and `ContextMenuItem` are the
- * same `MenuItem` underneath.
+ * The title is the default slot. `icon`, `shortcut` and `description` add those parts. It works
+ * in both menus because Reka's `DropdownMenuItem` and `ContextMenuItem` are the same `MenuItem`
+ * underneath.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The "new version available" dialog (#83): the Vue counterpart of the React
- * `VersionChecker`, which `App.vue` mounts while `useVersionCheckerEnabled` holds.
+ * @file The "new version available" dialog (#83), which `App.vue` mounts while
+ * `useVersionCheckerEnabled` holds.
  *
  * It fetches the latest release of this fork (`RELEASES_REPOSITORY`, #180) once a day, or ten
  * minutes after a failed request. When there is none, or the request fails (offline, rate-limited),

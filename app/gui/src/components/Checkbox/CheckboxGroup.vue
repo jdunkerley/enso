@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * @file A group of checkboxes bound to one form field holding the selected values: the Vue
- * counterpart of the React `Checkbox.Group`, styled by the same `CHECKBOX_GROUP_STYLES`. The
- * checkboxes are the default slot, each with its `value`. It is a `role="group"` labelled by its
- * field's label or, without one, by its content (the checkboxes' text), as in React. The `description` slot replaces the `description` text, for a description with
- * markup (React's `ReactNode` description).
+ * @file A group of checkboxes bound to one form field holding the selected values, styled by
+ * `CHECKBOX_GROUP_STYLES`. The checkboxes are the default slot, each with its `value`. It is a
+ * `role="group"` labelled by its field's label or, without one, by its content (the checkboxes'
+ * text). The `description` slot replaces the `description` text, for a description with markup.
  */
 import { CHECKBOX_GROUP_STYLES } from '$/components/Checkbox/variants'
 import Field from '$/components/Form/Field.vue'
@@ -65,7 +64,7 @@ provideCheckboxGroup({
         : [...current, value]
       : current.filter((v) => v !== value)
     field.onChange(next)
-    // React validates the group on every change.
+    // The group is validated on every change.
     void field.form.trigger(field.name.value)
   },
   onBlur: field.onBlur,

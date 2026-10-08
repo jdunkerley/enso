@@ -1,23 +1,21 @@
 <script setup lang="ts">
 /**
- * @file A button, or a link styled as one: the Vue counterpart of the React `#/components/Button`,
- * styled by the same `BUTTON_STYLES`.
+ * @file A button, or a link styled as one, styled by `BUTTON_STYLES`.
  *
- * The props keep the React names (`isDisabled`, `isLoading`, `tooltip`, `icon`, …) so that ports
- * stay mechanical; see the rulings in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
- * The differences are Vue's: `class` and `contentClass` instead of `className` and
- * `contentClassName`, slots instead of render props, and the press handler is the `onPress` prop,
- * which `@press="…"` binds. It is a prop rather than an emitted event so that its return value is
- * seen: while a returned promise is pending the button shows its loader and is disabled, as in
- * React.
+ * Its props (`isDisabled`, `isLoading`, `tooltip`, `icon`, …) keep the names they had before the
+ * Vue port (#75); see the rulings in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+ * It takes `class` and `contentClass`, and slots for its content. The press handler is the
+ * `onPress` prop, which `@press="…"` binds. It is a prop rather than an emitted event so that its
+ * return value is seen: while a returned promise is pending the button shows its loader and is
+ * disabled.
  *
  * - With `href` it renders an `<a>` (external links open in a new tab), otherwise a `<button>`. A
- *   plain click on a link to a page of this app navigates through the router, as react-aria's
- *   `RouterProvider` made React's links do (`$/components/Link/clientNavigation`).
+ *   plain click on a link to a page of this app navigates through the router
+ *   (`$/components/Link/clientNavigation`).
  * - An icon-only button (an `icon` and no default slot) gets a tooltip from `tooltip` or its
  *   `aria-label`. Any button gets one from `tooltip`; `tooltip: false` turns it off. A disabled
  *   button cannot be hovered for an accessible tooltip, so it shows the text as a visual tooltip
- *   instead, as in React.
+ *   instead.
  * - Inside a `ButtonGroup.vue` it takes the group's shared props, and its place in a joined group.
  */
 import { BUTTON_STYLES, type ButtonVariants } from '$/components/Button/variants'
@@ -115,8 +113,7 @@ const styles = computed(() => {
   return BUTTON_STYLES({
     isDisabled: disabled.value,
     isActive: shared('isActive'),
-    // `focus-visible:` classes, which only apply while focused anyway; react-aria passes its
-    // `isFocused` render prop here.
+    // Always on: it enables the `focus-visible:` classes, which only apply while focused anyway.
     isFocused: true,
     loading: loading.value,
     fullWidth: shared('fullWidth'),
@@ -166,7 +163,7 @@ const showIconLoader = computed(() => props.hideLoader !== true && iconLoaderVis
 const content = ref<HTMLElement>()
 const loader = ref<HTMLElement>()
 
-// The full loader fades in, and the content fades out, after the same delay as React's.
+// The full loader fades in, and the content fades out, after `ICON_LOADER_DELAY`.
 watch(
   [showOverlayLoader, loader],
   ([showing, loaderElement], _old, onCleanup) => {
@@ -245,8 +242,8 @@ const {
     >
       <span :class="styles.wrapper()">
         <span ref="content" :class="styles.content({ className: contentClass })">
-          <!-- React renders these straight into the content box, and wraps them in the extra click
-          zone only for an icon-only button; `contents` keeps the wrapper out of the layout. -->
+          <!-- These go straight into the content box, wrapped in the extra click zone only for an
+          icon-only button; `contents` keeps the wrapper out of the layout. -->
           <span :class="isIconOnly ? styles.extraClickZone() : 'contents'">
             <div v-if="$slots.addonStart" :class="styles.addonStart()">
               <slot name="addonStart" />

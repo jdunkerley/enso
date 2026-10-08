@@ -1,6 +1,6 @@
 /**
  * @file The billing modals over the dashboard (#84): the end of a trial, and the warning that a
- * downgraded plan's assets will be deleted, with the React originals' rule for when it shows again.
+ * downgraded plan's assets will be deleted, with its rule for when it shows again.
  */
 import { useText } from '$/providers/text'
 import LocalStorage from '$/utils/LocalStorage'

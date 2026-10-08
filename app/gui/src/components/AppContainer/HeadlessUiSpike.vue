@@ -5,12 +5,12 @@
  *
  * It exists to prove, in the running app rather than in isolation, that a Reka primitive styled
  * with the dashboard's `variants.ts` gets focus management, Escape and keyboard navigation right
- * next to react-aria, whose own overlays and global listeners are live on the same page
+ * alongside the other overlays and global listeners live on the same page
  * (`integration-test/dashboard/headlessUiSpike.spec.ts`). It is not a user-facing feature and goes
  * away once the `DropdownMenu` primitive has a real mount site.
  *
- * #78 added a Vue `Popover` beside it, to compare it in a real browser against the React user menu's
- * popover next to it; since #83 the user menu is a Vue `Popover` itself.
+ * #78 added a Vue `Popover` beside it, to compare it in a real browser with the user menu's popover
+ * next to it; since #83 the user menu is a `Popover` itself.
  */
 import Popover from '$/components/Dialog/Popover.vue'
 import DropdownMenu from '$/components/Menu/DropdownMenu.vue'

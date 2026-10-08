@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The organization's profile picture on the Organization settings tab, which uploads a new
- * one when clicked: the Vue port of the React `OrganizationProfilePictureInput`.
+ * one when clicked.
  */
 import Form from '$/components/Form/Form.vue'
 import FormError from '$/components/Form/FormError.vue'

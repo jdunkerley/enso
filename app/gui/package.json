@@ -91,7 +91,6 @@
     "fuzzysort": "3.1.0",
     "hash-sum": "^2.0.0",
     "idb-keyval": "^6.3.0",
-    "install": "^0.13.0",
     "is-network-error": "^1.3.2",
     "lexical": "^0.21.0",
     "lezer-enso-table-expr": "workspace:*",

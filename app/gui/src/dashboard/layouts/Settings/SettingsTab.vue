@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The content of a settings tab: the Vue port of the React `Tab`. Sections are laid out in
- * one column, or in two side by side on wide screens when a section asks for column 2.
+ * @file The content of a settings tab. Sections are laid out in one column, or in two side by side
+ * on wide screens when a section asks for column 2.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The versions of one asset, newest first, joined by a line. It waits for them in `setup`, so
- * it must be inside a `SuspenseLoader` (React's `useSuspenseQuery`). It owns the actions every
- * version offers: restore, duplicate (and open), and editing the version's comment.
+ * it must be inside a `SuspenseLoader`. It owns the actions every version offers: restore,
+ * duplicate (and open), and editing the version's comment.
  */
 import Result from '$/components/Result/Result.vue'
 import { useContainerData } from '$/providers/container'
@@ -36,7 +36,7 @@ const toasts = useToasts()
 const queryClient = useQueryClient()
 const { openProjectLocally } = useContainerData()
 
-/** Show an error toast, and log it, as React's `toastAndLog` does. */
+/** Show an error toast, and log it. */
 function toastAndLog(textId: 'restoreProjectError' | 'updateAssetBackendError', error: unknown) {
   const message = `${getText(textId, item.title)}: ${getMessageOrToString(error)}`
   toasts.show(message, { type: 'error' })

@@ -1,7 +1,6 @@
 /**
  * @file The right panel's Schedule tab (#183): what it shows for each selection, the calendar and
- * its keyboard use (what react-aria's `Calendar` gave the React tab), a day's executions with their
- * logs and deletion, and the new-execution dialog.
+ * its keyboard use, a day's executions with their logs and deletion, and the new-execution dialog.
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import type { Category } from '$/providers/category'
@@ -81,7 +80,7 @@ function daily(id: string, hour: number, withSession = false): ProjectExecution 
   } as unknown as ProjectExecution
 }
 
-// The React `App.tsx` registers it in the app.
+// `App.vue` registers it in the app.
 beforeAll(() => {
   if (!LocalStorage.getAllRegisteredKeys().includes('preferredTimeZone')) {
     LocalStorage.registerKey('preferredTimeZone', { schema: z.string() })
@@ -166,7 +165,7 @@ describe('the calendar', () => {
     expect(cell(todayDate).getAttribute('aria-label')).toMatch(/^Today, .* selected$/)
     expect(cell(todayDate).textContent).toContain('2')
     expect(cell(todayDate).hasAttribute('data-selected')).toBe(true)
-    // The header row is empty, as React's was.
+    // The header row is empty.
     expect(document.querySelector('thead')!.textContent?.trim()).toBe('')
   })
 

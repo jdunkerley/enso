@@ -1,7 +1,7 @@
 /**
  * @file The billing area's queries: a month's summary of scheduled executions (the Usage settings
- * tab), and the plans on offer (the subscription page). They keep the React `backendQueryOptions`'
- * keys and options: the summary fresh for a minute and not persisted, which the project-execution
+ * tab), and the plans on offer (the subscription page). They keep the keys and options used before
+ * the Vue port (#75): the summary fresh for a minute and not persisted, which the project-execution
  * mutations invalidate (`INVALIDATION_MAP`); the plans stale at once and persisted.
  */
 import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'

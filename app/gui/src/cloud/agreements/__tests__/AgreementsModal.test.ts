@@ -1,7 +1,7 @@
 /**
- * @file The Vue agreements dialog: a legal gate, so its behaviour must stay exactly the React
- * `AgreementsModal`'s. It cannot be dismissed; it records the acceptance only once both documents
- * are ticked; each checkbox starts ticked when its document is unchanged since the last acceptance.
+ * @file The agreements dialog: a legal gate, so its behaviour must stay exactly as tested here. It
+ * cannot be dismissed; it records the acceptance only once both documents are ticked; each checkbox
+ * starts ticked when its document is unchanged since the last acceptance.
  */
 import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
@@ -40,7 +40,7 @@ describe('AgreementsModal', () => {
     expect(modal).toBe(dialog())
     expect(modal.getAttribute('role')).toBe('dialog')
     expect(modal.querySelector('h2')!.textContent!.trim()).toBe(getText('licenseAgreementTitle'))
-    // Named by its title, as react-aria names a dialog.
+    // Named by its title.
     const labelledBy = modal.getAttribute('aria-labelledby')!
     expect(document.getElementById(labelledBy)!.textContent!.trim()).toBe(
       getText('licenseAgreementTitle'),
@@ -73,7 +73,7 @@ describe('AgreementsModal', () => {
   test('cannot be dismissed: no close button, Escape and outside clicks do nothing', async () => {
     const { userAgreed } = await setup()
     const modal = dialog()!
-    // The close button is rendered hidden, as React's `hideCloseButton` hides it.
+    // The close button, if rendered, is hidden.
     const closeButton = modal.querySelector('header button')
     expect(closeButton == null || closeButton.closest('.hidden') != null).toBe(true)
     // The overlay blocks pointer events to the page; click it as a user could.

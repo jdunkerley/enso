@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * @file The bar with the Enso logo at the top right of the pages outside the dashboard (login,
- * registration and the like), which opens the {@link InfoMenu}: the Vue counterpart of the React
- * `#/layouts/InfoBar` (#83). The React `Page` and the Vue authentication pages
- * (`AuthenticationPage.vue`) mount it.
+ * registration and the like), which opens the {@link InfoMenu}. The authentication pages
+ * (`AuthenticationPage.vue`), `PaymentsSuccessPage.vue` and `CloudBrowserDisabledPage.vue` mount
+ * it.
  */
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
@@ -18,7 +18,7 @@ const { getText } = useText()
   <div
     class="pointer-events-auto flex h-row shrink-0 cursor-default items-center gap-user-bar rounded-full bg-frame backdrop-blur-default"
   >
-    <!-- Named by its trigger, as react-aria's dialog was. -->
+    <!-- Named by its trigger. -->
     <Popover testId="info-menu" size="xxsmall" :aria-label="getText('openInfoMenu')">
       <template #trigger>
         <Button

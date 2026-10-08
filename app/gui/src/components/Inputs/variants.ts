@@ -1,12 +1,13 @@
 /**
- * @file Tailwind variants of the text input, shared by the React `#/components/Inputs` and their
- * Vue ports in this folder. The other inputs' variants are in the `*Variants.ts` files beside it,
- * one per family, so that each is bundled with the code that uses it.
+ * @file Tailwind variants of the text input. The other inputs' variants are in the `*Variants.ts`
+ * files beside it, one per family, so that each is bundled with the code that uses it.
  *
- * A few of those classes use react-aria-only modifiers (`selected:`, `pressed:`,
- * `outside-visible-range:`, `disabled:` on non-native elements). The Vue ports add the equivalents
- * keyed on Reka's `data-*`/ARIA attributes from the `*_VUE_STATES` constants beside them, per
- * decision 5 of the React-to-Vue record.
+ * A few of those classes use state variants (`STATE_VARIANTS` in `tailwind.config.ts`) keyed on
+ * attributes that Reka's elements do not always set: `selected:` is `[data-selected]`, `pressed:`
+ * is `[data-pressed]`, `outside-visible-range:` is `[data-outside-visible-range]`, and `disabled:`
+ * is `:disabled`, which non-native elements never match. The components add the equivalents keyed
+ * on Reka's `data-*`/ARIA attributes from the `*_VUE_STATES` constants beside them, per decision 5
+ * of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { makeRoundedStyles } from '$/utils/style/roundedStyles'

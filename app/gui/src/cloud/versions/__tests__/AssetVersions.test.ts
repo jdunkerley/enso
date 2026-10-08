@@ -1,6 +1,6 @@
 /**
  * @file The right panel's Versions tab (#89): what it shows for each selection, and its actions,
- * driven by the keyboard where react-aria gave the React tab keyboard access.
+ * driven by the keyboard wherever the tab offers keyboard access.
  */
 import type { Category } from '$/providers/category'
 import { useModals } from '$/providers/modals'
@@ -327,7 +327,7 @@ describe('tags', () => {
     // Focused after a short delay, once the popover's own focus handling has settled.
     await vi.waitFor(() => expect(document.activeElement).toBe(input))
     expect(backend.listAssetVersionTags).toHaveBeenCalledTimes(2)
-    // Case-insensitive, as react-aria's filter was.
+    // The filter is case-insensitive.
     await user.keyboard('NIGHT')
     const suggestions = [...document.querySelectorAll<HTMLElement>('form button')].map((button) =>
       button.textContent?.trim(),

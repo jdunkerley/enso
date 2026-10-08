@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The drive's search bar: a search field over a popover of the query's tags (`name:`,
- * `type:`, …), the labels (in the cloud) and suggestions for the term being typed. The Vue port of
- * React's `AssetSearchBar`, with its test ids and keyboard behaviour:
+ * `type:`, …), the labels (in the cloud) and suggestions for the term being typed. Its keyboard
+ * behaviour:
  *
  * - typing anywhere on the drive (outside a text field and a modal) focuses the field;
  * - the arrow keys move through the suggestions, previewing each in the field, and Escape returns
@@ -10,10 +10,10 @@
  * - Shift with a press adds a suggestion and keeps the popover open (Shift again removes it);
  * - Escape otherwise leaves the field, keeping its text.
  *
- * The suggestions come from the table (`useSuggestions`), which knows the listed assets, the
- * labels and the users. As in React, the suggestion the arrow keys highlight takes the focus
- * (React focused it from its ref whenever the popover re-rendered, which outlasted the field's own
- * refocus): typing then goes nowhere until the field is clicked, and Escape drops the focus.
+ * The suggestions come from the table (`useSuggestions`), which knows the listed assets, the labels
+ * and the users. The suggestion the arrow keys highlight takes the focus (it is focused whenever
+ * the popover re-renders, which outlasts the field's own refocus): typing then goes nowhere until
+ * the field is clicked, and Escape drops the focus.
  */
 import { useSuggestions, type Suggestion } from '#/layouts/Drive/suggestions'
 import DriveLabel from '#/pages/dashboard/components/DriveLabel.vue'
@@ -58,9 +58,9 @@ const areSuggestionsVisible = ref(false)
 /** Whether the suggestions are to show, at once. */
 let suggestionsVisibleNow = false
 /**
- * Show or hide the suggestions after anything else the event changed has rendered, as React's
- * `startTransition` deferred it: so the table re-renders for a new query while a suggestion still
- * has the focus, and does not take the focus from it (it takes the focus only from the body).
+ * Show or hide the suggestions after anything else the event changed has rendered: so the table
+ * re-renders for a new query while a suggestion still has the focus, and does not take the focus
+ * from it (it takes the focus only from the body).
  */
 function setAreSuggestionsVisible(value: boolean) {
   suggestionsVisibleNow = value
@@ -91,7 +91,7 @@ function moveCaretToEnd() {
   input.setSelectionRange(end, end)
 }
 
-// The order of React's effects on a new query, run after rendering.
+// The effects of a new query, in order, run after rendering.
 watch(
   () => query,
   (newQuery) => {
@@ -138,7 +138,7 @@ function setSuggestionButton(element: unknown, index: number) {
   else suggestionButtons.delete(index)
 }
 
-/** Focus the highlighted suggestion, as React's ref did on every render of the popover. */
+/** Focus the highlighted suggestion, on every render of the popover. */
 function focusSelectedSuggestion() {
   if (selectedIndex.value != null) suggestionButtons.get(selectedIndex.value)?.focus()
 }
@@ -210,10 +210,9 @@ useEventListener(document, 'keydown', (event: KeyboardEvent) => {
 })
 
 /**
- * React's field was controlled (its value was the query's `query`), and React put that value back
- * into the field after each event the field handled, overwriting what the effects above wrote
- * there: after moving through the suggestions and pressing Escape, the field shows nothing, and on
- * focus it shows the query again, so typing goes on from it.
+ * The field keeps to the query's `query`, not what the effects above wrote there: after moving
+ * through the suggestions and pressing Escape, the field shows nothing, and on focus it shows the
+ * query again, so typing goes on from it.
  */
 function onInputFocus(event: FocusEvent) {
   const input = event.target as HTMLInputElement
@@ -228,8 +227,7 @@ function onInput(event: Event) {
 }
 
 function onInputKeyDown(event: KeyboardEvent) {
-  // React's search field kept a non-empty field on Escape (its value was controlled), rather than
-  // letting the browser clear it.
+  // Escape keeps a non-empty field, rather than letting the browser clear it.
   if (event.key === 'Escape' && (event.target as HTMLInputElement).value !== '') {
     event.preventDefault()
   }

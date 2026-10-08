@@ -3,10 +3,10 @@
  * @file Renders the app's toasts (`$/providers/toasts`): one container per screen position, each
  * listing its toasts oldest first. Mounted once, in `App.vue`.
  *
- * It reproduces the look and behaviour the app had with `react-toastify`: 320px wide, top centre
- * by default, sliding in and out, at most three at once, a close button, a progress bar that
- * pauses on hover and while the window is unfocused, and `role="alert"` on the message.
- * A click in a container never dismisses a dialog (`data-ignore-click-outside`).
+ * Toasts are 320px wide, top centre by default, sliding in and out, at most three at once, with a
+ * close button, a progress bar that pauses on hover and while the window is unfocused, and
+ * `role="alert"` on the message. A click in a container never dismisses a dialog
+ * (`data-ignore-click-outside`).
  */
 import { useToasts, type ToastPosition, type ToastsStore } from '$/providers/toasts'
 import { computed } from 'vue'
@@ -28,7 +28,7 @@ const containers = computed(() =>
 </script>
 
 <template>
-  <!-- The test ID is the integration tests' handle on toasts (a contract kept from the React host, #81). -->
+  <!-- The test ID is the integration tests' handle on toasts (a contract kept from before the Vue port, #81). -->
   <div class="ToastHost" data-testid="toast-host">
     <div
       v-for="{ position, toasts } in containers"

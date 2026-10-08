@@ -4,8 +4,8 @@
  * `ErrorBoundary`. A modal leaves the stack when it emits `close`.
  *
  * The host adds no element of its own and does not teleport: each modal portals its own overlay
- * into `#enso-portal-root` (a Vue `Dialog`; the React shim's modals through React's `Portal`), so
- * their DOM is the same wherever the host is mounted.
+ * into `#enso-portal-root` (through its `Dialog`), so their DOM is the same wherever the host is
+ * mounted.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import { useModals, type ModalsStore } from '$/providers/modals'

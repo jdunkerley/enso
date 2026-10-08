@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * @file Text in one of the design system's type styles: the Vue counterpart of the React
- * `#/components/Text`.
+ * @file Text in one of the design system's type styles.
  *
  * A truncated text (`truncate`) shows its full content in a visual tooltip when it overflows. The
  * tooltip is the default slot again, unless the `tooltip` prop or slot gives something else;
  * `tooltipDisplay` changes when it shows (`always`, or `never`).
  *
- * Nested texts drop their line-height compensation, as in React; `TextGroup.vue` does the same
- * for a group of sibling texts.
+ * Nested texts drop their line-height compensation; `TextGroup.vue` does the same for a group of
+ * sibling texts.
  */
 import type { Placement } from '$/components/placement'
 import { TEXT_STYLE } from '$/components/Text/variants'
@@ -114,7 +113,7 @@ const { isOpen, onTooltipEnter, onTooltipLeave } = useVisualTooltip(element, {
   isDisabled: isTooltipDisabled,
 })
 
-/** The text's element, for a caller that measures it (React's `ref`). */
+/** The text's element, for a caller that measures it. */
 defineExpose({ element })
 </script>
 

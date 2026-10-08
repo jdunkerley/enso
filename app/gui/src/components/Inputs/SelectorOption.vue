@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file One option of a `Selector.vue`: the Vue counterpart of the React `SelectorOption`, styled
- * by the same `SELECTOR_OPTION_STYLES`. A native radio, visually hidden inside a `<label>`, with the
- * hover, press and focus-visible states react-aria computes tracked here the same way.
+ * @file One option of a `Selector.vue`, styled by `SELECTOR_OPTION_STYLES`. A native radio,
+ * visually hidden inside a `<label>`, with its hover, press and focus-visible states tracked here.
  */
 import { SELECTOR_OPTION_STYLES } from '$/components/Inputs/selectorVariants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

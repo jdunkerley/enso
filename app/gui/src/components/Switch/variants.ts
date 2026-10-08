@@ -1,6 +1,5 @@
 /**
- * @file Tailwind variants of the switch, shared by the React `Switch` and its Vue port in this
- * folder.
+ * @file Tailwind variants of the switch (`Switch.vue`).
  */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
@@ -40,9 +39,10 @@ export const SWITCH_STYLES = tv({
 })
 
 /**
- * The Vue switch's spelling of `SWITCH_STYLES`'s react-aria-only modifiers (`group-selected:`,
- * `group-pressed:`, `group-focus-visible:`), for the native input inside its `<label>`
- * (decision 5).
+ * The switch's own spelling of the states `SWITCH_STYLES` keys on with `group-selected:`,
+ * `group-pressed:` and `group-focus-visible:`, for the native input inside its `<label>`
+ * (decision 5). Nothing sets `data-pressed`, and the focus is on the input rather than the
+ * `<label>`, so only `group-selected:` (the label's `data-selected`) also matches without these.
  */
 export const SWITCH_VUE_STATES = {
   background:

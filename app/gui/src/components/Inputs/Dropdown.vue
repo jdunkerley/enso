@@ -1,14 +1,13 @@
 <script setup lang="ts" generic="T">
 /**
- * @file A styled dropdown that expands in place: the Vue counterpart of the React `Dropdown`,
- * styled by the same `DROPDOWN_STYLES`. The options are a Reka `Listbox` (`role="listbox"`), so
- * the keyboard works as react-aria's did: Tab focuses the list and expands it, arrow keys and
+ * @file A styled dropdown that expands in place, styled by `DROPDOWN_STYLES`. The options are a
+ * Reka `Listbox` (`role="listbox"`): Tab focuses the list and expands it, arrow keys and
  * typeahead move between options, Enter or Space selects. A mouse press on the dropdown toggles it;
  * a press elsewhere closes it.
  *
  * Each item is rendered by the default slot (`{ item }`), in the list and as the current value.
  * Single selection is `v-model:selectedIndex`; with `multiple` it is `v-model:selectedIndices`, and
- * the `multiple` slot (`{ items }`) shows the selection (React's `renderMultiple`).
+ * the `multiple` slot (`{ items }`) shows the selection.
  * `FormDropdown.vue` binds one to a form field.
  */
 import Icon from '$/components/Icon/Icon.vue'
@@ -50,7 +49,7 @@ defineSlots<{
 const root = ref<HTMLElement>()
 const isFocusWithin = ref(false)
 const isMouseFocused = ref(false)
-/** Whether the last interaction was the keyboard: react-aria's `useFocusVisible`. */
+/** Whether the last interaction was the keyboard. */
 const isKeyboardModality = ref(false)
 
 useEventListener(document, 'keydown', () => (isKeyboardModality.value = true), { capture: true })
@@ -123,10 +122,9 @@ function onMouseDown(event: MouseEvent) {
 }
 
 /**
- * React's list (react-aria's `ListBox`) takes the first Escape while it has a selection: it clears
- * the list's own selection (the field keeps its value) and stops the key there, so an enclosing
- * dialog closes only on the second Escape. The same here, without the clearing, which changed
- * nothing visible.
+ * While it has a selection, the list takes the first Escape and stops the key there, so an
+ * enclosing dialog closes only on the second Escape (kept from before the Vue port, #75). The
+ * selection is not cleared.
  */
 let escapeTaken = false
 watch([selectedIndex, selectedIndices], () => (escapeTaken = false))
@@ -160,8 +158,8 @@ function onFocusOut(event: FocusEvent) {
         <!-- Spacing. -->
         <div :class="styles.input()">&nbsp;</div>
         <div :class="styles.optionsContainer()">
-          <!-- `contents`, so that the grid row's item is the list itself, with `overflow-auto`, as in
-          React: a scroll container, which the closed row collapses (its minimum height is 0). With
+          <!-- `contents`, so that the grid row's item is the list itself, with `overflow-auto`: a
+          scroll container, which the closed row collapses (its minimum height is 0). With
           the root as the item (`min-h-0`, before #198), the closed list overflowed it, and a nested
           dropdown at a fractional position lost its bottom border (the datalink editor's lists). -->
           <ListboxRoot

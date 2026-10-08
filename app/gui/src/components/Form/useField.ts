@@ -1,6 +1,5 @@
 /**
- * @file `useField`: connects an input to its form. The Vue counterpart of the React `useField`,
- * `useFieldRegister` and `useFieldState` together.
+ * @file `useField`: connects an input to its form: registration, value and field state.
  */
 import { computed, onScopeDispose, toValue, useId, type MaybeRefOrGetter } from 'vue'
 import { useFormContext } from './formContext'
@@ -17,8 +16,7 @@ export interface UseFieldOptions {
   readonly isDisabled?: MaybeRefOrGetter<boolean | undefined>
   /**
    * Whether the field is required: its `*` mark and the input's `required`. Not read from the
-   * schema: the React form's schema reading never reached the field (react-hook-form returns
-   * `required` only in progressive mode), so a field showed as required only when told.
+   * schema: a field shows as required only when told, as it did before the Vue port (#75).
    */
   readonly isRequired?: MaybeRefOrGetter<boolean | undefined>
   /** Overrides whether the field shows as invalid; by default, whether it has an error. */
@@ -53,7 +51,7 @@ export function useField<T = unknown>(options: UseFieldOptions) {
   const state = computed(() => form.getFieldState(name.value))
   const error = computed(() => state.value.error)
   const isInvalid = computed(() => toValue(options.isInvalid) ?? state.value.invalid)
-  /** Only the prop: inputs that React disables while submitting add `isSubmitting` themselves. */
+  /** Only the prop: inputs that are disabled while submitting add `isSubmitting` themselves. */
   const isDisabled = computed(() => toValue(options.isDisabled) ?? false)
   const isSubmitting = computed(() => form.formState.isSubmitting)
   const isRequired = computed(() => toValue(options.isRequired) ?? false)

@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A coloured link with an icon: the Vue counterpart of the React `#/components/Link`, with
- * the same classes. A plain click on a link to a page of this app navigates through the router, as
- * react-aria's `RouterProvider` made the React one do; focus shows the `focus-ring`, as react-aria's
- * `FocusRing` added it, on keyboard focus only.
+ * @file A coloured link with an icon. A plain click on a link to a page of this app navigates
+ * through the router; focus shows the `focus-ring`, on keyboard focus only.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import type { Icon as IconName } from '@/util/iconMetadata/iconName'

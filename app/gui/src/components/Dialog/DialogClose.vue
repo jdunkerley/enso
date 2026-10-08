@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A `Button.vue` that closes the `Dialog.vue` or `Popover.vue` it is in, then runs its own
- * `onPress`: the Vue counterpart of the React `Dialog.Close`. Every prop falls through to the button.
+ * `onPress`. Every prop falls through to the button.
  */
 import Button from '$/components/Button/Button.vue'
 import { injectDialogContext } from './dialogContext'

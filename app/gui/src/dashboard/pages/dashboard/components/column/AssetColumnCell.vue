@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The content of one cell of the drive's table: the Vue port of React's `COLUMN_RENDERER`
- * and the column components in `column/components.tsx`. The name cell is the asset type's own;
- * the dates, size and people are as React drew them, and the accessed-by columns (hidden for now)
- * are empty, as React's placeholder was.
+ * @file The content of one cell of the drive's table. The name cell is the asset type's own; the
+ * dates, size and people are drawn here, and the accessed-by columns (hidden for now) are empty.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { Column } from '#/pages/dashboard/components/column/columnUtils'

@@ -38,7 +38,7 @@ describe('UpsertSecretForm', () => {
     const name = input(getText('secretNamePlaceholder'))!
     const value = input(getText('secretValuePlaceholder'))!
     expect(byTestId('upsert-secret-modal')?.tagName).toBe('FORM')
-    // After the same short delay as React's `useAutoFocus`.
+    // After a short delay.
     await vi.waitFor(() => expect(document.activeElement).toBe(name))
     expect(name.autocomplete).toBe('off')
     expect(value.type).toBe('password')

@@ -2,9 +2,8 @@
  * @file The drive's actions, for its Vue components: thin wrappers over the framework-free queries
  * and mutations (`$/utils/backendQuery`, `$/utils/driveQueries`, `$/utils/driveMutations`), the
  * uploads (`$/providers/upload`, `$/cloud/uploadToCloud`) and the transfer between categories,
- * giving them the drive's stores. They replace React's `backendHooks`, `backendUploadFilesHooks`,
- * `cutAndPasteHooks` and `useExportArchive` one for one (#192, ruling 12). Call them in a
- * component's `setup`; the functions they return may be called at any time.
+ * giving them the drive's stores (#192, ruling 12). Call them in a component's `setup`; the
+ * functions they return may be called at any time.
  */
 import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
 import { uploadAssetsToCloud, type UploadFileToCloudOptions } from '$/cloud/uploadToCloud'
@@ -54,8 +53,8 @@ import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { computed, onScopeDispose, ref, toValue, type MaybeRefOrGetter } from 'vue'
 
 /**
- * A function running a mutation through the mutation cache, as React's `useMutationCallback`
- * does, so that the drive's rows see it in flight (`useMutationState`).
+ * A function running a mutation through the mutation cache, so that the drive's rows see it in
+ * flight (`usePendingMutations`).
  */
 export function useMutationCallback<TData, TError, TVariables, TContext>(
   options: MaybeRefOrGetter<MutationOptions<TData, TError, TVariables, TContext>>,
@@ -66,13 +65,13 @@ export function useMutationCallback<TData, TError, TVariables, TContext>(
 
 /**
  * A function showing an error toast whose text is the given text's (if any) and the error's
- * message, and logging the same message, as React's `useToastAndLog` does.
+ * message, and logging the same message.
  */
 export function useToastAndLog() {
   const { getText } = useText()
   const toasts = useToasts()
   return (textId: TextId | null, error?: unknown, ...replacements: readonly string[]) => {
-    // The replacements are the text's, as React's `useToastAndLog` takes them.
+    // The replacements are the text's.
     // eslint-disable-next-line no-restricted-syntax
     const getTextWithReplacements = getText as (id: TextId, ...args: readonly string[]) => string
     const prefix = textId == null ? null : getTextWithReplacements(textId, ...replacements)
@@ -81,7 +80,7 @@ export function useToastAndLog() {
         `${prefix ?? ''}.`
       : `${prefix != null ? prefix + ': ' : ''}${getMessageOrToString(error)}`
     const id = toasts.show(message, { type: 'error' })
-    // As React's logger did.
+    // Logged as well as shown.
     // eslint-disable-next-line no-restricted-properties
     console.error(message)
     return id
@@ -303,8 +302,7 @@ export function useExportArchive(backend: MaybeRefOrGetter<Backend>, driveStore:
 }
 
 /**
- * A function opening the secret dialog to change a secret's value, replacing the open modals, as
- * the React drive opened it.
+ * A function opening the secret dialog to change a secret's value, replacing the open modals.
  */
 export function useEditSecret(backend: MaybeRefOrGetter<Backend>) {
   const modals = useModals()
@@ -329,9 +327,8 @@ export function useEditSecret(backend: MaybeRefOrGetter<Backend>) {
 }
 
 /**
- * The pending mutations with the given key (a prefix, as React's `useMutationState` filters
- * match), kept up to date: the drive's rows fade while they are deleted, restored, renamed or
- * moved.
+ * The pending mutations with the given key (matched as a prefix), kept up to date: the drive's rows
+ * fade while they are deleted, restored, renamed or moved.
  */
 export function usePendingMutations(mutationKey: () => MutationKey) {
   const mutationCache = useQueryClient().getMutationCache()

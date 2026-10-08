@@ -1,7 +1,6 @@
 /**
  * @file What a `ButtonGroup.vue` tells the `Button.vue`s in it: shared style props, and, for a
- * joined group, where each button sits. The Vue counterpart of the React `Button/shared.tsx`
- * contexts.
+ * joined group, where each button sits.
  */
 import type { ButtonVariants } from '$/components/Button/variants'
 import { createContextStore } from '@/providers'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A {@link Spinner} that starts at `initial` and moves to the given phase on the next frame,
- * so that the arc animates into it: the Vue counterpart of the React `StatelessSpinner`.
+ * so that the arc animates into it.
  */
 import type { SpinnerPhase } from '$/components/Spinner/variants'
 import { onScopeDispose, ref, watch } from 'vue'

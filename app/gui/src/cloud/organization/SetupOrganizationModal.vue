@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /**
- * @file The dialog asking a team or enterprise admin to name their organization: the Vue port of
- * the React `SetupOrganizationModal` and `SetupOrganizationForm` (`#/modals/SetupOrganizationForm`),
- * with the same title, text, field and buttons.
+ * @file The dialog asking a team or enterprise admin to name their organization: a title, text,
+ * the name field and buttons.
  *
  * `AppContainerLayout.vue` shows it while the organization has no name (through the modals
  * `registerCloud` contributes). Submitting names the organization and creates its default user
- * group of the same name; the layout then stops showing it. Like React's, it can be dismissed.
+ * group of the same name; the layout then stops showing it. It can be dismissed.
  */
 import Dialog from '$/components/Dialog/Dialog.vue'
 import Form from '$/components/Form/Form.vue'
@@ -27,7 +26,7 @@ const { remoteBackend } = useBackends()
 const updateOrganization = useMutation(backendMutationOptions('updateOrganization', remoteBackend))
 const createDefaultUserGroup = useMutation(backendMutationOptions('createUserGroup', remoteBackend))
 
-// Opens as it mounts, as React's `defaultOpen` did.
+// Opens as it mounts.
 const open = ref(true)
 
 async function setUp({ name }: { name: string }) {

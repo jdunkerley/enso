@@ -8,7 +8,7 @@
  * their place among the others; a contributable tab that nothing contributed is hidden, so a build
  * without the cloud shows none of them. A contribution is a loader, so that the tab's code stays
  * out of the initial chunk and the dashboard's until the tab first opens; `RightPanel.vue` shows a
- * loader meanwhile, as React's `Suspense` did around the React tabs. This module imports no
+ * loader meanwhile. This module imports no
  * component, since `registerCloud` reaches it from the app's entry.
  */
 import { shallowReactive, type Component } from 'vue'

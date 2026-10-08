@@ -1,6 +1,5 @@
 /**
- * @file `Link` and the client navigation it shares with `Button`: what react-aria's
- * `RouterProvider` did for the React links.
+ * @file `Link` and the client navigation it shares with `Button`.
  */
 import Button from '$/components/Button/Button.vue'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'

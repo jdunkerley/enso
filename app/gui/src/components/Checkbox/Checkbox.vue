@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * @file A checkbox: the Vue counterpart of the React `#/components/Checkbox`, styled by the same
- * `CHECKBOX_STYLES` and `CHECK_CLASSES`. The label text is the default slot.
+ * @file A checkbox, styled by `CHECKBOX_STYLES` and `CHECK_CLASSES`. The label text is the default
+ * slot.
  *
- * It works in one of three ways, as the React one does in the first two:
+ * It works in one of three ways:
  * - inside a `CheckboxGroup.vue`, it toggles its `value` in the group's field;
  * - with a `name`, it is a boolean form field, in a `Field` (label, description, error);
  * - with neither, it is a plain `v-model:isSelected` checkbox.
  *
- * `testId` goes on the `<label>`, as in React; attributes go on the native `<input>`.
+ * `testId` goes on the `<label>`; attributes go on the native `<input>`.
  */
 import type { CHECKBOX_STYLES } from '$/components/Checkbox/variants'
 import Field from '$/components/Form/Field.vue'
@@ -100,7 +100,7 @@ function onChange(selected: boolean) {
     if (props.value != null) group.toggle(props.value, selected)
   } else if (field != null) {
     field.onChange(selected)
-    // React validates a checkbox on every change.
+    // A checkbox is validated on every change.
     void field.form.trigger(field.name.value)
   } else {
     isSelectedModel.value = selected

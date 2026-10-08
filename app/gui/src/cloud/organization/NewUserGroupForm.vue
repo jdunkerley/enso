@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The "New User Group" popover: the group's name, which must not match an existing group's
- * (ignoring case and spacing), Submit and Cancel. The Vue port of React's `NewUserGroupForm`.
+ * (ignoring case and spacing), Submit and Cancel.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import DialogClose from '$/components/Dialog/DialogClose.vue'

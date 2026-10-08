@@ -1,9 +1,8 @@
 /**
  * @file The queries behind the right panel's Versions tab: an asset's versions, and the contents of
- * a project version's `Main.enso`, plus the optimistic tag updates. The Vue port of the React
- * `AssetPanel/components/queries.ts` and of the version-tag hooks in `#/hooks/backendHooks`, with
- * the same query keys and options (the shared `backendQueryOptions`, #192), so that the cache, its
- * persistence and the invalidations of `INVALIDATION_MAP` behave as before.
+ * a project version's `Main.enso`, plus the optimistic tag updates. Their keys and options come
+ * from the shared `backendQueryOptions` (#192), so that the cache, its persistence and the
+ * invalidations of `INVALIDATION_MAP` behave as before.
  */
 import { backendQueryKey, backendQueryOptions } from '$/utils/backendQuery'
 import { backendMutationOptions } from '@/composables/backend'

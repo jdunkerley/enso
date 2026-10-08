@@ -1,6 +1,6 @@
 /**
- * @file Drawing a QR code on a canvas, as `qrcode.react`'s `QRCodeCanvas` did: the same encoder
- * (Nayuki's QR Code generator, which `uqr` ports), no quiet zone, and one path of the dark modules.
+ * @file Drawing a QR code on a canvas: Nayuki's QR Code generator (which `uqr` ports) as the
+ * encoder, no quiet zone, and one path of the dark modules.
  */
 import { encode } from 'uqr'
 

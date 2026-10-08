@@ -1,4 +1,4 @@
-/** @file Styles for a scroller, shared by the React `#/components/Scroller` and its Vue port. */
+/** @file Styles for a scroller (`Scroller.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const SCROLLER_STYLES = tv({

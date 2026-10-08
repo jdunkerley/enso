@@ -1,7 +1,6 @@
 /**
  * @file The Activity tab lists the sessions of the project the right panel is focused on: the
- * project selected in the drive, or the one opened in a project tab (#176). Ported with the tab
- * from the React `ProjectSessions.test.tsx` (#89).
+ * project selected in the drive, or the one opened in a project tab (#176).
  */
 import { sessionsProjectFromContext, type RightPanelContext } from '$/providers/rightPanel'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The page the app shows while a checkout completes (`/payments/success`): a spinner with a
- * Cancel button. The Vue port of the React `PaymentsSuccess`, with the same steps and timings.
+ * Cancel button.
  *
  * It waits for the user's plan to become the one the checkout was for (`pendingCheckout.ts`),
  * re-reading the session every 3 s for up to a minute, under a loading toast. Then it forgets the
@@ -9,8 +9,7 @@
  * dashboard; on a timeout it says so and returns too. Without a pending plan it returns at once.
  * Leaving the page stops the wait.
  *
- * Like the React `Page` around it, it shows the info bar at the top right and mounts the modal host,
- * both loaded on first use.
+ * It shows the info bar at the top right and mounts the modal host, both loaded on first use.
  */
 import { DASHBOARD_PATH } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
@@ -29,9 +28,9 @@ import { clearPendingCheckoutTargetPlan, getPendingCheckoutTargetPlan } from '..
 const USER_REFETCH_DELAY_MS = 3_000
 const TIMEOUT = 60_000
 
-/** Loaded on demand, as the React `Page` loads it: its popover pulls in Reka. */
+/** Loaded on demand: its popover pulls in Reka. */
 const InfoBar = defineAsyncComponent(() => import('$/components/InfoBar/InfoBar.vue'))
-/** Loaded on demand, as the React `Page` loads it: its error boundary pulls in Reka. */
+/** Loaded on demand: its error boundary pulls in Reka. */
 const ModalHost = defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue'))
 
 const router = useRouter()

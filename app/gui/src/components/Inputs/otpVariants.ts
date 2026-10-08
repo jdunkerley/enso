@@ -1,5 +1,5 @@
 /**
- * @file Tailwind variants of the one-time-code input, shared by the React input and its Vue port.
+ * @file Tailwind variants of the one-time-code input.
  * See `variants.ts` for the `*_VUE_STATES` constants.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'

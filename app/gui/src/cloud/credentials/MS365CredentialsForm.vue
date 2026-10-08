@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Microsoft 365 credential: the Vue port of the React
- * `MS365CredentialsForm`. The recipe is `$/cloud/serviceCredentials/ms365`. Each permission's
- * description follows the chosen one. Remember to list a new form in `credentialInfos.ts`.
+ * @file The form creating a Microsoft 365 credential. The recipe is
+ * `$/cloud/serviceCredentials/ms365`. Each permission's description follows the chosen one.
+ * Remember to list a new form in `credentialInfos.ts`.
  */
 import * as ms365 from '$/cloud/serviceCredentials/ms365'
 import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'

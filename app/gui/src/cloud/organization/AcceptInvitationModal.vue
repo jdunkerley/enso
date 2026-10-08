@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * @file The dialog for a pending invitation to an organization: the Vue port of the React
- * `#/modals/AcceptInvitationModal`, with the same title, text, alert and buttons.
+ * @file The dialog for a pending invitation to an organization: its title, text, an alert, and
+ * buttons to accept or decline.
  *
  * `AppContainerLayout.vue` shows it while the user has an invitation (through the modals
  * `registerCloud` contributes). Accepting joins the organization (`updateUser`) and toasts a
  * welcome, or toasts the failure; declining deletes the invitation. Either way the dialog closes
- * once the request succeeds, and shows the error and stays open if it fails, as React's form did.
+ * once the request succeeds, and shows the error and stays open if it fails.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import AlertDialog from '$/components/AlertDialog/AlertDialog.vue'
@@ -41,7 +41,7 @@ const deleteInvitation = useMutation(
   }),
 )
 
-// Opens as it mounts, as React's `defaultOpen` did.
+// Opens as it mounts.
 const open = ref(true)
 </script>
 

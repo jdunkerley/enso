@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A progress bar (`role="progressbar"`) on Reka UI's `Progress`: the Vue counterpart of the
- * React `#/components/ProgressBar`.
+ * @file A progress bar (`role="progressbar"`) on Reka UI's `Progress`.
  */
 import { PROGRESS_BAR_STYLES } from '$/components/ProgressBar/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

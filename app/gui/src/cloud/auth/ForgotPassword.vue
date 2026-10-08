@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The first half of the password reset: the Vue port of the React `ForgotPassword`. It asks
- * Cognito to email a reset link, then returns to the sign-in page. When the account's email is not
- * confirmed yet, it offers to send the confirmation email again.
+ * @file The first half of the password reset. It asks Cognito to email a reset link, then returns
+ * to the sign-in page. When the account's email is not confirmed yet, it offers to send the
+ * confirmation email again.
  */
 import Button from '$/components/Button/Button.vue'
 import FormError from '$/components/Form/FormError.vue'

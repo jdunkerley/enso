@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The user bar's "Invite" button, opening the invitation dialog: the Vue port of the React
- * `InviteUsersButton` (#83 left it React until the dialog was ported).
+ * @file The user bar's "Invite" button, opening the invitation dialog.
  */
 import Button from '$/components/Button/Button.vue'
 import { useText } from '$/providers/text'

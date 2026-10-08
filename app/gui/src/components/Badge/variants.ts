@@ -1,4 +1,4 @@
-/** @file Styles for badges, shared by the React `#/components/Badge`/`StatusBadge` and their Vue ports. */
+/** @file Styles for badges (`Badge.vue` and `StatusBadge.vue`). */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
 

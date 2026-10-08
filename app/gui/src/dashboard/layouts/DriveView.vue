@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * @file The drive: the bar (location, actions, search) and the table of the shown directory. The
- * Vue port of React's `Drive`, mounted by the left panel (`LeftPanel.vue`), with the
- * `drive-view` test id and its `data-category` (the category actually shown).
+ * @file The drive: the bar (location, actions, search) and the table of the shown directory,
+ * mounted by the left panel (`LeftPanel.vue`), with the `drive-view` test id and its
+ * `data-category` (the category actually shown).
  *
  * It provides the drive's state (`provideDriveStore`, #90), the location it shows
- * (`provideDriveView`: the old directory stays on screen while a new one loads, as React's
- * transition kept it), the listed assets and the search suggestions. In place of the drive it
- * shows why the cloud is unavailable (the cloud cannot be reached, or the user is not enabled), or
- * that the cloud is unavailable offline.
+ * (`provideDriveView`: the old directory stays on screen while a new one loads), the listed assets
+ * and the search suggestions. In place of the drive it shows why the cloud is unavailable (the
+ * cloud cannot be reached, or the user is not enabled), or that the cloud is unavailable offline.
  */
 import AssetsTable from '#/layouts/AssetsTable.vue'
 import { provideAssetItems } from '#/layouts/Drive/assetItems'

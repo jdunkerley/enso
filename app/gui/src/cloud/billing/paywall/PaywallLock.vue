@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** @file A lock icon with the plan a feature needs: the Vue port of the React `PaywallLock`. */
+/** @file A lock icon with the plan a feature needs. */
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'
 import { getFeatureConfiguration, type PaywallFeatureName } from '$/composables/paywall'

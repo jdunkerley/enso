@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The right panel's Properties tab: the properties of the asset selected in a cloud category,
- * and the configuration of a secret or a datalink. The Vue port of the React
- * `AssetPanel/components/AssetProperties`.
+ * and the configuration of a secret or a datalink.
  *
  * Outside the cloud, or with nothing selected, it says so. The content is remounted for each asset,
- * inside its own error boundary, as React's was.
+ * inside its own error boundary.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import Result from '$/components/Result/Result.vue'

@@ -2,8 +2,7 @@
  * @file Placement of an overlay relative to its trigger.
  *
  * The Vue primitives take a single `placement` (the `@floating-ui` spelling, as the project-view's
- * `TooltipTrigger` does), and translate it to Reka's separate `side` and `align`. The React
- * primitives' react-aria placements (`'bottom start'`) port by replacing the space with a hyphen.
+ * `TooltipTrigger` does), and translate it to Reka's separate `side` and `align`.
  */
 import type { Placement } from '@floating-ui/vue'
 

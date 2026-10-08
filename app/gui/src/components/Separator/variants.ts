@@ -1,4 +1,4 @@
-/** @file Styles for a separator, shared by the React `#/components/Separator` and its Vue port. */
+/** @file Styles for a separator (`Separator.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const SEPARATOR_STYLES = tv({

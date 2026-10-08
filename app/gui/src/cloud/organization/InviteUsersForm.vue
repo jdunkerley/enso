@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
  * @file The invitation dialog's form: email addresses, separated by spaces, commas or semicolons,
- * and "Send invites". The Vue port of the React `InviteUsersForm`.
+ * and "Send invites".
  *
  * The addresses must all be valid, and no more than the seats left on the plan; either failure
- * reads "Email is invalid", as in React. On a plan whose invitations are limited, an alert gives
+ * reads "Email is invalid". On a plan whose invitations are limited, an alert gives
  * the seats left, with an upgrade button. It emits `submitted` with the addresses once every
  * invitation has been sent.
  *
- * React also tried to colour the invalid addresses red with the CSS Custom Highlight API. That
- * cannot reach the text of an `<input>`, and its ranges were set on the field's label, where the
- * offsets threw; it is not ported.
+ * The invalid addresses are not coloured red: the CSS Custom Highlight API cannot reach the text
+ * of an `<input>`.
  */
 import PaywallAlert from '$/cloud/billing/paywall/PaywallAlert.vue'
 import { parseUserEmails } from '$/cloud/parseUserEmails'
@@ -37,7 +36,7 @@ const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
 
 const inviteUserMutation = useMutation(backendMutationOptions('inviteUser', remoteBackend))
 
-// Fetched afresh whenever the dialog opens, as React's own query was.
+// Fetched afresh whenever the dialog opens.
 const invitations = useQuery(listInvitationsQueryOptions(remoteBackend, 0))
 await invitations.suspense()
 
@@ -58,8 +57,8 @@ const schema = z.object({
 })
 
 async function submit({ emails }: z.output<typeof schema>) {
-  // Each address once. React meant to do this too, but put the parsed entries (objects) in its
-  // `Set`, so an address typed twice was invited twice.
+  // Each address once: the `Set` holds the addresses, not the parsed entries (objects), so an
+  // address typed twice is invited once.
   const emailsToSubmit = Array.from(
     new Set(parseUserEmails(emails).entries.map(({ email }) => email)),
   ).filter((value): value is EmailAddress => isEmail(value))

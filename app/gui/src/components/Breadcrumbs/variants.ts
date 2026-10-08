@@ -1,4 +1,4 @@
-/** @file Styles for breadcrumbs, shared by the React `#/components/Breadcrumbs` and its Vue port. */
+/** @file Styles for breadcrumbs (`Breadcrumbs.vue` and `BreadcrumbItem.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const BREADCRUMBS_STYLES = tv({

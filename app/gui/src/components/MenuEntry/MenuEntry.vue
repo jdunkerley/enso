@@ -1,18 +1,17 @@
 <script setup lang="ts">
 /**
- * @file An entry of a menu drawn in a popover (the user and info menus): the Vue counterpart of the
- * React `#/components/MenuEntry`, with the same elements and classes, styled by the same
+ * @file An entry of a menu drawn in a popover (the user and info menus), styled by
  * `MENU_ENTRY_VARIANTS`.
  *
- * It is a button, not a `menuitem`: those menus are dialogs of buttons, as in React, and are
- * operated with Tab, Enter and Space. Its icon, colour, label and shortcut come from its action's
- * metadata (`$/configurations/inputBindings`), the shortcut as the user has bound it. Pressing it
- * closes the enclosing popover or dialog (or every modal, outside one), then calls `onPress`.
+ * It is a button, not a `menuitem`: those menus are dialogs of buttons, and are operated with Tab,
+ * Enter and Space. Its icon, colour, label and shortcut come from its action's metadata
+ * (`$/configurations/inputBindings`), the shortcut as the user has bound it. Pressing it closes the
+ * enclosing popover or dialog (or every modal, outside one), then calls `onPress`.
  *
  * `tooltip` shows a visual tooltip to the right of the entry (#91, for the drive's context menus).
- * React's paywall lock (`isUnderPaywall`, `feature`) is not here: the paywall is cloud code, which
- * the core may not import, so the drive's menus (which are dashboard code) give a locked entry the
- * lock icon, the "upgrade" tooltip and an `onPress` opening the paywall dialog themselves.
+ * The entry has no paywall lock of its own: the paywall is cloud code, which the core may not
+ * import, so the drive's menus (which are dashboard code) give a locked entry the lock icon, the
+ * "upgrade" tooltip and an `onPress` opening the paywall dialog themselves.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { injectDialogContext } from '$/components/Dialog/dialogContext'
@@ -61,9 +60,9 @@ defineSlots<{
 }>()
 
 /**
- * React's `FocusRing` adds the `focus-ring` class while the entry has visible focus. Tailwind does
- * not generate variants of that class (it is a multi-selector component), so its rules are spelled
- * out under `focus-visible:`.
+ * The `focus-ring` class's rules, applied while the entry has visible focus. Tailwind does not
+ * generate variants of that class (it is a multi-selector component), so its rules are spelled out
+ * under `focus-visible:`.
  */
 const FOCUS_RING =
   'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary focus-visible:transition-all'

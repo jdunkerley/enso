@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The "New Credential" dialog: a list of the credential types, and the chosen type's form
- * (`credentialInfos.ts`). The Vue port of the React `CreateCredentialModal`, with the same title,
- * size, list and forms.
+ * (`credentialInfos.ts`).
  *
- * It is meant for the modal stack (`useModals().open`, as the Vue drive opens it), and opens as it
- * mounts; it emits `close` once it has closed and its exit animation has ended. As in React an
- * outside click does not close it; Escape does. Submitting a form creates the credential with
- * `doCreate`, opens the provider's sign-in page in the browser, and closes it.
+ * It is meant for the modal stack (`useModals().open`, as the drive opens it), and opens as it
+ * mounts; it emits `close` once it has closed and its exit animation has ended. An outside click
+ * does not close it; Escape does. Submitting a form creates the credential with `doCreate`, opens
+ * the provider's sign-in page in the browser, and closes it.
  */
 import { makeCredentialCreationHandler } from '$/cloud/serviceCredentials/logic'
 import Dialog from '$/components/Dialog/Dialog.vue'

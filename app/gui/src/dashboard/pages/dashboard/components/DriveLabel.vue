@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
- * @file A label in its colour, pressable, with an optional button to remove it: the Vue port of
- * React's `Label`, for the drive's labels column and the asset search bar. (The React one stays for
- * the labels popover until #198; the Properties tab has its own never-pressable copy.)
+ * @file A label in its colour, pressable, with an optional button to remove it, for the drive's
+ * labels column and the asset search bar. (The Properties tab has its own never-pressable copy.)
  *
- * The text is the default slot, always plain text here (React took other content too, which no
- * caller passed). React's `react-aria-Button` class stays on the inner button, as
- * react-aria rendered it, and the focus ring shows on the wrapper while anything in it has visible
- * focus, as React's `FocusRing within placement="after"` did.
+ * The text is the default slot, always plain text. The inner button keeps the `react-aria-Button`
+ * class from before the Vue port (#75), and the focus ring shows on the wrapper while anything in
+ * it has visible focus.
  */
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import Button from '$/components/Button/Button.vue'

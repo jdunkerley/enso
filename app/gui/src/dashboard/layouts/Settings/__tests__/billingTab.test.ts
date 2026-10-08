@@ -112,7 +112,7 @@ describe('Billing & Plans tab', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     remote.createCustomerPortalSession.mockRejectedValue(new Error('No portal.'))
-    // The rejection reaches the button, as React's did.
+    // The rejection reaches the button.
     const onUnhandled = vi.fn()
     process.on('unhandledRejection', onUnhandled)
     try {

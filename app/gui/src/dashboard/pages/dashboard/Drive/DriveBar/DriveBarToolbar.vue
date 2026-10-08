@@ -2,12 +2,10 @@
 /**
  * @file The drive's toolbar: the buttons creating assets (a project, a folder, a secret, a
  * credential, a datalink), uploading and downloading, the count of cut or copied assets, and the
- * search bar. In the trash, a button emptying it; in Recent, only the count and the search bar. The
- * Vue port of React's `DriveBarToolbar`.
+ * search bar. In the trash, a button emptying it; in Recent, only the count and the search bar.
  *
- * The secret dialog is Vue's; the credential and datalink dialogs are still React's (#198), opened
- * over the page as their `Dialog.Trigger` did. Each of those buttons keeps the `aria-expanded`
- * react-aria gave it.
+ * The secret, credential and datalink dialogs open on the modal stack, over the page. Each of those
+ * buttons has an `aria-expanded`, true while its dialog is open.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
 import {

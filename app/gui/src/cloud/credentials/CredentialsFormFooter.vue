@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The end of a credential form: "Create" (or "Update"), an optional Cancel, and the form's
- * error. The Vue port of the React `CredentialsFormFooter`.
+ * error.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import DialogClose from '$/components/Dialog/DialogClose.vue'

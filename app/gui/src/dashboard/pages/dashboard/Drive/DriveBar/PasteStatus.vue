@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file How many assets are cut or copied, with the scissors or copy icon: the drive toolbar's
- * paste status, as React's `IconDisplay` in a `VisualTooltip` drew it.
+ * paste status, drawn as an icon display in a `VisualTooltip`.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { ICON_DISPLAY_STYLES } from '$/components/Icon/variants'

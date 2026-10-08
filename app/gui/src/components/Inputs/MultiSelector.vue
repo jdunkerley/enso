@@ -1,10 +1,9 @@
 <script setup lang="ts" generic="T">
 /**
- * @file A horizontal selector of several items, bound to a form field holding the selected items:
- * the Vue counterpart of the React `MultiSelector`, styled by the same `MULTI_SELECTOR_STYLES` and
- * `MULTI_SELECTOR_OPTION_STYLES`. A Reka `Listbox` (`role="listbox"`, `aria-multiselectable`):
- * arrow keys move between options, Space and Enter toggle one. `toLabel` names each item (React's
- * `children`, default `String`).
+ * @file A horizontal selector of several items, bound to a form field holding the selected items,
+ * styled by `MULTI_SELECTOR_STYLES` and `MULTI_SELECTOR_OPTION_STYLES`. A Reka `Listbox`
+ * (`role="listbox"`, `aria-multiselectable`): arrow keys move between options, Space and Enter
+ * toggle one. `toLabel` names each item (default `String`).
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
@@ -31,7 +30,7 @@ const props = withDefaults(
     name: string
     form?: AnyFormInstance | undefined
     items: readonly T[]
-    /** The text of each item. React's `children`. */
+    /** The text of each item. */
     toLabel?: ((item: T) => string) | undefined
     columns?: number | undefined
     defaultValue?: readonly T[] | undefined

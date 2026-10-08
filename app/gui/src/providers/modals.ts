@@ -58,8 +58,8 @@ export function createModalsStore() {
    */
   function open<C extends Component>(component: C, props: ComponentProps<C>) {
     const key = nextKey++
-    // Props are passed through untouched: they may hold values of another framework (the React
-    // shim's elements), which must not become reactive proxies.
+    // Props are passed through untouched, so that values in them do not become reactive
+    // proxies.
     stack.value = [...stack.value, { key, component: markRaw(component), props: markRaw(props) }]
     return { key, close: () => close(key) }
   }
@@ -118,11 +118,11 @@ export function createModalsStore() {
   return { stack, open, close, closeAll, ask }
 }
 
-/** The app's modal stack, reachable from any code: components, mutation callbacks, the React shim. */
+/** The app's modal stack, reachable from any code: components, mutation callbacks. */
 export const useModals = createGlobalState(createModalsStore)
 
 /**
- * {@link useModals} under a name that does not read as a React hook, for code outside Vue's
- * `setup` (the React shim).
+ * {@link useModals} under a name that does not read as a composable, for code outside Vue's
+ * `setup`.
  */
 export const getModalsStore = useModals

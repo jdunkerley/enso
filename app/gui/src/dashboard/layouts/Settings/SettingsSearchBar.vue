@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The settings page's search field: the Vue port of the React `#/layouts/SearchBar`, with the
- * same elements and classes. The `<input>` is named by `label`.
+ * @file The settings page's search field. The `<input>` is named by `label`.
  */
 import Icon from '$/components/Icon/Icon.vue'
 

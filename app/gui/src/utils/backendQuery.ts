@@ -1,8 +1,8 @@
 /**
- * @file The framework-free query and mutation options for the backend's methods. React's
- * `useQuery`/`useMutation` and vue-query consume the same objects, and every per-method default
- * (stale time, persistence, invalidations) is defined once, here: the two frameworks share one
- * `QueryClient`, so they must agree on what a key means ("Rulings from #192").
+ * @file The framework-free query and mutation options for the backend's methods. vue-query and
+ * direct `QueryClient` calls consume the same objects, and every per-method default (stale time,
+ * persistence, invalidations) is defined once, here: they all share one `QueryClient`, so they must
+ * agree on what a key means ("Rulings from #192").
  */
 import type {
   DataTag,
@@ -200,8 +200,8 @@ export type BackendMethodResult<Method extends BackendMethods> = Awaited<
 
 /**
  * The options a caller of {@link backendQueryOptions} may add or override. They are the ones whose
- * types React and vue-query agree on: a function-valued option (`enabled`, `staleTime`, …) means a
- * getter to vue-query, where React passes it the query.
+ * types TanStack Query's core and vue-query agree on: a function-valued option (`enabled`,
+ * `staleTime`, …) means a getter to vue-query, where the core passes it the query.
  */
 export interface BackendQueryExtraOptions {
   /** Appended to the method's query key. */
@@ -248,8 +248,8 @@ export function backendQueryOptions<Method extends BackendQueryMethod>(
   options?: BackendQueryExtraOptions,
 ): BackendQueryOptions<BackendMethodResult<Method> | undefined>
 /**
- * Query options for a call of a backend method, for React's `useQuery` and vue-query alike. The
- * key is `[backendType, method, ...args, ...options.queryKey]`.
+ * Query options for a call of a backend method, for vue-query and direct `QueryClient` calls alike.
+ * The key is `[backendType, method, ...args, ...options.queryKey]`.
  */
 export function backendQueryOptions<Method extends BackendQueryMethod>(
   backend: Backend | null,
@@ -262,8 +262,8 @@ export function backendQueryOptions<Method extends BackendQueryMethod>(
   return {
     ...options,
     networkMode: defaults.networkMode,
-    // This is SAFE: it is the key this method's data is cached under. React's and vue-query's
-    // `queryOptions` tag the key the same way.
+    // This is SAFE: it is the key this method's data is cached under. vue-query's `queryOptions`
+    // tags the key the same way.
     queryKey: queryKey as DataTag<QueryKey, BackendMethodResult<Method> | undefined, Error>,
     staleTime: options?.staleTime ?? defaults.staleTime,
     meta: {
@@ -311,7 +311,8 @@ export function backendMutationOptions<Method extends BackendMutationMethod>(
   options?: BackendMutationExtraOptions<Method, BackendMethodResult<Method> | undefined>,
 ): MutationOptions<BackendMethodResult<Method> | undefined, Error, Parameters<Backend[Method]>>
 /**
- * Mutation options for a call of a backend method, for React's `useMutation` and vue-query alike.
+ * Mutation options for a call of a backend method, for vue-query and direct `QueryClient` calls
+ * alike.
  * The mutation invalidates the queries in `options.meta.invalidates` and those
  * {@link INVALIDATION_MAP} lists for the method, and by default waits for them to be refetched.
  */

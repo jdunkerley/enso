@@ -1,6 +1,5 @@
 /**
- * @file How `Form.vue` hands its form to the fields, buttons and error displays inside it: the Vue
- * counterpart of the React `FormProvider`/`useFormContext`.
+ * @file How `Form.vue` hands its form to the fields, buttons and error displays inside it.
  */
 import { createContextStore } from '@/providers'
 import type { AnyFormInstance, FormInstance, TSchema } from './types'
@@ -8,8 +7,8 @@ import type { AnyFormInstance, FormInstance, TSchema } from './types'
 export const [provideForm, injectForm] = createContextStore('Form', (form: AnyFormInstance) => form)
 
 /**
- * The given form, or else the enclosing `Form.vue`'s. As in React, a field, `Submit` or `FormError`
- * outside a form must be given one through its `form` prop.
+ * The given form, or else the enclosing `Form.vue`'s. A field, `Submit` or `FormError` outside
+ * a form must be given one through its `form` prop.
  */
 export function useFormContext<Schema extends TSchema = TSchema>(
   form?: FormInstance<Schema> | undefined,

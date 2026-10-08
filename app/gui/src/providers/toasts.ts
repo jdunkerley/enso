@@ -196,7 +196,7 @@ export function createToastsStore() {
 
   /**
    * Show a loading toast while the promise is pending, then turn it into a success or an error
-   * toast, as react-toastify's `toast.promise` did. An outcome without content only dismisses the
+   * toast. An outcome without content only dismisses the
    * loading toast; content given as a function is rendered from the promise's result or error.
    * Returns the promise.
    */
@@ -251,11 +251,11 @@ export function createToastsStore() {
   return { toasts, show, update, dismiss, isActive, remove, onChange, promise }
 }
 
-/** The app's toasts, reachable from any code: Vue components, stores, and the React shim. */
+/** The app's toasts, reachable from any code: Vue components and stores. */
 export const useToasts = createGlobalState(createToastsStore)
 
 /**
- * {@link useToasts} under a name that does not read as a React hook, for code outside Vue's
- * `setup` (the React shim).
+ * {@link useToasts} under a name that does not read as a composable, for code outside Vue's
+ * `setup`.
  */
 export const getToastsStore = useToasts

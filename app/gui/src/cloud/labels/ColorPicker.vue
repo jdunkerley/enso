@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * @file A choice of one of the label colours (`COLORS`): the Vue port of the React
- * `#/components/ColorPicker`, with its markup and classes. It is a `role="radiogroup"` of native
- * radios hidden in round swatches, as react-aria rendered it, so arrow keys move the choice as the
- * browser does. The chosen swatch shows a dot; a swatch focused from the keyboard shows the focus
- * ring. `v-model` holds the colour.
+ * @file A choice of one of the label colours (`COLORS`). It is a `role="radiogroup"` of native
+ * radios hidden in round swatches, so arrow keys move the choice as the browser does. The chosen
+ * swatch shows a dot; a swatch focused from the keyboard shows the focus ring. `v-model` holds the
+ * colour.
  */
 import { twMerge } from '$/utils/style/tailwindMerge'
 import {

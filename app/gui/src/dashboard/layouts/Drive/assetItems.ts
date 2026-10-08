@@ -1,10 +1,9 @@
 /**
- * @file Every asset the drive's table has listed, by id: the Vue port of React's
- * `assetsTableItemsHooks`. The table records each directory's listing as it loads; the rows and the
- * context menus look an asset up (a pasted asset's parent, to check the user may move it there)
- * and list a directory's children (a renamed asset's siblings, which its new name must not clash
- * with), including directories listed before. React kept one such store for the window; this one
- * lives as long as the drive.
+ * @file Every asset the drive's table has listed, by id. The table records each directory's listing
+ * as it loads; the rows and the context menus look an asset up (a pasted asset's parent, to check
+ * the user may move it there) and list a directory's children (a renamed asset's siblings, which
+ * its new name must not clash with), including directories listed before. The store lives as long
+ * as the drive.
  */
 import { createContextStore } from '@/providers'
 import type { AnyAsset, AssetId, DirectoryId } from 'enso-common/src/services/Backend'

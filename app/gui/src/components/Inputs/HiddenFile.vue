@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A file input bound to a form field, with no visible field: the Vue counterpart of the
- * React `HiddenFile`. The field holds the chosen `File`; `autoSubmit` submits the form as soon as
- * one is chosen. Attributes go on the `<input>`; a caller opens it with `click()`.
+ * @file A file input bound to a form field, with no visible field. The field holds the chosen
+ * `File`; `autoSubmit` submits the form as soon as one is chosen. Attributes go on the `<input>`;
+ * a caller opens it with `click()`.
  */
 import type { AnyFormInstance } from '$/components/Form/types'
 import { useField } from '$/components/Form/useField'

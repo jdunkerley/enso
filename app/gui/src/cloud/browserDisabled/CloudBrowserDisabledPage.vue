@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The page shown in place of the dashboard when running projects in the browser is disabled
- * (the `enableCloudExecution` feature flag is off): the Vue port of the React
- * `#/layouts/CloudBrowserDisabled`, with the same result, text and buttons.
+ * (the `enableCloudExecution` feature flag is off).
  *
  * After `redirectDelayMs` (3 s) it opens the desktop app through its deep link (`enso://`, then
  * `redirectPath`), and its spinner turns into an info icon. The user can open the desktop app
- * themselves, or download it. Like the React `Page` around it, it shows the info bar at the top
- * right and mounts the modal host, both loaded on first use.
+ * themselves, or download it. It shows the info bar at the top right and mounts the modal host,
+ * both loaded on first use.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -29,9 +28,9 @@ const { redirectDelayMs = DEFAULT_REDIRECT_DELAY_MS, redirectPath = '' } = defin
   redirectPath?: string | undefined
 }>()
 
-/** Loaded on demand, as the React `Page` loads it: its popover pulls in Reka. */
+/** Loaded on demand: its popover pulls in Reka. */
 const InfoBar = defineAsyncComponent(() => import('$/components/InfoBar/InfoBar.vue'))
-/** Loaded on demand, as the React `Page` loads it: its error boundary pulls in Reka. */
+/** Loaded on demand: its error boundary pulls in Reka. */
 const ModalHost = defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue'))
 
 const { getText } = useText()

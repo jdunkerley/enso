@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A `PaywallButton.vue` that opens the feature's `PaywallDialog.vue`: the Vue port of the
- * React `PaywallDialogButton`. Attributes (`variant`, `showIcon`, …) go on the button, and so
- * does the default slot, its label.
+ * @file A `PaywallButton.vue` that opens the feature's `PaywallDialog.vue`. Attributes (`variant`,
+ * `showIcon`, …) go on the button, and so does the default slot, its label.
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import PaywallButton from './PaywallButton.vue'

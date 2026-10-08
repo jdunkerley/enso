@@ -1,7 +1,6 @@
 <script lang="ts">
 /**
- * @file The sign-up page: the Vue port of the React `Registration`, and of the
- * `RegistrationPage.vue` that hosted it (its data loader is here now).
+ * @file The sign-up page, with its data loader.
  *
  * Step one creates the account, after the user agrees to the Terms of Service and the Privacy
  * Policy. Step two (straight away with `?created=true`, which the sign-in page sets for an
@@ -168,7 +167,7 @@ const privacyPolicyUrl = `${$config.HOST}/privacy`
 
 <template>
   <AuthenticationPage :supportsOffline="supportsOffline">
-    <!-- The empty `step` slot keeps React's (empty) row of step markers, and so its gap. -->
+    <!-- The empty `step` slot keeps an (empty) row of step markers, and so its gap. -->
     <Stepper :state="stepperState">
       <template #step />
       <StepContent :index="0">

@@ -135,7 +135,7 @@ onUnmounted(() => {
 })
 
 // While the opened projects sync as the app exits, a dialog says so, and nothing else is open.
-// Unlike the React dashboard, mounting does not close the modals already open.
+// Mounting does not close the modals already open.
 let syncingDialog: { close: () => void } | undefined
 watch(
   () => openedProjects.closingOnAppExit.value,

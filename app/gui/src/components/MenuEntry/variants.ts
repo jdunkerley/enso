@@ -1,4 +1,4 @@
-/** @file Variants for a menu entry: shared by the React `#/components/MenuEntry` and `MenuEntry.vue`. */
+/** @file Variants for a menu entry (`MenuEntry.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 /** The styles of a menu entry's content. */

@@ -2,8 +2,7 @@
 /**
  * @file The dialog shown once an API key is created: its id and its secret, each with a button that
  * copies it, and a warning that the secret is shown only this once. It opens on the modal stack
- * (`$/providers/modals`) and emits `close` once it has closed. The Vue port of React's
- * `ApiKeyDialog`.
+ * (`$/providers/modals`) and emits `close` once it has closed.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import CopyButton from '$/components/Button/CopyButton.vue'

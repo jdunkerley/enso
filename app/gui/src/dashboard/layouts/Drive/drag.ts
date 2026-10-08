@@ -1,9 +1,8 @@
 /**
- * @file The drag payload of rows dragged from the drive's table, on native drag events: the Vue
- * port of React's `#/utilities/drag`. The rows travel in two forms: this in-page payload (looked up
- * by an id carried in a MIME type of the drag), which the table's rows and drop zone read, and the
- * serialisable `ASSETS_MIME_TYPE` one (`$/utils/assetsDataTransfer`), which the category buttons
- * read.
+ * @file The drag payload of rows dragged from the drive's table, on native drag events. The rows
+ * travel in two forms: this in-page payload (looked up by an id carried in a MIME type of the
+ * drag), which the table's rows and drop zone read, and the serialisable `ASSETS_MIME_TYPE` one
+ * (`$/utils/assetsDataTransfer`), which the category buttons read.
  */
 import type { Category } from '$/providers/category'
 import type { AnyAsset, AssetId } from 'enso-common/src/services/Backend'

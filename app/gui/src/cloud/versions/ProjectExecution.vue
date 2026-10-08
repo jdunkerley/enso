@@ -2,9 +2,8 @@
 /**
  * @file One scheduled execution of a project on the Schedule tab's selected day: when it runs (and,
  * on hover, its repeat interval, time zone and, with the advanced options, its maximum duration),
- * the logs of the session it started, if any, and an actions menu to delete it. The Vue port of the
- * React `AssetPanel/components/ProjectExecution` in its `compact` form, the only one the calendar
- * used.
+ * the logs of the session it started, if any, and an actions menu to delete it. It is always
+ * compact, as the calendar shows it.
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
@@ -49,7 +48,7 @@ const { backend, item, projectExecution, session, ...props } = defineProps<{
 }>()
 
 const MONTHS_IN_YEAR = 12
-/** React's `PROJECT_EXECUTION_STYLES`, with `compact` as the calendar set it (and always enabled). */
+/** The execution's styles, compact as the calendar shows it (and always enabled). */
 const PROJECT_EXECUTION_STYLES = tv({
   base: 'group flex flex-row gap-1 w-full rounded-default items-center odd:bg-primary/5 p-2',
   variants: {

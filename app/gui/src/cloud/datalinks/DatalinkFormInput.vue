@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The datalink editor (`DatalinkInput.vue`) as a field of the enclosing form: the Vue port of
- * the React `DatalinkFormInput`. As in React, a validation error shows only in the editor (its
- * invalid inputs and the schema's descriptions): React's `FieldError` there had no field around it,
- * so it rendered nothing.
+ * @file The datalink editor (`DatalinkInput.vue`) as a field of the enclosing form. A validation
+ * error shows only in the editor (its invalid inputs and the schema's descriptions); there is no
+ * separate field error.
  */
 import { useField } from '$/components/Form/useField'
 import { toRaw } from 'vue'

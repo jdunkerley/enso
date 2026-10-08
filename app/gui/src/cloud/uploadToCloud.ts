@@ -1,9 +1,8 @@
 /**
  * @file Uploading assets from the local drive to the Enso Cloud: packing each local project into a
  * file and uploading it through the uploads store, after asking how to resolve name conflicts.
- * Framework-free, moved out of the React `#/hooks/backendUploadFilesHooks` (#192): moving assets
- * from a local category to a cloud one calls it, from React and Vue alike. It is cloud-only, but a
- * helper rather than an area, so the core may import it (`src/cloud/CLAUDE.md`).
+ * Framework-free (#192): moving assets from a local category to a cloud one calls it. It is
+ * cloud-only, but a helper rather than an area, so the core may import it (`src/cloud/CLAUDE.md`).
  */
 import type { GetText } from '$/providers/text'
 import type { UploadKind } from '$/providers/upload'

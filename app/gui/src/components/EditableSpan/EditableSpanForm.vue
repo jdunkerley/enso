@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * @file The form an editable `EditableSpan.vue` turns into: the text in an input (focused after
- * React's 100 ms delay), a tick to submit it (once changed) and a cross to cancel. Escape, or a
- * press outside the form, cancels too, as react-aria's `useInteractOutside` did (a press that both
- * starts and ends outside). The value must be non-empty after trimming, and pass `schema` when
- * given; a failed check or submission shows its message beside the field in the danger colour, as
- * React's `ErrorMessage` drew it.
+ * @file The form an editable `EditableSpan.vue` turns into: the text in an input (focused after a
+ * 100 ms delay), a tick to submit it (once changed) and a cross to cancel. Escape, or a press
+ * outside the form (one that both starts and ends outside), cancels too. The value must be
+ * non-empty after trimming, and pass `schema` when given; a failed check or submission shows its
+ * message beside the field in the danger colour.
  */
 import Button from '$/components/Button/Button.vue'
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
@@ -52,7 +51,7 @@ provideForm(form)
 
 const formElement = ref<HTMLFormElement>()
 
-// A press that starts and ends outside the form cancels, as react-aria's `useInteractOutside`.
+// A press that starts and ends outside the form cancels.
 let pressStartedOutside = false
 function isOutside(event: PointerEvent) {
   const target = event.target
@@ -101,7 +100,7 @@ function onKeyDown(event: KeyboardEvent) {
 </script>
 
 <script lang="ts">
-/** How far the error outline reaches around the form, as React's `ErrorMessage` drew it. */
+/** How far the error outline reaches around the form. */
 const OFFSET = 12
 const CROSS_OFFSET = 30
 const OUTLINE_WIDTH = CROSS_OFFSET + 10

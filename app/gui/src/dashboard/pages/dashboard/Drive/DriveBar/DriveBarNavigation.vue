@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The drive's location bar, in the panel's toolbar: the Up button and the breadcrumbs of the
- * shown directory. The Vue port of React's `DriveBarNavigation`.
+ * shown directory.
  *
  * Pressing Up goes to the parent directory; a long press (or Alt+ArrowDown) opens a menu of every
- * directory on the path, as react-aria's `Menu.Trigger trigger="longPress"` did. Dropping onto a
- * breadcrumb moves the selected assets there, and holding a drag over one opens it. While a
- * breadcrumb's or the Up button's navigation is pending, it shows a spinner.
+ * directory on the path. Dropping onto a breadcrumb moves the selected assets there, and holding a
+ * drag over one opens it. While a breadcrumb's or the Up button's navigation is pending, it shows a
+ * spinner.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
 import Breadcrumbs from '$/components/Breadcrumbs/Breadcrumbs.vue'
@@ -141,7 +141,7 @@ async function onDrop(id: unknown) {
 
 // === The Up button's long-press menu ===
 
-/** How long a press must last to open the menu, as react-aria's `useLongPress`. */
+/** How long a press must last to open the menu. */
 const LONG_PRESS_THRESHOLD_MS = 500
 
 const upButtonWrapper = ref<HTMLElement>()

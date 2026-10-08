@@ -1,4 +1,4 @@
-/** @file Styles for the loader, shared by the React `#/components/Loader` and its Vue port. */
+/** @file Styles for the loader (`Loader.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const LOADER_STYLES = tv({

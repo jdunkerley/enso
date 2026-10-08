@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The user bar, at the right of the app container's top bar: the offline notice, the trial
- * indicator, "Invite" and "Upgrade", the notification tray and the user menu. The Vue counterpart
- * of the React `UserBar` (#83), mounted by `AppContainer.vue`.
+ * indicator, "Invite" and "Upgrade", the notification tray and the user menu (#83), mounted by
+ * `AppContainer.vue`.
  *
  * The cloud-only parts come from `src/cloud/`, imported directly (decision 6b's registries do not
  * exist yet): the trial indicator and "Upgrade" from `billing/`, "Invite" from `organization/`.

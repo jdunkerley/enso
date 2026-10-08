@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A field's error message: the Vue counterpart of the React `Form.FieldError`. It shows the
- * `error` prop when given, else the field's validation error, else nothing.
+ * @file A field's error message. It shows the `error` prop when given, else the field's
+ * validation error, else nothing.
  */
 import { FIELD_ERROR_STYLES } from '$/components/Form/variants'
 import { computed } from 'vue'

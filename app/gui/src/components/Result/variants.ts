@@ -1,4 +1,4 @@
-/** @file Styles for a result, shared by the React `#/components/Result` and its Vue port. */
+/** @file Styles for a result (`Result.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const RESULT_STYLES = tv({

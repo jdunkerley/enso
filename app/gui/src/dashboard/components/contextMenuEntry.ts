@@ -1,4 +1,4 @@
-/** @file An entry of the drive's context menu (`ContextMenu.vue`), as React's `MenuEntryProps`. */
+/** @file An entry of the drive's context menu (`ContextMenu.vue`). */
 import type { TEXT_STYLE } from '$/components/Text/variants'
 import type { PaywallFeatureName } from '$/composables/paywall'
 import type { DashboardBindingKey } from '$/configurations/inputBindings'

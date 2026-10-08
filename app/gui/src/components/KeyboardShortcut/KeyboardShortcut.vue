@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * @file A keyboard shortcut, drawn as its modifiers and key: the Vue counterpart of the React
- * `#/pages/dashboard/components/KeyboardShortcut`, with the same elements and classes.
+ * @file A keyboard shortcut, drawn as its modifiers and key.
  *
  * The modifiers are icons where the platform has one (⌘ ⇧ ⌥ ⌃ on macOS, the Windows key on
  * Windows), and words otherwise; Meta is "Super" on Linux. The arrow keys are arrows, and the space
  * bar is "Space".
  *
- * It takes the shortcut as a string (`Mod+Shift+K`). React's other form, `action`, reads the
- * dashboard's user-rebindable bindings from its React provider; it comes to Vue with the binding
- * registry (#170).
+ * It takes the shortcut as a string (`Mod+Shift+K`). Taking an `action` instead, to show the
+ * user's own binding for it, waits for the binding registry (#170).
  */
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'

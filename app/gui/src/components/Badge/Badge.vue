@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file Highlights an item's status for quick recognition: the Vue counterpart of the React
- * `#/components/Badge`.
+ * @file Highlights an item's status for quick recognition, styled by `BADGE_STYLES`.
  */
 import { BADGE_STYLES } from '$/components/Badge/variants'
 import Icon from '$/components/Icon/Icon.vue'

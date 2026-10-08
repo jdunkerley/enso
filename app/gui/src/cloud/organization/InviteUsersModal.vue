@@ -1,13 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The "Invite" dialog: a form for the email addresses to invite, then a success step with the
- * invitation link. The Vue port of the React `InviteUsersModal`, shared by every place that invites
- * users: the Members settings tab, the user bar's "Invite" (`InviteUsersButton.vue`), and any
- * app-level modal that needs it.
+ * invitation link. It is shared by every place that invites users: the Members settings tab, the
+ * user bar's "Invite" (`InviteUsersButton.vue`), and any app-level modal that needs it.
  *
- * Its trigger is the `trigger` slot, as React's `Dialog.Trigger`; without one it is controlled
- * through `v-model:open`. React's unused `relativeToTrigger` (a popover instead of a dialog) is not
- * ported.
+ * Its trigger is the `trigger` slot; without one it is controlled through `v-model:open`.
  */
 import Dialog from '$/components/Dialog/Dialog.vue'
 import { useText } from '$/providers/text'

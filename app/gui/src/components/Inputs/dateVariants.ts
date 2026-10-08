@@ -1,5 +1,5 @@
 /**
- * @file Tailwind variants of the date picker and the time field, shared by the React input and its Vue port.
+ * @file Tailwind variants of the date picker and the time field.
  * See `variants.ts` for the `*_VUE_STATES` constants.
  */
 import { makeRoundedStyles } from '$/utils/style/roundedStyles'
@@ -80,7 +80,7 @@ export const TIME_FIELD_STYLES = tv({
 export const CALENDAR_CELL_VUE_STATES =
   'data-[outside-view]:text-primary/30 data-[disabled]:text-primary/30 data-[unavailable]:text-primary/30 data-[selected]:border-primary/40'
 /**
- * The date and time segments' spelling of react-aria's `placeholder-shown:`, for Reka's segments
- * (`data-placeholder`).
+ * The date and time segments' spelling of their `dateSegment` style's `placeholder-shown:`, for
+ * Reka's segments (`data-placeholder`).
  */
 export const DATE_SEGMENT_VUE_STATES = 'data-[placeholder]:text-primary/30'

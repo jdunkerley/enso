@@ -2,7 +2,7 @@
 /**
  * @file The name cell of a project: its state button (`ProjectIcon.vue`) and its name, which turns
  * into a form while it is renamed. A double click opens the project, when the user may run it and
- * nobody else is using it. The Vue port of React's `ProjectNameColumn`.
+ * nobody else is using it.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
 import ProjectIcon, { CLOSED_PROJECT_STATE } from '#/pages/dashboard/components/ProjectIcon.vue'

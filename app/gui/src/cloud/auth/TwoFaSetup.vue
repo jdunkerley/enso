@@ -28,7 +28,7 @@ const session = useSession()
 const totp = useQuery({ queryKey: ['setupTOTP'], queryFn: () => session.setupTOTP() })
 const url = computed(() => totp.data.value?.url ?? '')
 
-// Shown once the link is known, as React's suspending query did.
+// Shown once the link is known.
 await totp.suspense()
 </script>
 

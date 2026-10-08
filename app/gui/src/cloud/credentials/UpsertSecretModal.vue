@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * @file The dialog creating or editing a cloud secret ("New Secret", "Edit Secret"): the Vue port
- * of the React `UpsertSecretModal`, around `UpsertSecretForm.vue`.
+ * @file The dialog creating or editing a cloud secret ("New Secret", "Edit Secret"), around
+ * `UpsertSecretForm.vue`.
  *
- * It is meant for the modal stack (`useModals().open`), and opens as it mounts; it emits `close` once
- * it has closed and its exit animation has ended. As in React an outside click does not close it;
- * Escape and Cancel do. `onCreate` gets the name and the value once the form is submitted.
+ * It is meant for the modal stack (`useModals().open`), and opens as it mounts; it emits `close`
+ * once it has closed and its exit animation has ended. An outside click does not close it; Escape
+ * and Cancel do. `onCreate` gets the name and the value once the form is submitted.
  */
 import Dialog from '$/components/Dialog/Dialog.vue'
 import { useText } from '$/providers/text'

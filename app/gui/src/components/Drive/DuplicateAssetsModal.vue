@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * @file The dialog resolving name conflicts ("1 conflicting file found"): the Vue port of the React
- * `ResolveDuplicationsModal`. Open it with `resolveDuplications` (`./duplicateAssets`), which
- * puts it on the modal stack; it emits `close` once it has closed and its exit animation ended.
+ * @file The dialog resolving name conflicts ("1 conflicting file found"). Open it with
+ * `resolveDuplications` (`./duplicateAssets`), which puts it on the modal stack; it emits `close`
+ * once it has closed and its exit animation ended.
  *
  * The form is `DuplicateAssetsForm.vue`, which waits for the directory's listings inside the
- * dialog's `SuspenseLoader`, as React's `useSuspenseQueries` suspended.
+ * dialog's `SuspenseLoader`.
  */
 import Dialog from '$/components/Dialog/Dialog.vue'
 import type { Category } from '$/providers/category'
@@ -47,7 +47,7 @@ function cancel() {
 }
 
 // Taken off the stack unanswered (the dashboard's global Escape binding closes every modal before
-// the dialog sees the key): that is a cancellation, as React's dialog reported Escape.
+// the dialog sees the key): that is a cancellation, as Escape is.
 onUnmounted(cancel)
 
 /** Nothing actually conflicts: answer at once, and close without asking. */

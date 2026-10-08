@@ -7,8 +7,8 @@ import { getModalsStore, type Resolution } from '$/providers/modals'
 import CopyInsteadModal from './CopyInsteadModal.vue'
 
 /**
- * Ask whether to copy instead. Resolves `'confirm'` to copy, `'dismiss'` otherwise. Like the React
- * `ask` it replaces, it closes every open modal first.
+ * Ask whether to copy instead. Resolves `'confirm'` to copy, `'dismiss'` otherwise. It closes every
+ * open modal first.
  */
 export function askToCopyInstead(message: string, description: string): Promise<Resolution> {
   const modals = getModalsStore()

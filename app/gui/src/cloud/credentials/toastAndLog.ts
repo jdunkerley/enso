@@ -1,4 +1,4 @@
-/** @file An error toast that is logged too: React's `toastAndLog(null, error)`, for the forms here. */
+/** @file An error toast that is logged too, for the forms here. */
 import { useToasts } from '$/providers/toasts'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The Enso devtools panel (#172): the floating Enso button at the bottom left, and the popover
- * it opens. The Vue counterpart of React's `EnsoDevtools` (`EnsoDevtoolsImpl.tsx`), with the same
- * sections in the same order:
+ * it opens. Its sections, in order:
  *
  * - "Hide Devtools", and "Clear cache and reload" (the query cache and its persisted copy);
  * - the user's plan, overridden through the `developerPlanOverride` feature flag (signed in only);
@@ -12,7 +11,7 @@
  *   itself unlocks);
  * - the local storage viewer and editor (`LocalStorageSection.vue`).
  *
- * The forms are created as the popover opens, from the current values, as in React.
+ * The forms are created as the popover opens, from the current values.
  */
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
@@ -110,15 +109,15 @@ function paywallDefaults() {
 }
 
 function onPaywallFeatureChange(name: string, value: unknown) {
-  // On means forced on; off leaves the feature to the plan, as in React.
+  // On means forced on; off leaves the feature to the plan.
   devtools.setPaywallFeature(name as PaywallFeatureName, value === true ? true : null)
 }
 </script>
 
 <template>
   <div :class="DIALOG_BACKGROUND({ className: 'fixed bottom-3 left-3 z-50 rounded-full' })">
-    <!-- React's popover was as tall as the window let it be, and scrolled; Reka's is as tall as its
-    content unless limited. -->
+    <!-- As tall as the window lets it be, and scrolled: Reka's popover is as tall as its content
+    unless limited. -->
     <Popover
       testId="enso-devtools"
       :aria-label="getText('ensoDevtoolsPopoverHeading')"

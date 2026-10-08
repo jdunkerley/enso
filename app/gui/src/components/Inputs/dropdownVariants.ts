@@ -63,7 +63,7 @@ export const DROPDOWN_STYLES = tv({
     optionsContainer: 'relative grid max-h-60 w-full overflow-auto transition-grid-template-rows',
     optionsList: 'overflow-auto',
     optionsItem:
-      'flex min-h-6 items-center gap-2 rounded-input transition-colors focus:cursor-default focus:bg-frame focus:font-bold focus:focus-ring not-focus:hover:bg-hover-bg not-selected:hover:bg-hover-bg',
+      'flex min-h-6 items-center gap-2 rounded-input transition-colors focus:cursor-default focus:bg-frame focus:font-bold focus:focus-ring',
     input: 'group relative flex items-center gap-2 w-full',
     dropdownArrow: 'rotate-90 opacity-80 group-hover:opacity-100',
     inputDisplay: 'grow select-none',
@@ -76,9 +76,8 @@ export const DROPDOWN_STYLES = tv({
   },
 })
 /**
- * The Vue `Dropdown`'s spelling of `DROPDOWN_STYLES`'s `not-focus:` and `not-selected:`, which
- * only match react-aria elements. The options are Reka `ListboxItem`s, which take real focus, so
- * `focus:` itself works unchanged.
+ * The hover background of a `Dropdown` option that is not focused, or not selected. The options are
+ * Reka `ListboxItem`s, which take real focus, so `focus:` in `optionsItem` works unchanged.
  */
 export const DROPDOWN_OPTION_VUE_STATES =
   '[&:not(:focus)]:hover:bg-hover-bg [&[aria-selected=false]]:hover:bg-hover-bg'

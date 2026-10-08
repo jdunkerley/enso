@@ -1,6 +1,6 @@
 /**
- * @file Framework-free utilities for breadcrumbs: collapsing a long path into a "more" item. Shared
- * by the React `#/components/Breadcrumbs` and the Vue `$/components/Breadcrumbs`.
+ * @file Framework-free utilities for breadcrumbs: collapsing a long path into a "more" item, for
+ * `$/components/Breadcrumbs`.
  */
 import invariant from 'tiny-invariant'
 

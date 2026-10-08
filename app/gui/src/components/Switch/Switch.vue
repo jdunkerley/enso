@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A switch bound to a boolean form field: the Vue counterpart of the React
- * `#/components/Switch`, styled by the same `SWITCH_STYLES`. A native checkbox with
- * `role="switch"`, visually hidden inside a `<label>`, as react-aria renders it, so Space toggles
- * it. The label is `label` or the `label` slot, before or after the track (`labelPosition`).
+ * @file A switch bound to a boolean form field, styled by `SWITCH_STYLES`. A native checkbox with
+ * `role="switch"`, visually hidden inside a `<label>`, so Space toggles it. The label is `label` or
+ * the `label` slot, before or after the track (`labelPosition`).
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'

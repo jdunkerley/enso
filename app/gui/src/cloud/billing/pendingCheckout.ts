@@ -1,7 +1,7 @@
 /**
  * @file The plan a checkout is for, kept in local storage while the user pays in Stripe's page, so
- * that the payments success page knows which plan to wait for. Moved unchanged from the React
- * `#/modules/payments` (#88): the same key and schema.
+ * that the payments success page knows which plan to wait for. Its key and schema are those used
+ * before the Vue port (#88).
  */
 import LocalStorage from '$/utils/LocalStorage'
 import { Plan } from 'enso-common/src/services/Backend'

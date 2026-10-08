@@ -2,12 +2,12 @@
 /**
  * @file The dialog in which a plan with seats (Team, and Solo while it could be trialled) is
  * bought: the price, the number of seats with a summary of what they cost, and the button that
- * goes on to Stripe. The Vue port of the React `PlanSelectorDialog`.
+ * goes on to Stripe.
  *
  * The trigger is the `trigger` slot, and `open` is a `v-model`. The form lives as long as the
- * dialog's component, not only while it is open, so the seats chosen survive closing it, as in
- * React. `onSubmit` receives the seats; while its promise is pending the submit button loads, and
- * if it rejects the form shows why.
+ * dialog's component, not only while it is open, so the seats chosen survive closing it. `onSubmit`
+ * receives the seats; while its promise is pending the submit button loads, and if it rejects the
+ * form shows why.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
@@ -108,7 +108,7 @@ const priceText = computed(
     <div class="flex items-center justify-between gap-4">
       <ErrorBoundary>
         <Form :form="form" class="mt-1">
-          <!-- React passed `isRequired`, but its field let the schema's (not required) win: no `*`. -->
+          <!-- Not marked required, as the schema does not require it: no `*`. -->
           <Input
             :readOnly="maxSeats === 1"
             name="seats"

@@ -1,6 +1,6 @@
 /**
- * @file The drive's Vue `ContextMenu`: React's DOM, and the closing behaviour react-aria gave it
- * (Escape, a press outside, a right-click elsewhere, pressing an entry).
+ * @file The drive's Vue `ContextMenu`: its DOM, and its closing behaviour (Escape, a press
+ * outside, a right-click elsewhere, pressing an entry).
  */
 import ContextMenu from '#/components/ContextMenu.vue'
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'

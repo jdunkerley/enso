@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A centred loading spinner that fills its container: the Vue counterpart of the React
- * `#/components/Loader`. Anything in the default slot is shown under the spinner.
+ * @file A centred loading spinner that fills its container. Anything in the default slot is shown
+ * under the spinner.
  */
 import {
   LOADER_SIZES,

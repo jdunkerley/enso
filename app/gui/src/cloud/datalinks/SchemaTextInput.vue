@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A text or number input of the datalink editor, with its error under it: the
- * `<FocusRing><Input/></FocusRing>` and errors of the React `JSONSchemaInput`'s `string`, `number`
- * and `integer` cases, with the same classes.
+ * @file A text or number input of the datalink editor, with its error under it, for the
+ * `string`, `number` and `integer` cases of `JSONSchemaInput.vue`. It shows the focus ring while
+ * the keyboard has put the focus in it.
  */
 import Text from '$/components/Text/Text.vue'
 import { useText } from '$/providers/text'

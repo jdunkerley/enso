@@ -1,7 +1,6 @@
 /**
  * @file The context-menu entries available everywhere in a directory (upload, new project, folder,
- * secret, credential and datalink, and paste): the Vue port of React's
- * `useGlobalContextMenuEntries`.
+ * secret, credential and datalink, and paste).
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'

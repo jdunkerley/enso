@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file An accessible tooltip on Reka UI's `Tooltip`: the Vue counterpart of the React
- * `TooltipTrigger` + `Tooltip` pair.
+ * @file An accessible tooltip on Reka UI's `Tooltip`.
  *
  * The default slot is the trigger, which must be a single focusable element (usually a
  * `Button`). The text is the `tooltip` prop or the `tooltip` slot. It opens on hover after
@@ -41,7 +40,7 @@ const {
 } = defineProps<{
   tooltip?: string | undefined
   placement?: Placement | undefined
-  /** Milliseconds of hover before the tooltip opens. React-aria's default, 1500. */
+  /** Milliseconds of hover before the tooltip opens; 1500 by default. */
   delay?: number | undefined
   /** Milliseconds within which moving to another tooltip's trigger skips its delay. */
   closeDelay?: number | undefined
@@ -60,8 +59,8 @@ const trigger = ref<InstanceType<typeof TooltipTrigger>>()
 const isPointerOver = ref(false)
 
 /**
- * Open on focus only when the keyboard put the focus there, as react-aria's `useTooltipTrigger`
- * does: a focus that a closing dialog returns to its trigger after a click shows no tooltip.
+ * Open on focus only when the keyboard put the focus there: a focus that a closing dialog returns
+ * to its trigger after a click shows no tooltip.
  */
 function onOpenChange(value: boolean) {
   const element: unknown = trigger.value?.$el
@@ -77,7 +76,7 @@ const classes = computed(
   () => `${TOOLTIP_STYLES({ variant, size, rounded, maxWidth, className })} ${TOOLTIP_MOTION}`,
 )
 
-/** React-aria's `offset` and `containerPadding` for the dashboard's tooltips. */
+/** The `offset` and `containerPadding` of the dashboard's tooltips. */
 const OFFSET = 9
 const CONTAINER_PADDING = 6
 </script>

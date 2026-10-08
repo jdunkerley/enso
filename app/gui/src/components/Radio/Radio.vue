@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * @file A radio button in a `RadioGroup.vue`: the Vue counterpart of the React `Radio`, styled by
- * the same `RADIO_STYLES`. A native `<input type="radio">`, visually hidden inside a `<label>`,
- * as react-aria renders it. The hover, press and focus-visible states that react-aria computes are
- * tracked here the same way, so the classes match. The label is `label` or the default slot.
+ * @file A radio button in a `RadioGroup.vue`, styled by `RADIO_STYLES`. A native
+ * `<input type="radio">`, visually hidden inside a `<label>`. The hover, press and focus-visible
+ * states are tracked here, for the classes `RADIO_STYLES` keys on them. The label is `label` or the
+ * default slot.
  */
 import { RADIO_STYLES } from '$/components/Radio/variants'
 import Text from '$/components/Text/Text.vue'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file Why the drive shows nothing in a cloud category while offline, with a button switching to
- * the local drive when there is one. The Vue port of React's `OfflineMessage` in `Drive.tsx`.
+ * the local drive when there is one.
  */
 import Button from '$/components/Button/Button.vue'
 import Icon from '$/components/Icon/Icon.vue'

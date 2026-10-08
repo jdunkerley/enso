@@ -2,9 +2,8 @@
 /**
  * @file The form scheduling a new execution of a project: its tag, time zone, first occurrence,
  * repeat interval (with the days or months it repeats on, and the next few occurrences), and with
- * the advanced options its parallel mode and maximum duration. The Vue port of the React
- * `NewProjectExecutionForm` (`#/layouts/NewProjectExecutionModal`). A successful submission closes
- * the enclosing dialog.
+ * the advanced options its parallel mode and maximum duration. A successful submission closes the
+ * enclosing dialog.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import DialogClose from '$/components/Dialog/DialogClose.vue'
@@ -70,7 +69,7 @@ const { backend, item, defaultDate } = defineProps<{
   defaultDate?: ZonedDateTime | undefined
 }>()
 
-// Kept as in React, which never offers "monthly on the last weekday".
+// "Monthly on the last weekday" is never offered.
 const DISABLE_LAST_WEEKDAY_REPEAT_TYPE = true as boolean
 const REPEAT_TIMES_COUNT = 3
 
@@ -127,7 +126,7 @@ const validRepeatTypes = computed(() => {
     : PROJECT_EXECUTION_REPEAT_TYPES
 })
 
-// Keep the first occurrence's instant in the chosen time zone, as React did from its first render.
+// Keep the first occurrence's instant in the chosen time zone, from the first render on.
 watch(formTimeZone, (zone) => form.setValue('startDate', toZoned(startDateValue.value, zone)), {
   immediate: true,
 })

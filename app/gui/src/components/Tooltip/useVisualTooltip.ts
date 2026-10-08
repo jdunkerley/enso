@@ -1,7 +1,6 @@
 /**
  * @file The behaviour of a visual tooltip: shown while the pointer is over its target (or over the
- * tooltip itself), after a short delay, and only when its display rule allows it. The Vue
- * counterpart of the React `useVisualTooltip`.
+ * tooltip itself), after a short delay, and only when its display rule allows it.
  *
  * A visual tooltip is not an accessible description: it repeats what is already on screen (the
  * full text of a truncated label, the reason a disabled button is disabled), so it is

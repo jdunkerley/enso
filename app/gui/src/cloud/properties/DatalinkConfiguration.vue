@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A datalink's configuration in the Properties tab: the datalink editor in a form, with
- * "Update" and "Reset" once it is changed (and the user may edit the datalink). The Vue port of the
- * datalink section's form in the React `AssetProperties`.
+ * "Update" and "Reset" once it is changed (and the user may edit the datalink).
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Form from '$/components/Form/Form.vue'

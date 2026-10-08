@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * @file A plan card's button: the Vue port of the React `SubscribeButton`. Its label says what
- * pressing it would do ("Start a 30-day free trial", "Upgrade", "Subscribe", "Current Plan"), and it
- * is disabled for the current plan and for a user who is not the organization's admin.
+ * @file A plan card's button. Its label says what pressing it would do ("Start a 30-day free
+ * trial", "Upgrade", "Subscribe", "Current Plan"), and it is disabled for the current plan and for
+ * a user who is not the organization's admin.
  *
  * - For a plan below the user's it is replaced by "Contact Sales to downgrade".
  * - For Solo it asks to confirm going to Stripe (an `AlertDialog`), then checks out one seat.
  * - For other plans it opens `PlanSelectorDialog.vue`, where the seats are chosen.
  *
- * `defaultOpen` opens that dialog as the page loads (the subscription page's `plan` parameter), as
- * React's `Dialog.Trigger` `defaultOpen` did, unless the button is disabled.
+ * `defaultOpen` opens that dialog as the page loads (the subscription page's `plan` parameter),
+ * unless the button is disabled.
  */
 import { getSalesEmail } from '$/appUtils'
 import AlertDialog from '$/components/AlertDialog/AlertDialog.vue'
@@ -66,13 +66,13 @@ const variant = computed(() => (isCurrent || isDowngrade ? 'outline' : 'submit')
 
 const disabled = computed(() => isCurrent || isDowngrade || isDisabled || !isOrganizationAdmin)
 
-// React's `Dialog.Trigger` `defaultOpen`: read once, as the button mounts.
+// `defaultOpen` is read once, as the button mounts.
 const open = ref(!disabled.value && defaultOpen === true)
 </script>
 
 <template>
   <div class="w-full text-center">
-    <!-- The line break between the link and "to downgrade" renders as the space React wrote. -->
+    <!-- The line break between the link and "to downgrade" renders as a space. -->
     <Text v-if="isDowngrade" transform="normal" class="my-0.5">
       <Text transform="none">
         <Button variant="link" :href="getSalesEmail() + `?subject=Downgrade%20our%20plan`">

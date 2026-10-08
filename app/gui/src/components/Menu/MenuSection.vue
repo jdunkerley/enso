@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A titled group of `MenuItem`s (`role="group"`, labelled by its title): the Vue counterpart
- * of the React `Menu.Section`.
+ * @file A titled group of `MenuItem`s (`role="group"`, labelled by its title).
  */
 import { DropdownMenuGroup, DropdownMenuLabel } from 'reka-ui'
 import { MENU_SECTION_STYLES } from './variants'

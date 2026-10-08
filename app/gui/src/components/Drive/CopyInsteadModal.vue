@@ -2,9 +2,7 @@
 /**
  * @file The question asked when assets cannot be moved or restored where they were dropped, but can
  * be copied there: from a team's folder to another team, to the user's own folder or to the local
- * drive (#14797), or restored from the trash into another team's folder. The Vue port of the React
- * prompt in `#/layouts/Drive/Categories/transferBetweenCategoriesHooks`, with the same title,
- * text, alert and buttons.
+ * drive (#14797), or restored from the trash into another team's folder.
  *
  * It is meant for the modal stack (`askToCopyInstead`, `./copyInstead`). It emits `close` once it
  * has closed and its exit animation has ended, which takes it off the stack.

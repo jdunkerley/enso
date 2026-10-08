@@ -1,7 +1,6 @@
 /**
- * @file The form layer's framework-free rules, shared by the React `#/components/Form` and its Vue
- * port (`Form.vue`) while both exist: the i18n zod error map, and the text of the form-level
- * errors. Every message comes from a `useText()` key, so no form hard-codes a string.
+ * @file The form layer's framework-free rules: the i18n zod error map, and the text of the
+ * form-level errors. Every message comes from a `useText()` key, so no form hard-codes a string.
  */
 import type { GetText } from '$/providers/text'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'

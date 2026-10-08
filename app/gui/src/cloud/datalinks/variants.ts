@@ -1,4 +1,4 @@
-/** @file The classes of the datalink editor's inputs, as the React `JSONSchemaInput` had them. */
+/** @file The classes of the datalink editor's inputs. */
 
 export const ROUNDED_INPUT_BASE_CLASSES =
   'h-6 w-full grow border-0.5 border-primary/20 bg-transparent px-2 outline-offset-2 transition-[border-color,outline] duration-200 read-only:read-only'

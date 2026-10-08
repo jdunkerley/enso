@@ -1,6 +1,6 @@
 /**
- * @file Whether a {@link Text} is nested in another one. Nested texts drop their line-height
- * compensation, as the React `Text.Group`/`TextProvider` does.
+ * @file Whether a {@link Text} is nested in another one (or in a `TextGroup.vue`). Nested texts
+ * drop their line-height compensation.
  */
 import { createContextStore } from '@/providers'
 

@@ -1,7 +1,6 @@
 /**
- * @file Scrolling a container while the pointer drags near its edges: the Vue port of React's
- * `autoScrollHooks`, with its constants. The drive's table uses it while a selection is drawn or
- * rows are dragged.
+ * @file Scrolling a container while the pointer drags near its edges. The drive's table uses it
+ * while a selection is drawn or rows are dragged.
  */
 import { onScopeDispose, toValue, type MaybeRefOrGetter } from 'vue'
 
@@ -73,7 +72,7 @@ export function useAutoScroll(
     }
     if (direction === 'horizontal' || direction === 'both') {
       if (container.scrollLeft > 0) {
-        // React measured this from the container's top, not its left; kept as it was.
+        // Measured from the container's top, not its left; kept as it was.
         const distanceToLeft = Math.max(0, pointerX - rect.top)
         if (distanceToLeft < threshold) {
           container.scrollLeft =

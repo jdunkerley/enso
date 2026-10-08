@@ -1,12 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The invitation dialog's last step: who was invited, the invitation link to copy, and the
- * buttons to go to the Members settings tab and to close. The Vue port of the React
- * `InviteUsersSuccess`.
+ * buttons to go to the Members settings tab and to close.
  *
- * React meant to hide "Go to Members Page" on the Members tab, but tested for a query parameter the
- * app no longer sets, so the button always showed; it still does. It now opens the Members tab
- * from anywhere: React's only switched the tab when the settings page was already open.
+ * "Go to Members Page" shows on every tab, the Members tab included, and opens the Members tab from
+ * anywhere, whether or not the settings page is already open.
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'

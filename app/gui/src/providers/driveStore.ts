@@ -1,7 +1,7 @@
 /**
  * @file The drive's state: the selection, the clipboard (cut or copied assets), the asset being
- * renamed, the context menu and the drag target. Framework-free (it began as the React drive's);
- * the Vue drive, `#/layouts/DriveView.vue`, provides it with {@link provideDriveStore}.
+ * renamed, the context menu and the drag target. Framework-free; the Vue drive,
+ * `#/layouts/DriveView.vue`, provides it with {@link provideDriveStore}.
  */
 import type { Category } from '$/providers/category'
 import type { TransferrableAsset } from '$/utils/assetsDataTransfer'
@@ -28,7 +28,7 @@ export type SelectedAssetInfo =
 
 /** Data for a context menu. */
 export interface ContextMenuData {
-  /** The element the menu belongs to; a React ref, or anything else with the same shape. */
+  /** The element the menu belongs to, as a `{ current }` ref object. */
   readonly triggerRef: { current: HTMLElement | null }
   readonly initialContextMenuPosition: Pick<MouseEvent, 'pageX' | 'pageY'> | null
 }

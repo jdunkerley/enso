@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The button showing a project's state in the drive's name cell, which opens it, or stops it
- * while it is opening or open: the Vue port of React's `ProjectIcon`, with its test ids
- * (`open-project`, `stop-project`), labels and tooltips.
+ * while it is opening or open, with its test ids (`open-project`, `stop-project`), labels and
+ * tooltips.
  */
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import Button from '$/components/Button/Button.vue'

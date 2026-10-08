@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The "danger zone" of the Account settings tab, with the button that deletes the user's
- * account once confirmed: the Vue port of the React `DeleteUserAccountSettingsSection`.
+ * account once confirmed.
  */
 import Button from '$/components/Button/Button.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'

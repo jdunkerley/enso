@@ -1,9 +1,8 @@
 /**
  * @file Uploading files: the store of the uploads to the cloud in progress
  * ({@link useUploadsToCloudStore}), and {@link uploadFiles}, which uploads files the user picked
- * or dropped into a drive directory, on either backend. `uploadFiles` is framework-free: it moved
- * here from the React `#/hooks/backendUploadFilesHooks` (#192), whose hook now only gives it the
- * React drive's stores.
+ * or dropped into a drive directory, on either backend. `uploadFiles` is framework-free (#192): its
+ * caller gives it the drive's stores.
  */
 import type { ResolvedDuplication } from '$/components/Drive/duplicateAssets'
 import type { CategoryType } from '$/providers/category'

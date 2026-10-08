@@ -1,6 +1,6 @@
 /**
- * @file The dashboard's bindings with the user's saved changes (#83: shared by React and Vue), through
- * `LocalStorage` itself. #86's `dashboardInputBindings.test.ts` covers the same store.
+ * @file The dashboard's bindings with the user's saved changes (#83), through `LocalStorage`
+ * itself. #86's `dashboardInputBindings.test.ts` covers the same store.
  */
 import { createDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import LocalStorage from '$/utils/LocalStorage'

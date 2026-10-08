@@ -92,7 +92,7 @@ test.describe('A click on the graph closes the user menu, and does nothing else'
     // `click()` would wait for the underlay to clear, so click by position.
     await page.mouse.click(graph!.x + graph!.width - 100, graph!.y + graph!.height / 2)
     await expect(menu).toHaveCount(0)
-    // As with React's menu, the click was the menu's: the selection is kept.
+    // The click was the menu's: the selection is kept.
     await expectGraphUntouched(page, node, nodeCount)
   })
 

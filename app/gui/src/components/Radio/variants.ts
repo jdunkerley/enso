@@ -1,6 +1,6 @@
 /**
- * @file Tailwind variants of the radio button and the radio group, shared by the React
- * `Radio` and `RadioGroup` and their Vue ports in this folder.
+ * @file Tailwind variants of the radio button and the radio group (`Radio.vue` and
+ * `RadioGroup.vue`).
  */
 import { tv } from '$/utils/style/tailwindVariants'
 

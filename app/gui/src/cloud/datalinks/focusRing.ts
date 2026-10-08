@@ -1,7 +1,7 @@
 /**
- * @file react-aria's `FocusRing` for the datalink editor's inputs: the `focus-ring` class while the
- * element (or, for a container, something inside it) has focus that the keyboard put there. A text
- * input matches `:focus-visible` on every focus, so the modality is tracked as react-aria tracks it
+ * @file A focus ring for the datalink editor's inputs: the `focus-ring` class while the element
+ * (or, for a container, something inside it) has focus that the keyboard put there. A text input
+ * matches `:focus-visible` on every focus, so the input modality is tracked separately
  * (`$/utils/inputModality`).
  */
 import { useKeyboardModality } from '$/utils/inputModality'

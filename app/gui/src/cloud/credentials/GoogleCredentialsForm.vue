@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Google credential: the Vue port of the React `GoogleCredentialsForm`.
- * The recipe is `$/cloud/serviceCredentials/google`. As in React, a failure shows under the form,
- * not as a toast. Remember to list a new form in `credentialInfos.ts`.
+ * @file The form creating a Google credential. The recipe is `$/cloud/serviceCredentials/google`. A
+ * failure shows under the form, not as a toast. Remember to list a new form in
+ * `credentialInfos.ts`.
  */
 import * as google from '$/cloud/serviceCredentials/google'
 import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'

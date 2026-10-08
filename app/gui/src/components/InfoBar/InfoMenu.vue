@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A menu with information about the app, opened from the {@link InfoBar}: the Vue counterpart
- * of the React `#/layouts/InfoMenu` (#83). A popover of buttons, as in React.
+ * @file A menu with information about the app, opened from the {@link InfoBar}: a popover of
+ * buttons.
  */
 import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import Icon from '$/components/Icon/Icon.vue'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * @file Wraps content in a visual tooltip: the Vue counterpart of the React `VisualTooltip`.
+ * @file Wraps content in a visual tooltip.
  *
  * The tooltip is the `tooltip` prop or the `tooltip` slot; with neither (or `tooltip === false`)
  * the content renders unwrapped. See `useVisualTooltip` for how it differs from an accessible

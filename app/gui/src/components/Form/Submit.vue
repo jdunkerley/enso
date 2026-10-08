@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * @file A form's submit button: the Vue counterpart of the React `Form.Submit`. A `Button.vue` of
- * `type="submit"` (variant `submit`, labelled "Submit" by default) that shows its loader, and is
- * disabled, while the form is submitting. Every other prop falls through to `Button.vue`.
+ * @file A form's submit button: a `Button.vue` of `type="submit"` (variant `submit`, labelled
+ * "Submit" by default) that shows its loader, and is disabled, while the form is submitting. Every
+ * other prop falls through to `Button.vue`.
  *
- * - `name` and `value` set that field just before submitting, as in React (a form with two submit
+ * - `name` and `value` set that field just before submitting (a form with two submit
  *   buttons that mean different things).
  * - `isDisabledWhenInvalid` also disables it while the values fail the schema. It is off by
- *   default, as in React: pressing Submit on an invalid form is what shows and focuses the errors.
+ *   default: pressing Submit on an invalid form is what shows and focuses the errors.
  */
 import Button from '$/components/Button/Button.vue'
 import type { ButtonVariants } from '$/components/Button/variants'

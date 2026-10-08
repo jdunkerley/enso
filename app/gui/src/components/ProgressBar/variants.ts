@@ -1,4 +1,4 @@
-/** @file Styles for a progress bar, shared by the React `#/components/ProgressBar` and its Vue port. */
+/** @file Styles for a progress bar (`ProgressBar.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const PROGRESS_BAR_STYLES = tv({

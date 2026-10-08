@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file One of an asset's labels, in its colour: the Vue port of the React `Label`, as the
- * Properties tab shows it (active and disabled: nothing happens on a press).
+ * @file One of an asset's labels, in its colour, as the Properties tab shows it (active and
+ * disabled: nothing happens on a press).
  */
 import Text from '$/components/Text/Text.vue'
 import { lChColorToCssColor, type LChColor } from 'enso-common/src/services/Backend'
@@ -14,8 +14,8 @@ const MAXIMUM_LIGHTNESS_FOR_DARK_COLORS = 50
 </script>
 
 <template>
-  <!-- React wrapped this in `FocusRing within placement="after"`, whose ring shows only while the
-  button has the focus; a disabled button never gets it. -->
+  <!-- No focus ring: it would show only while the button has the focus, and a disabled button
+  never gets it. -->
   <div class="relative rounded-full">
     <div
       class="relative flex h-6 items-center whitespace-nowrap rounded-inherit px-[7px] opacity-50 transition-all active hover:opacity-100 focus:opacity-100"

@@ -1,8 +1,8 @@
 /**
  * @file Mount a Vue component for a unit test with the app-level providers it expects.
  *
- * The shared harness for Vue component tests, in particular for components ported from the React
- * dashboard (#75, #81). It supplies what `App.vue` and `entrypoint.ts` would otherwise provide:
+ * The shared harness for Vue component tests (#75, #81). It supplies what `App.vue` and
+ * `entrypoint.ts` would otherwise provide:
  *
  * - a fresh TanStack `QueryClient` (no retries, so a failing query fails the test at once);
  * - a `vue-router` instance on in-memory history, already navigated to `route`;

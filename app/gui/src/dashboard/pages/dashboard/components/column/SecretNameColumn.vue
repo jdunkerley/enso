@@ -2,7 +2,7 @@
 /**
  * @file The name cell of a secret: its icon, and its name, which turns into a form while it is
  * renamed. A double click opens the secret dialog to change its value (a credential cannot be
- * edited there, and says so). The Vue port of React's `SecretNameColumn`.
+ * edited there, and says so).
  */
 import { useEditSecret } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'

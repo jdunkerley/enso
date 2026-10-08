@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
  * @file The price of the seats being bought, in the plan dialog: the monthly price, the billing
- * period and the subtotal. The Vue port of the React `PlanSelectorDialog`'s `Summary`, with the same
- * query (`createSubscriptionPriceQuery`, keyed by plan, seats and period). It is blurred while the
- * price loads, and while the seats are invalid (when it asks for nothing).
+ * period and the subtotal, from the query `createSubscriptionPriceQuery` (keyed by plan, seats and
+ * period). It is blurred while the price loads, and while the seats are invalid (when it asks for
+ * nothing).
  */
 import ErrorDisplay from '$/components/ErrorBoundary/ErrorDisplay.vue'
 import Text from '$/components/Text/Text.vue'

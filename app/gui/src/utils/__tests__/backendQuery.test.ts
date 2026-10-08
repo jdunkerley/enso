@@ -1,6 +1,7 @@
 /**
  * @file The framework-free backend query and mutation options (#192): the per-method defaults,
- * defined once and the same from React and Vue, and how a caller's options merge with them.
+ * defined once and the same directly and through `@/composables/backend`, and how a caller's
+ * options merge with them.
  */
 import {
   ACCOUNT_STALE_TIME_MS,
@@ -25,9 +26,9 @@ const remote = { type: BackendType.remote } as Backend
 const local = { type: BackendType.local } as Backend
 
 /**
- * The keys whose options React and Vue set differently before #192, and the options both get now:
- * the React drive's, per the ruling on #192, except the organization and the signed-in user, which
- * stay fresh for five minutes (the maintainer's choice on #201).
+ * The keys whose options were set differently in two places before #192, and the options they get
+ * now, per the ruling on #192, except the organization and the signed-in user, which stay fresh for
+ * five minutes (the maintainer's choice on #201).
  */
 const RULED: Record<string, { staleTime: number; persist: boolean }> = {
   getFileDetails: { staleTime: 0, persist: true },

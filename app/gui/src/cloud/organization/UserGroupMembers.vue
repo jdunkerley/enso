@@ -2,7 +2,7 @@
 /**
  * @file One user group's members, opened from the user groups' "Manage Users": back to the list,
  * "Add Users" (a combo box of the organization's other members), "Delete User Group", and per member
- * "Remove", each confirmed first. The Vue port of React's `UserGroupSettingsSection`.
+ * "Remove", each confirmed first.
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
@@ -47,7 +47,7 @@ const CELL_CLASS =
 function confirmDeleteGroup() {
   void modals.ask(ConfirmDeleteModal, {
     actionText: getText('deleteUserGroupActionText', userGroup.groupName),
-    // As in React: back to the list, and the confirmation closes at once.
+    // Back to the list, and the confirmation closes at once.
     onConfirm: () => {
       emit('back')
       deleteUserGroup.mutate([userGroup.id, userGroup.groupName])

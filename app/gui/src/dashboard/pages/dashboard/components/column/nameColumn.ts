@@ -1,6 +1,6 @@
 /**
  * @file What every name cell of the drive's table shares: whether its asset is being renamed, and
- * renaming it, as each React `*NameColumn` did with the drive store's `assetToRename`.
+ * renaming it, through the drive store's `assetToRename`.
  */
 import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useRenameAsset } from '#/layouts/Drive/driveActions'

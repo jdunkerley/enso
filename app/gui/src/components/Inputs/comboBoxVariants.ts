@@ -1,5 +1,5 @@
 /**
- * @file Tailwind variants of the combo box, shared by the React input and its Vue port.
+ * @file Tailwind variants of the combo box.
  * See `variants.ts` for the `*_VUE_STATES` constants.
  */
 import { makeRoundedStyles } from '$/utils/style/roundedStyles'

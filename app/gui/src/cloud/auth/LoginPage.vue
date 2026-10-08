@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The sign-in page: the Vue port of the React `Login`.
+ * @file The sign-in page.
  *
  * Step one offers the identity providers and the email and password form; when Cognito answers
  * with a challenge, step two asks for the one-time code of the user's authenticator app. An
@@ -152,7 +152,7 @@ watch(
   { flush: 'post' },
 )
 
-// React created the code's form afresh each time its step was shown.
+// The code's form starts afresh each time its step is shown.
 watch(stepperState.currentStep, (step) => {
   if (step === 1) otpForm.reset()
 })
@@ -160,7 +160,7 @@ watch(stepperState.currentStep, (step) => {
 
 <template>
   <AuthenticationPage :title="getText('loginToYourAccount')" :supportsOffline="isOnElectron()">
-    <!-- The empty `step` slot keeps React's (empty) row of step markers, and so its gap. -->
+    <!-- The empty `step` slot keeps an (empty) row of step markers, and so its gap. -->
     <Stepper :state="stepperState">
       <template #step />
       <StepContent :index="0">

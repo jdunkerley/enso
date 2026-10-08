@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A modal asking "Are you sure you want to …?" before a deletion: the Vue port of the React
- * `#/modals/ConfirmDeleteModal`, with the same title, text, alerts and buttons.
+ * @file A modal asking "Are you sure you want to …?" before a deletion.
  *
  * It is meant for the modal stack, and opens as it mounts:
  *
@@ -10,8 +9,7 @@
  * ```
  *
  * It emits `close` once it has closed and its exit animation has ended, which takes it off the
- * stack. The React modal stays for the React callers that open it from a `Dialog.Trigger`, until
- * they are ported.
+ * stack.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import AlertDialog from '$/components/AlertDialog/AlertDialog.vue'

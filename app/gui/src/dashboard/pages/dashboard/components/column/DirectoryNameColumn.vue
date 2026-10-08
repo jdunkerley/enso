@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The name cell of a directory: a button opening it, and its name, which turns into a form
- * while it is renamed. The Vue port of React's `DirectoryNameColumn`; the button keeps its test id
- * (`directory-row-navigate-button`) and shows a spinner while the drive opens the directory.
+ * while it is renamed. The button has the test id `directory-row-navigate-button` and shows a
+ * spinner while the drive opens the directory.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'

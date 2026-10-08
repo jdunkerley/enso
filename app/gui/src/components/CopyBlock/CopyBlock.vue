@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A block of text that copies itself to the clipboard when pressed: the Vue counterpart of
- * the React `CopyBlock`, styled by the same `COPY_BLOCK_STYLES`, with the same toast.
+ * @file A block of text that copies itself to the clipboard when pressed, styled by
+ * `COPY_BLOCK_STYLES`, with the copy buttons' toast.
  */
 import Button from '$/components/Button/Button.vue'
 import { useCopy } from '$/components/Button/copy'

@@ -4,7 +4,7 @@
  * a toast while it does.
  *
  * The entries are made here, by the user menu as it is set up, so that they are global actions
- * (`useMenuEntries`) whether or not the menu is open, as in React; `OrganizationSwitcher.vue`
+ * (`useMenuEntries`) whether or not the menu is open; `OrganizationSwitcher.vue`
  * draws them in the menu.
  */
 import { useMenuEntries, type MenuEntryAction } from '$/composables/menuEntries'

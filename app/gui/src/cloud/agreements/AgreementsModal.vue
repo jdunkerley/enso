@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The dialog asking the user to accept the updated Terms of Service and Privacy Policy: the
- * Vue port of the React `#/modals/AgreementsModal`, with the same title, text, checkboxes, links,
- * button and test ids (`agreements-modal`, `agreements-form`).
+ * @file The dialog asking the user to accept the updated Terms of Service and Privacy Policy, with
+ * the test ids `agreements-modal` and `agreements-form`.
  *
  * `ProtectedLayout.vue` shows it in place of the page while either agreement is missing (through
  * the gate `./agreements.ts` contributes), and decides when. It cannot be dismissed: no close
@@ -29,7 +28,7 @@ const { agreedToTos, agreedToPrivacyPolicy, userAgreed } = defineProps<{
 
 const { getText } = useText()
 
-// Opens as it mounts, as React's `defaultOpen` did.
+// Opens as it mounts.
 const open = ref(true)
 
 const defaultValues = {

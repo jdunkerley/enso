@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The plans on offer, as a row of cards: the Vue port of the React `PlanSelector`. The cards
- * come from the backend's payments configuration (`getPaymentsConfig`); the setup waits for it, as
- * React's suspense query did, so an enclosing `SuspenseLoader` shows the loader meanwhile.
+ * @file The plans on offer, as a row of cards. The cards come from the backend's payments
+ * configuration (`getPaymentsConfig`); the setup waits for it, so an enclosing `SuspenseLoader`
+ * shows the loader meanwhile.
  */
 import { mapPlanOnPaywall } from '$/composables/paywall/FeaturesConfiguration'
 import { useBackends } from '$/providers/backends'

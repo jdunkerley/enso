@@ -1,9 +1,8 @@
 <script setup lang="ts" generic="T">
 /**
- * @file A horizontal selector of one item, bound to a form field: the Vue counterpart of the React
- * `Selector`, styled by the same `SELECTOR_STYLES` and `SELECTOR_OPTION_STYLES`. The options are
- * native radios in a `role="radiogroup"`, so arrow keys move the selection. The field holds the
- * item itself; `toLabel` names each (React's `children`, default `String`).
+ * @file A horizontal selector of one item, bound to a form field, styled by `SELECTOR_STYLES` and
+ * `SELECTOR_OPTION_STYLES`. The options are native radios in a `role="radiogroup"`, so arrow keys
+ * move the selection. The field holds the item itself; `toLabel` names each (default `String`).
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
@@ -22,7 +21,7 @@ const props = withDefaults(
     name: string
     form?: AnyFormInstance | undefined
     items: readonly T[]
-    /** The text of each item. React's `children`. */
+    /** The text of each item. */
     toLabel?: ((item: T) => string) | undefined
     columns?: number | undefined
     defaultValue?: T | undefined

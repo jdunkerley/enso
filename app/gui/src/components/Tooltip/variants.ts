@@ -1,4 +1,4 @@
-/** @file Styles for a tooltip, shared by the React `#/components/Tooltip` and its Vue port. */
+/** @file Styles for a tooltip (`Tooltip.vue`). */
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
@@ -53,10 +53,10 @@ export const TOOLTIP_STYLES = tv({
 export type TooltipVariants = VariantProps<typeof TOOLTIP_STYLES>
 
 /**
- * The enter/exit motion of the Vue `Tooltip` (a Reka `TooltipContent`), in place of
- * {@link TOOLTIP_STYLES}'s `isEntering`/`isExiting`. Those key the direction on react-aria's
- * `placement-*:` modifiers, which match only react-aria's own elements; Reka reports the state as
- * `data-state` and the side it used as `data-side` (decision 5 of
+ * The enter/exit motion of `Tooltip.vue` (a Reka `TooltipContent`), in place of
+ * {@link TOOLTIP_STYLES}'s `isEntering`/`isExiting`. Those key the direction on `placement-*:`
+ * (`[data-placement]`, see `STATE_VARIANTS` in `tailwind.config.ts`), which Reka does not set; it
+ * reports the state as `data-state` and the side it used as `data-side` (decision 5 of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  */
 export const TOOLTIP_MOTION = [

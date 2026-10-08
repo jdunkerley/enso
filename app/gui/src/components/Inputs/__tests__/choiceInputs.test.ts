@@ -1,7 +1,7 @@
 /**
  * @file Keyboard, pointer and ARIA behaviour of the Vue choice inputs bound to a form: `Checkbox`
  * (alone and in a `CheckboxGroup`), `RadioGroup`/`Radio`, `Switch`, `Selector` and
- * `MultiSelector`. What react-aria gave the React ones, and what ports rely on.
+ * `MultiSelector`.
  */
 import {
   byTestId,

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Salesforce credential: the Vue port of the React
- * `SalesforceCredentialsForm`. The recipe is `$/cloud/serviceCredentials/salesforce`; its scopes are
- * fixed, so the form asks only for a name. Remember to list a new form in `credentialInfos.ts`.
+ * @file The form creating a Salesforce credential. The recipe is
+ * `$/cloud/serviceCredentials/salesforce`; its scopes are fixed, so the form asks only for a name.
+ * Remember to list a new form in `credentialInfos.ts`.
  */
 import * as salesforce from '$/cloud/serviceCredentials/salesforce'
 import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'

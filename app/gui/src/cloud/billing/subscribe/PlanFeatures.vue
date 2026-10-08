@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A plan's features, each with a check mark: the Vue port of the React `PlanFeatures`, shown
- * by `PlanSelectorDialog.vue`.
+ * @file A plan's features, each with a check mark, shown by `PlanSelectorDialog.vue`.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'

@@ -2,17 +2,15 @@
 /**
  * @file The labels column of the drive's table: the asset's labels (each removable), and a button
  * opening the labels popover for the asset, or for the whole selection when the asset is in it.
- * The Vue port of React's `LabelsColumn`.
  *
- * React also faded the labels out and offered a "show all labels" popover when they overflowed the
- * cell, but its measurement never reported an overflow, so neither ever showed (measured on the
- * base: eight labels in a 348px cell). The port leaves both out rather than show them for the
- * first time; restoring them is a visible change, for its own issue.
+ * Overflowing labels neither fade out nor offer a "show all labels" popover. Before the Vue port
+ * (#75) the column had both, but its measurement never reported an overflow, so neither ever showed
+ * (measured on the base: eight labels in a 348px cell); adding them is a visible change, for its
+ * own issue.
  *
  * The labels popover (`ManageLabelsModal.vue`, #198) opens on the modal stack over the open
- * modals, anchored to the button, as React's `Dialog.Trigger` opened it. The button has no accessible name, as
- * React's had none (axe's `button-name`, in the drive's baseline); it keeps an id, as react-aria
- * gave it one, so that axe names it by that (normalized) id as before.
+ * modals, anchored to the button. The button has no accessible name (axe's `button-name`, in the
+ * drive's baseline); it has an id, so that axe names it by that (normalized) id as before.
  */
 import { useMutationCallback, useToastAndLog } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'

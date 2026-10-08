@@ -1,6 +1,5 @@
 /**
- * @file Tailwind variants of the form layer, shared by the React `#/components/Form` and its Vue
- * port in this folder.
+ * @file Tailwind variants of the form layer.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv, type VariantProps } from '$/utils/style/tailwindVariants'

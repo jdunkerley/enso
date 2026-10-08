@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A form's reset button: the Vue counterpart of the React `Form.Reset`. It resets the form to
- * its default values (not the native reset, which would clear the inputs), and is disabled while
- * the form is submitting or unchanged. Every other prop falls through to `Button.vue`.
+ * @file A form's reset button. It resets the form to its default values (not the native reset,
+ * which would clear the inputs), and is disabled while the form is submitting or unchanged. Every
+ * other prop falls through to `Button.vue`.
  */
 import Button from '$/components/Button/Button.vue'
 import type { ButtonVariants } from '$/components/Button/variants'

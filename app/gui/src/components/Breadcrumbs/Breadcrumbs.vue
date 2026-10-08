@@ -1,15 +1,14 @@
 <script setup lang="ts">
 /**
- * @file A breadcrumb trail: the Vue counterpart of the React `#/components/Breadcrumbs`, styled by
- * the same `BREADCRUMBS_STYLES`.
+ * @file A breadcrumb trail, styled by `BREADCRUMBS_STYLES`.
  *
  * The items are `BreadcrumbItem.vue`s in the default slot; the last one is the current page
  * (`aria-current="page"`, not pressable). `@action` receives the `id` of a pressed item, and
  * `@drop` the `id` of the item something was dropped on, with the drop event. Items are icon
- * buttons, as React's `Button.GroupProvider variant="icon"` makes them.
+ * buttons.
  *
  * `getItemsWithCollapsedItem` (`./utilities`) collapses a long trail into a "more" item. The list is
- * named "Breadcrumbs", as react-aria's `useBreadcrumbs` named it (#91).
+ * named "Breadcrumbs" (#91).
  */
 import { provideButtonGroup } from '$/components/Button/buttonGroup'
 import { flattenSlotChildren } from '$/components/Button/buttonGroup'

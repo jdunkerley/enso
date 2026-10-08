@@ -1,8 +1,8 @@
 /**
- * @file Focus an input when it mounts: the Vue counterpart of the React `useAutoFocus`. Focus is
- * moved after the same short delay as React's, so that a dialog's own focus handling settles
- * first; a pointer press elsewhere before then cancels it, and so does another text field taking
- * the focus meanwhile: the user (or a test) is typing there, and the keystrokes must not move.
+ * @file Focus an input when it mounts. Focus is moved after a short delay, so that a dialog's own
+ * focus handling settles first; a pointer press elsewhere before then cancels it, and so does
+ * another text field taking the focus meanwhile: the user (or a test) is typing there, and the
+ * keystrokes must not move.
  */
 import { useEventListener } from '@vueuse/core'
 import { onMounted, onScopeDispose, toValue, type MaybeRefOrGetter, type Ref } from 'vue'
@@ -24,9 +24,9 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ])
 
 /**
- * Whether the focus is in a text field other than `element`. A page whose inputs mount later than
- * React's (a route loaded on demand) can otherwise move the focus away from a field the user has
- * already started typing in, within the delay.
+ * Whether the focus is in a text field other than `element`. A page whose inputs mount late (a
+ * route loaded on demand) can otherwise move the focus away from a field the user has already
+ * started typing in, within the delay.
  */
 function isTypingElsewhere(element: HTMLElement | null | undefined) {
   const active = document.activeElement

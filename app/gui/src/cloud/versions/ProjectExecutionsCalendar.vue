@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /**
  * @file The right panel's Schedule tab: a calendar of the scheduled executions of the project
- * selected in a cloud category. The Vue port of the React
- * `AssetPanel/components/ProjectExecutionsCalendar`.
+ * selected in a cloud category.
  *
  * Outside the cloud, with nothing selected, or for an asset that is not a project it says so. The
- * tab is enabled only on plans with the scheduler (`$/providers/rightPanel`, unchanged). The
- * calendar is inside its own error boundary, as React's was.
+ * tab is enabled only on plans with the scheduler (`$/providers/rightPanel`). The calendar is
+ * inside its own error boundary.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import Result from '$/components/Result/Result.vue'
@@ -49,8 +48,8 @@ const state = computed(() => {
     :centered="true"
     :title="state.placeholder"
   />
-  <!-- Not keyed by the project, as React's was not: the chosen day and month stay as the selection
-  moves to another project. -->
+  <!-- Not keyed by the project: the chosen day and month stay as the selection moves to another
+  project. -->
   <ErrorBoundary v-else-if="state.asset != null">
     <ProjectExecutionsCalendarContent :backend="remoteBackend" :item="state.asset" />
   </ErrorBoundary>

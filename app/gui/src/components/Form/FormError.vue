@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The form-level errors: the Vue counterpart of the React `Form.FormError`. It shows the
- * offline notice (for a form that cannot submit offline) and a failed submission's message, each in
- * an `Alert`, with the same test ids as React (`form-submit-offline`, `form-submit-error`).
+ * @file The form-level errors. It shows the offline notice (for a form that cannot submit
+ * offline) and a failed submission's message, each in an `Alert`, with the test ids
+ * `form-submit-offline` and `form-submit-error`.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import type { ALERT_STYLES } from '$/components/Alert/variants'

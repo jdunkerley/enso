@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
- * @file A date picker bound to a form field holding an `@internationalized/date` value: the Vue
- * counterpart of the React `DatePicker`, styled by the same `DATE_PICKER_STYLES`.
+ * @file A date picker bound to a form field holding an `@internationalized/date` value, styled by
+ * `DATE_PICKER_STYLES`.
  *
- * It is a Reka `DatePicker`, which gives what react-aria's did: the date is typed segment by
+ * It is a Reka `DatePicker`: the date is typed segment by
  * segment (`role="spinbutton"` segments; digits fill them, ArrowUp/ArrowDown change them,
  * ArrowLeft/ArrowRight and Tab move between them, Backspace clears), and the chevron button opens
  * a calendar grid navigated with the arrow keys, Enter selecting a day and Escape closing it. Dates
- * are written in ISO order, 24-hour, with English placeholders, as in React; the calendar speaks
+ * are written in ISO order, 24-hour, with English placeholders; the calendar speaks
  * the user's locale. The `x`
  * button clears the value (not shown when `isRequired`, unless `noResetButton` says otherwise).
  */
@@ -141,8 +141,8 @@ function segmentClass(part: SegmentPart, text: string) {
       :closeOnSelect="true"
     >
       <div :class="styles.base({ className: props.class })" :data-invalid="invalid || undefined">
-        <!-- The calendar opens below the field's start, as react-aria's did (its trigger was the
-        whole field), not centred on the chevron. -->
+        <!-- The calendar opens below the field's start, as if the whole field were its trigger,
+        not centred on the chevron. -->
         <DatePickerAnchor asChild>
           <DatePickerField
             v-slot="{ segments: fieldSegments }"
@@ -206,8 +206,8 @@ function segmentClass(part: SegmentPart, text: string) {
               >
                 <DatePickerGridHead v-if="!noCalendarHeader" :class="styles.calendarGridHeader()">
                   <DatePickerGridRow>
-                    <!-- React's header cells render no text, so the weekdays are for screen
-                    readers only, and the calendar looks as React's. -->
+                    <!-- The header cells show no text, so the weekdays are for screen
+                    readers only. -->
                     <DatePickerHeadCell
                       v-for="(day, i) in weekDays"
                       :key="i"
@@ -229,7 +229,7 @@ function segmentClass(part: SegmentPart, text: string) {
                   </DatePickerGridRow>
                 </DatePickerGridBody>
               </DatePickerGrid>
-              <!-- React's calendar ends with its (empty) error message, which gives it 4px more. -->
+              <!-- The calendar ends with an (empty) error message, which gives it 4px more. -->
               <Text />
             </DatePickerCalendar>
           </div>

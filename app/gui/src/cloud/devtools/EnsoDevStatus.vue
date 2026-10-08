@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The active developer overrides, at the bottom left of the window: one line each, with a
- * button resetting it. Nothing shows while nothing is overridden. The Vue counterpart of React's
- * `EnsoDevStatus` (#172).
+ * button resetting it. Nothing shows while nothing is overridden (#172).
  */
 import Button from '$/components/Button/Button.vue'
 import { POPOVER_STYLES } from '$/components/Dialog/variants'

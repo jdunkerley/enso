@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The Billing & Plans settings tab's one entry: "Open Billing Page", which opens the Stripe
- * customer portal in a new window. The Vue port of the React tab's custom entry (`data.tsx`).
+ * customer portal in a new window.
  *
  * It asks the backend for a customer portal session (`createCustomerPortalSession`), as a mutation
  * keyed `['billing', 'customerPortalSession']`, and opens the URL it returns with
  * `window.open(url, '_blank')`, which the desktop app hands to the system browser. A failure shows
- * an error toast and is logged, as React's `toastAndLog` did. The button loads meanwhile.
+ * an error toast and is logged. The button loads meanwhile.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
