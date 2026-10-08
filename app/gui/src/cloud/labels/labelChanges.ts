@@ -19,7 +19,7 @@ export interface LabelInfo {
  * or `null` when the change does not affect it (then it is left alone).
  *
  * A label that went to `all` is added, one that went to `none` removed, and the rest are kept as
- * the asset has them (`item.labels`, as it was when the popover opened, as in React).
+ * the asset has them (`item.labels`).
  */
 export function labelsAfterChange(
   item: SelectedAssetInfo,

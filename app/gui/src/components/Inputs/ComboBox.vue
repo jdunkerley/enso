@@ -8,6 +8,9 @@
  * and move through it, Enter selects, Escape closes it. The chevron button opens it too, and the
  * `x` button clears the typed text (unless `noResetButton`).
  *
+ * Escape closes the list first (the WAI-ARIA combobox pattern), and the next Escape the dialog or
+ * popover around it, even while the list is still fading out (see {@link onEscapeCapture}).
+ *
  * The field holds the item itself. Each item needs a unique text: `toKey`, else `toTextValue`,
  * else the item when it is a string. `toTextValue` is what typing filters by; `toOptionText` what
  * an option shows, if different; `toTooltip` what the option's tooltip shows. The default slot (`{ item }`) renders an option; without it, the text.
@@ -17,6 +20,7 @@ import { POPOVER_MOTION, POPOVER_STYLES } from '$/components/Dialog/variants'
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
 import { useField } from '$/components/Form/useField'
+import { injectDialogContext } from '$/components/Dialog/dialogContext'
 import { COMBO_BOX_STYLES } from '$/components/Inputs/comboBoxVariants'
 import { INPUT_STYLES } from '$/components/Inputs/variants'
 import { portalTarget } from '$/components/portal'
@@ -80,11 +84,25 @@ const input = ref<InstanceType<typeof ComboboxInput>>()
 const isChevronHovered = ref(false)
 const viewport = ref<InstanceType<typeof ComboboxViewport>>()
 
+const dialog = injectDialogContext(true)
+const isOpen = ref(false)
+
+/**
+ * Escape, before the combo box sees it. While the closed list fades out, Reka keeps it as the
+ * topmost dismissable layer, which would take the key and do nothing: the dialog or popover around
+ * the combo box closes instead, as it does once the list has gone.
+ */
+function onEscapeCapture() {
+  // The list's viewport is on the page from opening until the exit animation has ended.
+  if (!isOpen.value && viewport.value != null) dialog?.close()
+}
+
 /**
  * On opening, scroll the selected item to the top of the list, as react-aria did. Reka scrolls it
  * only as far as needed (to the bottom), after the list has rendered.
  */
 function onOpenChange(open: boolean) {
+  isOpen.value = open
   if (!open) return
   setTimeout(() => {
     const element: unknown = viewport.value?.$el
@@ -149,6 +167,7 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
       :class="styles.base({ className: props.class })"
       @focusout="field.onBlur"
       @update:open="onOpenChange"
+      @keydown.esc.capture="onEscapeCapture"
     >
       <ComboboxAnchor :class="styles.inputContainer()">
         <!-- The field's `<label>` wraps this button, and it is the first control in it, so hovering

@@ -61,6 +61,11 @@ opened), and emits `closed` after its exit animation, so it can sit on the modal
 stack. `Tooltip` opens on focus only when the keyboard put the focus there
 (`$/utils/inputModality`), as react-aria's did.
 
+From #207: a press on the backdrop of a `Dialog` or `AlertDialog` keeps focus
+inside it (`keepFocusOnBackdropPress`), and Escape in a `ComboBox` whose list is
+still fading out closes the dialog or popover around it, as it does once the
+list has gone.
+
 Forms and inputs are #79's.
 
 **Toasts and programmatic modals are global stores**, not components you mount:

@@ -20,6 +20,7 @@
  * - Without a trigger it focuses itself on opening, and returns focus on closing to the element
  *   that opened it, or to the trigger of the menu that element was in (`./focusReturn.ts`), as
  *   react-aria does. `opener` gives that element when the caller knew it before the dialog mounted.
+ *   A press on the backdrop of a dialog that stays open keeps focus inside it.
  * - `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
  *   (`$/providers/modals`) emits `close` then, so that it does not vanish mid-animation.
  * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
@@ -53,7 +54,7 @@ import {
 } from 'reka-ui'
 import { computed, ref, useSlots } from 'vue'
 import { provideDialogContext } from './dialogContext'
-import { useDialogFocus, type FocusReturnTarget } from './focusReturn'
+import { keepFocusOnBackdropPress, useDialogFocus, type FocusReturnTarget } from './focusReturn'
 
 type DialogVariants = VariantProps<typeof DIALOG_STYLES>
 
@@ -178,6 +179,7 @@ function stopNonEscapeKeys(event: KeyboardEvent) {
           })
         "
         @keydown="stopNonEscapeKeys"
+        @mousedown="keepFocusOnBackdropPress"
       >
         <!-- Reka unmounts the overlay once its exit animation has ended. -->
         <div

@@ -10,6 +10,7 @@ import {
   mountWithProviders,
   usePrimitiveTestEnvironment,
 } from '$/components/__tests__/mountWithProviders'
+import Popover from '$/components/Dialog/Popover.vue'
 import Form from '$/components/Form/Form.vue'
 import type { FormInstance } from '$/components/Form/types'
 import { useText } from '$/providers/text'
@@ -120,6 +121,82 @@ describe('ComboBox', () => {
     await flushPromises()
     expect(input.getAttribute('aria-expanded')).toBe('false')
     expect(form().getValues('fruit' as never)).toBe('Banana')
+  })
+
+  describe('in a popover, Escape closes the list, then the popover', () => {
+    function mountInPopover() {
+      const open = ref(true)
+      const onClose = vi.fn()
+      mountWithProviders(() =>
+        h(
+          Popover,
+          {
+            open: open.value,
+            'onUpdate:open': (value: boolean) => (open.value = value),
+            onClose,
+            'aria-label': 'Add',
+          },
+          {
+            default: () =>
+              h(
+                Form,
+                { schema: z.object({ fruit: z.string().optional() }), defaultValues: {} },
+                () => h(ComboBox<string>, { name: 'fruit', label: 'Fruit', items: fruits }),
+              ),
+          },
+        ),
+      )
+      return { open, onClose }
+    }
+
+    async function openList() {
+      const input = role('combobox') as HTMLInputElement
+      input.focus()
+      const user = userEvent.setup()
+      await user.keyboard('{ArrowDown}')
+      await flushPromises()
+      expect(input.getAttribute('aria-expanded')).toBe('true')
+      return { input, user }
+    }
+
+    test('once the list has gone', async () => {
+      const { open, onClose } = mountInPopover()
+      await flushPromises()
+      const { input, user } = await openList()
+      await user.keyboard('{Escape}')
+      await flushPromises()
+      expect(input.getAttribute('aria-expanded')).toBe('false')
+      expect(role('listbox')).toBeNull()
+      expect(open.value).toBe(true)
+      expect(onClose).not.toHaveBeenCalled()
+      await user.keyboard('{Escape}')
+      await flushPromises()
+      expect(open.value).toBe(false)
+      expect(onClose).toHaveBeenCalledOnce()
+    })
+
+    test('while the list is still fading out', async () => {
+      // The list's exit animation, which jsdom never ends: Reka keeps the list until it does.
+      const style = document.createElement('style')
+      style.textContent = '[data-state="closed"]:not([role="dialog"]) { animation-name: fade-out; }'
+      document.head.appendChild(style)
+      try {
+        const { open, onClose } = mountInPopover()
+        await flushPromises()
+        const { input, user } = await openList()
+        await user.keyboard('{Escape}')
+        await flushPromises()
+        expect(input.getAttribute('aria-expanded')).toBe('false')
+        expect(role('listbox')).not.toBeNull()
+        expect(open.value).toBe(true)
+        await user.keyboard('{Escape}')
+        await flushPromises()
+        expect(open.value).toBe(false)
+        expect(onClose).toHaveBeenCalledOnce()
+      } finally {
+        style.remove()
+      }
+    })
   })
 
   test('a click on an option selects it; the reset button clears the typed text', async () => {

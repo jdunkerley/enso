@@ -110,6 +110,20 @@ const disabledTooltip = computed(() =>
   !canOpenLocally.value ? getText('downloadToOpenWorkflow') : undefined,
 )
 
+/**
+ * This asset's row in the table: the one right-clicked, or, when the entry is used as a shortcut or
+ * from the command palette, the row showing it.
+ */
+function assetRow(): HTMLElement | null {
+  const clicked = driveStore.contextMenuData?.triggerRef.current
+  if (clicked?.dataset.id === asset.id) return clicked
+  return (
+    bindingTarget?.querySelector<HTMLElement>(
+      `[data-testid="asset-row"][data-id="${CSS.escape(asset.id)}"]`,
+    ) ?? null
+  )
+}
+
 const ownsThisAsset = computed(
   () => !isCloud.value || self.value?.permission === permissions.PermissionAction.own,
 )
@@ -300,15 +314,16 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
     isCloud.value && {
       action: 'label',
       doAction: () => {
-        // It replaces the open modals, as React's `setModal` did. No anchor: React's popover sat at
-        // the window's top-left corner, its row ref cleared as the menu closed (#198). Focus
-        // returns to the row.
-        const row = driveStore.contextMenuData?.triggerRef.current ?? null
+        // It replaces the open modals, as React's `setModal` did. It is anchored to the asset's
+        // row, and focus returns there.
+        const row = assetRow()
         modals.closeAll()
         modals.open(ManageLabelsModal, {
           backend: backend.value,
           items: [asset],
-          anchor: null,
+          anchor: row,
+          // Under the row's start, by the asset's name: the row is as wide as the table.
+          placement: 'bottom-start',
           opener: row,
         })
       },

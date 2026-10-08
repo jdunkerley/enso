@@ -183,42 +183,39 @@ interface EntryValue {
   readonly newName?: string
 }
 
-/**
- * What each entry shows: its conclusion as last chosen with its own buttons. As in React, where
- * each entry rendered its controller's value, which a change of `entries.N.conclusion` alone did
- * not refresh, Skip All (and "Skip the rest") change the values that Apply submits, not what the
- * entries show.
- */
-const entries = ref<readonly EntryValue[]>(form.getValues('entries') as readonly EntryValue[])
+/** What each entry shows: the values Apply submits, kept in step with the form. */
+const initialEntries = form.getValues('entries') as readonly EntryValue[]
+const entries = ref<readonly EntryValue[]>(initialEntries)
 
 function entryPath(index: number) {
   return `entries.${index}` as const
 }
 
-function setConclusion(index: number, conclusion: EntryValue['conclusion'], newName?: string) {
-  const current = entries.value[index]
-  if (current == null) return
-  const next = { ...current, conclusion, ...(newName != null ? { newName } : {}) }
-  form.setValue(entryPath(index), next)
+function setEntry(index: number, next: EntryValue) {
+  form.setValue(entryPath(index), next, { shouldDirty: true })
   entries.value = entries.value.map((entry, i) => (i === index ? next : entry))
 }
 
-function skipAll() {
-  conflictingAssets.forEach((_asset, index) => {
-    form.setValue(`${entryPath(index)}.conclusion`, 'skip', { shouldDirty: true })
-  })
+function setConclusion(index: number, conclusion: EntryValue['conclusion'], newName?: string) {
+  const current = entries.value[index]
+  if (current == null) return
+  setEntry(index, { ...current, conclusion, ...(newName != null ? { newName } : {}) })
 }
 
-/**
- * As React's: an entry's conclusion is never unset (it starts as `default`), so this changes
- * nothing.
- */
+/** "Change": the entry goes back to undecided, offering Skip, Replace and Rename again. */
+function changeConclusion(index: number) {
+  const initial = initialEntries[index]
+  if (initial != null) setEntry(index, initial)
+}
+
+function skipAll() {
+  entries.value.forEach((_entry, index) => setConclusion(index, 'skip'))
+}
+
+/** Skip every entry not yet decided; the ones with a conclusion keep it. */
 function skipRest() {
-  conflictingAssets.forEach((_asset, index) => {
-    const conclusion = form.getValues(`${entryPath(index)}.conclusion`)
-    if (conclusion == null) {
-      form.setValue(`${entryPath(index)}.conclusion`, 'skip', { shouldDirty: true })
-    }
+  entries.value.forEach((entry, index) => {
+    if (entry.conclusion === 'default') setConclusion(index, 'skip')
   })
 }
 </script>
@@ -252,7 +249,7 @@ function skipRest() {
             <Text v-if="entries[index]?.conclusion === 'replace'">
               {{ getText('assetWillBeReplaced') }}
             </Text>
-            <Button variant="link" @press="setConclusion(index, entries[index]!.conclusion)">
+            <Button variant="link" @press="changeConclusion(index)">
               {{ getText('change') }}
             </Button>
           </div>

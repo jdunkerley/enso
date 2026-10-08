@@ -94,19 +94,20 @@ const searchField = () =>
 const buttonNamed = (name: string) =>
   [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)
 const labelButton = (name: string) => buttonNamed(name)
+const pillList = () =>
+  document.querySelector(
+    `[role="list"][aria-label="${getText('manageLabelsModal.selectedLabels')}"]`,
+  )
+const pillNames = () =>
+  [...(pillList()?.querySelectorAll('[role="listitem"]') ?? [])].map((p) => p.textContent?.trim())
 const checkOf = (name: string) => labelButton(name)?.querySelector('svg path')?.getAttribute('d')
 
 describe('ManageLabelsModal', () => {
-  test('lists every label as a pill and in the list, checked when the asset has it', async () => {
+  test('lists every label, checked when the asset has it, and its labels as pills', async () => {
     await openPopover()
-    const pills = document.querySelector(
-      `[role="list"][aria-label="${getText('manageLabelsModal.selectedLabels')}"]`,
-    )!
+    expect(pillNames()).toEqual(['alpha'])
     expect(
-      [...pills.querySelectorAll('[role="listitem"]')].map((p) => p.textContent?.trim()),
-    ).toEqual(['alpha', 'beta'])
-    expect(
-      (pills.querySelector('[role="listitem"]') as HTMLElement).style.backgroundColor,
+      (pillList()!.querySelector('[role="listitem"]') as HTMLElement).style.backgroundColor,
     ).not.toBe('')
     expect(checkOf('alpha')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     expect(checkOf('beta')).toBe('')
@@ -123,8 +124,42 @@ describe('ManageLabelsModal', () => {
     expect(checkOf('beta')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     await user.click(labelButton('alpha')!)
     await flushPromises()
-    // Computed from the labels the asset had when the popover opened, as in React.
     expect(associateTag).toHaveBeenLastCalledWith(ASSET.id, ['beta'], 'labelled')
+  })
+
+  test('the pills follow the checks', async () => {
+    await openPopover()
+    const user = userEvent.setup()
+    await user.click(labelButton('beta')!)
+    await flushPromises()
+    expect(pillNames()).toEqual(['alpha', 'beta'])
+    await user.click(labelButton('alpha')!)
+    await flushPromises()
+    expect(pillNames()).toEqual(['beta'])
+    await user.click(labelButton('beta')!)
+    await flushPromises()
+    expect(pillList()).toBeNull()
+  })
+
+  test('labels created in a row all stay on the asset', async () => {
+    await openPopover()
+    const user = userEvent.setup()
+    for (const name of ['gamma', 'delta']) {
+      await user.clear(searchField()!)
+      await user.type(searchField()!, name)
+      await user.click(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', name))!)
+      await flushPromises()
+    }
+    expect(associateTag).toHaveBeenLastCalledWith(ASSET.id, ['alpha', 'gamma', 'delta'], 'labelled')
+    // And a check after that keeps them too.
+    await user.clear(searchField()!)
+    await user.click(labelButton('beta')!)
+    await flushPromises()
+    expect(associateTag).toHaveBeenLastCalledWith(
+      ASSET.id,
+      ['alpha', 'gamma', 'delta', 'beta'],
+      'labelled',
+    )
   })
 
   test('the search filters the list, and offers to create a missing label', async () => {
@@ -148,28 +183,37 @@ describe('ManageLabelsModal', () => {
     expect(labelButton('gamma')).toBeDefined()
   })
 
-  test('"Next color" does not change the colour, as in React', async () => {
+  test('"Next color" moves to the next colour, and the label is created in it', async () => {
     await openPopover()
     const user = userEvent.setup()
     await user.type(searchField()!, 'gamma')
     const swatch = document.querySelector<HTMLElement>(
       `button[aria-label="${getText('manageLabelsModal.nextColor')}"]`,
     )!
-    const before = swatch.style.backgroundColor
-    expect(before).not.toBe('')
+    const cssColor = (color: (typeof COLORS)[number]) => {
+      const probe = document.createElement('div')
+      probe.style.backgroundColor = lChColorToCssColor(color)
+      return probe.style.backgroundColor
+    }
+    // The least used colour first: `COLORS[1]`, as no label has it.
+    expect(swatch.style.backgroundColor).toBe(cssColor(COLORS[1]))
     await user.click(swatch)
-    expect(swatch.style.backgroundColor).toBe(before)
+    expect(swatch.style.backgroundColor).toBe(cssColor(COLORS[2]))
+    await user.click(swatch)
+    expect(swatch.style.backgroundColor).toBe(cssColor(COLORS[3]))
+    await user.click(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', 'gamma'))!)
+    await flushPromises()
+    expect(createTag).toHaveBeenCalledExactlyOnceWith({ value: 'gamma', color: COLORS[3] })
   })
 
-  test('Enter in the search field resets the form, as React implicit submission did', async () => {
+  test('Enter in the search field keeps the search and the checks', async () => {
     await openPopover()
     const user = userEvent.setup()
     await user.click(labelButton('beta')!)
     await user.type(searchField()!, 'be{Enter}')
     await flushPromises()
-    expect(searchField()!.value).toBe('')
-    // Back to what the asset had when the popover opened.
-    expect(checkOf('beta')).toBe('')
+    expect(searchField()!.value).toBe('be')
+    expect(checkOf('beta')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     expect(createTag).not.toHaveBeenCalled()
   })
 
