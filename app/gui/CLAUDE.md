@@ -14,16 +14,10 @@ feature:
 - `src/project-view/` — the **ProjectView** feature subtree (graph editor,
   component browser, code editor, visualizations, documentation editor). Vue.
   Uses `@vueuse/core`, `@tanstack/vue-query`, `yjs`. Import via `@/…`.
-- `src/dashboard/` — the **Dashboard** feature subtree (auth, cloud storage,
-  project browser, settings). Still **React** as a historical artifact; being
-  progressively migrated to Vue. Uses `react-aria`, `@tanstack/react-query`,
-  `react-hook-form`, `zod`. TailwindCSS for styling. Import via `#/…`.
-
-While the migration is in progress the two subtrees are bridged by **`veaury`**
-so Vue can embed React (and vice versa): Vue mounts React through
-`reactComponent` (`$/utils/react`), React mounts Vue through `vueComponent`
-(`#/utilities/vue`). Stay in one framework per file; only cross at the bridge
-boundary. `src/project-view/` no longer crosses it at all (#82).
+- `src/dashboard/` — the **Dashboard** feature subtree (cloud storage, project
+  browser, settings). Vue: it was React, and no React code is mounted any more
+  (#93); removing React and its dependencies from the toolchain is #94.
+  TailwindCSS for styling. Import via `#/…`.
 
 Many commons still sit inside `src/project-view/` for historical reasons. The
 plan is to move genuinely shared UI/utilities **out** of `project-view/` and
@@ -36,8 +30,10 @@ or shared? Shared goes at `src/`.
 component needs non-trivial changes, consider porting it to Vue rather than
 extending the React version.
 
-`App.vue` / `ReactRoot.tsx` / `entrypoint.ts` wire the subtrees together at the
-top level.
+`entrypoint.ts` creates the app; `App.vue` is the shell (the router view, the
+toasts, the About dialog, the tooltips). The `dashboard` route renders
+`src/components/DashboardPage.vue`, which holds the dashboard's global shortcuts
+and mounts `AppContainer.vue`.
 
 ## TypeScript path aliases
 
@@ -50,14 +46,13 @@ Defined in `vite.config.ts`:
 
 Reaching across subtrees (`@/` from `src/dashboard/`, or `#/` from
 `src/project-view/`) is allowed but usually a smell — prefer pulling shared code
-into `src/` and importing via `$/`, or cross the framework bridge via `veaury`.
+into `src/` and importing via `$/`.
 
-**Nothing outside `src/dashboard/` may import `#/…`**, except the React modules
-listed in `DASHBOARD_IMPORT_ALLOWLIST` in the root `eslint.config.mjs` (React
-components mounted through `reactComponent`, and the bridge's own glue). ESLint
-enforces this. The list only shrinks: when shared code needs something from the
-dashboard that is framework-free, move it to `src/` (as #77 did) rather than
-adding an entry. React files may import `$/…` freely.
+**Nothing outside `src/dashboard/` may import `#/…`**, except the modules listed
+in `DASHBOARD_IMPORT_ALLOWLIST` in the root `eslint.config.mjs` (the dashboard
+features the shell mounts, and its stylesheets). ESLint enforces this. The list
+only shrinks: when shared code needs something from the dashboard that is
+framework-free, move it to `src/` (as #77 did) rather than adding an entry.
 
 ## Where framework-free shared code lives
 
@@ -127,7 +122,7 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 ## Entry points
 
 - `index.html` → `src/entrypoint.ts` (browser bundle)
-- `src/App.vue` — top-level Vue shell that mounts both subtrees
+- `src/App.vue` — top-level Vue shell
 
 ## Scripts (run via `corepack pnpm`)
 

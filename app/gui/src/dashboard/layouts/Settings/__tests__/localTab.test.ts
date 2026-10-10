@@ -46,8 +46,6 @@ vi.mock('$/providers/backends', async () => {
       }),
   }
 })
-// The React tabs are not under test.
-vi.mock('$/utils/react', () => ({ reactComponent: () => () => null }))
 
 const { getText } = useText()
 const openFileBrowser = vi.fn<() => Promise<string[]>>()

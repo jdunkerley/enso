@@ -15,7 +15,6 @@ import {
   PROTECTED_LAYOUT_ROUTE,
 } from '$/router/routeNames'
 import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
-import { reactComponent } from '$/utils/react'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const UNAVAILABLE_PATH = '/UNAVAILABLE'
@@ -48,10 +47,7 @@ const routes = [
             name: 'dashboard',
             path: '/',
             beforeEnter: [maybeRedirectToProject, maybeRedirectToTab],
-            component: () =>
-              import('#/pages/dashboard/Dashboard.tsx').then((mod) =>
-                reactComponent(mod.Dashboard),
-              ),
+            component: () => import('$/components/DashboardPage.vue'),
             children: [
               {
                 name: 'project',

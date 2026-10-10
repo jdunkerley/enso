@@ -1,3 +1,17 @@
+<script lang="ts">
+import LocalStorage from '$/utils/LocalStorage'
+import * as z from 'zod'
+
+declare module '$/utils/LocalStorage' {
+  interface LocalStorageData {
+    readonly preferredTimeZone: string
+    readonly loginRedirect: string
+  }
+}
+LocalStorage.registerKey('preferredTimeZone', { schema: z.string() })
+LocalStorage.registerKey('loginRedirect', { isUserSpecific: true, schema: z.string() })
+</script>
+
 <script setup lang="ts">
 import { useVersionCheckerEnabled } from '$/cloud/versionChecker/versionChecker'
 import { openAboutModal, useAboutModal } from '$/components/AboutModal/aboutModal'
@@ -8,9 +22,8 @@ import {
   useDevNavigate,
   useThemeClass,
 } from '$/composables/appShellEffects'
+import { useOfflineNotification } from '$/composables/offlineNotification'
 import { useCodeFontRootClasses } from '$/providers/codeFont'
-import { ContextsForReactProvider } from '$/providers/react/globalProvider'
-import ReactRoot from '$/ReactRoot'
 import { appOpenCloseCallback } from '$/utils/analytics'
 import '@/assets/base.css'
 import { appBindings } from '@/bindings'
@@ -23,22 +36,14 @@ import { provideInteractionHandler } from '@/providers/interactionHandler'
 import { provideBubblingKeyboard, provideKeyboard } from '@/providers/keyboard'
 import { provideTooltipRegistry } from '@/providers/tooltipRegistry'
 import { registerAutoBlurHandler, registerGlobalBlurHandler } from '@/util/autoBlur'
-import { reactComponent } from '$/utils/react'
-import { useQueryClient } from '@tanstack/vue-query'
 import * as objects from 'enso-common/src/utilities/data/object'
 import { Platform, platform } from 'enso-common/src/utilities/detect'
 import { defineAsyncComponent, ref, watch } from 'vue'
 import LoadingScreen from './components/LoadingScreen.vue'
 
-// import LoadingScreenReact from '#/pages/authentication/LoadingScreen'
-// const LoadingScreen = reactComponent(LoadingScreenReact)
-
 const classSet = provideAppClassSet()
 useCodeFontRootClasses()
 const appTooltips = provideTooltipRegistry()
-
-const ReactRootWrapper = reactComponent(ReactRoot)
-const queryClient = useQueryClient()
 
 const globalEvents = provideGlobalEventRegistry()
 provideKeyboard(globalEvents)
@@ -82,6 +87,7 @@ useMounted(appOpenCloseCallback)
 useThemeClass()
 useClearSelectionOnClick()
 useDevNavigate()
+useOfflineNotification()
 
 // The "About Enso" dialog, opened by the app menu here, and by the user and info menus. Loaded on
 // first use, so that it keeps the dialog (and Reka) out of the initial chunk, and kept mounted
@@ -94,8 +100,7 @@ watch(about.isOpen, (isOpen) => {
 })
 window.api?.menu.setMenuItemHandler('about', openAboutModal)
 
-// The "new version available" dialog, mounted where the React one was (in the React root, on every
-// page), only while the check is enabled (the desktop app), and loaded then: it brings the dialog
+// The "new version available" dialog, mounted on every page, only while the check is enabled (the desktop app), and loaded then: it brings the dialog
 // and the stepper. It is cloud-area code (decision 6b), imported directly until the registries
 // exist.
 const VersionChecker = defineAsyncComponent(
@@ -109,22 +114,20 @@ const versionCheckerEnabled = useVersionCheckerEnabled()
     <!-- A route that fails to render shows the error display (its `ErrorBoundary`) rather than
     nothing; navigating elsewhere resets it. -->
     <RouterView v-slot="{ Component, route }">
-      <ContextsForReactProvider v-if="Component">
-        <ReactRootWrapper :queryClient="queryClient">
-          <ToastHost />
-          <AboutModal
-            v-if="aboutMounted"
-            v-model:open="about.isOpen.value"
-            :opener="about.opener.value"
-          />
-          <VersionChecker v-if="versionCheckerEnabled" />
-          <ErrorBoundary onlyRenderErrors :resetKeys="[route.path]">
-            <component :is="Component" />
-          </ErrorBoundary>
-          <div id="floatingLayer" />
-          <TooltipDisplayer :registry="appTooltips" />
-        </ReactRootWrapper>
-      </ContextsForReactProvider>
+      <template v-if="Component">
+        <ToastHost />
+        <AboutModal
+          v-if="aboutMounted"
+          v-model:open="about.isOpen.value"
+          :opener="about.opener.value"
+        />
+        <VersionChecker v-if="versionCheckerEnabled" />
+        <ErrorBoundary onlyRenderErrors :resetKeys="[route.path]">
+          <component :is="Component" />
+        </ErrorBoundary>
+        <div id="floatingLayer" />
+        <TooltipDisplayer :registry="appTooltips" />
+      </template>
       <LoadingScreen v-else />
     </RouterView>
   </div>
@@ -168,15 +171,6 @@ const versionCheckerEnabled = useVersionCheckerEnabled()
   min-height: 0;
   display: flex;
   flex-direction: row;
-}
-
-/*
-TODO [ao]: Veaury adds a wrapping elements which have `style="all: unset"`, which in turn breaks our layout.
-See https://github.com/gloriasoft/veaury/issues/158
-*/
-[__use_react_component_wrap],
-[data-use-vue-component-wrap] {
-  display: contents !important;
 }
 
 .mousePointer {

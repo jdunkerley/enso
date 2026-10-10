@@ -58,7 +58,7 @@ export function scopesOverlap(a: ShortcutScope, b: ShortcutScope) {
 
 /**
  * The dashboard actions whose shortcuts work anywhere in the window: attached to `document.body`
- * by the dashboard page (`Dashboard.tsx`), the user menu and the organization switcher
+ * by the dashboard page (`DashboardPage.vue`), the user menu and the organization switcher
  * (`useMenuEntries` outside a focus scope), the context menu and the assets table's `cancelCut`.
  * Every other dashboard action is the drive's.
  */

@@ -5,6 +5,7 @@ import '#/tailwind.css'
 import App from '$/App.vue'
 import { registerCloud } from '$/cloud'
 import { setupLogger } from '$/log'
+import { setFeatureFlag } from '$/providers/featureFlags'
 import { widgetDevtools } from '$/providers/openedProjects/widgetRegistry/devtools'
 import router from '$/router'
 import { createQueryClient } from '$/utils/queryClient'
@@ -28,6 +29,11 @@ async function main() {
   const onAuthenticated = imNotSureButPerhapsFixingRefreshingWithAuthentication()
   const queryClient = await createQueryClientOfPersistCache()
   const rootDirPath = await getRootDirPath()
+  // The local backend exists exactly when there is a root directory for its projects
+  // (`$/providers/backends`). An override (the integration tests') wins.
+  if (window.overrideFeatureFlags?.enableLocalBackend === undefined) {
+    setFeatureFlag('enableLocalBackend', Boolean(rootDirPath))
+  }
   const defaultDownloadPath = await getDefaultDownloadPath()
 
   const app = createApp(App)
