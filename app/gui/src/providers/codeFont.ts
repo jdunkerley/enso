@@ -7,11 +7,9 @@
  * portals outside `.App` and the shadow roots of custom-element visualizations, which inherit
  * custom properties but cannot be matched by an ancestor selector.
  */
-import { useZustandStoreRef } from '$/utils/zustand'
-import { watchEffect } from 'vue'
+import { createPersistedStore } from '$/utils/persistedStore'
+import { computed, watchEffect } from 'vue'
 import { z } from 'zod'
-import { createStore } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 /** Root class set while the "Code ligatures" setting is on. */
 export const CODE_LIGATURES_CLASS = 'codeLigatures'
@@ -45,20 +43,21 @@ const CODE_FONT_SETTINGS_SCHEMA = z.object({
   handwrittenComments: z.boolean().default(DEFAULT_CODE_FONT_SETTINGS.handwrittenComments),
 })
 
-export const codeFontSettingsStore = createStore<CodeFontSettings>()(
-  persist((): CodeFontSettings => ({ ...DEFAULT_CODE_FONT_SETTINGS }), {
+export const codeFontSettingsStore = createPersistedStore<CodeFontSettings>(
+  () => ({ ...DEFAULT_CODE_FONT_SETTINGS }),
+  {
     name: 'enso-code-font-settings',
     version: 1,
     merge: (persistedState, currentState) => {
       const parsed = CODE_FONT_SETTINGS_SCHEMA.safeParse(persistedState)
       return parsed.success ? { ...currentState, ...parsed.data } : currentState
     },
-  }),
+  },
 )
 
 /** The "Code ligatures" setting, as a Vue ref. */
 export function useCodeLigatures() {
-  return useZustandStoreRef(codeFontSettingsStore, (state) => state.codeLigatures)
+  return computed(() => codeFontSettingsStore.state.value.codeLigatures)
 }
 
 /** Change the "Code ligatures" setting. */
@@ -68,7 +67,7 @@ export function setCodeLigatures(codeLigatures: boolean) {
 
 /** The "Handwritten comments" setting, as a Vue ref. */
 export function useHandwrittenComments() {
-  return useZustandStoreRef(codeFontSettingsStore, (state) => state.handwrittenComments)
+  return computed(() => codeFontSettingsStore.state.value.handwrittenComments)
 }
 
 /** Change the "Handwritten comments" setting. */

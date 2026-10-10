@@ -55,7 +55,6 @@ overrides:
   tslib: "catalog:"
   typescript: "catalog:"
   vue-tsc: "catalog:"
-  "@types/react": ^18.3.1
   ws: ^8.18.0
   esbuild: ^0.25.0
   node-forge: ^1.4.0
@@ -89,33 +88,6 @@ packageExtensions:
   "@open-rpc/client-js":
     dependencies:
       events: ^3.3.0
-  react-error-boundary:
-    dependencies:
-      "@types/react": "*"
-  react-aria-components:
-    dependencies:
-      "@types/react": "*"
-  react-aria:
-    dependencies:
-      "@types/react": "*"
-  input-otp:
-    dependencies:
-      "@types/react": "*"
-  "@tanstack/react-query":
-    dependencies:
-      "@types/react": "*"
-  "@react-types/shared":
-    dependencies:
-      "@types/react": "*"
-  "@stripe/react-stripe-js":
-    dependencies:
-      "@types/react": "*"
-  react-hook-form:
-    dependencies:
-      "@types/react": "*"
-  "@hookform/resolvers":
-    dependencies:
-      zod: "*"
   "@aws-crypto/sha256-browser":
     dependencies:
       "@aws-sdk/util-utf8-browser": "*"
@@ -133,9 +105,6 @@ packageExtensions:
   modern-isomorphic-ws:
     peerDependencies:
       "@types/ws": "*"
-  veaury:
-    peerDependencies:
-      vue: "*"
 patchedDependencies:
   "@aws-amplify/auth": patches/@aws-amplify__auth.patch
   app-builder-lib@26.8.1: patches/app-builder-lib@26.8.1.patch

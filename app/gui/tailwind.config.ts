@@ -2,14 +2,67 @@
 import { fileURLToPath } from 'node:url'
 import type { Config } from 'tailwindcss'
 import animate from 'tailwindcss-animate'
-import reactAriaComponents from 'tailwindcss-react-aria-components'
 import plugin from 'tailwindcss/plugin.js'
 
 const HERE_PATH = fileURLToPath(new URL('.', import.meta.url))
 
+/**
+ * State variants, with their `group-` and `peer-` forms.
+ *
+ * Most are for the state our components expose as `data-*` attributes: `selected:` matches
+ * `[data-selected]`, `placement-top:` matches `[data-placement="top"]`, and so on.
+ * `placeholder-shown:` also matches `[data-placeholder]`, which the date input's segments set.
+ *
+ * The others are Tailwind's own pseudo-class variants, redefined unchanged: the order of this list
+ * is the order of the generated rules, so it decides which state wins when two apply at once (here,
+ * for instance, `hover:` beats `active:`, and `disabled:` beats `selected:`). The components' classes
+ * were written against this order, which is that of `tailwindcss-react-aria-components`; keep it.
+ * Only the `data-*` variants the components use are defined.
+ */
+const STATE_VARIANTS: readonly (readonly [name: string, selectors: readonly string[]])[] = [
+  ['placement-left', ['&[data-placement="left"]']],
+  ['placement-right', ['&[data-placement="right"]']],
+  ['placement-top', ['&[data-placement="top"]']],
+  ['placement-bottom', ['&[data-placement="bottom"]']],
+  ['open', ['&[open]']],
+  ['indeterminate', ['&:indeterminate']],
+  ['placeholder-shown', ['&[data-placeholder]', '&:placeholder-shown']],
+  ['required', ['&:required']],
+  ['invalid', ['&:invalid']],
+  ['read-only', ['&:read-only']],
+  ['outside-visible-range', ['&[data-outside-visible-range]']],
+  ['empty', ['&:empty']],
+  ['focus-within', ['&:focus-within']],
+  ['hover', ['&:hover']],
+  ['focus', ['&:focus']],
+  ['focus-visible', ['&:focus-visible']],
+  ['pressed', ['&[data-pressed]']],
+  ['selected', ['&[data-selected]']],
+  ['disabled', ['&:disabled']],
+]
+
+const stateVariants = plugin(({ addVariant, matchVariant }) => {
+  for (const [name, selectors] of STATE_VARIANTS) {
+    addVariant(name, [...selectors])
+    for (const [kind, combinator] of [
+      ['group', ' &'],
+      ['peer', ' ~ &'],
+    ] as const) {
+      matchVariant(
+        kind,
+        (_, { modifier }) => {
+          const parent = modifier ? `:merge(.${kind}\\/${modifier})` : `:merge(.${kind})`
+          return selectors.map((selector) => `${parent}${selector.slice(1)}${combinator}`)
+        },
+        { values: { [name]: name } },
+      )
+    }
+  }
+})
+
 // The names come from a third-party API and cannot be changed.
 export default {
-  content: [`${HERE_PATH}/src/**/*.tsx`, `${HERE_PATH}/src/**/*.ts`, `${HERE_PATH}/src/**/*.vue`],
+  content: [`${HERE_PATH}/src/**/*.ts`, `${HERE_PATH}/src/**/*.vue`],
   theme: {
     extend: {
       cursor: {
@@ -401,7 +454,7 @@ inset 0 -36px 51px -51px #00000014`,
     },
   },
   plugins: [
-    reactAriaComponents,
+    stateVariants,
     animate,
     plugin(({ addVariant, addUtilities, matchUtilities, addComponents, theme }) => {
       addVariant('group-hover-2', ['.group:where([data-hovered]) &', '.group:where(:hover) &'])

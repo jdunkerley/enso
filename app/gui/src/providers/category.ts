@@ -1,5 +1,5 @@
+import { createPersistedStore } from '$/utils/persistedStore'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
-import { useZustandStoreRef } from '$/utils/zustand'
 import type { Opt } from '@/util/data/opt'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import { createGlobalState } from '@vueuse/core'
@@ -15,8 +15,6 @@ import { newDirectoryId } from 'enso-common/src/services/LocalBackend'
 import { organizationIdToDirectoryId } from 'enso-common/src/services/RemoteBackend/ids'
 import { getFileName } from 'enso-common/src/utilities/file'
 import { computed, toValue } from 'vue'
-import { createStore } from 'zustand'
-import { persist } from 'zustand/middleware'
 import { useAuth } from './auth'
 import { useBackends } from './backends'
 import { useLocalPaths } from './localDirectories'
@@ -127,13 +125,9 @@ interface LocalRootDirectoryStoreState {
   readonly localDirectories: readonly Path[]
 }
 
-const localDirectoryStore = createStore<LocalRootDirectoryStoreState>()(
-  persist(
-    (): LocalRootDirectoryStoreState => ({
-      localDirectories: [],
-    }),
-    { name: 'enso-local-saved-directories', version: 1 },
-  ),
+const localDirectoryStore = createPersistedStore<LocalRootDirectoryStoreState>(
+  () => ({ localDirectories: [] }),
+  { name: 'enso-local-saved-directories', version: 1 },
 )
 
 /**
@@ -162,10 +156,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
     () => localPaths.localRootDirectory ?? backends.localBackend?.rootPath(),
   )
 
-  const localDirectories = useZustandStoreRef(
-    localDirectoryStore,
-    (state) => state.localDirectories,
-  )
+  const localDirectories = computed(() => localDirectoryStore.state.value.localDirectories)
 
   const localDirectoryCategories = computed(() =>
     localDirectories.value.map((dir): LocalDirectory => ({ type: 'localDirectory', path: dir })),

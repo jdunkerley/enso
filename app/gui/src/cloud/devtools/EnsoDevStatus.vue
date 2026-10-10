@@ -17,7 +17,6 @@ import {
   setFeatureFlag,
 } from '$/providers/featureFlags'
 import { useText } from '$/providers/text'
-import { useZustandStoreRef } from '$/utils/zustand'
 import { computed } from 'vue'
 
 /** An active override: what it is, and how to undo it. */
@@ -29,7 +28,7 @@ interface Override {
 
 const { getText } = useText()
 const devtools = useDevtoolsStore()
-const flags = useZustandStoreRef(flagsStore, (store) => store.featureFlags)
+const flags = computed(() => flagsStore.state.value.featureFlags)
 
 const overrides = computed(() => {
   const {

@@ -4,6 +4,9 @@
 2026-09-30 under delegation (maintainer to review); 7 decided by the maintainer
 **Epic:** #75 **Ticket:** #76
 
+> **Completed:** the port is finished, and React was removed from the toolchain
+> in #94.
+
 The dashboard (`app/gui/src/dashboard/`, about 46.9k lines of React) rests on
 four libraries that have no Vue counterpart yet: react-aria, react-hook-form,
 react-toastify, and a zustand store that holds React elements as the global

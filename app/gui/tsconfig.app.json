@@ -10,7 +10,6 @@
     "./lib0-ext.d.ts",
     "./project-manager-shim-middleware/**/*.ts",
     "./src/**/*.ts",
-    "./src/**/*.tsx",
     "./src/**/*.vue"
   ],
   "exclude": ["./src/**/__tests__"]

@@ -71,7 +71,7 @@ proud of its quality.
 Each line in the source file must be of a maximum of 100 characters of text
 (including comments).
 
-The exception is Tailwind class lists in `.tsx` files, which must be on a single
+The exception is Tailwind class lists in templates, which must be on a single
 line. If present, they must be placed after all other attributes.
 
 ### Imports
@@ -84,18 +84,15 @@ and are divided as follows:
 
 ```ts
 // Group 1: Node imports (with `node:` prefix).
-// Group 2: React imports.
-// Group 3: external imports.
-// Group 4: imports from other local packages.
-// Group 5: relative imports.
+// Group 2: external imports.
+// Group 3: imports from other local packages.
+// Group 4: relative imports.
 ```
 
 Please look at the following by way of example:
 
 ```ts
 import * as fs from "node:fs/promises";
-
-import * as react from "react";
 
 import * as authentication from "enso-authentication";
 

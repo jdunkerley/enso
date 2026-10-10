@@ -1,8 +1,7 @@
 /**
  * @file The asset search bar's suggestions: what they are, the ones for `type:`, and the store
  * through which the table (which knows the listed assets, labels and users) gives them to the bar.
- * React kept that store for the window (a zustand store in `AssetSearchBar.tsx`); this one lives as
- * long as the drive.
+ * The store lives as long as the drive.
  */
 import type AssetQuery from '$/utils/AssetQuery'
 import { createContextStore } from '@/providers'

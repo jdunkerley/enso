@@ -100,13 +100,12 @@ community build without the cloud can leave it out (decision 6b of
 - **The core never imports an area, nor `$/cloud` itself.** `entrypoint.ts`
   calls `registerCloud` before the router starts, and that is the only way in.
   An ESLint rule enforces it (`CLOUD_AREAS` in `eslint.config.mjs`; add a new
-  area there). The React dashboard (all of `src/dashboard/`) is exempt until it
-  is ported. The areas from #82 and #83 predate the registries and are imported
-  directly, with a note (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`,
-  `App.vue`); `billing` and `organization` joined `CLOUD_AREAS` with #87, since
-  their only direct importers are in the exempt dashboard.
-- Nothing here imports `#/` (the React dashboard). The last exception, the
-  Properties tab's React datalink editor, went with #198.
+  area there). The dashboard (all of `src/dashboard/`) is exempt: it mixes cloud
+  and core code. The areas from #82 and #83 predate the registries and are
+  imported directly, with a note (`UpsertSecretPanel.vue`, `UserBar.vue`,
+  `UserMenu.vue`, `App.vue`); `billing` and `organization` joined `CLOUD_AREAS`
+  with #87, since their only direct importers are in the exempt dashboard.
+- Nothing here imports `#/` (the dashboard).
 - **An area contributes through registries**, not by being imported. Routes are
   the first: `registerCloud` adds them with `router.addRoute`, under a named
   parent where they need one (`PROTECTED_LAYOUT_ROUTE`, `$/router/routeNames`).

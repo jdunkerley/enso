@@ -1,12 +1,11 @@
 /** @file Provider for feature flags, used to enable or disable certain features in the application. */
+import { createPersistedStore } from '$/utils/persistedStore'
 import { unsafeWriteValue } from '$/utils/write'
-import { useZustandStoreRef } from '$/utils/zustand'
 import { Plan } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { IS_DEV_MODE, isOnElectron, isOnLinux } from 'enso-common/src/utilities/detect'
+import { computed } from 'vue'
 import { z } from 'zod'
-import { createStore } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 const MIN_ASSETS_TABLE_REFRESH_INTERVAL_MS = 100
 export const DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS = 3_000
@@ -34,7 +33,7 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   debugHoverAreas: z.boolean(),
   /**
    * Show the Reka UI spike menu next to the user bar (#76). Proves the Vue headless-UI stack
-   * works beside React; off by default, set via `window.overrideFeatureFlags` or local storage.
+   * works; off by default, set via `window.overrideFeatureFlags` or local storage.
    * Remove with the spike once the Vue `DropdownMenu` primitive has a real mount site (#78).
    */
   enableHeadlessUiSpike: z.boolean(),
@@ -45,88 +44,24 @@ const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA
 /** Feature flags. */
 export type FeatureFlags = z.infer<typeof FEATURE_FLAGS_SCHEMA>
 
-/** Feature flags store. */
-export interface FeatureFlagsStore {
+/** The persisted state of {@link flagsStore}. */
+export interface FeatureFlagsState {
   readonly featureFlags: FeatureFlags
-  readonly setFeatureFlag: <Key extends keyof FeatureFlags>(
-    key: Key,
-    value: FeatureFlags[Key],
-  ) => void
-  readonly setFeatureFlags: (flags: Partial<FeatureFlags>) => void
 }
 
-export const flagsStore = createStore<FeatureFlagsStore>()(
-  persist(
-    (set) => ({
-      featureFlags: {
-        enableDeepLinks: !IS_DEV_MODE && !isOnLinux() && isOnElectron(),
-        enableLocalBackend: false,
-        enableMultitabs: false,
-        enableAssetsTableBackgroundRefresh: true,
-        assetsTableBackgroundRefreshInterval: DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS,
-        enableCloudExecution: IS_DEV_MODE || isOnElectron(),
-        enableAdvancedProjectExecutionOptions: false,
-        showDeveloperIds: false,
-        developerPlanOverride: undefined,
-        fileChunkUploadPoolSize: DEFAULT_FILE_CHUNK_UPLOAD_POOL_SIZE,
-        getLogEventsPageSize: DEFAULT_GET_LOG_EVENTS_PAGE_SIZE,
-        listDirectoryPageSize: DEFAULT_LIST_DIRECTORY_PAGE_SIZE,
-        dataCatalogQueryDebounceDelay: DEFAULT_DATA_CATALOG_QUERY_DEBOUNCE_DELAY_MS,
-        unsafeDarkTheme: false,
-        apiKeyLimit: 5,
-        debugHoverAreas: false,
-        enableHeadlessUiSpike: false,
-      },
-      setFeatureFlag: (key, value) => {
-        set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, [key]: value } }))
-      },
-      setFeatureFlags: (flags) => {
-        set(({ featureFlags }) => ({ featureFlags: { ...featureFlags, ...flags } }))
-      },
-    }),
-    {
-      name: 'enso-feature-flags',
-      version: 4,
-      migrate: migrateFeatureFlags,
-      merge: (persistedState, newState) => {
-        /** Mutates the state with provided feature flags. */
-        function unsafeMutateFeatureFlags(flags: {
-          [K in keyof FeatureFlags]?: FeatureFlags[K] | undefined
-        }) {
-          const newFeatureFlags = { ...newState.featureFlags }
-          for (const [k, v] of unsafeEntries(flags)) {
-            if (v !== undefined) {
-              unsafeWriteValue(newFeatureFlags, k, v)
-            }
-          }
-          unsafeWriteValue(newState, 'featureFlags', newFeatureFlags)
-        }
-
-        const parsedPersistedState = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
-
-        if (parsedPersistedState.success === true) {
-          unsafeMutateFeatureFlags(parsedPersistedState.data.featureFlags)
-        }
-
-        if (typeof window !== 'undefined') {
-          const predefinedFeatureFlags = FEATURE_FLAGS_SCHEMA.partial().safeParse(
-            window.overrideFeatureFlags,
-          )
-
-          if (predefinedFeatureFlags.success) {
-            const withOmittedUndefined = Object.fromEntries(
-              Object.entries(predefinedFeatureFlags.data).filter(([, value]) => value != null),
-            )
-            // This is safe, because zod omits unset values.
-            unsafeMutateFeatureFlags(withOmittedUndefined)
-          }
-        }
-
-        return newState
-      },
-    },
-  ),
-)
+/** Mutates `state` with the provided feature flags, skipping the `undefined` ones. */
+function unsafeMutateFeatureFlags(
+  state: FeatureFlagsState,
+  flags: { [K in keyof FeatureFlags]?: FeatureFlags[K] | undefined },
+) {
+  const newFeatureFlags = { ...state.featureFlags }
+  for (const [k, v] of unsafeEntries(flags)) {
+    if (v !== undefined) {
+      unsafeWriteValue(newFeatureFlags, k, v)
+    }
+  }
+  unsafeWriteValue(state, 'featureFlags', newFeatureFlags)
+}
 
 /**
  * Flags that no longer exist, with the store version that removed them. Earlier versions migrated
@@ -158,9 +93,66 @@ export function migrateFeatureFlags(persistedState: unknown, version: number): u
   return changed ? { ...persistedState, featureFlags } : persistedState
 }
 
+/**
+ * The feature flags: the defaults, overridden by the saved flags, overridden in turn by
+ * `window.overrideFeatureFlags` (which the integration tests' mocks set).
+ */
+export const flagsStore = createPersistedStore<FeatureFlagsState>(
+  () => ({
+    featureFlags: {
+      enableDeepLinks: !IS_DEV_MODE && !isOnLinux() && isOnElectron(),
+      enableLocalBackend: false,
+      enableMultitabs: false,
+      enableAssetsTableBackgroundRefresh: true,
+      assetsTableBackgroundRefreshInterval: DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS,
+      enableCloudExecution: IS_DEV_MODE || isOnElectron(),
+      enableAdvancedProjectExecutionOptions: false,
+      showDeveloperIds: false,
+      developerPlanOverride: undefined,
+      fileChunkUploadPoolSize: DEFAULT_FILE_CHUNK_UPLOAD_POOL_SIZE,
+      getLogEventsPageSize: DEFAULT_GET_LOG_EVENTS_PAGE_SIZE,
+      listDirectoryPageSize: DEFAULT_LIST_DIRECTORY_PAGE_SIZE,
+      dataCatalogQueryDebounceDelay: DEFAULT_DATA_CATALOG_QUERY_DEBOUNCE_DELAY_MS,
+      unsafeDarkTheme: false,
+      apiKeyLimit: 5,
+      debugHoverAreas: false,
+      enableHeadlessUiSpike: false,
+    },
+  }),
+  {
+    name: 'enso-feature-flags',
+    version: 4,
+    migrate: migrateFeatureFlags,
+    merge: (persistedState, currentState) => {
+      const newState = { ...currentState }
+      const parsedPersistedState = FEATURE_FLAGS_STATE_SCHEMA.safeParse(persistedState)
+
+      if (parsedPersistedState.success === true) {
+        unsafeMutateFeatureFlags(newState, parsedPersistedState.data.featureFlags)
+      }
+
+      if (typeof window !== 'undefined') {
+        const predefinedFeatureFlags = FEATURE_FLAGS_SCHEMA.partial().safeParse(
+          window.overrideFeatureFlags,
+        )
+
+        if (predefinedFeatureFlags.success) {
+          const withOmittedUndefined = Object.fromEntries(
+            Object.entries(predefinedFeatureFlags.data).filter(([, value]) => value != null),
+          )
+          // This is safe, because zod omits unset values.
+          unsafeMutateFeatureFlags(newState, withOmittedUndefined)
+        }
+      }
+
+      return newState
+    },
+  },
+)
+
 /** Composable for getting a specific feature flag. */
 export function useFeatureFlag<Key extends keyof FeatureFlags>(key: Key) {
-  return useZustandStoreRef(flagsStore, (store) => store.featureFlags[key])
+  return computed(() => flagsStore.state.value.featureFlags[key])
 }
 
 /** Get a single feature flag. Similar to `useFeatureFlag` but without using Vue reactivity. */
@@ -170,12 +162,14 @@ export function getFeatureFlag<Key extends keyof FeatureFlags>(key: Key) {
 
 /** Set a subset of feature flags. */
 export function setFeatureFlags(flags: Partial<FeatureFlags>) {
-  return flagsStore.getState().setFeatureFlags(flags)
+  flagsStore.setState({ featureFlags: { ...flagsStore.getState().featureFlags, ...flags } })
 }
 
 /** Set a single feature flag. */
 export function setFeatureFlag<Key extends keyof FeatureFlags>(key: Key, value: FeatureFlags[Key]) {
-  return flagsStore.getState().setFeatureFlag(key, value)
+  const flags: Partial<FeatureFlags> = {}
+  flags[key] = value
+  setFeatureFlags(flags)
 }
 
 // Define global API for managing feature flags
@@ -187,7 +181,7 @@ if (typeof window !== 'undefined') {
   })
 
   Object.defineProperty(window, 'setFeatureFlags', {
-    value: flagsStore.getState().setFeatureFlags,
+    value: setFeatureFlags,
     configurable: false,
     writable: false,
   })

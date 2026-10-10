@@ -1,5 +1,4 @@
 import { sentryVitePlugin } from '@sentry/vite-plugin'
-import react from '@vitejs/plugin-react'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import postcssNesting from 'postcss-nesting'
@@ -34,7 +33,7 @@ export default defineConfig({
     ...(isDevMode ?
       [
         await VueDevTools({
-          // The JSX transform used by the inspector is causing react to complain and adds significant load time.
+          // The component inspector adds significant load time.
           componentInspector: false,
         }),
       ]
@@ -46,13 +45,6 @@ export default defineConfig({
           isCustomElement: (tag) => tag.startsWith('enso-'),
         },
       },
-    }),
-    react({
-      include: [
-        fileURLToPath(new URL('./src/**/*.tsx', import.meta.url)),
-        fileURLToPath(new URL('./src/dashboard/**/use*.ts', import.meta.url)),
-        fileURLToPath(new URL('./src/dashboard/**/*Hooks.ts', import.meta.url)),
-      ],
     }),
     ...(process.env.DASHBOARD_TESTS !== 'true' ? [await projectManagerShim()] : []),
     ...((
@@ -81,8 +73,6 @@ export default defineConfig({
       // Warming server up ***significantly*** speeds up execution of the first batch of tests in dev mode.
       clientFiles: [
         './src/**/*.vue',
-        './src/**/*.tsx',
-        './src/dashboard/hooks/**/*.ts',
         './src/dashboard/tailwind.css',
         './node_modules/@tanstack/**/*.js',
       ],

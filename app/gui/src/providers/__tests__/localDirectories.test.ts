@@ -10,7 +10,7 @@ import { defineComponent, h, nextTick } from 'vue'
 
 /** The `localStorage` entry both former stores persisted, and this one does. */
 const STORAGE_KEY = 'enso-local-directory'
-/** Where `LocalStorage` kept the root directory before the zustand store. */
+/** Where `LocalStorage` kept the root directory before the persisted store. */
 const LEGACY_ROOT_KEY = 'Enso::localRootDirectory'
 
 /** The module, fresh: the store reads `localStorage` once, when it is created. */

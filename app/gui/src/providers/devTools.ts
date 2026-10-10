@@ -1,4 +1,4 @@
-/** @file A zustand store that contains the state of the Enso devtools. */
+/** @file A store that contains the state of the Enso devtools. */
 import {
   PAYWALL_FEATURES,
   type PaywallFeatureName,

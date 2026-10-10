@@ -14,8 +14,7 @@ Electron shell — plus a few grammars and shims.
 - `gui/` — The main GUI (Vue). Organized by feature subtree: `src/project-view/`
   for the ProjectView feature (graph editor, code editor, visualizations) and
   `src/dashboard/` for the Dashboard feature (auth, cloud, project browser).
-  Dashboard is still in React as a historical artifact and is being migrated to
-  Vue. Shared UI/infrastructure lives at `src/` directly. See `gui/CLAUDE.md`.
+  Shared UI/infrastructure lives at `src/` directly. See `gui/CLAUDE.md`.
 - `electron-client/` — Electron main process. Packages the GUI + backend bundle,
   handles auto-update, file associations, custom protocol (`enso://`). The
   published binary name is just `enso`.

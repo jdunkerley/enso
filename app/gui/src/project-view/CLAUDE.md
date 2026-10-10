@@ -6,8 +6,7 @@ panes. Everything that's specific to viewing and editing an open Enso project
 lives here. Import via the `@/` path alias.
 
 This is **not** "the Vue half" — Vue is the main framework of the entire GUI.
-This directory is a feature subtree that happens to be Vue, the same way
-`src/dashboard/` is a feature subtree that currently happens to be React.
+This directory is a feature subtree, as `src/dashboard/` is another.
 
 ## What belongs here (and what doesn't)
 
@@ -50,7 +49,7 @@ ask first: is this ProjectView-specific, or would another feature want it too?
 
 Cross-subtree wiring with the Dashboard (`src/dashboard/`) should go through
 `src/providers/` (the `$/providers/` alias), not by reaching into the other
-subtree's internals. Nothing in the app renders React any more (#82, #93).
+subtree's internals.
 
 ## Graph editor
 
