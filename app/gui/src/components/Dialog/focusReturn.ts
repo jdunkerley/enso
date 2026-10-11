@@ -101,3 +101,18 @@ export function returnFocus(event: Event, target: FocusReturnTarget) {
     setTimeout(() => setTimeout(() => element.focus({ preventScroll: true })))
   }
 }
+
+/**
+ * A `mousedown` handler for a modal dialog's overlay: a press on the backdrop (the overlay, outside
+ * the dialog itself) keeps focus where it is, inside the dialog, as react-aria's modal did. The
+ * browser would otherwise move focus to the page's body, out of the dialog's focus trap.
+ */
+export function keepFocusOnBackdropPress(event: MouseEvent) {
+  const target = event.target
+  if (
+    !(target instanceof Element) ||
+    target.closest('[role="dialog"], [role="alertdialog"]') == null
+  ) {
+    event.preventDefault()
+  }
+}

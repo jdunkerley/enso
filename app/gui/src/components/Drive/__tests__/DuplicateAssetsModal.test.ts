@@ -151,9 +151,6 @@ describe('the duplicate-name dialog', () => {
     await userEvent.click(button('Skip', dialog()))
     expect(dialog().textContent).toContain('The new file will be skipped')
     expect(dialog().textContent).toContain('Change')
-    // As in React, "Change" keeps the choice.
-    await userEvent.click(button('Change', dialog()))
-    expect(dialog().textContent).toContain('The new file will be skipped')
     await userEvent.click(button('Apply', dialog()))
     await vi.waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith([{ assetId: NEW_DATA.id, conclusion: 'skip' }]),
@@ -225,15 +222,82 @@ describe('the duplicate-name dialog', () => {
     expect(dialog().textContent).not.toContain('will be renamed')
   })
 
-  test('Skip All skips every asset, without changing what the entries show', async () => {
+  test('"Change" undoes the choice, and offers Skip, Replace and Rename again', async () => {
+    const { onSubmit } = await mountSeeded([NEW_DATA])
+    await userEvent.click(button('Skip', dialog()))
+    expect(dialog().textContent).toContain('The new file will be skipped')
+    await userEvent.click(button('Change', dialog()))
+    expect(dialog().textContent).not.toContain('will be skipped')
+    expect(button('Skip', dialog())).toBeTruthy()
+    expect(button('Rename', dialog())).toBeTruthy()
+    await userEvent.click(button('Apply', dialog()))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith([
+        { assetId: NEW_DATA.id, conclusion: 'rename', newName: 'data.csv (2)' },
+      ]),
+    )
+  })
+
+  test('"Change" after a rename goes back to the suggested name', async () => {
+    const { onSubmit } = await mountSeeded([NEW_DATA])
+    await userEvent.click(button('Rename', dialog()))
+    const input = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLInputElement>('input[name="newName"]')
+      expect(element).not.toBeNull()
+      return element!
+    })
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
+    await userEvent.keyboard('renamed.csv{Enter}')
+    await vi.waitFor(() => expect(dialog().textContent).toContain('renamed to: renamed.csv'))
+    await userEvent.click(button('Change', dialog()))
+    expect(dialog().textContent).not.toContain('will be renamed')
+    await userEvent.click(button('Apply', dialog()))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith([
+        { assetId: NEW_DATA.id, conclusion: 'rename', newName: 'data.csv (2)' },
+      ]),
+    )
+  })
+
+  test('Skip All skips every asset, and every entry says so', async () => {
     const { onSubmit } = await mountSeeded([NEW_DATA, NEW_NOTES])
     await userEvent.click(button('Skip All', dialog()))
-    // As in React, whose entries did not re-render when only their conclusion changed.
-    expect(dialog().textContent).not.toContain('will be skipped')
+    expect(dialog().textContent?.match(/The new file will be skipped/g)).toHaveLength(2)
     await userEvent.click(button('Apply', dialog()))
     await vi.waitFor(() =>
       expect(onSubmit).toHaveBeenCalledWith([
         { assetId: NEW_DATA.id, conclusion: 'skip' },
+        { assetId: NEW_NOTES.id, conclusion: 'skip' },
+      ]),
+    )
+  })
+
+  test('"Skip the rest" skips the undecided entries and keeps the decided ones', async () => {
+    const { onSubmit } = await mountSeeded([NEW_DATA, NEW_NOTES], { canReplace: true })
+    const replaceButtons = [...dialog().querySelectorAll<HTMLElement>('button')].filter(
+      (element) => element.textContent?.trim() === 'Replace',
+    )
+    expect(replaceButtons).toHaveLength(2)
+    await userEvent.click(replaceButtons[0]!)
+    expect(dialog().textContent).toContain('will be replaced')
+    const skipAllButton = button('Skip All', dialog())
+    const menuTrigger = skipAllButton.nextElementSibling
+    if (!(menuTrigger instanceof HTMLElement)) throw new Error('No menu beside Skip All')
+    await userEvent.click(menuTrigger)
+    const item = await vi.waitFor(() => {
+      const found = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+        (element) => element.textContent?.trim() === 'Skip the rest',
+      )
+      expect(found).toBeDefined()
+      return found!
+    })
+    await userEvent.click(item)
+    await vi.waitFor(() => expect(dialog().textContent).toContain('will be skipped'))
+    expect(dialog().textContent).toContain('will be replaced')
+    await userEvent.click(button('Apply', dialog()))
+    await vi.waitFor(() =>
+      expect(onSubmit).toHaveBeenCalledWith([
+        { assetId: NEW_DATA.id, conclusion: 'replace' },
         { assetId: NEW_NOTES.id, conclusion: 'skip' },
       ]),
     )

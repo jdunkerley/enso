@@ -44,7 +44,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from 'reka-ui'
-import { useDialogFocus } from '$/components/Dialog/focusReturn'
+import { keepFocusOnBackdropPress, useDialogFocus } from '$/components/Dialog/focusReturn'
 import { computed, ref, useSlots } from 'vue'
 import { z } from 'zod'
 
@@ -139,6 +139,7 @@ const styles = computed(() =>
         :class="
           DIALOG_OVERLAY_STYLES({ isEntering: open, isExiting: !open, blockInteractions: true })
         "
+        @mousedown="keepFocusOnBackdropPress"
       >
         <!-- Reka unmounts the overlay once its exit animation has ended. -->
         <div

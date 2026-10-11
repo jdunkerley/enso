@@ -6,10 +6,9 @@
  *
  * It is meant for the modal stack (`useModals().open`, as the Vue drive opens it), and opens as it
  * mounts, positioned against `anchor`: the element that opened it, which it does not render
- * (React's `triggerRef`). Without one it sits at the window's top-left corner, where React's
- * popover ended up when its anchor had gone (the context menu's row ref is cleared as the menu
- * closes). It emits `close` once it has closed and its exit animation has ended. An outside click
- * closes it.
+ * (React's `triggerRef`): the labels column's edit button, or the asset's row for the context menu's
+ * "Label". Without one (no row is shown) it sits at the window's top-left corner. It emits `close`
+ * once it has closed and its exit animation has ended. An outside click closes it.
  *
  * Escape closes only this popover, as react-aria's stopped the key: on the page it would otherwise
  * reach the dashboard's global Escape binding, which closes every modal on the stack (see "Rulings
@@ -17,19 +16,22 @@
  */
 import { focusReturnTarget } from '$/components/Dialog/focusReturn'
 import Popover from '$/components/Dialog/Popover.vue'
+import type { Placement } from '$/components/placement'
 import type { SelectedAssetInfo } from '$/providers/driveStore'
 import type { Backend } from 'enso-common/src/services/Backend'
 import type { ReferenceElement } from 'reka-ui'
 import { ref } from 'vue'
 import ManageLabelsForm from './ManageLabelsForm.vue'
 
-const { backend, items, anchor, opener } = defineProps<{
+const { backend, items, anchor, opener, placement } = defineProps<{
   backend: Backend
   items: readonly SelectedAssetInfo[]
   /** What it is positioned against. Omitted, the window's top-left corner. */
   anchor?: Element | null | undefined
   /** Where focus returns on closing; by default the element focused as it opened. */
   opener?: Element | null | undefined
+  /** Where it goes relative to `anchor`; below its centre by default. */
+  placement?: Placement | undefined
 }>()
 
 const emit = defineEmits<{
@@ -56,7 +58,11 @@ const WINDOW_ORIGIN: ReferenceElement = {
     class="max-w-64 overflow-y-hidden"
     :anchor="anchor ?? WINDOW_ORIGIN"
     :opener="openerTarget"
-    v-bind="anchor == null ? { placement: 'bottom-start', offset: 0, containerPadding: 0 } : {}"
+    v-bind="
+      anchor == null ? { placement: 'bottom-start', offset: 0, containerPadding: 0 }
+      : placement != null ? { placement }
+      : {}
+    "
     @keydown.esc.stop="open = false"
     @closed="emit('close')"
   >

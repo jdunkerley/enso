@@ -132,6 +132,23 @@ describe('Dialog', () => {
     expect(byTestId('modal-dialog')!.parentElement!.classList).toContain('backdrop-blur-md')
   })
 
+  test('a press on the backdrop of a dialog that stays open keeps focus inside it', async () => {
+    mountDialog({ isDismissable: false })
+    const user = await openWithKeyboard()
+    byTestId('name')!.focus()
+    await user.click(byTestId('modal-dialog')!)
+    await flushPromises()
+    expect(role('dialog')).not.toBeNull()
+    expect(document.activeElement).toBe(byTestId('name'))
+    await user.click(byTestId('modal-dialog')!.parentElement!)
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('name'))
+    // A press inside it still moves focus as usual.
+    byTestId('save')!.focus()
+    await user.click(byTestId('name')!)
+    expect(document.activeElement).toBe(byTestId('name'))
+  })
+
   test('keys other than Escape do not propagate out of it', async () => {
     const { onOuterKeydown } = mountDialog()
     const user = await openWithKeyboard()
@@ -364,6 +381,15 @@ describe('AlertDialog', () => {
     await user.click(byTestId('modal-dialog')!)
     await flushPromises()
     expect(role('alertdialog')).not.toBeNull()
+  })
+
+  test('a press on its backdrop keeps focus inside it', async () => {
+    mountAlert()
+    const user = await openWithKeyboard()
+    expect(document.activeElement).toBe(byTestId('alert-dialog-confirm'))
+    await user.click(byTestId('modal-dialog')!)
+    await flushPromises()
+    expect(document.activeElement).toBe(byTestId('alert-dialog-confirm'))
   })
 
   test('confirm waits for onConfirm, showing it as loading, then closes', async () => {

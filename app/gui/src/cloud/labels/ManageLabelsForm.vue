@@ -6,17 +6,13 @@
  * once; "Create Label" opens a form for a new one, with its colour; each label has a delete button
  * that asks first. When nothing matches the search, it offers to create a label of that name.
  *
- * The Vue port of the React `ManageLabelsForm`, kept as React had it:
- * - react-aria's `TagGroup` (a `grid` of focusable rows) is a plain `role="list"`: nothing acts
- *   on a pill, so it needs no keyboard focus (decision 1 of the foundations record);
- * - the pills show every label, checked or not, as React's did;
- * - Enter in the search field submits the form, which resets it: the search clears, and the checks
- *   go back to what the assets had when the popover opened (React's implicit submission did the
- *   same);
- * - the labels set on an asset are computed from what it had when the popover opened, so creating
- *   two labels in a row keeps only the second on it;
- * - the "Next color" button beside "Create …" does not change the colour shown (see
- *   `NotFoundLabel.vue`).
+ * The Vue port of the React `ManageLabelsForm`. react-aria's `TagGroup` (a `grid` of focusable
+ * rows) is a plain `role="list"`: nothing acts on a pill, so it needs no keyboard focus (decision 1
+ * of the foundations record). The pills show the labels that at least one of the assets has.
+ *
+ * Each change writes the assets' labels as this popover last wrote them, so that changes in a row
+ * (creating two labels, checking one and then creating another) all stay. Enter in the search field
+ * does nothing: the form only holds the popover's state, and submitting it would reset it.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -109,16 +105,32 @@ const form = useForm({
         .readonly(),
       query: z.string(),
     }),
-  // A getter, so that a reset (Enter in the search field) reads the labels as they are then.
   defaultValues: () => ({ labels: labelsPresence.value, query: '' }),
+  // Nothing is submitted: each change is written at once. Enter in the search field must not reset
+  // the search and the checks.
+  resetOnSubmit: false,
 })
+
+/** Each asset's labels, as this popover last wrote them. */
+const assetLabels = new Map(items.map((item) => [item.id, item.labels ?? []]))
+
+/** An asset, with its labels as this popover last wrote them. */
+function currentItem(item: SelectedAssetInfo): SelectedAssetInfo {
+  return { ...item, labels: [...(assetLabels.get(item.id) ?? [])] }
+}
+
+function writeLabels(item: SelectedAssetInfo, labels: readonly LabelName[]) {
+  assetLabels.set(item.id, labels)
+  return associateTag.mutateAsync([item.id, labels, item.title])
+}
 
 const selectedLabels = computed(() => form.watch('labels') as readonly LabelInfo[])
 const query = computed(() => form.watch('query') as string)
 
-/** The pills: the form's labels, as the labels query has them. */
+/** The pills: the labels the assets have, as the labels query has them. */
 const pills = computed(() =>
   selectedLabels.value
+    .filter((label) => label.state !== 'none')
     .map((label) => allLabels.value.find((allLabelsItem) => allLabelsItem.id === label.label.id))
     .filter((label) => label !== undefined),
 )
@@ -133,9 +145,7 @@ async function createLabel(name: string, color?: LChColor) {
     { value: labelName, color: color ?? leastUsedColor.value },
   ])
   await Promise.allSettled(
-    items.map((item) =>
-      associateTag.mutateAsync([item.id, [...(item.labels ?? []), labelName], item.title]),
-    ),
+    items.map((item) => writeLabels(item, [...(assetLabels.get(item.id) ?? []), labelName])),
   )
   form.setValue('labels', [...selectedLabels.value, { label: newLabel, state: 'all' }])
 }
@@ -157,10 +167,8 @@ function setLabelState(label: Label, state: LabelState) {
   form.setValue('labels', newSelectedLabels)
   return Promise.allSettled(
     items.map((item) => {
-      const newLabels = labelsAfterChange(item, previousLabels, newSelectedLabels)
-      return newLabels == null ?
-          Promise.resolve()
-        : associateTag.mutateAsync([item.id, newLabels, item.title])
+      const newLabels = labelsAfterChange(currentItem(item), previousLabels, newSelectedLabels)
+      return newLabels == null ? Promise.resolve() : writeLabels(item, newLabels)
     }),
   )
 }
@@ -216,7 +224,7 @@ const createLabelSchema = (z: SchemaBuilder) =>
       autoFocus
     />
 
-    <div v-if="selectedLabels.length > 0" :class="styles.itemLabels()">
+    <div v-if="pills.length > 0" :class="styles.itemLabels()">
       <Scroller background="secondary">
         <div class="contents">
           <div

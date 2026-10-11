@@ -14,6 +14,7 @@ import type { Backend } from 'enso-common/src/services/Backend'
 import { beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h, shallowRef } from 'vue'
 import DatalinkInput from '../DatalinkInput.vue'
+import JSONSchemaInput from '../JSONSchemaInput.vue'
 
 const listSecrets = vi.hoisted(() => vi.fn())
 vi.mock('$/providers/backends', async () => {
@@ -160,6 +161,21 @@ describe('DatalinkInput', () => {
     await chooseType('Enso Secret', 1)
     await vi.waitFor(() => expect(listSecrets).toHaveBeenCalled())
     expect(placeholder(getText('enterSecretPath'))).toHaveLength(1)
+  })
+
+  test("an invalid secret shows its schema's description once", async () => {
+    await mountWithProviders(JSONSchemaInput, {
+      props: {
+        defs: {},
+        schema: { type: 'string', format: 'enso-secret', description: 'Choose a secret.' },
+        path: '#',
+        getValidator: () => () => false,
+        value: '',
+        onChange: () => {},
+      },
+    })
+    await vi.waitFor(() => expect(listSecrets).toHaveBeenCalled())
+    expect(element().textContent?.match(/Choose a secret\./g)).toHaveLength(1)
   })
 
   test('a file path opens the file browser, which sets the path', async () => {
