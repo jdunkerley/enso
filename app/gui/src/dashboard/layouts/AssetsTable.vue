@@ -1,15 +1,15 @@
 <script lang="ts">
 /**
- * @file The drive's table of assets: the Vue port of React's `AssetsTable`, with the same markup,
- * test ids, keyboard handling, selection (click, Shift and the platform's range and toggle
- * modifiers, the rubber-band `SelectionBrush`), drag and drop (rows onto rows, rows out to the
- * category buttons, files from the system), context menus, column toggles and paging.
+ * @file The drive's table of assets, with its keyboard handling, selection (click, Shift and the
+ * platform's range and toggle modifiers, the rubber-band `SelectionBrush`), drag and drop (rows
+ * onto rows, rows out to the category buttons, files from the system), context menus, column
+ * toggles and paging.
  *
  * It lists the shown directory (`useDriveView`) in pages as it is scrolled, or the search results
- * while the query has text, and gives the search bar its suggestions. React's behaviour is kept
- * where the specs or a user could see it: the arrow keys move the selection, Shift extends it, Enter
- * opens; the root takes the focus when nothing else has it while the drive is the focused panel; and
- * the drag selection measures rows against the root, which does not scroll.
+ * while the query has text, and gives the search bar its suggestions. The arrow keys move the
+ * selection, Shift extends it, Enter opens; the root takes the focus when nothing else has it while
+ * the drive is the focused panel; and the drag selection measures rows against the root, which
+ * does not scroll.
  *
  * To assistive technology the table is an ARIA `grid` (a flat one: a directory opens in place of
  * the listing rather than expanding, so it is not a `treegrid`), multi-selectable, with one tab
@@ -33,7 +33,7 @@ LocalStorage.registerKey('enabledColumns', {
 /** The height of each row in the table body. It MUST be the one Tailwind's `h-table-row` sets. */
 const ROW_HEIGHT_PX = 36
 
-/** How long the layout isolation waits before following a resize, as React's `IsolateLayout`. */
+/** How long the layout isolation waits before following a resize. */
 const ISOLATE_LAYOUT_DEBOUNCE_MS = 16
 
 /** A selection being drawn by a drag. */
@@ -308,9 +308,9 @@ const scroller = ref<InstanceType<typeof Scroller>>()
 const scrollerContent = computed(() => scroller.value?.content)
 
 /**
- * Ask for the next page when the end of the table is in view, and there is one. (React asked
- * whether or not there was one: with no next page the query settles at once, unchanged, and React
- * asked again on the next render, round and round; nothing on screen changed.)
+ * Ask for the next page when the end of the table is in view, and there is one. (Without that
+ * check it loops: with no next page the query settles at once, unchanged, and its settling asks
+ * again, round and round, with nothing on screen changing.)
  */
 function fetchNextPageIfAtEnd() {
   // Do not request the next page while refetching, or the data is not updated:
@@ -349,7 +349,7 @@ function selectedAssetContext() {
   return { category: category.value }
 }
 
-// The temporary solution React had, to update the asset panel when the listing changes.
+// A temporary solution, to update the asset panel when the listing changes.
 watch(
   [assets, category],
   () => {
@@ -692,8 +692,8 @@ function keyboardAnchorIndex() {
 
 /**
  * Add the asset to the selection, or remove it if it is in it, from the selection as it was when
- * the key was pressed. (Ctrl+Space toggles twice from that same selection, as React's handler did,
- * so it ends up removing a sole selected asset.)
+ * the key was pressed. (Ctrl+Space toggles twice from that same selection, so it ends up removing
+ * a sole selected asset.)
  */
 function toggleSelected(selectedAssets: readonly SelectedAssetInfo[], item: AnyAsset) {
   driveStore.setSelectedAssets(
@@ -824,7 +824,7 @@ function onRootFocusOut(event: FocusEvent) {
   }
 }
 
-/** As React's ref callback did on every render: take the focus when nothing has it. */
+/** On mount and on every update: take the focus when nothing has it. */
 function focusRootIfIdle() {
   if (document.activeElement === document.body && container.focusedPanel.type === 'drive') {
     root.value?.focus()
@@ -1103,7 +1103,7 @@ function onDropzoneDrop(event: DragEvent) {
   onRowDrop(event, null)
 }
 
-/** Clear the selection, as React's `AssetsTableAssetsUnselector` did on a press. */
+/** Clear the selection on a press. */
 function unselectOnPointerDown() {
   if (driveStore.selectedIds.size > 0) driveStore.setSelectedAssets([])
 }
@@ -1134,9 +1134,8 @@ function onContextMenu(event: MouseEvent) {
 // === Layout isolation ===
 
 /**
- * React's `IsolateLayout`: the content sits in an SVG `foreignObject` sized to the container, so
- * that its layout is computed apart from the rest of the page. The size follows the container's,
- * debounced as React did.
+ * The content sits in an SVG `foreignObject` sized to the container, so that its layout is
+ * computed apart from the rest of the page. The size follows the container's, debounced.
  */
 const isolateContainer = ref<HTMLElement>()
 const isolateSize = ref<{ width: number; height: number } | null>(null)
@@ -1381,7 +1380,6 @@ const isLoadingRow = computed(
                     <input
                       ref="fileInput"
                       type="file"
-                      class="react-aria-Input"
                       style="display: none"
                       @change="onFilesChosen"
                     />

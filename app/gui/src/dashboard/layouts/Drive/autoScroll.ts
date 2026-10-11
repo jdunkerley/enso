@@ -18,8 +18,8 @@ export type AutoScrollDirection = 'both' | 'horizontal' | 'none' | 'vertical'
 export interface AutoScrollOptions {
   readonly direction?: AutoScrollDirection
   /**
-   * If the pointer is less than this distance from the top or bottom of the container, the
-   * container scrolls towards that edge.
+   * If the pointer is less than this distance from an edge of the container (in a scrolled
+   * direction), the container scrolls towards that edge.
    */
   readonly threshold?: number
   /** An arbitrary constant that controls the speed of autoscroll. */
@@ -72,8 +72,7 @@ export function useAutoScroll(
     }
     if (direction === 'horizontal' || direction === 'both') {
       if (container.scrollLeft > 0) {
-        // Measured from the container's top, not its left; kept as it was.
-        const distanceToLeft = Math.max(0, pointerX - rect.top)
+        const distanceToLeft = Math.max(0, pointerX - rect.left)
         if (distanceToLeft < threshold) {
           container.scrollLeft =
             container.scrollLeft - Math.floor(speed / (distanceToLeft + falloff))

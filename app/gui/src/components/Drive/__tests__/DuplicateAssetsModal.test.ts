@@ -1,7 +1,7 @@
 /**
  * @file The duplicate-name dialog (#92): what it shows for each conflict, the skip, replace and
- * rename choices, Skip All, Apply and Cancel, from the keyboard where react-aria gave the React
- * dialog keyboard access.
+ * rename choices, Skip All, Apply and Cancel, from the keyboard where the dialog gives keyboard
+ * access.
  */
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
@@ -215,7 +215,7 @@ describe('the duplicate-name dialog', () => {
       expect(element).not.toBeNull()
       return element!
     })
-    // The input is focused (and its text selected) after a short delay, as in React.
+    // The input is focused (and its text selected) after a short delay.
     await vi.waitFor(() => expect(document.activeElement).toBe(input))
     await userEvent.keyboard('notes.csv{Enter}')
     await vi.waitFor(() => expect(input.getAttribute('aria-invalid')).toBe('true'))

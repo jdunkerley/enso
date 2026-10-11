@@ -28,8 +28,8 @@ export type SelectedAssetInfo =
 
 /** Data for a context menu. */
 export interface ContextMenuData {
-  /** The element the menu belongs to, as a `{ current }` ref object. */
-  readonly triggerRef: { current: HTMLElement | null }
+  /** The element the menu belongs to. */
+  readonly trigger: HTMLElement | null
   readonly initialContextMenuPosition: Pick<MouseEvent, 'pageX' | 'pageY'> | null
 }
 

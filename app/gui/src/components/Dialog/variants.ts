@@ -23,16 +23,8 @@ export const DIALOG_OVERLAY_STYLES = tv({
 export const DIALOG_MODAL_STYLES = tv({
   base: 'fixed inset-0 flex items-center justify-center text-xs text-primary',
   variants: {
-    isEntering: { true: 'animate-in ease-out duration-200' },
-    isExiting: { true: 'animate-out ease-in duration-200' },
     type: { modal: '', fullscreen: 'p-3.5' },
   },
-  compoundVariants: [
-    { type: 'modal', isEntering: true, class: 'slide-in-from-top-1' },
-    { type: 'modal', isExiting: true, class: 'slide-out-to-top-1' },
-    { type: 'fullscreen', isEntering: true, class: 'zoom-in-[1.015]' },
-    { type: 'fullscreen', isExiting: true, class: 'zoom-out-[1.015]' },
-  ],
 })
 
 export const DIALOG_STYLES = tv({
@@ -140,12 +132,6 @@ export const POPOVER_STYLES = tv({
       light: { base: DIALOG_BACKGROUND({ variant: 'light' }) },
       dark: { base: DIALOG_BACKGROUND({ variant: 'dark' }) },
     },
-    isEntering: {
-      true: 'animate-in fade-in placement-bottom:slide-in-from-top-1 placement-top:slide-in-from-bottom-1 placement-left:slide-in-from-right-1 placement-right:slide-in-from-left-1 ease-out duration-200',
-    },
-    isExiting: {
-      true: 'animate-out fade-out placement-bottom:slide-out-to-top-1 placement-top:slide-out-to-bottom-1 placement-left:slide-out-to-right-1 placement-right:slide-out-to-left-1 ease-in duration-150',
-    },
     size: {
       custom: { base: '', dialog: '' },
 
@@ -181,8 +167,8 @@ export const POPOVER_STYLES = tv({
 /**
  * The enter/exit motion of the `Dialog`'s box (a Reka `DialogContent`), keyed on Reka's
  * `data-state`. It is on the box rather than on the full-screen layer around it
- * (`DIALOG_MODAL_STYLES`'s `isEntering`/`isExiting`), as Reka animates each layer it unmounts
- * separately. The box is all that layer shows, so it looks the same.
+ * (`DIALOG_MODAL_STYLES`), as Reka animates each layer it unmounts separately. The box is all that
+ * layer shows, so it looks the same.
  */
 export const DIALOG_MOTION = tv({
   base: [
@@ -198,9 +184,8 @@ export const DIALOG_MOTION = tv({
 })
 
 /**
- * The enter/exit motion of the `Popover` (a Reka `PopoverContent`), in place of
- * `POPOVER_STYLES`'s `isEntering`/`isExiting`, which key the direction on the `placement-*:`
- * modifiers. Reka reports the side it used as `data-side` (decision 5 of
+ * The enter/exit motion of the `Popover` (a Reka `PopoverContent`), keyed on the state Reka reports
+ * as `data-state` and the side it used as `data-side` (decision 5 of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  */
 export const POPOVER_MOTION = [

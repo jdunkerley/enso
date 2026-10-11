@@ -4,10 +4,8 @@ The **Dashboard feature** subtree: sign-up/sign-in, cloud project browser,
 settings. Everything whose meaning is tied to the Enso Cloud shell (before a
 project is opened, or alongside it) lives here. Import via the `#/` path alias.
 
-**Vue.** This subtree was built as an independent React effort and has been
-ported to Vue (#75); React and its dependencies are gone from the toolchain
-(#94). Common UI primitives and utilities live at `src/` directly (see the
-sibling project-view structure for the same principle); this directory holds
+**Vue** (#75). Common UI primitives and utilities live at `src/` directly (see
+the sibling project-view structure for the same principle); this directory holds
 only Dashboard-specific code.
 
 ## Structure

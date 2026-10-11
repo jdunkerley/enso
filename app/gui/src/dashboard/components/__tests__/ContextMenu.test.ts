@@ -55,7 +55,7 @@ const entryButton = (index: number) => present(openMenu().querySelectorAll('butt
 const outside = () => present(byTestId('outside'))
 
 describe('ContextMenu', () => {
-  test("has React's DOM: a dialog named by the label, of buttons, at the point", async () => {
+  test('is a dialog named by the label, of buttons, at the point', async () => {
     setup()
     await flushPromises()
     expect(menu()).not.toBeNull()

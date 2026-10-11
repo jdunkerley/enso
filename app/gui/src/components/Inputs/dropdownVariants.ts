@@ -1,5 +1,5 @@
 /**
- * @file Tailwind variants of the dropdown, shared by the React input and its Vue port.
+ * @file Tailwind variants of the dropdown (`Dropdown.vue`, `FormDropdown.vue`).
  * See `variants.ts` for the `*_VUE_STATES` constants.
  */
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'

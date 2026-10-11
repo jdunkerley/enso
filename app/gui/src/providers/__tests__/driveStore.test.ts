@@ -110,7 +110,7 @@ describe('createDriveStore', () => {
       const store = createDriveStore()
       store.setAssetToRename(FOLDER.id)
       expect(store.assetToRename).toBe(FOLDER.id)
-      const contextMenuData = { triggerRef: { current: null }, initialContextMenuPosition: null }
+      const contextMenuData = { trigger: null, initialContextMenuPosition: null }
       store.setContextMenuData(contextMenuData)
       expect(store.contextMenuData).toBe(contextMenuData)
       store.setDragTargetAssetId(PROJECT.id)
@@ -147,7 +147,7 @@ describe('createDriveStore', () => {
       expect(state.visuallySelectedKeys?.size).toBe(0)
     })
 
-    test('every update notifies, as the React subscribers expect', () => {
+    test('every update notifies, even one that changes nothing', () => {
       const store = createDriveStore()
       const listener = vi.fn()
       store.subscribe(listener)

@@ -49,7 +49,7 @@ beforeEach(() => {
 describe('SetupOrganizationModal', () => {
   const input = () => dialog()!.querySelector<HTMLInputElement>('input[name="name"]')!
 
-  test('asks for the name, with the React title, text, label and description', async () => {
+  test('asks for the name, with the title, text, label and description, and focuses the field', async () => {
     await mountWithProviders(SetupOrganizationModal)
     const modal = dialog()!
     expect(modal.querySelector('h2')!.textContent!.trim()).toBe(getText('setupOrganization'))
@@ -98,7 +98,7 @@ describe('SetupOrganizationModal', () => {
     expect(remote.createUserGroup).not.toHaveBeenCalled()
   })
 
-  test('can be dismissed with Escape, as React allowed', async () => {
+  test('can be dismissed with Escape', async () => {
     await mountWithProviders(SetupOrganizationModal)
     await userEvent.setup().keyboard('{Escape}')
     await vi.waitFor(() => expect(dialog()).toBeNull())
@@ -112,7 +112,7 @@ describe('AcceptInvitationModal', () => {
     userEmail: EmailAddress('user@example.com'),
   } as Invitation
 
-  test('shows the invitation, with the React title, text, alert and buttons', async () => {
+  test('shows the invitation as an alert dialog, with its text, alert and buttons, focusing Accept', async () => {
     await mountWithProviders(AcceptInvitationModal, { props: { invitation } })
     const modal = dialog('alertdialog')!
     expect(modal.querySelector('h2')!.textContent!.trim()).toBe(getText('pendingInvitationInfo'))

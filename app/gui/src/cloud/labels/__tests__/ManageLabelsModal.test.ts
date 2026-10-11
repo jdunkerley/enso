@@ -111,7 +111,7 @@ describe('ManageLabelsModal', () => {
     ).not.toBe('')
     expect(checkOf('alpha')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     expect(checkOf('beta')).toBe('')
-    // The search field has the focus, as React's `autoFocus`.
+    // The search field has the focus.
     await vi.waitFor(() => expect(document.activeElement).toBe(searchField()))
   })
 

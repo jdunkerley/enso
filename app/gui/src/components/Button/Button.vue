@@ -2,8 +2,8 @@
 /**
  * @file A button, or a link styled as one, styled by `BUTTON_STYLES`.
  *
- * Its props (`isDisabled`, `isLoading`, `tooltip`, `icon`, …) keep the names they had before the
- * Vue port (#75); see the rulings in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+ * Its props (`isDisabled`, `isLoading`, `tooltip`, `icon`, …) keep the dashboard's established
+ * names; see the rulings in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
  * It takes `class` and `contentClass`, and slots for its content. The press handler is the
  * `onPress` prop, which `@press="…"` binds. It is a prop rather than an emitted event so that its
  * return value is seen: while a returned promise is pending the button shows its loader and is

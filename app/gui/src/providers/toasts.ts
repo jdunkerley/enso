@@ -253,9 +253,3 @@ export function createToastsStore() {
 
 /** The app's toasts, reachable from any code: Vue components and stores. */
 export const useToasts = createGlobalState(createToastsStore)
-
-/**
- * {@link useToasts} under a name that does not read as a composable, for code outside Vue's
- * `setup`.
- */
-export const getToastsStore = useToasts

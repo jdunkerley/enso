@@ -1,8 +1,7 @@
 # gui/integration-test
 
 Playwright-based integration tests for the GUI. Organized by feature subtree,
-mirroring `src/`. Expect the structure to evolve as the Dashboard is ported to
-Vue:
+mirroring `src/`.
 
 **Type-checked in CI** (`tsconfig.node.json`, run by `app/gui`'s `typecheck`
 script alongside the app's own `tsconfig.app.json` — see #141). If a new file
@@ -125,8 +124,7 @@ in both modes. Anything else runs once, unlicensed.
 ## Accessibility checks
 
 `dashboard/accessibility.spec.ts` is the dashboard's accessibility safety net
-for the React→Vue port (#75, #81). It runs in every CI build, as part of the
-ordinary suite.
+(#81). It runs in every CI build, as part of the ordinary suite.
 
 - **axe-core** (`@axe-core/playwright`, WCAG 2.0–2.2 A/AA rules) scans four
   screens — login, drive, settings, and the asset panel — through

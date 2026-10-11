@@ -77,7 +77,7 @@ afterEach(() => {
 })
 
 describe('Billing & Plans tab', () => {
-  test("shows React's heading and button", async () => {
+  test('shows one heading, and the button at the start of its row', async () => {
     await mountTab()
     expect(
       [...document.querySelectorAll('h2')].map((heading) => heading.textContent.trim()),

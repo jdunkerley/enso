@@ -10,9 +10,9 @@ community build without the cloud can leave it out (decision 6b of
 - Top level: framework-free helpers (`validation.ts` with the Cognito password
   rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`,
   and `uploadToCloud.ts`, which packs local projects and uploads them to the
-  cloud when assets move from a local category to a cloud one, #192). The React
-  dashboard imports these while it is ported, and the core may import them.
-- `<area>/`: a ported cloud-only feature, Vue. So far:
+  cloud when assets move from a local category to a cloud one, #192). The
+  dashboard and the core may import them.
+- `<area>/`: a cloud-only feature, Vue. So far:
   - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
     file browser to create a secret, and the drive's secret dialog around it,
     `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack;
@@ -44,8 +44,8 @@ community build without the cloud can leave it out (decision 6b of
     `PaywallDialog`, `PaywallDialogButton`, `PaywallButton`, `PaywallAlert`,
     `PaywallLock`, `PaywallBulletPoints`, `PaywallUpgradeButton`), and the
     settings page's paywall screen, contributed by `registerBillingSettings`.
-    Since #88 also `PaywallModal.vue`, the dialog on the modal stack, which the
-    React menus' paywalled entries open; no React paywall code is left.
+    The paywall dialog that locked context-menu entries open on the modal stack
+    is the drive's `#/layouts/Drive/PaywallModal.vue`.
   - `billing/`, since #191: the Usage settings tab's section
     (`UsageSettingsSection.vue`, with `executionUsage.ts`), contributed by
     `registerBillingSettings`.
@@ -140,6 +140,4 @@ community build without the cloud can leave it out (decision 6b of
 Component tests live in `<area>/__tests__/` and mount with `mountWithProviders`
 (`$/utils/testing/`), mocking the global stores they use (`useSession`,
 `useAuth`, `useBackends`) and the pieces not under test (the info bar, the modal
-host). A side-by-side check against a React original lives in `src/dashboard/`
-(it imports `#/`), e.g. `dashboard/components/__tests__/vuePortParity.test.tsx`;
-it goes with its React original.
+host).

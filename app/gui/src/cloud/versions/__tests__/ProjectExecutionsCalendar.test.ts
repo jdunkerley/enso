@@ -148,7 +148,7 @@ describe('placeholders', () => {
 })
 
 describe('the calendar', () => {
-  test("shows this month's executions, named as react-aria named them", async () => {
+  test("shows this month's executions, with the month and each day named for screen readers", async () => {
     await renderTab()
     expect(backend.listProjectExecutions).toHaveBeenCalledWith(
       PROJECT_ID,

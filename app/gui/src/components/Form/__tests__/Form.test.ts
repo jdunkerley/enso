@@ -127,7 +127,7 @@ describe('validation', () => {
     expect(errorOf('email')?.textContent).toBe(getText('invalidEmailValidationError'))
   })
 
-  test('marks a field required only when told, as React does', () => {
+  test('marks a field required only when told, not from the schema', () => {
     mountForm({}, () =>
       h(Input, { name: 'name', label: 'Nick', testId: 'required', isRequired: true }),
     )

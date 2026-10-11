@@ -2,14 +2,14 @@
 /**
  * @file The form inside `DuplicateAssetsModal.vue`: for each conflicting asset, the new and the
  * existing one side by side, and Skip, Replace (when allowed) or Rename; then Skip All (or "Skip
- * the rest") and Apply. The Vue port of the React `ResolveDuplicationsModalInner`.
+ * the rest") and Apply.
  *
  * It waits in `setup` for the target directory's listings (its active and its trashed assets), so
  * it must be inside a `SuspenseLoader`, as `Dialog.vue`'s content is. When none of the assets
- * actually conflicts it emits `noConflicts` and renders nothing, as React did.
+ * actually conflicts it emits `noConflicts` and renders nothing.
  *
- * The values are an array (`entries.N`), one entry per asset, where React keyed them by asset id:
- * a local asset's id is an encoded path, whose dots would read as nested fields.
+ * The values are an array (`entries.N`), one entry per asset, not keyed by asset id: a local
+ * asset's id is an encoded path, whose dots would read as nested fields.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -271,8 +271,8 @@ function skipRest() {
                 <Button variant="primary" class="min-w-16">{{ getText('rename') }}</Button>
               </template>
               <template #default="{ close }">
-                <!-- Escape closes only this form, as react-aria's popover stopped it: on the page
-                it would reach the dashboard's global Escape binding, which closes every modal. -->
+                <!-- Escape closes only this form: on the page it would reach the dashboard's
+                global Escape binding, which closes every modal. -->
                 <Form
                   method="dialog"
                   :defaultValues="{

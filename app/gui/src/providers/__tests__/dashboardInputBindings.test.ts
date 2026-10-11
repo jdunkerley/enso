@@ -87,7 +87,7 @@ describe('createDashboardInputBindings', () => {
     expect(renamed).toBe(1)
   })
 
-  test('reads what the React dashboard saved in window.localStorage, unchanged', () => {
+  test('reads bindings saved in window.localStorage by older versions, unchanged', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ rename: ['Mod+Shift+R'], settings: ['Mod+,', 'F10'] }),

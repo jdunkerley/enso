@@ -34,7 +34,7 @@ async function setup(agreedToTos = false, agreedToPrivacyPolicy = false) {
 }
 
 describe('AgreementsModal', () => {
-  test('has the title, text, checkboxes, links and button of the React dialog', async () => {
+  test('is a dialog named by its title, with the text, checkboxes, links and button', async () => {
     await setup()
     const modal = byTestId('agreements-modal')!
     expect(modal).toBe(dialog())
