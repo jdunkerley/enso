@@ -931,6 +931,7 @@
   "restoreFromTrashShortcut": "Restore From Trash",
   "removeLabelShortcut": "Remove Label",
   "openInFileBrowserShortcut": "Open in File Browser",
+  "removeFromRecentShortcut": "Remove from Recent",
   "openInFileBrowserShortcutWindows": "Open in Explorer",
   "openInFileBrowserShortcutMacOs": "Open in Finder",
   "copyIdShortcut": "Copy Id(s)",
