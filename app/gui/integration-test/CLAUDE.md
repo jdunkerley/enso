@@ -148,10 +148,11 @@ ordinary suite.
   reason (see `package.json`'s `"//"`); a bump means a regenerated baseline in
   the same PR.
 - **Accessibility-tree snapshots** (`toMatchAriaSnapshot`) pin the roles, names
-  and states of the drive table header, the user menu and the settings sidebar.
-  They are partial on purpose — no unnamed icons or other incidental nodes — so
-  they hold the dashboard to the contract, not to its DOM. When a change alters
-  a tree deliberately (e.g. the user menu becoming a `menu` of `menuitem`s),
+  and states of the drive table header, the drive table's `grid` (its name, row
+  groups and selected row, #208), the user menu and the settings sidebar. They
+  are partial on purpose — no unnamed icons or other incidental nodes — so they
+  hold the dashboard to the contract, not to its DOM. When a change alters a
+  tree deliberately (e.g. the user menu becoming a `menu` of `menuitem`s),
   update the snapshot in the same PR
   (`--update-snapshots --update-source-method=overwrite`) and say why.
 
@@ -163,7 +164,7 @@ use:
 
 - state attributes and styling classes (`data-selected`, `data-pressed`, …) —
   use the ARIA state instead (e.g. `getByRole('row', { selected: true })`: drive
-  rows carry `aria-selected`);
+  rows carry `aria-selected`; the drive table itself is `getByRole('grid')`);
 - toast library classes — toasts are inside `getByTestId('toast-host')`;
 - generated or framework ids — `#agreements-modal` became
   `getByTestId('agreements-modal')`;

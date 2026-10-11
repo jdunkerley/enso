@@ -60,6 +60,96 @@ test('drive: no new axe violations; drive table header tree', async ({ drivePage
     })
 })
 
+test('drive table: a grid with row positions, selection and one roving tab stop', async ({
+  drivePage,
+  cloudApi,
+}) => {
+  cloudApi.addDirectory({ title: 'Folder' })
+  cloudApi.addProject({ title: 'Project' })
+  cloudApi.addFile({ title: 'File' })
+  await drivePage.goToCategory
+    .cloud()
+    .driveTable.clickRow('Folder')
+    .withAssetsTable(async (table, _context, page) => {
+      await expect(table).toHaveAttribute('aria-multiselectable', 'true')
+      await expect(table).toMatchAriaSnapshot(`
+        - grid "${TEXT.assetsTableLabel}":
+          - rowgroup:
+            - row
+          - rowgroup:
+            - row /Folder/ [selected]
+            - row /Project/
+            - row /File/
+      `)
+      const rows = table.getByTestId('asset-row')
+      await expect(rows).toHaveCount(3)
+      for (const [index, row] of (await rows.all()).entries()) {
+        await expect(row).toHaveAttribute('aria-rowindex', String(index + 2))
+      }
+      // The row focused last is the one tab stop; the controls in the other rows are out of the
+      // Tab sequence too.
+      await expect(table.locator('[tabindex="0"]')).toHaveCount(1)
+      await expect(rows.nth(0)).toHaveAttribute('tabindex', '0')
+      await expect(rows.nth(0)).toBeFocused()
+
+      await page.keyboard.press('ArrowDown')
+      await expect(rows.nth(1)).toBeFocused()
+      await expect(rows.nth(1)).toHaveAttribute('aria-selected', 'true')
+      await expect(rows.nth(0)).toHaveAttribute('aria-selected', 'false')
+      await expect(rows.nth(1)).toHaveAttribute('tabindex', '0')
+      await expect(rows.nth(0)).toHaveAttribute('tabindex', '-1')
+      await expect(rows.nth(0).getByTestId('directory-row-navigate-button')).toHaveAttribute(
+        'tabindex',
+        '-1',
+      )
+
+      // Escape clears the selection; the arrow keys go on from the focused row.
+      await page.keyboard.press('Escape')
+      await expect(table.getByRole('row', { selected: true })).toHaveCount(0)
+      await page.keyboard.press('ArrowDown')
+      await expect(rows.nth(2)).toBeFocused()
+      await expect(rows.nth(2)).toHaveAttribute('aria-selected', 'true')
+
+      // Back up to the directory: its own controls rejoin the Tab sequence with it.
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
+      await expect(rows.nth(0)).toBeFocused()
+      await expect(rows.nth(0).getByTestId('directory-row-navigate-button')).not.toHaveAttribute(
+        'tabindex',
+        '-1',
+      )
+      await expect(table.locator('[tabindex="0"]')).toHaveCount(1)
+    })
+})
+
+test('drive table: dragging rows is announced', async ({ drivePage, cloudApi }) => {
+  cloudApi.addDirectory({ title: 'Folder' })
+  cloudApi.addFile({ title: 'File' })
+  await drivePage.goToCategory
+    .cloud()
+    .driveTable.dragRowToRow('File', 'Folder')
+    .do(async (page) => {
+      await expect(page.getByTestId('drive-drag-announcement')).toHaveText(
+        TEXT.dragAnnouncementDroppedInto
+          .replace('$0', TEXT.dragAnnouncementOneAsset.replace('$0', 'File'))
+          .replace('$1', 'Folder'),
+      )
+    })
+    .driveTable.withRows(async (rows) => {
+      await expect(rows).toHaveText([/^Folder/])
+    })
+    // A drop outside the table is named by its target's accessible name.
+    .driveTable.clickRow('Folder')
+    .driveTable.dragRowToCategory('Folder', 'Trash')
+    .do(async (page) => {
+      await expect(page.getByTestId('drive-drag-announcement')).toHaveText(
+        TEXT.dragAnnouncementDroppedOn
+          .replace('$0', TEXT.dragAnnouncementOneAsset.replace('$0', 'Folder'))
+          .replace('$1', 'Trash'),
+      )
+    })
+})
+
 test('asset panel: no new axe violations', async ({ drivePage, cloudApi }) => {
   cloudApi.addProject({ title: 'Project', description: 'A description' })
   await drivePage.goToCategory

@@ -26,7 +26,9 @@ only Dashboard-specific code.
   modal stack (`$/providers/modals`), the labels, credential and datalink ones
   from `$/cloud/` (#198). Buttons inside a row bind `STOP_PRESS_PROPAGATION`
   (`layouts/Drive/pressPropagation.ts`), so that a press on them does not reach
-  the row. `layouts/Settings/` is the settings page.
+  the row. The table is an ARIA `grid` with one roving tab stop, and drags of
+  rows are announced in a live region (#208); `layouts/Drive/CLAUDE.md` has the
+  model. `layouts/Settings/` is the settings page.
 - `components/` — The drive's `ContextMenu.vue`. Shared primitives are in
   `src/components/`.
 - `modals/` — `CaptureKeyboardShortcutModal.vue`. The drive's other dialogs are

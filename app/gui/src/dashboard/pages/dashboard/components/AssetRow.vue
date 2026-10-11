@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
  * @file A row of the drive's table: the Vue port of React's `AssetRow`, with its `asset-row` test
- * id, `aria-selected` and `data-selected`.
+ * id, `aria-selected` and `data-selected`. In the table's `grid` it carries its position
+ * (`aria-rowindex`) and, when it is the grid's tab stop, `tabindex="0"`: every other row, and the
+ * controls inside it, are out of the Tab sequence.
  *
  * The row is the drag source of the selection and a drop target: dropped rows move into it (or its
  * parent, for a file), dropped files upload there, and assets held over a directory for two seconds
@@ -13,6 +15,7 @@
 import { ASSET_ROWS } from '#/layouts/Drive/drag'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useDriveView } from '#/layouts/Drive/driveView'
+import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import AssetColumnCell from '#/pages/dashboard/components/column/AssetColumnCell.vue'
 import { COLUMN_CSS_CLASS, type Column } from '#/pages/dashboard/components/column/columnUtils'
 import { directoryNavigationSource } from '#/pages/dashboard/components/column/nameColumn'
@@ -44,6 +47,12 @@ const props = defineProps<{
   columns: readonly Column[]
   labels: readonly Label[]
   isKeyboardSelected: boolean
+  /** Whether the row is the grid's one tab stop. */
+  isTabStop: boolean
+  /** The row's `aria-rowindex`: its position in the grid, counting the header row as 1. */
+  rowIndex: number
+  /** Focus has entered the row (the row itself or a control in it). */
+  onRowFocus: (item: AnyAsset) => void
   /** Whether a deletion of this asset is in flight. */
   isDeleting: boolean
   /** Whether a restoration of this asset from the trash is in flight. */
@@ -92,6 +101,7 @@ const visibility = computed(() =>
 )
 
 const root = ref<HTMLTableRowElement>()
+useTabStopContents(root, () => props.isTabStop)
 const isDraggedOver = ref(false)
 
 /**
@@ -101,6 +111,7 @@ const isDraggedOver = ref(false)
 const isDraggable = ref(true)
 function onFocusIn(event: FocusEvent) {
   if (isElementTextInput(event.target)) isDraggable.value = false
+  props.onRowFocus(props.item)
 }
 function onFocusOut() {
   isDraggable.value = true
@@ -270,13 +281,14 @@ function onDrop(event: DragEvent) {
   <tr
     ref="root"
     data-testid="asset-row"
-    tabindex="0"
+    :tabindex="isTabStop ? 0 : -1"
+    :aria-rowindex="rowIndex"
     :data-selected="isSelected"
     :aria-selected="isSelected"
     :data-id="item.id"
     :class="
       twMerge(
-        'h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
+        'AssetRow h-table-row rounded-full transition-all ease-in-out rounded-rows-child',
         visibility,
         (isDraggedOver || isSelected) && 'selected',
       )
@@ -304,3 +316,36 @@ function onDrop(event: DragEvent) {
     </td>
   </tr>
 </template>
+
+<style scoped>
+/*
+ * The focus ring of a row reached with the keyboard. An outline on the row would be hidden under the
+ * sticky name cell, so each cell draws its part of a pill-shaped ring as an inset shadow.
+ */
+.AssetRow:focus-visible > td {
+  --ring: var(--color-primary);
+  box-shadow:
+    inset 0 2px 0 0 var(--ring),
+    inset 0 -2px 0 0 var(--ring);
+}
+
+.AssetRow:focus-visible > td:first-child {
+  border-top-left-radius: 9999px;
+  border-bottom-left-radius: 9999px;
+  box-shadow:
+    inset 2px 0 0 0 var(--ring),
+    inset 0 2px 0 0 var(--ring),
+    inset 0 -2px 0 0 var(--ring);
+}
+
+.AssetRow:focus-visible > td:last-child {
+  box-shadow:
+    inset -2px 0 0 0 var(--ring),
+    inset 0 2px 0 0 var(--ring),
+    inset 0 -2px 0 0 var(--ring);
+}
+
+.AssetRow:focus-visible > td:only-child {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+</style>
