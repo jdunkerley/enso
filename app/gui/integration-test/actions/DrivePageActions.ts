@@ -66,9 +66,23 @@ function locateSecretValueInput(page: Page) {
   return locateUpsertSecretModal(page).getByPlaceholder(TEXT.secretValuePlaceholder)
 }
 
-/** Find a radio button that navigates to specified drive category. */
-function locateCategoryButton(page: Page, category: string): Locator {
-  return page.locator('.LeftPanel .leftBar').getByRole('button', { name: category, exact: true })
+/** The sidebar's group of categories: the cloud's or the local ones. */
+type CategoryGroup = 'cloud' | 'local'
+
+/** The group of the category with the given `categoryKey`. */
+function categoryGroup(key: string): CategoryGroup {
+  return key.startsWith('local') ? 'local' : 'cloud'
+}
+
+/**
+ * Find a radio button that navigates to specified drive category. Both groups have a "Recent", so
+ * the button is looked for in its group.
+ */
+function locateCategoryButton(page: Page, category: string, group: CategoryGroup): Locator {
+  return page
+    .locator('.LeftPanel .leftBar .categories')
+    .nth(group === 'cloud' ? 0 : 1)
+    .getByRole('button', { name: category, exact: true })
 }
 
 /** Actions for the "drive" page. */
@@ -89,6 +103,7 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
     cloud: () => this.goToCategoryNamed('Cloud', 'cloud'),
     local: () => this.goToCategoryNamed('Local', 'local'),
     recent: () => this.goToCategoryNamed('Recent', 'recent'),
+    localRecent: () => this.goToCategoryNamed('Recent', 'localRecent'),
     trash: () => this.goToCategoryNamed('Trash', 'trash'),
   }
 
@@ -105,13 +120,13 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
    */
   goToCategoryNamed(this: DrivePageActions<Context>, category: string, key: string) {
     return this.step(`Go to "${category}" category`, async (page) => {
-      await locateCategoryButton(page, category).click()
+      await locateCategoryButton(page, category, categoryGroup(key)).click()
       // Move the cursor off the leftBar so its `mouseenter`-triggered auto-expand
       // timer is cleared and any in-flight expansion collapses. The expanded leftBar
       // (~150px wide, `position: absolute; z-index: 2`) otherwise covers the leftmost
       // toolbar/table buttons and intercepts subsequent clicks.
       await page.mouse.move(0, 0)
-      await this.expectCategory(category)
+      await this.expectCategory(category, categoryGroup(key))
       // The sidebar marks the new category at once, but the drive view keeps showing the old one
       // (`layouts/Drive/driveView.ts`): until the new category has loaded, the previous one's rows
       // stay on screen and take clicks. Wait for no drive view still showing another category (the
@@ -123,9 +138,12 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
   }
 
   /** Expect the category to be selected. */
-  expectCategory(category: string) {
+  expectCategory(
+    category: string,
+    group: CategoryGroup = category === 'Local' ? 'local' : 'cloud',
+  ) {
     return this.step(`Expect category '${category}'`, (page) =>
-      expect(locateCategoryButton(page, category)).toContainClass('toggledOn'),
+      expect(locateCategoryButton(page, category, group)).toContainClass('toggledOn'),
     )
   }
 
@@ -268,9 +286,11 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
         return self.step(
           `Drag drive table row '${row}' to '${category}' category`,
           async (page) => {
-            const categoryElement = page
-              .locator('.LeftPanel .leftBar')
-              .getByRole('button', { name: category, exact: true })
+            const categoryElement = locateCategoryButton(
+              page,
+              category,
+              category === 'Local' ? 'local' : 'cloud',
+            )
 
             await getRow(page, row).dragTo(categoryElement, {
               sourcePosition: ASSET_ROW_SAFE_POSITION,

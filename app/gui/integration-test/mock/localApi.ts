@@ -17,6 +17,7 @@ import {
   type ProjectEntry,
   type ProjectMetadata,
   type ProjectState,
+  type RecentProjectEntry,
 } from 'enso-common/src/services/ProjectManager/types'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { unsafeMutable } from 'enso-common/src/utilities/data/object'
@@ -45,6 +46,8 @@ function array<T>(): Readonly<T>[] {
 const ROOT_PARENT_PATH = Path('/home/user/enso')
 const ROOT_PATH = Path('/home/user/enso/enso-projects')
 const DOWNLOAD_PATH = Path('/home/user/enso/Downloads')
+/** The shim's cap on the Recent list (`RECENT_LIMIT` in `localMetadata`). */
+const RECENT_LIMIT = 20
 
 const languageServerJsonAddress = { host: '127.0.0.1', port: 1235 }
 const languageServerYdocAddress = { host: '127.0.0.1', port: 1233 }
@@ -104,6 +107,8 @@ export async function mockLocalApi(page: Page) {
 
   const fileSystem = new Map<string, FileSystemEntryWithData>()
   const openProjects = new Map<UUID, ProjectState>()
+  /** The Recent list, newest first, as the shim's `recent.json` keeps it. */
+  let recentProjects: RecentProjectEntry[] = []
   /** The sessions every local project reports, as the engine's log files would list them. */
   const projectSessions: { projectSessionId: string; createdAt: string }[] = []
 
@@ -465,6 +470,61 @@ export async function mockLocalApi(page: Page) {
       }
     })
 
+    // The local Recent list, as the shim's `localMetadata` keeps it.
+    const recentProjectAt = (path: string) => {
+      const entry = fileSystem.get(path)
+      return entry?.type === 'ProjectEntry' ? entry : null
+    }
+    const isLiveRecentEntry = (entry: RecentProjectEntry) =>
+      recentProjectAt(entry.path)?.entry.metadata.id === entry.projectId
+
+    await page.route('/api/project-service/recent/list', async (route, request) => {
+      if (request.method() !== 'POST') {
+        return route.fulfill({ status: 400 })
+      }
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(toJSONRPCResult(recentProjects.filter(isLiveRecentEntry))),
+      })
+    })
+
+    await page.route('/api/project-service/recent/record', async (route, request) => {
+      if (request.method() !== 'POST') {
+        return route.fulfill({ status: 400 })
+      }
+      const { path }: { path: Path } = JSON.parse(request.postData() ?? '{}')
+      const project = recentProjectAt(path)
+      if (project == null) {
+        return route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(toJSONRPCError(`No project at '${path}'`)),
+        })
+      }
+      const projectId = project.entry.metadata.id
+      recentProjects = [
+        { path, projectId, openedAt: toRfc3339(new Date()) },
+        ...recentProjects.filter(
+          (entry) => entry.projectId !== projectId && isLiveRecentEntry(entry),
+        ),
+      ].slice(0, RECENT_LIMIT)
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(toJSONRPCResult(null)),
+      })
+    })
+
+    await page.route('/api/project-service/recent/forget', async (route, request) => {
+      if (request.method() !== 'POST') {
+        return route.fulfill({ status: 400 })
+      }
+      const { path }: { path: Path } = JSON.parse(request.postData() ?? '{}')
+      recentProjects = recentProjects.filter((entry) => entry.path !== path)
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(toJSONRPCResult(null)),
+      })
+    })
+
     await page.route('/api/root-directory-path', async (route, request) => {
       called('getRootDirectory', {})
       if (request.method() !== 'GET') {
@@ -660,6 +720,7 @@ export async function mockLocalApi(page: Page) {
             return fail('No destination path provided')
           }
           moveEntry(Path(sourcePath), Path(destinationPath))
+          recentPathMoved(sourcePath, destinationPath)
           return succeed({})
         }
         case 'list-project-sessions': {
@@ -680,11 +741,42 @@ export async function mockLocalApi(page: Page) {
             return fail(`Item does not exist at '${path}'`)
           }
           removeEntry(Path(path))
+          recentPathDeleted(path)
           return succeed({})
         }
       }
     })
   })
+
+  /** Whether `path` is `ancestor` or inside it. */
+  function isAtOrUnder(path: string, ancestor: string) {
+    return path === ancestor || path.startsWith(`${ancestor}/`)
+  }
+
+  /** Rewrite the Recent entries at or under a moved path, as the shim does. */
+  function recentPathMoved(from: string, to: string) {
+    recentProjects = recentProjects.map((entry) =>
+      isAtOrUnder(entry.path, from) ?
+        { ...entry, path: Path(`${to}${entry.path.slice(from.length)}`) }
+      : entry,
+    )
+  }
+
+  /** Forget the Recent entries at or under a deleted path, as the shim does. */
+  function recentPathDeleted(deletedPath: string) {
+    recentProjects = recentProjects.filter((entry) => !isAtOrUnder(entry.path, deletedPath))
+  }
+
+  /** Put the project at `path` at the top of the Recent list, as opening it would. */
+  function addRecentProject(path: Path) {
+    const project = fileSystem.get(path)
+    if (project?.type !== 'ProjectEntry') throw new Error(`No project at '${path}'`)
+    const projectId = project.entry.metadata.id
+    recentProjects = [
+      { path, projectId, openedAt: toRfc3339(new Date()) },
+      ...recentProjects.filter((entry) => entry.projectId !== projectId),
+    ]
+  }
 
   /** Add a session that every local project will report. */
   function addProjectSession(createdAt: string) {
@@ -704,6 +796,9 @@ export async function mockLocalApi(page: Page) {
     removeEntry,
     addProjectSession,
     updateVisualization,
+    addRecentProject,
+    /** The paths in the Recent list, newest first, whether or not a project is still there. */
+    recentProjectPaths: () => recentProjects.map((entry) => entry.path),
   } as const
 
   return api
