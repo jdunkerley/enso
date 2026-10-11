@@ -19,6 +19,11 @@
       "types": "./dist/handler/index.d.ts",
       "import": "./dist/handler/index.js"
     },
+    "./localMetadata": {
+      "source": "./src/localMetadata/index.ts",
+      "types": "./dist/localMetadata/index.d.ts",
+      "import": "./dist/localMetadata/index.js"
+    },
     "./projectService": {
       "source": "./src/projectService/index.ts",
       "types": "./dist/projectService/index.d.ts",
