@@ -143,6 +143,12 @@
   another action already uses in the same place is refused, with that action
   named. The command palette lists the graph editor's actions too, with your
   shortcuts. Shortcuts you changed before are kept.
+- [Screen readers can use the drive's file list][219]. It is announced as a
+  grid, with each row's position and whether it is selected, and Tab reaches it
+  once: the arrow keys move within it, and Tab moves on. The row you reach with
+  the keyboard is outlined. Dragging files and folders is announced too: what is
+  being moved, and where it was dropped or that the move was cancelled. To move
+  items with the keyboard alone, cut them and paste them into a folder.
 
 #### Enso Language & Runtime
 
@@ -279,6 +285,7 @@
 [186]: https://github.com/jdunkerley/enso/pull/186
 [174]: https://github.com/jdunkerley/enso/pull/174
 [188]: https://github.com/jdunkerley/enso/pull/188
+[219]: https://github.com/jdunkerley/enso/pull/219
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

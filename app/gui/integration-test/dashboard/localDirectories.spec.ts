@@ -15,7 +15,7 @@ const BROWSED_ROOT = '/path/to/some/mock/file'
 const BROWSED_ROOT_ENTRY = 'Folder In Browsed Root'
 
 const driveRows = (page: Page) =>
-  page.getByTestId('drive-view').getByRole('table').getByTestId('asset-row')
+  page.getByTestId('drive-view').getByRole('grid').getByTestId('asset-row')
 const settingsPanel = (page: Page) => page.getByTestId('settings-panel')
 
 test('the Local category follows the root folder set in Settings', async ({
