@@ -18,8 +18,10 @@ import {
   MissingComponentAction,
   Path,
   type CloseProjectParams,
+  type CreateLabelParams,
   type CreateProject,
   type CreateProjectParams,
+  type DeleteLabelParams,
   type DeleteProjectParams,
   type DuplicatedProject,
   type DuplicateProjectParams,
@@ -28,7 +30,9 @@ import {
   type OpenProject,
   type OpenProjectParams,
   type ProjectState,
+  type RecentProjectEntry,
   type RenameProjectParams,
+  type SetProjectLabelsParams,
   type UUID,
 } from './types.js'
 
@@ -408,6 +412,51 @@ export class ProjectManager {
   /** Download all log content for a local project session. */
   async downloadProjectSessionLogs(sessionId: string) {
     return this.runStandaloneCommandJson<string>(null, 'download-project-session-logs', sessionId)
+  }
+
+  /** List the local label definitions. */
+  async listLabels(): Promise<readonly backend.Label[]> {
+    return this.runProjectServiceCommand('labels/list', {})
+  }
+
+  /**
+   * Create a local label.
+   * @throws {Error} when a label with the same value already exists.
+   */
+  async createLabel(params: CreateLabelParams): Promise<backend.Label> {
+    return this.runProjectServiceCommand('labels/create', params)
+  }
+
+  /** Delete a local label. Projects carrying its name stop listing it. */
+  async deleteLabel(params: DeleteLabelParams): Promise<void> {
+    await this.runProjectServiceCommand('labels/delete', params)
+  }
+
+  /** Replace the labels of a local project. */
+  async setProjectLabels(params: SetProjectLabelsParams): Promise<void> {
+    await this.runProjectServiceCommand('project/set-labels', {
+      path: params.projectPath,
+      labels: params.labels,
+    })
+  }
+
+  /** The recently opened local projects that still exist, newest first. */
+  async listRecentProjects(): Promise<readonly RecentProjectEntry[]> {
+    const entries: readonly RecentProjectEntry[] = await this.runProjectServiceCommand(
+      'recent/list',
+      {},
+    )
+    return entries.map((entry) => ({ ...entry, path: normalizeSlashes(entry.path) }))
+  }
+
+  /** Record that the local project at `projectPath` was opened. */
+  async recordRecentProject(projectPath: Path): Promise<void> {
+    await this.runProjectServiceCommand('recent/record', { path: projectPath })
+  }
+
+  /** Remove the local project at `projectPath` from the recently opened projects. */
+  async forgetRecentProject(projectPath: Path): Promise<void> {
+    await this.runProjectServiceCommand('recent/forget', { path: projectPath })
   }
 
   /** Run the Project Manager binary with the given command-line arguments. */
