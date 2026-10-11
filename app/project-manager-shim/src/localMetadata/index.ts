@@ -148,7 +148,7 @@ export class LocalMetadata implements ProjectLifecycleListener {
   async resolveLabelNames(names: Iterable<string>): Promise<ReadonlySet<string>> {
     const wanted = new Set(names)
     return this.modifyLabels((file) => {
-      const live = new Set(file.labels.map((label) => label.value))
+      const live = new Set<string>(file.labels.map((label) => label.value))
       const deleted = new Set(file.deletedNames)
       const added: Label[] = []
       for (const name of wanted) {

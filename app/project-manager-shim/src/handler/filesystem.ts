@@ -9,6 +9,8 @@ import * as zlib from 'node:zlib'
 import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
 import * as yaml from 'yaml'
 import { getEngineLogDirectory } from '../distributionManager.js'
+import type { LocalMetadata } from '../localMetadata/index.js'
+import { updateJsonFile } from '../localMetadata/jsonFile.js'
 import * as projectManagement from '../projectManagement.js'
 import { resolveClashingProjectIds } from '../projectService/resolveClashingProjectIds.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
@@ -37,6 +39,11 @@ export interface ProjectMetadata {
   readonly created: string
   /** The last opened datetime. */
   readonly lastOpened?: string
+  /**
+   * Names of the project's labels. Only listings served with a {@link LocalMetadata} store carry
+   * this, and it then holds only names of existing labels.
+   */
+  readonly labels?: readonly string[]
 }
 
 // ==================
@@ -156,10 +163,38 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-/** Handle filesystem commands */
+/** The label names stored in a parsed `project.json`, ignoring anything malformed. */
+function extractProjectLabels(jsonObj: unknown): readonly string[] {
+  if (typeof jsonObj !== 'object' || jsonObj == null || !('labels' in jsonObj)) return []
+  const labels = jsonObj.labels
+  return Array.isArray(labels) ?
+      labels.filter((label): label is string => typeof label === 'string')
+    : []
+}
+
+/**
+ * Run a {@link LocalMetadata} update that follows a filesystem change. The change itself has
+ * already succeeded, so a failure here is logged rather than reported.
+ */
+async function followInLocalMetadata(update: (() => Promise<void>) | undefined): Promise<void> {
+  if (update == null) return
+  try {
+    await update()
+  } catch (error) {
+    console.error('Failed to update local metadata:', error)
+  }
+}
+
+/**
+ * Handle filesystem commands.
+ *
+ * With `localMetadata`, directory listings carry each project's labels, and the Recent list
+ * follows moves and deletes.
+ */
 export async function handleFilesystemCommand(
   cliArguments: string[],
   request: http.IncomingMessage,
+  localMetadata?: LocalMetadata,
 ): Promise<string | fsSync.ReadStream> {
   let result: string | fsSync.ReadStream = toJSONRPCError(
     `Error running Project Manager command.`,
@@ -185,6 +220,7 @@ export async function handleFilesystemCommand(
         if (directoryPath == null) break
         const directoryPathQueue = [directoryPath]
         const entries: FileSystemEntry[] = []
+        const projectLabels = new Map<string, readonly string[]>()
         while (true) {
           const currentDirectoryPath = directoryPathQueue.shift()
           if (currentDirectoryPath == null) break
@@ -193,7 +229,11 @@ export async function handleFilesystemCommand(
             entryNames.map(async (entryName) => {
               const entryPath = path.join(currentDirectoryPath, entryName)
               if (isFileHidden(entryPath)) return []
-              return [await getFileSystemEntry(entryPath)]
+              const { entry, labels } = await readFileSystemEntry(entryPath)
+              if (entry.type === FileSystemEntryType.ProjectEntry) {
+                projectLabels.set(entry.path, labels)
+              }
+              return [entry]
             }),
           )
           const resolvedEntries = await resolveClashingProjectEntryIds(fileEntries.flat())
@@ -204,7 +244,10 @@ export async function handleFilesystemCommand(
             }
           }
         }
-        result = toJSONRPCResult({ entries })
+        result = toJSONRPCResult({
+          entries:
+            localMetadata ? await withLabels(entries, projectLabels, localMetadata) : entries,
+        })
         break
       }
       case '--filesystem-create-directory': {
@@ -244,6 +287,9 @@ export async function handleFilesystemCommand(
         )
           break
         await fs.rename(sourcePath, destinationPath)
+        await followInLocalMetadata(
+          localMetadata && (() => localMetadata.pathMoved(sourcePath, destinationPath)),
+        )
         result = toJSONRPCResult(null)
         break
       }
@@ -251,6 +297,9 @@ export async function handleFilesystemCommand(
         const fileOrDirectoryPath = cliArguments[1]
         if (fileOrDirectoryPath == null) break
         await fs.rm(fileOrDirectoryPath, { recursive: true })
+        await followInLocalMetadata(
+          localMetadata && (() => localMetadata.pathDeleted(fileOrDirectoryPath)),
+        )
         result = toJSONRPCResult(null)
         break
       }
@@ -306,9 +355,10 @@ async function resolveClashingProjectEntryIds(entries: readonly FileSystemEntry[
       project.entry.path,
       projectManagement.PROJECT_METADATA_RELATIVE_PATH,
     )
-    const projectMetadata = JSON.parse(await fs.readFile(projectMetadataPath, 'utf-8'))
-    projectMetadata.id = newId
-    await fs.writeFile(projectMetadataPath, JSON.stringify(projectMetadata, null, 2))
+    await updateJsonFile(projectMetadataPath, (current) => ({
+      ...(typeof current === 'object' && current != null ? current : {}),
+      id: newId,
+    }))
     return {
       ...project,
       id: newId,
@@ -331,8 +381,40 @@ async function resolveClashingProjectEntryIds(entries: readonly FileSystemEntry[
   )
 }
 
+/**
+ * Set `labels` on every project entry to its stored names that are live labels. Unknown names are
+ * added to the store's label definitions.
+ */
+async function withLabels(
+  entries: readonly FileSystemEntry[],
+  projectLabels: ReadonlyMap<string, readonly string[]>,
+  localMetadata: LocalMetadata,
+): Promise<FileSystemEntry[]> {
+  const live = await localMetadata.resolveLabelNames([...projectLabels.values()].flat())
+  return entries.map((entry) =>
+    entry.type === FileSystemEntryType.ProjectEntry ?
+      {
+        ...entry,
+        metadata: {
+          ...entry.metadata,
+          labels: [...new Set(projectLabels.get(entry.path) ?? [])].filter((name) =>
+            live.has(name),
+          ),
+        },
+      }
+    : entry,
+  )
+}
+
 /** Get a file system entry for a given path. */
 export async function getFileSystemEntry(entryPath: string): Promise<FileSystemEntry> {
+  return (await readFileSystemEntry(entryPath)).entry
+}
+
+/** Read a file system entry, and for a project the label names stored in its `project.json`. */
+async function readFileSystemEntry(
+  entryPath: string,
+): Promise<{ readonly entry: FileSystemEntry; readonly labels: readonly string[] }> {
   const stat = await fs.stat(entryPath)
   const attributes: Attributes = {
     byteSize: stat.size,
@@ -342,9 +424,12 @@ export async function getFileSystemEntry(entryPath: string): Promise<FileSystemE
   }
   if (stat.isFile()) {
     return {
-      type: FileSystemEntryType.FileEntry,
-      path: entryPath,
-      attributes,
+      entry: {
+        type: FileSystemEntryType.FileEntry,
+        path: entryPath,
+        attributes,
+      },
+      labels: [],
     }
   } else {
     try {
@@ -377,10 +462,13 @@ export async function getFileSystemEntry(entryPath: string): Promise<FileSystemE
       if (metadata != null) {
         // This is a project.
         return {
-          type: FileSystemEntryType.ProjectEntry,
-          path: entryPath,
-          attributes,
-          metadata,
+          entry: {
+            type: FileSystemEntryType.ProjectEntry,
+            path: entryPath,
+            attributes,
+            metadata,
+          },
+          labels: extractProjectLabels(projectMetadataJson),
         }
       } else {
         // This error moves control flow to the
@@ -390,9 +478,12 @@ export async function getFileSystemEntry(entryPath: string): Promise<FileSystemE
     } catch {
       // This is a regular directory, not a project.
       return {
-        type: FileSystemEntryType.DirectoryEntry,
-        path: entryPath,
-        attributes,
+        entry: {
+          type: FileSystemEntryType.DirectoryEntry,
+          path: entryPath,
+          attributes,
+        },
+        labels: [],
       }
     }
   }
