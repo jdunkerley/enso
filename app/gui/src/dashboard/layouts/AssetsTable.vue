@@ -115,6 +115,7 @@ import {
   isAssetCredential,
   isUnauthorizedError,
   LabelName,
+  supportsAnyLabels,
   type AnyAsset,
   type AssetSortExpression,
   type DirectoryId,
@@ -165,7 +166,12 @@ const user = computed(() => {
   return value
 })
 
-const labelsQuery = useQuery(computed(() => backendQueryOptions(backend.value, 'listTags', [])))
+const supportsLabels = computed(() => supportsAnyLabels(backend.value))
+const labelsQuery = useQuery(
+  computed(() =>
+    backendQueryOptions(backend.value, 'listTags', [], { enabled: supportsLabels.value }),
+  ),
+)
 const usersQuery = useQuery(computed(() => backendQueryOptions(backend.value, 'listUsers', [])))
 const userGroupsQuery = useQuery(
   computed(() => backendQueryOptions(backend.value, 'listUserGroups', [])),
@@ -181,7 +187,13 @@ watch(enabledColumns, (columns) => localStorage.set('enabledColumns', [...column
   immediate: true,
 })
 const allowedColumns = computed(() =>
-  getColumnList(user.value.plan, backend.value.type, category.value.type, query.query !== ''),
+  getColumnList(
+    user.value.plan,
+    backend.value.type,
+    category.value.type,
+    query.query !== '',
+    supportsLabels.value,
+  ),
 )
 const columns = computed(() =>
   allowedColumns.value.filter((column) => enabledColumns.value.has(column)),

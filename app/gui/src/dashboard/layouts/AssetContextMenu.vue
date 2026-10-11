@@ -310,7 +310,8 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
           else openedProjects.closeProject(asset.id, { asset, backendType: backend.value.type })
         },
       },
-    isCloud.value && {
+    // Trash returned its own entries above.
+    backend.value.supportsLabels(asset.type) && {
       action: 'label',
       doAction: () => {
         // It replaces the open modals. It is anchored to the asset's row, and focus returns there.
