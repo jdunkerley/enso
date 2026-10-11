@@ -1,6 +1,5 @@
 /**
- * @file Where focus goes when a dialog without a trigger opens and closes, as react-aria decides
- * for the React dialogs.
+ * @file Where focus goes when a dialog without a trigger opens and closes.
  *
  * - **On open,** the dialog itself takes focus (it has `tabindex="-1"`), not its first button: the
  *   first Tab then reaches the first control. An input with `autoFocus` still takes focus, after
@@ -8,8 +7,7 @@
  * - **On close,** focus returns to the element that opened the dialog. When that element has gone,
  *   because it was an item in a menu that closed as the dialog opened (the user menu's "About
  *   Enso"), focus returns to the trigger of that menu instead (see {@link popupTrigger}).
- *   This is the step react-aria's chain of focus scopes takes; Reka, without it, leaves focus on
- *   the page's body.
+ *   Reka, without this step, leaves focus on the page's body.
  *
  * A dialog with a trigger keeps Reka's own behaviour, which returns focus to the trigger.
  */
@@ -19,7 +17,7 @@ import { toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue'
  * The trigger of the popup that contains `element`, if any: the element whose `aria-controls` names
  * the popup or one of its ancestors; failing that, for an element in a portalled popup, the one
  * open popup trigger (`aria-expanded="true"` with `aria-controls`) outside the portal root.
- * (react-aria's `DialogTrigger` names an id in `aria-controls` that the popover does not render.)
+ * (The fallback covers a trigger whose `aria-controls` names an id that the popup does not render.)
  */
 function popupTrigger(element: Element | null): HTMLElement | null {
   for (let node = element; node != null; node = node.parentElement) {
@@ -67,7 +65,7 @@ export function useDialogFocus(
     { flush: 'sync', immediate: true },
   )
 
-  /** Focus the dialog itself, as react-aria's `useDialog` does. */
+  /** Focus the dialog itself. */
   function onOpenAutoFocus(event: Event) {
     if (hasTrigger()) return
     if (event.target instanceof HTMLElement) {
@@ -104,8 +102,8 @@ export function returnFocus(event: Event, target: FocusReturnTarget) {
 
 /**
  * A `mousedown` handler for a modal dialog's overlay: a press on the backdrop (the overlay, outside
- * the dialog itself) keeps focus where it is, inside the dialog, as react-aria's modal did. The
- * browser would otherwise move focus to the page's body, out of the dialog's focus trap.
+ * the dialog itself) keeps focus where it is, inside the dialog. The browser would otherwise move
+ * focus to the page's body, out of the dialog's focus trap.
  */
 export function keepFocusOnBackdropPress(event: MouseEvent) {
   const target = event.target

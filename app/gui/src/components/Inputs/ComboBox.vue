@@ -1,19 +1,20 @@
 <script setup lang="ts" generic="T">
 /**
- * @file A combo box bound to a form field: a text input that filters a list of items, the Vue
- * counterpart of the React `ComboBox`, styled by the same `COMBO_BOX_STYLES` and `INPUT_STYLES`.
+ * @file A combo box bound to a form field: a text input that filters a list of items, styled by
+ * `COMBO_BOX_STYLES` and `INPUT_STYLES`.
  *
- * It is a Reka `Combobox`, which gives what react-aria's did: `role="combobox"` with
- * `aria-expanded` and `aria-controls`, typing filters and opens the list, ArrowDown/ArrowUp open it
- * and move through it, Enter selects, Escape closes it. The chevron button opens it too, and the
- * `x` button clears the typed text (unless `noResetButton`).
+ * It is a Reka `Combobox`: `role="combobox"` with `aria-expanded` and `aria-controls`, typing
+ * filters and opens the list, ArrowDown/ArrowUp open it and move through it, Enter selects, Escape
+ * closes it. The chevron button opens it too, and the `x` button clears the typed text (unless
+ * `noResetButton`).
  *
  * Escape closes the list first (the WAI-ARIA combobox pattern), and the next Escape the dialog or
  * popover around it, even while the list is still fading out (see {@link onEscapeCapture}).
  *
  * The field holds the item itself. Each item needs a unique text: `toKey`, else `toTextValue`,
  * else the item when it is a string. `toTextValue` is what typing filters by; `toOptionText` what
- * an option shows, if different; `toTooltip` what the option's tooltip shows. The default slot (`{ item }`) renders an option; without it, the text.
+ * an option shows, if different; `toTooltip` what the option's tooltip shows. The default slot
+ * (`{ item }`) renders an option; without it, the text.
  */
 import Button from '$/components/Button/Button.vue'
 import { POPOVER_MOTION, POPOVER_STYLES } from '$/components/Dialog/variants'
@@ -51,7 +52,7 @@ const props = withDefaults(
     toKey?: ((item: T) => string) | undefined
     toTextValue?: ((item: T) => string) | undefined
     toTooltip?: ((item: T) => string) | undefined
-    /** The text an option shows, when not its `toTextValue`. React's `children` returning a string. */
+    /** The text an option shows, when not its `toTextValue`. */
     toOptionText?: ((item: T) => string) | undefined
     defaultValue?: T | undefined
     label?: string | undefined
@@ -98,8 +99,8 @@ function onEscapeCapture() {
 }
 
 /**
- * On opening, scroll the selected item to the top of the list, as react-aria did. Reka scrolls it
- * only as far as needed (to the bottom), after the list has rendered.
+ * On opening, scroll the selected item to the top of the list. Reka scrolls it only as far as
+ * needed (to the bottom), after the list has rendered.
  */
 function onOpenChange(open: boolean) {
   isOpen.value = open
@@ -171,8 +172,8 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
     >
       <ComboboxAnchor :class="styles.inputContainer()">
         <!-- The field's `<label>` wraps this button, and it is the first control in it, so hovering
-        anywhere on the field hovers it too (`:hover` reaches a label's control). React styled real
-        pointer hovers only (react-aria's `data-hovered`), and so does this. -->
+        anywhere on the field hovers it too (`:hover` reaches a label's control). So it is styled
+        for real pointer hovers only (`data-hovered`). -->
         <ComboboxTrigger asChild>
           <Button
             variant="icon"
@@ -214,7 +215,7 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
             </div>
           </div>
         </div>
-        <!-- In the tab order, as react-aria's was; Reka takes it out. -->
+        <!-- Kept in the tab order, which Reka would take it out of. -->
         <ComboboxCancel v-if="!noResetButton" asChild>
           <Button
             variant="icon"
@@ -226,11 +227,11 @@ const accessibleName = computed(() => props.ariaLabel ?? props.label ?? 'Combo b
         </ComboboxCancel>
       </ComboboxAnchor>
 
-      <!-- No list without items: react-aria's popover does not open on an empty list. -->
+      <!-- No list without items: the popover does not open on an empty list. -->
       <ComboboxPortal v-if="items.length > 0" :to="portalTarget()">
-        <!-- As react-aria's: as wide as the input's box, at its start, and no taller than the space
-        below it (less 12px), the list scrolling inside. React's `--trigger-width` excludes the 48px
-        the shared variants add back. -->
+        <!-- As wide as the input's box, at its start, and no taller than the space below it (less
+        12px), the list scrolling inside. `--trigger-width` excludes the 48px the shared variants
+        add back. -->
         <ComboboxContent
           position="popper"
           align="start"

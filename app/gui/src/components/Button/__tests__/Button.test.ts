@@ -197,7 +197,7 @@ describe('CopyButton', () => {
     expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('check')
   })
 
-  describe('toasts, as the React one does', () => {
+  describe('toasts', () => {
     afterEach(() => {
       vi.useRealTimers()
       // No host here plays the exit animation that would remove a dismissed toast.

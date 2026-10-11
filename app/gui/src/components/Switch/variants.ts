@@ -28,7 +28,7 @@ export const SWITCH_STYLES = tv({
       className: 'flex-1',
     }),
     background:
-      'flex shrink-0 cursor-default items-center rounded-full bg-primary/30 bg-clip-padding shadow-inner outline-none ring-black transition duration-200 ease-in-out group-focus-visible:ring-2 group-pressed:bg-primary/60 group-selected:bg-primary group-selected:group-pressed:bg-primary/50',
+      'flex shrink-0 cursor-default items-center rounded-full bg-primary/30 bg-clip-padding shadow-inner outline-none ring-black transition duration-200 ease-in-out group-selected:bg-primary',
     thumb:
       'aspect-square h-full flex-none translate-x-0 transform rounded-full bg-white transition duration-200 ease-in-out group-selected:translate-x-[100%]',
   },
@@ -39,10 +39,10 @@ export const SWITCH_STYLES = tv({
 })
 
 /**
- * The switch's own spelling of the states `SWITCH_STYLES` keys on with `group-selected:`,
- * `group-pressed:` and `group-focus-visible:`, for the native input inside its `<label>`
- * (decision 5). Nothing sets `data-pressed`, and the focus is on the input rather than the
- * `<label>`, so only `group-selected:` (the label's `data-selected`) also matches without these.
+ * The switch's pressed, focused and selected states, keyed on the native input inside its `<label>`
+ * (decision 5): the focus ring while the input has visible focus, and the darker background while
+ * the label is pressed (`:active`). The selected state repeats `SWITCH_STYLES`'s `group-selected:`
+ * (the label's `data-selected`) so that it also wins over the pressed one.
  */
 export const SWITCH_VUE_STATES = {
   background:

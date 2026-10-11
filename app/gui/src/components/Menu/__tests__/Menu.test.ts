@@ -96,7 +96,7 @@ describe('DropdownMenu', () => {
     expect(byTestId('cut')!.textContent).toContain('Remove and copy')
   })
 
-  test('the separator is a thin separator, as in React', async () => {
+  test('the separator is a thin, half-pixel line', async () => {
     mountMenu()
     await open()
     const separator = byTestId('menu')!.querySelector('[role="separator"]')!

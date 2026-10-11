@@ -2,8 +2,9 @@ import { describe, expect, test } from 'vitest'
 import { qrCodeModules, qrCodePath } from '../qrCode'
 
 /**
- * The modules `qrcode.react` 3.1.0 drew for this link (its `qrcodegen`, error correction `L`, no
- * quiet zone), row by row: `1` dark, `0` light. `uqr` ports the same encoder, so the codes match.
+ * The reference code for this link: the modules the `qrcode.react` 3.1.0 package drew (its
+ * `qrcodegen`, error correction `L`, no quiet zone), row by row: `1` dark, `0` light. `uqr` ports
+ * the same encoder, so the codes match.
  */
 const HELLO_MODULES = [
   '111111100000101111111',
@@ -30,7 +31,7 @@ const HELLO_MODULES = [
 ]
 
 describe('qrCodeModules', () => {
-  test('encodes as qrcode.react did', () => {
+  test('encodes the reference modules of qrcode.react 3.1.0', () => {
     const modules = qrCodeModules('hello', 'L')
     expect(modules.map((row) => row.map((cell) => (cell ? '1' : '0')).join(''))).toEqual(
       HELLO_MODULES,

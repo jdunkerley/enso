@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * @file A row of the drive's table: the Vue port of React's `AssetRow`, with its `asset-row` test
- * id, `aria-selected` and `data-selected`. In the table's `grid` it carries its position
- * (`aria-rowindex`) and, when it is the grid's tab stop, `tabindex="0"`: every other row, and the
- * controls inside it, are out of the Tab sequence.
+ * @file A row of the drive's table, with its `asset-row` test id, `aria-selected` and
+ * `data-selected`. In the table's `grid` it carries its position (`aria-rowindex`) and, when it is
+ * the grid's tab stop, `tabindex="0"`: every other row, and the controls inside it, are out of the
+ * Tab sequence.
  *
  * The row is the drag source of the selection and a drop target: dropped rows move into it (or its
  * parent, for a file), dropped files upload there, and assets held over a directory for two seconds
@@ -106,7 +106,7 @@ const isDraggedOver = ref(false)
 
 /**
  * Whether the row may be dragged: only while selected, and not while a text field in it has the
- * focus (a Firefox bug otherwise breaks selecting text there), as React's `useDraggable`.
+ * focus (a Firefox bug otherwise breaks selecting text there).
  */
 const isDraggable = ref(true)
 function onFocusIn(event: FocusEvent) {
@@ -147,7 +147,7 @@ watch(
   { flush: 'post' },
 )
 
-/** As React's ref callback did on every render: keep the keyboard-selected row focused and shown. */
+/** On mount and on every update: keep the keyboard-selected row focused and shown. */
 function focusIfKeyboardSelected() {
   const element = root.value
   if (props.isKeyboardSelected && element != null && !element.contains(document.activeElement)) {
@@ -219,7 +219,7 @@ function onContextMenu(event: MouseEvent) {
   if (!isSelected.value) props.select(props.item)
   driveStore.update({
     contextMenuData: {
-      triggerRef: { current: root.value ?? null },
+      trigger: root.value ?? null,
       initialContextMenuPosition: { pageX: event.pageX, pageY: event.pageY },
     },
   })

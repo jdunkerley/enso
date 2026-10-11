@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /**
  * @file What the labels popover shows when no label matches the search: a colour swatch and
- * "Create <search>", which creates a label of that name in that colour. The Vue port of the React
- * `NotFoundLabel`. The swatch ("Next color") starts at the least used colour, and each press moves
- * it to the next of `COLORS`.
+ * "Create <search>", which creates a label of that name in that colour. The swatch ("Next color")
+ * starts at the least used colour, and each press moves it to the next of `COLORS`.
  *
- * "Create …" is not a submit button of the popover's form: in React it carried a `form` attribute
- * naming no form (its form instance, as text), so neither a click on it nor Enter in the search
- * field submitted the popover's form through it.
+ * "Create …" is not a submit button of the popover's form (it is a plain `type="button"` that
+ * submits its own `useForm`), so neither a click on it nor Enter in the search field submits the
+ * popover's form through it.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'

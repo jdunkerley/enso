@@ -34,12 +34,6 @@ export const TOOLTIP_STYLES = tv({
       large: 'max-w-lg',
       xlarge: 'max-w-xl',
     },
-    isEntering: {
-      true: 'animate-in fade-in placement-bottom:slide-in-from-top-0.5 placement-top:slide-in-from-bottom-0.5 placement-left:slide-in-from-right-0.5 placement-right:slide-in-from-left-0.5 ease-out duration-150',
-    },
-    isExiting: {
-      true: 'animate-out fade-out placement-bottom:slide-out-to-top-0.5 placement-top:slide-out-to-bottom-0.5 placement-left:slide-out-to-right-0.5 placement-right:slide-out-to-left-0.5 ease-in duration-150',
-    },
   },
   defaultVariants: {
     variant: 'primary',
@@ -53,10 +47,8 @@ export const TOOLTIP_STYLES = tv({
 export type TooltipVariants = VariantProps<typeof TOOLTIP_STYLES>
 
 /**
- * The enter/exit motion of `Tooltip.vue` (a Reka `TooltipContent`), in place of
- * {@link TOOLTIP_STYLES}'s `isEntering`/`isExiting`. Those key the direction on `placement-*:`
- * (`[data-placement]`, see `STATE_VARIANTS` in `tailwind.config.ts`), which Reka does not set; it
- * reports the state as `data-state` and the side it used as `data-side` (decision 5 of
+ * The enter/exit motion of `Tooltip.vue` (a Reka `TooltipContent`), keyed on the state Reka reports
+ * as `data-state` and the side it used as `data-side` (decision 5 of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  */
 export const TOOLTIP_MOTION = [

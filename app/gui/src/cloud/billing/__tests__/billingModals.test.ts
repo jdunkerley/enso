@@ -47,7 +47,7 @@ afterEach(() => {
 describe('TrialEndedModal', () => {
   const subscriptionId = SubscriptionId('subscription-1')
 
-  test('shows the React title, text, alert and buttons', async () => {
+  test('shows the title, explanation, warning and the Downgrade and Subscribe buttons', async () => {
     await mountWithProviders(TrialEndedModal, { props: { subscriptionId } })
     const modal = alertDialog()!
     expect(modal.querySelector('h2')!.textContent!.trim()).toBe(getText('trialEnded'))

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The context menu of one asset: the Vue port of React's `AssetContextMenu`, with the same
- * entries, conditions and order. Its entries are also the asset table's shortcuts while one asset is
- * selected (`useMenuEntries`, scoped to the table), and the command palette's actions.
+ * @file The context menu of one asset. Its entries are also the asset table's shortcuts while one
+ * asset is selected (`useMenuEntries`, scoped to the table), and the command palette's actions.
  */
 import ContextMenu from '#/components/ContextMenu.vue'
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
@@ -115,7 +114,7 @@ const disabledTooltip = computed(() =>
  * from the command palette, the row showing it.
  */
 function assetRow(): HTMLElement | null {
-  const clicked = driveStore.contextMenuData?.triggerRef.current
+  const clicked = driveStore.contextMenuData?.trigger
   if (clicked?.dataset.id === asset.id) return clicked
   return (
     bindingTarget?.querySelector<HTMLElement>(
@@ -314,8 +313,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
     isCloud.value && {
       action: 'label',
       doAction: () => {
-        // It replaces the open modals, as React's `setModal` did. It is anchored to the asset's
-        // row, and focus returns there.
+        // It replaces the open modals. It is anchored to the asset's row, and focus returns there.
         const row = assetRow()
         modals.closeAll()
         modals.open(ManageLabelsModal, {

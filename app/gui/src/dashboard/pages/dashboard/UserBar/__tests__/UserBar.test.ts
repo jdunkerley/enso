@@ -2,11 +2,10 @@
  * @file The Vue user bar (#83): the user menu (a dialog of buttons), its entries as global actions,
  * the notification tray, the offline notice and the cloud-only buttons.
  */
-// The stores are plain objects, not hooks: imported under `get…` names to say so.
-import { useAboutModal as getAboutModal } from '$/components/AboutModal/aboutModal'
-import { useActionsStore as getActionsStore } from '$/providers/actions'
-import { useText as getTextStore } from '$/providers/text'
-import { getToastsStore } from '$/providers/toasts'
+import { useAboutModal } from '$/components/AboutModal/aboutModal'
+import { useActionsStore } from '$/providers/actions'
+import { useText } from '$/providers/text'
+import { useToasts } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { onlineManager } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
@@ -49,7 +48,7 @@ vi.mock('$/providers/backends', async () => {
 const uploads = reactive(new Map<string, object>())
 vi.mock('$/providers/upload', () => ({ useUploadsToCloudStore: () => ({ uploads }) }))
 
-const { getText } = getTextStore()
+const { getText } = useText()
 
 // The overlays teleport into the portal root that `index.html` provides.
 let portalRoot: HTMLElement
@@ -120,10 +119,10 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  getAboutModal().isOpen.value = false
+  useAboutModal().isOpen.value = false
   onlineManager.setOnline(true)
   uploads.clear()
-  getToastsStore().dismiss()
+  useToasts().dismiss()
 })
 
 describe('UserBar', () => {
@@ -183,7 +182,7 @@ describe('UserBar', () => {
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
     expect(must(userMenu()).textContent).not.toContain(getText(Plan.free))
     expect(must(userMenu()).textContent).toContain('Working locally')
-    const names = getActionsStore()
+    const names = useActionsStore()
       .findActions('')
       .map((action) => action.name)
     expect(names).not.toContain(getText('upgradePlanShortcut'))
@@ -228,7 +227,7 @@ describe('UserBar', () => {
     await flushPromises()
     await user.click(entry(getText('aboutThisAppShortcut')))
     await flushPromises()
-    expect(getAboutModal().isOpen.value).toBe(true)
+    expect(useAboutModal().isOpen.value).toBe(true)
 
     await user.click(userMenuButton())
     await flushPromises()
@@ -241,7 +240,7 @@ describe('UserBar', () => {
   test('the entries are global actions while the bar is mounted, the menu closed', async () => {
     const { goToSettingsPage, unmount } = await mountUserBar()
     const names = () =>
-      getActionsStore()
+      useActionsStore()
         .findActions('')
         .map((action) => action.name)
     expect(names()).toEqual(
@@ -306,7 +305,7 @@ describe('NotificationTray', () => {
     })
     await flushPromises()
     const message = getText('uploadingXFilesWithProgressNotification', 0, 1, '0.50', '2')
-    const toast = must(getToastsStore().toasts.value.find((t) => t.id === 'upload-1'))
+    const toast = must(useToasts().toasts.value.find((t) => t.id === 'upload-1'))
     expect(toast.isLoading).toBe(true)
     expect(toast.position).toBe('bottom-right')
     expect(toast.progress).toBe(0.25)

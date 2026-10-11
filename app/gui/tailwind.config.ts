@@ -10,7 +10,7 @@ const HERE_PATH = fileURLToPath(new URL('.', import.meta.url))
  * State variants, with their `group-` and `peer-` forms.
  *
  * Most are for the state our components expose as `data-*` attributes: `selected:` matches
- * `[data-selected]`, `placement-top:` matches `[data-placement="top"]`, and so on.
+ * `[data-selected]`, `outside-visible-range:` matches `[data-outside-visible-range]`, and so on.
  * `placeholder-shown:` also matches `[data-placeholder]`, which the date input's segments set.
  *
  * The others are Tailwind's own pseudo-class variants, redefined unchanged: the order of this list
@@ -21,10 +21,6 @@ const HERE_PATH = fileURLToPath(new URL('.', import.meta.url))
  * Only the `data-*` variants the components use are defined.
  */
 const STATE_VARIANTS: readonly (readonly [name: string, selectors: readonly string[]])[] = [
-  ['placement-left', ['&[data-placement="left"]']],
-  ['placement-right', ['&[data-placement="right"]']],
-  ['placement-top', ['&[data-placement="top"]']],
-  ['placement-bottom', ['&[data-placement="bottom"]']],
   ['open', ['&[open]']],
   ['indeterminate', ['&:indeterminate']],
   ['placeholder-shown', ['&[data-placeholder]', '&:placeholder-shown']],
@@ -37,7 +33,6 @@ const STATE_VARIANTS: readonly (readonly [name: string, selectors: readonly stri
   ['hover', ['&:hover']],
   ['focus', ['&:focus']],
   ['focus-visible', ['&:focus-visible']],
-  ['pressed', ['&[data-pressed]']],
   ['selected', ['&[data-selected]']],
   ['disabled', ['&:disabled']],
 ]

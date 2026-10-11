@@ -3,7 +3,6 @@ import UserBar from '#/pages/dashboard/UserBar/UserBar.vue'
 import CommandPalette from '$/components/CommandPalette.vue'
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useContainerData } from '$/providers/container'
-import { useFeatureFlag } from '$/providers/featureFlags'
 import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
@@ -22,7 +21,6 @@ import * as objects from 'enso-common/src/utilities/data/object'
 import { normalizeSlashes } from 'enso-common/src/utilities/file'
 import { ConfigProvider } from 'reka-ui'
 import { onMounted, onUnmounted, shallowRef, toRefs } from 'vue'
-import HeadlessUiSpike from './HeadlessUiSpike.vue'
 import LeftPanel from './LeftPanel.vue'
 import MiddlePanel from './MiddlePanel.vue'
 import RightPanel from './RightPanel.vue'
@@ -36,7 +34,6 @@ const openedProjects = useOpenedProjects()
 const containerData = useContainerData()
 const { openProjectLocally, openSettingsTab, closeCurrentTab } = containerData
 const { focusedPanel, middlePanelShown } = toRefs(containerData)
-const headlessUiSpikeEnabled = useFeatureFlag('enableHeadlessUiSpike')
 const text = useText()
 provideAsyncResources(openedProjects)
 provideRightPanelData(focusedPanel)
@@ -120,7 +117,6 @@ onUnmounted(() => {
         <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
           <div class="bar">
             <TabBar />
-            <HeadlessUiSpike v-if="headlessUiSpikeEnabled" />
             <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
           </div>
           <div class="belowBar">

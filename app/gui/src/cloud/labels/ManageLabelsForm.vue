@@ -1,14 +1,15 @@
 <script setup lang="ts">
 /**
- * @file The content of `ManageLabelsModal.vue`: a search field, every label as a strip of pills, and
- * the list of labels with a checkbox each (checked when every chosen asset has the label, a dash
- * when some have it), filtered by the search. Checking or unchecking one sets the assets' labels at
- * once; "Create Label" opens a form for a new one, with its colour; each label has a delete button
- * that asks first. When nothing matches the search, it offers to create a label of that name.
+ * @file The content of `ManageLabelsModal.vue`: a search field, every label as a strip of pills,
+ * and the list of labels with a checkbox each (checked when every chosen asset has the label, a
+ * dash when some have it), filtered by the search. Checking or unchecking one sets the assets'
+ * labels at once; "Create Label" opens a form for a new one, with its colour; each label has a
+ * delete button that asks first. When nothing matches the search, it offers to create a label of
+ * that name.
  *
- * The Vue port of the React `ManageLabelsForm`. react-aria's `TagGroup` (a `grid` of focusable
- * rows) is a plain `role="list"`: nothing acts on a pill, so it needs no keyboard focus (decision 1
- * of the foundations record). The pills show the labels that at least one of the assets has.
+ * The strip of pills is a plain `role="list"`, not a `grid` of focusable rows: nothing acts on a
+ * pill, so it needs no keyboard focus (decision 1 of the foundations record). The pills show the
+ * labels that at least one of the assets has.
  *
  * Each change writes the assets' labels as this popover last wrote them, so that changes in a row
  * (creating two labels, checking one and then creating another) all stay. Enter in the search field
@@ -74,7 +75,7 @@ const modals = useModals()
 const styles = MANAGE_LABELS_MODAL_STYLES()
 const { contains } = useFilter({ sensitivity: 'base' })
 
-// React's `useSuspenseQuery`: wait for the labels only when none are cached.
+// Wait for the labels only when none are cached.
 const labelsQuery = useQuery(labelsQueryOptions(backend))
 if (labelsQuery.data.value == null) await labelsQuery.suspense()
 const allLabels = computed(() => labelsQuery.data.value ?? [])
@@ -182,7 +183,7 @@ async function confirmDelete(label: Label) {
     onConfirm: () => deleteLabel(label),
   })
   // The delete button that opened the question went with its label, so the confirmation cannot
-  // return focus to it. Focus the search field, as React's focus scope did.
+  // return focus to it. Focus the search field instead.
   if (answer === 'confirm') {
     // Once the question has left the stack (after its exit animation) and its focus handling ran.
     await until(() => modals.stack.value.length).toBe(depth)
@@ -263,8 +264,6 @@ const createLabelSchema = (z: SchemaBuilder) =>
           :leastUsedColor="leastUsedColor"
           :onCreateLabel="createLabel"
         />
-        <!-- React's `pressed:bg-primary/5` here never applied (a react-aria modifier on a plain
-        `div`), so it is not carried over. -->
         <div
           v-for="{ label, state } in filteredLabels"
           :id="label.id"
@@ -301,7 +300,7 @@ const createLabelSchema = (z: SchemaBuilder) =>
 
     <div class="flex w-full flex-col gap-2 px-2 py-2">
       <ButtonGroup width="full" align="between" gap="small">
-        <!-- Escape closes only this form, as react-aria's popover stopped it. -->
+        <!-- Escape closes only this form, not the labels popover around it. -->
         <Popover v-model:open="isCreateOpen" @keydown.esc.stop="isCreateOpen = false">
           <template #trigger>
             <Button variant="icon" size="small" fullWidth icon="add">

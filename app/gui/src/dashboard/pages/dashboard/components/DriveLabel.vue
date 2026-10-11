@@ -3,9 +3,8 @@
  * @file A label in its colour, pressable, with an optional button to remove it, for the drive's
  * labels column and the asset search bar. (The Properties tab has its own never-pressable copy.)
  *
- * The text is the default slot, always plain text. The inner button keeps the `react-aria-Button`
- * class from before the Vue port (#75), and the focus ring shows on the wrapper while anything in
- * it has visible focus.
+ * The text is the default slot, always plain text. The focus ring shows on the wrapper while
+ * anything in it has visible focus.
  */
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import Button from '$/components/Button/Button.vue'
@@ -65,7 +64,6 @@ const MAXIMUM_LIGHTNESS_FOR_DARK_COLORS = 50
       <button
         :data-testid="testId"
         type="button"
-        class="react-aria-Button"
         :disabled="isDisabled"
         :data-disabled="isDisabled ? 'true' : undefined"
         v-bind="STOP_PRESS_PROPAGATION"

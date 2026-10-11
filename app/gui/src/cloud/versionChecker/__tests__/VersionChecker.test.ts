@@ -5,7 +5,7 @@
 import VersionChecker from '$/cloud/versionChecker/VersionChecker.vue'
 import { useDevtoolsStore } from '$/providers/devTools'
 import { useText } from '$/providers/text'
-import { getToastsStore } from '$/providers/toasts'
+import { useToasts } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
@@ -90,7 +90,7 @@ describe('VersionChecker, with nothing to offer', () => {
     await flushPromises()
     await new Promise((resolve) => setTimeout(resolve, 100))
     expect(dialog()).toBeNull()
-    expect(getToastsStore().toasts.value).toHaveLength(0)
+    expect(useToasts().toasts.value).toHaveLength(0)
     expect(getLatestRelease).toHaveBeenCalledOnce()
     expect(error).not.toHaveBeenCalled()
     error.mockRestore()

@@ -1,34 +1,32 @@
 <script setup lang="ts">
 /**
- * @file A modal dialog on Reka UI's `Dialog`: the Vue counterpart of the React
- * `#/components/Dialog`, styled by the same `DIALOG_STYLES`, `DIALOG_OVERLAY_STYLES` and
- * `DIALOG_MODAL_STYLES`.
+ * @file A modal dialog on Reka UI's `Dialog`, styled by `DIALOG_STYLES`, `DIALOG_OVERLAY_STYLES`
+ * and `DIALOG_MODAL_STYLES`.
  *
- * Reka provides what react-aria did: `role="dialog"` labelled by the title, focus moved in on open
- * and trapped, focus returned to the trigger on close, Escape and outside-click dismissal, scroll
- * lock, and `aria-hidden` on everything else. Nested dialogs and popovers stack: Escape and outside
- * clicks reach the topmost one first, so React's `DialogStackProvider` has no Vue counterpart.
+ * Reka provides `role="dialog"` labelled by the title, focus moved in on open and trapped, focus
+ * returned to the trigger on close, Escape and outside-click dismissal, scroll lock, and
+ * `aria-hidden` on everything else. Nested dialogs and popovers stack: Escape and outside clicks
+ * reach the topmost one first, so no separate dialog stack is needed.
  *
- * - The trigger is the `trigger` slot, and replaces React's `Dialog.Trigger` wrapper. Without one,
- *   the dialog is controlled through `v-model:open`.
- * - The content is the default slot, which receives `{ close }`. `DialogClose.vue`, anywhere inside,
- *   closes it too.
+ * - The trigger is the `trigger` slot. Without one, the dialog is controlled through
+ *   `v-model:open`.
+ * - The content is the default slot, which receives `{ close }`. `DialogClose.vue`, anywhere
+ *   inside, closes it too.
  * - `@dismiss` fires when the user closes it (Escape, outside click, the close button, or
- *   `close`), like React's `onDismiss`. Setting `open` to `false` from outside does not fire it.
- * - Like React, keys other than Escape do not propagate out of the dialog, so global shortcuts do
- *   not fire while it is open.
+ *   `close`). Setting `open` to `false` from outside does not fire it.
+ * - Keys other than Escape do not propagate out of the dialog, so global shortcuts do not fire
+ *   while it is open.
  * - Without a trigger it focuses itself on opening, and returns focus on closing to the element
- *   that opened it, or to the trigger of the menu that element was in (`./focusReturn.ts`), as
- *   react-aria does. `opener` gives that element when the caller knew it before the dialog mounted.
+ *   that opened it, or to the trigger of the menu that element was in (`./focusReturn.ts`).
+ *   `opener` gives that element when the caller knew it before the dialog mounted.
  *   A press on the backdrop of a dialog that stays open keeps focus inside it.
  * - `@closed` fires once it has closed and its exit animation has ended: a modal on the stack
  *   (`$/providers/modals`) emits `close` then, so that it does not vanish mid-animation.
  * - The `title` labels it. A dialog without one needs an `aria-label`; Reka also warns about it in
- *   development builds. Attributes (`aria-label` among them) go on the `role="dialog"` element, as
- *   React spreads its other props onto react-aria's `Dialog`.
+ *   development builds. Attributes (`aria-label` among them) go on the `role="dialog"` element.
  *
- * The global modal stack (`setModal` and its Vue replacement) is #80's; this is the primitive it
- * will render.
+ * The global modal stack (`$/providers/modals`, rendered by `ModalHost.vue`) opens dialogs built on
+ * this one.
  */
 import ResetButtonGroup from '$/components/Button/ResetButtonGroup.vue'
 import CloseButton from '$/components/Button/CloseButton.vue'
@@ -168,8 +166,8 @@ function stopNonEscapeKeys(event: KeyboardEvent) {
       <slot name="trigger" />
     </DialogTrigger>
     <DialogPortal :to="portalTarget()">
-      <!-- React's `ModalOverlay` > `Modal` > `Dialog` nesting. The content sits inside the overlay
-      (Reka's "scrollable overlay" layout), so a click on either outer layer is outside it. -->
+      <!-- An overlay > modal > dialog nesting. The content sits inside the overlay (Reka's
+      "scrollable overlay" layout), so a click on either outer layer is outside it. -->
       <DialogOverlay
         :class="
           DIALOG_OVERLAY_STYLES({

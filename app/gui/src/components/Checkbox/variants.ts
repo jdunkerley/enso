@@ -93,9 +93,8 @@ export const CHECKBOX_STYLES = tv({
   slots: {
     icon: [
       'border-[0.5px] rounded-md transition-[outline-offset,border-width] duration-200',
-      'outline -outline-offset-2 outline-transparent group-focus-visible:outline-offset-0 group-focus-visible:outline-primary',
+      'outline -outline-offset-2 outline-transparent',
       'border-primary group-selected:border-transparent',
-      'group-pressed:border',
       'shrink-0',
     ],
   },
@@ -119,10 +118,8 @@ export const CHECKBOX_GROUP_STYLES = tv({
 })
 
 /**
- * The checkbox's spelling of the modifiers in `CHECKBOX_STYLES`'s icon (`group-selected:`,
- * `group-pressed:`, `group-focus-visible:`; see `STATE_VARIANTS` in `tailwind.config.ts`), which
- * key on the `<label>`. The label sets `data-selected`, but nothing sets `data-pressed`, and the
- * focus is on the native input inside it, so these key on the input instead (decision 5).
+ * The checkbox icon's selected, pressed and focused states (decision 5): the label's
+ * `data-selected`, the label pressed (`:active`), and visible focus on the native input inside it.
  */
 export const CHECKBOX_VUE_STATES =
   'group-data-[selected=true]:border-transparent group-active:border group-has-[:focus-visible]:outline-offset-0 group-has-[:focus-visible]:outline-primary'

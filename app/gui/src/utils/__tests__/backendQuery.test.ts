@@ -41,17 +41,17 @@ const RULED: Record<string, { staleTime: number; persist: boolean }> = {
 
 describe('backendQueryOptions', () => {
   test.each(Object.entries(RULED))(
-    '%s: one set of options, from React and Vue',
+    '%s: one set of options, directly and through the Vue wrapper',
     (method, expected) => {
       const queryMethod = method as BackendQueryMethod
-      const react = backendQueryOptions(remote, queryMethod, [] as never)
+      const direct = backendQueryOptions(remote, queryMethod, [] as never)
       const vue = vueBackendQueryOptions(queryMethod, [] as never, remote)
-      for (const options of [react, vue]) {
+      for (const options of [direct, vue]) {
         expect(options.staleTime).toBe(expected.staleTime)
         expect(options.meta.persist).toBe(expected.persist)
         expect(options.networkMode).toBe('online')
       }
-      expect(toValue(vue.queryKey)).toEqual(react.queryKey)
+      expect(toValue(vue.queryKey)).toEqual(direct.queryKey)
     },
   )
 
@@ -164,12 +164,12 @@ describe('backendMutationOptions', () => {
     const vue = toValue(
       vueBackendMutationOptions('updateAsset', remote, { mutationKey: ['editDescription'] }),
     )
-    const react = backendMutationOptions(remote, 'updateAsset', {
+    const direct = backendMutationOptions(remote, 'updateAsset', {
       mutationKey: ['editDescription'],
     })
-    expect(vue.mutationKey).toEqual(react.mutationKey)
-    expect(vue.meta).toEqual(react.meta)
-    expect(vue.networkMode).toBe(react.networkMode)
+    expect(vue.mutationKey).toEqual(direct.mutationKey)
+    expect(vue.meta).toEqual(direct.meta)
+    expect(vue.networkMode).toBe(direct.networkMode)
   })
 
   test('executeMutation runs it through the mutation cache, outside any component', async () => {

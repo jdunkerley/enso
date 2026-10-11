@@ -22,7 +22,7 @@ test('The saved flags are migrated, and overridden by `window.overrideFeatureFla
   expect(getFeatureFlag('enableMultitabs')).toBe(true)
   expect(getFeatureFlag('enableLocalBackend')).toBe(true)
   const saved = JSON.parse(localStorage.getItem('enso-feature-flags') ?? 'null')
-  expect(saved.version).toBe(4)
+  expect(saved.version).toBe(5)
   expect(saved.state.featureFlags).toMatchObject({ enableMultitabs: true })
   expect(saved.state.featureFlags).not.toHaveProperty('monoNodes')
 })

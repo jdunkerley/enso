@@ -2,9 +2,8 @@
 
 The right panel's **Properties** tab (#183): the selected cloud asset's path,
 owner, dates, size, creator, sharing and labels, and the configuration of a
-secret or a datalink. Vue, ported from the React
-`AssetPanel/components/AssetProperties` ("Rulings from #183" in
-`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
+secret or a datalink. Vue; the decisions behind it are under "Rulings from #183"
+in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
 
 - `rightPanel.ts` — `registerPropertiesTab`, called by `registerCloud`:
   contributes the tab (`settings`) to `$/providers/rightPanelContributions`,
@@ -17,11 +16,14 @@ secret or a datalink. Vue, ported from the React
   (#91).
 - `UpsertSecretForm.vue` (from `../credentials/`, #82) edits a secret's value.
 - `DatalinkConfiguration.vue` — the datalink's form, around the datalink editor
-  (`../datalinks/DatalinkFormInput.vue`, ported with the drive's datalink dialog
-  in #198).
+  (`../datalinks/DatalinkFormInput.vue`, shared with the drive's datalink
+  dialog, #198).
 - `SpotlightOverlay.vue` — the dimming overlay that "Edit" on a secret or a
   datalink (the asset context menu sets `spotlightOn`) opens around its section.
-  It follows the section every frame (React measured it only on resize).
-- `queries.ts` — the datalink and labels queries, with React's keys and options
-  (the labels popover, `../labels/`, shares the labels query).
+  It follows the section every frame, not only on resize, because the section
+  moves as the right panel slides in.
+- `queries.ts` — the datalink and labels queries, with the keys and options
+  `backendQueryOptions` gives them, so the cache, its persistence and
+  `INVALIDATION_MAP` apply (the labels popover, `../labels/`, shares the labels
+  query).
 - Tests: `__tests__/AssetProperties.test.ts`, with the datalink editor stubbed.

@@ -1,6 +1,6 @@
 /**
- * @file Keyboard, focus and ARIA behaviour of the Vue `Dialog`, `Popover` and `AlertDialog`: what
- * react-aria's overlays give the React ones, and what a port must not lose.
+ * @file Keyboard, focus and ARIA behaviour of `Dialog`, `Popover` and `AlertDialog`: what these
+ * overlays must keep.
  */
 import {
   byTestId,
@@ -266,7 +266,7 @@ describe('Popover', () => {
     expect(popover.getAttribute('data-side')).toBe('bottom')
     expect(popover.getAttribute('data-align')).toBe('start')
     expect(env.portalRoot.contains(popover)).toBe(true)
-    // The dialog itself, as react-aria's: Tab goes on to its first control.
+    // The dialog itself: Tab goes on to its first control.
     expect(document.activeElement).toBe(popover)
     // `POPOVER_STYLES` defaults: `size: 'small'`, `rounded: 'xxlarge'`.
     expect(popover.classList).toContain('max-w-sm')
@@ -290,8 +290,8 @@ describe('Popover', () => {
     expect(document.activeElement).toBe(byTestId('trigger'))
   })
 
-  // A modal popover makes the rest of the page `pointer-events: none`, as react-aria's underlay
-  // blocks it; the click still reaches the document, which is what dismisses it.
+  // A modal popover makes the rest of the page `pointer-events: none`; the click still reaches the
+  // document, which is what dismisses it.
   const outsideClicker = () => userEvent.setup({ pointerEventsCheck: 0 })
 
   test('an outside click closes it', async () => {
@@ -459,7 +459,7 @@ describe('`closed`', () => {
   })
 })
 
-describe('focus without a trigger (as react-aria)', () => {
+describe('focus without a trigger', () => {
   function mountControlled(props: Record<string, unknown> = {}) {
     const open = ref(false)
     mountWithProviders(() => [

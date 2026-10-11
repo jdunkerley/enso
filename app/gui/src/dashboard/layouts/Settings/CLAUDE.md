@@ -57,10 +57,10 @@ The Keyboard shortcuts tab edits the window's bindings
 `$/providers/dashboardInputBindings`, and the graph editor's (#170), listed by
 category from the registry (`$/configurations/keyboardShortcuts`). A change
 applies at once, in the open graph editor too. They are saved to `localStorage`
-under `inputBindings`, in a versioned extension of the format the React provider
-used, which older builds still read. The capture modal refuses a key that
-another action has where both are active (the registry's scopes) and names it; a
-conflict a reset brings back is shown in red.
+under `inputBindings`, in a versioned format (version 2 extends version 1, see
+`$/providers/inputBindings`), which older builds still read. The capture modal
+refuses a key that another action has where both are active (the registry's
+scopes) and names it; a conflict a reset brings back is shown in red.
 
 ## Tests
 

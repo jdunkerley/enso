@@ -3,9 +3,9 @@
  * files beside it, one per family, so that each is bundled with the code that uses it.
  *
  * A few of those classes use state variants (`STATE_VARIANTS` in `tailwind.config.ts`) keyed on
- * attributes that Reka's elements do not always set: `selected:` is `[data-selected]`, `pressed:`
- * is `[data-pressed]`, `outside-visible-range:` is `[data-outside-visible-range]`, and `disabled:`
- * is `:disabled`, which non-native elements never match. The components add the equivalents keyed
+ * attributes that Reka's elements do not always set: `selected:` is `[data-selected]`,
+ * `outside-visible-range:` is `[data-outside-visible-range]`, and `disabled:` is `:disabled`, which
+ * non-native elements never match. The components add the equivalents keyed
  * on Reka's `data-*`/ARIA attributes from the `*_VUE_STATES` constants beside them, per decision 5
  * of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
  */

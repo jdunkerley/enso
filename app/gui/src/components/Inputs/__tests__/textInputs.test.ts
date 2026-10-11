@@ -2,8 +2,7 @@
  * @file Keyboard, pointer and ARIA behaviour of the Vue text-like inputs bound to a form:
  * `ComboBox`, `Dropdown`/`FormDropdown`, `DatePicker`, `TimeField`, `OTPInput`, `Password`,
  * `HiddenFile`, and `Input`'s value conversion and auto-focus. The ticket (#79) asks for the
- * keyboard use of `ComboBox`, `Dropdown` and `DatePicker` in particular: react-aria gave the React
- * ones their keyboard, and Reka must give the same.
+ * keyboard use of `ComboBox`, `Dropdown` and `DatePicker` in particular, which Reka gives them.
  */
 import {
   byTestId,
@@ -87,7 +86,7 @@ describe('ComboBox', () => {
     expect(allByRole('option').map((o) => o.textContent?.trim())).toEqual(['Apple', 'Apricot'])
   })
 
-  test('with no items, opens no list, as react-aria did not', async () => {
+  test('with no items, opens no list', async () => {
     mountInForm(z.object({ fruit: z.string().optional() }), {}, () =>
       h(ComboBox<string>, { name: 'fruit', label: 'Fruit', items: [], testId: 'fruit' }),
     )
@@ -213,7 +212,7 @@ describe('ComboBox', () => {
     await user.click(document.querySelector<HTMLElement>(`[aria-label="${getText('reset')}"]`)!)
     expect(input.value).toBe('')
   })
-  test('names its list and buttons as react-aria did; the reset button is in the tab order', async () => {
+  test('names its list and buttons; the reset button is in the tab order', async () => {
     mountComboBox()
     const input = role('combobox') as HTMLInputElement
     const user = userEvent.setup()
@@ -314,7 +313,7 @@ describe('Dropdown', () => {
     expect(root.hasAttribute('data-focused')).toBe(false)
   })
 
-  test('the list takes the first Escape while it has a selection, as in React', async () => {
+  test('the list takes the first Escape while it has a selection', async () => {
     const onKeydown = vi.fn()
     mountWithProviders(() =>
       h('div', { onKeydown }, [

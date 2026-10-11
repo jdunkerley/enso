@@ -31,12 +31,6 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   unsafeDarkTheme: z.boolean(),
   apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
-  /**
-   * Show the Reka UI spike menu next to the user bar (#76). Proves the Vue headless-UI stack
-   * works; off by default, set via `window.overrideFeatureFlags` or local storage.
-   * Remove with the spike once the Vue `DropdownMenu` primitive has a real mount site (#78).
-   */
-  enableHeadlessUiSpike: z.boolean(),
 })
 
 const FEATURE_FLAGS_STATE_SCHEMA = z.object({ featureFlags: FEATURE_FLAGS_SCHEMA.partial() })
@@ -66,7 +60,8 @@ function unsafeMutateFeatureFlags(
 /**
  * Flags that no longer exist, with the store version that removed them. Earlier versions migrated
  * them: version 2 turned `enableMonaspaceCodeFont` on by default (#110), version 3 `monoNodes`
- * (#112); version 4 removed both, making Monaspace Neon unconditional (#113).
+ * (#112); version 4 removed both, making Monaspace Neon unconditional (#113). Version 5 removed
+ * `enableHeadlessUiSpike`, with the spike menu it showed (#222).
  *
  * `merge` already ignores unknown keys (the schema strips them), so a stale entry would do no harm;
  * migrating strips it from storage too, so that the stored flags match the schema.
@@ -74,6 +69,7 @@ function unsafeMutateFeatureFlags(
 const REMOVED_FLAGS: readonly { flag: string; version: number }[] = [
   { flag: 'enableMonaspaceCodeFont', version: 4 },
   { flag: 'monoNodes', version: 4 },
+  { flag: 'enableHeadlessUiSpike', version: 5 },
 ]
 
 /** Upgrade persisted feature flags from an older `version`: see {@link REMOVED_FLAGS}. */
@@ -116,12 +112,11 @@ export const flagsStore = createPersistedStore<FeatureFlagsState>(
       unsafeDarkTheme: false,
       apiKeyLimit: 5,
       debugHoverAreas: false,
-      enableHeadlessUiSpike: false,
     },
   }),
   {
     name: 'enso-feature-flags',
-    version: 4,
+    version: 5,
     migrate: migrateFeatureFlags,
     merge: (persistedState, currentState) => {
       const newState = { ...currentState }

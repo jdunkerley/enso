@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file An editor for a value described by a JSON schema, built from the schema: the Vue port of the
- * React `JSONSchemaInput`, with the same markup and classes. The datalink editor
- * (`DatalinkInput.vue`) is this over the datalink schema.
+ * @file An editor for a value described by a JSON schema, built from the schema. The datalink
+ * editor (`DatalinkInput.vue`) is this over the datalink schema.
  *
  * - A `const` schema shows nothing: the value cannot change.
  * - `string` is a text field; `format: "enso-secret"` a combo box of the user's secrets,
@@ -14,11 +13,11 @@
  *   value matches), and that member's editor; `allOf` every member's editor.
  *
  * A part whose value fails its validator (`getValidator(path)`) gets a red border, and the
- * schema's description under it. The parts are wrapped in a column only when there are several,
- * as React returned a lone child unwrapped.
+ * schema's description under it. The parts are wrapped in a column only when there are several; a
+ * lone part is left unwrapped.
  *
- * The `boolean` case is a plain checkbox. No datalink schema reaches it (every boolean there is a
- * `const`); React's was a form field named `input`, whose state replaced the value it was given.
+ * The `boolean` case is a plain checkbox, not a form field. No datalink schema reaches it (every
+ * boolean there is a `const`).
  */
 import Button from '$/components/Button/Button.vue'
 import Checkbox from '$/components/Checkbox/Checkbox.vue'
@@ -70,8 +69,8 @@ const isSecret = computed(
 )
 
 // The functionality for inputting `enso-secret`s SHOULD be injected using a plugin, but it is more
-// convenient to avoid having plugin infrastructure. Keys and options as React's
-// `backendQueryOptions(remoteBackend, 'listSecrets', [])`.
+// convenient to avoid having plugin infrastructure. Keys and options as
+// `backendQueryOptions(remoteBackend, 'listSecrets', [])` gives them.
 const secretsQuery = useQuery(
   computed(() => ({
     ...backendBaseOptions(remoteBackend),
@@ -174,7 +173,7 @@ const anyOfSchemas = computed(() =>
 const selectedChildIndex = ref(0)
 /**
  * Follow the value: when it does not match the chosen member, choose the first that it matches (or
- * the first member, when none is chosen). React did this as it rendered.
+ * the first member, when none is chosen).
  */
 function syncSelectedChild() {
   const childSchemas = anyOfSchemas.value

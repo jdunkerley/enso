@@ -67,7 +67,7 @@ describe('EditableSpan', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  test('whitespace alone passes, as in React (`min(1)` is checked before `trim()`)', async () => {
+  test('whitespace alone passes (`min(1)` is checked before `trim()`)', async () => {
     const { onSubmit } = setup()
     const user = userEvent.setup()
     await user.clear(input())

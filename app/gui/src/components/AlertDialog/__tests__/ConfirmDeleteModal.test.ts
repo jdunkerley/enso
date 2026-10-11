@@ -66,7 +66,7 @@ describe('ConfirmDeleteModal', () => {
     expect(store.stack.value).toEqual([])
   })
 
-  test('a failed deletion keeps the question open, with its error, as React did', async () => {
+  test('a failed deletion keeps the question open, with its error', async () => {
     const store = setup()
     const onConfirm = vi
       .fn()

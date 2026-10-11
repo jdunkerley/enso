@@ -1,19 +1,16 @@
 <script setup lang="ts">
 /**
- * @file A dialog that asks the user to confirm or cancel an action, on Reka UI's `AlertDialog`:
- * the Vue counterpart of the React `#/components/AlertDialog`, and styled the same way (a small
- * `Dialog` with no close button).
+ * @file A dialog that asks the user to confirm or cancel an action, on Reka UI's `AlertDialog`,
+ * styled as a small `Dialog` with no close button.
  *
- * `role="alertdialog"`; it opens with focus on the confirm button, as React's `autoFocus` does, and
- * cannot be dismissed by an outside click or Escape: the user must choose. `onConfirm` and
- * `onCancel` may return a promise; the dialog shows the confirm button loading until it settles,
- * then closes. The answer is submitted through a form, as in React (#84): if the callback fails,
- * the dialog stays open and shows why under the buttons, as React's `Form.FormError` did (with the
- * same message and `form-submit-error` test id; a JavaScript error, not the backend's, reads
- * "something went wrong" and goes to Sentry); with
- * `canSubmitOffline` set to `false` (React's default; `true` here, as for the callers before #84)
- * it shows the offline notice instead of answering while offline. `cancel` set to `null` leaves
- * out the cancel button, as React's `cancel={null}` did.
+ * `role="alertdialog"`; it opens with focus on the confirm button, and cannot be dismissed by an
+ * outside click or Escape: the user must choose. `onConfirm` and `onCancel` may return a promise;
+ * the dialog shows the confirm button loading until it settles, then closes. The answer is
+ * submitted through a form (#84): if the callback fails, the dialog stays open and shows why under
+ * the buttons, with the form's error message and `form-submit-error` test id (a JavaScript error,
+ * not the backend's, reads "something went wrong" and goes to Sentry); with `canSubmitOffline` set
+ * to `false` (it defaults to `true`) it shows the offline notice instead of answering while
+ * offline. `cancel` set to `null` leaves out the cancel button.
  *
  * The message is `message`, or the default slot, which receives `{ confirm, cancel }`.
  *
@@ -69,7 +66,7 @@ const {
   isDestructive?: boolean | undefined
   onConfirm?: (() => unknown) | undefined
   onCancel?: (() => unknown) | undefined
-  /** Whether it may answer while offline. Defaults to `true`; React's form defaulted to `false`. */
+  /** Whether it may answer while offline. Defaults to `true`, unlike `useForm`'s `false`. */
   canSubmitOffline?: boolean | undefined
   testId?: string | undefined
 }>()
@@ -112,8 +109,7 @@ async function respond(response: 'cancel' | 'confirm') {
 
 /**
  * Focus the confirm button rather than Reka's default, the first focusable element. It is focused
- * as visibly focused, as React's `autoFocus` is: react-aria treats focus that no key or pointer
- * press led to as "virtual", and shows it, so the button shows its focused colour from the start.
+ * as visibly focused, so the button shows its focused colour from the start.
  */
 function focusConfirm(event: Event) {
   const container = event.target instanceof Element ? event.target : document
@@ -166,9 +162,8 @@ const styles = computed(() =>
             <div :class="styles.scroller()">
               <div :class="styles.measurerWrapper()">
                 <div :class="styles.content()">
-                  <!-- React's form, with its layout: a column, items at the start, 1rem apart. The
-                  message is laid out among them (`contents`), as React's was, which keeps every
-                  line where React painted it. -->
+                  <!-- A form's layout: a column, items at the start, 1rem apart. The message is
+                  laid out among them (`contents`), rather than as one block. -->
                   <form :class="FORM_STYLES({ gap: 'medium' })" novalidate @submit.prevent>
                     <AlertDialogDescription asChild>
                       <div class="contents">

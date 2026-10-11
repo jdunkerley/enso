@@ -1,6 +1,6 @@
 /**
  * @file Which labels an asset gets when the labels popover changes the state of one: the logic of
- * the React `ManageLabelsForm`'s `onChange`, framework-free so that it can be tested on its own.
+ * `ManageLabelsForm.vue`'s changes, framework-free so that it can be tested on its own.
  */
 import type { SelectedAssetInfo } from '$/providers/driveStore'
 import type { Label, LabelName } from 'enso-common/src/services/Backend'

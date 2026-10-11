@@ -239,7 +239,7 @@ export const MULTI_SELECTOR_OPTION_STYLES = tv({
     },
     color: {
       primary:
-        'selected:bg-primary selected:text-white hover:bg-primary/5 pressed:bg-primary/10 outline outline-2 outline-transparent outline-offset-[-2px] focus-visible:outline-primary focus-visible:outline-offset-0',
+        'selected:bg-primary selected:text-white hover:bg-primary/5 outline outline-2 outline-transparent outline-offset-[-2px] focus-visible:outline-primary focus-visible:outline-offset-0',
     },
     variant: {
       default: '',
@@ -254,8 +254,8 @@ export const MULTI_SELECTOR_OPTION_STYLES = tv({
   },
 })
 /**
- * The Vue `MultiSelector` option's spelling of `MULTI_SELECTOR_OPTION_STYLES`'s `selected:` and
- * `pressed:`, for a Reka `ListboxItem` (`aria-selected`, native `:active`).
+ * The `MultiSelector` option's selected and pressed states, for a Reka `ListboxItem`
+ * (`aria-selected`, native `:active`).
  */
 export const MULTI_SELECTOR_OPTION_VUE_STATES =
   'aria-selected:bg-primary aria-selected:text-white active:bg-primary/10'

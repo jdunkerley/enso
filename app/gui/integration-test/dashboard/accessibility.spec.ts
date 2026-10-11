@@ -1,5 +1,5 @@
 /**
- * @file Accessibility safety net for the React→Vue dashboard port (#81).
+ * @file Accessibility safety net for the dashboard (#81).
  *
  * - axe-core runs on the four main screens (login, drive, settings, asset panel) and fails on any
  *   violation not in the screen's baseline (see `integration-test/accessibility.ts`).
