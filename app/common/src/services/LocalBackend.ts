@@ -124,6 +124,9 @@ export class LocalBackend extends backend.Backend {
   override async listDirectory(
     query: backend.ListDirectoryRequestParams & { readonly recursive?: boolean },
   ): Promise<backend.ListDirectoryResponseBody> {
+    if (query.recentProjects === true || query.filterBy === backend.FilterBy.recent) {
+      return this.listRecentProjects(query)
+    }
     if (query.filterBy != null && query.filterBy !== backend.FilterBy.active) {
       return { assets: [], paginationToken: null }
     }
@@ -230,6 +233,48 @@ export class LocalBackend extends backend.Backend {
       assets,
       paginationToken: last ? backend.PaginationToken(String(last.id)) : null,
     }
+  }
+
+  /**
+   * The recently opened local projects, newest first unless a sort is asked for, unpaged. Each
+   * project's parent directory is listed once, so that its asset is the folder view's own.
+   * Projects that cannot be listed any more are left out.
+   */
+  private async listRecentProjects(
+    query: backend.ListDirectoryRequestParams,
+  ): Promise<backend.ListDirectoryResponseBody> {
+    const entries = await this.projectManager.listRecentProjects()
+    const parentPaths = new Set(
+      entries.map((entry) => getDirectoryAndName(entry.path).directoryPath),
+    )
+    const listings = await Promise.all(
+      Array.from(parentPaths, async (parentPath) => {
+        try {
+          const { assets } = await this.listDirectory({
+            ...query,
+            parentId: newDirectoryId(parentPath),
+            filterBy: null,
+            recentProjects: false,
+            from: null,
+            pageSize: null,
+          })
+          return assets
+        } catch {
+          return []
+        }
+      }),
+    )
+    const assetsById = new Map(listings.flat().map((asset) => [asset.id, asset]))
+    const assets = entries.flatMap((entry) => assetsById.get(newProjectId(entry.path)) ?? [])
+    if (query.sortExpression != null) {
+      assets.sort((a, b) => backend.compareAssets(a, b, query.sortExpression, query.sortDirection))
+    }
+    return { assets, paginationToken: null }
+  }
+
+  /** Remove a local project from the recently opened projects. */
+  async forgetRecentProject(projectId: backend.ProjectId): Promise<void> {
+    await this.projectManager.forgetRecentProject(backend.extractTypeAndPath(projectId).path)
   }
 
   /** Recursively search for assets in a directory. */
@@ -423,7 +468,6 @@ export class LocalBackend extends backend.Backend {
           { cloud: body.openHybridProjectParameters }
         : {}),
       })
-      return
     } catch (error) {
       throw new Error(
         `Could not open project ${title != null ? `'${title}'` : `with ID '${projectId}'`}: ${
@@ -431,6 +475,12 @@ export class LocalBackend extends backend.Backend {
         }.`,
         { cause: error },
       )
+    }
+    // A hybrid project is a cloud project's local copy, and cloud projects are not recorded.
+    if (body?.openHybridProjectParameters == null) {
+      await this.projectManager.recordRecentProject(path).catch((error: unknown) => {
+        console.warn(`Could not add the project at '${path}' to the recent projects:`, error)
+      })
     }
   }
 
