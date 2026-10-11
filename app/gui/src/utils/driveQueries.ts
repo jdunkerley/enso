@@ -4,7 +4,7 @@
  * assets. Every caller shares one `QueryClient` and these keys, so all read the same cached
  * listings.
  */
-import type { Category, CategoryType } from '$/providers/category'
+import { isRecentCategory, type Category, type CategoryType } from '$/providers/category'
 import { backendQueryOptions } from '$/utils/backendQuery'
 import type { QueryClient, QueryFunctionContext, QueryKey } from '@tanstack/query-core'
 import type { Backend } from 'enso-common/src/services/Backend'
@@ -72,7 +72,7 @@ export function listDirectoryQueryOptions(options: ListDirectoryQueryOptions) {
         sortExpression,
         sortDirection,
         filterBy,
-        recentProjects: category.type === 'recent',
+        recentProjects: isRecentCategory(category),
         infinite,
       },
     ],
@@ -93,7 +93,7 @@ export function listDirectoryQueryOptions(options: ListDirectoryQueryOptions) {
             sortExpression,
             sortDirection,
             filterBy,
-            recentProjects: category.type === 'recent',
+            recentProjects: isRecentCategory(category),
             from: from ?? null,
             pageSize: pageSize ?? null,
           },
@@ -225,7 +225,7 @@ export function categoryListDirectoryQueryOptions(
       parentId,
       labels: null,
       filterBy: CATEGORY_TO_FILTER_BY[category],
-      recentProjects: category === 'recent',
+      recentProjects: isRecentCategory(category),
       sortExpression: null,
       sortDirection: null,
       from: null,

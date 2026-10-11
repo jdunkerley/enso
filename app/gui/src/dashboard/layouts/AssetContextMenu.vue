@@ -24,7 +24,7 @@ import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useMenuEntries } from '$/composables/menuEntries'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
-import { isCloudCategory, useCategories } from '$/providers/category'
+import { isCloudCategory, isRecentCategory, useCategories } from '$/providers/category'
 import { useContainerData, type Tab } from '$/providers/container'
 import { useDriveStore } from '$/providers/driveStore'
 import { useFeatureFlag } from '$/providers/featureFlags'
@@ -137,7 +137,7 @@ const canEditThisAsset = computed(
 )
 const canAddToThisDirectory = computed(
   () =>
-    category.value.type !== 'recent' &&
+    !isRecentCategory(category.value) &&
     asset.type === backendModule.AssetType.directory &&
     canEditThisAsset.value,
 )

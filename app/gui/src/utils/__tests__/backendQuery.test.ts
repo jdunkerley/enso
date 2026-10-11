@@ -13,12 +13,13 @@ import {
   STALE_TIME_MAP,
   type BackendQueryMethod,
 } from '$/utils/backendQuery'
+import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import {
   backendMutationOptions as vueBackendMutationOptions,
   backendQueryOptions as vueBackendQueryOptions,
 } from '@/composables/backend'
-import { QueryClient } from '@tanstack/query-core'
-import { BackendType, DirectoryId, type Backend } from 'enso-common/src/services/Backend'
+import { partialMatchKey, QueryClient } from '@tanstack/query-core'
+import { BackendType, DirectoryId, FilterBy, type Backend } from 'enso-common/src/services/Backend'
 import { describe, expect, test, vi } from 'vitest'
 import { toValue } from 'vue'
 
@@ -158,6 +159,23 @@ describe('backendMutationOptions', () => {
     expect(
       backendMutationOptions(remote, 'createDirectory', { invalidate: false }).meta?.invalidates,
     ).toEqual([])
+  })
+
+  test('a local open refreshes the local Recent listing, whose key says it is Recent', () => {
+    const recentKey = listDirectoryQueryOptions({
+      backend: local,
+      category: { type: 'localRecent' },
+      parentId: null,
+      refetchInterval: null,
+      labels: null,
+      sortExpression: null,
+      sortDirection: null,
+      infinite: true,
+    }).queryKey
+    expect(recentKey[3]).toMatchObject({ filterBy: FilterBy.recent, recentProjects: true })
+    const meta = backendMutationOptions(local, 'openProject').meta
+    expect(meta?.invalidates.some((key) => partialMatchKey(recentKey, key))).toBe(true)
+    expect(meta?.refetchType).toBe('all')
   })
 
   test('Vue gets the same options, its mutation key appended', () => {

@@ -20,7 +20,11 @@ import { useCopy } from '$/components/Button/copy'
 import { useMenuEntries } from '$/composables/menuEntries'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
-import { canTransferBetweenCategories, isCloudCategory } from '$/providers/category'
+import {
+  canTransferBetweenCategories,
+  isCloudCategory,
+  isRecentCategory,
+} from '$/providers/category'
 import { useDriveStore } from '$/providers/driveStore'
 import { useFeatureFlag } from '$/providers/featureFlags'
 import { useModals } from '$/providers/modals'
@@ -160,7 +164,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
     },
   }
 
-  if (category.value.type === 'recent') return [copyIdsMenuEntry]
+  if (isRecentCategory(category.value)) return [copyIdsMenuEntry]
   if (category.value.type === 'trash') {
     return selected.length === 0 ?
         []

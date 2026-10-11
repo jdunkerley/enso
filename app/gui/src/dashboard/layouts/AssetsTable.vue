@@ -78,7 +78,7 @@ import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import Text from '$/components/Text/Text.vue'
 import UserWithPopover from '$/components/UserWithPopover/UserWithPopover.vue'
 import { useAuth } from '$/providers/auth'
-import { categoryKey, useCategories } from '$/providers/category'
+import { categoryKey, isRecentCategory, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useDriveLocation } from '$/providers/drive'
@@ -286,7 +286,7 @@ const assetsPages = useInfiniteQuery(
         }),
       initialPageParam: null as PaginationToken | null,
       getNextPageParam: (lastPage: { assets: readonly AnyAsset[]; paginationToken?: unknown }) =>
-        lastPage.assets.length === currentPageSize && currentCategory.type !== 'recent' ?
+        lastPage.assets.length === currentPageSize && !isRecentCategory(currentCategory) ?
           ((lastPage.paginationToken ?? null) as PaginationToken | null)
         : null,
       retry: (_count: number, error: Error) => {
@@ -1046,7 +1046,7 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
 }
 
 function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
-  if (category.value.type === 'trash' || category.value.type === 'recent') {
+  if (category.value.type === 'trash' || isRecentCategory(category.value)) {
     dragAnnouncements.rejected()
     return
   }
@@ -1159,7 +1159,10 @@ const isolateStyle = computed(() =>
 
 const specialEmptyText = computed(() =>
   query.query !== '' ? getText('noFilesMatchTheCurrentFilters')
-  : currentDirectoryId.value !== categories.categoryDirectoryId(category.value) ?
+  : (
+    currentDirectoryId.value !==
+    (categories.categoryDirectoryId(category.value) ?? location.value.rootDirectoryId)
+  ) ?
     getText('thisFolderIsEmpty')
   : null,
 )
@@ -1168,6 +1171,8 @@ const emptyText = computed(() =>
   category.value.type === 'trash' ? (specialEmptyText.value ?? getText('yourTrashIsEmpty'))
   : category.value.type === 'recent' ?
     (specialEmptyText.value ?? getText('youHaveNoRecentProjects'))
+  : category.value.type === 'localRecent' ?
+    (specialEmptyText.value ?? getText('noRecentLocalProjects'))
   : (specialEmptyText.value ?? getText('youHaveNoFiles')),
 )
 
@@ -1302,7 +1307,7 @@ const isLoadingRow = computed(
                     :class="
                       twMerge(
                         'sticky left-1 grid max-w-[calc(100cqw_-_0.5rem)] grow place-items-center pb-40 pt-20',
-                        (category.type === 'recent' || category.type === 'trash') && 'hidden',
+                        (isRecentCategory(category) || category.type === 'trash') && 'hidden',
                       )
                     "
                     @dragenter="onDropzoneDragOver"

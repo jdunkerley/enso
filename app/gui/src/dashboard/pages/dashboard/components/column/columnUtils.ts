@@ -1,5 +1,5 @@
 /** @file Types and constants related to `Column`s. */
-import type { CategoryType } from '$/providers/category'
+import { isRecentCategory, type CategoryType } from '$/providers/category'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import * as backend from 'enso-common/src/services/Backend'
 
@@ -71,7 +71,7 @@ export function getColumnList(
   const isCloud = backendType === backend.BackendType.remote
   const isEnterprise = userPlan === backend.Plan.enterprise
   const isTrash = category === 'trash'
-  const isRecent = category === 'recent'
+  const isRecent = isRecentCategory(category)
   const isRoot = category === 'cloud'
   const isTeam = category === 'team'
 
