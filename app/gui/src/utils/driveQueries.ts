@@ -22,6 +22,7 @@ export const CATEGORY_TO_FILTER_BY: Readonly<Record<CategoryType, FilterBy | nul
   cloud: FilterBy.active,
   local: FilterBy.active,
   recent: null,
+  localRecent: FilterBy.recent,
   trash: FilterBy.trashed,
   team: FilterBy.active,
   localDirectory: FilterBy.active,
