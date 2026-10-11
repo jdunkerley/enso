@@ -426,3 +426,246 @@ passed to `ProjectService.default`), `server.ts` (`Server` takes and passes
   (`newDirectoryId(getFolderPath(path))`).
 - **PR 4 (docs)** extends the shim CLAUDE.md written in Task 9 and adds the
   labels, categories and drive docs.
+
+---
+
+## PR 3
+
+# Local labels and a local Recent list, PR 3 (local Recent): implementation plan
+
+> **For agentic workers:** execute task by task with TDD (failing test, watch it
+> fail, implement, watch it pass, commit). Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** A "Recent" category under Local in the drive's sidebar that lists the
+local projects opened most recently, newest first, with an empty state, a
+reduced context menu and "Remove from Recent".
+
+**Architecture:** A new category type `localRecent` in
+`app/gui/src/providers/category.ts`, mapped to the local backend. Every check
+for the cloud's `'recent'` goes through a new `isRecentCategory(category)`, so
+both Recents share paging, the Path column, the drop rules, the drive bar and
+the context-menu limits. `LocalBackend.listDirectory` answers `filterBy: recent`
+from `ProjectManager.listRecentProjects`; `LocalBackend.openProject` records
+successful local opens; a new `LocalBackend.forgetRecentProject` backs "Remove
+from Recent".
+
+**Spec:** `docs/superpowers/specs/2026-10-11-local-labels-and-recent-design.md`
+(sections 2, 3 "The local Recent category" and 4; PR 3 of 4).
+
+**Global Constraints:**
+
+- Stacked on PR 1 (#225). PR 2 is built in parallel: edits to the files it also
+  touches (`AssetContextMenu.vue`, `AssetsTable.vue`, `columnUtils.ts`,
+  `DriveBarToolbar.vue`, `localApi.ts`, `LocalBackend.ts`) stay additive and
+  local; `isRecentCategory` replacements are one-line changes.
+- The cloud's Recent keeps its behaviour (one deliberate exception, below).
+- CHANGELOG entry under `#### Enso IDE` (a user-visible feature).
+- `corepack pnpm` only. Never `git stash`, never `--no-verify`.
+
+## Where the code differs from the spec, and what this plan does
+
+1. **The cloud's Recent is not a `filterBy`.** It lists with `filterBy: null`
+   and `recentProjects: true`. Local Recent lists with
+   `CATEGORY_TO_FILTER_BY.localRecent = FilterBy.recent` and
+   `recentProjects: true`; `LocalBackend.listDirectory` takes the Recent branch
+   on either flag.
+2. **The Recent categories have no home directory** (`categoryDirectoryId` is
+   `null`), and the drive view falls back to the user's _cloud_ root as the
+   location's root. For `localRecent` that would make the local backend fetch
+   the details of a cloud directory id. `driveView.ts` falls back to the local
+   root for local categories instead.
+3. **Empty text.** `AssetsTable.vue`'s "This folder is empty" check compares the
+   current directory with `categoryDirectoryId`, which is `null` for both
+   Recents, so the Recent-specific empty text never showed. The check now
+   compares with the location's root when the category has no home directory.
+   This also makes the cloud's Recent show "You have no recent projects…" when
+   it is empty: the one change to the cloud's Recent, and a fix.
+4. **Two "Recent" buttons.** The local entry reuses `recentCategory` ("Recent")
+   and the `history` icon, so the sidebar has two buttons named "Recent", one in
+   each group. The Playwright helpers locate category buttons within their
+   group.
+5. **Hybrid opens are not recorded.** `openProject` with
+   `openHybridProjectParameters` opens a cloud project's local copy; the spec
+   says cloud projects are never recorded locally.
+6. **Recording is best effort.** A failed `recordRecentProject` is logged and
+   does not fail the open.
+7. **Query invalidation needs no change.** `INVALIDATION_MAP.openProject`
+   already invalidates every `listDirectory` query of the backend, Recent's
+   included (the key is `[backendType, 'listDirectory', null, {…}]`). A unit
+   test pins it.
+8. **Metadata.** Recent assets are built by listing each distinct parent
+   directory once through `LocalBackend.listDirectory` itself and keeping the
+   recent projects' entries. That gives the same title, dates, state, paths and
+   (after PR 2) labels as the folder view, with no second mapping to keep in
+   step, and one `filesystem-list` per parent rather than per project.
+
+## File structure
+
+| File                                                           | Change                                                                            |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `app/common/src/services/LocalBackend.ts`                      | Recent branch in `listDirectory`; record in `openProject`; `forgetRecentProject`. |
+| `app/common/src/services/__test__/LocalBackend.recent.test.ts` | **new.** Unit tests for the three.                                                |
+| `app/common/src/text/english.json`                             | `noRecentLocalProjects`, `removeFromRecentShortcut`.                              |
+| `app/gui/src/providers/category.ts`                            | `localRecent`, `isRecentCategory`, sidebar order.                                 |
+| `app/gui/src/providers/__tests__/category.test.ts`             | **new.** `isRecentCategory`, keys, backend, drop rules.                           |
+| `app/gui/src/utils/driveQueries.ts`                            | `CATEGORY_TO_FILTER_BY.localRecent`; `recentProjects` via `isRecentCategory`.     |
+| `app/gui/src/utils/transferBetweenCategories.ts`               | `localRecent` like `recent`.                                                      |
+| `app/gui/src/dashboard/layouts/Drive/driveView.ts`             | Local root as the root of local categories without a home directory.              |
+| Drive components (see Task 3)                                  | `isRecentCategory`; empty text; local Recent menu.                                |
+| `app/gui/src/configurations/inputBindings.ts`                  | `removeFromRecent` action.                                                        |
+| `app/gui/integration-test/mock/localApi.ts`                    | `recent/list`, `record`, `forget` mocks; moves and deletes keep them in step.     |
+| `app/gui/integration-test/actions/DrivePageActions.ts`         | Category buttons located per group; `goToCategory.localRecent`.                   |
+| `app/gui/integration-test/dashboard/localRecent.spec.ts`       | **new.**                                                                          |
+| `CHANGELOG.md`                                                 | Entry.                                                                            |
+
+## Interfaces
+
+```ts
+// category.ts
+export interface PredefinedCategory {
+  type: "cloud" | "recent" | "trash" | "local" | "localRecent";
+}
+/** Whether the category is a Recent list (the cloud's or the local one). */
+export function isRecentCategory(category: Category | CategoryType): boolean;
+
+// LocalBackend.ts
+/** Remove a local project from the recently opened projects. */
+forgetRecentProject(projectId: backend.ProjectId): Promise<void>;
+```
+
+## Tasks
+
+### Task 1: `LocalBackend` Recent listing, recording and forgetting
+
+**Files:** `app/common/src/services/LocalBackend.ts`; create
+`app/common/src/services/__test__/LocalBackend.recent.test.ts`.
+
+- [ ] Write tests with a stub `ProjectManager` (an object implementing only
+      `listRecentProjects`, `recordRecentProject`, `forgetRecentProject`,
+      `listDirectory`, `getProject`, `openProject`, `rootDirectory`); stub
+      `location` for `baseUrl`:
+
+```ts
+it("lists recent projects newest first, with their real parent", async () => {
+  pm.recent = [entry("/root/a/P2", ID2), entry("/root/P1", ID1)];
+  pm.dirs.set("/root/a", [project("/root/a/P2", ID2, "P2")]);
+  pm.dirs.set("/root", [project("/root/P1", ID1, "P1"), directory("/root/a")]);
+  const { assets, paginationToken } =
+    await backend().listDirectory(recentQuery);
+  expect(assets.map((a) => [a.id, a.parentId, a.title])).toEqual([
+    [newProjectId(Path("/root/a/P2")), newDirectoryId(Path("/root/a")), "P2"],
+    [newProjectId(Path("/root/P1")), newDirectoryId(Path("/root")), "P1"],
+  ]);
+  expect(paginationToken).toBeNull();
+});
+// also: lists each parent directory once; leaves out entries whose project is
+// not listed; still returns [] for other non-active filters (trashed);
+// records a successful local open; records nothing when the open fails;
+// records nothing for a hybrid open; a failed record does not fail the open;
+// forgetRecentProject forgets the project path.
+```
+
+- [ ] Run `corepack pnpm exec vitest run LocalBackend.recent` in `app/common`;
+      watch them fail.
+- [ ] Implement: at the top of `listDirectory`, take the Recent branch when
+      `query.recentProjects === true || query.filterBy === FilterBy.recent`. The
+      private method groups entries by `getFolderPath(path)`, calls
+      `this.listDirectory({ ...query, parentId: newDirectoryId(parent), filterBy: null, recentProjects: false, from: null, pageSize: null })`
+      once per parent (`Promise.all`; a failing parent contributes nothing),
+      keeps the recent order, sorts only if `sortExpression` is set, and returns
+      `paginationToken: null`. In `openProject`, after a successful open with no
+      hybrid parameters, record the path; a failed record is `console.warn`ed.
+- [ ] Run the tests; watch them pass. Commit.
+
+### Task 2: the `localRecent` category and `isRecentCategory`
+
+**Files:** `category.ts`; create `providers/__tests__/category.test.ts`.
+
+- [ ] Tests:
+
+```ts
+test("isRecentCategory", () => {
+  expect(isRecentCategory({ type: "recent" })).toBe(true);
+  expect(isRecentCategory({ type: "localRecent" })).toBe(true);
+  expect(isRecentCategory("localRecent")).toBe(true);
+  for (const type of ["cloud", "trash", "local"] as const)
+    expect(isRecentCategory({ type })).toBe(false);
+});
+test("local Recent uses the local backend and round-trips its key", () => {
+  expect(CATEGORY_BACKEND.localRecent).toBe(BackendType.local);
+  expect(categoryFromKey(categoryKey({ type: "localRecent" }))).toEqual({
+    type: "localRecent",
+  });
+  expect(categoryIcon("localRecent")).toBe("history");
+});
+test("nothing can be dropped into or out of either Recent", () => {
+  expect(
+    dropOperationBetweenCategories({ type: "local" }, { type: "localRecent" }),
+  ).toBe("cancel");
+  expect(
+    dropOperationBetweenCategories({ type: "localRecent" }, { type: "cloud" }),
+  ).toBe("cancel");
+});
+```
+
+- [ ] Watch them fail; implement (type, `CATEGORY_BACKEND`, `categoryKey`,
+      `categoryFromKey`, `categoryIcon`, `categoryLabel` (`recentCategory`),
+      `categoryDirectoryId` (`null`), `localCategoriesList` = Local, Recent,
+      saved folders, `dropOperationBetweenCategories`); fix the exhaustive
+      switches `vue-tsc` reports. Pass; commit.
+
+### Task 3: replace every `'recent'` check
+
+- [ ] `driveQueries.ts`: `CATEGORY_TO_FILTER_BY.localRecent = FilterBy.recent`,
+      `recentProjects: isRecentCategory(category)` (three sites). Unit test: the
+      `localRecent` key has `filterBy: 'Recent'` and `recentProjects: true`.
+- [ ] `backendQuery.test.ts`: `openProject` invalidates
+      `[BackendType.local, 'listDirectory']`.
+- [ ] One-line replacements: `AssetsTable.vue` (paging, drop rejection, empty
+      text, drop zone), `AssetsTableContextMenu.vue`, `AssetContextMenu.vue`
+      (`canAddToThisDirectory`), `DriveBarNavigation.vue` (three),
+      `DriveBarToolbar.vue`, `columnUtils.ts` (Path column),
+      `transferBetweenCategories.ts`.
+- [ ] `driveView.ts`: local root as the root of local categories without a home
+      directory. Empty text: `noRecentLocalProjects` for `localRecent`; the
+      folder-empty check compares with the location's root.
+- [ ] Typecheck, unit tests; commit.
+
+### Task 4: the local Recent context menu
+
+- [ ] `inputBindings.ts`:
+      `removeFromRecent: { bindings: [], icon: 'history', rebindable: false, category: 'fileManagement' }`;
+      text `removeFromRecentShortcut`: "Remove from Recent".
+- [ ] `AssetContextMenu.vue`: in `localRecent`, keep only the entries `open`,
+      `close`, `label`, `openInFileBrowser` and `copyId` of the normal list (so
+      Label… lights up when PR 2's gate does), and append `removeFromRecent`,
+      which calls `localBackend.forgetRecentProject(asset.id)` and invalidates
+      `[BackendType.local, 'listDirectory']`.
+- [ ] Covered by the Playwright spec (Task 5). Commit.
+
+### Task 5: Playwright
+
+- [ ] `localApi.ts`: a `recent` array; `recent/list` (validated: a project at
+      `path` whose id is `projectId`), `recent/record` (error when no project;
+      move to the top; cap 20), `recent/forget`; `filesystem-move-from` rewrites
+      entries at or under the source; `filesystem-delete` forgets them. The open
+      mock does not record: the GUI's `LocalBackend` does.
+- [ ] `DrivePageActions.ts`: locate category buttons within the cloud or local
+      group; `goToCategory.localRecent()`.
+- [ ] `dashboard/localRecent.spec.ts`:
+  - the empty state text;
+  - open "Mock Project", close it, open a second project; Recent lists the
+    second, then the first;
+  - "Remove from Recent" on one; it disappears and the other stays;
+  - move a recent project into a folder in Local; Recent still lists it.
+- [ ] Run the spec on Windows (with the lock). Commit.
+
+### Task 6: verification, PR, changelog, screenshots
+
+- [ ] Delete caches; `corepack pnpm -r compile`; typecheck, lint
+      (`--max-warnings=0`) and unit tests in common and gui; full Playwright
+      suite on Windows.
+- [ ] Push; open the PR (base `feature/local-metadata`); add the CHANGELOG entry
+      with the real number; push.
+- [ ] Screenshots on `pr-screenshots` under `pr-<N>/`; embed them in the PR
+      body.
