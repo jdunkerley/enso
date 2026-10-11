@@ -12,71 +12,89 @@ import { TEXT } from '../actions'
 /** The default project's folder (`integration-test/base.ts`, `mock/localApi.ts`). */
 const MOCK_PROJECT_FOLDER = 'Mock_Project'
 
-test('local Recent lists opened projects newest first, and removes one on request', async ({
-  page,
-  drivePage,
-  localApi,
-}) => {
-  localApi.addProject({
-    metadata: {
-      id: UUID(uuidv4()),
-      name: 'Second Project',
-      namespace: 'local',
-      created: toRfc3339(new Date()),
+test.describe('with two local projects', () => {
+  // The drive has listed the root by the time a test's body runs, so projects are added here.
+  test.use({
+    setupApi: {
+      local: (api) => {
+        api.addProject({
+          metadata: {
+            id: UUID(uuidv4()),
+            name: 'Second Project',
+            namespace: 'local',
+            created: toRfc3339(new Date()),
+          },
+        })
+      },
     },
   })
 
-  await drivePage.goToCategory
-    .localRecent()
-    .do(async () => {
-      await expect(page.getByText(TEXT.noRecentLocalProjects)).toBeVisible()
-    })
-    .goToCategory.local()
-    .driveTable.openProject('Mock Project')
-    .expectProjectEditorOpened('Mock Project')
-    .goToPage.drive()
-    .driveTable.openProject('Second Project')
-    .expectProjectEditorOpened('Second Project')
-    .goToPage.drive()
-    .goToCategory.localRecent()
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^Second Project/, /^Mock Project/])
-    })
-    .driveTable.rightClickRow('Mock Project')
-    .do(async () => {
-      await page.getByRole('button', { name: TEXT.removeFromRecentShortcut }).click()
-    })
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^Second Project/])
-    })
-    .do(() => {
-      expect(localApi.recentProjectPaths()).toEqual([
-        posix.join(localApi.rootPath, 'Second_Project'),
-      ])
-    })
+  test('local Recent lists opened projects newest first, and removes one on request', async ({
+    page,
+    drivePage,
+    localApi,
+  }) => {
+    await drivePage.goToCategory
+      .localRecent()
+      .do(async () => {
+        await expect(page.getByText(TEXT.noRecentLocalProjects)).toBeVisible()
+      })
+      .goToCategory.local()
+      .driveTable.openProject('Mock Project')
+      .expectProjectEditorOpened('Mock Project')
+      .goToPage.drive()
+      .driveTable.openProject('Second Project')
+      .expectProjectEditorOpened('Second Project')
+      .goToPage.drive()
+      .goToCategory.localRecent()
+      .driveTable.withRows(async (rows) => {
+        await expect(rows).toHaveText([/^Second Project/, /^Mock Project/])
+      })
+      .driveTable.rightClickRow('Mock Project')
+      .do(async () => {
+        await page.getByRole('button', { name: TEXT.removeFromRecentShortcut }).click()
+      })
+      .driveTable.withRows(async (rows) => {
+        await expect(rows).toHaveText([/^Second Project/])
+      })
+      .do(() => {
+        expect(localApi.recentProjectPaths()).toEqual([
+          posix.join(localApi.rootPath, 'Second_Project'),
+        ])
+      })
+  })
 })
 
-test('a project moved into a folder keeps its Recent entry', async ({ drivePage, localApi }) => {
-  const folderPath = Path(posix.join(localApi.rootPath, 'Folder'))
-  localApi.addDirectory({ path: folderPath })
-  localApi.addRecentProject(Path(posix.join(localApi.rootPath, MOCK_PROJECT_FOLDER)))
+test.describe('with a recent project beside a folder', () => {
+  // The drive has listed the root by the time a test's body runs, so the folder is added here.
+  test.use({
+    setupApi: {
+      local: (api) => {
+        api.addDirectory({ path: Path(posix.join(api.rootPath, 'Folder')) })
+        api.addRecentProject(Path(posix.join(api.rootPath, MOCK_PROJECT_FOLDER)))
+      },
+    },
+  })
 
-  await drivePage.goToCategory
-    .local()
-    .driveTable.rightClickRow('Mock Project')
-    .contextMenu.cut()
-    .driveTable.rightClickRow('Folder')
-    .contextMenu.paste()
-    .do(async () => {
-      await expect
-        .poll(() => localApi.recentProjectPaths())
-        .toEqual([posix.join(folderPath, MOCK_PROJECT_FOLDER)])
-    })
-    .goToCategory.localRecent()
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^Mock Project/])
-    })
-    .driveTable.withPathColumnCell('Mock Project', async (cell) => {
-      await expect(cell).toContainText('Folder')
-    })
+  test('a project moved into a folder keeps its Recent entry', async ({ drivePage, localApi }) => {
+    const folderPath = posix.join(localApi.rootPath, 'Folder')
+    await drivePage.goToCategory
+      .local()
+      .driveTable.rightClickRow('Mock Project')
+      .contextMenu.cut()
+      .driveTable.rightClickRow('Folder')
+      .contextMenu.paste()
+      .do(async () => {
+        await expect
+          .poll(() => localApi.recentProjectPaths())
+          .toEqual([posix.join(folderPath, MOCK_PROJECT_FOLDER)])
+      })
+      .goToCategory.localRecent()
+      .driveTable.withRows(async (rows) => {
+        await expect(rows).toHaveText([/^Mock Project/])
+      })
+      .driveTable.withPathColumnCell('Mock Project', async (cell) => {
+        await expect(cell).toContainText('Folder')
+      })
+  })
 })
