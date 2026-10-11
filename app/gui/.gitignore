@@ -40,3 +40,6 @@ src/project-view/util/iconName.ts
 
 # Sentry Config File
 .env.sentry-build-plugin
+
+# Dev-server stand-in for Electron userData (local labels, Recent)
+.dev-profile/

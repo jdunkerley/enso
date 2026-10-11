@@ -1,20 +1,32 @@
 /** @file Project Manager Shim bindings. */
 
-import { net } from 'electron'
+import { app, net } from 'electron'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { getProjectRoot } from 'project-manager-shim'
+import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { ProjectService } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
+let localMetadata: LocalMetadata | null = null
 let extraArgs: readonly string[] = []
+
+/** The local labels and Recent store, kept in Electron's `userData` directory. */
+export function getLocalMetadata(): LocalMetadata {
+  localMetadata ??= new LocalMetadata({ userDataDirectory: app.getPath('userData') })
+  return localMetadata
+}
 
 /** Get the project service. */
 function getProjectService(electron: Electron | undefined, electronIsDev: boolean): ProjectService {
   if (!projectService) {
-    projectService = ProjectService.default(paths.resourcesPath(electron, electronIsDev), extraArgs)
+    projectService = ProjectService.default(
+      paths.resourcesPath(electron, electronIsDev),
+      extraArgs,
+      getLocalMetadata(),
+    )
   }
   return projectService
 }
@@ -27,7 +39,11 @@ export function setupProjectService(
 ): ProjectService {
   extraArgs = args
   if (!projectService) {
-    projectService = ProjectService.default(paths.resourcesPath(electron, electronIsDev), args)
+    projectService = ProjectService.default(
+      paths.resourcesPath(electron, electronIsDev),
+      args,
+      getLocalMetadata(),
+    )
   }
   return projectService
 }

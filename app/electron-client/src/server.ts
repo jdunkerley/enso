@@ -21,6 +21,7 @@ import {
   isProjectServiceRequest,
   isWatcherRequest,
 } from 'project-manager-shim/handler'
+import type { LocalMetadata } from 'project-manager-shim/localMetadata'
 import * as ydocServer from 'ydoc-server'
 
 import { tarFsPack, unzipEntries, zipWriteStream } from '@/archive'
@@ -181,22 +182,32 @@ export class Server {
   private projectsRootDirectory: string
   private devServer?: vite.ViteDevServer
   private projectService: ProjectService
+  private localMetadata: LocalMetadata
   private watchers: Map<AssetId, Watcher> = new Map()
 
-  /** Create a simple HTTP server. */
+  /**
+   * Create a simple HTTP server.
+   * @param localMetadata - The local labels and Recent store, in Electron's `userData` directory.
+   */
   constructor(
     public config: Config,
     projectService: ProjectService,
+    localMetadata: LocalMetadata,
   ) {
     this.projectsRootDirectory = projectManagement.getProjectsDirectory()
     this.projectService = projectService
+    this.localMetadata = localMetadata
   }
 
   /** Server constructor. */
-  static async create(config: Config, projectService: ProjectService): Promise<Server> {
+  static async create(
+    config: Config,
+    projectService: ProjectService,
+    localMetadata: LocalMetadata,
+  ): Promise<Server> {
     const localConfig = Object.assign({}, config)
     localConfig.port = await findPort(localConfig.port)
-    const server = new Server(localConfig, projectService)
+    const server = new Server(localConfig, projectService, localMetadata)
     await server.run()
     return server
   }
@@ -269,6 +280,7 @@ export class Server {
         requestUrl,
         async () => this.projectService,
         headers,
+        this.localMetadata,
       )
     } else if (isWatcherRequest(requestUrl)) {
       const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
@@ -1032,7 +1044,7 @@ export class Server {
         .writeHead(HTTP_STATUS_BAD_REQUEST, COOP_COEP_CORP_HEADERS)
         .end('Command arguments must be an array of strings.')
     } else {
-      const result = await handleFilesystemCommand(cliArguments, request)
+      const result = await handleFilesystemCommand(cliArguments, request, this.localMetadata)
 
       if (typeof result === 'string') {
         const resultData = Buffer.from(result)
