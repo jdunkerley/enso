@@ -1173,6 +1173,11 @@ export class RemoteBackend extends backend.Backend {
     }
   }
 
+  /** Every asset type can carry labels in the cloud. */
+  override supportsLabels(_assetType: backend.AssetType) {
+    return true
+  }
+
   /**
    * Create a label used for categorizing assets.
    * @throws {Error} An error if a non-successful status code (not 200-299) was received.
