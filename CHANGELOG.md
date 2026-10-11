@@ -149,6 +149,11 @@
   the keyboard is outlined. Dragging files and folders is announced too: what is
   being moved, and where it was dropped or that the move was cancelled. To move
   items with the keyboard alone, cut them and paste them into a folder.
+- [Local projects you open are listed under Recent][227]. The drive's sidebar
+  has a Recent category under Local, listing the local projects you opened most
+  recently, newest first, with the folder each is in. Right-click one to open
+  it, show it in your file browser, or remove it from the list. A project you
+  move or rename in the IDE keeps its place.
 
 #### Enso Language & Runtime
 
@@ -286,6 +291,7 @@
 [174]: https://github.com/jdunkerley/enso/pull/174
 [188]: https://github.com/jdunkerley/enso/pull/188
 [219]: https://github.com/jdunkerley/enso/pull/219
+[227]: https://github.com/jdunkerley/enso/pull/227
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
