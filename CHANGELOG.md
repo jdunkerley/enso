@@ -149,6 +149,12 @@
   the keyboard is outlined. Dragging files and folders is announced too: what is
   being moved, and where it was dropped or that the move was cancelled. To move
   items with the keyboard alone, cut them and paste them into a folder.
+- [Local projects can have labels][226], as cloud assets do. Right-click a
+  project in the Local category and choose "Label…", or use the edit button in
+  its Labels column, to add, create or remove labels; the search bar's label
+  chips then show only the projects that carry any of the chosen labels. Labels
+  are kept on this computer, and travel with a project when it is copied. Local
+  folders and files cannot be labelled yet.
 
 #### Enso Language & Runtime
 
@@ -286,6 +292,7 @@
 [174]: https://github.com/jdunkerley/enso/pull/174
 [188]: https://github.com/jdunkerley/enso/pull/188
 [219]: https://github.com/jdunkerley/enso/pull/219
+[226]: https://github.com/jdunkerley/enso/pull/226
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
