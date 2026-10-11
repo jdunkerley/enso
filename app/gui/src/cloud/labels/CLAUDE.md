@@ -23,6 +23,8 @@ organization's labels for the selected assets. Vue, ported from the React
 - The labels query is `../properties/queries.ts`' `labelsQueryOptions`, with
   React's key; the mutations are `backendMutationOptions`
   (`@/composables/backend`).
-- Kept React quirks (each a visible change, for a separate decision) are listed
-  in the files' comments and in the rulings.
+- The React quirks the port kept were decided and fixed in #207 ("Rulings from
+  #207"): the popover from the context menu opens under the row, "Next color"
+  works, Enter in the search does nothing, the pills show the assets' labels,
+  and each change builds on the labels the popover last wrote.
 - Tests: `__tests__/`.

@@ -2559,3 +2559,50 @@ maintainer to review. The details are in `layouts/Drive/CLAUDE.md`.
    reports nothing new.
 7. **Changelog entry**: screen reader support and a visible focus ring are
    features a user can notice.
+
+## Rulings from #207 (the React quirks the ports kept, 2026-10-08)
+
+#207 decides the React behaviour that #92, #191 and #198 ported unchanged and
+listed for a separate decision. Delegated like the rulings above: provisionally
+accepted, for the maintainer to review.
+
+1. **The labels popover from the context menu opens under the row**, at its
+   start (by the asset's name: the row is as wide as the table), and focus
+   returns to the row. React meant to anchor it to the row; its ref was cleared
+   as the menu closed. Used as a shortcut or from the command palette, the entry
+   finds the row by the asset's id; with no row shown, the popover still falls
+   back to the window's top-left corner.
+2. **"Next color" moves the swatch to the next colour**, and "Create <search>"
+   creates the label in it (it set the colour on the popover's form, not its
+   own).
+3. **Enter in the popover's search field does nothing**
+   (`resetOnSubmit: false`): the form only holds the popover's state, and its
+   reset cleared the search and put the checks back to what the assets had when
+   it opened.
+4. **The pills show the labels the assets have** (every, or some, of them), as
+   their name, "Selected labels", says; with none, the strip is not shown.
+5. **Each change writes the labels as the popover last wrote them**, not as the
+   asset had them when it opened, so two labels created in a row both stay.
+6. **An invalid secret's description shows once** in the datalink editor.
+7. **The datalink editor's `boolean` case stays a plain checkbox.** It works (it
+   reports its value), and no datalink schema reaches it; React's form-field
+   version was the odd one. Nothing to fix.
+8. **The duplicate-name dialog**: "Change" puts an entry back to undecided (and
+   a rename back to the suggested name), offering Skip, Replace and Rename
+   again; "Skip the rest" skips the entries still undecided and keeps the
+   others' choice; Skip All shows every entry as skipped.
+9. **A press on a modal's backdrop keeps focus inside it.** `Dialog.vue` and
+   `AlertDialog.vue` prevent the `mousedown` default on the overlay outside the
+   dialog (`keepFocusOnBackdropPress`, `focusReturn.ts`), so a dialog that stays
+   open (not dismissable, or an alert) keeps its focus, as react-aria's modal
+   did; a dismissable one still closes and returns focus to its opener.
+10. **Escape in "Add Users" keeps closing the list first.** This is the WAI-ARIA
+    combobox pattern (Escape dismisses the listbox), what the Vue dropdown does
+    and what #191's ruling 11 and #198's ruling 4 pin for every popover holding
+    a list; React closing the whole popover at once was the quirk. What was
+    wrong is the second Escape: pressed while the closed list was still fading
+    out (about 150 ms), Reka's list was still the topmost dismissable layer and
+    took the key for nothing. `ComboBox.vue` now closes the dialog or popover
+    around it then (`onEscapeCapture`), so the second Escape always closes it.
+11. **No changelog entry**: these are fixes, so the PR takes
+    `CI: No changelog needed`.

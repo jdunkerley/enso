@@ -17,10 +17,8 @@
  * schema's description under it. The parts are wrapped in a column only when there are several,
  * as React returned a lone child unwrapped.
  *
- * Kept as React had it: a secret's description shows twice when it is invalid (inside the combo
- * box's column and after it), and the `boolean` case is a plain checkbox. No datalink schema
- * reaches it (every boolean there is a `const`); React's was a form field named `input`, whose
- * state replaced the value it was given.
+ * The `boolean` case is a plain checkbox. No datalink schema reaches it (every boolean there is a
+ * `const`); React's was a form field named `input`, whose state replaced the value it was given.
  */
 import Button from '$/components/Button/Button.vue'
 import Checkbox from '$/components/Checkbox/Checkbox.vue'
@@ -269,7 +267,6 @@ const partCount = computed(() => {
           </Form>
           <Text v-if="error != null" class="px-2 text-danger">{{ error }}</Text>
         </div>
-        <Text v-if="error != null" class="px-2 text-danger">{{ error }}</Text>
       </template>
       <FilePathInput
         v-else-if="schemaFormat === 'enso-file'"

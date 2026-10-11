@@ -1,5 +1,5 @@
 import assert from 'assert'
-import { expect, test } from 'integration-test/base'
+import { expect, test, type Locator } from 'integration-test/base'
 import * as locate from './locate'
 
 test('Color picker button appears when multiple nodes are selected', async ({
@@ -73,7 +73,7 @@ test('Multiple nodes can be colored with the color picker', async ({ editorPage,
   // Click on a color in the color ring (click in the center-right area of the color ring)
   const colorRing = colorPickerMenu.locator('.gradient')
   await expect(colorRing).toBeVisible()
-  const colorRingBox = await colorRing.boundingBox()
+  const colorRingBox = await settledBox(colorRing)
   assert(colorRingBox)
   // Move to the right side of the ring (roughly 3 o'clock position) to trigger color change
   const targetX = colorRingBox.x + colorRingBox.width * 0.85
@@ -193,32 +193,30 @@ test('Multiple color changes can be applied to the same selection', async ({
 
   // Select first color (right side of ring)
   const colorRing = colorPickerMenu.locator('.gradient')
-  const colorRingBox = await colorRing.boundingBox()
+  const colorRingBox = await settledBox(colorRing)
   assert(colorRingBox)
+  const node1InitialColor = await groupColor(node1)
+  const node2InitialColor = await groupColor(node2)
   const firstX = colorRingBox.x + colorRingBox.width * 0.85
   const firstY = colorRingBox.y + colorRingBox.height / 2
   await page.mouse.move(firstX, firstY)
-  await page.waitForTimeout(100)
 
-  const node1FirstColor = await node1.getAttribute('style')
-  const node2FirstColor = await node2.getAttribute('style')
+  // The hover preview reaches the nodes asynchronously, so wait for it rather than for a fixed time.
+  await expect.poll(() => groupColor(node1)).not.toEqual(node1InitialColor)
+  await expect.poll(() => groupColor(node2)).not.toEqual(node2InitialColor)
+  const node1FirstColor = await groupColor(node1)
+  const node2FirstColor = await groupColor(node2)
 
   // Move to a different color (bottom of ring)
   const secondX = colorRingBox.x + colorRingBox.width / 2
   const secondY = colorRingBox.y + colorRingBox.height * 0.85
   await page.mouse.move(secondX, secondY)
-  await page.waitForTimeout(100)
 
-  const node1SecondColor = await node1.getAttribute('style')
-  const node2SecondColor = await node2.getAttribute('style')
-
-  // Verify that the colors changed
-  expect(node1SecondColor).not.toEqual(node1FirstColor)
-  expect(node2SecondColor).not.toEqual(node2FirstColor)
-
-  // Both nodes should still have color overrides
-  expect(node1SecondColor).toContain('--node-group-color')
-  expect(node2SecondColor).toContain('--node-group-color')
+  // Verify that the colors changed, and both nodes still have color overrides
+  await expect.poll(() => groupColor(node1)).not.toEqual(node1FirstColor)
+  await expect.poll(() => groupColor(node2)).not.toEqual(node2FirstColor)
+  expect(await groupColor(node1)).toBeTruthy()
+  expect(await groupColor(node2)).toBeTruthy()
 })
 
 test('Colored nodes retain their color after deselection', async ({ editorPage, page }) => {
@@ -241,7 +239,7 @@ test('Colored nodes retain their color after deselection', async ({ editorPage, 
   await expect(colorPickerMenu).toBeVisible()
 
   const colorRing = colorPickerMenu.locator('.gradient')
-  const colorRingBox = await colorRing.boundingBox()
+  const colorRingBox = await settledBox(colorRing)
   assert(colorRingBox)
   const targetX = colorRingBox.x + colorRingBox.width * 0.85
   const targetY = colorRingBox.y + colorRingBox.height / 2
@@ -269,3 +267,18 @@ test('Colored nodes retain their color after deselection', async ({ editorPage, 
   expect(node1FinalStyle).toEqual(node1ColoredStyle)
   expect(node2FinalStyle).toEqual(node2ColoredStyle)
 })
+
+/**
+ * The ring's box once its opening animation has finished. The ring grows from `scale(0)`, so a box
+ * measured during the animation is too small, and points computed from it miss the ring.
+ */
+async function settledBox(colorRing: Locator) {
+  await colorRing.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)))
+  return colorRing.boundingBox()
+}
+
+/** The node's `--node-group-color` override, or `undefined` when it has none. */
+async function groupColor(node: Locator) {
+  const style = await node.getAttribute('style')
+  return style?.match(/--node-group-color:\s*([^;]+)/)?.[1]?.trim()
+}
