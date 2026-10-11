@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import trash from 'trash'
 import * as yaml from 'yaml'
+import { serialised, updateJsonFile, writeJsonAtomic } from '../localMetadata/jsonFile.js'
 import * as nameValidation from './nameValidation.js'
 import { resolveClashingProjectIds } from './resolveClashingProjectIds.js'
 import { Path, UUID } from './types.js'
@@ -65,6 +66,20 @@ interface ProjectJson {
   lastOpened?: Rfc3339DateTime | null
 }
 
+/**
+ * Write `fields` into a project's `project.json`, keeping every other field already there (such as
+ * `labels`). A file that cannot be parsed is replaced.
+ */
+async function mergeProjectJson(metadataPath: string, fields: ProjectJson): Promise<void> {
+  await updateJsonFile(metadataPath, (current) => ({
+    ...(typeof current === 'object' && current != null && !Array.isArray(current) ? current : {}),
+    ...fields,
+  })).catch(async (error) => {
+    if (!(error instanceof SyntaxError)) throw error
+    await serialised(metadataPath, () => writeJsonAtomic(metadataPath, fields))
+  })
+}
+
 /** File-based implementation of ProjectRepository. */
 export class ProjectFileRepository implements ProjectRepository {
   /** Creates a new ProjectFileRepository with the specified projects directory. */
@@ -85,14 +100,12 @@ export class ProjectFileRepository implements ProjectRepository {
   /** Updates project metadata. */
   async update(project: Project): Promise<void> {
     const metadataPath = path.join(project.path, PROJECT_METADATA_RELATIVE_PATH)
-    const metadata: ProjectJson = {
+    await mergeProjectJson(metadataPath, {
       id: project.id,
       kind: project.kind,
       created: project.created,
       lastOpened: project.lastOpened ?? null,
-    }
-    await fs.mkdir(path.dirname(metadataPath), { recursive: true })
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    })
   }
 
   /** Deletes a path. */
@@ -182,14 +195,12 @@ export class ProjectFileRepository implements ProjectRepository {
     await fs.cp(project.path, targetPath, { recursive: true })
     // Update metadata
     const metadataPath = path.join(targetPath, PROJECT_METADATA_RELATIVE_PATH)
-    const metadata: ProjectJson = {
+    await mergeProjectJson(metadataPath, {
       id: newMetadata.id,
       kind: 'UserProject',
       created: newMetadata.created,
       lastOpened: newMetadata.lastOpened ?? null,
-    }
-    await fs.mkdir(path.dirname(metadataPath), { recursive: true })
-    await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2))
+    })
     // Update package name
     await this.renamePackage(targetPath, newName)
 
