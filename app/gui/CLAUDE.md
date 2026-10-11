@@ -113,12 +113,13 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   Billing & Plans and Usage tabs, the subscription page with the Stripe
   checkout, the payments success page and the top bar's billing parts;
   `versions/` and `properties/`: the right panel's Versions, Schedule and
-  Properties tabs; `credentials/`, `labels/` and `datalinks/`: the drive's
-  secret, credential, labels and datalink dialogs). Keep cloud-only code here
-  rather than in `src/utils/`, so a build without the cloud can drop one folder.
-  The core reaches the areas only through `registerCloud`
-  (`src/cloud/index.ts`), which `entrypoint.ts` calls; see
-  `src/cloud/CLAUDE.md`.
+  Properties tabs; `credentials/` and `datalinks/`: the drive's secret,
+  credential and datalink dialogs). Keep cloud-only code here rather than in
+  `src/utils/`, so a build without the cloud can drop one folder. The core
+  reaches the areas only through `registerCloud` (`src/cloud/index.ts`), which
+  `entrypoint.ts` calls; see `src/cloud/CLAUDE.md`. Labels are not cloud-only:
+  the drive's labels code is in `src/dashboard/components/labels/`, and asks the
+  backend's `supportsLabels` rather than whether it is the cloud.
 
 ## Entry points
 

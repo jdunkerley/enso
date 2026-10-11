@@ -15,7 +15,7 @@ import {
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
-import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
+import ManageLabelsModal from '#/components/labels/ManageLabelsModal.vue'
 import { isUploadableAsset } from '$/cloud/uploadToCloud'
 import { usePreferredTimeZone } from '$/cloud/versions/schedule'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'

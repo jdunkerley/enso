@@ -69,7 +69,7 @@ import {
   getColumnList,
 } from '#/pages/dashboard/components/column/columnUtils'
 import ColumnHeading from '#/pages/dashboard/components/columnHeading/ColumnHeading.vue'
-import DriveLabel from '#/pages/dashboard/components/DriveLabel.vue'
+import DriveLabel from '#/components/labels/DriveLabel.vue'
 import Button from '$/components/Button/Button.vue'
 import DragModal from '$/components/Drive/DragModal.vue'
 import Scroller from '$/components/Scroller/Scroller.vue'

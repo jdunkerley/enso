@@ -16,7 +16,7 @@
  * the field is clicked, and Escape drops the focus.
  */
 import { useSuggestions, type Suggestion } from '#/layouts/Drive/suggestions'
-import DriveLabel from '#/pages/dashboard/components/DriveLabel.vue'
+import DriveLabel from '#/components/labels/DriveLabel.vue'
 import Button from '$/components/Button/Button.vue'
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import Icon from '$/components/Icon/Icon.vue'

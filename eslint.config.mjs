@@ -85,7 +85,6 @@ const CLOUD_AREAS = [
   'browserDisabled',
   'datalinks',
   'devtools',
-  'labels',
   'organization',
   'properties',
   'versions',
