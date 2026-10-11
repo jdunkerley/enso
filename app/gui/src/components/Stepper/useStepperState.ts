@@ -1,6 +1,6 @@
 /**
- * @file The state of a `Stepper.vue`: the Vue counterpart of the React `useStepperState`, with the
- * same names and rules (steps are 0-indexed; going past the last step calls `onCompleted` instead).
+ * @file The state of a `Stepper.vue` (steps are 0-indexed; going past the last step calls
+ * `onCompleted` instead).
  */
 import { computed, readonly, ref, type ComputedRef, type Ref } from 'vue'
 
@@ -24,7 +24,7 @@ export interface StepperState {
   readonly percentComplete: ComputedRef<number>
 }
 
-/** A stepper's state, and the helpers the React hook returns beside it. */
+/** A stepper's state, and the helpers for moving between its steps. */
 export function useStepperState(options: StepperStateOptions) {
   const { steps, defaultStep = 0, onStepChange, onCompleted } = options
   if (steps <= 0) throw new Error('Invalid number of steps')

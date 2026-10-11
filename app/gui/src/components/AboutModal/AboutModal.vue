@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The "About Enso" dialog: the app's edition and versions, with a button to copy them. The Vue
- * port of the React `AboutModal`, with the same dialog, text and layout.
+ * @file The "About Enso" dialog: the app's edition and versions, with a button to copy them.
  *
  * `App.vue` mounts it once, and the app menu's About item, the user menu and the info menu open it
  * through {@link openAboutModal} (`./aboutModal.ts`).

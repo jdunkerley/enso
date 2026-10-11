@@ -1,7 +1,6 @@
 /**
  * @file Placeholders of date and time segments. The date inputs use the Swedish locale (`sv`)
- * because it writes ISO dates (`2026-09-30`), but show the English placeholders, as the React
- * `DatePicker` does.
+ * because it writes ISO dates (`2026-09-30`), but show the English placeholders.
  */
 
 /** A date or time segment's part, as Reka names it (Reka has no era segment). */
@@ -48,10 +47,10 @@ export interface Segment {
 const TIME_PARTS: readonly SegmentPart[] = ['hour', 'minute', 'second']
 
 /**
- * The segments in ISO order (`2026-09-30 14:05:00`), whatever the locale's order: the React
- * `DatePicker` formats its input in the `sv` locale for this, but in Reka the locale also names the
- * calendar's days and months, which must stay in the user's language. Reka moves between segments
- * in DOM order, so the keyboard follows the ISO order too.
+ * The segments in ISO order (`2026-09-30 14:05:00`), whatever the locale's order. The `sv` locale
+ * alone would give this order, but in Reka the locale also names the calendar's days and months,
+ * which must stay in the user's language. Reka moves between segments in DOM order, so the
+ * keyboard follows the ISO order too.
  */
 export function isoSegments(segments: readonly Segment[]): Segment[] {
   const byPart = new Map(segments.filter((s) => s.part !== 'literal').map((s) => [s.part, s]))

@@ -1,6 +1,6 @@
 /**
  * @file Whether the "About Enso" dialog is open. It is global, as the dialog is reachable from
- * everywhere: the app menu (registered by `App.vue`), and the user and info menus (React).
+ * everywhere: the app menu (registered by `App.vue`), and the user and info menus.
  */
 import { focusReturnTarget, type FocusReturnTarget } from '$/components/Dialog/focusReturn'
 import { createGlobalState } from '@vueuse/core'

@@ -1,5 +1,5 @@
 /**
- * @file The Vue `AlertDialog`'s answer, submitted through a form as React's was (#84): a failure
+ * @file The `AlertDialog`'s answer, submitted through a form (#84): a failure
  * shown under the buttons, the offline notice, and a dialog without a cancel button.
  */
 import {

@@ -1,6 +1,6 @@
 /**
  * @file How a `CheckboxGroup.vue` tells the checkboxes inside it which values are selected, and
- * lets them toggle theirs: the Vue counterpart of the React `CheckboxGroupProvider`.
+ * lets them toggle theirs.
  */
 import { createContextStore } from '@/providers'
 import type { Ref } from 'vue'

@@ -42,7 +42,7 @@ const CONTAINER_STYLE = { backgroundColor: PANEL_BACKGROUND_COLOR }
 /**
  * The content of a tab contributed from elsewhere (the cloud's Properties, Versions and Schedule
  * tabs; `$/providers/rightPanelContributions`), loaded when the tab first opens. Meanwhile it shows
- * the loader React's `Suspense` showed around the React tabs.
+ * a loader.
  */
 const contributedComponents = new Map<RightPanelTabLoader, Component>()
 function contributedTab(tab: ContributedRightPanelTab) {

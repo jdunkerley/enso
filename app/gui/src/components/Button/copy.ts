@@ -1,5 +1,5 @@
 /**
- * @file Copying text to the clipboard from a button, as the React `useCopy` does: a "Copied to
+ * @file Copying text to the clipboard from a button: a "Copied to
  * clipboard" toast at the bottom right on success, an error toast on failure, and a state that
  * returns to `idle` after 2 s or once the toast is closed.
  */
@@ -8,7 +8,7 @@ import { useToasts } from '$/providers/toasts'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { onScopeDispose, ref } from 'vue'
 
-/** The success toast's id, shared by every copy button as in React: one such toast at a time. */
+/** The success toast's id, shared by every copy button: one such toast at a time. */
 const SUCCESS_TOAST_ID = 'copySuccess'
 
 /** How long the success or error state stays. */
@@ -53,7 +53,7 @@ export function useCopy(options: UseCopyOptions = {}) {
       hideProgressBar: true,
       position: 'bottom-right',
     })
-    // Closing the toast resets the state, as in React.
+    // Closing the toast resets the state.
     stopWatchingToast?.()
     stopWatchingToast = toasts.onChange((change) => {
       if (change.id === SUCCESS_TOAST_ID && change.status === 'removed') reset()

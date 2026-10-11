@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * @file The heading of one column of the drive's table: the Vue port of React's `COLUMN_HEADING`
- * components. Name, Modified and Created at sort the table (ascending, descending, then not sorted)
- * and are named by what pressing them does; every other heading's icon hides its column. The
- * markup, labels and test ids are React's, which #81's accessibility snapshot pins.
+ * @file The heading of one column of the drive's table. Name, Modified and Created at sort the
+ * table (ascending, descending, then not sorted) and are named by what pressing them does; every
+ * other heading's icon hides its column. The markup, labels and test ids are pinned by #81's
+ * accessibility snapshot.
  */
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'
 import { Column } from '#/pages/dashboard/components/column/columnUtils'

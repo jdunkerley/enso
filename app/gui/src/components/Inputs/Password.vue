@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A password input with a show/hide button: the Vue counterpart of the React `Password`.
+ * @file A password input with a show/hide button.
  * Every prop and attribute falls through to `Input.vue`; the button appears once there is a value.
  */
 import Button from '$/components/Button/Button.vue'

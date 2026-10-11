@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A check mark (or the indeterminate dash) in a box: the Vue counterpart of the React
- * `#/components/Check`, styled by the same `CHECK_CLASSES`. Decorative (`role="presentation"`).
+ * @file A check mark (or the indeterminate dash) in a box, styled by `CHECK_CLASSES`. Decorative
+ * (`role="presentation"`).
  */
 import { CHECK_CLASSES } from '$/components/Checkbox/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

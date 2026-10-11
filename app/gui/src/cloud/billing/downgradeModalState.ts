@@ -1,7 +1,7 @@
 /**
  * @file When the user last acknowledged a downgrade: `PlanDowngradedModal.vue` waits a while before
  * showing again, and `TrialEndedModal.vue` counts as having shown it. Kept in `LocalStorage` under
- * `downgradeModal`, per user, as the React `useDowngadeModalState` kept it.
+ * `downgradeModal`, per user: the key and format used before the Vue port (#75).
  */
 import LocalStorage from '$/utils/LocalStorage'
 import { computed } from 'vue'

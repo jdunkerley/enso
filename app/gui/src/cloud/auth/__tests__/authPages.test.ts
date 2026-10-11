@@ -1,7 +1,7 @@
 /**
- * @file The Vue authentication pages: the behaviour the React pages had, and the Playwright specs
- * cannot reach against the mocked Cognito (the one-time-code challenge, its errors, an unconfirmed
- * account, a missing reset link).
+ * @file The authentication pages: the behaviour the Playwright specs cannot reach against the
+ * mocked Cognito (the one-time-code challenge, its errors, an unconfirmed account, a missing reset
+ * link).
  */
 import { LOGIN_PATH } from '$/appUtils'
 import { useText } from '$/providers/text'
@@ -41,7 +41,7 @@ vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return { useBackends: () => mockBackends() }
 })
-// The info bar has its own tests, and the modal host renders the React modals: neither is under
+// The info bar has its own tests, and the modal host renders the modal stack: neither is under
 // test.
 vi.mock('$/components/InfoBar/InfoBar.vue', () => ({
   __esModule: true,
@@ -54,7 +54,7 @@ vi.mock('$/components/ModalHost/ModalHost.vue', () => ({
 
 const { getText } = useText()
 
-// The React `App.tsx` registers it, which every page of the app loads first.
+// `App.vue` registers it, which every page of the app loads first.
 LocalStorage.registerKey('loginRedirect', { isUserSpecific: true, schema: z.string() })
 
 beforeEach(() => {

@@ -79,7 +79,7 @@ test.describe('on the free plan', () => {
       .driveTable.rightClickRow(0)
       .contextMenu.exportToCloud()
       .do(async () => {
-        // React's dialog had no accessible name (#156, ruling 11): find it by its title's text.
+        // The dialog is found by its title's text, not by an accessible name (#156, ruling 11).
         const dialog = page.getByRole('dialog').filter({ hasText: TEXT.uploadToCloudFeatureLabel })
         await expect(dialog).toBeVisible()
         await expect(

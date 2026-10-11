@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The two-factor authentication section of the Account settings tab: the Vue port of the
- * React `SetupTwoFaForm`. With 2FA on, it offers to turn it off (after a code from the
- * authenticator app); with 2FA off, a switch reveals the setup (`TwoFaSetup.vue`).
+ * @file The two-factor authentication section of the Account settings tab. With 2FA on, it offers
+ * to turn it off (after a code from the authenticator app); with 2FA off, a switch reveals the
+ * setup (`TwoFaSetup.vue`).
  */
 import type { MfaType } from '$/authentication/cognito'
 import Alert from '$/components/Alert/Alert.vue'
@@ -50,7 +50,7 @@ async function verifyAndUpdate(otp: string, mfaType: MfaType) {
   await updateMfaPreference.mutateAsync(mfaType)
 }
 
-// Shown once the preference is known, as React's suspending query did.
+// Shown once the preference is known.
 await preference.suspense()
 </script>
 

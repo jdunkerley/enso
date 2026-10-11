@@ -1,6 +1,5 @@
 /**
- * @file Styles for an icon, shared by the React `#/components/Icon` and the Vue
- * `$/components/Icon/Icon.vue`.
+ * @file Styles for an icon (`$/components/Icon/Icon.vue`).
  */
 import { tv, type VariantProps } from '$/utils/style/tailwindVariants'
 

@@ -2,16 +2,14 @@
  * @file The location the drive shows, and how it moves to another one.
  *
  * The drive location (`$/providers/drive`) changes the moment a category button, a breadcrumb or a
- * row asks it to. The React drive rendered every change of location in a React transition: the old
- * directory (its bar, its rows, its `data-category`) stayed on screen until the new directory's
- * details (and, for the trash, its listing) had loaded, while `isNavigating` showed the category
- * button's spinner and the button that asked showed its own (#90, ruling 5). The specs rely on that
- * through `data-category`.
+ * row asks it to. The drive shows the change only once it has loaded: the old directory (its bar,
+ * its rows, its `data-category`) stays on screen until the new directory's details (and, for the
+ * trash, its listing) have loaded, while `isNavigating` shows the category button's spinner and the
+ * button that asked shows its own (#90, ruling 5). The specs rely on that through `data-category`.
  *
- * {@link provideDriveView} gives the Vue drive the same: `shown` is the location whose data is
- * there, `target` the one asked for. Everything below the drive reads `shown`. A control that
- * navigates passes itself as the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom}
- * is true for it, as each React control's own `useTransition` did.
+ * {@link provideDriveView} does this: `shown` is the location whose data is there, `target` the one
+ * asked for. Everything below the drive reads `shown`. A control that navigates passes itself as
+ * the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom} is true for it.
  */
 import { useAuth } from '$/providers/auth'
 import { categoryKey, useCategories, type Category } from '$/providers/category'
@@ -66,7 +64,7 @@ function sameLocation(a: DriveViewLocation, b: DriveViewLocation) {
   )
 }
 
-/** Query options for the details of a directory, as React's `DriveBarNavigation` had them. */
+/** Query options for the details of a directory. */
 export function directoryDetailsQueryOptions(
   location: DriveViewLocation,
   rootPath: Path | null | undefined,
@@ -97,7 +95,7 @@ export function directoryDetailsQueryOptions(
   }
 }
 
-/** Select {@link DirectoryDetails} from the details of a directory, as React did. */
+/** Select {@link DirectoryDetails} from the details of a directory. */
 export function selectDirectoryDetails(data: AnyAsset | null): DirectoryDetails | null {
   if (data == null) return null
   return {

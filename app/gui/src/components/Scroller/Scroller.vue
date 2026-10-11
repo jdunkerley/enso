@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A scrolling container that fades its edges while there is more to scroll to: the Vue
- * counterpart of the React `#/components/Scroller`, styled by the same `SCROLLER_STYLES`.
+ * @file A scrolling container that fades its edges while there is more to scroll to, styled
+ * by `SCROLLER_STYLES`.
  */
 import { SCROLLER_STYLES } from '$/components/Scroller/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

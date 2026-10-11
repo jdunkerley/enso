@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * @file A one-time-code input bound to a string form field: the Vue counterpart of the React
- * `OTPInput`, styled by the same `OTP_INPUT_STYLES` and `OTP_SLOT_STYLES`, on Reka's `PinInput`
- * instead of `input-otp`. One `<input>` per character (`autocomplete="one-time-code"`): typing
- * moves to the next, Backspace to the previous, arrow keys between them, and pasting a code fills
- * them all. Six or more characters are grouped in threes with a separator, as in React.
+ * @file A one-time-code input bound to a string form field, styled by `OTP_INPUT_STYLES` and
+ * `OTP_SLOT_STYLES`, on Reka's `PinInput`. One `<input>` per character
+ * (`autocomplete="one-time-code"`): typing moves to the next, Backspace to the previous, arrow keys
+ * between them, and pasting a code fills them all. Six or more characters are grouped in threes
+ * with a separator.
  *
  * When every character is filled it calls `onComplete` and, unless `submitOnComplete` is `false`,
  * submits the form.

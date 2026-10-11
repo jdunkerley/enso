@@ -1,8 +1,8 @@
 /**
- * @file Framework-free query options for the drive: its directory listings and searches, and
- * reading an asset back from the query cache, plus the names the drive gives new assets. Moved out
- * of the React `#/hooks/backendHooks` (#92, #192), with the same keys: the React and Vue sides
- * share one `QueryClient`, so both read the same cached listings.
+ * @file Framework-free query options for the drive (#92, #192): its directory listings and
+ * searches, and reading an asset back from the query cache, plus the names the drive gives new
+ * assets. Every caller shares one `QueryClient` and these keys, so all read the same cached
+ * listings.
  */
 import type { Category, CategoryType } from '$/providers/category'
 import { backendQueryOptions } from '$/utils/backendQuery'

@@ -1,4 +1,4 @@
-/** @file Styles for an alert, shared by the React `#/components/Alert` and its Vue port. */
+/** @file Styles for an alert (`Alert.vue`). */
 import { tv } from '$/utils/style/tailwindVariants'
 
 export const ALERT_STYLES = tv({

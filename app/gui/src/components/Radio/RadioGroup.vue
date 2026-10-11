@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A radio group bound to a string form field: the Vue counterpart of the React `Radio.Group`,
- * styled by the same `RADIO_GROUP_STYLES`. The radios are the default slot. It is a
- * `role="radiogroup"` labelled by its field's label; the radios are native, so arrow keys move the
- * selection as the browser does.
+ * @file A radio group bound to a string form field, styled by `RADIO_GROUP_STYLES`. The radios are
+ * the default slot. It is a `role="radiogroup"` labelled by its field's label; the radios are
+ * native, so arrow keys move the selection as the browser does.
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'

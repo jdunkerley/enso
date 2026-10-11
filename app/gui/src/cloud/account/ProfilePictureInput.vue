@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The user's profile picture on the Account settings tab, which uploads a new one when
- * clicked: the Vue port of the React `ProfilePictureInput`.
+ * clicked.
  */
 import Form from '$/components/Form/Form.vue'
 import FormError from '$/components/Form/FormError.vue'

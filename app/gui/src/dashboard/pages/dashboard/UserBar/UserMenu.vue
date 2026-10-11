@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
  * @file The user menu: the profile picture button at the right of the user bar, and the popover of
- * user actions and settings it opens. The Vue counterpart of the React `UserMenu` (#83).
+ * user actions and settings it opens (#83).
  *
- * As in React it is a dialog ("User Settings") of buttons, operated with Tab, Enter and Space, not
- * a `menu`. Its entries are global actions while the user bar is mounted, whether or not the menu
- * is open (`useMenuEntries`): they are in the command palette, and their shortcuts (`Mod+,` for
- * Settings, `Mod+/` for About) work anywhere.
+ * It is a dialog ("User Settings") of buttons, operated with Tab, Enter and Space, not a `menu`.
+ * Its entries are global actions while the user bar is mounted, whether or not the menu is open
+ * (`useMenuEntries`): they are in the command palette, and their shortcuts (`Mod+,` for Settings,
+ * `Mod+/` for About) work anywhere.
  *
  * The cloud-only parts come from `src/cloud/` (the organization switcher, "Upgrade Plan"); they are
  * imported directly, as the cloud registries of decision 6b do not exist yet.
@@ -60,7 +60,7 @@ const toasts = useToasts()
 const modals = useModals()
 const devtools = useDevtoolsStore()
 
-/** Show an error toast, and log it, as React's `toastAndLog` does. */
+/** Show an error toast, and log it. */
 function toastAndLog(message: string) {
   toasts.show(message, { type: 'error' })
   console.error(message)

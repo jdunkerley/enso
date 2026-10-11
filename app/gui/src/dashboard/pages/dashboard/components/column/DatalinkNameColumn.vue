@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The name cell of a datalink: its icon, and its name, which turns into a form while it is
- * renamed. A double click opens the asset panel's Properties tab. The Vue port of React's
- * `DatalinkNameColumn` (whose name, unlike the other cells', has no `asset-row-name` test id: kept
- * as it was).
+ * renamed. A double click opens the asset panel's Properties tab. Its name, unlike the other
+ * cells', has no `asset-row-name` test id (kept as it was).
  */
 import Icon from '$/components/Icon/Icon.vue'
 import EditableSpan from '$/components/EditableSpan/EditableSpan.vue'

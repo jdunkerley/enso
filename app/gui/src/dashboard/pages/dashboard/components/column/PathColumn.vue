@@ -2,9 +2,8 @@
 /**
  * @file The path column of the drive's table (shown in Recent, the trash and search results): the
  * asset's parent directory, or a button opening a popover with the whole path. Pressing a directory
- * there goes to its category, as React's `PathColumn` did (it set the directory and then the
- * category, which resets the directory: kept as it was). Test ids are React's
- * (`path-column-cell-…`, `path-column-item-…`).
+ * there goes to its category (it sets the directory and then the category, which resets the
+ * directory: kept as it was). Its test ids are `path-column-cell-…` and `path-column-item-…`.
  */
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { STOP_PRESS_PROPAGATION } from '#/layouts/Drive/pressPropagation'

@@ -1,6 +1,6 @@
 /**
  * @file The Vue `Stepper`, `Step`, `StepContent` and `useStepperState`: the step markers' states,
- * the current step's content, and moving between steps as the React stepper does.
+ * the current step's content, and moving between steps.
  */
 import {
   mountWithProviders,

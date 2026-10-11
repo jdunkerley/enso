@@ -2,11 +2,10 @@
 /**
  * @file The right panel's Versions tab: the versions of the asset selected in a cloud category,
  * newest first, with their tags and comments, and actions to compare, restore or duplicate them.
- * The Vue port of the React `AssetPanel/components/AssetVersions`.
  *
  * Outside the cloud, with nothing selected, or for an asset without versions (only projects, files
  * and datalinks have them) it says so. The list itself (`AssetVersionList.vue`) loads in a
- * `SuspenseLoader`, as React's suspended, and is remounted for each asset.
+ * `SuspenseLoader`, and is remounted for each asset.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'

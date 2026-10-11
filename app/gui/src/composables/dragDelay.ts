@@ -1,7 +1,6 @@
 /**
- * @file Running an action when a drag hovers over a drop target for a while: the Vue port of
- * React's `useDragDelayAction` (#91). The drive's directory rows and breadcrumbs open when assets
- * are held over them for two seconds.
+ * @file Running an action when a drag hovers over a drop target for a while (#91). The drive's
+ * directory rows and breadcrumbs open when assets are held over them for two seconds.
  */
 import { onScopeDispose } from 'vue'
 

@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
- * @file A menu of actions opened from a trigger: the Vue counterpart of the React
- * `#/components/Menu` + `Menu.Trigger`, built on Reka UI's `DropdownMenu`.
+ * @file A menu of actions opened from a trigger, built on Reka UI's `DropdownMenu`.
  *
- * Reka provides the accessibility behaviour react-aria provided on the React side: `menu` /
- * `menuitem` roles, focus moved into the menu on open and back to the trigger on close, arrow-key
- * navigation with typeahead, Escape and outside-click dismissal.
+ * Reka provides the accessibility behaviour: `menu` / `menuitem` roles, focus moved into the menu
+ * on open and back to the trigger on close, arrow-key navigation with typeahead, Escape and
+ * outside-click dismissal.
  *
- * The trigger is the `trigger` slot, replacing React's `Menu.Trigger` wrapper; the items
+ * The trigger is the `trigger` slot; the items
  * (`MenuItem`, `MenuSection`, `MenuSeparator`, `MenuSubmenu`) are the default slot.
  *
- * An item that opens a dialog keeps the focus in that dialog, as react-aria's menus do: Reka would
+ * An item that opens a dialog keeps the focus in that dialog: Reka would
  * return the focus to the trigger once the menu's exit animation ended, and the dialog's focus trap
  * then took it back without showing it (an `AlertDialog`'s confirm button lost its focused look).
  */
@@ -34,7 +33,7 @@ const {
 } = defineProps<{
   variant?: 'dark' | 'light' | undefined
   placement?: Placement | undefined
-  /** Distance from the trigger, in pixels. React's menus use react-aria's default, 8. */
+  /** Distance from the trigger, in pixels. */
   offset?: number | undefined
   testId?: string | undefined
   class?: string | undefined

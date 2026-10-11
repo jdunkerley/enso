@@ -1,6 +1,6 @@
 /**
- * @file The query behind the API keys settings tab: the user's API keys. It keeps the React
- * `backendQueryOptions`' key and options (stale at once, persisted), so that the cache and its
+ * @file The query behind the API keys settings tab: the user's API keys. It keeps the key and
+ * options used before the Vue port (#75), stale at once and persisted, so that the cache and its
  * persistence stay valid; `createApiKey` and `deleteApiKey` invalidate it (`INVALIDATION_MAP`).
  */
 import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'

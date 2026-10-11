@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The dialog shown when the trial of a paid plan has ended: the Vue port of the React
- * `#/modals/TrialEndedModal`, with the same title, text, alert and buttons.
+ * @file The dialog shown when the trial of a paid plan has ended.
  *
  * `AppContainerLayout.vue` shows it for a paid plan whose subscription is paused (through the
  * modals `registerCloud` contributes). "Subscribe" opens a checkout for the Solo plan in a new tab;
@@ -32,7 +31,7 @@ const createCheckoutSession = useMutation(
 )
 const cancelSubscription = useMutation(backendMutationOptions('cancelSubscription', remoteBackend))
 
-// Opens as it mounts, as React's `defaultOpen` did.
+// Opens as it mounts.
 const open = ref(true)
 
 async function subscribe() {

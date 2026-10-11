@@ -1,6 +1,5 @@
 /**
- * @file Types of the Vue form layer (`useForm`, `Form.vue` and the inputs). They mirror the React
- * `#/components/Form` types, without react-hook-form.
+ * @file Types of the Vue form layer (`useForm`, `Form.vue` and the inputs).
  */
 import type { Path } from '$/utils/objectPath'
 import type { MaybeRefOrGetter } from 'vue'
@@ -42,10 +41,10 @@ export interface FieldError {
   readonly type: 'manual' | 'validation'
 }
 
-/** When a field is validated. The same names, and meaning, as react-hook-form's `mode`. */
+/** When a field is validated. */
 export type ValidationMode = 'all' | 'onBlur' | 'onChange' | 'onSubmit' | 'onTouched'
 
-/** Callbacks around a submission. The same as the React form's. */
+/** Callbacks around a submission. */
 export interface OnSubmitCallbacks<Schema extends TSchema, SubmitResult = void> {
   readonly onSubmit?:
     | ((
@@ -86,7 +85,7 @@ export interface UseFormOptions<
   /**
    * The initial values. A ref or getter is read when the form is created and again on every
    * `reset()`, so a form fed by a query can call `reset()` once the data arrives. It is not
-   * re-applied on its own, as in React.
+   * re-applied on its own.
    */
   readonly defaultValues?: MaybeRefOrGetter<DefaultValues<FieldValues<Schema>> | undefined>
   /** When fields are validated before the first submission. Default `onSubmit`. */
@@ -152,8 +151,7 @@ export interface FieldRegistration {
 }
 
 /**
- * A form: its values, state and actions. The Vue counterpart of the React `FormInstance`
- * (`UseFormReturn`), with the same method names, so that ports stay mechanical.
+ * A form: its values, state and actions.
  *
  * It is reactive: `formState`, `getValues`, `watch` and `getFieldState` read reactive state, so a
  * `computed` or a template that calls them updates.

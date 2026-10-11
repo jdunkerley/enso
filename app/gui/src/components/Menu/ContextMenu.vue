@@ -1,16 +1,15 @@
 <script setup lang="ts">
 /**
- * @file A menu that opens at the pointer on a right click inside its trigger area: the Vue
- * counterpart of the React `#/components/ContextMenu`, for the drive's asset table.
+ * @file A menu that opens at the pointer on a right click inside its trigger area, for the drive's
+ * asset table.
  *
  * The trigger area is the `trigger` slot; the items are the default slot, the same `MenuItem`,
  * `MenuSection` and `MenuSeparator` as a `DropdownMenu` uses. It is a Reka `DropdownMenu`
  * positioned against the clicked point, so it has the same keyboard behaviour, closes on Escape or
- * an outside click, and also closes when anything outside it scrolls or is right-clicked, as in
- * React.
+ * an outside click, and also closes when anything outside it scrolls or is right-clicked.
  *
- * It is controlled (`v-model:open`), and exposes `open({ pageX, pageY })` and `close()` for the
- * React version's imperative `ContextMenuApi` callers, which open it from a row's own handler.
+ * It is controlled (`v-model:open`), and exposes `open({ pageX, pageY })` and `close()` for
+ * imperative callers, which open it from a row's own handler.
  * (Reka's own `ContextMenu` cannot be closed programmatically, which the drive needs.)
  */
 import { portalTarget } from '$/components/portal'

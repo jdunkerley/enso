@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The sessions of one project, newest first, each with a button showing its logs. It waits
- * for them in `setup`, so it must be inside a `SuspenseLoader` (React's `useSuspenseQuery`).
+ * for them in `setup`, so it must be inside a `SuspenseLoader`.
  */
 import Result from '$/components/Result/Result.vue'
 import Scroller from '$/components/Scroller/Scroller.vue'
@@ -20,7 +20,8 @@ const { backend, project } = defineProps<{
 const { getText } = useText()
 
 const sessionsQuery = useQuery({
-  // React's key, unchanged: a session list cached (and persisted) by the React tab stays valid.
+  // The key used before the Vue port (#75), unchanged: a session list cached (and persisted)
+  // before then stays valid.
   queryKey: ['getProjectSessions', project.id, project.title],
   queryFn: async () => {
     const sessions = await backend.listProjectSessions(project.id, project.title)

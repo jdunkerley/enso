@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A button that copies text to the clipboard, and briefly shows whether that worked: the
- * Vue counterpart of the React `Button/CopyButton`.
+ * @file A button that copies text to the clipboard, and briefly shows whether that worked.
  *
- * Like the React one, it shows a "Copied to clipboard" toast at the bottom right on success (unless
+ * It shows a "Copied to clipboard" toast at the bottom right on success (unless
  * `successToastMessage` is `false`), which closes with the success icon; a failure shows an error
  * toast and is logged.
  */
@@ -22,7 +21,7 @@ const {
   successToastMessage = true,
 } = defineProps<{
   copyText: string
-  /** `null` shows no icon (`false` in React). */
+  /** `null` shows no icon. */
   copyIcon?: IconName | null | undefined
   successIcon?: IconName | undefined
   errorIcon?: IconName | undefined

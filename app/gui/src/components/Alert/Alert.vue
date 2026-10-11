@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file An alert box: the Vue counterpart of the React `#/components/Alert`. An `error` alert is an
- * `alert` live region and can take focus programmatically (`tabindex="-1"`), as in React.
+ * @file An alert box, styled by `ALERT_STYLES`. An `error` alert is an `alert` live region and can
+ * take focus programmatically (`tabindex="-1"`).
  */
 import { ALERT_STYLES } from '$/components/Alert/variants'
 import Icon from '$/components/Icon/Icon.vue'

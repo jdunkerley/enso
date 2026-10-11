@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The name cell of a file: its type's icon, and its name, which turns into a form while it is
- * renamed. The Vue port of React's `FileNameColumn`.
+ * renamed.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import EditableSpan from '$/components/EditableSpan/EditableSpan.vue'

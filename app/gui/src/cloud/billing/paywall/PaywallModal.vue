@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
  * @file `PaywallDialog.vue` opened on the modal stack (`$/providers/modals`): it opens as it mounts,
- * and emits `close` once it has closed, so that the stack drops it. The React menus' entries open it
- * for a feature the user's plan lacks ("Upload To Cloud" on the free plan), where they opened the
- * React `PaywallDialog` with `setModal`.
+ * and emits `close` once it has closed, so that the stack drops it. It is for menu entries of a
+ * feature the user's plan lacks ("Upload To Cloud" on the free plan).
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import { ref } from 'vue'

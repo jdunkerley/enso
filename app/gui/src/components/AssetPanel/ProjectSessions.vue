@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The right panel's Activity tab: the sessions of the project the panel is focused on, the
- * project selected in the drive or the one opened in a project tab (#176). The Vue port of the
- * React `AssetPanel/components/ProjectSessions`.
+ * project selected in the drive or the one opened in a project tab (#176).
  *
  * Without such a project it asks for one. The list itself (`ProjectSessionList.vue`) loads in a
- * `SuspenseLoader`, as React's suspended, and is remounted for each project.
+ * `SuspenseLoader`, and is remounted for each project.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'

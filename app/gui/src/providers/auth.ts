@@ -292,7 +292,7 @@ function createAuthStore(
   }
 
   /**
-   * Update the user session data in the React Query cache.
+   * Update the user session data in the query cache.
    * This only works for full user sessions.
    * @deprecated Never use this function. Prefer particular functions like `setUsername` or `deleteUser`.
    */

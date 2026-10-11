@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * @file A text that turns into a one-field form to edit it: the Vue counterpart of the React
- * `#/components/EditableSpan`, which the drive's name cells use to rename an asset in place.
+ * @file A text that turns into a one-field form to edit it, which the drive's name cells use to
+ * rename an asset in place.
  *
  * While not `editable` it is a truncated `Text`. While editable it is `EditableSpanForm.vue`. The
- * text is the `text` prop, where React took it as its children.
+ * text is the `text` prop.
  */
 import Text from '$/components/Text/Text.vue'
 import { twJoin } from '$/utils/style/tailwindMerge'

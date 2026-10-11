@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file An asset's icon, by its type (and a file's extension): the Vue counterpart of the React
- * `#/pages/dashboard/components/AssetIcon`, which stays for the React drive table until #91.
+ * @file An asset's icon, by its type (and a file's extension).
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { fileIcon } from '$/utils/fileIcon'

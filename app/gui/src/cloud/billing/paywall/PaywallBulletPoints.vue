@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file The list of what a plan brings, from a `;`-separated text: the Vue port of the React
- * `PaywallBulletPoints`.
+ * @file The list of what a plan brings, from a `;`-separated text.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'

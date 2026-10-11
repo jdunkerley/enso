@@ -1,6 +1,5 @@
 /**
- * @file The plan selector's styles: the grid of plan cards, and a card. Moved unchanged from the
- * React `PlanSelector` and `Card` (#88).
+ * @file The plan selector's styles: the grid of plan cards, and a card.
  */
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import { tv } from '$/utils/style/tailwindVariants'

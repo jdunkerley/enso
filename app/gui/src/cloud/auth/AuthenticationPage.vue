@@ -1,15 +1,14 @@
 <script setup lang="ts">
 /**
- * @file The layout of the authentication pages: the Vue port of the React `AuthenticationPage`
- * (and of the `Page` around it), with the same classes.
+ * @file The layout of the authentication pages.
  *
  * The page is a centred card holding the default slot, under an optional `title`, and the `footer`
- * slot below it. With a `form` (from `useForm`), the card is that form's `<form>` element, as in
- * React. While offline, a notice above the card says that signing in is unavailable, and, with
+ * slot below it. With a `form` (from `useForm`), the card is that form's `<form>` element. While
+ * offline, a notice above the card says that signing in is unavailable, and, with
  * `supportsOffline`, that the local projects still are.
  *
- * Like the React `Page`, it shows the info bar at the top right (`$/components/InfoBar`, #83) and
- * mounts the modal host, both loaded on first use.
+ * It shows the info bar at the top right (`$/components/InfoBar`, #83) and mounts the modal host,
+ * both loaded on first use.
  */
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import Form from '$/components/Form/Form.vue'
@@ -33,9 +32,9 @@ const {
   testId?: string | undefined
 }>()
 
-/** Loaded on demand, as the React `Page` loads it: its popover pulls in Reka. */
+/** Loaded on demand: its popover pulls in Reka. */
 const InfoBar = defineAsyncComponent(() => import('$/components/InfoBar/InfoBar.vue'))
-/** Loaded on demand, as the React `Page` loads it: its error boundary pulls in Reka. */
+/** Loaded on demand: its error boundary pulls in Reka. */
 const ModalHost = defineAsyncComponent(() => import('$/components/ModalHost/ModalHost.vue'))
 
 const CONTAINER_CLASSES = DIALOG_BACKGROUND({

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file A settings entry that is a form: the Vue port of the React `FormEntry`. Save and Cancel
- * appear once the form is edited (and only when an input is editable); the form resets whenever
- * the entry's value changes, for instance once a saved change has been fetched back.
+ * @file A settings entry that is a form. Save and Cancel appear once the form is edited (and only
+ * when an input is editable); the form resets whenever the entry's value changes, for instance once
+ * a saved change has been fetched back.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Form from '$/components/Form/Form.vue'

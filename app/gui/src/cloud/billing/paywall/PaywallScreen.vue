@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A screen in place of a feature the user's plan lacks: the plan it needs, what it brings,
- * and the upgrade button. The Vue port of the React `PaywallScreen`.
+ * and the upgrade button.
  */
 import Heading from '$/components/Text/Heading.vue'
 import Text from '$/components/Text/Text.vue'

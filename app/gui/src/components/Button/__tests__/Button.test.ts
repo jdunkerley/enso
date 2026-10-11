@@ -1,6 +1,6 @@
 /**
- * @file Behaviour of the Vue `Button` family: what react-aria's `Button` gave the React one, and
- * the loading, tooltip and group behaviour the dashboard relies on.
+ * @file Behaviour of the `Button` family: its behaviour as a button, and the loading, tooltip and
+ * group behaviour the dashboard relies on.
  */
 import {
   byTestId,
@@ -93,7 +93,7 @@ describe('Button', () => {
     expect(button.querySelector('use')?.getAttribute('data-icon')).toBe('close')
     expect(button.classList).toContain('aspect-square')
 
-    // Keyboard focus opens it (`delay: 0` for buttons, as in React).
+    // Keyboard focus opens it (`delay: 0` for buttons).
     await userEvent.setup().tab()
     expect(document.activeElement).toBe(button)
     await vi.waitFor(() => expect(document.querySelector('[role="tooltip"]')).not.toBeNull())

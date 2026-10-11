@@ -1,12 +1,11 @@
 <script setup lang="ts">
 /**
- * @file A styled text input without a form field: the Vue counterpart of the React `BasicInput`,
- * styled by the same `INPUT_STYLES`. `Input.vue` wraps it in a `Field`; `ComboBox.vue` uses it bare.
+ * @file A styled text input without a form field, styled by `INPUT_STYLES`. `Input.vue` wraps it
+ * in a `Field`; `ComboBox.vue` uses it bare.
  *
  * The value is `v-model`. The addons and a custom icon are slots (`addonStart`, `addonEnd`, `icon`);
  * `icon` also takes an `icons.svg` name. Attributes (`name`, `autocomplete`, `aria-*`, native
- * listeners) go on the `<input>`, as React spreads its props onto it. Clicking anywhere in the box
- * focuses the input.
+ * listeners) go on the `<input>`. Clicking anywhere in the box focuses the input.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { INPUT_STYLES } from '$/components/Inputs/variants'
@@ -28,7 +27,7 @@ const {
   variants = INPUT_STYLES,
   isInvalid = false,
   isDisabled = false,
-  // `undefined`, not `false`: React passes it through unset, which adds no read-only class.
+  // `undefined`, not `false`: left unset, it adds no read-only class.
   readOnly = undefined,
   description,
   descriptionId,
@@ -52,7 +51,7 @@ const {
   placeholder?: string | undefined
   /** Focus the input on mount; `select` also selects its text. */
   autoFocus?: boolean | 'select' | undefined
-  /** Classes for the `<input>`, as React's `className`. */
+  /** Classes for the `<input>`. */
   class?: string | undefined
 }>()
 

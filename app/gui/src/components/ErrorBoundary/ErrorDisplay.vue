@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The default fallback of `ErrorBoundary.vue`: a `Result` with the error, a "Try again"
- * button and, in development builds, the stack. The Vue counterpart of the React `ErrorDisplay`.
+ * button and, in development builds, the stack.
  */
 import Alert from '$/components/Alert/Alert.vue'
 import Button from '$/components/Button/Button.vue'

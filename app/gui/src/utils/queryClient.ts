@@ -54,7 +54,7 @@ declare module '@tanstack/query-core' {
   }
 }
 
-/** Query Client type suitable for shared use in React and Vue. */
+/** Query Client type suitable for shared use across the app. */
 export type QueryClient = vueQuery.QueryClient
 
 const DEFAULT_QUERY_STALE_TIME_MS = 0

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The button that leads to the plan a feature needs: the subscription page or, for the
- * enterprise plan, the contact page. The Vue port of the paywall's React `UpgradeButton` (the user
- * bar's "Upgrade" is `../UpgradeButton.vue`).
+ * enterprise plan, the contact page. (The user bar's "Upgrade" is `../UpgradeButton.vue`.)
  *
  * Its label is the default slot, or "Upgrade to <plan>" ("Contact Sales" for the enterprise plan).
  * Other attributes (`class`, …) go on the `Button.vue`.

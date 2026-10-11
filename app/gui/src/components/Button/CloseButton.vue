@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A small round button with a close icon, for closing a dialog or a panel: the Vue
- * counterpart of the React `Button/CloseButton`. On macOS the icon only shows on hover, as the
- * window controls do.
+ * @file A small round button with a close icon, for closing a dialog or a panel. On macOS the icon
+ * only shows on hover, as the window controls do.
  *
  * (Not to be confused with `src/components/CloseButton.vue`, the window-control close button of the
  * app's own title bar.)

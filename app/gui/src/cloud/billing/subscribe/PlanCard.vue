@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A plan's card on the subscription page: its title, subtitle and price, its button, its
- * features and a "Learn More" link. The Vue port of the React `Card`.
+ * features and a "Learn More" link.
  *
  * The button is `SubscribeButton.vue` (disabled for the free plan), or "Contact Us" for the
  * enterprise plan. The Team card is raised with a shadow. Buying starts a Stripe checkout
@@ -54,7 +54,7 @@ const {
 const { getText } = useText()
 const checkout = useCheckout()
 
-/** The Team plan is the one raised: React's `PROPS_FOR_PLAN`. */
+/** The Team plan is the one raised. */
 const styles = computed(() =>
   PLAN_CARD_STYLES({ elevated: plan === Plan.team ? 'xxlarge' : 'none' }),
 )

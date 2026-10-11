@@ -1,11 +1,7 @@
 /**
  * @file The Reka UI spike (#76): a Vue `DropdownMenu` built on Reka's `DropdownMenu`, mounted in the app
- * container beside the user bar, keeps react-aria's keyboard and focus behaviour while
- * react-aria's own overlays and global listeners are live on the same page.
- *
- * The user bar was React when this came in; since #83 its menu is a Vue `Popover` too, so the test
- * that compared the spike's popover with the React user menu's is gone (#83 compared the user menu
- * itself with React's, by screenshot, and they matched).
+ * container beside the user bar, keeps its keyboard and focus behaviour while the page's other
+ * overlays and global listeners are live.
  *
  * Remove together with `HeadlessUiSpike.vue` once the `DropdownMenu` primitive has a real mount site.
  */
@@ -71,8 +67,8 @@ test('pointer selection, and the disabled item does nothing', async ({ drivePage
 
 test('coexists with the user menu', async ({ drivePage }) => {
   await drivePage.do(async (page) => {
-    // Like react-aria's popovers (whose underlay swallows the dismissing click), Reka's menu is
-    // modal by default: the first outside click only closes it; the next reaches the user bar.
+    // Reka's menu is modal by default (its underlay swallows the dismissing click): the first
+    // outside click only closes it; the next reaches the user bar.
     await trigger(page).click()
     await expect(menu(page)).toBeVisible()
     const userMenuButton = page.getByLabel(TEXT.userMenuLabel).locator('visible=true')

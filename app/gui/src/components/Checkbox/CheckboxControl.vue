@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The box, check mark and text of a checkbox: a native `<input type="checkbox">`, visually
- * hidden inside a `<label>`, as react-aria renders it, so that it keeps the native keyboard
+ * hidden inside a `<label>`, so that it keeps the native keyboard
  * (Space) and form semantics. `Checkbox.vue` binds it to a form or a group; use that instead.
  */
 import { CHECKBOX_STYLES, CHECKBOX_VUE_STATES } from '$/components/Checkbox/variants'
@@ -45,7 +45,7 @@ const emit = defineEmits<{ change: [selected: boolean]; blur: [] }>()
 const input = ref<HTMLInputElement>()
 const slots = useSlots()
 /**
- * The input is named by its own text, as react-aria names it. A checkbox in a labelled
+ * The input is named by its own text. A checkbox in a labelled
  * `CheckboxGroup` sits inside its field's `<label>` too, which would otherwise name the group's
  * first checkbox by the whole group's text.
  */

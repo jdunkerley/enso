@@ -1,6 +1,5 @@
 /**
- * @file Tailwind variants of the stepper and its steps, shared by the React
- * `Stepper` and `Step` and their Vue ports in this folder.
+ * @file Tailwind variants of the stepper and its steps (`Stepper.vue` and `Step.vue`).
  */
 import { tv } from '$/utils/style/tailwindVariants'
 

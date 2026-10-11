@@ -1,6 +1,6 @@
 /**
- * @file The Enso Cloud's plans: their names, prices, seats and trial. Moved from the React
- * `#/modules/payments` (#192) with the subscription price query (`subscriptionPrice.ts`).
+ * @file The Enso Cloud's plans: their names, prices, seats and trial. The subscription price query
+ * is in `subscriptionPrice.ts`.
  */
 import { Plan } from 'enso-common/src/services/Backend'
 

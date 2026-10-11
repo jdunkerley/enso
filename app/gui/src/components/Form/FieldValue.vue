@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file Renders its default slot with a field's current value: the Vue counterpart of the React
- * `Form.FieldValue`. In Vue a `computed(() => form.watch(name))` does the same in script.
+ * @file Renders its default slot with a field's current value. In script, a
+ * `computed(() => form.watch(name))` does the same.
  */
 import { computed } from 'vue'
 import { useFormContext } from './formContext'

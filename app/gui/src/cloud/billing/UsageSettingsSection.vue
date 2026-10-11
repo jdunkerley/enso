@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The Usage settings tab: for a month (the current one at first), each user's and project's
- * scheduled executions, with their count and their total and average uptime. The Vue port of the
- * React `UsageSettingsSection`.
+ * scheduled executions, with their count and their total and average uptime.
  */
 import BasicInput from '$/components/Inputs/BasicInput.vue'
 import Scroller from '$/components/Scroller/Scroller.vue'
@@ -50,7 +49,7 @@ const isLoading = computed(() => summaryQuery.isLoading.value)
 const unknownUserPlaceholder = computed(() => getText('executionSummaryUnknownUser'))
 const unknownProjectPlaceholder = computed(() => getText('executionSummaryUnknownProject'))
 
-/** As in React, a cleared input keeps the month it had. */
+/** A cleared input keeps the month it had. */
 function onMonthChange(nextMonth: string | number | null | undefined) {
   if (nextMonth != null && nextMonth !== '') month.value = String(nextMonth)
 }

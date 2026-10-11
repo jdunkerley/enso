@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The Activity log settings tab: the organization's audit log, filtered by date range, event
- * type and user, sortable by each column, and loaded a page at a time as it is scrolled. The Vue
- * port of the React `ActivityLogSettingsSection`.
+ * type and user, sortable by each column, and loaded a page at a time as it is scrolled.
  */
 import Button from '$/components/Button/Button.vue'
 import Form from '$/components/Form/Form.vue'
@@ -118,7 +117,7 @@ const form = useForm({
 })
 const maxDate = today(getLocalTimeZone())
 
-/** A picked day, as the start of that day in the user's time zone, as React's `toDate()` gave. */
+/** A picked day, as the start of that day in the user's time zone. */
 function dayToRfc3339(date: DateValue | null | undefined) {
   return date == null ? undefined : toRfc3339(date.toDate(getLocalTimeZone()))
 }
@@ -193,7 +192,7 @@ const sortedLogs = computed(() => {
       compare = (a, b) => {
         const aTime = a.timestamp == null ? 0 : Number(new Date(a.timestamp))
         const bTime = b.timestamp == null ? 0 : Number(new Date(b.timestamp))
-        // As in React, which applied the direction to the first operand only.
+        // The direction applies to the first operand only, as it did before the Vue port (#75).
         return multiplier * aTime - bTime
       }
       break

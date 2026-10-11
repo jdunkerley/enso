@@ -1,6 +1,5 @@
 /**
- * @file The notification tray's notifications: the Vue counterpart of the React
- * `computedNotificationHooks` (#83).
+ * @file The notification tray's notifications (#83).
  *
  * Notifications are computed from app state; today the only source is the user's uploads to the
  * cloud (`$/providers/upload`), summed into one "uploading N files" notification with a progress
@@ -130,7 +129,7 @@ export function useNotifications(item: Component) {
     (summary) => {
       if (summary == null) return
       // Each upload takes part in one notification only, so its first upload identifies it.
-      // Upserted only when the message changes, as React did.
+      // Upserted only when the message changes.
       if (notificationMap.value.get(summary.id)?.message === summary.message) return
       upsertNotification(summary.id, {
         id: summary.id,

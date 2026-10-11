@@ -1,7 +1,7 @@
 /**
  * @file The drive's secret dialog (#92): its titles, that it opens focused on the first field,
  * creates on submission and closes, and that Cancel and Escape close it without creating, while an
- * outside click does not (as React's `isDismissable={false}`).
+ * outside click does not.
  */
 import {
   byTestId,

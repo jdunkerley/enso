@@ -1,9 +1,9 @@
 <script setup lang="ts">
 /**
- * @file A modal capturing a keyboard shortcut: the Vue port of the React
- * `CaptureKeyboardShortcutModal`. The shortcut is the last key pressed with its modifiers; Enter
- * confirms it, unless it is already bound to something (`conflictsWith` names what, #170). It is
- * meant for the modal stack (`useModals().open`), and emits `close` once it has closed.
+ * @file A modal capturing a keyboard shortcut. The shortcut is the last key pressed with its
+ * modifiers; Enter confirms it, unless it is already bound to something (`conflictsWith` names
+ * what, #170). It is meant for the modal stack (`useModals().open`), and emits `close` once it has
+ * closed.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'

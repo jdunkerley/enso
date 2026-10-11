@@ -2,7 +2,7 @@
 /**
  * @file The "Add Users" popover of a user group: a combo box of the organization's members who are
  * not in the group yet, "Add User" and "Done". It stays open after adding, so that several users
- * can be added in turn. The Vue port of React's `UserGroupAddUserForm`.
+ * can be added in turn.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import DialogClose from '$/components/Dialog/DialogClose.vue'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A labelled form field: the Vue counterpart of the React `Form.Field`, styled by the same
- * `FIELD_STYLES`. The inputs render their control inside one; a custom control can too.
+ * @file A labelled form field, styled by `FIELD_STYLES`. The inputs render their control inside
+ * one; a custom control can too.
  *
  * It shows the label (with a `*` when required, and an optional contextual-help button), the
  * control in a `<label>` so that clicking the text focuses it (unless `preventLabelFocus`), a
@@ -10,7 +10,7 @@
  *
  * The `ids` tie the control to the label, description and error: an input passes the ids from
  * its `useField` and sets `aria-describedby`/`aria-errormessage` on its control with them.
- * Attributes (`aria-label`, `aria-details`, …) go on the root, as in React.
+ * Attributes (`aria-label`, `aria-details`, …) go on the root.
  * @example
  * ```vue
  * <Field name="age" label="Age" :ids="field.ids">
@@ -57,7 +57,7 @@ const {
   fullWidth?: boolean | undefined
   isHidden?: boolean | undefined
   preventLabelFocus?: boolean | undefined
-  /** React's `variants`/`fieldVariants`: a `FIELD_STYLES` extension. */
+  /** A `FIELD_STYLES` extension. */
   variants?: ExtractFunction<typeof FIELD_STYLES> | undefined
   ids?: FieldIds | undefined
   testId?: string | undefined
@@ -98,7 +98,7 @@ function onLabelClick(event: MouseEvent) {
     :aria-errormessage="hasError ? fieldIds.errorId : undefined"
     :aria-required="isRequired"
   >
-    <!-- Without a label, the label id names the whole content, as React's `aria.Label` does: a
+    <!-- Without a label, the label id names the whole content: a
     `CheckboxGroup` without a label is named by its checkboxes' text. -->
     <label
       :id="label == null && !$slots.label ? fieldIds.labelId : undefined"

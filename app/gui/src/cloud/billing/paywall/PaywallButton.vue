@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file A button showing that a feature is behind a paywall, with a lock icon (unless `showIcon` is
- * `false`) and the plan in its tooltip: the Vue port of the React `PaywallButton`. Its label is the
- * default slot, or "Upgrade to <plan>". Other attributes go on the `Button.vue`.
+ * `false`) and the plan in its tooltip. Its label is the default slot, or "Upgrade to <plan>".
+ * Other attributes go on the `Button.vue`.
  */
 import Button from '$/components/Button/Button.vue'
 import { getFeatureConfiguration, type PaywallFeatureName } from '$/composables/paywall'

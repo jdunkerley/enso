@@ -1,13 +1,12 @@
 /**
- * @file Starting a Stripe checkout for a plan: the React `Card`'s `onSubmit`, unchanged. It logs the
- * checkout, asks the backend for a checkout session (`createCheckoutSession`, with the plan as
- * `price`, the seats as `quantity` and the billing period as `interval`), remembers the plan
- * (`pendingCheckout.ts`), opens the session's URL in a new window (`window.open(url, '_blank')`,
- * which the desktop app hands to the system browser), and goes to the payments success page, which
- * waits for the plan to change.
+ * @file Starting a Stripe checkout for a plan. It logs the checkout, asks the backend for a
+ * checkout session (`createCheckoutSession`, with the plan as `price`, the seats as `quantity` and
+ * the billing period as `interval`), remembers the plan (`pendingCheckout.ts`), opens the session's
+ * URL in a new window (`window.open(url, '_blank')`, which the desktop app hands to the system
+ * browser), and goes to the payments success page, which waits for the plan to change.
  *
- * It runs as a vue-query mutation, as React's `useMutationCallback` did, so the mutation cache's
- * global handlers (the unauthorized-session recovery) see it.
+ * It runs as a vue-query mutation, so the mutation cache's global handlers (the
+ * unauthorized-session recovery) see it.
  */
 import { PAYMENTS_SUCCESS_PATH } from '$/appUtils'
 import { useBackends } from '$/providers/backends'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The subscription page (`/subscribe`), where the user's plan is changed: a link back to the
- * dashboard, and the plans on offer (`PlanSelector.vue`). The Vue port of the React `Subscribe`.
+ * dashboard, and the plans on offer (`PlanSelector.vue`).
  *
  * The `plan` query parameter (`getUpgradeURL`, from the paywall's upgrade buttons) names a plan whose
  * dialog opens at once. Choosing a plan goes on to Stripe and then to the payments success page.

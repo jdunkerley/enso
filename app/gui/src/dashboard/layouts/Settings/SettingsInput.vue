@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file An input of a settings form: the Vue port of the React `Input` and `AriaInput`. Text,
- * email and password fields have their label beside them (`SETTINGS_FIELD_STYLES`); a combo box
- * keeps the default layout, as in React.
+ * @file An input of a settings form. Text, email and password fields have their label beside them
+ * (`SETTINGS_FIELD_STYLES`); a combo box keeps the default layout.
  */
 import { SETTINGS_FIELD_STYLES } from '$/components/Form/variants'
 import ComboBox from '$/components/Inputs/ComboBox.vue'

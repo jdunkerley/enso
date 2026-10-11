@@ -2,15 +2,15 @@
 /**
  * @file The Schedule tab's calendar for one project: a month grid counting each day's scheduled
  * executions, a button scheduling a new one, and the executions of the chosen day (those that
- * started a session first). The Vue port of the React `ProjectExecutionsCalendarInternal`.
+ * started a session first).
  *
- * The calendar is Reka's `Calendar`, giving what react-aria's did: a grid of day buttons navigated
- * with the arrow keys (moving to the next or previous month at its edges), Enter or Space choosing
- * a day, and previous and next month buttons. Days outside the month are disabled; the day header
- * row is empty, as React's was (its header cells were given no content).
+ * The calendar is Reka's `Calendar`: a grid of day buttons navigated with the arrow keys (moving to
+ * the next or previous month at its edges), Enter or Space choosing a day, and previous and next
+ * month buttons. Days outside the month are disabled; the day header row is empty (its header
+ * cells are given no content).
  *
- * While a month's executions load, a loader replaces the whole tab and the calendar keeps its state,
- * as React's suspended query did.
+ * While a month's executions load, a loader replaces the whole tab and the calendar keeps its
+ * state.
  */
 import Button from '$/components/Button/Button.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
@@ -60,9 +60,8 @@ import { projectExecutionsQueryOptions, usePreferredTimeZone } from './schedule'
 const { backend, item } = defineProps<{ backend: Backend; item: ProjectAsset }>()
 
 /**
- * React's `PROJECT_EXECUTIONS_CALENDAR_STYLES`, with react-aria's `outside-visible-range:`,
- * `disabled:` and `selected:` spelled for Reka's cells. React showed the hover only on enabled
- * days (react-aria's `data-hovered`).
+ * The calendar's styles, with the `outside-visible-range:`, `disabled:` and `selected:` variants
+ * spelled for Reka's cells. The hover shows only on enabled days.
  */
 const PROJECT_EXECUTIONS_CALENDAR_STYLES = tv({
   base: '',
@@ -105,7 +104,7 @@ const dayFormatter = computed(
 const monthLabel = computed(() =>
   monthFormatter.value.format(focusedMonth.value.toDate(timeZone.value)),
 )
-/** A day's name, as react-aria gave it: "Today, Monday, January 23, 2045 selected". */
+/** A day's accessible name: "Today, Monday, January 23, 2045 selected". */
 function dayLabel(date: DateValue) {
   const label = dayFormatter.value.format(date.toDate(timeZone.value))
   const isSelected = date.compare(selectedDate.value) === 0
@@ -115,9 +114,9 @@ function dayLabel(date: DateValue) {
   return isSelected ? `${label} selected` : label
 }
 /**
- * Days of other months are disabled, as in react-aria. (Reka's `disableDaysOutsideCurrentView`
- * would also mark every cell `aria-disabled`.) Reka reads this when the calendar is created; it
- * follows the shown month itself.
+ * Days of other months are disabled. (Reka's `disableDaysOutsideCurrentView` would also mark every
+ * cell `aria-disabled`.) Reka reads this when the calendar is created; it follows the shown month
+ * itself.
  */
 function isOutsideMonth(date: DateValue) {
   return !isSameMonth(date, focusedMonth.value)
@@ -213,7 +212,7 @@ function newExecutionDefaultDate() {
 
 <template>
   <Loader v-if="projectExecutionsQuery.isPending.value" minHeight="h24" size="medium" />
-  <!-- React's `Form` around the calendar, which only held the chosen day. -->
+  <!-- A form around the calendar, which only holds the chosen day. -->
   <form
     v-show="!projectExecutionsQuery.isPending.value"
     :class="
@@ -225,9 +224,9 @@ function newExecutionDefaultDate() {
     novalidate
     @submit.prevent
   >
-    <!-- Named and structured for assistive technology as react-aria's calendar was: an
-    "application" named by the month, with a hidden heading, a "grid" of day buttons named by
-    their date ("Today, …", "… selected"), and a hidden "Next" button at the end. -->
+    <!-- Named and structured for assistive technology: an "application" named by the month, with
+    a hidden heading, a "grid" of day buttons named by their date ("Today, …", "… selected"), and
+    a hidden "Next" button at the end. -->
     <CalendarRoot
       v-slot="{ grid }"
       v-model:placeholder="focusedMonth"

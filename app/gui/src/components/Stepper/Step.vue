@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file One step's marker in a `Stepper.vue`: the Vue counterpart of the React `Stepper.Step`,
- * styled by the same `STEP_STYLES`. It shows the step number (or `icon`), a check once completed
- * (or `completeIcon`), a title and a description; the default slot adds content beside them.
+ * @file One step's marker in a `Stepper.vue`, styled by `STEP_STYLES`. It shows the step number (or
+ * `icon`), a check once completed (or `completeIcon`), a title and a description; the default slot
+ * adds content beside them.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { STEP_STYLES } from '$/components/Stepper/variants'

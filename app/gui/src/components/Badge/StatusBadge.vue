@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A dot on the corner of its content, to notify the user of an item's state: the Vue
- * counterpart of the React `#/components/StatusBadge`.
+ * @file A dot on the corner of its content, to notify the user of an item's state.
  */
 import { STATUS_BADGE_STYLES } from '$/components/Badge/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

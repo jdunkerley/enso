@@ -39,8 +39,8 @@ export interface AxeBaselineEntry {
  * The key a violation is matched on: rule id plus the node's selector.
  *
  * Two parts of axe's selectors change without the page changing, so they are normalized:
- * - IDs generated per render — React's `useId` (`:r1:`), react-aria's `react-aria123`, and any id
- *   that embeds a counter — become `#<generated>`;
+ * - IDs generated per render — any id that contains a digit (a counter) or an escaped colon —
+ *   become `#<generated>`;
  * - Vue's scoped-style attributes (`[data-v-1a2b3c4d]`), whose hash covers the component's source
  *   in production builds, are dropped.
  *

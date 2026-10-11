@@ -196,7 +196,7 @@ export default class AssetQuery {
     }
   }
 
-  /** Create an identical copy of this query. Useful to force a React refresh. */
+  /** Create an identical copy of this query, with a new identity. */
   clone() {
     return new AssetQuery(
       this.query,

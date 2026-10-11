@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file Vue's `<Suspense>` with a `Loader.vue` as the default fallback: the Vue counterpart of the
- * React `#/components/Suspense`, which wraps `React.Suspense` the same way.
+ * @file Vue's `<Suspense>` with a `Loader.vue` as the default fallback.
  *
  * It is not called `Suspense`, so that it cannot shadow Vue's built-in `<Suspense>` in a template.
  * The content is the default slot; `fallback` replaces the loader, and `loaderProps` configures it.

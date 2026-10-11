@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file A user's picture and name, as a button opening a popover with their email address (a
- * `mailto:` link, and a button copying it). The Vue counterpart of the React `UserWithPopover`,
- * which stays for its React callers (the drive table and the settings) until they are ported.
+ * `mailto:` link, and a button copying it).
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'

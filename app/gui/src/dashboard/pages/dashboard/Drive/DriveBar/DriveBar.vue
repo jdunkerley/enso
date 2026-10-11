@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The drive's bar: the location (Up and the breadcrumbs), drawn in the panel's toolbar, and
- * the toolbar of actions with the search bar. The Vue port of React's `DriveBar`, which put the
- * location there through a portal into the element the left panel gave it.
+ * the toolbar of actions with the search bar. The location is teleported into the toolbar element
+ * the left panel gives it.
  */
 import type AssetQuery from '$/utils/AssetQuery'
 import DriveBarNavigation from './DriveBarNavigation.vue'

@@ -1,6 +1,5 @@
 /**
- * @file Patterns are set of reusable styles for certain elements, shared by the React dashboard
- * and its Vue ports.
+ * @file Patterns are set of reusable styles for certain elements of the dashboard.
  */
 
 import { tv } from '$/utils/style/tailwindVariants'

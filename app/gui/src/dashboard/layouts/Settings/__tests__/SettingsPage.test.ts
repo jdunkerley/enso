@@ -72,7 +72,7 @@ const ContributedEntry = () =>
   h('p', { 'data-testid': 'contributed' }, `hello ${useSettingsContext().value.user.name}`)
 
 beforeAll(() => {
-  // The React `App.tsx` registers it, which every page of the app loads first.
+  // `App.vue` registers it, which every page of the app loads first.
   LocalStorage.registerKey('preferredTimeZone', { schema: z.string() })
 })
 

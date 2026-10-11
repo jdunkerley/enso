@@ -40,7 +40,7 @@ describe('createDashboardInputBindings', () => {
 
   test('an action missing from the saved bindings keeps its defaults (#170)', () => {
     // Every save writes every action, so this only happens to an action added in a later release.
-    // The React provider (and #86) left it with none.
+    // Before #170 it was left with none.
     const bindings = createDashboardInputBindings(fakeStorage({ rename: ['F2'] }) as never)
     expect(bindings.metadata.copy.bindings).toEqual(BINDINGS.copy.bindings)
   })

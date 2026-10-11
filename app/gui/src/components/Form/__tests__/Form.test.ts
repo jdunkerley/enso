@@ -2,8 +2,7 @@
  * @file Behaviour of the Vue form layer (`useForm`, `Form`, `Field`, `Submit`, `Reset`,
  * `FormError`, `FieldValue`) with the Vue `Input`: validation and its localized messages, error
  * display and its ARIA wiring, dirty/touched state, async submission, server errors, reset, the
- * offline rule and `method="dialog"`. What react-hook-form and the React wrapper gave the React
- * forms, and what ports rely on.
+ * offline rule and `method="dialog"`.
  */
 import {
   byTestId,
@@ -103,7 +102,7 @@ describe('validation', () => {
     expect(input.getAttribute('aria-describedby')).toBe(error.id)
     expect(input.getAttribute('aria-errormessage')).toBe(error.id)
     expect(byTestId('email')!.getAttribute('aria-invalid')).toBe('true')
-    // The error text is the field's error, styled as React's.
+    // The error text is the field's error, styled as an error.
     expect(error.classList).toContain('text-danger')
   })
 

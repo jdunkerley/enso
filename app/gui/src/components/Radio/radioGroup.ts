@@ -1,7 +1,7 @@
 /**
  * @file How a `RadioGroup.vue` shares its field with the radios inside it: the selected value, the
- * group's state, and which radio is being pressed (React's `RadioGroupProvider`), so that a
- * selected radio can show that a sibling is being pressed.
+ * group's state, and which radio is being pressed, so that a selected radio can show that a sibling
+ * is being pressed.
  */
 import { createContextStore } from '@/providers'
 import type { Ref } from 'vue'

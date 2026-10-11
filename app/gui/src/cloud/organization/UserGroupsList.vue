@@ -32,7 +32,7 @@ const context = useSettingsContext()
 const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
 
 const userGroupsQuery = useQuery(listUserGroupsQueryOptions(remoteBackend))
-// Only the rows need the members, as in React, where each row asked for them.
+// Only the rows need the members, so they are fetched only when there are rows.
 const usersQuery = useQuery(
   listUsersQueryOptions(
     remoteBackend,
@@ -40,7 +40,7 @@ const usersQuery = useQuery(
     computed(() => (userGroupsQuery.data.value?.length ?? 0) > 0),
   ),
 )
-// As React's tab suspended: on the groups, then (through their rows) on the members.
+// Suspends on the groups, then (if there are any rows) on the members.
 await userGroupsQuery.suspense()
 if ((userGroupsQuery.data.value?.length ?? 0) > 0) await usersQuery.suspense()
 

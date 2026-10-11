@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The API keys settings tab: the user's API keys, with "New API Key" (disabled once the limit
- * is reached), how many more can be created, and per key "Delete", confirmed first. The Vue port of
- * the React `ApiKeySettingsSection`.
+ * is reached), how many more can be created, and per key "Delete", confirmed first.
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'

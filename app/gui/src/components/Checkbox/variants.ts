@@ -1,6 +1,6 @@
 /**
- * @file Tailwind variants of the checkbox, its check mark and the checkbox group, shared by the React
- * `Checkbox`, `Check` and `CheckboxGroup` and their Vue ports in this folder.
+ * @file Tailwind variants of the checkbox, its check mark and the checkbox group (`Checkbox.vue`,
+ * `Check.vue` and `CheckboxGroup.vue` in this folder).
  */
 import { tv } from '$/utils/style/tailwindVariants'
 
@@ -119,9 +119,10 @@ export const CHECKBOX_GROUP_STYLES = tv({
 })
 
 /**
- * The Vue checkbox's spelling of the react-aria-only modifiers in `CHECKBOX_STYLES`'s icon
- * (`group-selected:`, `group-pressed:`, `group-focus-visible:`), which key on attributes react-aria
- * sets on its `<label>`. The Vue `<label>` has the native input inside it instead (decision 5).
+ * The checkbox's spelling of the modifiers in `CHECKBOX_STYLES`'s icon (`group-selected:`,
+ * `group-pressed:`, `group-focus-visible:`; see `STATE_VARIANTS` in `tailwind.config.ts`), which
+ * key on the `<label>`. The label sets `data-selected`, but nothing sets `data-pressed`, and the
+ * focus is on the native input inside it, so these key on the input instead (decision 5).
  */
 export const CHECKBOX_VUE_STATES =
   'group-data-[selected=true]:border-transparent group-active:border group-has-[:focus-visible]:outline-offset-0 group-has-[:focus-visible]:outline-primary'

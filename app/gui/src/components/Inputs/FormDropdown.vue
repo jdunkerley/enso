@@ -1,8 +1,7 @@
 <script setup lang="ts" generic="T">
 /**
- * @file A `Dropdown.vue` bound to a form field holding the selected item: the Vue counterpart of the
- * React `FormDropdown`. Items are matched to the value structurally, as React does. The default
- * slot renders each item (`{ item }`).
+ * @file A `Dropdown.vue` bound to a form field holding the selected item. Items are matched to the
+ * value structurally. The default slot renders each item (`{ item }`).
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'

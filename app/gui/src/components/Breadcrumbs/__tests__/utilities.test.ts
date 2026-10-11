@@ -1,4 +1,4 @@
-/** @file Tests for collapsing a long breadcrumb path (moved from the React `Breadcrumbs.test.tsx`). */
+/** @file Tests for collapsing a long breadcrumb path. */
 
 import { describe } from 'vitest'
 import { getItemsWithCollapsedItem } from '../utilities'

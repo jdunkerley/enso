@@ -2,7 +2,7 @@
  * @file The "New Credential" dialog (#198): its list of types, each type's form, the fields'
  * errors, and that a submission creates the credential, opens the sign-in page and closes the
  * dialog; a failure shows a toast (Snowflake, Strava, Microsoft 365, Salesforce) or the form's
- * error (Google), as in React.
+ * error (Google).
  */
 import {
   byTestId,

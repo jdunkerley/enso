@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Strava credential: the Vue port of the React `StravaCredentialsForm`.
- * The recipe is `$/cloud/serviceCredentials/strava`. Remember to list a new form in
- * `credentialInfos.ts`.
+ * @file The form creating a Strava credential. The recipe is `$/cloud/serviceCredentials/strava`.
+ * Remember to list a new form in `credentialInfos.ts`.
  */
 import * as strava from '$/cloud/serviceCredentials/strava'
 import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'

@@ -1,6 +1,6 @@
 /**
- * @file The password schemas of the authentication pages, shared with the React settings page's
- * password change.
+ * @file The password schemas of the authentication pages, shared with the settings page's password
+ * change.
  */
 import { PASSWORD_REGEX } from '$/cloud/validation'
 import type { GetText } from '$/providers/text'

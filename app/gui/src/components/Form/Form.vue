@@ -1,14 +1,14 @@
 <script setup lang="ts" generic="Schema extends TSchema, SubmitResult = void">
 /**
- * @file A form: the Vue counterpart of the React `#/components/Form`, styled by the same
- * `FORM_STYLES`. It creates a form with `useForm` (or takes one through `form`), provides it to the
- * fields inside, and submits it on the native submit event (`novalidate`: the schema validates).
+ * @file A form, styled by `FORM_STYLES`. It creates a form with `useForm` (or takes one through
+ * `form`), provides it to the fields inside, and submits it on the native submit event
+ * (`novalidate`: the schema validates).
  *
- * The props keep the React names: `schema`, `defaultValues`, `onSubmit` (bound with `@submit`),
+ * The props are `schema`, `defaultValues`, `onSubmit` (bound with `@submit`),
  * `onSubmitSuccess`, `onSubmitFailed`, `onSubmitted`, `onChange`, `method="dialog"` (a successful
  * submission closes the enclosing dialog), `canSubmitOffline`, `gap`, `testId`, and `formOptions`
- * for the rest of `useForm`'s options. The default slot receives `{ form }`, React's render-prop
- * argument; `defineExpose` exposes it too (React's `formRef`).
+ * for the rest of `useForm`'s options. The default slot receives `{ form }`; `defineExpose`
+ * exposes it too.
  * @example
  * With `Form`, `Input`, `Submit` and `FormError` imported from `$/components/Form/` and
  * `$/components/Inputs/`, and `getText` from `useText()`:

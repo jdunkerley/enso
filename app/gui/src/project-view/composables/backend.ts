@@ -1,7 +1,7 @@
 /**
  * @file The Vue side of the backend's queries and mutations: reactive wrappers over the
  * framework-free options in `$/utils/backendQuery`, which hold every per-method default, so that a
- * key means the same here as in React ("Rulings from #192").
+ * key means the same wherever it is used ("Rulings from #192").
  */
 import { useBackends } from '$/providers/backends'
 import {

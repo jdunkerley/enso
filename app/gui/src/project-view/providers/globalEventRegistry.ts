@@ -42,7 +42,6 @@ const OVERLAY_LAYER_SELECTOR = '[data-dismissable-layer]'
  * both: `Enter` on a user-menu entry also opened the component browser. Worse, Reka listens for
  * `Escape` on `window` too, after these handlers, so the graph's `Escape` (deselect all, which
  * stops the event) kept every overlay from closing on `Escape` while a project was open (#170).
- * React's overlays never let these keys reach `window` in the first place.
  *
  * `keyup` is not filtered, so modifier state (`useGlobalKeyboard`) cannot stick.
  */

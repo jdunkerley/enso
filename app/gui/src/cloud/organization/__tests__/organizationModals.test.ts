@@ -1,6 +1,6 @@
 /**
  * @file The organization modals over the dashboard (#84): setting up the organization's name, and
- * accepting or declining an invitation. Each does what its React original did, and fails as it did.
+ * accepting or declining an invitation: what each shows and does, and how it fails.
  */
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The content of the dialog confirming the deletion of the user's account: the Vue port of
- * the React `ConfirmDeleteUserModal`'s form. A successful deletion closes the dialog.
+ * @file The content of the dialog confirming the deletion of the user's account: its form. A
+ * successful deletion closes the dialog.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Form from '$/components/Form/Form.vue'
@@ -15,7 +15,7 @@ const { doDelete } = defineProps<{ doDelete: () => Promise<void> }>()
 const { getText } = useText()
 const formComponent = ref<ComponentPublicInstance>()
 
-// The form takes the focus, as React's did, once the dialog has placed it.
+// The form takes the focus once the dialog has placed it.
 onMounted(() =>
   requestAnimationFrame(() => {
     const element: unknown = formComponent.value?.$el

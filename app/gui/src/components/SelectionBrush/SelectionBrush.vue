@@ -1,8 +1,8 @@
 <script lang="ts">
 /**
- * @file A rubber-band selection rectangle drawn while the pointer drags over `target`: the Vue
- * counterpart of the React `#/components/SelectionBrush`, which the drive's table uses. It is not
- * the graph editor's `SelectionBrush.vue`, which draws in the graph's coordinates.
+ * @file A rubber-band selection rectangle drawn while the pointer drags over `target`, used by the
+ * drive's table. It is not the graph editor's `SelectionBrush.vue`, which draws in the graph's
+ * coordinates.
  *
  * A drag starts on a pointer press inside `target` (unless `preventDrag` says no) and counts once
  * the pointer has left a 24px dead zone. While it lasts, the pointer is captured by `target`, text
@@ -10,8 +10,8 @@
  * `onDrag` receives the rectangle (in page coordinates) on every frame the pointer moves;
  * `onDragEnd` the releasing event, and `onDragCancel` follows it when the pointer was cancelled.
  *
- * As in React, the rectangle drawn lags the pointer by one move event: each frame uses the
- * position the previous event recorded.
+ * The rectangle drawn lags the pointer by one move event: each frame uses the position the
+ * previous event recorded.
  */
 import { portalTarget } from '$/components/portal'
 import type { Coordinate2D, DetailedRectangle, Rectangle } from '$/utils/geometry'

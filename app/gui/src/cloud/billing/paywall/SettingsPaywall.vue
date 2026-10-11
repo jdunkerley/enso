@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The paywall screen the settings page shows in place of a tab whose feature the user's plan
- * lacks: the Vue port of the React settings `Paywall`, contributed by `registerBillingSettings`.
+ * lacks, contributed by `registerBillingSettings`.
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import PaywallScreen from './PaywallScreen.vue'

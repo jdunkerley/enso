@@ -1,8 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A few details of an asset (icon, title, "New" or "Existing", last modified): the Vue port
- * of the React `AssetSummary`, with the same elements and classes. React's `newName` prop, which
- * nothing passed, is left out.
+ * @file A few details of an asset (icon, title, "New" or "Existing", last modified).
  */
 import Badge from '$/components/Badge/Badge.vue'
 import Icon from '$/components/Icon/Icon.vue'

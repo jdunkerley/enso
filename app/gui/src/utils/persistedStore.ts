@@ -22,8 +22,8 @@ export interface PersistOptions<State> {
 /**
  * A state object saved to `localStorage` on every change, and loaded from it when created.
  *
- * The saved entry is `{ state, version }` as JSON, the format the zustand `persist` middleware used,
- * so values saved before these stores moved off zustand still load.
+ * The saved entry is `{ state, version }` as JSON, the format used before #94, so values saved
+ * before then still load.
  */
 export interface PersistedStore<State extends object> {
   /** The current state. Reactive: replaced as a whole on every change. */

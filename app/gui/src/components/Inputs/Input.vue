@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * @file A text input bound to a form field: the Vue counterpart of the React `Input`, a
- * `BasicInput.vue` in a `Field.vue`, styled by the same `INPUT_STYLES` and `FIELD_STYLES`.
+ * @file A text input bound to a form field: a `BasicInput.vue` in a `Field.vue`, styled by
+ * `INPUT_STYLES` and `FIELD_STYLES`.
  *
  * `name` picks the field of the enclosing `Form.vue` (or of `form`). The value, error, required
- * state and dirty/touched state come from the form. As in React, `type="number"` stores a number
+ * state and dirty/touched state come from the form. `type="number"` stores a number
  * and `type="date"` a `Date`, and the input is disabled while the form submits.
  *
  * The `<input>` carries the accessibility state: `aria-invalid`, `aria-describedby` (the
- * description and the error) and `aria-errormessage`. Attributes go on it too, as React spreads its
- * props onto the input; `testId` goes on the field, and the input is `data-testid="input"`.
+ * description and the error) and `aria-errormessage`. Attributes go on it too; `testId` goes on
+ * the field, and the input is `data-testid="input"`.
  */
 import Field from '$/components/Form/Field.vue'
 import type { AnyFormInstance } from '$/components/Form/types'
@@ -46,10 +46,10 @@ const props = withDefaults(
     rounded?: InputVariants['rounded']
     variant?: InputVariants['variant']
     variants?: ExtractFunction<typeof INPUT_STYLES> | undefined
-    /** React's `fieldVariants`: a `FIELD_STYLES` extension for the field. */
+    /** A `FIELD_STYLES` extension for the field. */
     fieldVariants?: ExtractFunction<typeof FIELD_STYLES> | undefined
     fieldClass?: string | undefined
-    /** Overrides the field's error message under the input; `null` shows none, as React's `error`. */
+    /** Overrides the field's error message under the input; `null` shows none. */
     error?: string | null | undefined
     testId?: string | undefined
     /** Classes for the `<input>`. */

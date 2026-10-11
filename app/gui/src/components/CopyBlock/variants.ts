@@ -1,4 +1,4 @@
-/** @file Variants of the copy block, shared by the React `CopyBlock` and its Vue port. */
+/** @file Variants of the copy block (`CopyBlock.vue`). */
 import { TEXT_STYLE } from '$/components/Text/variants'
 import { tv } from '$/utils/style/tailwindVariants'
 

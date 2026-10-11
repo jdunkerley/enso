@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The page of a user whose account is marked for deletion: the Vue port of the React
- * `RestoreAccount`. They can restore the account, or sign out.
+ * @file The page of a user whose account is marked for deletion. They can restore the account, or
+ * sign out.
  */
 import Button from '$/components/Button/Button.vue'
 import Icon from '$/components/Icon/Icon.vue'

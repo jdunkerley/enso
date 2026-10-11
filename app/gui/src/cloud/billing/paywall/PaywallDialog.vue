@@ -1,9 +1,8 @@
 <script setup lang="ts">
 /**
  * @file A dialog asking the user to upgrade for a feature: the plan it needs, what it brings, and
- * the upgrade button. The Vue port of the React `PaywallDialog`. Its trigger is the `trigger` slot
- * (`PaywallDialogButton.vue` passes a `PaywallButton.vue`); without one it is controlled through
- * `v-model:open`.
+ * the upgrade button. Its trigger is the `trigger` slot (`PaywallDialogButton.vue` passes a
+ * `PaywallButton.vue`); without one it is controlled through `v-model:open`.
  */
 import Dialog from '$/components/Dialog/Dialog.vue'
 import Text from '$/components/Text/Text.vue'

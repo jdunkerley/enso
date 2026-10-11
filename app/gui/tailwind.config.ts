@@ -16,7 +16,8 @@ const HERE_PATH = fileURLToPath(new URL('.', import.meta.url))
  * The others are Tailwind's own pseudo-class variants, redefined unchanged: the order of this list
  * is the order of the generated rules, so it decides which state wins when two apply at once (here,
  * for instance, `hover:` beats `active:`, and `disabled:` beats `selected:`). The components' classes
- * were written against this order, which is that of `tailwindcss-react-aria-components`; keep it.
+ * were written against this order, kept from the `tailwindcss-react-aria-components` plugin that
+ * this list replaced in #217; keep it.
  * Only the `data-*` variants the components use are defined.
  */
 const STATE_VARIANTS: readonly (readonly [name: string, selectors: readonly string[]])[] = [
@@ -702,9 +703,6 @@ inset 0 -36px 51px -51px #00000014`,
           respectImportant: true,
         },
       )
-
-      addVariant('not-focus', '&:where([data-rac]):not([data-focused])')
-      addVariant('not-selected', '&:where([data-rac]):not([data-selected])')
 
       addVariant('windows', '.windows &')
       addVariant('macos', '.macos &')

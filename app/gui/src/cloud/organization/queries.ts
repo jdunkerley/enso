@@ -1,7 +1,7 @@
 /**
  * @file The queries behind the organization's settings tabs and the invitation dialog: the
  * organization's members, its pending invitations, its user groups and its activity log. They keep
- * the React `backendQueryOptions`' keys and options, so that the cache and its persistence stay
+ * the keys and options `backendQueryOptions` gives them, so that the cache and its persistence stay
  * valid.
  */
 import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'
@@ -10,12 +10,12 @@ import type { Backend, GetLogEventsRequestParams } from 'enso-common/src/service
 import { MINUTE_MS } from 'enso-common/src/utilities/data/dateTime'
 import { computed, type Ref } from 'vue'
 
-/** How long the members and invitations stay fresh, as in React. */
+/** How long the members and invitations stay fresh. */
 const LIST_USERS_STALE_TIME_MS = 60_000
 
 /**
  * Options for a query of the organization's members. The Members tab keeps them fresh for a minute;
- * the user groups and the activity log use React's default for `listUsers`, `Infinity`.
+ * the user groups and the activity log use `Infinity`.
  */
 export function listUsersQueryOptions(
   backend: Backend,
@@ -46,7 +46,7 @@ export function listInvitationsQueryOptions(
   })
 }
 
-/** Options for a query of the organization's user groups: stale at once, persisted, as in React. */
+/** Options for a query of the organization's user groups: stale at once, persisted. */
 export function listUserGroupsQueryOptions(backend: Backend) {
   return queryOptions({
     ...backendBaseOptions(backend),
@@ -78,8 +78,8 @@ export function nextLogEventsPageParam(
 
 /**
  * Options for the activity log, a page at a time: fresh for a minute and not persisted, under
- * React's key (the request's filters, then `{ infinite: true }`). The filters are reactive, and
- * the key follows them.
+ * the key used before the Vue port (#75): the request's filters, then `{ infinite: true }`. The
+ * filters are reactive, and the key follows them.
  */
 export function logEventsQueryOptions(backend: Backend, filter: () => LogEventsFilter) {
   return {

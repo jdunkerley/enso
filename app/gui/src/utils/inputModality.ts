@@ -1,8 +1,7 @@
 /**
- * @file Whether the user's last interaction was the keyboard: react-aria's "focus visible" modality,
- * tracked as `useFocusVisible` tracks it (a key press switches to the keyboard, a pointer press
- * away from it). `:focus-visible` cannot stand in for it: a text field matches it on every focus, and
- * jsdom does not support it.
+ * @file Whether the user's last interaction was the keyboard: the "focus visible" modality (a key
+ * press switches to the keyboard, a pointer press away from it). `:focus-visible` cannot stand in
+ * for it: a text field matches it on every focus, and jsdom does not support it.
  */
 import { readonly, ref } from 'vue'
 
@@ -15,7 +14,7 @@ function listen() {
   if (listening || typeof document === 'undefined') return
   listening = true
   const toKeyboard = (event: KeyboardEvent) => {
-    // Shortcuts with a modifier do not count, as in react-aria.
+    // Shortcuts with a modifier do not count.
     if (!event.metaKey && !event.ctrlKey && !event.altKey) keyboard.value = true
   }
   const toPointer = () => (keyboard.value = false)

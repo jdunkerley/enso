@@ -1,12 +1,10 @@
 <script setup lang="ts">
 /**
- * @file A path to a cloud file, with the file browser under it while the field has the focus: the
- * Vue port of the React `FilePathInput` (#82 handed it to #92), with the same classes and styles.
- * The file browser (`FileBrowserWidget.vue`, the project view's) is now mounted directly, where
- * React mounted it through the framework bridge.
+ * @file A path to a cloud file, with the file browser under it while the field has the focus. The
+ * file browser is the project view's `FileBrowserWidget.vue`, mounted directly.
  *
  * Typing changes the path at once. Choosing a file in the browser sets the path; after that, the
- * browser closes when the focus leaves the field, as in React (before a choice it stays open).
+ * browser closes when the focus leaves the field (before a choice it stays open).
  */
 import Text from '$/components/Text/Text.vue'
 import { useText } from '$/providers/text'

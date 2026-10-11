@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /**
- * @file The drive's context menu: the Vue port of React's `ContextMenu`, a non-modal popover of
- * `MenuEntry.vue` buttons at the point that was right-clicked.
+ * @file The drive's context menu: a non-modal popover of `MenuEntry.vue` buttons at the point that
+ * was right-clicked.
  *
- * It keeps React's DOM and behaviour (#91, ruling 3), not the shared `$/components/Menu/ContextMenu.vue`
- * (a Reka `menu` of `menuitem`s): the same `context-menu` test id on the popover, a `dialog` inside
- * it named by `ariaLabel`, buttons operated with Tab, Enter and Space, and no focus taken on
- * opening. It closes on Escape (the dashboard's `closeModal` binding, while it is open), on a press
- * that starts and ends outside it, and when anything outside it scrolls or is right-clicked; and,
- * through the dialog context, when an entry is pressed.
+ * It has its own DOM and behaviour (#91, ruling 3), not the shared
+ * `$/components/Menu/ContextMenu.vue` (a Reka `menu` of `menuitem`s): the `context-menu` test id on
+ * the popover, a `dialog` inside it named by `ariaLabel`, buttons operated with Tab, Enter and
+ * Space, and no focus taken on opening. It closes on Escape (the dashboard's `closeModal` binding,
+ * while it is open), on a press that starts and ends outside it, and when anything outside it
+ * scrolls or is right-clicked; and, through the dialog context, when an entry is pressed.
  *
  * A locked entry (`isUnderPaywall`) shows the lock and the "upgrade" tooltip, and opens the paywall
- * dialog for its `feature` instead of running its action, as React's `MenuEntry` did.
+ * dialog for its `feature` instead of running its action.
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import PaywallModal from '#/layouts/Drive/PaywallModal.vue'
@@ -53,7 +53,7 @@ function close() {
 
 provideDialogContext({ close })
 
-// Escape closes it while it is open, through the dashboard's `closeModal` binding, as in React.
+// Escape closes it while it is open, through the dashboard's `closeModal` binding.
 watch(
   open,
   (isOpen, _old, onCleanup) => {
@@ -74,8 +74,8 @@ function isOutside(event: Event) {
 
 /**
  * Whether the menu has been open for a couple of frames. Right-clicking a row focuses it, and the
- * focus scrolls the table's layout container a pixel on the next frame; React's menu, mounted in
- * a transition, was not yet listening then, so that scroll did not close it.
+ * focus scrolls the table's layout container a pixel on the next frame; that scroll must not close
+ * the menu.
  */
 const isSettled = ref(false)
 watch(
@@ -111,7 +111,7 @@ useEventListener(
   { capture: true },
 )
 
-// A press that starts and ends outside closes it, as react-aria's `useInteractOutside`.
+// A press that starts and ends outside closes it.
 let pressStartedOutside = false
 useEventListener(
   document,

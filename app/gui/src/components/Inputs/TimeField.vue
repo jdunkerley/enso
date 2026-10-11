@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * @file A time field bound to a form field holding an `@internationalized/date` time: the Vue
- * counterpart of the React `TimeField`, styled by the same `TIME_FIELD_STYLES`. A Reka
- * `TimeField`: the time is typed segment by segment (`role="spinbutton"`; digits fill a segment,
- * ArrowUp/ArrowDown change it, ArrowLeft/ArrowRight move between them). The `x` button clears it
- * (not shown when `isRequired`, unless `noResetButton` says otherwise).
+ * @file A time field bound to a form field holding an `@internationalized/date` time, styled by
+ * `TIME_FIELD_STYLES`. A Reka `TimeField`: the time is typed segment by segment
+ * (`role="spinbutton"`; digits fill a segment, ArrowUp/ArrowDown change it, ArrowLeft/ArrowRight
+ * move between them). The `x` button clears it (not shown when `isRequired`, unless
+ * `noResetButton` says otherwise).
  */
 import Button from '$/components/Button/Button.vue'
 import Field from '$/components/Form/Field.vue'

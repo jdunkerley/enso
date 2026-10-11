@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * @file The Keyboard shortcuts settings tab: the Vue port of the React
- * `KeyboardShortcutsSettingsSection`. It lists the rebindable actions of the dashboard and of the
- * graph editor (#170), grouped by category, with their shortcuts, which can be removed, added
- * (`CaptureKeyboardShortcutModal`) and reset, one action or all at once. The changes go to the
- * window's bindings (`$/providers/inputBindings`), so they apply at once, and are saved.
+ * @file The Keyboard shortcuts settings tab. It lists the rebindable actions of the dashboard and
+ * of the graph editor (#170), grouped by category, with their shortcuts, which can be removed,
+ * added (`CaptureKeyboardShortcutModal`) and reset, one action or all at once. The changes go to
+ * the window's bindings (`$/providers/inputBindings`), so they apply at once, and are saved.
  *
  * A shortcut that shares its key with another action where both are active is drawn in red, and
  * the row names the other action; the capture modal will not add such a shortcut

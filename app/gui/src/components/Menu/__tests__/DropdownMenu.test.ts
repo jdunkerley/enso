@@ -1,6 +1,5 @@
 /**
- * @file Keyboard and focus behaviour of the Reka-based {@link DropdownMenu} primitive: what react-aria's
- * `Menu` guarantees on the React side, and what a port must not lose.
+ * @file Keyboard and focus behaviour of the Reka-based {@link DropdownMenu} primitive.
  */
 import userEvent from '@testing-library/user-event'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
@@ -43,7 +42,7 @@ enableAutoUnmount(afterEach)
 describe('DropdownMenu', () => {
   let portalRoot: HTMLElement
   beforeEach(() => {
-    // `index.html` provides this; the menu renders into it beside the React overlays.
+    // `index.html` provides this; the menu renders into it.
     portalRoot = document.createElement('div')
     portalRoot.id = 'enso-portal-root'
     document.body.appendChild(portalRoot)

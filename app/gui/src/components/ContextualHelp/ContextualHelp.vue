@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A help (or info) icon button that opens a popover with more detail: the Vue counterpart of
- * the React `#/components/ContextualHelp`. The content is the default slot.
+ * @file A help (or info) icon button that opens a popover with more detail. The content is the
+ * default slot.
  */
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'

@@ -1,7 +1,7 @@
 /**
- * @file The Vue paywall pieces (`src/cloud/billing/paywall/`): the screen, the alert, the button
- * that opens the dialog, and the dialog on the modal stack (the React menus' paywalled entries),
- * with the plan each feature needs and where its upgrade button leads.
+ * @file The paywall pieces (`src/cloud/billing/paywall/`): the screen, the alert, the button that
+ * opens the dialog, and the dialog on the modal stack (for menus' paywalled entries), with the plan
+ * each feature needs and where its upgrade button leads.
  */
 import { SUBSCRIBE_PATH } from '$/appUtils'
 import PaywallAlert from '$/cloud/billing/paywall/PaywallAlert.vue'

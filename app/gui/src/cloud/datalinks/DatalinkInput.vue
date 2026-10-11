@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The datalink editor: `JSONSchemaInput.vue` over the datalink schema
- * (`$/utils/datalinkSchema.json`), validated by its compiled validators. The Vue port of the React
- * `DatalinkInput`.
+ * (`$/utils/datalinkSchema.json`), validated by its compiled validators.
  */
 import SCHEMA from '$/utils/datalinkSchema.json' with { type: 'json' }
 import { AJV } from '$/utils/datalinkValidator'

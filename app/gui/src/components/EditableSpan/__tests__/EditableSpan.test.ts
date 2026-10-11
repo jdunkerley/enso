@@ -1,6 +1,6 @@
 /**
- * @file The Vue `EditableSpan`: the keyboard and pointer behaviour react-aria gave the React one
- * (Enter submits, Escape and a press outside cancel, keys do not reach the table behind it).
+ * @file The `EditableSpan`'s keyboard and pointer behaviour (Enter submits, Escape and a press
+ * outside cancel, keys do not reach the table behind it).
  */
 import {
   byTestId,

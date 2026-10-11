@@ -2,8 +2,7 @@
 /**
  * @file A row of the user groups: the group's name, the pictures of its first members (with how
  * many more there are), and, for an admin, "Manage Users" joined to a menu that deletes the group
- * once confirmed (below the chevron's start, 8px off, where React's `Menu.Trigger` put it). The Vue
- * port of React's `UserGroupRow`.
+ * once confirmed (below the chevron's start, 8px off).
  */
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
@@ -49,7 +48,7 @@ const users = computed(() =>
 function confirmDelete() {
   void modals.ask(ConfirmDeleteModal, {
     actionText: getText('deleteUserGroupActionText', userGroup.groupName),
-    // As in React, the confirmation closes at once, without waiting for the deletion.
+    // The confirmation closes at once, without waiting for the deletion.
     onConfirm: () => {
       deleteUserGroup.mutate([userGroup.id, userGroup.groupName])
     },

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file An item in the notification tray, also shown in a notification's toast: the Vue
- * counterpart of the React `NotificationItem` (#83), with the same elements and classes.
+ * @file An item in the notification tray, also shown in a notification's toast (#83).
  */
 import CloseButton from '$/components/Button/CloseButton.vue'
 import Icon from '$/components/Icon/Icon.vue'

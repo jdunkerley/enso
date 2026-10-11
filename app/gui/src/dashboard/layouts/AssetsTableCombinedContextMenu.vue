@@ -1,13 +1,11 @@
 <script setup lang="ts">
 /**
  * @file The asset table's context menu: one asset's (`AssetContextMenu.vue`) while exactly one is
- * selected, else the table's (`AssetsTableContextMenu.vue`). The Vue port of React's
- * `AssetsTableCombinedContextMenu`.
+ * selected, else the table's (`AssetsTableContextMenu.vue`).
  *
- * It keeps where the menu is and whether it is open, which React kept in each menu: when the kind
- * of menu changes (a right click on a row that was not selected selects it), the new one opens
- * only where the row's right click asked for it (`contextMenuData`), as React's freshly mounted
- * menu did. `open` and `close` are React's imperative `ContextMenuApi`.
+ * It keeps where the menu is and whether it is open: when the kind of menu changes (a right click
+ * on a row that was not selected selects it), the new one opens only where the row's right click
+ * asked for it (`contextMenuData`). `open` and `close` are its imperative API.
  */
 import AssetContextMenu from '#/layouts/AssetContextMenu.vue'
 import AssetsTableContextMenu from '#/layouts/AssetsTableContextMenu.vue'

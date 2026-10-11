@@ -179,10 +179,10 @@ export const POPOVER_STYLES = tv({
 })
 
 /**
- * The enter/exit motion of the Vue `Dialog`'s box (a Reka `DialogContent`). In React it is on the
- * full-screen `Modal` layer around the box (`DIALOG_MODAL_STYLES`'s `isEntering`/`isExiting`);
- * Reka animates each layer it unmounts separately, so the Vue port moves it onto the box itself,
- * keyed on Reka's `data-state`. The box is all that layer shows, so it looks the same.
+ * The enter/exit motion of the `Dialog`'s box (a Reka `DialogContent`), keyed on Reka's
+ * `data-state`. It is on the box rather than on the full-screen layer around it
+ * (`DIALOG_MODAL_STYLES`'s `isEntering`/`isExiting`), as Reka animates each layer it unmounts
+ * separately. The box is all that layer shows, so it looks the same.
  */
 export const DIALOG_MOTION = tv({
   base: [
@@ -198,9 +198,9 @@ export const DIALOG_MOTION = tv({
 })
 
 /**
- * The enter/exit motion of the Vue `Popover` (a Reka `PopoverContent`), in place of
- * `POPOVER_STYLES`'s `isEntering`/`isExiting`, which key the direction on react-aria's
- * `placement-*:` modifiers. Reka reports the side it used as `data-side` (decision 5 of
+ * The enter/exit motion of the `Popover` (a Reka `PopoverContent`), in place of
+ * `POPOVER_STYLES`'s `isEntering`/`isExiting`, which key the direction on the `placement-*:`
+ * modifiers. Reka reports the side it used as `data-side` (decision 5 of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  */
 export const POPOVER_MOTION = [

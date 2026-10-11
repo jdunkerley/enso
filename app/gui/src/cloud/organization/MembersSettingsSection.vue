@@ -2,7 +2,7 @@
 /**
  * @file The Members settings tab: the organization's members and pending invitations, with (for an
  * admin) "Invite Members", the seats left on the plan, and per row the actions to remove a member,
- * or to copy, resend or remove an invitation. The Vue port of the React `MembersSettingsSection`.
+ * or to copy, resend or remove an invitation.
  */
 import PaywallDialogButton from '$/cloud/billing/paywall/PaywallDialogButton.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
@@ -69,7 +69,7 @@ function isResending(email: EmailAddress) {
   return resendInvitation.isPending.value && resendInvitation.variables.value?.[0] === email
 }
 
-/** The link that signs up into the organization, as the React table built it. */
+/** The link that signs up into the organization. */
 function invitationLink(invitation: Invitation) {
   // eslint-disable-next-line camelcase
   const params = new URLSearchParams({ organization_id: invitation.organizationId }).toString()

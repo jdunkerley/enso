@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A spinning arc that animates using the `dasharray-<percentage>` custom Tailwind classes: the
- * Vue counterpart of the React `#/components/Spinner`.
+ * @file A spinning arc that animates using the `dasharray-<percentage>` custom Tailwind classes.
  *
  * The project-view's `shared/LoadingSpinner.vue` draws the same arc with its own CSS, because it is
  * also mounted inside visualizations' custom elements, where Tailwind does not reach. This one is

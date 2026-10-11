@@ -1,9 +1,8 @@
 /**
  * @file Moving or copying assets from one drive category to another: what dropping assets on a
- * category, or pasting them into one, does. Framework-free, moved out of the React
- * `#/layouts/Drive/Categories/transferBetweenCategoriesHooks` (#192): the Vue composable
- * (`$/composables/transferBetweenCategories`) and the React hook give it the app's stores, and the
- * mutations run through the shared query client, with the options in `$/utils/driveMutations`.
+ * category, or pasting them into one, does. Framework-free (#192): the Vue composable
+ * (`$/composables/transferBetweenCategories`) gives it the app's stores, and the mutations run
+ * through the shared query client, with the options in `$/utils/driveMutations`.
  */
 import type { UploadFileToCloudOptions } from '$/cloud/uploadToCloud'
 import {
@@ -155,7 +154,7 @@ export async function transferBetweenCategories(
     case 'team':
     case 'cloud': {
       // Moving out of a team's folder is not allowed: the user is asked to copy instead, and a
-      // dismissed question does nothing (#200; React went on to attempt the move).
+      // dismissed question does nothing (#200).
       if (from.type === 'team' && to.type === 'team' && !categoryEq(from, to)) {
         const resolution =
           method === 'move' ? await askToCopyInsteadOfMoving(context, from) : 'confirm'

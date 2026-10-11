@@ -64,7 +64,7 @@ function onBlur() {
 function onInput(event: Event) {
   const textArea = event.target as HTMLTextAreaElement
   draft.value = textArea.value.replace(/[\r\n]+/g, ' ')
-  // Keep the element showing the draft (a controlled input in React).
+  // Keep the element showing the draft, as a controlled input.
   if (textArea.value !== draft.value) textArea.value = draft.value
 }
 

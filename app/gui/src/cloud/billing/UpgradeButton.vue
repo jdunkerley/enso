@@ -12,7 +12,7 @@ const { getText } = useText()
 const router = useRouter()
 
 function navigate(event: MouseEvent) {
-  // A client-side navigation, as react-aria's links do under its `RouterProvider`.
+  // A client-side navigation, through the router.
   event.preventDefault()
   void router.push(SUBSCRIBE_PATH)
 }

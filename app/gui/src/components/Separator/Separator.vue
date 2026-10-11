@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * @file A visual separator (`role="separator"`) on Reka UI's `Separator`: the Vue counterpart of
- * the React `#/components/Separator`.
+ * @file A visual separator (`role="separator"`) on Reka UI's `Separator`.
  */
 import { SEPARATOR_STYLES } from '$/components/Separator/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'

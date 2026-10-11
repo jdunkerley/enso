@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Snowflake credential: the Vue port of the React
- * `SnowflakeCredentialsForm`. The recipe is `$/cloud/serviceCredentials/snowflake`. Remember to list
- * a new form in `credentialInfos.ts`.
+ * @file The form creating a Snowflake credential. The recipe is
+ * `$/cloud/serviceCredentials/snowflake`. Remember to list a new form in `credentialInfos.ts`.
  */
 import * as snowflake from '$/cloud/serviceCredentials/snowflake'
 import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'

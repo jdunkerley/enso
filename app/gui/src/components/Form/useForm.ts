@@ -2,10 +2,10 @@
  * @file `useForm`: the in-house form state over zod that `Form.vue` and the Vue inputs use, chosen
  * over vee-validate in decision 2 of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
  *
- * It keeps the React `useForm`'s behaviour, so that ports stay mechanical:
+ * It provides:
  * - the schema is a zod object (or a callback building one), validated asynchronously with the
  *   shared i18n error map, so every message comes from a `useText()` key;
- * - fields are validated on submit, then re-validated on change (react-hook-form's default
+ * - fields are validated on submit, then re-validated on change (the default
  *   `mode: 'onSubmit'`, `reValidateMode: 'onChange'`); `mode` picks the others;
  * - dirty and touched state per field and for the form;
  * - `submit()` validates, focuses the first invalid field, and awaits `onSubmit` while
@@ -15,7 +15,7 @@
  *   runs `onSubmitSuccess`. `onSubmitted` runs either way;
  * - offline, a form that cannot submit offline shows the offline notice and does not submit;
  * - `setFormError`, `setError`, `clearErrors`, `setValue`, `getValues`, `watch`, `trigger`,
- *   `reset`, `resetField`, `setFocus`, `getFieldState`, with react-hook-form's names.
+ *   `reset`, `resetField`, `setFocus`, `getFieldState`.
  */
 import { injectDialogContext } from '$/components/Dialog/dialogContext'
 import { useIsOnline } from '$/providers/online'
@@ -361,8 +361,8 @@ export function useForm<Schema extends TSchema, SubmitResult = void>(
       await options.onSubmitSuccess?.(result, submitted, form)
       await options.onSubmitted?.(result, null, submitted, form)
     } finally {
-      // Counted at the end, as react-hook-form does, so that a form reset by a successful
-      // submission still re-validates on change.
+      // Counted at the end, so that a form reset by a successful submission still re-validates
+      // on change.
       state.submitCount += 1
       state.isSubmitting = false
       state.isSubmitted = true

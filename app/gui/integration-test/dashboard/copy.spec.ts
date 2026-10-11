@@ -89,8 +89,8 @@ test('move to trash', async ({ drivePage, cloudApi }) => {
   cloudApi.addDirectory()
   await drivePage.goToCategory
     .cloud()
-    // Release `Mod` before dragging: the drag does not start while `Mod` is still held (seen with
-    // the React drive table). `withModPressed` releases the key once its callback ends.
+    // Release `Mod` before dragging: the drag does not start while `Mod` is still held.
+    // `withModPressed` releases the key once its callback ends.
     .withModPressed((modActions) =>
       modActions.driveTable.clickRow('New Folder 1').driveTable.clickRow('New Folder 2'),
     )

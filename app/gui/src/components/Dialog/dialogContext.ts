@@ -1,6 +1,5 @@
 /**
- * @file How content inside a `Dialog.vue` or `Popover.vue` closes it: the Vue counterpart of the
- * React `DialogProvider`. `DialogClose.vue` uses it.
+ * @file How content inside a `Dialog.vue` or `Popover.vue` closes it. `DialogClose.vue` uses it.
  */
 import { createContextStore } from '@/providers'
 

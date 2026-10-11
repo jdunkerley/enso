@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The Properties tab's content for one asset: its path, owner, dates, size, creator, sharing
- * and labels; a secret's value (or a credential's state); a datalink's configuration. The Vue port
- * of the React `AssetPropertiesInternal`.
+ * and labels; a secret's value (or a credential's state); a datalink's configuration.
  *
  * When the asset's context menu chose "Edit" on a secret or a datalink, the right panel's context
  * names it in `spotlightOn`: the window then dims around that section (`SpotlightOverlay.vue`) until the
@@ -53,7 +52,7 @@ const { backend, item, category } = defineProps<{
 /** A section of the tab. */
 const SECTION_CLASS =
   'pointer-events-auto flex flex-col items-start gap-side-panel-section rounded-default'
-/** A section's heading (react-aria's `Heading`: a plain `h2`). */
+/** A section's heading: a plain `h2`. */
 const HEADING_CLASS = 'h-side-panel-heading py-side-panel-heading-y text-lg leading-snug'
 
 const rightPanel = useRightPanelData()

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The settings page: the Vue port of the React `Settings`. A sidebar of tabs (in a popover on
- * narrow screens), a search field that narrows the tabs, sections and entries to those matching it,
- * and the current tab, kept in the `SettingsTab` query parameter.
+ * @file The settings page: a sidebar of tabs (in a popover on narrow screens), a search field that
+ * narrows the tabs, sections and entries to those matching it, and the current tab, kept in the
+ * `SettingsTab` query parameter.
  *
  * Every tab is laid out by `SettingsTab.vue`. The sections of the Account tab and of the cloud's tabs
  * (Organization, Billing & Plans, Members, User groups, Activity log, API keys, Usage) come from the
@@ -212,7 +212,7 @@ const title = computed(() =>
       data-testid="settings-panel"
     >
       <h1 class="flex items-center px-heading-x">
-        <!-- React's menu trigger placed its popover at the button's bottom start. -->
+        <!-- The menu's popover sits at the button's bottom start. -->
         <Popover size="auto" placement="bottom-start">
           <template #trigger>
             <Button variant="icon" icon="menu_dots" class="mr-3 sm:hidden" />

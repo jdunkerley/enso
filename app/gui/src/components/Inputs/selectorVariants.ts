@@ -1,5 +1,5 @@
 /**
- * @file Tailwind variants of the selector and the multi-selector, shared by the React input and its Vue port.
+ * @file Tailwind variants of the selector and the multi-selector.
  * See `variants.ts` for the `*_VUE_STATES` constants.
  */
 import { TEXT_STYLE } from '$/components/Text/variants'

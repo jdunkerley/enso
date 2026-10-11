@@ -1,12 +1,10 @@
 <script setup lang="ts">
 /**
- * @file The page the email-confirmation link opens: the Vue port of the React
- * `ConfirmRegistration`. It confirms the account with the link's `email` and `verification_code`
- * at once, then sends the user to `redirect_url` (by default the dashboard) after five seconds.
- * Without either parameter it returns to the sign-in page.
+ * @file The page the email-confirmation link opens. It confirms the account with the link's `email`
+ * and `verification_code` at once, then sends the user to `redirect_url` (by default the dashboard)
+ * after five seconds. Without either parameter it returns to the sign-in page.
  *
- * The result's title (confirming, confirmed, failed) is the page's only, level-1, heading. The React
- * page had an empty `h1` above it instead (#178).
+ * The result's title (confirming, confirmed, failed) is the page's only, level-1, heading (#178).
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Button from '$/components/Button/Button.vue'

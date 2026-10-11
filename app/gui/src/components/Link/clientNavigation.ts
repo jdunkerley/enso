@@ -1,15 +1,14 @@
 /**
- * @file In-app navigation for links, as react-aria's `RouterProvider` gave the React dashboard: a
- * plain left click on a link to a page of this app goes through the router instead of reloading
- * the page.
+ * @file In-app navigation for links: a plain left click on a link to a page of this app goes
+ * through the router instead of reloading the page.
  */
 import { inject } from 'vue'
 import { routerKey } from 'vue-router'
 
 /**
- * Whether a click on a link should navigate within the app: the rule of react-aria's
- * `shouldClientNavigate`. The link must stay in this window and on this origin, not be a download,
- * and the click must have no modifier key (which asks for a new tab or window).
+ * Whether a click on a link should navigate within the app. The link must stay in this window and
+ * on this origin, not be a download, and the click must have no modifier key (which asks for a new
+ * tab or window).
  */
 export function shouldClientNavigate(link: HTMLAnchorElement, event: MouseEvent) {
   const target = link.getAttribute('target')

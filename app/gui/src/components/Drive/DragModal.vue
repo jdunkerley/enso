@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * @file The preview that follows the pointer while assets are dragged: up to three of them stacked,
- * each its icon and title, and a badge counting them all. The Vue port of the React `DragModal`,
- * with the drive table's styling of it built in.
+ * each its icon and title, and a badge counting them all, with the drive table's styling built
+ * in.
  *
  * It is meant for the modal stack: open it on `dragstart` (the browser's own drag image should be
  * blank), and it emits `close`, after calling `onDragEnd`, when the drag ends. It teleports to the

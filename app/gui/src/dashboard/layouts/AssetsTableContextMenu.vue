@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The context menu of the asset table when no asset, or several, are selected: the Vue port
- * of React's `AssetsTableContextMenu`, with the same entries, conditions and order. Its entries are
- * also the table's shortcuts meanwhile (`useMenuEntries`, scoped to the table), and the command
+ * @file The context menu of the asset table when no asset, or several, are selected. Its entries
+ * are also the table's shortcuts meanwhile (`useMenuEntries`, scoped to the table), and the command
  * palette's actions.
  */
 import ContextMenu from '#/components/ContextMenu.vue'

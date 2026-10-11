@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
- * @file A row (or column) of buttons: the Vue counterpart of the React `Button.Group`, styled by
- * the same `BUTTON_GROUP_STYLES`.
+ * @file A row (or column) of buttons, styled by `BUTTON_GROUP_STYLES`.
  *
  * `buttonVariants` sets shared props for every `Button.vue` inside, which their own props
  * override. With `gap: 'joined'` the buttons are joined into one control, each told whether it is
- * the first, a middle or the last one (`Button.GroupJoin` in React).
+ * the first, a middle or the last one.
  */
 import { BUTTON_GROUP_STYLES } from '$/components/Button/variants'
 import type { VariantProps } from '$/utils/style/tailwindVariants'
@@ -46,7 +45,7 @@ const {
 const isJoined = computed(() => gap === 'joined')
 
 provideButtonGroup(() => buttonVariants)
-// A group nested in a joined group starts afresh, as React's `ResetButtonGroupContext` does.
+// A group nested in a joined group starts afresh.
 provideJoinedButton(undefined)
 
 const slots = useSlots()

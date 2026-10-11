@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * @file An icon from `icons.svg`: the Vue counterpart of the React `#/components/Icon`.
+ * @file An icon from `icons.svg`.
  *
- * `icons.svg` is the one icon set (see "Assets and icons" in `app/gui/CLAUDE.md`); the React
- * `Icon` and the project-view `SvgIcon` already draw from it, and so does this. An unknown name
+ * `icons.svg` is the one icon set (see "Assets and icons" in `app/gui/CLAUDE.md`); the
+ * project-view `SvgIcon` draws from it too. An unknown name
  * renders the "missing" glyph, exactly as `SvgIcon` does. Something other than an `icons.svg` icon
  * (an element, a spinner) goes in the default slot instead of `icon`, and is wrapped in the same
- * sized box, like the React `Icon` given an element.
+ * sized box.
  */
 import { ICON_STYLES, type IconVariants } from '$/components/Icon/variants'
 import type { Icon } from '@/util/iconMetadata/iconName'

@@ -1,9 +1,8 @@
 /**
- * @file The Vue user bar (#83): the user menu (a dialog of buttons, as React's), its entries as
- * global actions, the notification tray, the offline notice and the cloud-only buttons.
+ * @file The Vue user bar (#83): the user menu (a dialog of buttons), its entries as global actions,
+ * the notification tray, the offline notice and the cloud-only buttons.
  */
-// The stores are plain objects, not React hooks: renamed so that the dashboard's rules-of-hooks
-// lint does not take them for hooks.
+// The stores are plain objects, not hooks: imported under `get…` names to say so.
 import { useAboutModal as getAboutModal } from '$/components/AboutModal/aboutModal'
 import { useActionsStore as getActionsStore } from '$/providers/actions'
 import { useText as getTextStore } from '$/providers/text'
@@ -143,7 +142,7 @@ describe('UserBar', () => {
     const menu = must(userMenu())
     expect(menu.getAttribute('role')).toBe('dialog')
     expect(menu.getAttribute('aria-label')).toBe(getText('userMenuLabel'))
-    // As react-aria's: the dialog itself, then Tab to the entries.
+    // The dialog itself takes the focus, then Tab goes to the entries.
     expect(document.activeElement).toBe(menu)
     expect(menu.textContent).toContain('Ada Lovelace')
     expect(menu.textContent).toContain(getText(Plan.solo))

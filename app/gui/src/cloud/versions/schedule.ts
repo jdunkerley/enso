@@ -1,7 +1,7 @@
 /**
  * @file Helpers of the right panel's Schedule tab and its new-execution dialog: the user's preferred
  * time zone, ordinal numbers in the user's language, the query of a project's executions in a month
- * (with React's key and options), and the new-execution form's schema.
+ * (with the key and options used before the Vue port, #75), and the new-execution form's schema.
  */
 import { useText } from '$/providers/text'
 import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'
@@ -35,8 +35,8 @@ export const MAX_DURATION_MINIMUM_MINUTES = 1
 export const MAX_DURATION_MAXIMUM_MINUTES = 180
 
 /**
- * The new-execution form's schema, as React's: the time zone is chosen by its description, and the
- * repeat is built from the repeat type, the days or months, and the first occurrence.
+ * The new-execution form's schema: the time zone is chosen by its description, and the repeat is
+ * built from the repeat type, the days or months, and the first occurrence.
  */
 export const UPSERT_EXECUTION_SCHEMA = z
   .object({
@@ -123,7 +123,7 @@ export const UPSERT_EXECUTION_SCHEMA = z
     },
   )
 
-/** As React's `listProjectExecutionsQueryOptions` sets it. */
+/** How long a month's executions stay fresh, as before the Vue port (#75). */
 const PROJECT_EXECUTIONS_STALE_TIME = 60_000
 
 /** Options for a query of a project's executions in a month (`month` counts from 1). */

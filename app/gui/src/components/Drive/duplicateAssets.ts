@@ -3,8 +3,7 @@
  * upload to the cloud): the types of a resolution, the suggested new name, and
  * {@link resolveDuplications}, which asks the user through `DuplicateAssetsModal.vue`.
  *
- * Framework-free callers (the React upload and paste hooks today, the Vue drive's mutations after
- * #192) reach it here: it is shared code, so it may not import the React dashboard.
+ * Framework-free callers (uploads, and the drive's actions and mutations) reach it here.
  */
 import type { Category } from '$/providers/category'
 import { getModalsStore } from '$/providers/modals'
@@ -67,7 +66,7 @@ export interface ResolveDuplicationsOptions {
  * Ask the user how to resolve name conflicts: skip, replace or rename each asset. Resolves with the
  * choices, or with none when no asset actually conflicts; rejects when the user cancels.
  *
- * Like the React `setModal` it replaces, it closes every open modal first.
+ * It closes every open modal first.
  */
 export function resolveDuplications(options: ResolveDuplicationsOptions) {
   const modals = getModalsStore()
@@ -76,7 +75,7 @@ export function resolveDuplications(options: ResolveDuplicationsOptions) {
     modals.open(DuplicateAssetsModal, {
       ...options,
       onSubmit: resolve,
-      // Rejected with no reason, as the React modal's dismissal did: callers only see that it failed.
+      // Rejected with no reason: callers only see that it failed.
       onCancel: () => reject(),
     })
   })

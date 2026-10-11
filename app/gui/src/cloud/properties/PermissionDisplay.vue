@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A user's name in a coloured pill showing their permission on an asset: the Vue port of the
- * React `PermissionDisplay`, as the Properties tab uses it (never pressable, so always a disabled
- * button, as React rendered it without `onPress`).
+ * @file A user's name in a coloured pill showing their permission on an asset, as the Properties
+ * tab uses it (never pressable, so always a disabled button).
  */
 import Button from '$/components/Button/Button.vue'
 import Text from '$/components/Text/Text.vue'

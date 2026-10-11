@@ -1,14 +1,12 @@
 /**
- * @file Whether an element (or, `within`, something inside it) has visible focus: the Vue
- * counterpart of the React `#/components/styled/FocusRing`, which adds its focus-ring class while
- * react-aria's `FocusRing` reports `isFocusVisible`. Bind the returned class on the element, so the
- * ring shows exactly where React's did (`focus-ring`, or on a pseudo-element:
- * `before:focus-ring`, `after:focus-ring`; `focus-ring-outset`).
+ * @file Whether an element (or, `within`, something inside it) has visible focus. Bind the
+ * returned class on the element, so that the focus ring shows while it has (`focus-ring`, or on a
+ * pseudo-element: `before:focus-ring`, `after:focus-ring`; `focus-ring-outset`).
  */
 import { useEventListener } from '@vueuse/core'
 import { computed, ref, type MaybeRefOrGetter } from 'vue'
 
-/** Which pseudo-element to place the focus ring on (if any), as React's `FocusRing` takes it. */
+/** Which pseudo-element to place the focus ring on (if any). */
 export type FocusRingPlacement = 'after' | 'before' | 'outset'
 
 /** Options of {@link useFocusRing}. */
@@ -18,7 +16,7 @@ export interface FocusRingOptions {
   readonly placement?: FocusRingPlacement
 }
 
-/** The class React's `FocusRing` adds, for a placement. */
+/** The focus-ring class for a placement. */
 export function focusRingClass(placement?: FocusRingPlacement) {
   return (
     placement === 'outset' ? 'focus-ring-outset'

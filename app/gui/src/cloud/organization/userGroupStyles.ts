@@ -1,4 +1,4 @@
-/** @file The classes of the user-group tables' header cells and rows, as React's `tv()`s had them. */
+/** @file The classes of the user-group tables' header cells and rows. */
 import { tv } from '$/utils/style/tailwindVariants'
 
 /** A header cell of a user-group table. */

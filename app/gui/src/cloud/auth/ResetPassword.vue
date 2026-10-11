@@ -1,10 +1,9 @@
 <script setup lang="ts">
 /**
- * @file The second half of the password reset: the Vue port of the React `ResetPassword`, reached
- * from the emailed link with the `email` and `verification_code` parameters. It sets the new
- * password, then sends the user to `redirect_url` (by default the desktop app's sign-in deep link)
- * after three seconds, or at once with the "open in desktop" button. Without either parameter it
- * returns to the sign-in page with an error.
+ * @file The second half of the password reset, reached from the emailed link with the `email` and
+ * `verification_code` parameters. It sets the new password, then sends the user to `redirect_url`
+ * (by default the desktop app's sign-in deep link) after three seconds, or at once with the "open
+ * in desktop" button. Without either parameter it returns to the sign-in page with an error.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Button from '$/components/Button/Button.vue'
@@ -45,7 +44,7 @@ const defaultEmail = queryParam(route, 'email')
 const defaultVerificationCode = queryParam(route, 'verification_code')
 const redirectUrl = queryParam(route, 'redirect_url') ?? 'enso://auth/login'
 
-/** An error toast, logged too: React's `toastAndLog`. */
+/** An error toast, logged too. */
 function toastAndLog(textId: 'missingEmailError' | 'missingVerificationCodeError') {
   const message = `${getText(textId)}.`
   toasts.show(message, { type: 'error' })

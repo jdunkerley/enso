@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file The list of settings tabs, in their groups: the Vue port of the React `Sidebar`, with the
- * same elements and classes. Each tab is a button; the current one is highlighted.
+ * @file The list of settings tabs, in their groups. Each tab is a button; the current one is
+ * highlighted.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'

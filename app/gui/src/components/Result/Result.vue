@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The result of an operation (success, error, info, loading), with a title, a subtitle and
- * any content: the Vue counterpart of the React `#/components/Result`.
+ * any content.
  *
- * `status` may also be `'custom'`, with the `status` slot supplying the icon; the React one takes
- * an element there. `icon` replaces the status's `icons.svg` icon; `false` hides the icon.
+ * `status` may also be `'custom'`, with the `status` slot supplying the icon. `icon` replaces the
+ * status's `icons.svg` icon; `false` hides the icon.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import {

@@ -3,7 +3,6 @@
  * @file The devtools' local storage section (#172): every registered `LocalStorage` key, with a
  * dialog editing its value as JSON (checked against the key's schema) and a button deleting it;
  * and, for the whole store, copying it to the clipboard, pasting it back, and deleting everything.
- * The Vue counterpart of the last section of React's `EnsoDevtools`.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -30,7 +29,7 @@ const storage = LocalStorage.getInstance()
 
 /**
  * The values read so far: `values` is shallow-reactive, so a shallow copy follows every change
- * without traversing the values themselves (as React's `useLocalStorageValues` did).
+ * without traversing the values themselves.
  */
 const values = computed<Partial<Record<LocalStorageKey, unknown>>>(() => ({
   ...storage['values'],

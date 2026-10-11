@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * @file An item that opens a nested menu (ArrowRight or hover opens it, ArrowLeft closes it): the
- * Vue counterpart of the React `Menu.SubmenuTrigger`. The trigger's title is the `label` prop and
- * the submenu's items are the default slot.
+ * @file An item that opens a nested menu (ArrowRight or hover opens it, ArrowLeft closes it). The
+ * trigger's title is the `label` prop and the submenu's items are the default slot.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { portalTarget } from '$/components/portal'
@@ -46,7 +45,7 @@ const menuClasses = computed(() => MENU_STYLES({ variant }))
       </div>
     </DropdownMenuSubTrigger>
     <DropdownMenuPortal :to="portalTarget()">
-      <!-- 8px from its item, as react-aria's submenus are (measured against the React menus). -->
+      <!-- 8px from its item. -->
       <DropdownMenuSubContent
         :sideOffset="8"
         :collisionPadding="MENU_CONTAINER_PADDING"

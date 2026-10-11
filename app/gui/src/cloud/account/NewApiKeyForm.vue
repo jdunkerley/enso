@@ -2,7 +2,7 @@
 /**
  * @file The "New API Key" popover: the key's name (which must be new), description and expiry,
  * Submit and Cancel. Once created, the key's secret is shown in `ApiKeyDialog.vue`, on the modal
- * stack, as React's `setModal` showed it. The Vue port of React's `NewApiKeyForm`.
+ * stack.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import DialogClose from '$/components/Dialog/DialogClose.vue'

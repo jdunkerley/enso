@@ -1,9 +1,8 @@
 /**
  * @file Framework-free options for the drive's batched mutations: deleting, restoring, copying,
- * moving and downloading several assets at once. Moved out of the React
- * `#/hooks/backendBatchedHooks` (#192) with the same keys and invalidations, so that React's
- * `useMutation`, vue-query and `executeMutation` (`$/utils/backendQuery`) run the same mutations, and
- * `useMutationState` sees them whichever side started them.
+ * moving and downloading several assets at once (#192). vue-query and `executeMutation`
+ * (`$/utils/backendQuery`) run the same mutations, with the same keys and invalidations, so
+ * `useMutationState` sees them whichever started them.
  */
 import type {
   ResolveDuplicationsOptions,
@@ -44,7 +43,7 @@ function fulfilledValues<T>(results: readonly PromiseSettledResult<T>[]) {
   return results.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
 }
 
-/** Type the options of a mutation, as React's and vue-query's `mutationOptions` do. */
+/** Type the options of a mutation, as vue-query's `mutationOptions` does. */
 function defineMutationOptions<TData, TVariables>(
   options: MutationOptions<TData, Error, TVariables>,
 ) {

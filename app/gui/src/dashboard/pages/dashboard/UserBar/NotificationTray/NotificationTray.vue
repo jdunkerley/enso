@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The notifications button in the user bar, with a badge while there are notifications newer
- * than the last time it was opened, and the tray it opens: the Vue counterpart of the React
- * `NotificationTray` (#83).
+ * than the last time it was opened, and the tray it opens (#83).
  *
- * The list is a plain `role="list"`, where React's was a react-aria `GridList` (`role="grid"`) that
- * nothing selects or navigates; see "Rulings from #83".
+ * The list is a plain `role="list"`, not a `role="grid"`: nothing selects or navigates it; see
+ * "Rulings from #83".
  */
 import StatusBadge from '$/components/Badge/StatusBadge.vue'
 import Button from '$/components/Button/Button.vue'

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * @file A multi-step process: the Vue counterpart of the React `Stepper`, styled by the same
- * `STEPPER_STYLES`. Its state comes from `useStepperState`.
+ * @file A multi-step process, styled by `STEPPER_STYLES`. Its state comes from `useStepperState`.
  *
- * - The `step` slot renders each step's marker (React's `renderStep`), usually a `Step.vue`, with
+ * - The `step` slot renders each step's marker, usually a `Step.vue`, with
  *   `{ index, isCurrent, isCompleted, isFirst, isLast, isDisabled, … }`. Without it no markers show.
  * - The default slot is the current step's content, with `{ currentStep, isFirst, isLast,
- *   nextStep, previousStep, goToStep, … }`, inside an error boundary and a suspense loader, as in
- *   React. It is re-created on every step change. `StepContent.vue`s inside it show only the
- *   current step's content.
+ *   nextStep, previousStep, goToStep, … }`, inside an error boundary and a suspense loader. It is
+ *   re-created on every step change. `StepContent.vue`s inside it show only the current step's
+ *   content.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'

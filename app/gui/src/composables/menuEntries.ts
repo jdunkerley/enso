@@ -1,18 +1,17 @@
 /**
- * @file The Vue counterpart of the React `useMenuEntries` (`#/hooks/menuHooks`): a menu's entries
- * are also global actions. While the component that declares them is mounted:
+ * @file A menu's entries are also global actions. While the component that declares them is
+ * mounted:
  *
  * - each enabled entry is in the command palette (`$/providers/actions`), named and grouped as
  *   in the keyboard-shortcuts settings, with its current shortcuts;
- * - each entry's shortcut runs it, from anywhere in the document (as React's, which attach to
- *   `document.body` outside a binding focus scope).
+ * - each entry's shortcut runs it, from anywhere in the document (the bindings attach to
+ *   `document.body` when there is no `target`).
  *
  * The shortcuts are the user's (`$/providers/dashboardInputBindings`), read when an event arrives, so a
- * rebinding applies at once, as in React.
+ * rebinding applies at once.
  *
- * A `target` scopes the shortcuts to an element and its descendants, as React's binding focus scope
- * (`BindingFocusScopeContext`) did for the drive's context menus: their shortcuts act only on a key
- * pressed inside the assets table.
+ * A `target` scopes the shortcuts to an element and its descendants, as for the drive's context
+ * menus: their shortcuts act only on a key pressed inside the assets table.
  */
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import { useActionsStore, type Action } from '$/providers/actions'
@@ -31,7 +30,7 @@ export interface MenuEntryAction {
 }
 
 /**
- * Make a menu's entries global actions, as React's `useMenuEntries` does (see the file comment).
+ * Make a menu's entries global actions (see the file comment).
  * `entries` may leave an entry out with `false`, `null` or `undefined`.
  * @returns the entries, without the left-out ones.
  */
@@ -72,7 +71,7 @@ export function useMenuEntries<Entry extends MenuEntryAction>(
     detach = inputBindings.attach(element, 'keydown', {
       [DEFAULT_HANDLER]: (_event, matchingBindings) => {
         for (const binding of matchingBindings) {
-          // The last entry for an action wins, as in React's map of entries by action.
+          // The last entry for an action wins.
           const entry = present.value.filter((candidate) => candidate.action === binding).at(-1)
           if (!entry || entry.isDisabled === true) continue
           entry.doAction()

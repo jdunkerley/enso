@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * @file A section of a settings tab, with its heading and entries: the Vue port of the React
- * `Section`. It is hidden when none of its entries is visible.
+ * @file A section of a settings tab, with its heading and entries. It is hidden when none of its
+ * entries is visible.
  */
 import Heading from '$/components/Text/Heading.vue'
 import type { SettingsSectionData } from '$/configurations/settings'

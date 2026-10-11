@@ -5,7 +5,7 @@
  * Enso button opening the devtools panel, and the list of active developer overrides.
  *
  * The button hides with "Hide Devtools", and comes back from the user menu's "Toggle Enso
- * Devtools" (Enso team members only); the overrides list stays either way, as in React.
+ * Devtools" (Enso team members only); the overrides list stays either way.
  */
 import { useDevtoolsStore } from '$/providers/devTools'
 import DevtoolsPanel from './DevtoolsPanel.vue'
