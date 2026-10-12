@@ -11,8 +11,7 @@
  * own issue.
  *
  * The labels popover (`ManageLabelsModal.vue`, #198) opens on the modal stack over the open
- * modals, anchored to the button. The button has no accessible name (axe's `button-name`, in the
- * drive's baseline); it has an id, so that axe names it by that (normalized) id as before.
+ * modals, anchored to the button, which is named "Manage Labels" (its `aria-label`, as its tooltip).
  */
 import { useMutationCallback, useToastAndLog } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
@@ -31,7 +30,7 @@ import {
   type Label as BackendLabel,
   type LabelName,
 } from 'enso-common/src/services/Backend'
-import { computed, shallowRef, useId } from 'vue'
+import { computed, shallowRef } from 'vue'
 
 const { item, labels } = defineProps<{
   item: AnyAsset
@@ -47,7 +46,6 @@ const associateTag = useMutationCallback(() =>
   backendMutationOptions(driveView.location.backend, 'associateTag'),
 )
 
-const editButtonId = useId()
 const labelsByName = computed(() => new Map(labels.map((label) => [label.value, label])))
 const shownLabels = computed(() =>
   (item.labels ?? []).filter((label) => labelsByName.value.has(label)),
@@ -110,9 +108,9 @@ function openLabelsModal(event: MouseEvent) {
     <!-- Clicks here must not reach the row, which would select it. -->
     <div v-if="canLabel" class="contents" @click.stop>
       <Button
-        :id="editButtonId"
         variant="icon"
         showIconOnHover
+        :aria-label="getText('manageLabels')"
         :tooltip="getText('manageLabels')"
         tooltipPlacement="top"
         icon="edit"

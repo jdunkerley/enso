@@ -348,7 +348,8 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           /** Toggle visibility for the "labels" column. */
           labels() {
             return self.step('Toggle "labels" column', (page) =>
-              page.getByLabel(TEXT.labelsColumnName).click(),
+              // Exact: each row's "Manage Labels" button contains the name too.
+              page.getByLabel(TEXT.labelsColumnName, { exact: true }).click(),
             )
           },
           /** Toggle visibility for the "accessed by projects" column. */
