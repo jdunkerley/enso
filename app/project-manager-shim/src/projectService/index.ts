@@ -8,6 +8,7 @@ import { makeProjectTelemetryKey } from 'enso-common/src/services/ProjectManager
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import KSUID from 'ksuid'
 import * as crypto from 'node:crypto'
+import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import {
   EnsoRunner,
   findEnsoExecutable,
@@ -76,15 +77,23 @@ export interface DuplicatedProject {
 export class ProjectService {
   private static readonly DEFAULT_NAMESPACE = 'local'
 
-  /** Creates a new ProjectService with the specified runner. */
+  /**
+   * Creates a new ProjectService with the specified runner.
+   * @param lifecycle - Told about project directories this service moves or deletes.
+   */
   constructor(
     private readonly runner: Runner,
     private readonly extraArgs: readonly string[],
     private readonly logger: Console = console,
+    private readonly lifecycle?: ProjectLifecycleListener,
   ) {}
 
   /** Creates a default ProjectService using the Enso executable found in the environment. */
-  static default(workDir: string = '.', extraArgs: readonly string[] = []): ProjectService {
+  static default(
+    workDir: string = '.',
+    extraArgs: readonly string[] = [],
+    lifecycle?: ProjectLifecycleListener,
+  ): ProjectService {
     const ensoPath = findEnsoExecutable(workDir)
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
@@ -96,7 +105,19 @@ export class ProjectService {
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
     const allExtraArgs = [...envArgsArray, ...extraArgs]
 
-    return new ProjectService(runner, allExtraArgs)
+    return new ProjectService(runner, allExtraArgs, console, lifecycle)
+  }
+
+  /** Tell {@link lifecycle} about a change that has already happened; failures are only logged. */
+  private async notifyLifecycle(
+    notify: (listener: ProjectLifecycleListener) => Promise<void>,
+  ): Promise<void> {
+    if (this.lifecycle == null) return
+    try {
+      await notify(this.lifecycle)
+    } catch (error) {
+      this.logger.error('Failed to update local metadata:', error)
+    }
   }
 
   /** Creates a new user project with the specified configuration. */
@@ -261,6 +282,7 @@ export class ProjectService {
       await repo.delete(project.path)
       this.logger.debug('Project permanently deleted', projectId, error)
     }
+    await this.notifyLifecycle((listener) => listener.projectDeleted(projectId))
   }
 
   /** Duplicates a project. */
@@ -326,8 +348,9 @@ export class ProjectService {
       await this.runner.registerShutdownHook(project.path, 'rename-project-directory', async () => {
         this.logger.info(`Executing deferred directory rename for project ${projectId}`)
         try {
-          await repo.renameProjectDirectory(project.path, newNormalizedName)
+          const newPath = await repo.renameProjectDirectory(project.path, newNormalizedName)
           this.logger.info(`Successfully renamed project directory for ${projectId}`)
+          await this.notifyLifecycle((listener) => listener.projectMoved(projectId, newPath))
         } catch (error) {
           this.logger.error(`Failed to rename project directory for ${projectId}:`, error)
         }
@@ -336,7 +359,8 @@ export class ProjectService {
       await this.runner.renameProject(project.path, namespace, oldNormalizedName, newNormalizedName)
     } else {
       // If server is not running, rename the directory immediately
-      await repo.renameProjectDirectory(project.path, newNormalizedName)
+      const newPath = await repo.renameProjectDirectory(project.path, newNormalizedName)
+      await this.notifyLifecycle((listener) => listener.projectMoved(projectId, newPath))
     }
   }
 

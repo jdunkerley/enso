@@ -39,6 +39,7 @@ import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { tmpdir } from 'node:os'
 import type { Readable } from 'node:stream'
 import { finished } from 'node:stream/promises'
+import { fileURLToPath } from 'node:url'
 import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
 import type { Watcher } from 'project-manager-shim/fs'
@@ -49,6 +50,7 @@ import {
   isProjectServiceRequest,
   isWatcherRequest,
 } from 'project-manager-shim/handler'
+import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { ProjectService } from 'project-manager-shim/projectService'
 import { tarFsPack, unzipEntries, zipWriteStream } from './archive'
 
@@ -63,6 +65,15 @@ const HTTP_STATUS_BAD_REQUEST = 400
 const HTTP_STATUS_NOT_FOUND = 404
 const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500
 const PROJECTS_ROOT_DIRECTORY = projectManagement.getProjectsDirectory().replace(/\\/g, '/')
+
+/**
+ * The dev server's stand-in for Electron's `userData` directory, holding the local labels and
+ * Recent list. It is kept apart from any real user data: `ENSO_DEV_USER_DATA_DIR`, or a
+ * git-ignored folder in this checkout.
+ */
+const DEV_USER_DATA_DIRECTORY =
+  process.env.ENSO_DEV_USER_DATA_DIR ??
+  path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.dev-profile', 'userData')
 
 const COMMON_HEADERS = {
   'Cross-Origin-Opener-Policy': 'same-origin',
@@ -80,6 +91,7 @@ const COOP_COEP_CORP_HEADERS = [
 /** Middleware for project manager shim. */
 export class ProjectManagerShimMiddleware {
   private projectService?: ProjectService
+  private readonly localMetadata = new LocalMetadata({ userDataDirectory: DEV_USER_DATA_DIRECTORY })
   private watchers: Map<AssetId, Watcher> = new Map()
 
   /** Create the new middleware. */
@@ -89,7 +101,7 @@ export class ProjectManagerShimMiddleware {
   async getProjectService(): Promise<ProjectService> {
     if (!this.projectService) {
       await this.setup()
-      this.projectService = ProjectService.default()
+      this.projectService = ProjectService.default('.', [], this.localMetadata)
     }
     return this.projectService
   }
@@ -188,6 +200,7 @@ export class ProjectManagerShimMiddleware {
         requestPath,
         () => this.getProjectService(),
         COMMON_HEADERS,
+        this.localMetadata,
       )
     } else if (isWatcherRequest(requestPath)) {
       handleWatcherRequest(request, response, COMMON_HEADERS, this.watchers)
@@ -234,7 +247,11 @@ export class ProjectManagerShimMiddleware {
               .end('Command arguments must be an array of strings.')
           } else {
             void (async () => {
-              const result = await handleFilesystemCommand(cliArguments, request)
+              const result = await handleFilesystemCommand(
+                cliArguments,
+                request,
+                this.localMetadata,
+              )
 
               if (typeof result === 'string') {
                 const resultData = Buffer.from(result)

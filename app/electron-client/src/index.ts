@@ -42,7 +42,12 @@ import { Channel } from './ipc.js'
 import { setupLogger } from './log.js'
 import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from './menuItems.js'
 import { capitalizeFirstLetter } from './naming.js'
-import { handleProjectProtocol, setupProjectService, version } from './projectService.js'
+import {
+  getLocalMetadata,
+  handleProjectProtocol,
+  setupProjectService,
+  version,
+} from './projectService.js'
 import { enableAll } from './security.js'
 import { Config, Server } from './server.js'
 import { getUrlToOpen, handleOpenUrl, registerAssociations } from './urlAssociations.js'
@@ -336,7 +341,7 @@ class App {
       port: args.server.port,
     })
     const projectService = this.createProjectService(args)
-    this.server = await Server.create(serverCfg, projectService)
+    this.server = await Server.create(serverCfg, projectService, getLocalMetadata())
     console.log('Content server started.')
   }
 

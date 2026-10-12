@@ -87,6 +87,8 @@ export interface ProjectMetadata {
   readonly created: dateTime.Rfc3339DateTime
   /** The last opened datetime. */
   readonly lastOpened?: dateTime.Rfc3339DateTime
+  /** Names of the project's labels; only names of existing labels are listed. */
+  readonly labels?: readonly backend.LabelName[]
 }
 
 /** Attributes of a file or folder. */
@@ -233,4 +235,31 @@ export interface DuplicateProjectParams {
 export interface DeleteProjectParams {
   readonly projectId: UUID
   readonly projectsDirectory: Path
+}
+
+/** Parameters for the "create label" endpoint. */
+export interface CreateLabelParams {
+  readonly value: backend.LabelName
+  readonly color: backend.LChColor
+}
+
+/** Parameters for the "delete label" endpoint. */
+export interface DeleteLabelParams {
+  readonly id: backend.TagId
+}
+
+/** Parameters for the "set project labels" endpoint. */
+export interface SetProjectLabelsParams {
+  readonly projectPath: Path
+  /** The complete new list of label names. */
+  readonly labels: readonly backend.LabelName[]
+}
+
+/** A recently opened local project. */
+export interface RecentProjectEntry {
+  /** The project directory. */
+  readonly path: Path
+  /** The project's id from its `.enso/project.json`. */
+  readonly projectId: UUID
+  readonly openedAt: dateTime.Rfc3339DateTime
 }
