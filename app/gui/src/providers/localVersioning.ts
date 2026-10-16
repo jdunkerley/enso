@@ -87,6 +87,8 @@ export type RepositoryOffer =
   | 'noGit'
   /** Not watched, no local backend, or quitting. */
   | 'unavailable'
+  /** The user accepted, but creating or enabling the repository failed (a toast says why). */
+  | 'failed'
 
 const TIMED_OUT = Symbol('timed out')
 
@@ -252,10 +254,39 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     return statuses.get(projectId)?.enabled === true
   }
 
+  /**
+   * A local path spelt one way: forward slashes, no trailing one (but the root's own), the drive
+   * letter lowercase. Paths on a drive compare case-insensitively, see {@link pathKey}.
+   */
+  function normalizePath(path: string) {
+    let result = path.replaceAll('\\', '/')
+    if (result.length > 1 && result.endsWith('/') && !/^[a-zA-Z]:\/$/.test(result)) {
+      result = result.replace(/\/+$/, '')
+    }
+    return result.replace(/^[a-zA-Z]:/, (drive) => drive.toLowerCase())
+  }
+
+  /** What two spellings of the same local path have in common. */
+  function pathKey(path: string) {
+    const normalized = normalizePath(path)
+    return /^[a-z]:/.test(normalized) ? normalized.toLowerCase() : normalized
+  }
+
   /** Whether `path` is `folder` or inside it; both are the GUI's own spellings of local paths. */
   function isAtOrUnder(path: string, folder: string) {
-    return path === folder || path.startsWith(folder.endsWith('/') ? folder : `${folder}/`)
+    const key = pathKey(path)
+    const folderKey = pathKey(folder)
+    return (
+      key === folderKey || key.startsWith(folderKey.endsWith('/') ? folderKey : `${folderKey}/`)
+    )
   }
+
+  function includesPath(paths: readonly string[], folder: string) {
+    return paths.some((path) => pathKey(path) === pathKey(folder))
+  }
+
+  /** The offers being made, so that a second request joins the first rather than asking again. */
+  const offering = new Map<ProjectId, Promise<RepositoryOffer>>()
 
   async function askRepository(kind: 'create' | 'use', folder: string) {
     let dontAskAgain = false
@@ -277,9 +308,23 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
    * Make sure the project's repository is enabled, asking once if need be: Create when there is
    * none (at the local root), Use for an existing one the provider could not enable silently.
    * Nothing is asked while quitting, or again after "Don't ask again"; "Not now" is remembered for
-   * the session, but only a `'close'` honours it.
+   * the session, but only a `'close'` honours it. A request made while another is being answered
+   * for the same project gets that one's result.
    */
-  async function offerRepository(
+  function offerRepository(
+    projectId: ProjectId,
+    reason: 'close' | 'save',
+  ): Promise<RepositoryOffer> {
+    const existing = offering.get(projectId)
+    if (existing != null) return existing
+    const offer = makeOffer(projectId, reason).finally(() => {
+      if (offering.get(projectId) === offer) offering.delete(projectId)
+    })
+    offering.set(projectId, offer)
+    return offer
+  }
+
+  async function makeOffer(
     projectId: ProjectId,
     reason: 'close' | 'save',
   ): Promise<RepositoryOffer> {
@@ -296,22 +341,21 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     const folder = status.repoRoot ?? backend.rootPath()
     // A saved local directory outside the root is versioned only if already in a repository.
     if (kind === 'create' && !isAtOrUnder(project.path, folder)) return 'outsideRoot'
-    const { declinedRoots, declinedRepositories } = deps.prompts.getState()
-    if ((kind === 'create' ? declinedRoots : declinedRepositories).includes(folder)) {
-      return 'declined'
-    }
-    if (reason === 'close' && notNowThisSession.has(folder)) return 'declined'
+    const declinedKey = kind === 'create' ? 'declinedRoots' : 'declinedRepositories'
+    if (includesPath(deps.prompts.getState()[declinedKey], folder)) return 'declined'
+    if (reason === 'close' && notNowThisSession.has(pathKey(folder))) return 'declined'
     switch (await askRepository(kind, folder)) {
       case 'notNow':
-        notNowThisSession.add(folder)
+        notNowThisSession.add(pathKey(folder))
         return 'declined'
-      case 'dontAskAgain':
-        deps.prompts.setState(
-          kind === 'create' ?
-            { declinedRoots: [...declinedRoots, folder] }
-          : { declinedRepositories: [...declinedRepositories, folder] },
-        )
+      case 'dontAskAgain': {
+        // Read again: the state may have changed while the prompt was open.
+        const declined = deps.prompts.getState()[declinedKey]
+        if (!includesPath(declined, folder)) {
+          deps.prompts.setState({ [declinedKey]: [...declined, normalizePath(folder)] })
+        }
         return 'declined'
+      }
       case 'accept':
         try {
           if (kind === 'create') await backend.initVersioning(folder)
@@ -319,11 +363,9 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
         } catch (error) {
           deps.toasts.show(
             `${deps.getText('versioningSetupError')}: ${getMessageOrToString(error)}`,
-            {
-              type: 'error',
-            },
+            { type: 'error' },
           )
-          return 'declined'
+          return 'failed'
         }
         await refresh(projectId)
         return statuses.get(projectId)?.enabled === true ? 'ready' : 'declined'

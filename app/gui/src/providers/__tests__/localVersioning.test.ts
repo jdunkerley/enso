@@ -419,4 +419,72 @@ describe('offerRepository', () => {
     await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('ready')
     expect(modals.stack.value).toHaveLength(0)
   })
+
+  test('concurrent offers share one prompt, one init and one result', async () => {
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockResolvedValueOnce(noRepository())
+      .mockResolvedValueOnce(noRepository())
+      .mockResolvedValue(status({ changed: true }))
+    const { backend, modals, store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    const a = store.offerRepository(PROJECT, 'save')
+    const b = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'accept')
+    await expect(a).resolves.toBe('ready')
+    await expect(b).resolves.toBe('ready')
+    expect(backend.initVersioning).toHaveBeenCalledOnce()
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test.each([
+    ['backslashes', String.raw`C:\Users\x\enso`, 'C:/Users/x/enso/P'],
+    ['a trailing separator', 'C:/Users/x/enso/', 'C:/Users/x/enso/P'],
+    ['another drive-letter case', 'c:/Users/x/enso', 'C:/Users/x/enso/P'],
+  ])('a root spelt with %s still contains its projects', async (_name, root, projectPath) => {
+    const project = newProjectId(Path(projectPath))
+    const { modals, store } = setup({
+      rootPath: () => Path(root),
+      versioningStatus: vi.fn(async () => noRepository()),
+    })
+    store.watchProject(project, FLUSHED)
+    void store.offerRepository(project, 'save')
+    await vi.waitFor(() => expect(modals.stack.value).toHaveLength(1))
+  })
+
+  test("Don't ask again is keyed by the normalised root, without duplicates", async () => {
+    const { modals, prompts, store } = setup({
+      rootPath: () => Path('C:\\Users\\x\\enso\\'),
+      versioningStatus: vi.fn(async () => noRepository()),
+    })
+    const project = newProjectId(Path('C:/Users/x/enso/P'))
+    store.watchProject(project, FLUSHED)
+    const first = store.offerRepository(project, 'save')
+    await answerPrompt(modals, 'dontAskAgain')
+    await first
+    expect(prompts.getState().declinedRoots).toEqual(['c:/Users/x/enso'])
+    prompts.setState({ declinedRoots: [] })
+    store.resetPrompts()
+    const second = store.offerRepository(project, 'save')
+    await vi.waitFor(() => expect(modals.stack.value).toHaveLength(1))
+    prompts.setState({ declinedRoots: ['c:/Users/x/enso'] })
+    await answerPrompt(modals, 'dontAskAgain')
+    await second
+    expect(prompts.getState().declinedRoots).toEqual(['c:/Users/x/enso'])
+  })
+
+  test('a setup failure is reported as failed, with a toast', async () => {
+    const { modals, store, toasts } = setup({
+      versioningStatus: vi.fn(async () => noRepository()),
+      initVersioning: vi.fn(async () => {
+        throw new Error('boom')
+      }),
+    })
+    const show = vi.spyOn(toasts, 'show')
+    store.watchProject(PROJECT, FLUSHED)
+    const offered = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'accept')
+    await expect(offered).resolves.toBe('failed')
+    expect(show).toHaveBeenCalled()
+  })
 })
