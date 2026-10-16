@@ -12,6 +12,7 @@
  * (`watchProject`, `unwatchProject`); the store does not read the opened projects itself.
  */
 import RepositoryPromptModal from '$/components/LocalVersioning/RepositoryPromptModal.vue'
+import SaveVersionModal from '$/components/LocalVersioning/SaveVersionModal.vue'
 import { useModals, type ModalsStore } from '$/providers/modals'
 import type { FlushOutcome } from '$/providers/openedProjects/project/flush'
 import { useText } from '$/providers/text'
@@ -51,6 +52,7 @@ export type LocalVersioningBackend = Pick<
   | 'enableVersioningIfInside'
   | 'initVersioning'
   | 'enableVersioning'
+  | 'commitVersion'
 >
 
 /** What the store works with; the app's are {@link useLocalVersioning}'s, tests pass their own. */
@@ -372,6 +374,84 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     }
   }
 
+  /** The saves being made, so that a second request for the same project is ignored. */
+  const saving = new Map<ProjectId, Promise<void>>()
+
+  /**
+   * Save a version: make sure a repository is in use, write the open modules, then commit with
+   * `comment` as given (the shim saves an empty one as "Saved"). A declined write is a failure:
+   * an error toast, and no commit. A save asked for while one is being made for the project is
+   * that one: no second commit is started.
+   */
+  function save(projectId: ProjectId, comment = ''): Promise<void> {
+    const existing = saving.get(projectId)
+    if (existing != null) return existing
+    const result = makeSave(projectId, comment).finally(() => {
+      if (saving.get(projectId) === result) saving.delete(projectId)
+    })
+    saving.set(projectId, result)
+    return result
+  }
+
+  async function makeSave(projectId: ProjectId, comment: string) {
+    const project = watched.get(projectId)
+    const backend = deps.localBackend()
+    if (project == null || backend == null) return
+    const offer = await offerRepository(projectId, 'save')
+    if (offer !== 'ready') {
+      // 'failed' has its own toast, and the rest need no word.
+      if (offer === 'declined') {
+        deps.toasts.show(deps.getText('versioningOffForFolder'), { type: 'info' })
+      } else if (offer === 'outsideRoot') {
+        deps.toasts.show(deps.getText('versioningNotForThisFolder'), { type: 'info' })
+      }
+      return
+    }
+    const blocked = statuses.get(projectId)?.blocked
+    if (blocked != null) {
+      deps.toasts.show(deps.getText('versioningBlocked', blocked), { type: 'error' })
+      return
+    }
+    try {
+      const written = await project.flush()
+      if (written.kind === 'declined') {
+        deps.toasts.show(`${deps.getText('saveVersionError')}: ${written.reason}`, {
+          type: 'error',
+        })
+        return
+      }
+      const { id } = await backend.commitVersion(projectId, comment)
+      if (id == null) {
+        deps.toasts.show(deps.getText('versionNothingToSave'), { type: 'info' })
+      } else {
+        deps.toasts.show(
+          deps.getText(written.kind === 'waited' ? 'versionSavedAfterWaiting' : 'versionSaved'),
+          { type: 'success' },
+        )
+      }
+    } catch (error) {
+      deps.toasts.show(`${deps.getText('saveVersionError')}: ${getMessageOrToString(error)}`, {
+        type: 'error',
+      })
+    } finally {
+      await refresh(projectId)
+    }
+  }
+
+  /** Open the "Save a version" dialog, whose Save saves with its comment. */
+  function askToSave(projectId: ProjectId) {
+    deps.modals.open(SaveVersionModal, {
+      onSave: (comment: string) => save(projectId, comment),
+    })
+  }
+
+  /** Off when blocked, or when an enabled repository has nothing to save. */
+  function canSave(projectId: ProjectId) {
+    const status = statuses.get(projectId)
+    if (status == null || !status.git || status.blocked != null) return false
+    return !status.enabled || status.repoRoot == null || status.changed
+  }
+
   /** While quitting nothing is asked. */
   function setQuitting(value: boolean) {
     quitting = value
@@ -393,6 +473,9 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     offerRepository,
     setQuitting,
     resetPrompts,
+    save,
+    askToSave,
+    canSave,
   }
 }
 

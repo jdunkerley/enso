@@ -51,6 +51,9 @@ function setup(backendOverrides: Partial<LocalVersioningBackend> = {}) {
     enableVersioningIfInside: vi.fn(async () => ({ enabled: false })),
     initVersioning: vi.fn(async (root: Path) => ({ repoRoot: root })),
     enableVersioning: vi.fn(async () => {}),
+    commitVersion: vi.fn(async (_id: ProjectId, _message: string) => ({
+      id: 'a'.repeat(40) as string | null,
+    })),
     ...backendOverrides,
   }
   const modals = createModalsStore()
@@ -486,5 +489,154 @@ describe('offerRepository', () => {
     await answerPrompt(modals, 'accept')
     await expect(offered).resolves.toBe('failed')
     expect(show).toHaveBeenCalled()
+  })
+})
+
+describe('save', () => {
+  test('writes the open modules, then commits with the comment as given', async () => {
+    const order: string[] = []
+    const commitVersion = vi.fn(async (_id: ProjectId, _message: string) => {
+      order.push('commit')
+      return { id: 'a'.repeat(40) as string | null }
+    })
+    const { toasts, store } = setup({
+      versioningStatus: vi.fn(async () => status({ changed: true })),
+      commitVersion,
+    })
+    store.watchProject(PROJECT, async () => {
+      order.push('flush')
+      return { kind: 'flushed' }
+    })
+    await store.save(PROJECT)
+    await store.save(PROJECT, 'Joined the sales table')
+    expect(order).toEqual(['flush', 'commit', 'flush', 'commit'])
+    expect(commitVersion.mock.calls.map((call) => call[1])).toEqual(['', 'Joined the sales table'])
+    expect(toasts.toasts.value.map((t) => [t.type, t.content])).toContainEqual([
+      'success',
+      'Version saved',
+    ])
+  })
+
+  test('after waiting for the auto-save, the toast says so', async () => {
+    const { toasts, store } = setup()
+    store.watchProject(PROJECT, async () => ({ kind: 'waited' }))
+    await store.save(PROJECT)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'success',
+      content: 'Version saved, after waiting for the project to write its changes',
+    })
+  })
+
+  test('a declined write is an error toast, and nothing is committed', async () => {
+    const { backend, toasts, store } = setup()
+    store.watchProject(PROJECT, async () => ({
+      kind: 'declined',
+      reason: 'src/Main.enso was changed on disk.',
+    }))
+    await store.save(PROJECT)
+    expect(backend.commitVersion).not.toHaveBeenCalled()
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'error',
+      content: 'Could not save a version: src/Main.enso was changed on disk.',
+    })
+  })
+
+  test('nothing to commit is an info toast', async () => {
+    const { toasts, store } = setup({ commitVersion: vi.fn(async () => ({ id: null })) })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.save(PROJECT)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'info',
+      content: 'Nothing has changed since the last version',
+    })
+  })
+
+  test('a failed commit shows git’s message in an error toast', async () => {
+    const { toasts, store } = setup({
+      commitVersion: vi.fn(async () => {
+        throw new Error('index.lock exists')
+      }),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.save(PROJECT)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'error',
+      content: 'Could not save a version: index.lock exists',
+    })
+  })
+
+  test('blocked: an error toast with git’s message, and no commit', async () => {
+    const { backend, toasts, store } = setup({
+      versioningStatus: vi.fn(async () => status({ blocked: 'A merge is in progress.' })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.save(PROJECT)
+    expect(backend.commitVersion).not.toHaveBeenCalled()
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'error',
+      content: 'Versions cannot be saved: A merge is in progress.',
+    })
+  })
+
+  test('outside the root, with no repository, it says why nothing is saved', async () => {
+    const { toasts, store } = setup({
+      versioningStatus: vi.fn(async () => status({ repoRoot: null, enabled: false })),
+    })
+    const elsewhere = newProjectId(Path('/elsewhere/Q'))
+    store.watchProject(elsewhere, FLUSHED)
+    await store.save(elsewhere)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'info',
+      content:
+        'This project is outside your projects folder and in no git repository, so no versions are kept for it.',
+    })
+  })
+
+  test('a declined offer says versions are off for the folder', async () => {
+    const { toasts, store } = setup({
+      versioningStatus: vi.fn(async () => status({ enabled: false, optedOut: true })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.save(PROJECT)
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'info',
+      content: 'Versions are off for this folder. Turn them on in Settings → Local.',
+    })
+  })
+
+  test('a save during a save does not start a second commit', async () => {
+    const gate = deferred<FlushOutcome>()
+    const { backend, store } = setup()
+    store.watchProject(PROJECT, () => gate.promise)
+    const first = store.save(PROJECT)
+    const second = store.save(PROJECT)
+    gate.resolve({ kind: 'flushed' })
+    await first
+    await second
+    expect(backend.commitVersion).toHaveBeenCalledOnce()
+    await store.save(PROJECT)
+    expect(backend.commitVersion).toHaveBeenCalledTimes(2)
+  })
+
+  test.each([
+    [status({ changed: true }), true],
+    [status({ changed: false }), false],
+    [status({ changed: true, blocked: 'merge' }), false],
+    [status({ repoRoot: null, enabled: false }), true],
+    [status({ git: false, repoRoot: null, enabled: false }), false],
+  ])('canSave(%j) is %s', async (current, expected) => {
+    const { store } = setup({ versioningStatus: vi.fn(async () => current) })
+    store.watchProject(PROJECT, FLUSHED)
+    await store.refresh(PROJECT)
+    expect(store.canSave(PROJECT)).toBe(expected)
+  })
+
+  test('askToSave opens the dialog, whose Save saves with its comment', async () => {
+    const { backend, modals, store } = setup()
+    store.watchProject(PROJECT, FLUSHED)
+    store.askToSave(PROJECT)
+    const props = modals.stack.value[0]!.props as { onSave: (comment: string) => Promise<void> }
+    await props.onSave('From the dialog')
+    expect(backend.commitVersion).toHaveBeenCalledWith(PROJECT, 'From the dialog')
   })
 })

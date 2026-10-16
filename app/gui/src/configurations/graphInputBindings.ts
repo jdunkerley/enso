@@ -67,6 +67,12 @@ const GRAPH_BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'redo',
       category: 'graphEditor',
     },
+    'graph.saveVersion': { bindings: ['Mod+S'], icon: 'save', category: 'graphEditor' },
+    'graph.saveVersionWithComment': {
+      bindings: ['Mod+Shift+S'],
+      icon: 'save',
+      category: 'graphEditor',
+    },
     'graph.openComponentBrowser': { bindings: ['Enter'], icon: 'add', category: 'graphEditor' },
     'graph.toggleVisualization': { bindings: ['Space'], icon: 'eye', category: 'graphComponents' },
     'components.deleteSelected': {
