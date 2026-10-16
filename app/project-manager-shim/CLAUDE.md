@@ -80,22 +80,81 @@ Rules worth keeping:
   store to `handleProjectServiceRequest` and `handleFilesystemCommand`; without
   it, the routes answer with a JSON-RPC error and listings carry no labels.
 
-## Versioning on close and move
+## Local versioning (`src/localVersioning/`)
 
-`ProjectService` takes the host's `LocalVersioning`. `openProject` registers a
-`'version-on-close'` shutdown hook (before any rename hook, so it runs first)
-that commits the project as `Saved on close`; a failure is logged and returned
-as `versioningWarning` on the `closeProject` result, and the close still
-succeeds. Renames and `filesystem-move` of a project directory call
-`LocalVersioning.commitMove`, which commits old and new paths together when both
-are in one repository and never throws. `commit` skips a path git knows nothing
-about (never versioned, or only ignored files), and resolves a path that no
-longer exists through its nearest existing ancestor.
+`LocalVersioning` stores snapshots of local projects as git commits. Projects
+versioned inside the same repository can share the same git history, with each
+commit scoped to its own paths only — changes to project A are never recorded
+with project B's. All git calls for a repository are serialized through
+`runGit(queueKey: repoRoot)`, so commits are FIFO-sequenced and never race on
+index.lock.
 
-Every commit and note is an automatic snapshot: `LocalVersioning.commit` passes
-`--no-verify` and `-c commit.gpgsign=false` (and `notes add` the latter), so the
-user's git hooks and signing never block or hang it. Callers that make someone
-wait (the close hook, `commitMove`) bound the commit with
-`withinVersioningTimeout` (15 s, `Saving a version timed out.`); the git process
-is deliberately left running, since killing it mid-commit can leave
-`index.lock`.
+### Module and routes
+
+- `src/localVersioning/index.ts`: `LocalVersioning` class with methods `status`,
+  `init`, `commit`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`,
+  `commitMove`, and helper `repositoryOf`.
+- `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
+  `identityArgs` (see _Identity fallback_ below).
+- Routes (POST to `/api/project-service/versioning/*`): `status`, `init`,
+  `commit`, `log`, `file-at`, `restore`, `duplicate-at`, `set-comment`. See
+  `handler/projectService.ts` for request/response shapes.
+
+### Serial queue
+
+All git calls for a repository go through
+`runGit(command, args, {queueKey: repoRoot})`. Each repository has its own
+queue; calls are processed FIFO, so no race on `index.lock` within one repo.
+Queues drain themselves (entries are cleaned when they complete); a failing call
+does not block later ones.
+
+### Identity fallback
+
+`identityArgs` tries `git var GIT_AUTHOR_IDENT`. If unavailable (a minimal git
+config or env override), it falls back to a hardcoded identity
+(`Enso IDE <noreply@enso.org>`). Commits and notes always have an author.
+
+### Ignore lines
+
+Versioning appends two lines to `.gitignore`:
+
+- `**/.enso/` — the IDE-generated project metadata (id, GUI settings)
+- `*.bak` — backup files from restore Unless a `**/.enso/` line already exists
+  (in which case `.gitignore` is left alone, even if `*.bak` is missing). The
+  lines are added only when `init` is called; a repository's `.gitignore` is
+  otherwise never touched. **The `.enso/` folder is excluded from all commits
+  independently of `.gitignore`**, via pathspec, so a project can track `.enso/`
+  if needed — it will not be versioned.
+
+### Notes reference
+
+Comments on versions are stored as git notes under `refs/notes/enso`. Each
+commit can have one note; `setComment` overwrites any existing note. Notes are
+never signed, even if the user's git config signs commits (via
+`-c commit.gpgsign=false`).
+
+### Close hook ordering
+
+`ProjectService.openProject` registers a `'version-on-close'` shutdown hook
+**before any other hook** (e.g. rename). It commits the project as
+`Saved on close` if there are changes; a failure is logged and returned as
+`versioningWarning` on the `closeProject` result, but the close still succeeds.
+
+### Timeouts and robustness
+
+- Callers that block (the close hook, `commitMove` on rename/move) bound their
+  git call with `withinVersioningTimeout(15 s)`. If the timeout fires,
+  `VERSIONING_TIMEOUT_MESSAGE` is raised, but **the git process keeps running**
+  (it is not killed). Killing mid-commit can leave `index.lock`, blocking future
+  operations, so a stuck process is preferred.
+- Every commit and note passes `--no-verify` (bypasses user hooks) and
+  `-c commit.gpgsign=false` (bypasses signing), so versioning never hangs on
+  user configuration.
+- `commit` skips paths with nothing tracked (no `HEAD`, not staged) and no
+  changes on disk.
+
+### Known limitation
+
+Moving a project out of its repository (or to another repository) leaves the old
+path's removal uncommitted. A future enhancement would detect this and make one
+final commit at the old path before moving.
