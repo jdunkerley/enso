@@ -15,6 +15,12 @@ describe('runCommand', () => {
     expect(error).toBeInstanceOf(CommandError)
     expect(error.code).toBe(3)
     expect(error.stderr).toContain('bad')
+    expect(error.message).toContain('bad')
+  })
+
+  test('the message falls back to the exit code when there is no stderr', async () => {
+    const error = await runCommand(process.execPath, ['-e', 'process.exit(4)']).catch((e) => e)
+    expect(error.message).toContain('exited with code 4')
   })
 
   test('input is written to stdin', async () => {

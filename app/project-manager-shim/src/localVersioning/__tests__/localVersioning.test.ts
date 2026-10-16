@@ -187,6 +187,37 @@ describe('commit', () => {
   })
 })
 
+describe('.enso exclusion without a .gitignore rule', () => {
+  test('.enso changes are neither changed nor committed', async () => {
+    await withProjects(async (root, versioning) => {
+      await git(root, 'init')
+      await git(root, 'config', 'user.name', 'Tester')
+      await git(root, 'config', 'user.email', 'tester@example.com')
+      const a = path.join(root, 'A')
+      await git(root, 'add', '-f', 'A/.enso/project.json')
+      await git(root, 'commit', '-m', 'Tracked .enso')
+      await versioning.commit([a], 'Saved')
+      await fs.writeFile(path.join(a, '.enso', 'project.json'), '{"x":1}\n')
+      await fs.writeFile(path.join(a, '.enso', 'new.json'), '{}\n')
+      expect((await versioning.status(a)).changed).toBe(false)
+      await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'main = 2\n')
+      const { id } = await versioning.commit([a], 'Edit')
+      const files = await git(root, 'show', '--name-only', '--format=', id!)
+      expect(files).toContain('A/src/Main.enso')
+      expect(files).not.toContain('/.enso/')
+    })
+  })
+})
+
+describe('a locked repository', () => {
+  test('commit rejects with a message about the lock', async () => {
+    await withRepo(async (root, versioning) => {
+      await fs.writeFile(path.join(root, '.git', 'index.lock'), '')
+      await expect(versioning.commit([path.join(root, 'A')], 'Saved')).rejects.toThrow(/lock/i)
+    })
+  })
+})
+
 describe('a repository in the middle of a merge', () => {
   test('is blocked', async () => {
     await withRepo(async (root, versioning) => {

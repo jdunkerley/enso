@@ -46,6 +46,15 @@ const BLOCKING_STATES: readonly (readonly [string, string])[] = [
   ['rebase-apply', 'The repository is in the middle of a rebase.'],
 ]
 
+/** A pathspec excluding the `.enso` folder of the project at `relative` (a version never holds it). */
+function ensoFolder(relative: string): string {
+  return relative === '.' ? '.enso' : `${relative}/.enso`
+}
+
+function excludeEnso(relative: string): string {
+  return `:(exclude)${ensoFolder(relative)}`
+}
+
 /** `p` relative to `repoRoot` (resolving links first), with `/` separators; `.` for the root. */
 async function repoRelative(repoRoot: string, p: string): Promise<string> {
   const relative = path.relative(await fs.realpath(repoRoot), await fs.realpath(p))
@@ -95,6 +104,7 @@ export class LocalVersioning {
         '--untracked-files=all',
         '--',
         relative,
+        excludeEnso(relative),
       ])
       let lastVersion: VersionSummary | null = null
       if (
@@ -103,7 +113,9 @@ export class LocalVersioning {
           () => false,
         )
       ) {
-        const log = (await run(['log', '-1', '--format=%H%x00%cI', '--', relative])).trim()
+        const log = (
+          await run(['log', '-1', '--format=%H%x00%cI', '--', relative, excludeEnso(relative)])
+        ).trim()
         const [id, date] = log.split('\0')
         if (id && date) lastVersion = { id, date }
       }
@@ -143,18 +155,25 @@ export class LocalVersioning {
     if (repoRoot == null) throw new Error(`${first} is not in a git repository`)
     const blocked = await blockedReason(repoRoot)
     if (blocked != null) throw new Error(blocked)
-    const relatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
-    const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
-    await run(['add', '-A', '--', ...relatives])
-    const unchanged = await run(['diff', '--cached', '--quiet', '--', ...relatives]).then(
-      () => true,
-      (error: unknown) => {
-        if (error instanceof CommandError && error.code === 1) return false
-        throw error
-      },
-    )
-    if (unchanged) return { id: null }
-    await run([...(await identityArgs(repoRoot)), 'commit', '-m', message, '--', ...relatives])
-    return { id: (await run(['rev-parse', 'HEAD'])).trim() }
+    try {
+      const relatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
+      const pathspecs = [...relatives, ...relatives.map(excludeEnso)]
+      const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      // `add` rejects an exclude pathspec that matches an ignored folder, so unstage `.enso` afterwards.
+      await run(['add', '-A', '--', ...relatives])
+      await run(['reset', '--quiet', '--', ...relatives.map(ensoFolder)])
+      const unchanged = await run(['diff', '--cached', '--quiet', '--', ...pathspecs]).then(
+        () => true,
+        (error: unknown) => {
+          if (error instanceof CommandError && error.code === 1) return false
+          throw error
+        },
+      )
+      if (unchanged) return { id: null }
+      await run([...(await identityArgs(repoRoot)), 'commit', '-m', message, '--', ...pathspecs])
+      return { id: (await run(['rev-parse', 'HEAD'])).trim() }
+    } catch (error) {
+      throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+    }
   }
 }

@@ -20,7 +20,7 @@ export class CommandError extends Error {
     readonly stdout: string,
     readonly stderr: string,
   ) {
-    super()
+    super(stderr.trim() || `${command} exited with code ${code}`)
   }
 }
 
