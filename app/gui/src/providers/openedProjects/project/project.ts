@@ -5,6 +5,7 @@ import {
   visualizationConfigPreprocessorEqual,
   type NodeVisualizationConfiguration,
 } from '$/providers/openedProjects/project/executionContext'
+import { createModuleFlusher } from '$/providers/openedProjects/project/flush'
 import { VisualizationDataRegistry } from '$/providers/openedProjects/project/visualizationDataRegistry'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
 import { proxyRefs } from '$/utils/reactivity'
@@ -123,6 +124,9 @@ export function createProjectStore(
   })
 
   const projectModel = new DistributedProject(doc)
+  // Writes the open modules before a version is saved (`flush.ts`).
+  const moduleFlusher = createModuleFlusher(doc, () => projectModel.modules.values())
+  onScopeDispose(() => moduleFlusher.close())
 
   const entryPoint = computed<MethodPointer>(() => {
     const mainModule = ProjectPath.create(undefined, 'Main' as Identifier)
@@ -459,6 +463,8 @@ export function createProjectStore(
     awareness: markRaw(awareness),
     computedValueRegistry: markRaw(computedValueRegistry),
     lsRpcConnection: markRaw(lsRpcConnection),
+    /** Write the open modules to disk, as the GUI has them now (`flush.ts`). */
+    flushModules: moduleFlusher.flush,
     dataConnection: markRaw(dataConnection),
     useVisualizationData,
     isRecordingEnabled,

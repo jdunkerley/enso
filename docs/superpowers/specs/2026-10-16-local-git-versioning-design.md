@@ -205,10 +205,12 @@ after the project's files change through the drive. Nothing is shown when
 
 ### Saving
 
-- **Flush first.** Before `commit`, the GUI asks the Language Server to write
-  each open module (`text/save` with the buffer's current version, through the
-  project's existing LS connection), so a save does not wait for the 6 s
-  autosave.
+- **Flush first.** The ydoc server, the Language Server's client for the
+  modules, writes them (`text/save`) when the GUI asks over the index doc's
+  `ydoc:control` channel. The request carries each module doc's state vector, so
+  a module is written only once the GUI's last edit has reached it. A refusal
+  (changed on disk) is a failure; without an answer the GUI waits for the 6 s
+  auto-save.
 - **Ctrl/Cmd+S** (`graph.saveVersion`) commits "Saved". **Ctrl/Cmd+Shift+S**
   (`graph.saveVersionWithComment`) and the save icon open a small dialog with an
   optional comment; Enter saves, an empty comment saves "Saved". Both are
