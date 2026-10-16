@@ -67,8 +67,8 @@ interface ProjectJson {
 }
 
 /**
- * Write `fields` into a project's `project.json`, keeping every other field already there (such as
- * `labels`). A file that cannot be parsed is replaced.
+ * Write `fields` into a project's `project.json`, keeping every other field already there,
+ * including ones this code does not know about. A file that cannot be parsed is replaced.
  */
 async function mergeProjectJson(metadataPath: string, fields: ProjectJson): Promise<void> {
   await updateJsonFile(metadataPath, (current) => ({

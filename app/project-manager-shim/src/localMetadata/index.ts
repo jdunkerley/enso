@@ -13,6 +13,7 @@ import * as crypto from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import {
+  isRecord,
   readJson,
   readVersionedJson,
   serialised,
@@ -182,12 +183,12 @@ export class LocalMetadata implements ProjectLifecycleListener {
     await assertProjectDirectory(projectPath)
     const live = await this.resolveLabelNames(names)
     const labels = [...new Set(names)].filter((name) => live.has(name))
-    await writePackageLabels(projectPath, labels)
-    await updateJsonFile(projectJsonPath, (current) => {
+    await updateJsonFile(projectJsonPath, async (current) => {
       if (!isRecord(current)) {
         throw new Error(`'${projectJsonPath}' does not hold project metadata.`)
       }
       const { labels: _old, ...rest } = current
+      await writePackageLabels(projectPath, labels)
       return rest
     })
   }
@@ -325,10 +326,6 @@ export class LocalMetadata implements ProjectLifecycleListener {
 // =================
 // === Utilities ===
 // =================
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value != null && !Array.isArray(value)
-}
 
 function copyColor(color: LChColor): LChColor {
   return {

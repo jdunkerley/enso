@@ -3,14 +3,18 @@ import * as crypto from 'node:crypto'
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import * as yaml from 'yaml'
-import { readJson, renameWithRetry, updateJsonFile } from './jsonFile.js'
+import {
+  PACKAGE_METADATA_RELATIVE_PATH,
+  PROJECT_METADATA_RELATIVE_PATH,
+} from '../projectManagement.js'
+import { isRecord, readJson, renameWithRetry, updateJsonFile } from './jsonFile.js'
 
 /**
  * The `labels` list of the `package.yaml` in `projectPath`; `[]` when absent or
  * malformed.
  */
 export async function readPackageLabels(projectPath: string): Promise<string[]> {
-  const filePath = path.join(projectPath, 'package.yaml')
+  const filePath = path.join(projectPath, PACKAGE_METADATA_RELATIVE_PATH)
   let text: string
   try {
     text = await fs.readFile(filePath, 'utf8')
@@ -42,7 +46,7 @@ export async function writePackageLabels(
   projectPath: string,
   labels: readonly string[],
 ): Promise<void> {
-  const filePath = path.join(projectPath, 'package.yaml')
+  const filePath = path.join(projectPath, PACKAGE_METADATA_RELATIVE_PATH)
   let text: string
   try {
     text = await fs.readFile(filePath, 'utf8')
@@ -82,7 +86,7 @@ export async function writePackageLabels(
  * @throws {Error} when labels have to be moved and `package.yaml` cannot be rewritten.
  */
 export async function readProjectLabels(projectPath: string): Promise<string[]> {
-  const projectJsonPath = path.join(projectPath, '.enso', 'project.json')
+  const projectJsonPath = path.join(projectPath, PROJECT_METADATA_RELATIVE_PATH)
   let current: unknown
   try {
     current = await readJson(projectJsonPath)
@@ -110,14 +114,10 @@ export async function readProjectLabels(projectPath: string): Promise<string[]> 
  */
 export async function readLegacyProjectLabels(projectPath: string): Promise<string[]> {
   try {
-    const json = await readJson(path.join(projectPath, '.enso', 'project.json'))
+    const json = await readJson(path.join(projectPath, PROJECT_METADATA_RELATIVE_PATH))
     if (!isRecord(json) || !Array.isArray(json.labels)) return []
     return json.labels.filter((label): label is string => typeof label === 'string')
   } catch {
     return []
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value != null && !Array.isArray(value)
 }

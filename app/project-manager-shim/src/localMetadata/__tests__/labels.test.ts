@@ -172,9 +172,12 @@ describe('setProjectLabels', () => {
 
   test('rejects a corrupt project.json without moving it', async () => {
     const project = await createProject(path.join(root, 'P'), 'id-1')
+    await writePackageLabels(project, ['keep'])
+    const yamlBefore = await fs.readFile(path.join(project, 'package.yaml'), 'utf8')
     await fs.writeFile(path.join(project, '.enso', 'project.json'), '{bad')
     await expect(store.setProjectLabels(project, ['a'])).rejects.toThrow()
     expect(await fs.readFile(path.join(project, '.enso', 'project.json'), 'utf8')).toBe('{bad')
+    expect(await fs.readFile(path.join(project, 'package.yaml'), 'utf8')).toBe(yamlBefore)
   })
 })
 

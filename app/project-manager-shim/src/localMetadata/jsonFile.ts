@@ -70,6 +70,11 @@ export async function renameWithRetry(from: string, to: string): Promise<void> {
   }
 }
 
+/** Whether `value` is a plain JSON object (not null, not an array). */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value != null && !Array.isArray(value)
+}
+
 /** The `code` of a Node.js system error, if any. */
 export function errorCode(error: unknown): string | undefined {
   return typeof error === 'object' && error != null && 'code' in error ?
