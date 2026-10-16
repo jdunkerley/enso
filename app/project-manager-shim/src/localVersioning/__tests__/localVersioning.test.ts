@@ -238,3 +238,86 @@ describe('a repository in the middle of a merge', () => {
     })
   })
 })
+
+describe('log, fileAt and setComment', () => {
+  /** Commits `A` three times, with a `B` commit between each. Returns `A`'s version ids, oldest first. */
+  async function history(root: string, versioning: LocalVersioning) {
+    const a = path.join(root, 'A')
+    const b = path.join(root, 'B')
+    const ids: string[] = []
+    for (const [n, message] of ['one', 'two', 'three'].entries()) {
+      await fs.writeFile(path.join(a, 'src', 'Main.enso'), `main = ${n + 10}\n`)
+      ids.push((await versioning.commit([a], message)).id!)
+      await fs.writeFile(path.join(b, 'src', 'Main.enso'), `main = ${n + 20}\n`)
+      await versioning.commit([b], `b${n}`)
+    }
+    return ids
+  }
+
+  test('log lists the project newest first', async () => {
+    await withRepo(async (root, versioning) => {
+      const ids = await history(root, versioning)
+      const entries = await versioning.log(path.join(root, 'A'))
+      expect(entries.map((e) => e.id)).toEqual([...ids].reverse())
+      expect(entries.map((e) => e.comment)).toEqual(['three', 'two', 'one'])
+      expect(entries.map((e) => e.isLatest)).toEqual([true, false, false])
+      expect(entries[0]!.author).toEqual({ name: 'Tester', email: 'tester@example.com' })
+      expect(entries[0]!.date).toMatch(/^\d{4}-\d\d-\d\dT/)
+    })
+  })
+
+  test('setComment overrides only that version', async () => {
+    await withRepo(async (root, versioning) => {
+      const ids = await history(root, versioning)
+      const a = path.join(root, 'A')
+      await versioning.setComment(a, ids[1]!, 'Edited')
+      expect((await versioning.log(a)).map((e) => e.comment)).toEqual(['three', 'Edited', 'one'])
+      await versioning.setComment(a, ids[1]!, 'Edited again')
+      expect((await versioning.log(a))[1]!.comment).toBe('Edited again')
+    })
+  })
+
+  test('setComment works without a configured identity', async () => {
+    await withRepo(async (root, versioning) => {
+      const ids = await history(root, versioning)
+      await git(root, 'config', '--unset', 'user.name')
+      await git(root, 'config', '--unset', 'user.email')
+      const a = path.join(root, 'A')
+      await versioning.setComment(a, ids[0]!, 'Anonymous')
+      expect((await versioning.log(a))[2]!.comment).toBe('Anonymous')
+    })
+  })
+
+  test('log is empty without versions', async () => {
+    await withRepo(async (root, versioning) => {
+      expect(await versioning.log(path.join(root, 'A'))).toEqual([])
+      await versioning.commit([path.join(root, 'B')], 'Only B')
+      expect(await versioning.log(path.join(root, 'A'))).toEqual([])
+    })
+  })
+
+  test('fileAt reads a file at a version', async () => {
+    await withRepo(async (root, versioning) => {
+      const ids = await history(root, versioning)
+      const a = path.join(root, 'A')
+      expect(await versioning.fileAt(a, ids[0]!, 'src/Main.enso')).toBe('main = 10\n')
+      expect(await versioning.fileAt(a, ids[0]!, 'src\\Main.enso')).toBe('main = 10\n')
+      await expect(versioning.fileAt(a, ids[0]!, 'src/Missing.enso')).rejects.toBeDefined()
+    })
+  })
+
+  test('works for a project at the repository root', async () => {
+    await withTempRepo(
+      async (root) => {
+        await writeFiles(root, { 'package.yaml': 'name: R\n', 'src/Main.enso': 'main = 1\n' })
+        await git(root, 'config', 'user.name', 'Tester')
+        await git(root, 'config', 'user.email', 'tester@example.com')
+        const versioning = new LocalVersioning()
+        const { id } = await versioning.commit([root], 'Root')
+        expect((await versioning.log(root)).map((e) => e.id)).toEqual([id])
+        expect(await versioning.fileAt(root, id!, 'src/Main.enso')).toBe('main = 1\n')
+      },
+      { init: true },
+    )
+  })
+})

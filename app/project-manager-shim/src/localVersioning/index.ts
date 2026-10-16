@@ -27,6 +27,16 @@ export interface VersioningStatus {
   readonly blocked: string | null
 }
 
+/** A saved version of a project, with who made it and its comment. */
+export interface VersionEntry extends VersionSummary {
+  readonly author: { readonly name: string; readonly email: string }
+  /** The version's `refs/notes/enso` note if it has one, else its commit message. */
+  readonly comment: string
+  readonly isLatest: boolean
+}
+
+const NOTES_REF = '--ref=enso'
+
 /** Lines the root `.gitignore` must contain. */
 export const ENSO_IGNORE_LINES: readonly string[] = ['**/.enso/', '*.bak']
 
@@ -172,6 +182,76 @@ export class LocalVersioning {
       if (unchanged) return { id: null }
       await run([...(await identityArgs(repoRoot)), 'commit', '-m', message, '--', ...pathspecs])
       return { id: (await run(['rev-parse', 'HEAD'])).trim() }
+    } catch (error) {
+      throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+    }
+  }
+
+  /** The project's versions, newest first. Empty if the repository has no commits for it. */
+  async log(projectPath: string): Promise<readonly VersionEntry[]> {
+    const repoRoot = await findRepoRoot(projectPath)
+    if (repoRoot == null) return []
+    const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+    const hasHead = await run(['rev-parse', '--verify', '--quiet', 'HEAD']).then(
+      () => true,
+      () => false,
+    )
+    if (!hasHead) return []
+    const relative = await repoRelative(repoRoot, projectPath)
+    const output = await run([
+      'log',
+      '--format=%H%x00%cI%x00%an%x00%ae%x00%B%x1e',
+      '--',
+      relative,
+      excludeEnso(relative),
+    ])
+    const commits = output
+      .split('\x1e')
+      .filter((record) => record.trim() !== '')
+      .map((record) => {
+        const [id = '', date = '', name = '', email = '', message = ''] = record
+          .replace(/^\r?\n/, '')
+          .split('\0')
+        return { id, date, name, email, message: message.trim() }
+      })
+    // An absent notes ref lists nothing.
+    const noted = new Set(
+      (await run(['notes', NOTES_REF, 'list']))
+        .split(/\r?\n/)
+        .map((line) => line.split(' ')[1])
+        .filter((id): id is string => !!id),
+    )
+    return Promise.all(
+      commits.map(async ({ id, date, name, email, message }, index) => ({
+        id,
+        date,
+        author: { name, email },
+        comment: noted.has(id) ? (await run(['notes', NOTES_REF, 'show', id])).trim() : message,
+        isLatest: index === 0,
+      })),
+    )
+  }
+
+  /** The text of `relativePath` (relative to the project) at version `id`. */
+  async fileAt(projectPath: string, id: string, relativePath: string): Promise<string> {
+    const repoRoot = await findRepoRoot(projectPath)
+    if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
+    const relative = await repoRelative(repoRoot, projectPath)
+    const file = relativePath.replace(/\\/g, '/').replace(/^\.?\//, '')
+    const target = relative === '.' ? file : `${relative}/${file}`
+    return runGit(repoRoot, ['show', `${id}:${target}`], { queueKey: repoRoot })
+  }
+
+  /** Set the comment shown for version `id`, as a git note (the commit itself is not rewritten). */
+  async setComment(projectPath: string, id: string, comment: string): Promise<void> {
+    const repoRoot = await findRepoRoot(projectPath)
+    if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
+    try {
+      await runGit(
+        repoRoot,
+        [...(await identityArgs(repoRoot)), 'notes', NOTES_REF, 'add', '-f', '-m', comment, id],
+        { queueKey: repoRoot },
+      )
     } catch (error) {
       throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
     }
