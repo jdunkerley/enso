@@ -25,18 +25,19 @@ Along the way, two tidy-ups:
 
 ## Decisions
 
-| Question                       | Decision                                                                                                                                                                          |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Which git                      | The user's git CLI, if installed; one repository at the root folder (or the repository the root is already inside).                                                               |
-| What a version contains        | Everything in the project folder except `.enso/` (the engine's caches, `suggestions.db`, the old `.vcs/`, and `project.json`) and `*.bak`.                                        |
-| Labels                         | Moved into `package.yaml` as a `labels` list, which the engine learns to preserve.                                                                                                |
-| When versions are committed    | On close ("Saved on close"), on app quit (each open local project is closed properly first), and by hand (Ctrl+S "Saved"; Ctrl+Shift+S or the save icon with a comment).          |
-| Offering `git init`            | In context, once: the first save or close of a local project when the root is in no repository. "Create", "Not now", "Don't ask again for this folder". Also in Settings → Local. |
-| The changed indicator          | A dot beside the project name in the project view's top bar, a ● on its tab, and the save icon enabled only when there is something to save.                                      |
-| Versions tab                   | List, See changes, Compare, Restore, Duplicate (and open), and comments editable afterwards through git notes. No tags.                                                           |
-| Restore of an open project     | Close it (committing "Saved on close"), restore, reopen.                                                                                                                          |
-| Where the git logic lives      | A `localVersioning` module in the project-manager shim, exposed as `/api/project-service/versioning/*` endpoints, as `localMetadata` is.                                          |
-| The engine's VCS (`vcs/*` LSP) | Removed: the Scala manager, handlers, tests, protocol docs, the TypeScript wrappers, and JGit if nothing else uses it.                                                            |
+| Question                       | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Which git                      | The user's git CLI, if installed; one repository at the root folder (or the repository the root is already inside).                                                                                                                                                                                                                                                                                                                                                     |
+| What a version contains        | Everything in the project folder except `.enso/` (the engine's caches, `suggestions.db`, the old `.vcs/`, and `project.json`) and `*.bak`.                                                                                                                                                                                                                                                                                                                              |
+| Labels                         | Moved into `package.yaml` as a `labels` list, which the engine learns to preserve.                                                                                                                                                                                                                                                                                                                                                                                      |
+| When versions are committed    | On close ("Saved on close"), on app quit (each open local project is closed properly first), and by hand (Ctrl+S "Saved"; Ctrl+Shift+S or the save icon with a comment).                                                                                                                                                                                                                                                                                                |
+| Using an existing repository   | Never without consent. A repository is versioned only once enabled, recorded per repository by the shim in `<userData>/versioning.json` (not in the user's repository or git config). `init` enables the repository it creates; PR 4 enables silently a repository rooted at or inside the projects root, and asks before using any other. Until enabled: close and move do nothing, `commit`, `restore` and `setComment` are refused, and reading history still works. |
+| Offering `git init`            | In context, once: the first save or close of a local project when the root is in no repository. "Create", "Not now", "Don't ask again for this folder". Also in Settings → Local.                                                                                                                                                                                                                                                                                       |
+| The changed indicator          | A dot beside the project name in the project view's top bar, a ● on its tab, and the save icon enabled only when there is something to save.                                                                                                                                                                                                                                                                                                                            |
+| Versions tab                   | List, See changes, Compare, Restore, Duplicate (and open), and comments editable afterwards through git notes. No tags.                                                                                                                                                                                                                                                                                                                                                 |
+| Restore of an open project     | Close it (committing "Saved on close"), restore, reopen.                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Where the git logic lives      | A `localVersioning` module in the project-manager shim, exposed as `/api/project-service/versioning/*` endpoints, as `localMetadata` is.                                                                                                                                                                                                                                                                                                                                |
+| The engine's VCS (`vcs/*` LSP) | Removed: the Scala manager, handlers, tests, protocol docs, the TypeScript wrappers, and JGit if nothing else uses it.                                                                                                                                                                                                                                                                                                                                                  |
 
 Out of scope:
 
@@ -139,17 +140,26 @@ Out of scope:
 All take a project path (or the root path) and return JSON-RPC results like
 `localMetadata`'s routes.
 
-| Endpoint      | Body                              | Result                                                                                                                     |
-| ------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `status`      | `{ path }`                        | `{ git: boolean, repoRoot: string \| null, changed: boolean, lastVersion: { id, date } \| null, blocked: string \| null }` |
-| `init`        | `{ rootPath }`                    | `{ repoRoot }`                                                                                                             |
-| `commit`      | `{ path, message }`               | `{ id } \| { id: null }` (nothing to commit)                                                                               |
-| `log`         | `{ path }`                        | `{ versions: { id, date, author, comment, isLatest }[] }`                                                                  |
-| `fileAt`      | `{ path, id, relativePath }`      | the file's text at that version                                                                                            |
-| `restore`     | `{ path, id }`                    | `{ id }` of the new "Restored version from …" commit                                                                       |
-| `duplicateAt` | `{ path, id, title, parentPath }` | the new project's path and id                                                                                              |
-| `setComment`  | `{ path, id, comment }`           | —                                                                                                                          |
+| Endpoint      | Body                              | Result                                                                                                                                       |
+| ------------- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`      | `{ path }`                        | `{ git: boolean, repoRoot: string \| null, changed: boolean, lastVersion: { id, date } \| null, blocked: string \| null, enabled: boolean }` |
+| `init`        | `{ rootPath }`                    | `{ repoRoot }` (the new repository is enabled)                                                                                               |
+| `enable`      | `{ repoRoot }`                    | — (`repoRoot` must be a repository root)                                                                                                     |
+| `disable`     | `{ repoRoot }`                    | —                                                                                                                                            |
+| `commit`      | `{ path, message }`               | `{ id } \| { id: null }` (nothing to commit)                                                                                                 |
+| `log`         | `{ path }`                        | `{ versions: { id, date, author, comment, isLatest }[] }`                                                                                    |
+| `fileAt`      | `{ path, id, relativePath }`      | the file's text at that version                                                                                                              |
+| `restore`     | `{ path, id }`                    | `{ id }` of the new "Restored version from …" commit                                                                                         |
+| `duplicateAt` | `{ path, id, title, parentPath }` | the new project's path and id                                                                                                                |
+| `setComment`  | `{ path, id, comment }`           | —                                                                                                                                            |
 
+- **Consent**: a repository is versioned only once it is _enabled_ (`enable`, or
+  `init` for a repository it creates). `status` reports `enabled` and still
+  computes `changed`, `lastVersion` and `blocked` when it is false, so the GUI
+  can show its prompt. While it is false, the close hook and the move commit do
+  nothing (silently), `commit`, `restore` and `setComment` reject with
+  `Versioning is not enabled for the repository at <repoRoot>.`, and `log`,
+  `fileAt` and `duplicateAt` (which change nothing in the repository) work.
 - **`status`**: `changed` is `git status --porcelain -- <project>` being
   non-empty (untracked files included, ignored ones not). `blocked` is git's
   message when the repository is mid-merge, mid-rebase, or otherwise unusable;
@@ -225,6 +235,13 @@ title in `TabBar.vue`, while `changed` is true. Both have accessible names
   repository's path or a **Create repository** button, and a reset of "Don't ask
   again".
 - With no repository, saving offers the dialog again; closing behaves as today.
+- **An existing repository** (`status.git` and `repoRoot` set, `enabled` false)
+  is not committed to until the user agrees. A repository rooted at or inside
+  the user's projects root is enabled silently on first status (it is theirs for
+  this purpose). Any other, such as a home-folder dotfiles repository or a work
+  monorepo above the projects folder, gets the prompt "Keep versions of your
+  projects in the existing repository at <repoRoot>?" with **Use**, **Not now**
+  and **Don't ask again**.
 
 ### Quitting
 
