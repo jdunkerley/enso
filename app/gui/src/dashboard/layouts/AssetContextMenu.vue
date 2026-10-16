@@ -15,7 +15,7 @@ import {
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
-import ManageLabelsModal from '$/cloud/labels/ManageLabelsModal.vue'
+import ManageLabelsModal from '#/components/labels/ManageLabelsModal.vue'
 import { isUploadableAsset } from '$/cloud/uploadToCloud'
 import { usePreferredTimeZone } from '$/cloud/versions/schedule'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
@@ -310,7 +310,8 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
           else openedProjects.closeProject(asset.id, { asset, backendType: backend.value.type })
         },
       },
-    isCloud.value && {
+    // Trash returned its own entries above.
+    backend.value.supportsLabels(asset.type) && {
       action: 'label',
       doAction: () => {
         // It replaces the open modals. It is anchored to the asset's row, and focus returns there.

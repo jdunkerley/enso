@@ -259,6 +259,35 @@ export async function mockLocalApi(page: Page) {
   addDirectory({ path: ROOT_PATH })
   addDirectory({ path: DOWNLOAD_PATH })
 
+  // === Labels (the shim's `localMetadata`) ===
+
+  const labels: backend.Label[] = []
+  /** Deleted label names, which projects still carrying them no longer list. */
+  const deletedLabelNames = new Set<string>()
+
+  const addLabel = (value: string, color: backend.LChColor) => {
+    const label: backend.Label = {
+      id: backend.TagId(uuidv4()),
+      value: backend.LabelName(value),
+      color,
+    }
+    labels.push(label)
+    deletedLabelNames.delete(value)
+    return label
+  }
+
+  /** A listing entry as the shim lists it: a project's labels without the deleted ones. */
+  const withLiveLabels = (entry: FileSystemEntry): FileSystemEntry =>
+    entry.type !== 'ProjectEntry' ?
+      entry
+    : {
+        ...entry,
+        metadata: {
+          ...entry.metadata,
+          labels: (entry.metadata.labels ?? []).filter((name) => !deletedLabelNames.has(name)),
+        },
+      }
+
   await test.step('Mock Local API', async () => {
     const toJSONRPCResult = (result: unknown): JSONRPCResponse<unknown> => ({
       jsonrpc: '2.0',
@@ -353,6 +382,44 @@ export async function mockLocalApi(page: Page) {
         contentType: 'application/json',
         body: JSON.stringify(toJSONRPCResult(null)),
       })
+    })
+
+    const labelRoute = (
+      name: string,
+      handler: (params: Record<string, unknown>) => JSONRPCResponse<unknown>,
+    ) =>
+      page.route(`/api/project-service/${name}`, async (route, request) => {
+        if (request.method() !== 'POST') {
+          return route.fulfill({ status: 400 })
+        }
+        return route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(handler(JSON.parse(request.postData() ?? '{}'))),
+        })
+      })
+
+    await labelRoute('labels/list', () => toJSONRPCResult(labels))
+    await labelRoute('labels/create', (params) => {
+      const value = String(params.value)
+      if (labels.some((label) => label.value === value)) {
+        return toJSONRPCError(`A label named '${value}' already exists.`)
+      }
+      return toJSONRPCResult(addLabel(value, params.color as backend.LChColor))
+    })
+    await labelRoute('labels/delete', (params) => {
+      const index = labels.findIndex((label) => label.id === params.id)
+      const [label] = index === -1 ? [] : labels.splice(index, 1)
+      if (label != null) deletedLabelNames.add(label.value)
+      return toJSONRPCResult(null)
+    })
+    await labelRoute('project/set-labels', (params) => {
+      const project = fileSystem.get(String(params.path))
+      if (project?.type !== 'ProjectEntry') {
+        return toJSONRPCError(`No project at '${String(params.path)}'`)
+      }
+      const names = (params.labels as string[]).filter((name) => !deletedLabelNames.has(name))
+      unsafeMutable(project.entry.metadata).labels = names.map(backend.LabelName)
+      return toJSONRPCResult(null)
     })
 
     const ydocAddressBase = `ws://${languageServerYdocAddress.host}:${languageServerYdocAddress.port}`
@@ -605,7 +672,7 @@ export async function mockLocalApi(page: Page) {
               if (recursive && entry.type === 'DirectoryEntry') {
                 folderPathQueue.push(entry.path)
               }
-              entries.push(entry)
+              entries.push(withLiveLabels(entry))
             }
           }
           return succeed({ entries })
@@ -704,6 +771,7 @@ export async function mockLocalApi(page: Page) {
     removeEntry,
     addProjectSession,
     updateVisualization,
+    addLabel,
   } as const
 
   return api

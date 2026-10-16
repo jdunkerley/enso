@@ -150,6 +150,23 @@ describe('backendMutationOptions', () => {
     expect(INVALIDATION_MAP.createTag).toEqual(['listTags'])
   })
 
+  test("the local label mutations refresh the local backend's labels and listings", () => {
+    expect(backendMutationOptions(local, 'createTag').meta?.invalidates).toEqual([
+      [BackendType.local, 'listTags'],
+    ])
+    expect(backendMutationOptions(local, 'deleteTag').meta?.invalidates).toEqual([
+      [BackendType.local, 'listTags'],
+    ])
+    expect(backendMutationOptions(local, 'associateTag').meta).toMatchObject({
+      invalidates: [
+        [BackendType.local, 'listDirectory'],
+        [BackendType.local, 'searchDirectory'],
+        [BackendType.local, 'getAssetDetails'],
+      ],
+      refetchType: 'all',
+    })
+  })
+
   test('refetches every listing, not only the active ones, after a change to the drive', () => {
     expect(backendMutationOptions(remote, 'createDirectory').meta?.refetchType).toBe('all')
   })

@@ -1553,8 +1553,17 @@ export function compareAssets(
   }
 }
 
-/** Whether an asset matches the given backend search query. */
+/** Whether the backend can label assets of at least one type. */
+export function supportsAnyLabels(backend: Pick<Backend, 'supportsLabels'>) {
+  return Object.values(AssetType).some((type) => backend.supportsLabels(type))
+}
+
+/**
+ * Whether an asset matches the given backend search query. With `labels`, it must carry at least
+ * one of them.
+ */
 export function doesAssetMatchQuery(query: SearchDirectoryRequestParams) {
+  const labels = query.labels != null && query.labels.length !== 0 ? query.labels : null
   const typeLower = query.type?.toLowerCase()
   const titleLower = query.title?.toLowerCase()
   const extensionLower = query.extension?.toLowerCase()
@@ -1581,6 +1590,9 @@ export function doesAssetMatchQuery(query: SearchDirectoryRequestParams) {
           asset.extension?.toLowerCase().includes(term) !== true,
       ) === true
     ) {
+      return false
+    }
+    if (labels != null && !labels.every((label) => asset.labels?.includes(label) === true)) {
       return false
     }
     return true
@@ -2068,6 +2080,8 @@ export abstract class Backend {
   ): Promise<void>
   /** Return the secret environment variables accessible by the user. */
   abstract listSecrets(): Promise<readonly SecretInfo[]>
+  /** Whether assets of the given type can carry labels on this backend. */
+  abstract supportsLabels(assetType: AssetType): boolean
   /** Create a label used for categorizing assets. */
   abstract createTag(body: CreateTagRequestBody): Promise<Label>
   /** Return all labels accessible by the user. */

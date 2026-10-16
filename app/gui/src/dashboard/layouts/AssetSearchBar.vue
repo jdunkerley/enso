@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The drive's search bar: a search field over a popover of the query's tags (`name:`,
- * `type:`, …), the labels (in the cloud) and suggestions for the term being typed. Its keyboard
+ * `type:`, …), the labels (where the backend supports them) and suggestions for the term being typed. Its keyboard
  * behaviour:
  *
  * - typing anywhere on the drive (outside a text field and a modal) focuses the field;
@@ -16,7 +16,7 @@
  * the field is clicked, and Escape drops the focus.
  */
 import { useSuggestions, type Suggestion } from '#/layouts/Drive/suggestions'
-import DriveLabel from '#/pages/dashboard/components/DriveLabel.vue'
+import DriveLabel from '#/components/labels/DriveLabel.vue'
 import Button from '$/components/Button/Button.vue'
 import { DIALOG_BACKGROUND } from '$/components/Dialog/variants'
 import Icon from '$/components/Icon/Icon.vue'
@@ -31,7 +31,11 @@ import { isElementTextInput, isPotentiallyShortcut, isTextInputEvent } from '$/u
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useQuery } from '@tanstack/vue-query'
 import { useEventListener } from '@vueuse/core'
-import type { Backend, Label as BackendLabel } from 'enso-common/src/services/Backend'
+import {
+  supportsAnyLabels,
+  type Backend,
+  type Label as BackendLabel,
+} from 'enso-common/src/services/Backend'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import { computed, nextTick, onMounted, onUpdated, ref, shallowRef, watch } from 'vue'
 
@@ -284,7 +288,10 @@ function pressSuggestion(index: number, suggestion: Suggestion, event: MouseEven
   }
 }
 
-const labelsQuery = useQuery(computed(() => backendQueryOptions(backend, 'listTags', [])))
+const supportsLabels = computed(() => backend != null && supportsAnyLabels(backend))
+const labelsQuery = useQuery(
+  computed(() => backendQueryOptions(backend, 'listTags', [], { enabled: supportsLabels.value })),
+)
 const sortedLabels = computed(() =>
   [...(labelsQuery.data.value ?? [])].sort((a, b) => compareCaseInsensitive(a.value, b.value)),
 )
@@ -349,7 +356,7 @@ enum QuerySource {
             </div>
             <!-- The labels -->
             <div
-              v-if="isCloud && sortedLabels.length !== 0"
+              v-if="supportsLabels && sortedLabels.length !== 0"
               data-testid="asset-search-labels"
               class="pointer-events-auto flex gap-2 px-1.5"
             >

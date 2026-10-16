@@ -73,6 +73,15 @@ export function newFileId(path: Path) {
 }
 
 /**
+ * Whether an asset carries every one of the labels, as `doesAssetMatchQuery` requires. An "any"
+ * filter is left for when the search bar is revisited.
+ */
+function assetHasAllLabels(labels: readonly backend.LabelName[]) {
+  return (asset: backend.AnyAsset) =>
+    labels.every((label) => asset.labels?.includes(label) === true)
+}
+
+/**
  * Class for sending requests to the Project Manager API endpoints.
  * This is used instead of the cloud backend API when managing local projects from the dashboard.
  */
@@ -192,6 +201,7 @@ export class LocalBackend extends backend.Backend {
                     (await this.projectManager.getProject(entry.path))?.state ??
                     backend.ProjectState.closed,
                 },
+                labels: entry.metadata.labels ?? [],
               } satisfies backend.ProjectAsset
             }
             case 'FileEntry': {
@@ -220,6 +230,9 @@ export class LocalBackend extends backend.Backend {
           throw new backend.DirectoryDoesNotExistError()
         }
       }
+    }
+    if (query.labels != null && query.labels.length !== 0) {
+      result = result.filter(assetHasAllLabels(query.labels))
     }
     result.sort((a, b) => backend.compareAssets(a, b, query.sortExpression, query.sortDirection))
     const from = query.from as backend.AssetId | null
@@ -1069,17 +1082,25 @@ export class LocalBackend extends backend.Backend {
     return Promise.resolve([])
   }
 
-  /** Invalid operation. */
-  override createTag() {
-    return this.invalidOperation()
+  /** Only projects can carry labels locally. */
+  override supportsLabels(assetType: backend.AssetType) {
+    return assetType === backend.AssetType.project
   }
 
   /**
-   * Return an empty array. This function is required to be implemented as it is unconditionally
-   * called, but its result should never need to be used.
+   * Create a local label.
+   * @throws {Error} When a label with the same value already exists.
    */
+  override createTag(body: backend.CreateTagRequestBody) {
+    return this.projectManager.createLabel({
+      value: backend.LabelName(body.value),
+      color: body.color,
+    })
+  }
+
+  /** Return the local labels. */
   override listTags() {
-    return Promise.resolve([])
+    return this.projectManager.listLabels()
   }
 
   /**
@@ -1090,14 +1111,25 @@ export class LocalBackend extends backend.Backend {
     return Promise.resolve([])
   }
 
-  /** Do nothing. This function should never need to be called. */
-  override associateTag() {
-    return Promise.resolve()
+  /**
+   * Set the full list of labels of a local project.
+   * @throws {Error} When the asset is not a project.
+   */
+  override async associateTag(
+    assetId: backend.AssetId,
+    labels: readonly backend.LabelName[],
+    _title: string,
+  ) {
+    const { type, path } = backend.extractTypeAndPath(assetId)
+    if (type !== backend.AssetType.project) {
+      throw new Error('Labels are not supported for local files and folders yet')
+    }
+    await this.projectManager.setProjectLabels({ projectPath: path, labels })
   }
 
-  /** Do nothing. This function should never need to be called. */
-  override deleteTag() {
-    return Promise.resolve()
+  /** Delete a local label. */
+  override deleteTag(tagId: backend.TagId, _value: backend.LabelName) {
+    return this.projectManager.deleteLabel({ id: tagId })
   }
 
   /** Invalid operation. */
