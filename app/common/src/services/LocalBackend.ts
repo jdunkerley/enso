@@ -351,10 +351,21 @@ export class LocalBackend extends backend.Backend {
    * @throws {Error} An error if the JSON-RPC call fails.
    */
   override async closeProject(projectId: backend.ProjectId, title: string | null): Promise<void> {
+    await this.closeProjectReportingVersioning(projectId, title)
+  }
+
+  /**
+   * Close the project, as {@link closeProject} does, and return the shim's `versioningWarning`
+   * when it could not save the "Saved on close" version (the close itself still succeeded).
+   * @throws {Error} An error if the JSON-RPC call fails.
+   */
+  async closeProjectReportingVersioning(
+    projectId: backend.ProjectId,
+    title: string | null,
+  ): Promise<{ readonly versioningWarning?: string }> {
     const { path } = backend.extractTypeAndPath(projectId)
     try {
-      await this.projectManager.closeProject({ projectPath: path })
-      return
+      return await this.projectManager.closeProject({ projectPath: path })
     } catch (error) {
       throw new Error(
         `Could not close project ${title != null ? `'${title}'` : `with ID '${projectId}'`}: ${
@@ -370,6 +381,37 @@ export class LocalBackend extends backend.Backend {
   /** Whether `path` is in a repository, whether that is enabled, and its unsaved changes. */
   versioningStatus(path: backend.Path): Promise<VersioningStatus> {
     return this.projectManager.versioningStatus(path)
+  }
+
+  /** Create a repository at `rootPath` (the local root), and enable it. */
+  initVersioning(rootPath: backend.Path): Promise<{ readonly repoRoot: Path }> {
+    return this.projectManager.initVersioning(rootPath)
+  }
+
+  /** Agree to have the existing repository at `repoRoot` versioned; clears an opt-out. */
+  enableVersioning(repoRoot: backend.Path): Promise<void> {
+    return this.projectManager.enableVersioning(repoRoot)
+  }
+
+  /** Stop versioning the repository at `repoRoot`, recording the opt-out; its history is kept. */
+  disableVersioning(repoRoot: backend.Path): Promise<void> {
+    return this.projectManager.disableVersioning(repoRoot)
+  }
+
+  /** Enable the repository at `repoRoot` if it is at or inside `rootPath` and not opted out. */
+  enableVersioningIfInside(
+    repoRoot: backend.Path,
+    rootPath: backend.Path,
+  ): Promise<{ readonly enabled: boolean }> {
+    return this.projectManager.enableVersioningIfInside(repoRoot, rootPath)
+  }
+
+  /** Save the project's current state as a version (an empty message is saved as "Saved"). */
+  commitVersion(
+    projectId: backend.ProjectId,
+    message: string,
+  ): Promise<{ readonly id: string | null }> {
+    return this.projectManager.commitVersion(backend.extractTypeAndPath(projectId).path, message)
   }
 
   /**
