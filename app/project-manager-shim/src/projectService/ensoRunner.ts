@@ -73,6 +73,7 @@ export interface Socket {
 export interface ShutdownHookRegistry {
   'rename-project-directory': true
   'remove-from-list': true
+  'version-on-close': true
 }
 
 export type ShutdownHookType = keyof ShutdownHookRegistry

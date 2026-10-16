@@ -486,3 +486,39 @@ describe('restore and exportAt', () => {
     )
   })
 })
+
+describe('commit across a move', () => {
+  test('renaming a never-versioned project commits the new path', async () => {
+    await withRepo(async (root, versioning) => {
+      await fs.rename(path.join(root, 'A'), path.join(root, 'C'))
+      const { id } = await versioning.commit([path.join(root, 'A'), path.join(root, 'C')], 'Moved')
+      expect(id).toMatch(/^[0-9a-f]{40}$/)
+      const files = await git(root, 'show', '--name-only', '--format=', id!)
+      expect(files).toContain('C/package.yaml')
+      expect(files).not.toContain('B/')
+    })
+  })
+
+  test('moving a versioned project commits the removal and the addition together', async () => {
+    await withRepo(async (root, versioning) => {
+      await versioning.commit([path.join(root, 'A')], 'Saved')
+      await fs.rename(path.join(root, 'A'), path.join(root, 'C'))
+      const { id } = await versioning.commit([path.join(root, 'A'), path.join(root, 'C')], 'Moved')
+      expect(id).not.toBeNull()
+      const files = await git(root, 'show', '--name-status', '--format=', '-M', id!)
+      expect(files).toMatch(/A\/package\.yaml/)
+      expect(files).toMatch(/C\/package\.yaml/)
+      expect(await git(root, 'rev-list', '--count', 'HEAD')).toBe('2')
+    })
+  })
+
+  test('a move with nothing versioned on either side commits nothing', async () => {
+    await withRepo(async (root, versioning) => {
+      await fs.mkdir(path.join(root, 'D'))
+      await fs.rename(path.join(root, 'D'), path.join(root, 'E'))
+      expect(
+        await versioning.commit([path.join(root, 'D'), path.join(root, 'E')], 'Moved'),
+      ).toEqual({ id: null })
+    })
+  })
+})

@@ -9,6 +9,7 @@ import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import KSUID from 'ksuid'
 import * as crypto from 'node:crypto'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
+import type { LocalVersioning } from '../localVersioning/index.js'
 import {
   EnsoRunner,
   findEnsoExecutable,
@@ -65,6 +66,12 @@ export interface OpenProject {
   readonly projectNamespace: string
 }
 
+/** The return value of the "close project" endpoint. */
+export interface CloseProjectResult {
+  /** Set when the project was closed but saving a version of it failed. */
+  readonly versioningWarning?: string
+}
+
 /** The return value of the "duplicate project" endpoint. */
 export interface DuplicatedProject {
   readonly projectId: UUID
@@ -86,13 +93,18 @@ export class ProjectService {
     private readonly extraArgs: readonly string[],
     private readonly logger: Console = console,
     private readonly lifecycle?: ProjectLifecycleListener,
+    private readonly versioning?: LocalVersioning,
   ) {}
+
+  /** Why the last close-commit of each project (by path) failed, until `closeProject` reports it. */
+  private readonly versioningWarnings = new Map<string, string>()
 
   /** Creates a default ProjectService using the Enso executable found in the environment. */
   static default(
     workDir: string = '.',
     extraArgs: readonly string[] = [],
     lifecycle?: ProjectLifecycleListener,
+    versioning?: LocalVersioning,
   ): ProjectService {
     const ensoPath = findEnsoExecutable(workDir)
     if (!ensoPath) {
@@ -105,7 +117,7 @@ export class ProjectService {
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
     const allExtraArgs = [...envArgsArray, ...extraArgs]
 
-    return new ProjectService(runner, allExtraArgs, console, lifecycle)
+    return new ProjectService(runner, allExtraArgs, console, lifecycle, versioning)
   }
 
   /** Tell {@link lifecycle} about a change that has already happened; failures are only logged. */
@@ -242,6 +254,23 @@ export class ProjectService {
       await this.projectEnvVars(projectId, projectsDirectory, cloud),
     )
 
+    // Registered before any rename hook, so a project is saved before its directory moves.
+    if (this.versioning != null) {
+      const versioning = this.versioning
+      await this.runner.registerShutdownHook(project.path, 'version-on-close', async () => {
+        try {
+          if ((await versioning.repositoryOf(project.path)) == null) return
+          await versioning.commit([project.path], 'Saved on close')
+        } catch (error) {
+          this.logger.error(`Failed to save project ${projectId} on close:`, error)
+          this.versioningWarnings.set(
+            project.path,
+            error instanceof Error ? error.message : String(error),
+          )
+        }
+      })
+    }
+
     // Return the OpenProject response
     return {
       projectId,
@@ -254,14 +283,18 @@ export class ProjectService {
   }
 
   /** Closes a project and stops its language server. */
-  async closeProject(projectId: UUID, projectsDirectory: Path): Promise<void> {
+  async closeProject(projectId: UUID, projectsDirectory: Path): Promise<CloseProjectResult> {
     const repo = this.getProjectRepository(projectsDirectory)
     const project = await repo.findById(projectId)
     if (!project) {
       throw new Error(`Project '${projectId}' not found`)
     }
     this.logger.debug('Closing project', projectId, projectsDirectory)
+    this.versioningWarnings.delete(project.path)
     await this.runner.closeProject(project.path)
+    const versioningWarning = this.versioningWarnings.get(project.path)
+    this.versioningWarnings.delete(project.path)
+    return versioningWarning != null ? { versioningWarning } : {}
   }
 
   /** Deletes a user project. */
@@ -389,6 +422,7 @@ export class ProjectService {
         try {
           const newPath = await repo.renameProjectDirectory(project.path, newNormalizedName)
           this.logger.info(`Successfully renamed project directory for ${projectId}`)
+          await this.versioning?.commitMove(project.path, newPath, 'Saved on close')
           await this.notifyLifecycle((listener) => listener.projectMoved(projectId, newPath))
         } catch (error) {
           this.logger.error(`Failed to rename project directory for ${projectId}:`, error)
@@ -399,6 +433,11 @@ export class ProjectService {
     } else {
       // If server is not running, rename the directory immediately
       const newPath = await repo.renameProjectDirectory(project.path, newNormalizedName)
+      await this.versioning?.commitMove(
+        project.path,
+        newPath,
+        `Renamed ${project.name} to ${newName}`,
+      )
       await this.notifyLifecycle((listener) => listener.projectMoved(projectId, newPath))
     }
   }

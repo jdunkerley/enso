@@ -1051,7 +1051,12 @@ export class Server {
         .writeHead(HTTP_STATUS_BAD_REQUEST, COOP_COEP_CORP_HEADERS)
         .end('Command arguments must be an array of strings.')
     } else {
-      const result = await handleFilesystemCommand(cliArguments, request, this.localMetadata)
+      const result = await handleFilesystemCommand(
+        cliArguments,
+        request,
+        this.localMetadata,
+        this.localVersioning,
+      )
 
       if (typeof result === 'string') {
         const resultData = Buffer.from(result)

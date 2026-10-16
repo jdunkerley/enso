@@ -251,8 +251,8 @@ export async function handleProjectServiceRequest(
           const projectService = await getProjectService()
           return projectService.closeProject(body.projectId, body.projectsDirectory)
         })
-        .then(() => {
-          response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(null))
+        .then((closed) => {
+          response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(closed))
         })
         .catch((err) => {
           console.error(err)

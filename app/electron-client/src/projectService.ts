@@ -34,6 +34,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
       paths.resourcesPath(electron, electronIsDev),
       extraArgs,
       getLocalMetadata(),
+      getLocalVersioning(),
     )
   }
   return projectService
@@ -51,6 +52,7 @@ export function setupProjectService(
       paths.resourcesPath(electron, electronIsDev),
       args,
       getLocalMetadata(),
+      getLocalVersioning(),
     )
   }
   return projectService

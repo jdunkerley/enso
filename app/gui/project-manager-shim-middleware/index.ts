@@ -103,7 +103,12 @@ export class ProjectManagerShimMiddleware {
   async getProjectService(): Promise<ProjectService> {
     if (!this.projectService) {
       await this.setup()
-      this.projectService = ProjectService.default('.', [], this.localMetadata)
+      this.projectService = ProjectService.default(
+        '.',
+        [],
+        this.localMetadata,
+        this.localVersioning,
+      )
     }
     return this.projectService
   }
@@ -254,6 +259,7 @@ export class ProjectManagerShimMiddleware {
                 cliArguments,
                 request,
                 this.localMetadata,
+                this.localVersioning,
               )
 
               if (typeof result === 'string') {

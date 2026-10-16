@@ -77,8 +77,34 @@ function excludeEnso(relative: string): string {
 
 /** `p` relative to `repoRoot` (resolving links first), with `/` separators; `.` for the root. */
 async function repoRelative(repoRoot: string, p: string): Promise<string> {
-  const relative = path.relative(await fs.realpath(repoRoot), await fs.realpath(p))
+  const relative = path.relative(await fs.realpath(repoRoot), await realpathOrParent(p))
   return relative === '' ? '.' : relative.split(path.sep).join('/')
+}
+
+/**
+ * `fs.realpath(p)`, or, for a path that no longer exists (the old path after a move), the real path
+ * of its nearest existing ancestor joined with the rest.
+ */
+async function realpathOrParent(p: string): Promise<string> {
+  try {
+    return await fs.realpath(p)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    const parent = path.dirname(p)
+    if (parent === p) throw error
+    return path.join(await realpathOrParent(parent), path.basename(p))
+  }
+}
+
+/** The nearest ancestor of `p` (or `p` itself) that exists. */
+async function existingAncestor(p: string): Promise<string> {
+  let current = path.resolve(p)
+  while (!(await exists(current))) {
+    const parent = path.dirname(current)
+    if (parent === current) break
+    current = parent
+  }
+  return current
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -167,21 +193,70 @@ export class LocalVersioning {
     return { repoRoot }
   }
 
+  /**
+   * The repository containing `p` (which may no longer exist, as after a move), or `null` when
+   * there is none or git is not installed.
+   */
+  async repositoryOf(p: string): Promise<string | null> {
+    if ((await findGit()) == null) return null
+    return findRepoRoot(await existingAncestor(p))
+  }
+
+  /**
+   * Commit the move of a project from `oldPath` to `newPath`, when both are in the same
+   * repository; otherwise nothing is recorded. The move has already happened, so a failure is
+   * logged and never thrown.
+   */
+  async commitMove(oldPath: string, newPath: string, message: string): Promise<void> {
+    try {
+      const repoRoot = await this.repositoryOf(newPath)
+      if (repoRoot == null || repoRoot !== (await this.repositoryOf(oldPath))) return
+      await this.commit([oldPath, newPath], message)
+    } catch (error) {
+      console.error(`Failed to commit the move of ${oldPath} to ${newPath}:`, error)
+    }
+  }
+
+  /** `p` relative to its repository, with `/` separators; `null` when it is in none. */
+  async relativeToRepository(p: string): Promise<string | null> {
+    const repoRoot = await this.repositoryOf(p)
+    return repoRoot == null ? null : repoRelative(repoRoot, p)
+  }
+
   /** Commit everything under `paths` (all in one repository). `null` when nothing changed. */
   async commit(paths: readonly string[], message: string): Promise<{ readonly id: string | null }> {
     const first = paths[0]
     if (first == null) return { id: null }
-    const repoRoot = await findRepoRoot(first)
+    // A path may have just been moved away, so look for the repository from one that exists.
+    const repoRoot = await findRepoRoot(await existingAncestor(first))
     if (repoRoot == null) throw new Error(`${first} is not in a git repository`)
     const blocked = await blockedReason(repoRoot)
     if (blocked != null) throw new Error(blocked)
     try {
-      const relatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
-      const pathspecs = [...relatives, ...relatives.map(excludeEnso)]
+      const allRelatives = await Promise.all(paths.map((p) => repoRelative(repoRoot, p)))
       const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      const hasHead = await run(['rev-parse', '--verify', '--quiet', 'HEAD']).then(
+        () => true,
+        () => false,
+      )
+      // `git add` and `git commit` fail on a pathspec that matches nothing known to git (the old
+      // path of a project that was never versioned, a new path holding only ignored files).
+      const isTracked = async (relative: string) =>
+        (await run(['ls-files', '--cached', '--', relative])).trim() !== '' ||
+        (hasHead &&
+          (await run(['ls-tree', '-r', '--name-only', 'HEAD', '--', relative])).trim() !== '')
+      const toAdd: string[] = []
+      for (const [i, relative] of allRelatives.entries()) {
+        if ((await exists(paths[i]!)) || (await isTracked(relative))) toAdd.push(relative)
+      }
+      if (toAdd.length === 0) return { id: null }
       // `add` rejects an exclude pathspec that matches an ignored folder, so unstage `.enso` afterwards.
-      await run(['add', '-A', '--', ...relatives])
-      await run(['reset', '--quiet', '--', ...relatives.map(ensoFolder)])
+      await run(['add', '-A', '--', ...toAdd])
+      await run(['reset', '--quiet', '--', ...toAdd.map(ensoFolder)])
+      const relatives: string[] = []
+      for (const relative of toAdd) if (await isTracked(relative)) relatives.push(relative)
+      if (relatives.length === 0) return { id: null }
+      const pathspecs = [...relatives, ...relatives.map(excludeEnso)]
       const unchanged = await run(['diff', '--cached', '--quiet', '--', ...pathspecs]).then(
         () => true,
         (error: unknown) => {

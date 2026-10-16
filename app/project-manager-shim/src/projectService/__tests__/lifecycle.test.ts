@@ -2,8 +2,10 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { runCommand } from '../../childProcess/runCommand.js'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import type { ProjectLifecycleListener } from '../../localMetadata/index.js'
+import { LocalVersioning } from '../../localVersioning/index.js'
 import type { Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path, UUID } from '../types.js'
@@ -30,7 +32,12 @@ function fakeRunner(): Runner {
       jsonSocket: { host: '127.0.0.1', port: 1 },
       ydocSocket: { host: '127.0.0.1', port: 2 },
     }),
-    closeProject: async () => {},
+    // As the real runner does: run the hooks on close.
+    closeProject: async () => {
+      const pending = hooks
+      hooks = []
+      for (const hook of pending) await hook()
+    },
     isProjectRunning: async () => running,
     renameProject: async () => {},
     registerShutdownHook: async (_path, _type, hook) => {
@@ -79,5 +86,81 @@ describe('ProjectService lifecycle notifications', () => {
     listener.projectMoved.mockRejectedValue(new Error('boom'))
     await createProject(path.join(root, 'Old'), 'id-1')
     await expect(service.renameProject(UUID('id-1'), 'New', Path(root))).resolves.toBeUndefined()
+  })
+})
+
+describe('versioning on close', () => {
+  const git = (cwd: string, ...args: string[]) =>
+    runCommand('git', args, { cwd }).then(({ stdout }) => stdout.trim())
+  let versioning: LocalVersioning
+  let saved: [string, string | undefined][]
+
+  beforeEach(async () => {
+    // Hide the developer's git configuration, and give commits an identity.
+    const config = path.join(root, 'gitconfig')
+    await fs.writeFile(config, '[user]\n\tname = Tester\n\temail = tester@example.com\n')
+    saved = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'].map((n) => [n, process.env[n]])
+    process.env.GIT_CONFIG_GLOBAL = config
+    process.env.GIT_CONFIG_NOSYSTEM = '1'
+    versioning = new LocalVersioning()
+    service = new ProjectService(fakeRunner(), [], console, listener, versioning)
+  })
+
+  afterEach(() => {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+  })
+
+  /** Open and close `id`, as the GUI does. */
+  async function openThenClose(id: string, svc = service) {
+    running = true
+    await svc.openProject(UUID(id), Path(root))
+    return svc.closeProject(UUID(id), Path(root))
+  }
+
+  test('closing a project in a repository commits only that project', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'A'), 'id-1')
+    await createProject(path.join(root, 'B'), 'id-2')
+    await openThenClose('id-1')
+    expect(await git(root, 'log', '-1', '--format=%s')).toBe('Saved on close')
+    const files = await git(root, 'show', '--name-only', '--format=')
+    expect(files).toContain('A/package.yaml')
+    expect(files).not.toContain('B/')
+  })
+
+  test('closing a project outside a repository succeeds and creates none', async () => {
+    await createProject(path.join(root, 'A'), 'id-1')
+    const result = await openThenClose('id-1')
+    expect(result.versioningWarning).toBeUndefined()
+    await expect(fs.access(path.join(root, '.git'))).rejects.toThrow()
+  })
+
+  test('a failing commit is logged and reported on the close result', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'A'), 'id-1')
+    vi.spyOn(versioning, 'commit').mockRejectedValue(new Error('index is locked'))
+    const logger = { ...console, error: vi.fn(), debug: vi.fn(), info: vi.fn() } as Console
+    const svc = new ProjectService(fakeRunner(), [], logger, listener, versioning)
+    const result = await openThenClose('id-1', svc)
+    expect(result.versioningWarning).toBe('index is locked')
+    expect(logger.error).toHaveBeenCalled()
+  })
+
+  test('renaming an open project, then closing it, commits the removal and the new files', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'Old'), 'id-1')
+    await versioning.commit([path.join(root, 'Old')], 'Before')
+    running = true
+    await service.openProject(UUID('id-1'), Path(root))
+    await service.renameProject(UUID('id-1'), 'New', Path(root))
+    await service.closeProject(UUID('id-1'), Path(root))
+    const files = await git(root, 'show', '--name-status', '--format=%s', 'HEAD')
+    expect(files).toContain('Saved on close')
+    expect(files).toContain('Old/package.yaml')
+    expect(files).toContain('New/package.yaml')
+    expect(await git(root, 'status', '--porcelain', '--', 'Old', 'New')).toBe('')
   })
 })

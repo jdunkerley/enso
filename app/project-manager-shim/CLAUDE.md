@@ -79,3 +79,15 @@ Rules worth keeping:
   `recent/{list,record,forget}` under `/api/project-service/`. Hosts pass the
   store to `handleProjectServiceRequest` and `handleFilesystemCommand`; without
   it, the routes answer with a JSON-RPC error and listings carry no labels.
+
+## Versioning on close and move
+
+`ProjectService` takes the host's `LocalVersioning`. `openProject` registers a
+`'version-on-close'` shutdown hook (before any rename hook, so it runs first)
+that commits the project as `Saved on close`; a failure is logged and returned
+as `versioningWarning` on the `closeProject` result, and the close still
+succeeds. Renames and `filesystem-move` of a project directory call
+`LocalVersioning.commitMove`, which commits old and new paths together when both
+are in one repository and never throws. `commit` skips a path git knows nothing
+about (never versioned, or only ignored files), and resolves a path that no
+longer exists through its nearest existing ancestor.

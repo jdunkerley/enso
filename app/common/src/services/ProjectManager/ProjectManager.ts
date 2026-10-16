@@ -106,7 +106,9 @@ export class ProjectManager {
   }
 
   /** Close an open project. */
-  async closeProject(params: WithProjectPath<CloseProjectParams>): Promise<void> {
+  async closeProject(
+    params: WithProjectPath<CloseProjectParams>,
+  ): Promise<{ readonly versioningWarning?: string }> {
     const fullParams: CloseProjectParams = await this.paramsWithPathToWithId(params)
     const cacheKey = makeProjectCacheKey(fullParams)
     const state = this.projects.get(cacheKey)
@@ -119,7 +121,10 @@ export class ProjectManager {
       })
     }
     this.projects.delete(cacheKey)
-    return this.runProjectServiceCommand('project/close', fullParams)
+    return this.runProjectServiceCommand<{ readonly versioningWarning?: string }>(
+      'project/close',
+      fullParams,
+    )
   }
 
   /** Create a new project. */
