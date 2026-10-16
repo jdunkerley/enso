@@ -19,8 +19,10 @@ inspect). **Also owns the in-browser Enso AST module.**
 - `src/ensoFile.ts` — `.enso` file format helpers (on-disk representation
   reconstructed client-side).
 - `src/ydocControl.ts` — the `ydoc:control` channel's messages (the GUI's
-  `flush` request, the server's `flushed` answer) and the state-vector helpers;
-  see `app/ydoc-server/CLAUDE.md` ("Control channel").
+  `flush` request, the server's `flushed` answer), the server's deadline, and
+  the state-vector and delete-set helpers; `src/moduleFlusher.ts` — the client's
+  end of `flush` (the GUI re-exports it). See `app/ydoc-server/CLAUDE.md`
+  ("Control channel").
 - `src/uuid.ts`, `src/util/` — small helpers.
 - `parser-codegen/` — scripts/inputs that derive some of the AST TS types from
   the Rust parser's metamodel. Re-run when the parser output format changes.

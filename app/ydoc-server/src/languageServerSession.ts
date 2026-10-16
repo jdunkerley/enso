@@ -22,11 +22,12 @@ import { assertNever } from 'ydoc-shared/util/assert'
 import { AbortScope, exponentialBackoff, printingCallbacks } from 'ydoc-shared/util/net'
 import { YjsServerTransport } from 'ydoc-shared/util/net/YjsTransport'
 import {
+  FLUSH_DEADLINE_MS,
   YDOC_CONTROL_CHANNEL,
   encodeControlMessage,
+  moduleStateCovers,
   parseControlMessage,
-  stateVectorCovers,
-  type StateVectorEntries,
+  type ModuleState,
 } from 'ydoc-shared/ydocControl'
 import {
   DistributedProject,
@@ -302,26 +303,35 @@ export class LanguageServerSession {
   private async handleControlMessage(raw: string) {
     const message = parseControlMessage(raw)
     if (message?.type !== 'flush') return
-    const result = await this.flush(message.modules)
+    let error: string | undefined
+    try {
+      const result = await this.flush(message.modules)
+      if (!result.ok) error = result.error.message('')
+    } catch (thrown) {
+      // Answer anyway: without an answer the GUI would take the save for an auto-save.
+      error = `The modules could not be saved: ${thrown instanceof Error ? thrown.message : thrown}`
+    }
     this.control.send(
       encodeControlMessage(
-        result.ok ?
+        error == null ?
           { type: 'flushed', id: message.id, ok: true }
-        : { type: 'flushed', id: message.id, ok: false, error: result.error.message('') },
+        : { type: 'flushed', id: message.id, ok: false, error },
       ),
     )
   }
 
   /**
    * Write every module `modules` names (by doc guid) to disk, once each contains the edits the
-   * caller had made (its state vector), so that a version taken next includes them. Modules this
-   * session does not know are skipped.
+   * caller had made (its state vector and delete set), so that a version taken next includes them.
+   * Modules this session does not know are skipped. All of it, the Language Server's requests
+   * included, is bounded by one deadline, {@link ModulePersistence.FLUSH_DEADLINE_MS} from now.
    */
-  async flush(modules: Readonly<Record<string, StateVectorEntries>>): Promise<Result<void>> {
+  async flush(modules: Readonly<Record<string, ModuleState>>): Promise<Result<void>> {
+    const deadline = Date.now() + ModulePersistence.FLUSH_DEADLINE_MS
     const flushes = Object.entries(modules).flatMap(([guid, wanted]) => {
       const name = this.model.findModuleByDocId(guid)
       const module = name != null ? this.authoritativeModules.get(name) : undefined
-      return module != null ? [module.flush(wanted)] : []
+      return module != null ? [module.flush(wanted, deadline)] : []
     })
     const results = await Promise.all(flushes)
     return results.find((result) => !result.ok) ?? Ok()
@@ -352,6 +362,17 @@ export class LanguageServerSession {
   getYDoc(guid: string): WSSharedDoc | undefined {
     return this.docs.get(guid)
   }
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** `promise`'s value, or `undefined` if it has not settled by `deadline` (a `Date.now()` time). */
+function beforeDeadline<T>(promise: Promise<T>, deadline: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), Math.max(0, deadline - Date.now()))
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
 }
 
 function isSourceFile(path: Path): boolean {
@@ -406,11 +427,19 @@ export class ModulePersistence extends ObservableV2<{ removed: () => void }> {
   queuedAction: LsAction | null = null
   /** The file's modification time, as of the last write or read this session knows of. */
   diskTime: string | null = null
+  /**
+   * How many edits the Language Server rejected. After a rejection the module reloads from disk
+   * and ends up `Synchronized` again, so a flush compares this count instead of watching the state.
+   */
+  droppedEdits = 0
   cleanup = (): void => {}
   private readonly sharedDoc: Y.Doc
 
-  /** How long a flush waits for the GUI's edits to arrive and to reach the Language Server. */
-  static FLUSH_WAIT_MS = 4_000
+  /**
+   * The whole time a flush may take, from the request: waiting for the GUI's edits to arrive and to
+   * reach the Language Server, and the Language Server's requests.
+   */
+  static FLUSH_DEADLINE_MS = FLUSH_DEADLINE_MS
   /** How long a flush waits, before refusing, for a `text/autoSave` that may be on its way. */
   static DISK_RECHECK_MS = 500
   /** After a failed save, when it is tried again (the engine's own auto-save delay). */
@@ -664,6 +693,7 @@ export class ModulePersistence extends ObservableV2<{ removed: () => void }> {
       console.error('Could not apply edit:', error)
       // Try to recover by reloading the file.
       // Drop the attempted updates, since applying them have failed.
+      this.droppedEdits += 1
       this.setState(LsSyncState.WriteError)
       this.syncedContent = null
       this.syncedVersion = null
@@ -936,17 +966,73 @@ export class ModulePersistence extends ObservableV2<{ removed: () => void }> {
   }
 
   /**
-   * Write the module to disk once the shared doc covers `wanted` (the GUI's state vector) and the
-   * covered edits have reached the Language Server. Refuses, writing nothing (so the Language
-   * Server's pending auto-save is untouched), when the edits do not arrive in time, when the module
-   * is not in sync, or when the file changed on disk since this session last wrote or read it. A
-   * save that fails is reported and tried once more after {@link SAVE_RETRY_MS}.
+   * Write the module to disk once the shared doc covers `wanted` (the GUI's state vector and delete
+   * set) and the covered edits have reached the Language Server, all before `deadline` (a
+   * `Date.now()` time), the Language Server's requests included.
+   *
+   * Refuses, writing nothing (so the Language Server's pending auto-save is untouched), when the
+   * edits do not arrive in time, when the module is not in sync, when the Language Server rejected
+   * an edit while the flush waited (the module then reloads from disk, dropping it), or when the
+   * file changed on disk since this session last wrote or read it. A save that fails is reported
+   * and tried once more after {@link SAVE_RETRY_MS}.
    */
-  async flush(wanted: StateVectorEntries): Promise<Result<void>> {
+  async flush(wanted: ModuleState, deadline: number): Promise<Result<void>> {
     const where = this.path.segments.join('/')
-    if (!(await this.waitForCover(wanted, ModulePersistence.FLUSH_WAIT_MS)))
+    const dropped = this.droppedEdits
+    const droppedAnEdit = () =>
+      this.droppedEdits !== dropped ?
+        Err(`An edit to ${where} could not be applied by the Language Server, so it was not saved.`)
+      : null
+    if (!(await this.waitForCover(wanted, deadline)))
       return Err(`The last edits to ${where} did not arrive.`)
-    const deadline = Date.now() + ModulePersistence.FLUSH_WAIT_MS
+    const synced = await this.waitForSync(where, deadline)
+    if (!synced.ok) return synced
+    const droppedBefore = droppedAnEdit()
+    if (droppedBefore) return droppedBefore
+    const unchanged = await this.diskUnchanged(where, deadline)
+    if (!unchanged.ok) return unchanged
+    // Edits made during the check reach the Language Server before the version is read, so that the
+    // save names the buffer's current version.
+    const resynced = await this.waitForSync(where, deadline)
+    if (!resynced.ok) return resynced
+    const droppedAfter = droppedAnEdit()
+    if (droppedAfter) return droppedAfter
+    const version = this.syncedVersion
+    if (version == null) return Err(`${where} is not in sync with the Language Server.`)
+    const saved = await beforeDeadline(this.ls.saveTextFile(this.path, version), deadline)
+    // No retry: the save may still be carried out.
+    if (saved == null) return Err(`The Language Server did not save ${where} in time.`)
+    if (!saved.ok) {
+      this.retrySave(version)
+      // `LsRpcError.toString` names the request and the Language Server's own message.
+      return Err(`Could not save ${where}: ${saved.error.payload}`)
+    }
+    // Bounded too; if it is late, it still lands, and a `text/autoSave` would record the time as well.
+    await beforeDeadline(this.recordDiskTime(), deadline)
+    return Ok()
+  }
+
+  /** Wait, until `deadline`, for the shared doc to contain everything `wanted` describes. */
+  private waitForCover(wanted: ModuleState, deadline: number): Promise<boolean> {
+    if (moduleStateCovers(this.sharedDoc, wanted)) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const done = (covered: boolean) => {
+        clearTimeout(timer)
+        this.sharedDoc.off('update', onUpdate)
+        resolve(covered)
+      }
+      // Registered after the constructor's own listener, so the update is already queued for the
+      // Language Server (`updateToApply`) when this sees it.
+      const onUpdate = () => {
+        if (moduleStateCovers(this.sharedDoc, wanted)) done(true)
+      }
+      const timer = setTimeout(() => done(false), Math.max(0, deadline - Date.now()))
+      this.sharedDoc.on('update', onUpdate)
+    })
+  }
+
+  /** Wait, until `deadline`, for every queued edit to have reached the Language Server. */
+  private async waitForSync(where: string, deadline: number): Promise<Result<void>> {
     while (this.updateToApply != null || !this.inState(LsSyncState.Synchronized)) {
       if (
         this.inState(
@@ -958,59 +1044,36 @@ export class ModulePersistence extends ObservableV2<{ removed: () => void }> {
         )
       )
         return Err(`${where} is not in sync with the Language Server.`)
-      if (Date.now() > deadline) return Err(`${where} did not reach the Language Server in time.`)
+      const left = deadline - Date.now()
+      if (left <= 0) return Err(`${where} did not reach the Language Server in time.`)
       this.trySyncRemoteUpdates()
-      await Promise.race([this.lastAction, new Promise((resolve) => setTimeout(resolve, 50))])
+      await Promise.race([this.lastAction, sleep(Math.min(50, left))])
     }
-    const version = this.syncedVersion
-    if (version == null) return Err(`${where} is not in sync with the Language Server.`)
-    if (!(await this.diskUnchanged())) return Err(`${where} was changed on disk.`)
-    const saved = await this.ls.saveTextFile(this.path, version)
-    if (!saved.ok) {
-      this.retrySave(version)
-      // `LsRpcError.toString` names the request and the Language Server's own message.
-      return Err(`Could not save ${where}: ${saved.error.payload}`)
-    }
-    await this.recordDiskTime()
     return Ok()
-  }
-
-  private waitForCover(wanted: StateVectorEntries, timeoutMs: number): Promise<boolean> {
-    if (stateVectorCovers(this.sharedDoc, wanted)) return Promise.resolve(true)
-    return new Promise((resolve) => {
-      const done = (covered: boolean) => {
-        clearTimeout(timer)
-        this.sharedDoc.off('update', onUpdate)
-        resolve(covered)
-      }
-      // Registered after the constructor's own listener, so the update is already queued for the
-      // Language Server (`updateToApply`) when this sees it.
-      const onUpdate = () => {
-        if (stateVectorCovers(this.sharedDoc, wanted)) done(true)
-      }
-      const timer = setTimeout(() => done(false), timeoutMs)
-      this.sharedDoc.on('update', onUpdate)
-    })
   }
 
   /**
    * Whether the file's modification time is still the one this session last saw. A mismatch is
-   * checked again after {@link DISK_RECHECK_MS}, so that a `text/autoSave` already on its way does
-   * not count as an outside change.
+   * checked again after {@link DISK_RECHECK_MS} (or at the deadline, if sooner), so that a
+   * `text/autoSave` already on its way does not count as an outside change.
    */
-  private async diskUnchanged(): Promise<boolean> {
+  private async diskUnchanged(where: string, deadline: number): Promise<Result<void>> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const info = await this.ls.fileInfo(this.path)
+      const info = await beforeDeadline(this.ls.fileInfo(this.path), deadline)
+      if (info == null) return Err(`The Language Server did not describe ${where} in time.`)
       if (
         info.ok &&
         this.diskTime != null &&
         info.value.attributes.lastModifiedTime === this.diskTime
       )
-        return true
-      if (attempt === 0)
-        await new Promise((resolve) => setTimeout(resolve, ModulePersistence.DISK_RECHECK_MS))
+        return Ok()
+      if (attempt === 0) {
+        const wait = Math.min(ModulePersistence.DISK_RECHECK_MS, deadline - Date.now())
+        if (wait <= 0) break
+        await sleep(wait)
+      }
     }
-    return false
+    return Err(`${where} was changed on disk.`)
   }
 
   /** Try a failed save once more, unless the module has moved on (its own auto-save covers that). */
