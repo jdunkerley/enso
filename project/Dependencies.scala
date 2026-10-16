@@ -494,7 +494,6 @@ object Dependencies {
   val directoryWatcherVersion = "0.18.0"
   val flatbuffersVersion      = "24.3.25"
   val guavaVersion            = "33.7.1-jre"
-  val jgitVersion             = "7.8.0.202609011348-r"
   val kindProjectorVersion    = "0.13.3"
   val mockitoScalaVersion     = "1.17.14"
   val mockitoJavaVersion      = "5.24.0"

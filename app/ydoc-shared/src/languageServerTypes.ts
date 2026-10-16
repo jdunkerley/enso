@@ -319,11 +319,6 @@ export interface VisualizationConfiguration {
   positionalArgumentsExpressions?: string[]
 }
 
-export interface VCSSave {
-  commitId: string
-  message: string
-}
-
 export type SuggestionDatabaseUpdates = {
   updates: SuggestionsDatabaseUpdate[]
   currentVersion: number
@@ -425,25 +420,6 @@ export namespace response {
     checksum: Checksum
   }
 
-  export interface VCSCommit {
-    commitId: string
-    message: string
-  }
-
-  export interface VCSStatus {
-    dirty: boolean
-    changed: Path[]
-    lastSave: VCSSave
-  }
-
-  export interface VCSChanges {
-    changed: Path[]
-  }
-
-  export interface VCSSaves {
-    saves: VCSSave[]
-  }
-
   export interface ExecutionContext {
     contextId: ContextId
     canModify: CapabilityRegistration
@@ -483,20 +459,6 @@ export enum LanguageServerErrorCode {
    * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#accessdeniederror)
    */
   AccessDenied = 100,
-
-  // === VCS Manager API errors ===
-  // https://github.com/enso-org/enso/blob/develop/engine/language-server/src/main/scala/org/enso/languageserver/vcsmanager/VcsManagerApi.scala
-  // `ContentRootNotFound` is also defined by the File Manager API with the same code, so it is omitted here.
-  /** A miscellaneous VCS error. */
-  VCS = 1000,
-  /** The project was not found in the VCS. */
-  VCSProjectNotFound = 1002,
-  /** The project is not under version control. */
-  VCSNotFound = 1003,
-  /** The requested save could not be found. */
-  SaveNotFound = 1004,
-  /** The requested project is already under version control. */
-  VCSAlreadyExists = 1005,
 
   // === File Manager API errors ===
   // https://github.com/enso-org/enso/blob/develop/engine/language-server/src/main/scala/org/enso/languageserver/filemanager/FileManagerApi.scala

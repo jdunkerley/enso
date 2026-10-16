@@ -1,6 +1,6 @@
 package org.enso.languageserver.text
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Stash, Terminated}
+import akka.actor.{Actor, ActorRef, Props, Terminated}
 import com.typesafe.scalalogging.LazyLogging
 import org.enso.languageserver.boot.TimingsConfig
 import org.enso.languageserver.capability.CapabilityProtocol.{
@@ -9,7 +9,7 @@ import org.enso.languageserver.capability.CapabilityProtocol.{
   CapabilityReleaseBadRequest,
   ReleaseCapability
 }
-import org.enso.languageserver.data.{CanEdit, CapabilityRegistration, ClientId}
+import org.enso.languageserver.data.{CanEdit, CapabilityRegistration}
 import org.enso.languageserver.filemanager.{
   ContentRootManager,
   FileEvent,
@@ -17,38 +17,17 @@ import org.enso.languageserver.filemanager.{
   Path
 }
 import org.enso.languageserver.monitoring.MonitoringProtocol.{Ping, Pong}
-import org.enso.languageserver.session.JsonSession
-import org.enso.languageserver.text.BufferRegistry.{
-  ReloadBufferTimeout,
-  SaveTimeout,
-  VcsTimeout
-}
-import org.enso.languageserver.text.CollaborativeBuffer.{
-  ForceSave,
-  ReloadBuffer,
-  ReloadBufferFailed,
-  ReloadedBuffer
-}
 import org.enso.languageserver.util.UnhandledLogging
 import org.enso.languageserver.text.TextProtocol.{
   ApplyEdit,
   ApplyExpressionValue,
   CloseFile,
   FileNotOpened,
-  FileSaved,
   OpenBuffer,
   OpenFile,
   ReadCollaborativeBuffer,
   ReadCollaborativeBufferResult,
-  SaveFailed,
   SaveFile
-}
-import org.enso.languageserver.vcsmanager.GenericVcsFailure
-import org.enso.languageserver.vcsmanager.VcsProtocol.{
-  InitRepo,
-  RestoreRepo,
-  RestoreRepoResponse,
-  SaveRepo
 }
 import org.enso.logger.masking.MaskedPath
 import org.enso.polyglot.runtime.Runtime.Api
@@ -68,10 +47,10 @@ import java.util.UUID
   *
   * {{{
   *
-  *                   *C                            1      1
-  *  +------------------+   *H    +------------------+     +------------------+
-  *  | ClientController +----+--->+  BufferRegistry  +---->+    VCSManager    |
-  *  +------------------+    ^    +---------+--------+     +------------------+
+  *                   *C                            1
+  *  +------------------+   *H    +------------------+
+  *  | ClientController +----+--->+  BufferRegistry  |
+  *  +------------------+    ^    +---------+--------+
   *                          |              |
   *                          |              |
   *                    1     |              v       *P
@@ -88,21 +67,18 @@ import java.util.UUID
   * }}}
   *
   * @param fileManager a file manager
-  * @param vcsManager a VCS manager
   * @param runtimeConnector a gateway to the runtime
   * @param contentRootManager the content root manager
   * @param timingsConfig a config with timeout/delay values
   */
 class BufferRegistry(
   fileManager: ActorRef,
-  vcsManager: ActorRef,
   runtimeConnector: ActorRef,
   contentRootManager: ContentRootManager,
   timingsConfig: TimingsConfig
 )(implicit
   versionCalculator: ContentBasedVersioning
 ) extends Actor
-    with Stash
     with LazyLogging
     with UnhandledLogging {
 
@@ -210,20 +186,6 @@ class BufferRegistry(
         sender() ! FileNotOpened
       }
 
-    case msg @ InitRepo(clientId, path) =>
-      forwardMessageToVCS((msg, sender()), clientId, path, registry)
-
-    case msg @ SaveRepo(clientId, path, _) =>
-      forwardMessageToVCS((msg, sender()), clientId, path, registry)
-
-    case msg @ RestoreRepo(clientId, path, _) =>
-      forwardMessageToVCSAndReloadBuffers(
-        (msg, sender()),
-        clientId,
-        path,
-        registry
-      )
-
     case msg @ FileEvent(path, kind, _) =>
       if (kind == FileEventKinds.Added || kind == FileEventKinds.Modified) {
         registry.get(path).foreach { buffer =>
@@ -257,266 +219,13 @@ class BufferRegistry(
         }
   }
 
-  private def forwardMessageToVCS(
-    msgWithSender: (Any, ActorRef),
-    clientId: ClientId,
-    root: Path,
-    registry: Map[Path, ActorRef]
-  ): Unit = {
-    val openBuffers = registry.filter(_._1.startsWith(root))
-    val timeouts = openBuffers.map { case (_, actorRef) =>
-      actorRef ! ForceSave(clientId)
-      (
-        actorRef,
-        context.system.scheduler
-          .scheduleOnce(timingsConfig.requestTimeout, self, SaveTimeout)
-      )
-    }
-    if (timeouts.isEmpty) {
-      vcsManager.forward(msgWithSender._1)
-      context.become(running(registry))
-    } else {
-      context.become(
-        waitOnSaveConfirmationAndForwardToVCS(msgWithSender, registry, timeouts)
-      )
-    }
-  }
-
-  private def waitOnSaveConfirmationAndForwardToVCS(
-    msg: (Any, ActorRef),
-    registry: Map[Path, ActorRef],
-    timeouts: Map[ActorRef, Cancellable]
-  ): Receive = {
-    case SaveTimeout(from) =>
-      // TODO: log failure
-      val timeouts1 = timeouts.removed(from)
-      if (timeouts1.isEmpty) {
-        vcsManager.tell(msg._1, msg._2)
-        unstashAll()
-        context.become(running(registry))
-      } else {
-        context.become(
-          waitOnSaveConfirmationAndForwardToVCS(msg, registry, timeouts1)
-        )
-      }
-    case SaveFailed | FileSaved =>
-      // TODO: log failure
-      timeouts.get(sender()).foreach(_.cancel())
-      val timeouts1 = timeouts.removed(sender())
-      if (timeouts1.isEmpty) {
-        vcsManager.tell(msg._1, msg._2)
-        unstashAll()
-        context.become(running(registry))
-      } else {
-        context.become(
-          waitOnSaveConfirmationAndForwardToVCS(msg, registry, timeouts1)
-        )
-      }
-    case _ =>
-      stash()
-  }
-
-  private def forwardMessageToVCSAndReloadBuffers(
-    msgWithSender: (Any, ActorRef),
-    clientId: ClientId,
-    root: Path,
-    registry: Map[Path, ActorRef]
-  ): Unit = {
-    val openBuffers = registry.filter(_._1.startsWith(root))
-    val timeouts = openBuffers.map { case (_, actorRef) =>
-      actorRef ! ForceSave(clientId)
-      (
-        actorRef,
-        context.system.scheduler
-          .scheduleOnce(timingsConfig.requestTimeout, self, SaveTimeout)
-      )
-    }
-    if (timeouts.isEmpty) {
-      vcsManager.tell(msgWithSender._1, self)
-      val timeout = context.system.scheduler
-        .scheduleOnce(timingsConfig.requestTimeout, self, VcsTimeout)
-      context.become(
-        waitOnVcsRestoreResponse(clientId, msgWithSender._2, timeout, registry)
-      )
-    } else {
-      context.become(
-        waitOnSaveConfirmationForwardToVCSAndReload(
-          clientId,
-          msgWithSender,
-          registry,
-          timeouts
-        )
-      )
-    }
-  }
-
-  private def waitOnSaveConfirmationForwardToVCSAndReload(
-    clientId: ClientId,
-    msg: (Any, ActorRef),
-    registry: Map[Path, ActorRef],
-    timeouts: Map[ActorRef, Cancellable]
-  ): Receive = {
-    case SaveTimeout(from) =>
-      val timeouts1 = timeouts.removed(from)
-      if (timeouts1.isEmpty) {
-        vcsManager ! msg._1
-        val vcsTimeout = context.system.scheduler
-          .scheduleOnce(timingsConfig.requestTimeout, self, SaveTimeout)
-        unstashAll()
-        context.become(
-          waitOnVcsRestoreResponse(clientId, msg._2, vcsTimeout, registry)
-        )
-      } else {
-        context.become(
-          waitOnSaveConfirmationForwardToVCSAndReload(
-            clientId,
-            msg,
-            registry,
-            timeouts1
-          )
-        )
-      }
-
-    case SaveFailed | FileSaved =>
-      timeouts.get(sender()).foreach(_.cancel())
-      val timeouts1 = timeouts.removed(sender())
-      if (timeouts1.isEmpty) {
-        vcsManager ! msg._1
-        val vcsTimeout = context.system.scheduler
-          .scheduleOnce(timingsConfig.requestTimeout, self, VcsTimeout)
-        unstashAll()
-        context.become(
-          waitOnVcsRestoreResponse(clientId, msg._2, vcsTimeout, registry)
-        )
-      } else {
-        context.become(
-          waitOnSaveConfirmationForwardToVCSAndReload(
-            clientId,
-            msg,
-            registry,
-            timeouts1
-          )
-        )
-      }
-
-    case _ =>
-      stash()
-  }
-
-  private def waitOnVcsRestoreResponse(
-    clientId: ClientId,
-    sender: ActorRef,
-    timeout: Cancellable,
-    registry: Map[Path, ActorRef]
-  ): Receive = {
-    case response @ RestoreRepoResponse(Right(_)) =>
-      if (timeout != null) timeout.cancel()
-      reloadBuffers(clientId, sender, response, registry)
-
-    case response @ RestoreRepoResponse(Left(_)) =>
-      if (timeout != null) timeout.cancel()
-      sender ! response
-      unstashAll()
-      context.become(running(registry))
-
-    case VcsTimeout =>
-      sender ! RestoreRepoResponse(Left(GenericVcsFailure("operation timeout")))
-      unstashAll()
-      context.become(running(registry))
-
-    case _ =>
-      stash()
-  }
-
-  private def reloadBuffers(
-    clientId: ClientId,
-    from: ActorRef,
-    response: RestoreRepoResponse,
-    registry: Map[Path, ActorRef]
-  ): Unit = {
-    val filesDiff = response.result.getOrElse(Nil)
-    val timeouts = registry.filter(r => filesDiff.contains(r._1)).map {
-      case (path, collaborativeEditor) =>
-        collaborativeEditor ! ReloadBuffer(JsonSession(clientId, from), path)
-        (
-          path,
-          context.system.scheduler
-            .scheduleOnce(
-              timingsConfig.requestTimeout,
-              self,
-              ReloadBufferTimeout(path)
-            )
-        )
-    }
-
-    if (timeouts.isEmpty) {
-      from ! response
-      context.become(running(registry))
-    } else {
-      context.become(
-        waitingOnBuffersToReload(from, timeouts, registry, response)
-      )
-    }
-  }
-
-  private def waitingOnBuffersToReload(
-    from: ActorRef,
-    timeouts: Map[Path, Cancellable],
-    registry: Map[Path, ActorRef],
-    response: RestoreRepoResponse
-  ): Receive = {
-    case ReloadedBuffer(path) =>
-      timeouts.get(path).foreach(_.cancel())
-      val timeouts1 = timeouts.removed(path)
-      if (timeouts1.isEmpty) {
-        from ! response
-        context.become(running(registry))
-      } else {
-        context.become(
-          waitingOnBuffersToReload(from, timeouts1, registry, response)
-        )
-      }
-
-    case ReloadBufferFailed(path, _) =>
-      timeouts.get(path).foreach(_.cancel())
-      val timeouts1 = timeouts.removed(path)
-      if (timeouts1.isEmpty) {
-        // TODO: log failure
-        from ! response
-        context.become(running(registry))
-      } else {
-        context.become(
-          waitingOnBuffersToReload(from, timeouts1, registry, response)
-        )
-      }
-
-    case ReloadBufferTimeout(path) =>
-      val timeouts1 = timeouts.removed(path)
-      if (timeouts1.isEmpty) {
-        // TODO: log failure
-        from ! response
-        context.become(running(registry))
-      } else {
-        context.become(
-          waitingOnBuffersToReload(from, timeouts1, registry, response)
-        )
-      }
-  }
-
 }
 
 object BufferRegistry {
 
-  case class SaveTimeout(ref: ActorRef)
-
-  case class ReloadBufferTimeout(path: Path)
-
-  case object VcsTimeout
-
   /** Creates a configuration object used to create a [[BufferRegistry]]
     *
     * @param fileManager a file manager actor
-    * @param vcsManager a VCS manager actor
     * @param runtimeConnector a gateway to the runtime
     * @param contentRootManager the content root manager
     * @param timingsConfig a config with timout/delay values
@@ -524,7 +233,6 @@ object BufferRegistry {
     */
   def props(
     fileManager: ActorRef,
-    vcsManager: ActorRef,
     runtimeConnector: ActorRef,
     contentRootManager: ContentRootManager,
     timingsConfig: TimingsConfig
@@ -534,7 +242,6 @@ object BufferRegistry {
     Props(
       new BufferRegistry(
         fileManager,
-        vcsManager,
         runtimeConnector,
         contentRootManager,
         timingsConfig

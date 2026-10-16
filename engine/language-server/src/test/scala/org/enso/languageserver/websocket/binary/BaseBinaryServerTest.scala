@@ -12,8 +12,7 @@ import org.enso.languageserver.data.{
   ExecutionContextConfig,
   FileManagerConfig,
   PathWatcherConfig,
-  ProjectDirectoriesConfig,
-  VcsManagerConfig
+  ProjectDirectoriesConfig
 }
 import org.enso.languageserver.effect.{ExecutionContextRuntime, ZioExec}
 import org.enso.languageserver.filemanager.{
@@ -48,7 +47,6 @@ abstract class BaseBinaryServerTest extends BinaryServerTestKit {
   val config = Config(
     testContentRoot,
     FileManagerConfig(timeout = 3.seconds),
-    VcsManagerConfig(),
     PathWatcherConfig(),
     ExecutionContextConfig(requestTimeout = 3.seconds),
     ProjectDirectoriesConfig.initialize(testContentRoot.file),

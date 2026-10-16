@@ -47,7 +47,6 @@ import org.enso.languageserver.search.SuggestionsHandler
 import org.enso.languageserver.search.SuggestionsHandler.ProjectNameUpdated
 import org.enso.languageserver.session.SessionRouter
 import org.enso.languageserver.text.BufferRegistry
-import org.enso.languageserver.vcsmanager.{Git, VcsManager}
 import org.enso.librarymanager.LibraryLocations
 import org.enso.librarymanager.local.DefaultLocalLibraryProvider
 import org.enso.librarymanager.published.PublishedLibraryCache
@@ -111,7 +110,6 @@ abstract class BaseServerTest
     Config(
       testContentRoot,
       FileManagerConfig(timeout = 3.seconds),
-      VcsManagerConfig(),
       PathWatcherConfig(),
       ExecutionContextConfig(requestTimeout = 3.seconds),
       ProjectDirectoriesConfig(testContentRoot.file),
@@ -242,23 +240,10 @@ abstract class BaseServerTest
       ),
       s"file-manager-${UUID.randomUUID()}"
     )
-    val vcsManager = system.actorOf(
-      VcsManager.props(
-        config.vcsManager,
-        Git.withEmptyUserConfig(
-          Some(config.vcsManager.dataDirectory),
-          config.vcsManager.asyncInit
-        ),
-        contentRootManagerWrapper,
-        zioExec
-      ),
-      s"vcs-manager-${UUID.randomUUID()}"
-    )
     val bufferRegistry =
       system.actorOf(
         BufferRegistry.props(
           fileManager,
-          vcsManager,
           runtimeConnectorProbe.ref,
           contentRootManagerWrapper,
           timingsConfig
@@ -412,7 +397,6 @@ abstract class BaseServerTest
       capabilityRouter       = capabilityRouter,
       fileEventRegistry      = fileEventRegistry,
       fileManager            = fileManager,
-      vcsManager             = vcsManager,
       contentRootManager     = contentRootManagerActor,
       contextRegistry        = contextRegistry,
       suggestionsHandler     = suggestionsHandler,
@@ -538,7 +522,6 @@ abstract class BaseServerTest
     capabilityRouter: ActorRef,
     fileEventRegistry: ActorRef,
     fileManager: ActorRef,
-    vcsManager: ActorRef,
     contentRootManager: ActorRef,
     contextRegistry: ActorRef,
     suggestionsHandler: ActorRef,
@@ -557,7 +540,6 @@ abstract class BaseServerTest
         bufferRegistry,
         capabilityRouter,
         fileManager,
-        vcsManager,
         contentRootManager,
         contextRegistry,
         suggestionsHandler,
