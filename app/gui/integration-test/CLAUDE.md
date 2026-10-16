@@ -114,6 +114,12 @@ in both modes. Anything else runs once, unlicensed.
   `english.json` is `undefined` in a spec (failing as
   `Cannot read properties of undefined (reading 'unicode')`) until
   `corepack pnpm --filter enso-common run compile`.
+- **The app under test also imports the workspace packages' `dist/`**, so a
+  reused worktree or clone keeps running the old shared code after a merge or
+  checkout. A missing export then stops the app on "Loading Enso..." and every
+  spec times out waiting for `before-auth-layout`/`after-auth-layout`; the
+  trace's console shows `does not provide an export named …`. Run
+  `corepack pnpm -r --if-present run compile` before trusting a local run.
 - **The mocked Cognito can ask for a one-time code.** With `mock_totp_code` set
   in `localStorage`, a password sign-in stops at the code step, and that value
   is the right code; any other fails as Amplify 6 fails it
