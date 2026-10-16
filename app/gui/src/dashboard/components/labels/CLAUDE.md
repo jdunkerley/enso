@@ -42,8 +42,8 @@ from `src/cloud/labels/` when local projects gained labels (spec
   both backends. The Properties tab stays cloud-only.
 - Locally, labels are stored by the project-manager shim (`localMetadata`, see
   `app/project-manager-shim/CLAUDE.md`): definitions in
-  `<userData>/labels.json`, names in each project's `.enso/project.json`.
-  Filtering by labels keeps the assets carrying **all** of them
+  `<userData>/labels.json`, names in each project's `package.yaml`. Filtering by
+  labels keeps the assets carrying **all** of them
   (`LocalBackend.listDirectory`, `doesAssetMatchQuery`); an "any" filter is left
   for when the search bar is revisited. The cloud's rule is the server's and is
   not visible from this repository.

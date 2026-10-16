@@ -109,7 +109,8 @@ public abstract class StaticAnalysisTest {
                     true,
                     Option.empty(),
                     CollectionConverters.asScala(List.<org.enso.pkg.ProvidesWith>of()).toList(),
-                    Option.empty());
+                    Option.empty(),
+                    CollectionConverters.asScala(List.<String>of()).toList());
             return new Package<>(root, initialConfig, TruffleFileSystem.INSTANCE);
           } catch (IOException e) {
             throw new RuntimeException(e);

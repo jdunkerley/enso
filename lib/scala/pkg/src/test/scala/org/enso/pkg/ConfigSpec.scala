@@ -16,6 +16,44 @@ class ConfigSpec
     with OptionValues {
 
   "Config" should {
+    "keep labels through a round trip" in {
+      val yaml =
+        """name: example
+          |namespace: local
+          |labels:
+          |  - finance
+          |  - draft
+          |""".stripMargin
+      val config = Config.fromYaml(yaml).get
+      config.labels shouldEqual List("finance", "draft")
+      Config.fromYaml(config.toYaml()).get.labels shouldEqual List(
+        "finance",
+        "draft"
+      )
+    }
+
+    "ignore labels that are not a list of strings" in {
+      val scalar = Config.fromYaml("name: example\nlabels: draft\n")
+      scalar.get.labels shouldEqual Nil
+      val empty = Config.fromYaml("name: example\nlabels:\n")
+      empty.get.labels shouldEqual Nil
+      val nested =
+        Config.fromYaml("name: example\nlabels:\n  a: b\n  c:\n    - d\n")
+      nested.get.labels shouldEqual Nil
+    }
+
+    "omit labels from the YAML when there are none" in {
+      val config = Config.fromYaml("name: example\n").get
+      config.labels shouldEqual Nil
+      config.toYaml() should not include "labels"
+    }
+
+    "keep labels when another setting changes" in {
+      val config  = Config.fromYaml("name: example\nlabels:\n  - a\n").get
+      val updated = config.copy(preferLocalLibraries = true)
+      Config.fromYaml(updated.toYaml()).get.labels shouldEqual List("a")
+    }
+
     "deserialize the serialized representation to the original value" in {
       val config = Config(
         name           = "placeholder",

@@ -152,6 +152,7 @@ object Contact {
   * @param componentGroups the description of component groups provided by this
   *                        package,
   * @param jvm determines whether JVM mode should be enabled for the project
+  * @param labels names of the labels the IDE shows on the project
   */
 case class Config(
   name: String,
@@ -165,7 +166,8 @@ case class Config(
   preferLocalLibraries: Boolean,
   componentGroups: Option[ComponentGroups],
   services: List[ProvidesWith],
-  jvm: Option[Boolean]
+  jvm: Option[Boolean],
+  labels: List[String] = Nil
 ) {
 
   /** Converts the configuration into a YAML representation.
@@ -219,6 +221,7 @@ object Config {
     val ComponentGroups        = "component-groups"
     val Services: String       = "services"
     val Jvm: String            = "jvm"
+    val Labels: String         = "labels"
   }
 
   implicit val yamlDecoder: YamlDecoder[Config] =
@@ -302,6 +305,13 @@ object Config {
               .flatMap(v => booleanDecoder.decode(v).toOption)
               .map(v => Right(Some(v)))
               .getOrElse(Right(None))
+            labels <- clazzMap
+              .get(JsonFields.Labels)
+              .flatMap(v =>
+                implicitly[YamlDecoder[List[String]]].decode(v).toOption
+              )
+              .map(Right(_))
+              .getOrElse(Right(Nil))
           } yield Config(
             name,
             normalizedName,
@@ -314,7 +324,8 @@ object Config {
             preferLocalLibraries,
             componentGroups,
             services,
-            jvmMode
+            jvmMode,
+            labels
           )
       }
     }
@@ -373,6 +384,15 @@ object Config {
         if (value.jvm.nonEmpty) {
           elements.add(
             (JsonFields.Jvm, booleanEncoder.encode(value.jvm.get))
+          )
+        }
+
+        if (value.labels.nonEmpty) {
+          elements.add(
+            (
+              JsonFields.Labels,
+              implicitly[YamlEncoder[List[String]]].encode(value.labels)
+            )
           )
         }
 

@@ -52,7 +52,11 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
   }
 }
 
-async function renameWithRetry(from: string, to: string): Promise<void> {
+/**
+ * Rename `from` over `to`, retrying a few times on the errors Windows reports while another
+ * process briefly holds either file.
+ */
+export async function renameWithRetry(from: string, to: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       await fs.rename(from, to)
@@ -64,6 +68,11 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
       await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_DELAY_MS * attempt))
     }
   }
+}
+
+/** Whether `value` is a plain JSON object (not null, not an array). */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value != null && !Array.isArray(value)
 }
 
 /** The `code` of a Node.js system error, if any. */

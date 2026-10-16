@@ -50,9 +50,11 @@ extending this package.
   `{ version: 1, entries: [{ path, projectId, openedAt }] }`, newest first, at
   most 20, unique by project UUID. Reads hide entries whose `project.json` `id`
   no longer matches; `recordRecent` prunes them.
-- A project's labels — an optional `labels: string[]` in its
-  `.enso/project.json`. Nothing in the engine reads that file (only this shim
-  does), so the extra field is safe there.
+- A project's labels — an optional `labels: string[]` in its `package.yaml` (the
+  engine preserves the key), read and written by `localMetadata/packageYaml.ts`.
+  `readProjectLabels` moves labels that earlier versions wrote to
+  `.enso/project.json` into `package.yaml` (whose own labels win) and strips
+  them from `project.json`.
 
 `<userData>` is Electron's `app.getPath('userData')` in the app
 (`app/electron-client/src/projectService.ts`), and `ENSO_DEV_USER_DATA_DIR` or
@@ -62,8 +64,8 @@ Rules worth keeping:
 
 - **Write `project.json` only through `localMetadata/jsonFile.ts`**
   (`updateJsonFile`), which serialises writers per path and renames a temporary
-  file into place. A plain `writeFile` of a fresh object drops `labels` (or
-  `lastOpened`) written by someone else.
+  file into place. A plain `writeFile` of a fresh object drops `lastOpened`
+  written by someone else.
 - A corrupt or newer `labels.json`/`recent.json` is renamed to
   `<name>.corrupt-<ts>`/`<name>.newer-<ts>` and treated as empty. A corrupt
   `project.json` is never moved: that would cost the project its UUID.

@@ -6,7 +6,13 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import { LocalMetadata } from '../../localMetadata/index.js'
+import * as packageYaml from '../../localMetadata/packageYaml.js'
 import { handleFilesystemCommand } from '../filesystem.js'
+
+vi.mock('../../localMetadata/packageYaml.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../localMetadata/packageYaml.js')>()
+  return { ...actual, readProjectLabels: vi.fn(actual.readProjectLabels) }
+})
 
 // The commands under test never read the request.
 const REQUEST = {} as http.IncomingMessage
@@ -84,6 +90,28 @@ describe('labels in the listing', () => {
     })
     const entries = await list(store)
     expect(entries.find((entry) => entry.path === project)?.metadata?.labels).toEqual(['ok'])
+  })
+
+  test('when the migration fails, the labels left in project.json are still listed', async () => {
+    const project = await createProject(path.join(projects, 'P'), 'id-1', { labels: ['old', 3] })
+    const projectJsonPath = path.join(project, '.enso', 'project.json')
+    const before = await fs.readFile(projectJsonPath, 'utf8')
+    vi.mocked(packageYaml.readProjectLabels).mockRejectedValueOnce(new Error('cannot rewrite'))
+    vi.spyOn(console, 'error').mockImplementationOnce(() => {})
+
+    const entries = await list(store)
+    expect(entries.find((entry) => entry.path === project)?.metadata?.labels).toEqual(['old'])
+    expect(await fs.readFile(projectJsonPath, 'utf8')).toBe(before)
+  })
+
+  test("when the migration fails, package.yaml's own labels win", async () => {
+    const project = await createProject(path.join(projects, 'P'), 'id-1', { labels: ['old'] })
+    await packageYaml.writePackageLabels(project, ['new'])
+    vi.mocked(packageYaml.readProjectLabels).mockRejectedValueOnce(new Error('cannot rewrite'))
+    vi.spyOn(console, 'error').mockImplementationOnce(() => {})
+
+    const entries = await list(store)
+    expect(entries.find((entry) => entry.path === project)?.metadata?.labels).toEqual(['new'])
   })
 
   test('without a store, no labels are listed', async () => {
