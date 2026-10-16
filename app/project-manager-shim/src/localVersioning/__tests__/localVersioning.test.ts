@@ -1013,16 +1013,120 @@ describe('history across moves', () => {
     })
   })
 
-  test('ignores a trailer naming a path outside the repository', async () => {
+  test.each(['../B', '/A', 'A*', 'A?', '[A]', ':(top)A', '-A', './A'])(
+    'ignores a trailer naming the unsafe path %s',
+    async (from) => {
+      await withRepo(async (root, versioning) => {
+        await versioning.commit([path.join(root, 'A')], 'first')
+        // The hand-made commit is the first at `N`, so its trailer is read.
+        await writeFiles(root, { 'N/package.yaml': 'name: N\n', 'N/src/Main.enso': 'n\n' })
+        await git(root, 'add', '-A', '--', 'N')
+        await git(root, 'commit', '-q', '-m', 'Hand-made', '-m', `Enso-Moved-From: ${from}`)
+        const log = await versioning.log(path.join(root, 'N'))
+        expect(log.map((v) => v.comment)).toEqual(['Hand-made'])
+      })
+    },
+  )
+
+  test('follows A to B and back to A, through every segment', async () => {
     await withRepo(async (root, versioning) => {
       const a = path.join(root, 'A')
-      await versioning.commit([a], 'first')
-      await writeFiles(root, { 'A/src/Main.enso': 'main = 2\n' })
-      await git(root, 'add', '-A', '--', 'A')
-      await git(root, 'commit', '-q', '-m', 'Hand-made', '-m', 'Enso-Moved-From: ../B', '--', 'A')
+      const b = path.join(root, 'B2')
+      const first = (await versioning.commit([a], 'first')).id!
+      await fs.rename(a, b)
+      await versioning.commitMove(a, b, 'A to B2')
+      const away = await git(root, 'rev-parse', 'HEAD')
+      await writeFiles(root, { 'B2/src/Main.enso': 'main = 2\n' })
+      const edited = (await versioning.commit([b], 'edited at B2')).id!
+      await fs.rename(b, a)
+      await versioning.commitMove(b, a, 'B2 to A')
+      const back = await git(root, 'rev-parse', 'HEAD')
       const log = await versioning.log(a)
-      expect(log.map((v) => v.comment)).toEqual(['Hand-made', 'first'])
+      expect(log.map((v) => v.comment)).toEqual(['B2 to A', 'edited at B2', 'A to B2', 'first'])
+      expect(log.map((v) => v.id)).toEqual([back, edited, away, first])
+      const contents = ['main = 2\n', 'main = 2\n', 'main = 1\n', 'main = 1\n']
+      for (const [i, { id }] of log.entries())
+        expect(await versioning.fileAt(a, id, 'src/Main.enso')).toBe(contents[i])
+      for (const [i, { id }] of [...log.entries()].reverse()) {
+        await versioning.restore(a, id)
+        expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe(contents[i])
+        expect(await git(root, 'status', '--porcelain', '--', 'A', 'B2')).toBe('')
+      }
     })
+  }, 30_000)
+
+  test('a reused name shows the moved project, not the deleted one', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const b = path.join(root, 'B')
+      const aFirst = (await versioning.commit([a], 'A first')).id!
+      await versioning.commit([b], 'B first')
+      await fs.rm(b, { recursive: true })
+      await versioning.commit([b], 'B deleted')
+      await fs.rename(a, b)
+      await versioning.commitMove(a, b, 'A to B')
+      const log = await versioning.log(b)
+      expect(log.map((v) => v.comment)).toEqual(['A to B', 'A first'])
+      expect(log.at(-1)?.id).toBe(aFirst)
+    })
+  })
+
+  test('a move away from a path is never listed for the project that later lives there', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      await versioning.commit([a], 'old A')
+      await fs.rename(a, path.join(root, 'Elsewhere'))
+      await versioning.commitMove(a, path.join(root, 'Elsewhere'), 'A to Elsewhere')
+      await writeFiles(root, project('A'))
+      await versioning.commit([a], 'new A')
+      expect((await versioning.log(a)).map((v) => v.comment)).toEqual(['new A'])
+    })
+  })
+
+  test('a cross-move restore that cannot be done changes nothing', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const moved = path.join(root, 'folder', 'A')
+      // This repository tracks the project's `.enso/`, at both paths.
+      await git(root, 'add', '-A', '--', 'A')
+      await git(root, 'add', '-f', '--', 'A/.enso')
+      await git(root, 'commit', '-q', '-m', 'tracked')
+      const tracked = await git(root, 'rev-parse', 'HEAD')
+      await fs.mkdir(path.join(root, 'folder'))
+      await fs.rename(a, moved)
+      await versioning.commitMove(a, moved, 'Moved')
+      await git(root, 'add', '-f', '--', 'folder/A/.enso')
+      await git(root, 'rm', '-q', '-r', '--cached', '--', 'A/.enso')
+      await git(root, 'commit', '-q', '-m', 'tracked again')
+      await writeFiles(root, { 'folder/A/src/Main.enso': 'main = 3\n' })
+      await expect(versioning.restore(moved, tracked)).rejects.toThrow(/\.enso/)
+      expect(await git(root, 'diff', '--cached', '--name-status')).toBe('')
+      expect(await fs.readFile(path.join(moved, 'src', 'Main.enso'), 'utf8')).toBe('main = 3\n')
+      expect(await git(root, 'ls-files', '--', 'folder/A/src/Main.enso')).toBe(
+        'folder/A/src/Main.enso',
+      )
+    })
+  })
+
+  test('a project at the repository root lists only versions from since it was there', async () => {
+    await withTempRepo(
+      async (root) => {
+        await git(root, 'config', 'user.name', 'Tester')
+        await git(root, 'config', 'user.email', 'tester@example.com')
+        const versioning = versioningFor(root)
+        await versioning.init(root)
+        await writeFiles(root, project('Old'))
+        const before = (await versioning.commit([path.join(root, 'Old')], 'Old only')).id!
+        await fs.rm(path.join(root, 'Old'), { recursive: true })
+        await writeFiles(root, { 'package.yaml': 'name: R\n', 'src/Main.enso': 'main = 1\n' })
+        const rooted = (await versioning.commit([root], 'Root')).id!
+        expect((await versioning.log(root)).map((v) => v.id)).toEqual([rooted])
+        await expect(versioning.restore(root, before)).rejects.toThrow(/not a version/)
+        await expect(fs.access(path.join(root, 'Old'))).rejects.toThrow()
+        expect(await fs.readFile(path.join(root, 'src', 'Main.enso'), 'utf8')).toBe('main = 1\n')
+      },
+      { init: true },
+    )
   })
 
   test('fileAt reads a version from before the move at its old path', async () => {

@@ -240,8 +240,8 @@ function withoutMoveTrailer(message: string): string {
 /**
  * The path in a commit message's {@link MOVED_FROM_TRAILER} trailer, or `null`. A path that is not
  * a plain repository-relative one (absolute, with a `.` or `..` segment, or one git could read as an
- * option or pathspec magic) is ignored: a trailer is only text in a commit message, which anyone
- * can write.
+ * option, pathspec magic or a glob) is ignored: a trailer is only text in a commit message, which
+ * anyone can write.
  */
 function movedFrom(message: string): string | null {
   const prefix = `${MOVED_FROM_TRAILER}: `
@@ -255,7 +255,7 @@ function movedFrom(message: string): string | null {
     from === '' ||
     /^[/:-]/.test(from) ||
     /^[a-zA-Z]:/.test(from) ||
-    from.includes('\\') ||
+    /[\\*?[\]]/.test(from) ||
     from.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
   return unsafe ? null : from
 }
@@ -267,6 +267,21 @@ interface LoggedVersion extends VersionEntry {
 
 /** How many moves `log` follows back at most: a guard against a cycle of trailers. */
 const MAX_FOLLOWED_MOVES = 100
+
+/**
+ * Whether `revision` (a validated version id, optionally with `:<path>` or `^{tree}`) names an
+ * object. Resolving it first means a missing path fails as such, and is never read as anything else.
+ */
+function objectExists(repoRoot: string, revision: string): Promise<boolean> {
+  return runGit(repoRoot, ['cat-file', '-e', revision], { queueKey: repoRoot }).then(
+    () => true,
+    () => false,
+  )
+}
+
+/** The message of the error for a restore across a move that `.enso` folders tracked in git block. */
+const TRACKED_ENSO_MESSAGE =
+  'This version cannot be restored here: the repository tracks the project’s .enso folder, both at the version’s path and at the current one.'
 
 /** Options for {@link LocalVersioning}. */
 export interface LocalVersioningOptions {
@@ -583,10 +598,16 @@ export class LocalVersioning {
   }
 
   /**
-   * The project's versions, newest first, following its moves back: when the oldest commit at the
-   * current path carries an {@link MOVED_FROM_TRAILER} trailer, the commits before it at the old
-   * path follow, and so on (at most {@link MAX_FOLLOWED_MOVES} moves). Each version records the
-   * path the project had then.
+   * The project's versions, newest first, following its moves back. The commits at the current
+   * path are read newest first up to the first one carrying an {@link MOVED_FROM_TRAILER} trailer:
+   * one naming another path moved the project in, so it is listed and the commits before it at that
+   * path follow (at most {@link MAX_FOLLOWED_MOVES} moves); one naming this path moved an earlier
+   * project away, so neither it nor anything older here is listed. Each version records the path
+   * the project had then.
+   *
+   * A project at the repository root is never moved in or away, so trailers are not followed;
+   * since `git log -- .` lists every commit, its history starts at the commit that last added the
+   * root `package.yaml` (before it, the root was not this project).
    */
   private async logIn(repoRoot: string, projectPath: string): Promise<readonly LoggedVersion[]> {
     const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
@@ -597,6 +618,11 @@ export class LocalVersioning {
       )
     if (!(await hasCommit('HEAD'))) return []
     let relative = await repoRelative(repoRoot, projectPath)
+    const atRoot = relative === '.'
+    const rootSince =
+      atRoot ?
+        (await run(['log', '-1', '--format=%H', '--diff-filter=A', '--', 'package.yaml'])).trim()
+      : ''
     let before: string | null = null
     const seen = new Set<string>()
     const commits: {
@@ -625,17 +651,23 @@ export class LocalVersioning {
             .split('\0')
           return { id, date, name, email, message: message.trim(), relativePath: relative }
         })
-        .filter((commit) => !seen.has(commit.id))
+      let movedIn: { readonly id: string; readonly from: string } | null = null
       for (const commit of segment) {
+        if (seen.has(commit.id)) break
+        const from = atRoot ? null : movedFrom(commit.message)
+        // A move away from this path: what is older here belongs to the project that left.
+        if (from === relative) break
         seen.add(commit.id)
         commits.push(commit)
+        if (atRoot && commit.id === rootSince) break
+        if (from != null) {
+          movedIn = { id: commit.id, from }
+          break
+        }
       }
-      const oldest = segment.at(-1)
-      const from = oldest != null ? movedFrom(oldest.message) : null
-      if (oldest == null || from == null || from === relative) break
-      if (!(await hasCommit(`${oldest.id}^`))) break
-      before = oldest.id
-      relative = from
+      if (movedIn == null || !(await hasCommit(`${movedIn.id}^`))) break
+      before = movedIn.id
+      relative = movedIn.from
     }
     // An absent notes ref lists nothing.
     const noted = new Set(
@@ -673,6 +705,8 @@ export class LocalVersioning {
       const version = (await this.logIn(repoRoot, projectPath)).find((entry) => entry.id === id)
       const relative = version?.relativePath ?? current
       const target = relative === '.' ? file : `${relative}/${file}`
+      if (!(await objectExists(repoRoot, `${id}:${target}`)))
+        throw new Error(`${relativePath} does not exist in version ${id}`)
       return runGit(repoRoot, ['show', `${id}:${target}`], { queueKey: repoRoot })
     })
   }
@@ -751,11 +785,24 @@ export class LocalVersioning {
     return exclusive(repoRoot, async () => {
       await this.assertEnabledIn(repoRoot)
       const version = await this.assertProjectVersionIn(repoRoot, projectPath, id)
-      await this.commitIn(repoRoot, [projectPath], 'Saved before restore')
       const relative = await repoRelative(repoRoot, projectPath)
       const run = (args: readonly string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
+      const moved = version.relativePath !== relative
+      // Every precondition is checked before anything in the work tree or index changes.
+      if (moved && (relative === '.' || version.relativePath === '.'))
+        throw new Error('A version from another path cannot be restored at the repository root.')
+      const source = version.relativePath === '.' ? `${id}^{tree}` : `${id}:${version.relativePath}`
+      if (!(await objectExists(repoRoot, source)))
+        throw new Error(`The project does not exist in version ${id}`)
+      if (
+        moved &&
+        (await objectExists(repoRoot, `${id}:${ensoFolder(version.relativePath)}`)) &&
+        (await run(['ls-files', '--cached', '--', ensoFolder(relative)])).trim() !== ''
+      )
+        throw new Error(TRACKED_ENSO_MESSAGE)
+      await this.commitIn(repoRoot, [projectPath], 'Saved before restore')
       try {
-        if (version.relativePath === relative) {
+        if (!moved) {
           await run([
             'restore',
             `--source=${id}`,
@@ -766,26 +813,33 @@ export class LocalVersioning {
             excludeEnso(relative),
           ])
         } else {
-          if (relative === '.')
-            throw new Error(
-              'A version from before a move cannot be restored at the repository root.',
-            )
           // The version is from before a move: its files were at another path. Everything at the
           // current path is tracked (the commit above), so drop it from the index, read the old
           // path's tree in under the current path, write it out, and remove what is left over.
-          await run([
-            'rm',
-            '-r',
-            '-q',
-            '--cached',
-            '--ignore-unmatch',
-            '--',
-            relative,
-            excludeEnso(relative),
-          ])
-          await run(['read-tree', `--prefix=${relative}/`, `${id}:${version.relativePath}`])
-          await run(['restore', '--worktree', '--', relative, excludeEnso(relative)])
-          await run(['clean', '-f', '-d', '-q', '--', relative, excludeEnso(relative)])
+          try {
+            await run([
+              'rm',
+              '-r',
+              '-q',
+              '--cached',
+              '--ignore-unmatch',
+              '--',
+              relative,
+              excludeEnso(relative),
+            ])
+            await run(['read-tree', `--prefix=${relative}/`, source])
+            await run(['restore', '--worktree', '--', relative, excludeEnso(relative)])
+            await run(['clean', '-f', '-d', '-q', '--', relative, excludeEnso(relative)])
+          } catch (error) {
+            // Put the index back as the commit above left it, so no deletion stays staged.
+            await run(['reset', '-q', '--', relative, excludeEnso(relative)]).catch(
+              (resetError: unknown) =>
+                console.error(`Failed to reset the index for ${relative}:`, resetError),
+            )
+            if (error instanceof CommandError && error.stderr.includes('Cannot bind'))
+              throw new Error(TRACKED_ENSO_MESSAGE, { cause: error })
+            throw error
+          }
         }
       } catch (error) {
         throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
@@ -814,6 +868,8 @@ export class LocalVersioning {
       const version = await this.assertProjectVersionIn(repoRoot, projectPath, id)
       const relative = version.relativePath
       const tree = relative === '.' ? `${id}^{tree}` : `${id}:${relative}`
+      if (!(await objectExists(repoRoot, tree)))
+        throw new Error(`The project does not exist in version ${id}`)
       await fs.mkdir(path.dirname(targetPath), { recursive: true })
       try {
         // Not recursive: creating it is what claims it, so an existing directory is never used.
