@@ -11,7 +11,11 @@ import * as yaml from 'yaml'
 import { getEngineLogDirectory } from '../distributionManager.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import { updateJsonFile } from '../localMetadata/jsonFile.js'
-import { readPackageLabels, readProjectLabels } from '../localMetadata/packageYaml.js'
+import {
+  readLegacyProjectLabels,
+  readPackageLabels,
+  readProjectLabels,
+} from '../localMetadata/packageYaml.js'
 import * as projectManagement from '../projectManagement.js'
 import { resolveClashingProjectIds } from '../projectService/resolveClashingProjectIds.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
@@ -166,14 +170,16 @@ async function fileExists(path: string): Promise<boolean> {
 
 /**
  * The label names of the project at `projectPath`. A failure to move old labels into
- * `package.yaml` is logged and the labels already there are used, so the project still lists.
+ * `package.yaml` is logged, and the labels there are used, or the old ones in `project.json` when
+ * `package.yaml` has none, so the project still lists with its labels.
  */
 async function readLabels(projectPath: string): Promise<readonly string[]> {
   try {
     return await readProjectLabels(projectPath)
   } catch (error) {
     console.error(`Failed to read the labels of '${projectPath}':`, error)
-    return readPackageLabels(projectPath)
+    const current = await readPackageLabels(projectPath)
+    return current.length > 0 ? current : readLegacyProjectLabels(projectPath)
   }
 }
 

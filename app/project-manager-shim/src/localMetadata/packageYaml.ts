@@ -104,6 +104,20 @@ export async function readProjectLabels(projectPath: string): Promise<string[]> 
   return readPackageLabels(projectPath)
 }
 
+/**
+ * The label names still in `.enso/project.json`, ignoring anything malformed; `[]` when the file
+ * is missing, unreadable or has none. Reads only.
+ */
+export async function readLegacyProjectLabels(projectPath: string): Promise<string[]> {
+  try {
+    const json = await readJson(path.join(projectPath, '.enso', 'project.json'))
+    if (!isRecord(json) || !Array.isArray(json.labels)) return []
+    return json.labels.filter((label): label is string => typeof label === 'string')
+  } catch {
+    return []
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value != null && !Array.isArray(value)
 }
