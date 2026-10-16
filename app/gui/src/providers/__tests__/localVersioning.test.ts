@@ -8,12 +8,14 @@ import { useText } from '$/providers/text'
 import { createToastsStore } from '$/providers/toasts'
 import { createPersistedStore } from '$/utils/persistedStore'
 import { Path, type ProjectId } from 'enso-common/src/services/Backend'
-import { newProjectId, type LocalBackend } from 'enso-common/src/services/LocalBackend'
+import { newProjectId } from 'enso-common/src/services/LocalBackend'
 import type { VersioningStatus } from 'enso-common/src/services/ProjectManager/types'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   createLocalVersioningStore,
   VERSIONING_POLL_INTERVAL_MS,
+  VERSIONING_REQUEST_TIMEOUT_MS,
+  type LocalVersioningBackend,
   type RepositoryPromptsState,
 } from '../localVersioning'
 import type { FlushOutcome } from '../openedProjects/project/flush'
@@ -42,14 +44,11 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function setup(backendOverrides: Record<string, unknown> = {}) {
-  const backend = {
+function setup(backendOverrides: Partial<LocalVersioningBackend> = {}) {
+  const backend: LocalVersioningBackend = {
     rootPath: () => ROOT,
     versioningStatus: vi.fn(async (_path: Path) => status()),
     enableVersioningIfInside: vi.fn(async () => ({ enabled: false })),
-    initVersioning: vi.fn(async () => ({ repoRoot: ROOT })),
-    enableVersioning: vi.fn(async () => {}),
-    commitVersion: vi.fn(async () => ({ id: 'a'.repeat(40) as string | null })),
     ...backendOverrides,
   }
   const modals = createModalsStore()
@@ -59,8 +58,7 @@ function setup(backendOverrides: Record<string, unknown> = {}) {
     { name: 'test-local-versioning-prompts', version: 1 },
   )
   const store = createLocalVersioningStore({
-    // A stub with only what the store calls; not a third-party API.
-    localBackend: () => backend as unknown as LocalBackend,
+    localBackend: () => backend,
     modals,
     toasts,
     getText: useText().getText,
@@ -105,7 +103,7 @@ describe('polling', () => {
     await vi.advanceTimersByTimeAsync(0)
     const a = store.refresh(PROJECT)
     const b = store.refresh(PROJECT)
-    await vi.advanceTimersByTimeAsync(4 * VERSIONING_POLL_INTERVAL_MS)
+    await vi.advanceTimersByTimeAsync(3 * VERSIONING_POLL_INTERVAL_MS)
     expect(versioningStatus).toHaveBeenCalledTimes(1)
     first.resolve(status())
     await a
@@ -132,20 +130,106 @@ describe('polling', () => {
     expect(versioningStatus).toHaveBeenCalledTimes(3)
   })
 
-  test('a failed status keeps the previous one, and polling goes on', async () => {
+  test('a failed status is unknown, not the previous one; it is logged once per streak', async () => {
     const versioningStatus = vi
       .fn<(path: Path) => Promise<VersioningStatus>>()
       .mockResolvedValueOnce(status({ changed: true }))
+      .mockRejectedValueOnce(new Error('shim down'))
       .mockRejectedValueOnce(new Error('shim down'))
       .mockResolvedValue(status())
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { store } = setup({ versioningStatus })
     store.watchProject(PROJECT, FLUSHED)
-    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    await vi.advanceTimersByTimeAsync(0)
     expect(store.statusOf(PROJECT)?.changed).toBe(true)
-    expect(warn).toHaveBeenCalled()
+    expect(store.isStatusUnknown(PROJECT)).toBe(false)
+    await vi.advanceTimersByTimeAsync(2 * VERSIONING_POLL_INTERVAL_MS)
+    expect(versioningStatus).toHaveBeenCalledTimes(3)
+    expect(store.statusOf(PROJECT)).toBeUndefined()
+    expect(store.isStatusUnknown(PROJECT)).toBe(true)
+    expect(warn).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
     expect(store.statusOf(PROJECT)?.changed).toBe(false)
+    expect(store.isStatusUnknown(PROJECT)).toBe(false)
+  })
+
+  test('re-watching a project with a request pending waits for it', async () => {
+    const first = deferred<VersioningStatus>()
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(status())
+    const { store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    store.unwatchProject(PROJECT)
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(versioningStatus).toHaveBeenCalledTimes(1)
+    first.resolve(status())
+    await vi.advanceTimersByTimeAsync(0)
+    expect(versioningStatus).toHaveBeenCalledTimes(2)
+    expect(store.statusOf(PROJECT)).toEqual(status())
+  })
+
+  test('a request that never settles: status unknown after the timeout, no new request', async () => {
+    const hung = deferred<VersioningStatus>()
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockReturnValueOnce(hung.promise)
+      .mockResolvedValue(status({ changed: true }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    const awaited = store.refresh(PROJECT)
+    let released = false
+    void awaited.then(() => (released = true))
+    await vi.advanceTimersByTimeAsync(VERSIONING_REQUEST_TIMEOUT_MS - 1)
+    expect(released).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(released).toBe(true)
+    expect(store.isStatusUnknown(PROJECT)).toBe(true)
+    expect(store.statusOf(PROJECT)).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(5 * VERSIONING_POLL_INTERVAL_MS)
+    expect(versioningStatus).toHaveBeenCalledTimes(1)
+    hung.resolve(status())
+    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    expect(versioningStatus).toHaveBeenCalledTimes(2)
+    expect(store.isStatusUnknown(PROJECT)).toBe(false)
+    expect(store.statusOf(PROJECT)?.changed).toBe(true)
+  })
+
+  test('two projects are polled independently', async () => {
+    const other: ProjectId = newProjectId(Path('/root/Q'))
+    const { backend, store } = setup()
+    store.watchProject(PROJECT, FLUSHED)
+    store.watchProject(other, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(backend.versioningStatus).toHaveBeenCalledTimes(2)
+    store.unwatchProject(PROJECT)
+    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    expect(backend.versioningStatus).toHaveBeenCalledTimes(3)
+    expect(backend.versioningStatus).toHaveBeenLastCalledWith(Path('/root/Q'))
+    expect(store.statusOf(other)).toEqual(status())
+    expect(store.statusOf(PROJECT)).toBeUndefined()
+  })
+
+  test('unwatching during a request writes nothing and starts no timer', async () => {
+    const first = deferred<VersioningStatus>()
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValue(status())
+    const { store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    store.unwatchProject(PROJECT)
+    first.resolve(status())
+    await vi.advanceTimersByTimeAsync(3 * VERSIONING_POLL_INTERVAL_MS)
+    expect(versioningStatus).toHaveBeenCalledTimes(1)
+    expect(store.statusOf(PROJECT)).toBeUndefined()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })
 
@@ -172,6 +256,31 @@ describe('a repository that is not enabled', () => {
     store.watchProject(PROJECT, FLUSHED)
     await vi.advanceTimersByTimeAsync(3 * VERSIONING_POLL_INTERVAL_MS)
     expect(enableVersioningIfInside).toHaveBeenCalledTimes(1)
+    expect(store.isVersioned(PROJECT)).toBe(false)
+  })
+
+  test('a failed offer is made again on the next read', async () => {
+    const versioningStatus = vi.fn(async () => status({ enabled: false }))
+    const enableVersioningIfInside = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('busy'))
+      .mockResolvedValue({ enabled: false })
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { store } = setup({ versioningStatus, enableVersioningIfInside })
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    expect(enableVersioningIfInside).toHaveBeenCalledTimes(2)
+  })
+
+  test('not a git repository: nothing is offered', async () => {
+    const versioningStatus = vi.fn(async () =>
+      status({ git: false, repoRoot: null, enabled: false }),
+    )
+    const enableVersioningIfInside = vi.fn(async () => ({ enabled: false }))
+    const { store } = setup({ versioningStatus, enableVersioningIfInside })
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(enableVersioningIfInside).not.toHaveBeenCalled()
     expect(store.isVersioned(PROJECT)).toBe(false)
   })
 

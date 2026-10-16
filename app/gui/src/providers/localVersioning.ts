@@ -26,6 +26,13 @@ import { useBackends } from './backends'
 /** How often an open project's status is read, counted from the previous answer. */
 export const VERSIONING_POLL_INTERVAL_MS = 5_000
 
+/**
+ * How long a status request is waited for. A git operation that timed out in the shim can hold a
+ * repository busy, so a request may take very long; past this the status is reported unknown, but
+ * no new request is issued until the pending one settles.
+ */
+export const VERSIONING_REQUEST_TIMEOUT_MS = 20_000
+
 /** The answers to the repository prompts that last beyond a session (Task 19). */
 export interface RepositoryPromptsState {
   /** Local roots for which "Don't ask again for this folder" was chosen at "Create". */
@@ -34,14 +41,21 @@ export interface RepositoryPromptsState {
   readonly declinedRepositories: readonly string[]
 }
 
+/** The part of {@link LocalBackend} the store calls (tests stub just this). */
+export type LocalVersioningBackend = Pick<
+  LocalBackend,
+  'rootPath' | 'versioningStatus' | 'enableVersioningIfInside'
+>
+
 /** What the store works with; the app's are {@link useLocalVersioning}'s, tests pass their own. */
 export interface LocalVersioningDependencies {
-  readonly localBackend: () => LocalBackend | null
+  readonly localBackend: () => LocalVersioningBackend | null
   readonly modals: ModalsStore
   readonly toasts: ToastsStore
   readonly getText: ReturnType<typeof useText>['getText']
   readonly prompts: PersistedStore<RepositoryPromptsState>
   readonly pollIntervalMs?: number
+  readonly requestTimeoutMs?: number
 }
 
 interface WatchedProject {
@@ -52,19 +66,56 @@ interface WatchedProject {
   /** A refresh was asked for while one was in flight. */
   again: boolean
   stopped: boolean
+  /** The last read failed or timed out, and the failure was already logged. */
+  failing: boolean
 }
+
+const TIMED_OUT = Symbol('timed out')
 
 /** Create the store. The app uses the global one, {@link useLocalVersioning}. */
 export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   const pollIntervalMs = deps.pollIntervalMs ?? VERSIONING_POLL_INTERVAL_MS
+  const requestTimeoutMs = deps.requestTimeoutMs ?? VERSIONING_REQUEST_TIMEOUT_MS
   const statuses = shallowReactive(new Map<ProjectId, VersioningStatus>())
+  /** Projects whose status could not be read (failed or timed out): no status, not a stale one. */
+  const unknown = shallowReactive(new Set<ProjectId>())
   const watched = new Map<ProjectId, WatchedProject>()
+  /**
+   * The real request pending for each project, kept apart from the watch so that re-watching a
+   * project (close and reopen) still waits for it. It never rejects.
+   */
+  const pending = new Map<ProjectId, Promise<void>>()
   /** Repositories already offered to `enableVersioningIfInside` this session. */
   const offeredToShim = new Set<string>()
 
-  async function readStatus(projectId: ProjectId, project: WatchedProject) {
+  /** Wait for `promise`, at most {@link requestTimeoutMs}. */
+  async function withTimeout(promise: Promise<void>): Promise<void | typeof TIMED_OUT> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<typeof TIMED_OUT>((resolve) => {
+      timer = setTimeout(() => resolve(TIMED_OUT), requestTimeoutMs)
+    })
+    try {
+      return await Promise.race([promise, timeout])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  function markUnknown(projectId: ProjectId, project: WatchedProject, reason: unknown) {
+    if (project.stopped) return
+    statuses.delete(projectId)
+    unknown.add(projectId)
+    if (!project.failing) {
+      project.failing = true
+      console.warn(`Could not read the versioning status of '${project.path}':`, reason)
+    }
+  }
+
+  /** The real request: read (and maybe enable) and store the result. Never rejects. */
+  async function fetchAndStore(projectId: ProjectId, project: WatchedProject): Promise<void> {
     const backend = deps.localBackend()
     if (backend == null) return
+    let offered: string | undefined
     try {
       let status = await backend.versioningStatus(project.path)
       if (
@@ -74,17 +125,45 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
         !status.optedOut &&
         !offeredToShim.has(status.repoRoot)
       ) {
-        offeredToShim.add(status.repoRoot)
+        offered = status.repoRoot
+        offeredToShim.add(offered)
         const { enabled } = await backend.enableVersioningIfInside(
           status.repoRoot,
           backend.rootPath(),
         )
         if (enabled) status = await backend.versioningStatus(project.path)
       }
-      if (!project.stopped) statuses.set(projectId, status)
+      if (project.stopped) return
+      project.failing = false
+      unknown.delete(projectId)
+      statuses.set(projectId, status)
     } catch (error) {
-      console.warn(`Could not read the versioning status of '${project.path}':`, error)
+      // A transient failure must not suppress the offer for the session.
+      if (offered != null) offeredToShim.delete(offered)
+      markUnknown(projectId, project, error)
     }
+  }
+
+  /** One read: wait out an earlier pending request, then issue ours, waiting for it a while. */
+  async function readOnce(projectId: ProjectId, project: WatchedProject): Promise<boolean> {
+    const earlier = pending.get(projectId)
+    if (earlier != null) {
+      if ((await withTimeout(earlier)) === TIMED_OUT) {
+        markUnknown(projectId, project, new Error('the previous status request is still pending'))
+        return false
+      }
+      if (project.stopped) return false
+    }
+    const real = fetchAndStore(projectId, project)
+    pending.set(projectId, real)
+    void real.finally(() => {
+      if (pending.get(projectId) === real) pending.delete(projectId)
+    })
+    if ((await withTimeout(real)) === TIMED_OUT) {
+      markUnknown(projectId, project, new Error('the status request timed out'))
+      return false
+    }
+    return true
   }
 
   function refresh(projectId: ProjectId): Promise<void> {
@@ -100,7 +179,9 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       try {
         do {
           project.again = false
-          await readStatus(projectId, project)
+          // After a timeout the coalesced re-run is left to the next poll, which waits for the
+          // pending request: refresh() awaiters are released instead of kept waiting on it.
+          if (!(await readOnce(projectId, project))) break
         } while (project.again && !project.stopped)
       } finally {
         project.inFlight = undefined
@@ -121,6 +202,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       inFlight: undefined,
       again: false,
       stopped: false,
+      failing: false,
     })
     void refresh(projectId)
   }
@@ -132,17 +214,24 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     clearTimeout(project.timer)
     watched.delete(projectId)
     statuses.delete(projectId)
+    unknown.delete(projectId)
   }
 
+  /** The last status read, or `undefined` while none is known (see {@link isStatusUnknown}). */
   function statusOf(projectId: ProjectId) {
     return statuses.get(projectId)
+  }
+
+  /** Whether the last read failed or timed out, so the project's status is not known. */
+  function isStatusUnknown(projectId: ProjectId) {
+    return unknown.has(projectId)
   }
 
   function isVersioned(projectId: ProjectId) {
     return statuses.get(projectId)?.enabled === true
   }
 
-  return { watchProject, unwatchProject, refresh, statusOf, isVersioned }
+  return { watchProject, unwatchProject, refresh, statusOf, isStatusUnknown, isVersioned }
 }
 
 /** The store's type. */
