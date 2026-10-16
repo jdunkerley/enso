@@ -121,7 +121,14 @@ Out of scope:
   `ensoRunner.ts`, extracted to a shared helper), never through a shell, with
   `-C <repoRoot>`, `GIT_TERMINAL_PROMPT=0`, and `core.quotepath=false`.
 - **One queue per repository**: every git call for a repository runs after the
-  previous one finishes, so the IDE never races itself for `index.lock`.
+  previous one finishes, and each operation (a commit is several calls) holds a
+  per-repository lock from its first call to its last, so the IDE never races
+  itself for `index.lock` and operations never interleave. Only a git that was
+  found is cached, so installing git needs no restart.
+- **Isolation from the user's git:** `GIT_OPTIONAL_LOCKS=0` (`status` never
+  takes the index lock), inherited `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE`
+  and similar variables are dropped, and the IDE's commits and notes run no
+  hooks (`--no-verify`, `core.hooksPath` at the null device) and are not signed.
 - **Author:** the user's own git identity. If `git var GIT_AUTHOR_IDENT` fails
   (no identity configured), that one commit is made with
   `-c user.name=Enso -c user.email=noreply@enso.org`. The user's git config is
@@ -174,7 +181,8 @@ All take a project path (or the root path) and return JSON-RPC results like
 - **Rename and move** (the shim's own `rename-project-directory` hook and
   `filesystem-move`): when both the old and the new path are in the same
   repository, the commit covers both paths, so the old path's removal is not
-  left uncommitted.
+  left uncommitted. It carries an `Enso-Moved-From: <old path>` trailer
+  (repository-relative) so PR 5 can follow the history across the move.
 
 ## PR 4: saving in the GUI
 
@@ -250,6 +258,9 @@ it merges.
   `VersionTag`, the tag suggestions query) are hidden for local versions.
 - **Restore of an open project:** close it (committing "Saved on close"),
   restore, reopen it.
+- **History across renames and moves:** `log` follows `Enso-Moved-From` trailers
+  so a renamed or moved project keeps its earlier versions
+  (fileAt/restore/exportAt use the path at each version).
 - Folders and files in the local drive still show "local assets do not have
   versions" (the text is reworded to say only projects have them).
 
@@ -288,3 +299,6 @@ Versions tab, and `LocalBackend`; this spec marked implemented.
   commit then records what is on disk.
 - **Git notes are not pushed by default**: edited comments stay local unless the
   user pushes `refs/notes/enso`.
+- **Deleting a project, or moving a folder that contains projects, is not
+  committed** (out of scope): the removal stays uncommitted in the repository
+  and shows in the user's `git status` until they commit it themselves.

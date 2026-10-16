@@ -82,79 +82,129 @@ Rules worth keeping:
 
 ## Local versioning (`src/localVersioning/`)
 
-`LocalVersioning` stores snapshots of local projects as git commits. Projects
-versioned inside the same repository can share the same git history, with each
-commit scoped to its own paths only — changes to project A are never recorded
-with project B's. All git calls for a repository are serialized through
-`runGit(queueKey: repoRoot)`, so commits are FIFO-sequenced and never race on
-index.lock.
+`LocalVersioning` stores snapshots of local projects as git commits, using the
+user's own git CLI. Projects inside the same repository share its history, but
+every commit is scoped to its own paths — changes to project A are never
+recorded with project B's, and a change the user staged by hand elsewhere is
+neither committed nor unstaged.
 
 ### Module and routes
 
-- `src/localVersioning/index.ts`: `LocalVersioning` class with methods `status`,
-  `init`, `commit`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`,
-  `commitMove`, and helper `repositoryOf`.
+- `src/localVersioning/index.ts`: `LocalVersioning` with `status`, `init`,
+  `commit`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`, `commitMove`,
+  and the lookup `repositoryOf`.
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
   `identityArgs` (see _Identity fallback_ below).
 - Routes (POST to `/api/project-service/versioning/*`): `status`, `init`,
   `commit`, `log`, `file-at`, `restore`, `duplicate-at`, `set-comment`. See
-  `handler/projectService.ts` for request/response shapes.
+  `handler/projectService.ts` for request/response shapes. `commit` with an
+  empty or whitespace-only `message` saves as `Saved`. The `restore` route (not
+  `LocalVersioning.restore`) refuses a running project.
 
-### Serial queue
+### Serialisation: an operation lock and a call queue
 
-All git calls for a repository go through
-`runGit(command, args, {queueKey: repoRoot})`. Each repository has its own
-queue; calls are processed FIFO, so no race on `index.lock` within one repo.
-Queues drain themselves (entries are cleaned when they complete); a failing call
-does not block later ones.
+- **Operation lock.** Each public operation (`status`, `commit`, `log`,
+  `fileAt`, `setComment`, `restore`, `exportAt`, `commitMove`) holds its
+  repository's lock from its first git call to its last, so a commit's several
+  calls, and the `rev-parse HEAD` that gives its id, never interleave with
+  another operation; reads take it too, for a consistent snapshot. The lock is
+  keyed by the repository's real path and shared by all instances. Operations
+  call only the unlocked `…In` helpers (`restore` → `commitIn`, `setComment` →
+  `logIn`), never a public method, so they cannot wait on themselves. A failing
+  operation releases the lock.
+- **Call queue.** Every git call also goes through
+  `runGit(cwd, args, { queueKey: repoRoot })`, which runs one call per
+  repository at a time, FIFO. Queues drain themselves; a failing call does not
+  block later ones.
+
+Both only order the IDE's own calls. The user's git, run at the same time, can
+still hit `index.lock`; such a failure is reported (`blocked`, or a rejected
+commit), never retried silently.
+
+### How git is run
+
+`runGit` adds `-c core.quotepath=false`, `GIT_TERMINAL_PROMPT=0` and
+`GIT_OPTIONAL_LOCKS=0` (read-only commands such as `status` must not take the
+index lock just to refresh it; commands that change the index take it anyway),
+and drops inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
+`GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES`, `GIT_COMMON_DIR`,
+`GIT_NAMESPACE` and `GIT_PREFIX` (a caller's own `env`, such as `exportAt`'s
+`GIT_INDEX_FILE`, still applies). `findGit` caches only a git it found, so
+installing git while the IDE runs needs no restart.
+
+### Version ids
+
+`fileAt`, `setComment`, `restore` and `exportAt` accept only a full commit hash
+(40 or 64 lowercase hex digits), so nothing from a caller can reach git as an
+option (`--output=…`) or a revision expression (`HEAD~1`); abbreviated ids are
+rejected. `setComment`, `restore` and `exportAt` also check the id is in the
+project's own `log`.
 
 ### Identity fallback
 
-`identityArgs` tries `git var GIT_AUTHOR_IDENT`. If unavailable (a minimal git
-config or env override), it falls back to a hardcoded identity
-(`Enso IDE <noreply@enso.org>`). Commits and notes always have an author.
+`identityArgs` tries `git var GIT_AUTHOR_IDENT`. If git has no identity (a
+minimal config), commits and notes use `-c` overrides for
+`Enso <noreply@enso.org>`; nothing is written to the user's config.
 
 ### Ignore lines
 
-Versioning appends two lines to `.gitignore`:
+`init` appends two lines to the root `.gitignore`, unless a `**/.enso/` line is
+already there (then the file is left alone, even without `*.bak`):
 
-- `**/.enso/` — the IDE-generated project metadata (id, GUI settings)
-- `*.bak` — backup files from restore Unless a `**/.enso/` line already exists
-  (in which case `.gitignore` is left alone, even if `*.bak` is missing). The
-  lines are added only when `init` is called; a repository's `.gitignore` is
-  otherwise never touched. **The `.enso/` folder is excluded from all commits
-  independently of `.gitignore`**, via pathspec, so a project can track `.enso/`
-  if needed — it will not be versioned.
+- `**/.enso/` — the IDE-generated project metadata (id, GUI settings).
+- `*.bak` — editor and backup files, ignored by convention.
+
+A repository's `.gitignore` is otherwise never touched. **The `.enso/` folder is
+excluded from every commit independently of `.gitignore`**, via pathspec, so it
+is never versioned even in a repository that tracks it.
 
 ### Notes reference
 
-Comments on versions are stored as git notes under `refs/notes/enso`. Each
-commit can have one note; `setComment` overwrites any existing note. Notes are
-never signed, even if the user's git config signs commits (via
-`-c commit.gpgsign=false`).
+Comments on versions are git notes under `refs/notes/enso`. Each commit has at
+most one; `setComment` overwrites it. `log` shows the note, else the commit
+message without any `Enso-Moved-From` trailer.
 
-### Close hook ordering
+### Close hook and moves
 
 `ProjectService.openProject` registers a `'version-on-close'` shutdown hook
-**before any other hook** (e.g. rename). It commits the project as
-`Saved on close` if there are changes; a failure is logged and returned as
-`versioningWarning` on the `closeProject` result, but the close still succeeds.
+before any rename hook, so a project is saved before its directory moves. The
+runner runs shutdown hooks in registration order, and `remove-from-list` is
+registered first (when the engine starts), so the project is no longer listed as
+running while its close commit is made. The hook commits the project as
+`Saved on close` if it changed; a failure is logged and returned as
+`versioningWarning` on the `closeProject` result, and the close still succeeds.
+
+A rename (`renameProject`) or a filesystem move of a project directory commits
+both paths together (`commitMove`), with an `Enso-Moved-From: <old path>`
+trailer (repository-relative) so the earlier history can be followed (PR 5).
 
 ### Timeouts and robustness
 
-- Callers that block (the close hook, `commitMove` on rename/move) bound their
-  git call with `withinVersioningTimeout(15 s)`. If the timeout fires,
-  `VERSIONING_TIMEOUT_MESSAGE` is raised, but **the git process keeps running**
-  (it is not killed). Killing mid-commit can leave `index.lock`, blocking future
-  operations, so a stuck process is preferred.
-- Every commit and note passes `--no-verify` (bypasses user hooks) and
-  `-c commit.gpgsign=false` (bypasses signing), so versioning never hangs on
-  user configuration.
+- The close hook and `commitMove` bound **all** their git work — the repository
+  lookups included — with `withinVersioningTimeout` (15 s), then give up with
+  `VERSIONING_TIMEOUT_MESSAGE`. **The git process is not killed** (killing it
+  mid-commit can leave `index.lock`): it runs on, and its operation keeps the
+  repository's lock until it ends, so later operations on that repository wait
+  for it. That is the accepted cost.
+- IDE commits and notes are automatic snapshots, so the user's configuration for
+  hand-written commits never applies: `--no-verify` (skips `pre-commit` and
+  `commit-msg`), `-c core.hooksPath=<null device>` (no hook at all runs,
+  `post-commit` and auto-push hooks included) and `-c commit.gpgsign=false` (no
+  signing prompt).
+- A merge, rebase, cherry-pick, revert or bisect in progress blocks versioning
+  (`blocked` in `status`; `commit` rejects). One `git rev-parse --git-path …`
+  call finds every state's file.
 - `commit` skips paths with nothing tracked (no `HEAD`, not staged) and no
   changes on disk.
+- `exportAt` creates the target's parent if needed and claims the target with a
+  non-recursive `mkdir` (an existing directory is rejected, never used or
+  removed).
 
-### Known limitation
+### Known limitations
 
-Moving a project out of its repository (or to another repository) leaves the old
-path's removal uncommitted. A future enhancement would detect this and make one
-final commit at the old path before moving.
+- Moving a project out of its repository (or to another repository) leaves the
+  old path's removal uncommitted.
+- Deleting a project, or moving a folder that contains projects, leaves the
+  removal uncommitted too; it shows in the user's `git status`.
+- `log` does not yet follow `Enso-Moved-From`, so a renamed project lists only
+  its versions since the rename (PR 5).
