@@ -51,11 +51,6 @@ The license file can be found at `licenses/APACHE2.0`.
 Copyright notices related to this dependency can be found in the directory `com.google.flatbuffers.flatbuffers-java-24.3.25`.
 
 
-'JavaEWAH', licensed under the Apache 2, is distributed with the engine.
-The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `com.googlecode.javaewah.JavaEWAH-1.2.3`.
-
-
 'icu4j', licensed under the Unicode/ICU License, is distributed with the engine.
 The license information can be found along with the copyright notices.
 Copyright notices related to this dependency can be found in the directory `com.ibm.icu.icu4j-73.2`.
@@ -129,11 +124,6 @@ Copyright notices related to this dependency can be found in the directory `com.
 'commons-cli', licensed under the Apache License, Version 2.0, is distributed with the engine.
 The license file can be found at `licenses/APACHE2.0`.
 Copyright notices related to this dependency can be found in the directory `commons-cli.commons-cli-1.5.0`.
-
-
-'commons-codec', licensed under the Apache-2.0, is distributed with the engine.
-The license file can be found at `licenses/APACHE2.0`.
-Copyright notices related to this dependency can be found in the directory `commons-codec.commons-codec-1.22.1`.
 
 
 'commons-io', licensed under the Apache-2.0, is distributed with the engine.
@@ -419,11 +409,6 @@ Copyright notices related to this dependency can be found in the directory `org.
 'bcutil-jdk18on', licensed under the Bouncy Castle Licence, is distributed with the engine.
 The license file can be found at `licenses/Bouncy_Castle_Licence.txt`.
 Copyright notices related to this dependency can be found in the directory `org.bouncycastle.bcutil-jdk18on-1.86`.
-
-
-'org.eclipse.jgit', licensed under the BSD-3-Clause, is distributed with the engine.
-The license file can be found at `licenses/BSD-3-Clause`.
-Copyright notices related to this dependency can be found in the directory `org.eclipse.jgit.org.eclipse.jgit-7.8.0.202609011348-r`.
 
 
 'js-language', licensed under the MIT License, is distributed with the engine.

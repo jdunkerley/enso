@@ -494,7 +494,6 @@ lazy val componentModulesPaths =
       "commons-cli"            % "commons-cli"                  % commonsCliVersion,
       "commons-io"             % "commons-io"                   % commonsIoVersion,
       "org.yaml"               % "snakeyaml"                    % snakeyamlVersion,
-      "org.eclipse.jgit"       % "org.eclipse.jgit"             % jgitVersion,
       "com.typesafe"           % "config"                       % typesafeConfigVersion,
       "org.reactivestreams"    % "reactive-streams"             % reactiveStreamsVersion,
       "org.apache.commons"     % "commons-lang3"                % commonsLangVersion,
@@ -2178,7 +2177,6 @@ lazy val `language-server` = (project in file("engine/language-server"))
       "org.graalvm.truffle" % "truffle-api"             % graalMavenPackagesVersion % "provided",
       "org.graalvm.sdk"     % "polyglot-tck"            % graalMavenPackagesVersion % "provided",
       "org.netbeans.api"    % "org-openide-util-lookup" % netbeansApiVersion        % "provided",
-      "org.eclipse.jgit"    % "org.eclipse.jgit"        % jgitVersion,
       "org.apache.tika"     % "tika-core"               % tikaVersion               % Test
     ),
     javaModuleName := "org.enso.language.server",
@@ -2193,7 +2191,6 @@ lazy val `language-server` = (project in file("engine/language-server"))
       "commons-cli"            % "commons-cli"             % commonsCliVersion,
       "commons-io"             % "commons-io"              % commonsIoVersion,
       "com.google.flatbuffers" % "flatbuffers-java"        % flatbuffersVersion,
-      "org.eclipse.jgit"       % "org.eclipse.jgit"        % jgitVersion,
       "org.netbeans.api"       % "org-openide-util-lookup" % netbeansApiVersion
     ),
     Compile / internalModuleDependencies :=
@@ -3970,7 +3967,6 @@ lazy val `engine-runner` = project
               "org.enso.table",
               "org.enso.database",
               "org.enso.tableau",
-              "org.eclipse.jgit",
               "com.google",
               "io.grpc",
               "io.netty.util.concurrent.AbstractScheduledEventExecutor",

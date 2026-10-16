@@ -13,9 +13,7 @@ import org.enso.languageserver.event.{
 import org.enso.languageserver.filemanager.{
   FileAttributes,
   FileEvent,
-  FileEventKinds,
   FileManagerProtocol,
-  FileNotFound,
   GenericFileSystemFailure,
   OperationTimeout,
   Path
@@ -23,11 +21,7 @@ import org.enso.languageserver.filemanager.{
 import org.enso.languageserver.session.JsonSession
 import org.enso.languageserver.text.CollaborativeBuffer.{
   AutoSave,
-  ForceSave,
   IOTimeout,
-  ReloadBuffer,
-  ReloadBufferFailed,
-  ReloadedBuffer,
   ServerConfirmationTimeout
 }
 import org.enso.languageserver.text.TextProtocol._
@@ -319,45 +313,6 @@ class CollaborativeBuffer(
         )
       }
 
-    case ForceSave(clientId) =>
-      autoSave.get(clientId) match {
-        case Some((contentVersion, cancellable)) =>
-          cancellable.cancel()
-          saveFile(
-            buffer,
-            clients,
-            lockHolder,
-            clientId,
-            contentVersion,
-            autoSave.removed(clientId),
-            isAutoSave     = true,
-            onClose        = None,
-            reportProgress = Some(sender())
-          )
-        case None =>
-          sender() ! FileSaved
-      }
-
-    case ReloadBuffer(rpcSession, path) =>
-      if (buffer.inMemory) {
-        fileManager ! FileManagerProtocol.OpenBuffer(path)
-      } else {
-        fileManager ! FileManagerProtocol.ReadFileWithAttributes(path)
-      }
-      val timeoutCancellable = context.system.scheduler
-        .scheduleOnce(timingsConfig.requestTimeout, self, IOTimeout)
-      context.become(
-        waitingOnReloadedContent(
-          sender(),
-          rpcSession,
-          path,
-          buffer,
-          timeoutCancellable,
-          clients,
-          buffer.inMemory
-        )
-      )
-
     case FileEvent(path, _, attributes) =>
       attributes match {
         case Right(attrs) =>
@@ -392,95 +347,6 @@ class CollaborativeBuffer(
 
     case ReadCollaborativeBuffer(_) =>
       sender() ! ReadCollaborativeBufferResult(Some(buffer))
-  }
-
-  private def waitingOnReloadedContent(
-    replyTo: ActorRef,
-    rpcSession: JsonSession,
-    path: Path,
-    oldBuffer: Buffer,
-    timeoutCancellable: Cancellable,
-    clients: Map[ClientId, JsonSession],
-    inMemoryBuffer: Boolean
-  ): Receive = {
-    case FileManagerProtocol.ReadFileWithAttributesResult(
-          Right((file, attrs))
-        ) =>
-      timeoutCancellable.cancel()
-      val buffer = Buffer(file.path, file.content, inMemoryBuffer)
-        .withLastModifiedTime(attrs.lastModifiedTime)
-
-      // Notify *all* clients about the new buffer
-      // This also ensures that the client that requested the restore operation
-      // also gets a notification.
-      val edits = List(TextEdit(oldBuffer.fullRange, file.content))
-      val change = FileEdit(
-        path,
-        edits,
-        oldBuffer.version.toHexString,
-        buffer.version.toHexString
-      )
-      runtimeConnector ! Api.Request(
-        Api.EditFileNotification(file.path, edits, execute = true, None)
-      )
-      clients.values.foreach { _.rpcController ! TextDidChange(List(change)) }
-      unstashAll()
-      replyTo ! ReloadedBuffer(path)
-      context.become(
-        collaborativeEditing(
-          buffer,
-          clients,
-          lockHolder = Some(rpcSession),
-          Map.empty
-        )
-      )
-
-    case FileManagerProtocol.ReadFileWithAttributesResult(Left(FileNotFound)) =>
-      clients.values.foreach {
-        _.rpcController ! TextProtocol.FileEvent(
-          path,
-          FileEventKinds.Removed,
-          None
-        )
-      }
-      replyTo ! ReloadedBuffer(path)
-      timeoutCancellable.cancel()
-      stop(Map.empty)
-
-    case FileManagerProtocol.ReadFileWithAttributesResult(Left(err)) =>
-      replyTo ! ReloadBufferFailed(path, "io failure: " + err.toString)
-      timeoutCancellable.cancel()
-      context.become(
-        collaborativeEditing(
-          oldBuffer,
-          clients,
-          lockHolder = Some(rpcSession),
-          Map.empty
-        )
-      )
-
-    case Status.Failure(ex) =>
-      logger.error(
-        s"Waiting for file content for [${rpcSession.clientId}] failed with: ${ex.getMessage}.",
-        ex
-      )
-      replyTo ! ReloadBufferFailed(path, "io failure: " + ex.toString)
-      timeoutCancellable.cancel()
-      stop(Map.empty)
-
-    case IOTimeout =>
-      logger.warn("Timeout reached when awaiting file's content reloading")
-      replyTo ! ReloadBufferFailed(path, "io timeout")
-      context.become(
-        collaborativeEditing(
-          oldBuffer,
-          clients,
-          lockHolder = Some(rpcSession),
-          Map.empty
-        )
-      )
-
-    case _ => stash()
   }
 
   private def saving(
@@ -1038,14 +904,6 @@ object CollaborativeBuffer {
     clientId: ClientId,
     clientVersion: ContentVersion
   )
-
-  case class ForceSave(clientId: ClientId)
-
-  case class ReloadBuffer(rpcSession: JsonSession, path: Path)
-
-  case class ReloadBufferFailed(path: Path, reason: String)
-
-  case class ReloadedBuffer(path: Path)
 
   /** Creates a configuration object used to create a [[CollaborativeBuffer]]
     *
