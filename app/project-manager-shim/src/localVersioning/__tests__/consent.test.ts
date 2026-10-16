@@ -91,3 +91,49 @@ describe('VersioningConsent', () => {
     expect((await fs.readdir(path.dirname(file()))).some((n) => n.includes('.newer-'))).toBe(true)
   })
 })
+
+describe('opting out', () => {
+  test('disable records an opt-out, which enable clears', async () => {
+    const repo = path.join(dir, 'repo')
+    expect(await store().isOptedOut(repo)).toBe(false)
+    await store().enable(repo)
+    await store().disable(repo)
+    expect(await store().isEnabled(repo)).toBe(false)
+    expect(await store().isOptedOut(repo)).toBe(true)
+    const json = JSON.parse(await fs.readFile(file(), 'utf8'))
+    expect(json).toMatchObject({ version: 1, enabledRepositories: [] })
+    expect(json.disabledRepositories).toHaveLength(1)
+    await store().enable(repo)
+    expect(await store().isEnabled(repo)).toBe(true)
+    expect(await store().isOptedOut(repo)).toBe(false)
+  })
+
+  test('disabling a repository that was never enabled still records the opt-out', async () => {
+    const repo = path.join(dir, 'repo')
+    await store().disable(repo)
+    expect(await store().isOptedOut(repo)).toBe(true)
+  })
+
+  test('a file written before opt-outs existed still loads', async () => {
+    const repo = path.join(dir, 'repo')
+    await store().enable(repo)
+    const json = JSON.parse(await fs.readFile(file(), 'utf8'))
+    await fs.writeFile(
+      file(),
+      JSON.stringify({ version: 1, enabledRepositories: json.enabledRepositories }),
+    )
+    expect(await store().isEnabled(repo)).toBe(true)
+    expect(await store().isOptedOut(repo)).toBe(false)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  test('a disabledRepositories that is not a list of strings is a file of the wrong shape', async () => {
+    await fs.mkdir(path.join(dir, 'userData'), { recursive: true })
+    await fs.writeFile(
+      file(),
+      JSON.stringify({ version: 1, enabledRepositories: [], disabledRepositories: [3] }),
+    )
+    expect(await store().isOptedOut(path.join(dir, 'repo'))).toBe(false)
+    expect(warn).toHaveBeenCalled()
+  })
+})

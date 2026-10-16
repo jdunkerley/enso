@@ -192,9 +192,31 @@ describe('versioning routes', () => {
         expect(await status()).toBe(true)
         expect((await call('versioning/disable', { repoRoot: repo })).result).toBeNull()
         expect(await status()).toBe(false)
+        expect((await call('versioning/status', { path: project })).result).toMatchObject({
+          optedOut: true,
+        })
       },
       { init: true },
     )
+  })
+
+  test('enable-if-inside enables a repository at the root, and needs both paths', async () => {
+    await withTempRepo(
+      async (repo) => {
+        const project = await createProject(path.join(repo, 'P'), 'id-1')
+        expect(
+          (await call('versioning/enable-if-inside', { repoRoot: repo, rootPath: repo })).result,
+        ).toEqual({ enabled: true })
+        expect((await call('versioning/status', { path: project })).result).toMatchObject({
+          enabled: true,
+          optedOut: false,
+        })
+      },
+      { init: true },
+    )
+    expect((await call('versioning/enable-if-inside', { repoRoot: 'x' })).error).toMatchObject({
+      message: expect.stringContaining("'rootPath' must be a string."),
+    })
   })
 
   test('enable and disable need a repoRoot, and enable needs a repository', async () => {

@@ -36,6 +36,7 @@ describe('ProjectManager versioning methods', () => {
       lastVersion: { id: 'a'.repeat(40), date: '2026-10-16T00:00:00Z' },
       blocked: null,
       enabled: true,
+      optedOut: false,
     }
     nextResult = status
     expect(await manager().versioningStatus(project)).toEqual(status)
@@ -121,6 +122,19 @@ describe('ProjectManager versioning methods', () => {
       {
         url: '/api/project-service/versioning/set-comment',
         body: { path: project, id: 'abc', comment: 'hello' },
+      },
+    ])
+  })
+
+  it('enableVersioningIfInside', async () => {
+    nextResult = { enabled: true }
+    expect(await manager().enableVersioningIfInside(Path('/root'), Path('/root'))).toEqual({
+      enabled: true,
+    })
+    expect(calls).toEqual([
+      {
+        url: '/api/project-service/versioning/enable-if-inside',
+        body: { repoRoot: '/root', rootPath: '/root' },
       },
     ])
   })

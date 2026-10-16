@@ -60,6 +60,7 @@ describe('status', () => {
         changed: false,
         lastVersion: null,
         blocked: null,
+        optedOut: false,
         enabled: false,
       })
     })
@@ -73,6 +74,7 @@ describe('status', () => {
         changed: false,
         lastVersion: null,
         blocked: null,
+        optedOut: false,
         enabled: false,
       })
     })
@@ -886,6 +888,84 @@ describe('consent', () => {
       await git(nested, 'init')
       expect((await versioning.status(nested)).enabled).toBe(false)
       expect((await versioning.status(a)).enabled).toBe(true)
+    })
+  })
+})
+
+describe('enableIfInside', () => {
+  test('enables a repository at the projects root', async () => {
+    await withProjects(async (root, versioning) => {
+      await git(root, 'init', '-b', 'main')
+      expect(await versioning.enableIfInside(root, root)).toEqual({ enabled: true })
+      expect((await versioning.status(path.join(root, 'A'))).enabled).toBe(true)
+    })
+  })
+
+  test('enables a repository inside the projects root', async () => {
+    await withTempRepo(async (dir) => {
+      const team = path.join(dir, 'projects', 'team')
+      await writeFiles(team, project('A'))
+      await git(team, 'init', '-b', 'main')
+      const versioning = versioningFor(dir)
+      expect(await versioning.enableIfInside(team, path.join(dir, 'projects'))).toEqual({
+        enabled: true,
+      })
+      expect((await versioning.status(path.join(team, 'A'))).enabled).toBe(true)
+    })
+  })
+
+  test('leaves a repository above the projects root alone', async () => {
+    await withProjects(async (root, versioning) => {
+      await git(root, 'init', '-b', 'main')
+      await fs.mkdir(path.join(root, 'projects'))
+      expect(await versioning.enableIfInside(root, path.join(root, 'projects'))).toEqual({
+        enabled: false,
+      })
+      expect((await versioning.status(path.join(root, 'A'))).enabled).toBe(false)
+    })
+  })
+
+  test('a sibling whose name starts with the root’s is not inside it', async () => {
+    await withTempRepo(async (dir) => {
+      const sibling = path.join(dir, 'projects-old')
+      await writeFiles(sibling, project('A'))
+      await git(sibling, 'init', '-b', 'main')
+      await fs.mkdir(path.join(dir, 'projects'))
+      expect(await versioningFor(dir).enableIfInside(sibling, path.join(dir, 'projects'))).toEqual({
+        enabled: false,
+      })
+    })
+  })
+
+  test('compares real paths: a root reached through a junction (OneDrive)', async () => {
+    await withProjects(async (root, versioning) => {
+      await git(root, 'init', '-b', 'main')
+      const link = path.join(path.dirname(root), 'linked-root')
+      // 'junction' needs no privileges on Windows; elsewhere the type is ignored.
+      await fs.symlink(root, link, 'junction')
+      expect(await versioning.enableIfInside(root, link)).toEqual({ enabled: true })
+    })
+  })
+
+  test('never re-enables a repository the user turned off; an explicit enable does', async () => {
+    await withRepo(async (root, versioning) => {
+      await versioning.disable(root)
+      expect(await versioning.enableIfInside(root, root)).toEqual({ enabled: false })
+      const status = await versioning.status(path.join(root, 'A'))
+      expect(status).toMatchObject({ enabled: false, optedOut: true })
+      await versioning.enable(root)
+      expect(await versioning.status(path.join(root, 'A'))).toMatchObject({
+        enabled: true,
+        optedOut: false,
+      })
+    })
+  })
+
+  test('an already enabled repository stays enabled wherever the root is', async () => {
+    await withRepo(async (root, versioning) => {
+      expect(await versioning.enableIfInside(root, path.join(root, 'elsewhere'))).toEqual({
+        enabled: true,
+      })
     })
   })
 })

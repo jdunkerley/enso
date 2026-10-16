@@ -284,6 +284,8 @@ export interface VersioningStatus {
    * repository until it is enabled (see `ProjectManager.enableVersioning`).
    */
   readonly enabled: boolean
+  /** The user turned versioning off for this repository; it is enabled again only explicitly. */
+  readonly optedOut: boolean
 }
 
 /** A saved version of a local project. */
