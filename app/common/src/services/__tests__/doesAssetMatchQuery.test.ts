@@ -28,12 +28,13 @@ describe('doesAssetMatchQuery: labels', () => {
   const matches = (labels: readonly string[] | null) =>
     backend.doesAssetMatchQuery({ ...QUERY, labels: labels?.map(backend.LabelName) ?? null })
 
-  test('an asset carrying any of the labels matches', () => {
+  test('an asset carrying all of the labels matches', () => {
     expect(matches(['a'])(asset(['a', 'b']))).toBe(true)
-    expect(matches(['x', 'b'])(asset(['a', 'b']))).toBe(true)
+    expect(matches(['b', 'a'])(asset(['a', 'b', 'c']))).toBe(true)
   })
 
-  test('an asset carrying none of them does not', () => {
+  test('an asset missing any of them does not', () => {
+    expect(matches(['x', 'b'])(asset(['a', 'b']))).toBe(false)
     expect(matches(['x'])(asset(['a']))).toBe(false)
     expect(matches(['x'])(asset())).toBe(false)
   })

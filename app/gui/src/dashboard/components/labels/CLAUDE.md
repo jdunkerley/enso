@@ -43,9 +43,10 @@ from `src/cloud/labels/` when local projects gained labels (spec
 - Locally, labels are stored by the project-manager shim (`localMetadata`, see
   `app/project-manager-shim/CLAUDE.md`): definitions in
   `<userData>/labels.json`, names in each project's `.enso/project.json`.
-  Filtering by labels keeps the assets carrying **any** of them
-  (`LocalBackend.listDirectory`, `doesAssetMatchQuery`); the cloud's rule is the
-  server's and is not visible from this repository.
+  Filtering by labels keeps the assets carrying **all** of them
+  (`LocalBackend.listDirectory`, `doesAssetMatchQuery`); an "any" filter is left
+  for when the search bar is revisited. The cloud's rule is the server's and is
+  not visible from this repository.
 - Its behaviour was settled in #207 ("Rulings from #207"): the popover from the
   context menu opens under the row, "Next color" works, Enter in the search does
   nothing, the pills show the assets' labels, and each change builds on the

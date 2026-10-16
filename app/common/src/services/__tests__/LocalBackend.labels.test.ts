@@ -173,17 +173,17 @@ describe('listDirectory', () => {
     expect(byTitle.get('data.csv')?.labels).toBeUndefined()
   })
 
-  test('keeps the assets carrying any of the requested labels', async () => {
+  test('keeps the assets carrying all of the requested labels', async () => {
     projectManager.listDirectory.mockResolvedValue([
       project('A', ['a']),
-      project('B', ['b', 'c']),
-      project('C', ['c']),
+      project('B', ['a', 'b', 'c']),
+      project('C', ['b', 'a']),
       project('D'),
       directory,
       file,
     ])
     const { assets } = await list(['a', 'b'])
-    expect(assets.map((asset) => asset.title).sort()).toEqual(['A', 'B'])
+    expect(assets.map((asset) => asset.title).sort()).toEqual(['B', 'C'])
   })
 
   test('no requested labels filter nothing', async () => {

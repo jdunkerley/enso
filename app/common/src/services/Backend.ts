@@ -1592,7 +1592,7 @@ export function doesAssetMatchQuery(query: SearchDirectoryRequestParams) {
     ) {
       return false
     }
-    if (labels != null && !labels.some((label) => asset.labels?.includes(label) === true)) {
+    if (labels != null && !labels.every((label) => asset.labels?.includes(label) === true)) {
       return false
     }
     return true

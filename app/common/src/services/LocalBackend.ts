@@ -73,12 +73,12 @@ export function newFileId(path: Path) {
 }
 
 /**
- * Whether an asset carries at least one of the labels. The cloud's rule (all or any) for its
- * `label` parameters is not documented, so the local backend uses "any", as `doesAssetMatchQuery`
- * does.
+ * Whether an asset carries every one of the labels, as `doesAssetMatchQuery` requires. An "any"
+ * filter is left for when the search bar is revisited.
  */
-function assetHasAnyLabel(labels: readonly backend.LabelName[]) {
-  return (asset: backend.AnyAsset) => labels.some((label) => asset.labels?.includes(label) === true)
+function assetHasAllLabels(labels: readonly backend.LabelName[]) {
+  return (asset: backend.AnyAsset) =>
+    labels.every((label) => asset.labels?.includes(label) === true)
 }
 
 /**
@@ -232,7 +232,7 @@ export class LocalBackend extends backend.Backend {
       }
     }
     if (query.labels != null && query.labels.length !== 0) {
-      result = result.filter(assetHasAnyLabel(query.labels))
+      result = result.filter(assetHasAllLabels(query.labels))
     }
     result.sort((a, b) => backend.compareAssets(a, b, query.sortExpression, query.sortDirection))
     const from = query.from as backend.AssetId | null

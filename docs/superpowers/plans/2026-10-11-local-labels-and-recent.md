@@ -453,9 +453,9 @@ on the same base in parallel, so edits to `LocalBackend.ts`, `localApi.ts` and
    not in this repository, the cloud Playwright mock ignores the parameter, and
    the one label-filter spec (`assetSearchBar.spec.ts`, "labels") is skipped.
    The cloud's semantics therefore **cannot be determined** here. The task's
-   fallback applies: **"any"**. An asset matches when it carries at least one of
-   the requested labels. Recorded in the PR. An empty or null `labels` filters
-   nothing.
+   fallback applied: "any". At sign-off the user chose **"all"**: an asset
+   matches when it carries every requested label; an "any" filter waits for the
+   search bar to be revisited. An empty or null `labels` filters nothing.
 2. **Where `labelsQueryOptions` goes.** The spec moves it with the labels code
    to `src/dashboard/components/labels/`, and says the cloud imports it from
    there. But the cloud's Properties tab
@@ -489,7 +489,7 @@ on the same base in parallel, so edits to `LocalBackend.ts`, `localApi.ts` and
 
 | File                                                                                                  | Change                                                                                                                                            |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `app/common/src/services/Backend.ts`                                                                  | abstract `supportsLabels`; `supportsAnyLabels`; `doesAssetMatchQuery` matches `labels` (any).                                                     |
+| `app/common/src/services/Backend.ts`                                                                  | abstract `supportsLabels`; `supportsAnyLabels`; `doesAssetMatchQuery` matches `labels` (all).                                                     |
 | `app/common/src/services/RemoteBackend.ts`                                                            | `supportsLabels` returns `true`.                                                                                                                  |
 | `app/common/src/services/LocalBackend.ts`                                                             | `supportsLabels`; tag methods over the client; `labels` on project assets; `query.labels` filter.                                                 |
 | `app/common/src/services/__tests__/LocalBackend.labels.test.ts`                                       | **new.**                                                                                                                                          |
@@ -576,8 +576,9 @@ export function getColumnList(
     rejects one without and one with no `labels`.
 - [ ] Implement: in the `ProjectEntry` case add
       `labels: entry.metadata.labels ?? []`; after the entries are built, a
-      separate label filter (before the sort); in `doesAssetMatchQuery` an "any"
-      check. Pass; commit.
+      separate label filter (before the sort); in `doesAssetMatchQuery` an "all"
+      check (first written as "any"; the user chose "all" at sign-off). Pass;
+      commit.
 
 ### Task 3: invalidation pin
 
