@@ -44,6 +44,7 @@ import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from '.
 import { capitalizeFirstLetter } from './naming.js'
 import {
   getLocalMetadata,
+  getLocalVersioning,
   handleProjectProtocol,
   setupProjectService,
   version,
@@ -341,7 +342,12 @@ class App {
       port: args.server.port,
     })
     const projectService = this.createProjectService(args)
-    this.server = await Server.create(serverCfg, projectService, getLocalMetadata())
+    this.server = await Server.create(
+      serverCfg,
+      projectService,
+      getLocalMetadata(),
+      getLocalVersioning(),
+    )
     console.log('Content server started.')
   }
 

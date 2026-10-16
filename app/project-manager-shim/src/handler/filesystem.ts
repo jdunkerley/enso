@@ -16,6 +16,7 @@ import {
   readPackageLabels,
   readProjectLabels,
 } from '../localMetadata/packageYaml.js'
+import type { LocalVersioning } from '../localVersioning/index.js'
 import * as projectManagement from '../projectManagement.js'
 import { resolveClashingProjectIds } from '../projectService/resolveClashingProjectIds.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
@@ -196,16 +197,41 @@ async function followInLocalMetadata(update: (() => Promise<void>) | undefined):
   }
 }
 
+async function isProjectDirectory(directory: string): Promise<boolean> {
+  try {
+    return (await fs.stat(path.join(directory, 'package.yaml'))).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Commit the move of a project directory, naming it by its path in the repository. Never throws,
+ * and the wait is bounded (see `LocalVersioning.commitMove`).
+ */
+async function commitProjectMove(
+  versioning: LocalVersioning,
+  sourcePath: string,
+  destinationPath: string,
+): Promise<void> {
+  await versioning.commitMove(
+    sourcePath,
+    destinationPath,
+    ({ to }) => `Moved ${path.basename(sourcePath)} to ${to}`,
+  )
+}
+
 /**
  * Handle filesystem commands.
  *
  * With `localMetadata`, directory listings carry each project's labels, and the Recent list
- * follows moves and deletes.
+ * follows moves and deletes. With `localVersioning`, moving a project directory commits the move.
  */
 export async function handleFilesystemCommand(
   cliArguments: string[],
   request: http.IncomingMessage,
   localMetadata?: LocalMetadata,
+  localVersioning?: LocalVersioning,
 ): Promise<string | fsSync.ReadStream> {
   let result: string | fsSync.ReadStream = toJSONRPCError(
     `Error running Project Manager command.`,
@@ -297,7 +323,11 @@ export async function handleFilesystemCommand(
           destinationPath == null
         )
           break
+        const isProject = await isProjectDirectory(sourcePath)
         await fs.rename(sourcePath, destinationPath)
+        if (isProject && localVersioning != null) {
+          await commitProjectMove(localVersioning, sourcePath, destinationPath)
+        }
         await followInLocalMetadata(
           localMetadata && (() => localMetadata.pathMoved(sourcePath, destinationPath)),
         )

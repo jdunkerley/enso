@@ -22,6 +22,7 @@ import {
   isWatcherRequest,
 } from 'project-manager-shim/handler'
 import type { LocalMetadata } from 'project-manager-shim/localMetadata'
+import type { LocalVersioning } from 'project-manager-shim/localVersioning'
 import * as ydocServer from 'ydoc-server'
 
 import { tarFsPack, unzipEntries, zipWriteStream } from '@/archive'
@@ -183,20 +184,24 @@ export class Server {
   private devServer?: vite.ViteDevServer
   private projectService: ProjectService
   private localMetadata: LocalMetadata
+  private localVersioning: LocalVersioning
   private watchers: Map<AssetId, Watcher> = new Map()
 
   /**
    * Create a simple HTTP server.
    * @param localMetadata - The local labels and Recent store, in Electron's `userData` directory.
+   * @param localVersioning - The git-based versioning of local projects.
    */
   constructor(
     public config: Config,
     projectService: ProjectService,
     localMetadata: LocalMetadata,
+    localVersioning: LocalVersioning,
   ) {
     this.projectsRootDirectory = projectManagement.getProjectsDirectory()
     this.projectService = projectService
     this.localMetadata = localMetadata
+    this.localVersioning = localVersioning
   }
 
   /** Server constructor. */
@@ -204,10 +209,11 @@ export class Server {
     config: Config,
     projectService: ProjectService,
     localMetadata: LocalMetadata,
+    localVersioning: LocalVersioning,
   ): Promise<Server> {
     const localConfig = Object.assign({}, config)
     localConfig.port = await findPort(localConfig.port)
-    const server = new Server(localConfig, projectService, localMetadata)
+    const server = new Server(localConfig, projectService, localMetadata, localVersioning)
     await server.run()
     return server
   }
@@ -281,6 +287,7 @@ export class Server {
         async () => this.projectService,
         headers,
         this.localMetadata,
+        this.localVersioning,
       )
     } else if (isWatcherRequest(requestUrl)) {
       const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
@@ -1044,7 +1051,12 @@ export class Server {
         .writeHead(HTTP_STATUS_BAD_REQUEST, COOP_COEP_CORP_HEADERS)
         .end('Command arguments must be an array of strings.')
     } else {
-      const result = await handleFilesystemCommand(cliArguments, request, this.localMetadata)
+      const result = await handleFilesystemCommand(
+        cliArguments,
+        request,
+        this.localMetadata,
+        this.localVersioning,
+      )
 
       if (typeof result === 'string') {
         const resultData = Buffer.from(result)

@@ -34,6 +34,8 @@ import {
   type RenameProjectParams,
   type SetProjectLabelsParams,
   type UUID,
+  type VersionEntry,
+  type VersioningStatus,
 } from './types.js'
 
 /** A project with its path provided instead of its id. */
@@ -104,7 +106,9 @@ export class ProjectManager {
   }
 
   /** Close an open project. */
-  async closeProject(params: WithProjectPath<CloseProjectParams>): Promise<void> {
+  async closeProject(
+    params: WithProjectPath<CloseProjectParams>,
+  ): Promise<{ readonly versioningWarning?: string }> {
     const fullParams: CloseProjectParams = await this.paramsWithPathToWithId(params)
     const cacheKey = makeProjectCacheKey(fullParams)
     const state = this.projects.get(cacheKey)
@@ -117,7 +121,10 @@ export class ProjectManager {
       })
     }
     this.projects.delete(cacheKey)
-    return this.runProjectServiceCommand('project/close', fullParams)
+    return this.runProjectServiceCommand<{ readonly versioningWarning?: string }>(
+      'project/close',
+      fullParams,
+    )
   }
 
   /** Create a new project. */
@@ -457,6 +464,75 @@ export class ProjectManager {
   /** Remove the local project at `projectPath` from the recently opened projects. */
   async forgetRecentProject(projectPath: Path): Promise<void> {
     await this.runProjectServiceCommand('recent/forget', { path: projectPath })
+  }
+
+  /** Whether the project at `path` is versioned, has unsaved changes, and its last version. */
+  async versioningStatus(path: Path): Promise<VersioningStatus> {
+    const status: VersioningStatus = await this.runProjectServiceCommand('versioning/status', {
+      path,
+    })
+    return { ...status, repoRoot: status.repoRoot && normalizeSlashes(status.repoRoot) }
+  }
+
+  /** Start versioning the projects under `rootPath` in a new repository, which is enabled. */
+  async initVersioning(rootPath: Path): Promise<{ readonly repoRoot: Path }> {
+    const result: { readonly repoRoot: Path } = await this.runProjectServiceCommand(
+      'versioning/init',
+      { rootPath },
+    )
+    return { repoRoot: normalizeSlashes(result.repoRoot) }
+  }
+
+  /**
+   * Agree to have the existing repository at `repoRoot` versioned. Until then nothing is committed
+   * to it, on close or otherwise.
+   */
+  async enableVersioning(repoRoot: Path): Promise<void> {
+    await this.runProjectServiceCommand('versioning/enable', { repoRoot })
+  }
+
+  /** Stop versioning the repository at `repoRoot`. Its history is left as it is. */
+  async disableVersioning(repoRoot: Path): Promise<void> {
+    await this.runProjectServiceCommand('versioning/disable', { repoRoot })
+  }
+
+  /** Save the project's current state as a version. `id` is `null` when nothing had changed. */
+  async commitVersion(path: Path, message: string): Promise<{ readonly id: string | null }> {
+    return this.runProjectServiceCommand('versioning/commit', { path, message })
+  }
+
+  /** The project's saved versions, newest first. */
+  async listVersions(path: Path): Promise<{ readonly versions: readonly VersionEntry[] }> {
+    return this.runProjectServiceCommand('versioning/log', { path })
+  }
+
+  /** The content of `relativePath` in the project as it was at version `id`. */
+  async versionFileContent(path: Path, id: string, relativePath: string): Promise<string> {
+    return this.runProjectServiceCommand('versioning/file-at', { path, id, relativePath })
+  }
+
+  /** Restore the project to version `id`. The project must not be running. */
+  async restoreVersion(path: Path, id: string): Promise<{ readonly id: string }> {
+    return this.runProjectServiceCommand('versioning/restore', { path, id })
+  }
+
+  /** Create a new project in `parentPath` from the project as it was at version `id`. */
+  async duplicateVersion(
+    path: Path,
+    id: string,
+    title: string,
+    parentPath: Path,
+  ): Promise<DuplicatedProject> {
+    const result: DuplicatedProject = await this.runProjectServiceCommand(
+      'versioning/duplicate-at',
+      { path, id, title, parentPath },
+    )
+    return { ...result, projectPath: normalizeSlashes(result.projectPath) }
+  }
+
+  /** Change the comment of version `id`. */
+  async setVersionComment(path: Path, id: string, comment: string): Promise<void> {
+    await this.runProjectServiceCommand('versioning/set-comment', { path, id, comment })
   }
 
   /** Run the Project Manager binary with the given command-line arguments. */

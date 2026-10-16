@@ -913,6 +913,31 @@ corepack pnpm -r --filter enso --filter project-manager-shim --filter enso-commo
 - [ ] Commit, push, open the PR (base: PR 1's branch, or `develop` if PR 1 has
       merged) with `CI: No changelog needed`.
 
+### Task 15: consent before versioning an existing repository
+
+Added after the whole-branch review, on the decision "Ask first": `findRepoRoot`
+finds any enclosing repository, so a home-folder dotfiles repository or a work
+monorepo above the projects folder would get "Saved on close" commits unasked.
+
+- [x] `localVersioning/consent.ts`: `VersioningConsent`
+      (`isEnabled`/`enable`/`disable`), persisted in
+      `<userData>/versioning.json` through the `jsonFile.ts` helpers; compared
+      by real path (lowercased on Windows) through `repositoryKey` in `git.ts`,
+      which the operation lock now uses too.
+- [x] `LocalVersioning` takes `{ consent }`; `status.enabled`; `init` enables
+      (and now runs under the new repository's lock); `enable` (rejects a path
+      that is not a repository root) and `disable`; `commitIfEnabled` for the
+      close hook; `commitMove` skips silently; `commit`, `restore`, `setComment`
+      reject with
+      `Versioning is not enabled for the repository at     <repoRoot>.`; `log`,
+      `fileAt`, `exportAt` need no consent.
+- [x] Routes `versioning/enable`, `versioning/disable`; client
+      `enableVersioning`, `disableVersioning`, `VersioningStatus.enabled`; the
+      Electron host and the dev middleware construct the store in `<userData>`.
+- [x] Existing tests enable their repository first (`init` or `enable`); a
+      `createVersioning`/`versioningFor` helper in `testRepo.ts` gives tests a
+      store in a temporary directory.
+
 ---
 
 ## PR 4 outline: saving in the GUI (detail when it starts)
@@ -936,7 +961,12 @@ corepack pnpm -r --filter enso --filter project-manager-shim --filter enso-commo
    names "Changed since the last version".
 7. The init prompt (Create / Not now / Don't ask again for this folder),
    remembered per root in a `createPersistedStore`, before a save or close of a
-   project in no repository; never during quit.
+   project in no repository; never during quit. Its variant for an existing
+   repository that is not enabled (`status.enabled` false): "Keep versions of
+   your projects in the existing repository at <repoRoot>?" with Use
+   (`enableVersioning`) / Not now / Don't ask again. A repository rooted at or
+   inside the user's projects root is enabled silently on first status; any
+   other gets the prompt.
 8. Settings → Local: a Versions section (git found; repo path or Create
    repository; reset "Don't ask again").
 9. Quit: `beforeunload` closes open local projects in a repository behind a

@@ -7,16 +7,26 @@ import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
+import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 let localMetadata: LocalMetadata | null = null
+let localVersioning: LocalVersioning | null = null
 let extraArgs: readonly string[] = []
 
 /** The local labels and Recent store, kept in Electron's `userData` directory. */
 export function getLocalMetadata(): LocalMetadata {
   localMetadata ??= new LocalMetadata({ userDataDirectory: app.getPath('userData') })
   return localMetadata
+}
+
+/** The git-based versioning of local projects; the repositories it may use are kept in `userData`. */
+export function getLocalVersioning(): LocalVersioning {
+  localVersioning ??= new LocalVersioning({
+    consent: new VersioningConsent({ userDataDirectory: app.getPath('userData') }),
+  })
+  return localVersioning
 }
 
 /** Get the project service. */
@@ -26,6 +36,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
       paths.resourcesPath(electron, electronIsDev),
       extraArgs,
       getLocalMetadata(),
+      getLocalVersioning(),
     )
   }
   return projectService
@@ -43,6 +54,7 @@ export function setupProjectService(
       paths.resourcesPath(electron, electronIsDev),
       args,
       getLocalMetadata(),
+      getLocalVersioning(),
     )
   }
   return projectService

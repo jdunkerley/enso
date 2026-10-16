@@ -193,6 +193,18 @@ export class ProjectFileRepository implements ProjectRepository {
     const targetPath = await this.findTargetPath(normalizedName)
     // Copy directory
     await fs.cp(project.path, targetPath, { recursive: true })
+    return this.giveNewIdentity(targetPath, newName, newMetadata)
+  }
+
+  /**
+   * Gives a copied project directory a new identity: the id and dates in `project.json`, and the
+   * name in `package.yaml`. Returns the project as loaded from `targetPath`.
+   */
+  async giveNewIdentity(
+    targetPath: Path,
+    newName: string,
+    newMetadata: ProjectMetadata,
+  ): Promise<Project> {
     // Update metadata
     const metadataPath = path.join(targetPath, PROJECT_METADATA_RELATIVE_PATH)
     await mergeProjectJson(metadataPath, {

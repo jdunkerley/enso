@@ -51,6 +51,7 @@ import {
   isWatcherRequest,
 } from 'project-manager-shim/handler'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
+import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 import { tarFsPack, unzipEntries, zipWriteStream } from './archive'
 
@@ -92,6 +93,9 @@ const COOP_COEP_CORP_HEADERS = [
 export class ProjectManagerShimMiddleware {
   private projectService?: ProjectService
   private readonly localMetadata = new LocalMetadata({ userDataDirectory: DEV_USER_DATA_DIRECTORY })
+  private readonly localVersioning = new LocalVersioning({
+    consent: new VersioningConsent({ userDataDirectory: DEV_USER_DATA_DIRECTORY }),
+  })
   private watchers: Map<AssetId, Watcher> = new Map()
 
   /** Create the new middleware. */
@@ -101,7 +105,12 @@ export class ProjectManagerShimMiddleware {
   async getProjectService(): Promise<ProjectService> {
     if (!this.projectService) {
       await this.setup()
-      this.projectService = ProjectService.default('.', [], this.localMetadata)
+      this.projectService = ProjectService.default(
+        '.',
+        [],
+        this.localMetadata,
+        this.localVersioning,
+      )
     }
     return this.projectService
   }
@@ -201,6 +210,7 @@ export class ProjectManagerShimMiddleware {
         () => this.getProjectService(),
         COMMON_HEADERS,
         this.localMetadata,
+        this.localVersioning,
       )
     } else if (isWatcherRequest(requestPath)) {
       handleWatcherRequest(request, response, COMMON_HEADERS, this.watchers)
@@ -251,6 +261,7 @@ export class ProjectManagerShimMiddleware {
                 cliArguments,
                 request,
                 this.localMetadata,
+                this.localVersioning,
               )
 
               if (typeof result === 'string') {

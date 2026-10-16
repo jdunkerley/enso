@@ -5,15 +5,24 @@ import type { AddressInfo } from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createProject } from '../../localMetadata/__tests__/testUtils.js'
+import { createProject, readProjectJson } from '../../localMetadata/__tests__/testUtils.js'
 import { LocalMetadata } from '../../localMetadata/index.js'
 import { readPackageLabels } from '../../localMetadata/packageYaml.js'
+import { createVersioning, withTempRepo } from '../../localVersioning/__tests__/testRepo.js'
+import type { LocalVersioning } from '../../localVersioning/index.js'
+import type { Runner } from '../../projectService/ensoRunner.js'
+import { ProjectService } from '../../projectService/index.js'
 import { handleProjectServiceRequest } from '../projectService.js'
 
 let root: string
 let server: http.Server
 let baseUrl: string
 let store: LocalMetadata | undefined
+let versioning: LocalVersioning | undefined
+let running = false
+/** The only part of the runner these routes use. */
+const runner: Partial<Runner> = { isProjectRunning: () => Promise.resolve(running) }
+const projectService = new ProjectService(runner as Runner, [])
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'project-service-handler-'))
@@ -21,14 +30,17 @@ beforeEach(async () => {
     userDataDirectory: path.join(root, 'userData'),
     logger: { warn: vi.fn() },
   })
+  running = false
+  versioning = createVersioning(path.join(root, 'userData'))
   server = http.createServer((request, response) => {
     void handleProjectServiceRequest(
       request,
       response,
       request.url ?? '',
-      () => Promise.reject(new Error('The project service is not used by these routes.')),
+      () => Promise.resolve(projectService),
       {},
       store,
+      versioning,
     )
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -104,6 +116,163 @@ describe('without a store', () => {
   test('the routes answer with a JSON-RPC error', async () => {
     store = undefined
     expect((await call('labels/list', {})).error).toBeDefined()
+  })
+})
+
+describe('versioning routes', () => {
+  async function withProject(body: (repo: string, project: string) => Promise<void>) {
+    await withTempRepo(
+      async (repo) => {
+        await versioning!.enable(repo)
+        await body(repo, await createProject(path.join(repo, 'P'), 'id-1'))
+      },
+      { init: true },
+    )
+  }
+
+  test('status round trip', async () => {
+    await withProject(async (repo, project) => {
+      const { result } = await call('versioning/status', { path: project })
+      expect(result).toMatchObject({ git: true, changed: true, lastVersion: null, blocked: null })
+      expect(path.resolve((result as { repoRoot: string }).repoRoot)).toBe(path.resolve(repo))
+    })
+  })
+
+  test('a missing path is a JSON-RPC error', async () => {
+    const { error } = await call('versioning/status', {})
+    expect(error).toMatchObject({ message: expect.stringContaining("'path' must be a string.") })
+    expect((await call('versioning/commit', { path: 'x' })).error).toMatchObject({
+      message: expect.stringContaining("'message' must be a string."),
+    })
+  })
+
+  test('commit, log, file-at and set-comment', async () => {
+    await withProject(async (_repo, project) => {
+      const { result: committed } = await call('versioning/commit', {
+        path: project,
+        message: 'first',
+      })
+      const id = (committed as { id: string }).id
+      expect(id).toMatch(/^[0-9a-f]{40}$/)
+      const { result: log } = await call('versioning/log', { path: project })
+      expect(log).toMatchObject({ versions: [{ id, comment: 'first', isLatest: true }] })
+      const { result: content } = await call('versioning/file-at', {
+        path: project,
+        id,
+        relativePath: 'package.yaml',
+      })
+      expect(content).toContain('namespace: local')
+      const commented = await call('versioning/set-comment', { path: project, id, comment: 'x' })
+      expect(commented.result).toBeNull()
+      expect((await call('versioning/log', { path: project })).result).toMatchObject({
+        versions: [{ comment: 'x' }],
+      })
+    })
+  })
+
+  test.each(['', ' \n '])('commit with the message %j is "Saved"', async (message) => {
+    await withProject(async (_repo, project) => {
+      const { result } = await call('versioning/commit', { path: project, message })
+      expect((result as { id: string }).id).toMatch(/^[0-9a-f]{40}$/)
+      expect((await call('versioning/log', { path: project })).result).toMatchObject({
+        versions: [{ comment: 'Saved' }],
+      })
+    })
+  })
+
+  test('enable and disable switch consent for a repository', async () => {
+    await withTempRepo(
+      async (repo) => {
+        const project = await createProject(path.join(repo, 'P'), 'id-1')
+        const status = async () =>
+          ((await call('versioning/status', { path: project })).result as { enabled: boolean })
+            .enabled
+        expect(await status()).toBe(false)
+        expect((await call('versioning/enable', { repoRoot: repo })).result).toBeNull()
+        expect(await status()).toBe(true)
+        expect((await call('versioning/disable', { repoRoot: repo })).result).toBeNull()
+        expect(await status()).toBe(false)
+      },
+      { init: true },
+    )
+  })
+
+  test('enable and disable need a repoRoot, and enable needs a repository', async () => {
+    expect((await call('versioning/enable', {})).error).toMatchObject({
+      message: expect.stringContaining("'repoRoot' must be a string."),
+    })
+    expect((await call('versioning/disable', {})).error).toMatchObject({
+      message: expect.stringContaining("'repoRoot' must be a string."),
+    })
+    await withTempRepo(async (dir) => {
+      expect((await call('versioning/enable', { repoRoot: dir })).error).toMatchObject({
+        message: expect.stringContaining('not the root of a git repository'),
+      })
+    })
+  })
+
+  test('init starts a repository', async () => {
+    await withTempRepo(async (dir) => {
+      const { result } = await call('versioning/init', { rootPath: dir })
+      expect(path.resolve((result as { repoRoot: string }).repoRoot)).toBe(path.resolve(dir))
+    })
+  })
+
+  test('restore is refused while the project is running', async () => {
+    await withProject(async (_repo, project) => {
+      const { result } = await call('versioning/commit', { path: project, message: 'first' })
+      const id = (result as { id: string }).id
+      await fs.writeFile(path.join(project, 'package.yaml'), 'name: P\nnamespace: other\n')
+      running = true
+      const refused = await call('versioning/restore', { path: project, id })
+      expect(refused).not.toHaveProperty('result')
+      expect(refused.error).toMatchObject({ message: expect.stringContaining('running') })
+      expect(await fs.readFile(path.join(project, 'package.yaml'), 'utf8')).toContain('other')
+
+      running = false
+      expect((await call('versioning/restore', { path: project, id })).result).toHaveProperty('id')
+      expect(await fs.readFile(path.join(project, 'package.yaml'), 'utf8')).toContain('local')
+    })
+  })
+
+  test('duplicate-at makes a new project from an old version', async () => {
+    await withProject(async (repo, project) => {
+      const { result } = await call('versioning/commit', { path: project, message: 'first' })
+      const id = (result as { id: string }).id
+      await fs.writeFile(path.join(project, 'package.yaml'), 'name: P\nnamespace: other\n')
+      const parent = path.join(repo, 'copies')
+      await fs.mkdir(parent)
+      const { result: copy } = await call('versioning/duplicate-at', {
+        path: project,
+        id,
+        title: 'P',
+        parentPath: parent,
+      })
+      expect(copy).toMatchObject({ projectName: 'P', projectNormalizedName: 'P' })
+      const { projectPath, projectId } = copy as { projectPath: string; projectId: string }
+      expect(path.resolve(projectPath)).toBe(path.resolve(parent, 'P'))
+      expect(projectId).not.toBe('id-1')
+      expect(await fs.readFile(path.join(projectPath, 'package.yaml'), 'utf8')).toContain('local')
+      expect((await readProjectJson(projectPath)).id).toBe(projectId)
+      // A second copy with the same title gets a free name.
+      const { result: second } = await call('versioning/duplicate-at', {
+        path: project,
+        id,
+        title: 'P',
+        parentPath: parent,
+      })
+      expect(second).toMatchObject({ projectName: 'P_1' })
+    })
+  })
+})
+
+describe('versioning routes without a store', () => {
+  test('answer with a JSON-RPC error', async () => {
+    versioning = undefined
+    const { error } = await call('versioning/status', { path: 'x' })
+    expect(error).toMatchObject({
+      message: expect.stringContaining('Local versioning is not available in this host.'),
+    })
   })
 })
 

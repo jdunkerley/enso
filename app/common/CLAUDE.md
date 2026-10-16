@@ -19,7 +19,7 @@ neutral ground — anything Vue-specific belongs in its own package.
 - `src/constants.ts` — app-wide constants (URLs, feature flags, version
   strings).
 
-## `LocalBackend`: labels and Recent
+## `LocalBackend`: labels, Recent, and versioning
 
 - **Labels are for projects only** (`supportsLabels`); the tag methods call the
   shim's `localMetadata` endpoints and throw for folders and files.
@@ -34,8 +34,14 @@ neutral ground — anything Vue-specific belongs in its own package.
 - **Opens are recorded** after a successful `openProject`, except a hybrid
   project's (a cloud project's local copy); a failure to record only warns.
   `forgetRecentProject` backs "Remove from Recent".
-- The store, its files and its rules (cap, validation, following moves) are the
-  shim's; see `app/project-manager-shim/CLAUDE.md`.
+- **Versioning** is, for now, on `ProjectManager`, not `LocalBackend`: its
+  methods (`versioningStatus`, `initVersioning`, `commitVersion`,
+  `listVersions`, `versionFileContent`, `restoreVersion`, `duplicateVersion`,
+  `setVersionComment`) call the shim's `versioning/*` endpoints, which wrap
+  `LocalVersioning` (git-based snapshots). `LocalBackend` uses them from PR 4
+  (saving) and PR 5 (the Versions tab) of the git-versioning design.
+- The store, its files and its rules (cap, validation, following moves, git) are
+  the shim's; see `app/project-manager-shim/CLAUDE.md`.
 
 ## Rules
 

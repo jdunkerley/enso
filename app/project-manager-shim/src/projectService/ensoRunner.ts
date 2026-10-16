@@ -12,6 +12,7 @@ import * as path from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import * as portfinder from 'portfinder'
 import { extract } from 'tar'
+import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
 import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
@@ -72,6 +73,7 @@ export interface Socket {
 export interface ShutdownHookRegistry {
   'rename-project-directory': true
   'remove-from-list': true
+  'version-on-close': true
 }
 
 export type ShutdownHookType = keyof ShutdownHookRegistry
@@ -272,10 +274,7 @@ export class EnsoRunner implements Runner {
   /** Creates a new EnsoRunner with the path to the Enso executable. */
   constructor(private ensoPath: Path) {}
 
-  private async runProcess<T extends childProcess.ChildProcess>(
-    args: readonly string[],
-    spawnCallback: (cmd: string, cmdArgs: readonly string[]) => T,
-  ) {
+  private resolveCommandAndArgs(args: readonly string[]): [string, readonly string[]] {
     const [cmd, cmdArgs] =
       this.ensoPath.endsWith('.bat') ?
         ['cmd.exe', ['/c', this.ensoPath, ...args]]
@@ -284,6 +283,14 @@ export class EnsoRunner implements Runner {
     if (isDevMode) {
       console.log('runProcess', cmd, cmdArgs.join(' '))
     }
+    return [cmd, cmdArgs]
+  }
+
+  private async runProcess<T extends childProcess.ChildProcess>(
+    args: readonly string[],
+    spawnCallback: (cmd: string, cmdArgs: readonly string[]) => T,
+  ) {
+    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args)
     return spawnCallback(cmd, cmdArgs)
   }
 
@@ -291,37 +298,29 @@ export class EnsoRunner implements Runner {
     args: readonly string[],
     options?: childProcess.SpawnOptionsWithoutStdio,
   ): Promise<void> {
-    const process = await this.runProcess(args, (cmd, cmdArgs) =>
-      childProcess.spawn(cmd, cmdArgs, options),
-    )
-    return new Promise((resolve, reject) => {
-      let stdout = ''
-      let stderr = ''
+    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args)
 
-      process.stdout.on('data', (data) => {
-        stdout += data.toString()
-      })
-
-      process.stderr.on('data', (data) => {
-        stderr += data.toString()
-      })
-
-      process.on('error', (error) => {
-        reject(new Error(`Failed to spawn enso process: ${error.message}`))
-      })
-
-      process.on('close', (code) => {
-        if (code === 0) {
-          resolve()
-        } else {
-          reject(
-            new Error(
-              `Enso process exited with code ${code}.\nstdout: ${stdout}\nstderr: ${stderr}`,
-            ),
-          )
+    const commandOptions: { readonly cwd?: string; readonly env?: NodeJS.ProcessEnv } | undefined =
+      !options ? undefined : (
+        {
+          ...(options.cwd && typeof options.cwd === 'string' && { cwd: options.cwd }),
+          ...(options.env && { env: options.env }),
         }
+      )
+
+    try {
+      await runChildCommand(cmd, cmdArgs as string[], commandOptions)
+    } catch (error) {
+      if (error instanceof CommandError) {
+        throw new Error(
+          `Enso process exited with code ${error.code}.\nstdout: ${error.stdout}\nstderr: ${error.stderr}`,
+          { cause: error },
+        )
+      }
+      throw new Error(`Failed to spawn enso process: ${(error as Error).message}`, {
+        cause: error,
       })
-    })
+    }
   }
 
   /** Run an existing Enso project at the specified path. Returns the exit code of the process. */

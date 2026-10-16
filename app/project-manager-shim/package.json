@@ -24,6 +24,11 @@
       "types": "./dist/localMetadata/index.d.ts",
       "import": "./dist/localMetadata/index.js"
     },
+    "./localVersioning": {
+      "source": "./src/localVersioning/index.ts",
+      "types": "./dist/localVersioning/index.d.ts",
+      "import": "./dist/localVersioning/index.js"
+    },
     "./projectService": {
       "source": "./src/projectService/index.ts",
       "types": "./dist/projectService/index.d.ts",
