@@ -32,6 +32,16 @@ class ConfigSpec
       )
     }
 
+    "ignore labels that are not a list of strings" in {
+      val scalar = Config.fromYaml("name: example\nlabels: draft\n")
+      scalar.get.labels shouldEqual Nil
+      val empty = Config.fromYaml("name: example\nlabels:\n")
+      empty.get.labels shouldEqual Nil
+      val nested =
+        Config.fromYaml("name: example\nlabels:\n  a: b\n  c:\n    - d\n")
+      nested.get.labels shouldEqual Nil
+    }
+
     "omit labels from the YAML when there are none" in {
       val config = Config.fromYaml("name: example\n").get
       config.labels shouldEqual Nil

@@ -307,7 +307,10 @@ object Config {
               .getOrElse(Right(None))
             labels <- clazzMap
               .get(JsonFields.Labels)
-              .map(implicitly[YamlDecoder[List[String]]].decode)
+              .flatMap(v =>
+                implicitly[YamlDecoder[List[String]]].decode(v).toOption
+              )
+              .map(Right(_))
               .getOrElse(Right(Nil))
           } yield Config(
             name,
