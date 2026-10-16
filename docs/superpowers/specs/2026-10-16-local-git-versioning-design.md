@@ -1,7 +1,7 @@
 # Local projects versioned with git: design
 
-Date: 2026-10-16. Status: approved in conversation; awaiting review of this
-document.
+Date: 2026-10-16. Status: approved (#229). Plan:
+`docs/superpowers/plans/2026-10-16-local-git-versioning.md`.
 
 ## Goal
 
