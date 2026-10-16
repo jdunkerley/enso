@@ -50,8 +50,14 @@ interface VersioningContext {
 const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningContext>>> = {
   'versioning/status': ({ versioning }, body) => versioning.status(requireString(body, 'path')),
   'versioning/init': ({ versioning }, body) => versioning.init(requireString(body, 'rootPath')),
-  'versioning/commit': ({ versioning }, body) =>
-    versioning.commit([requireString(body, 'path')], requireString(body, 'message')),
+  'versioning/commit': ({ versioning }, body) => {
+    const message = requireString(body, 'message')
+    // An empty message is a save without a comment.
+    return versioning.commit(
+      [requireString(body, 'path')],
+      message.trim() === '' ? 'Saved' : message,
+    )
+  },
   'versioning/log': async ({ versioning }, body) => ({
     versions: await versioning.log(requireString(body, 'path')),
   }),

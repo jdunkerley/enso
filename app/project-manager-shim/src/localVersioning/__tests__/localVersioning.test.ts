@@ -3,7 +3,12 @@ import * as path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
 import { findGit } from '../git.js'
-import { ENSO_IGNORE_LINES, LocalVersioning } from '../index.js'
+import {
+  ENSO_IGNORE_LINES,
+  LocalVersioning,
+  VERSIONING_TIMEOUT_MESSAGE,
+  VERSIONING_TIMEOUT_MS,
+} from '../index.js'
 import { withTempRepo, writeFiles } from './testRepo.js'
 
 vi.mock('../git.js', async (importOriginal) => {
@@ -13,6 +18,14 @@ vi.mock('../git.js', async (importOriginal) => {
 
 const git = (cwd: string, ...args: string[]) =>
   runCommand('git', args, { cwd }).then(({ stdout }) => stdout.trim())
+
+/** Resolves once a timer is pending (with fake timers), so the timeout has started. */
+async function waitForTimer() {
+  const deadline = Date.now() + 3_000
+  while (vi.getTimerCount() === 0 && Date.now() < deadline)
+    await new Promise((resolve) => setImmediate(resolve))
+  expect(vi.getTimerCount()).toBeGreaterThan(0)
+}
 
 const project = (name: string) => ({
   [`${name}/package.yaml`]: `name: ${name}\n`,
@@ -337,7 +350,10 @@ describe('untrusted arguments', () => {
       const target = bad.startsWith('--output=') ? bad : 'x'
       await expect(versioning.fileAt(a, bad, 'src/Main.enso')).rejects.toThrow(/version id/i)
       await expect(versioning.setComment(a, bad, 'c')).rejects.toThrow(/version id/i)
-      await expect(fs.access(path.join(a, target.replace('--output=', '')))).rejects.toBeDefined()
+      // git runs in the repository root, so that is where `--output=x` would write.
+      const written = target.replace('--output=', '')
+      await expect(fs.access(path.join(root, written))).rejects.toBeDefined()
+      await expect(fs.access(path.join(a, written))).rejects.toBeDefined()
     })
   })
 
@@ -461,7 +477,18 @@ describe('restore and exportAt', () => {
       const { a, v1 } = await twoVersionsAndEdit(root, versioning)
       const copy = path.join(root, 'taken')
       await fs.mkdir(copy)
+      await fs.writeFile(path.join(copy, 'mine.txt'), 'keep')
       await expect(versioning.exportAt(a, v1, copy)).rejects.toThrow(/exists/i)
+      expect(await fs.readFile(path.join(copy, 'mine.txt'), 'utf8')).toBe('keep')
+    })
+  })
+
+  test('exportAt creates missing parent directories', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a, v1 } = await twoVersionsAndEdit(root, versioning)
+      const copy = path.join(root, 'new', 'parent', 'copy')
+      await versioning.exportAt(a, v1, copy)
+      expect(await fs.readFile(path.join(copy, 'src', 'Main.enso'), 'utf8')).toBe('v1')
     })
   })
 
@@ -541,6 +568,205 @@ describe('commits are automatic snapshots', () => {
       expect(id).not.toBeNull()
       await versioning.setComment(path.join(root, 'A'), id!, 'Note')
       expect((await versioning.log(path.join(root, 'A')))[0]?.comment).toBe('Note')
+    })
+  })
+})
+
+describe('concurrent operations on one repository', () => {
+  test('two commits of the same project both settle, and only one version is made', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const results = await Promise.all([
+        versioning.commit([a], 'first'),
+        versioning.commit([a], 'second'),
+      ])
+      const ids = results.map((r) => r.id)
+      expect(ids.filter((id) => id != null)).toHaveLength(1)
+      expect(ids.filter((id) => id == null)).toHaveLength(1)
+      const log = await versioning.log(a)
+      expect(log.map((e) => e.id)).toEqual(ids.filter((id) => id != null))
+    })
+  })
+
+  test('commits of two projects get their own ids and only their own files', async () => {
+    await withRepo(async (root, versioning) => {
+      const [a, b] = await Promise.all([
+        versioning.commit([path.join(root, 'A')], 'a'),
+        versioning.commit([path.join(root, 'B')], 'b'),
+      ])
+      expect(a.id).toMatch(/^[0-9a-f]{40}$/)
+      expect(b.id).toMatch(/^[0-9a-f]{40}$/)
+      expect(a.id).not.toBe(b.id)
+      const aFiles = await git(root, 'show', '--name-only', '--format=%s', a.id!)
+      const bFiles = await git(root, 'show', '--name-only', '--format=%s', b.id!)
+      expect(aFiles).toMatch(/^a\n/)
+      expect(aFiles).toContain('A/package.yaml')
+      expect(aFiles).not.toContain('B/')
+      expect(bFiles).toMatch(/^b\n/)
+      expect(bFiles).toContain('B/package.yaml')
+      expect(bFiles).not.toContain('A/')
+    })
+  })
+
+  test('a failed operation does not hold the repository', async () => {
+    await withRepo(async (root, versioning) => {
+      const lock = path.join(root, '.git', 'index.lock')
+      await fs.writeFile(lock, '')
+      await expect(versioning.commit([path.join(root, 'A')], 'Saved')).rejects.toThrow(/lock/i)
+      await fs.rm(lock)
+      expect((await versioning.commit([path.join(root, 'A')], 'Saved')).id).not.toBeNull()
+    })
+  })
+})
+
+describe("the user's own staging", () => {
+  test('a change staged in another project is neither committed nor unstaged', async () => {
+    await withRepo(async (root, versioning) => {
+      await versioning.commit([root], 'Base')
+      await fs.writeFile(path.join(root, 'A', 'src', 'Main.enso'), 'main = 2\n')
+      await fs.writeFile(path.join(root, 'B', 'x.txt'), 'staged\n')
+      await git(root, 'add', 'B/x.txt')
+      const { id } = await versioning.commit([path.join(root, 'A')], 'A only')
+      expect(await git(root, 'show', '--name-only', '--format=', id!)).toBe('A/src/Main.enso')
+      expect(await git(root, 'diff', '--cached', '--name-only')).toBe('B/x.txt')
+    })
+  })
+})
+
+describe('paths with spaces and non-ASCII characters', () => {
+  test('status, commit, log, fileAt and restore', async () => {
+    await withTempRepo(async (tmp) => {
+      const root = path.join(tmp, 'r é')
+      const project = path.join(root, 'Mój projekt ü')
+      await writeFiles(project, { 'package.yaml': 'name: P\n', 'src/Main.enso': 'v1' })
+      const versioning = new LocalVersioning()
+      await versioning.init(root)
+      await git(root, 'config', 'user.name', 'Tester')
+      await git(root, 'config', 'user.email', 'tester@example.com')
+      expect((await versioning.status(project)).changed).toBe(true)
+      const v1 = (await versioning.commit([project], 'one')).id!
+      expect(v1).toMatch(/^[0-9a-f]{40}$/)
+      const status = await versioning.status(project)
+      expect(status.changed).toBe(false)
+      expect(status.lastVersion?.id).toBe(v1)
+      await fs.writeFile(path.join(project, 'src', 'Main.enso'), 'v2')
+      expect((await versioning.status(project)).changed).toBe(true)
+      expect((await versioning.log(project)).map((e) => e.id)).toEqual([v1])
+      expect(await versioning.fileAt(project, v1, 'src/Main.enso')).toBe('v1')
+      await versioning.restore(project, v1)
+      expect(await fs.readFile(path.join(project, 'src', 'Main.enso'), 'utf8')).toBe('v1')
+      expect((await versioning.log(project)).map((e) => e.comment.split(' from ')[0])).toEqual([
+        'Restored version',
+        'Saved before restore',
+        'one',
+      ])
+    })
+  })
+})
+
+describe('git state the IDE does not own', () => {
+  test.each([
+    ['CHERRY_PICK_HEAD', /cherry-pick/i],
+    ['REVERT_HEAD', /revert/i],
+    ['BISECT_LOG', /bisect/i],
+  ])('a repository with %s is blocked', async (file, message) => {
+    await withRepo(async (root, versioning) => {
+      const { id } = await versioning.commit([root], 'Base')
+      await fs.writeFile(path.join(root, '.git', file), `${id}\n`)
+      await fs.writeFile(path.join(root, 'A', 'src', 'Main.enso'), 'main = 2\n')
+      expect((await versioning.status(path.join(root, 'A'))).blocked).toMatch(message)
+      await expect(versioning.commit([path.join(root, 'A')], 'Nope')).rejects.toThrow(message)
+    })
+  })
+
+  test('status does not rewrite the index (no optional locks)', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      await versioning.commit([a], 'Saved')
+      const index = path.join(root, '.git', 'index')
+      // A new mtime with the same content makes git refresh, and normally write, the index.
+      const future = new Date(Date.now() + 60_000)
+      await fs.utimes(path.join(a, 'package.yaml'), future, future)
+      const before = (await fs.stat(index)).mtimeMs
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect((await versioning.status(a)).changed).toBe(false)
+      expect((await fs.stat(index)).mtimeMs).toBe(before)
+    })
+  })
+
+  test('an inherited GIT_DIR does not redirect versioning to another repository', async () => {
+    await withRepo(async (root, versioning) => {
+      const other = path.join(path.dirname(root), 'other')
+      await fs.mkdir(other)
+      await git(other, 'init', '-b', 'main')
+      const saved = process.env.GIT_DIR
+      process.env.GIT_DIR = path.join(other, '.git')
+      let id: string | null
+      try {
+        id = (await versioning.commit([path.join(root, 'A')], 'Saved')).id
+      } finally {
+        if (saved === undefined) delete process.env.GIT_DIR
+        else process.env.GIT_DIR = saved
+      }
+      expect(id).toMatch(/^[0-9a-f]{40}$/)
+      expect(await git(root, 'rev-parse', 'HEAD')).toBe(id)
+      await expect(git(other, 'rev-parse', '--verify', 'HEAD')).rejects.toBeDefined()
+    })
+  })
+
+  test("a post-commit hook does not run on the IDE's commits", async () => {
+    await withRepo(async (root, versioning) => {
+      const hook = path.join(root, '.git', 'hooks', 'post-commit')
+      await fs.mkdir(path.dirname(hook), { recursive: true })
+      await fs.writeFile(hook, '#!/bin/sh\necho ran > .git/hook-ran\n', { mode: 0o755 })
+      const { id } = await versioning.commit([path.join(root, 'A')], 'Saved')
+      await versioning.setComment(path.join(root, 'A'), id!, 'Note')
+      await expect(fs.access(path.join(root, '.git', 'hook-ran'))).rejects.toBeDefined()
+      // The hook does run for a commit made by hand, so the check above means something.
+      await fs.writeFile(path.join(root, 'B', 'src', 'Main.enso'), 'main = 9\n')
+      await git(root, 'add', 'B')
+      await git(root, 'commit', '-m', 'By hand')
+      await expect(fs.access(path.join(root, '.git', 'hook-ran'))).resolves.toBeUndefined()
+    })
+  })
+})
+
+describe('commitMove', () => {
+  test('records where the project came from in an Enso-Moved-From trailer', async () => {
+    await withRepo(async (root, versioning) => {
+      await versioning.commit([path.join(root, 'A')], 'Saved')
+      await fs.mkdir(path.join(root, 'folder'))
+      await fs.rename(path.join(root, 'A'), path.join(root, 'folder', 'A'))
+      const warning = await versioning.commitMove(
+        path.join(root, 'A'),
+        path.join(root, 'folder', 'A'),
+        ({ to }) => `Moved A to ${to}`,
+      )
+      expect(warning).toBeUndefined()
+      expect(await git(root, 'log', '-1', '--format=%s')).toBe('Moved A to folder/A')
+      expect(
+        await git(root, 'log', '-1', '--format=%(trailers:key=Enso-Moved-From,valueonly)'),
+      ).toBe('A')
+      // The trailer is not part of the comment shown for the version.
+      expect((await versioning.log(path.join(root, 'folder', 'A')))[0]?.comment).toBe(
+        'Moved A to folder/A',
+      )
+    })
+  })
+
+  test('gives up after the timeout, including while finding the repository', async () => {
+    await withRepo(async (root, versioning) => {
+      const spy = vi.spyOn(versioning, 'repositoryOf').mockReturnValue(new Promise(() => {}))
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      try {
+        const moving = versioning.commitMove(path.join(root, 'A'), path.join(root, 'C'), 'Moved')
+        await waitForTimer()
+        await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
+        expect(await moving).toBe(VERSIONING_TIMEOUT_MESSAGE)
+      } finally {
+        vi.useRealTimers()
+        spy.mockRestore()
+      }
     })
   })
 })

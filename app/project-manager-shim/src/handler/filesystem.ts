@@ -205,23 +205,20 @@ async function isProjectDirectory(directory: string): Promise<boolean> {
   }
 }
 
-/** Commit the move of a project directory, naming it by its path in the repository. */
+/**
+ * Commit the move of a project directory, naming it by its path in the repository. Never throws,
+ * and the wait is bounded (see `LocalVersioning.commitMove`).
+ */
 async function commitProjectMove(
   versioning: LocalVersioning,
   sourcePath: string,
   destinationPath: string,
 ): Promise<void> {
-  try {
-    const relative = await versioning.relativeToRepository(destinationPath)
-    if (relative == null) return
-    await versioning.commitMove(
-      sourcePath,
-      destinationPath,
-      `Moved ${path.basename(sourcePath)} to ${relative}`,
-    )
-  } catch (error) {
-    console.error('Failed to commit the move of a project:', error)
-  }
+  await versioning.commitMove(
+    sourcePath,
+    destinationPath,
+    ({ to }) => `Moved ${path.basename(sourcePath)} to ${to}`,
+  )
 }
 
 /**

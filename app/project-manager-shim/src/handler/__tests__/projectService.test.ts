@@ -169,6 +169,16 @@ describe('versioning routes', () => {
     })
   })
 
+  test.each(['', ' \n '])('commit with the message %j is "Saved"', async (message) => {
+    await withProject(async (_repo, project) => {
+      const { result } = await call('versioning/commit', { path: project, message })
+      expect((result as { id: string }).id).toMatch(/^[0-9a-f]{40}$/)
+      expect((await call('versioning/log', { path: project })).result).toMatchObject({
+        versions: [{ comment: 'Saved' }],
+      })
+    })
+  })
+
   test('init starts a repository', async () => {
     await withTempRepo(async (dir) => {
       const { result } = await call('versioning/init', { rootPath: dir })

@@ -259,8 +259,13 @@ export class ProjectService {
       const versioning = this.versioning
       await this.runner.registerShutdownHook(project.path, 'version-on-close', async () => {
         try {
-          if ((await versioning.repositoryOf(project.path)) == null) return
-          await withinVersioningTimeout(versioning.commit([project.path], 'Saved on close'))
+          // The repository lookup is git too, so it counts towards the timeout.
+          await withinVersioningTimeout(
+            (async () => {
+              if ((await versioning.repositoryOf(project.path)) == null) return
+              await versioning.commit([project.path], 'Saved on close')
+            })(),
+          )
         } catch (error) {
           this.logger.error(`Failed to save project ${projectId} on close:`, error)
           this.versioningWarnings.set(

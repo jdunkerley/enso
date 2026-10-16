@@ -170,6 +170,58 @@ describe('versioning on close', () => {
     await versioning.commit([path.join(root, 'Old')], 'Before')
     await service.renameProject(UUID('id-1'), 'New', Path(root))
     expect(await git(root, 'log', '-1', '--format=%s')).toBe('Renamed Old to New')
+    expect(await git(root, 'log', '-1', '--format=%(trailers:key=Enso-Moved-From,valueonly)')).toBe(
+      'Old',
+    )
+  })
+
+  /** Resolves once a timer is pending (with fake timers), so the timeout has started. */
+  async function waitForTimer() {
+    const deadline = Date.now() + 3_000
+    while (vi.getTimerCount() === 0 && Date.now() < deadline)
+      await new Promise((resolve) => setImmediate(resolve))
+    expect(vi.getTimerCount()).toBeGreaterThan(0)
+  }
+
+  test('finding the repository counts towards the timeout of the close', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'A'), 'id-1')
+    running = true
+    await service.openProject(UUID('id-1'), Path(root))
+    // The commit itself is real; only the lookup before it never finishes.
+    const spy = vi.spyOn(versioning, 'repositoryOf').mockReturnValue(new Promise(() => {}))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const closing = service.closeProject(UUID('id-1'), Path(root))
+      await waitForTimer()
+      await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
+      expect(await closing).toEqual({ versioningWarning: 'Saving a version timed out.' })
+    } finally {
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
+  })
+
+  test('renaming an open project gives up on a stuck move commit after the timeout', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'Old'), 'id-1')
+    running = true
+    await service.openProject(UUID('id-1'), Path(root))
+    await service.renameProject(UUID('id-1'), 'New', Path(root))
+    const spy = vi.spyOn(versioning, 'repositoryOf').mockReturnValue(new Promise(() => {}))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const closing = service.closeProject(UUID('id-1'), Path(root))
+      await waitForTimer()
+      await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
+      await waitForTimer()
+      await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
+      expect(await closing).toEqual({ versioningWarning: 'Saving a version timed out.' })
+      expect(listener.projectMoved).toHaveBeenCalledOnce()
+    } finally {
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
   })
 
   test('a commit that never finishes times out, and the close still resolves', async () => {
@@ -182,7 +234,7 @@ describe('versioning on close', () => {
     try {
       const closing = service.closeProject(UUID('id-1'), Path(root))
       // The close reads the filesystem before it starts waiting on the commit.
-      while (vi.getTimerCount() === 0) await new Promise((resolve) => setImmediate(resolve))
+      await waitForTimer()
       await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
       expect(await closing).toEqual({ versioningWarning: 'Saving a version timed out.' })
     } finally {

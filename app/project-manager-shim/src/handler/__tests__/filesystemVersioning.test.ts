@@ -33,6 +33,9 @@ describe('filesystem-move of a project directory', () => {
       await versioning.commit([path.join(root, 'A')], 'Saved')
       await move(path.join(root, 'A'), path.join(root, 'folder', 'A'), versioning)
       expect(await git(root, 'log', '-1', '--format=%s')).toBe('Moved A to folder/A')
+      expect(
+        await git(root, 'log', '-1', '--format=%(trailers:key=Enso-Moved-From,valueonly)'),
+      ).toBe('A')
       const files = await git(root, 'show', '--name-only', '--format=')
       expect(files).toContain('A/package.yaml')
       expect(files).toContain('folder/A/package.yaml')
