@@ -1,6 +1,7 @@
 # Local labels and a local Recent list: design
 
-Date: 2026-10-11. Status: approved.
+Date: 2026-10-11. Status: implemented in #225 (shim store), #226 (labels) and
+#227 (Recent), merged 2026-10-16.
 
 ## Goal
 
@@ -137,8 +138,9 @@ already filtered out.
     and folders yet".
 - **`listDirectory`:**
   - sets `labels` on project assets from the listing;
-  - honours `query.labels`, using the same rule (all or any) as the cloud's
-    `listDirectory`; the cloud's behaviour is confirmed in PR 2;
+  - honours `query.labels`, keeping the assets that carry **all** of them. The
+    cloud's rule could not be confirmed from this repository; "all" was chosen
+    at sign-off, and an "any" filter waits for the search bar to be revisited;
   - with `filterBy: recent`, returns the validated recent projects as project
     assets with their real `parentId`, and no paging.
 - **Search:** `doesAssetMatchQuery` matches labels, so the search bar's label

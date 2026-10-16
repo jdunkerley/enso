@@ -150,6 +150,20 @@ Cognito). In local/desktop mode it also talks to the local TypeScript Project
 Manager (`app/project-manager-shim/`), which is used in both dev and the
 packaged Electron build. The old Scala Project Manager is no longer wired in.
 
+The drive's sidebar is a list of **categories** (`$/providers/category`), each
+on one backend (`CATEGORY_BACKEND`): the cloud's Cloud, Recent, Trash and teams;
+the local Local, Recent (`localRecent`) and the saved local directories.
+
+- **Ask `isRecentCategory`, never `type === 'recent'`**: both Recent lists
+  behave alike (no new folder or project, no navigating up, drops into or out of
+  them are cancelled, the listing asks `recentProjects`).
+- A category with no home directory (a Recent) is rooted at its backend's root
+  (`driveView.ts`).
+- Local Recent's context menu keeps Open, Close, Label, Open in File Browser and
+  Copy Id(s), and adds Remove from Recent (`AssetContextMenu.vue`).
+- Labels (both backends) are in `src/dashboard/components/labels/`; see its
+  `CLAUDE.md`. `Backend.supportsLabels(assetType)` gates every labels control.
+
 ## Assets and icons
 
 Static assets live in `public/`. The GUI also ships with sample project
