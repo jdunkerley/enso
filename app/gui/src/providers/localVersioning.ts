@@ -11,6 +11,7 @@
  * `projectStates.ts` tells the store when a local project is initialized and when it stops
  * (`watchProject`, `unwatchProject`); the store does not read the opened projects itself.
  */
+import RepositoryPromptModal from '$/components/LocalVersioning/RepositoryPromptModal.vue'
 import { useModals, type ModalsStore } from '$/providers/modals'
 import type { FlushOutcome } from '$/providers/openedProjects/project/flush'
 import { useText } from '$/providers/text'
@@ -20,6 +21,7 @@ import { createGlobalState } from '@vueuse/core'
 import { extractTypeAndPath, type Path, type ProjectId } from 'enso-common/src/services/Backend'
 import { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { VersioningStatus } from 'enso-common/src/services/ProjectManager/types'
+import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { shallowReactive } from 'vue'
 import { useBackends } from './backends'
 
@@ -44,7 +46,11 @@ export interface RepositoryPromptsState {
 /** The part of {@link LocalBackend} the store calls (tests stub just this). */
 export type LocalVersioningBackend = Pick<
   LocalBackend,
-  'rootPath' | 'versioningStatus' | 'enableVersioningIfInside'
+  | 'rootPath'
+  | 'versioningStatus'
+  | 'enableVersioningIfInside'
+  | 'initVersioning'
+  | 'enableVersioning'
 >
 
 /** What the store works with; the app's are {@link useLocalVersioning}'s, tests pass their own. */
@@ -70,6 +76,18 @@ interface WatchedProject {
   failing: boolean
 }
 
+/** What became of {@link LocalVersioningStore.offerRepository}. */
+export type RepositoryOffer =
+  /** The repository is enabled: versions are kept. */
+  | 'ready'
+  /** The user chose Not now or Don't ask again, earlier or now, or opted out. */
+  | 'declined'
+  /** No repository, and the project is outside the local root: none is offered. */
+  | 'outsideRoot'
+  | 'noGit'
+  /** Not watched, no local backend, or quitting. */
+  | 'unavailable'
+
 const TIMED_OUT = Symbol('timed out')
 
 /** Create the store. The app uses the global one, {@link useLocalVersioning}. */
@@ -87,6 +105,9 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   const pending = new Map<ProjectId, Promise<void>>()
   /** Repositories already offered to `enableVersioningIfInside` this session. */
   const offeredToShim = new Set<string>()
+  let quitting = false
+  /** Folders answered "Not now" this session. */
+  const notNowThisSession = new Set<string>()
 
   /** Wait for `promise`, at most {@link requestTimeoutMs}. */
   async function withTimeout(promise: Promise<void>): Promise<void | typeof TIMED_OUT> {
@@ -231,7 +252,106 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     return statuses.get(projectId)?.enabled === true
   }
 
-  return { watchProject, unwatchProject, refresh, statusOf, isStatusUnknown, isVersioned }
+  /** Whether `path` is `folder` or inside it; both are the GUI's own spellings of local paths. */
+  function isAtOrUnder(path: string, folder: string) {
+    return path === folder || path.startsWith(folder.endsWith('/') ? folder : `${folder}/`)
+  }
+
+  async function askRepository(kind: 'create' | 'use', folder: string) {
+    let dontAskAgain = false
+    const answer = await deps.modals.ask(RepositoryPromptModal, {
+      kind,
+      folder,
+      onDontAskAgain: () => {
+        dontAskAgain = true
+      },
+    })
+    return (
+      answer === 'confirm' ? 'accept'
+      : dontAskAgain ? 'dontAskAgain'
+      : 'notNow'
+    )
+  }
+
+  /**
+   * Make sure the project's repository is enabled, asking once if need be: Create when there is
+   * none (at the local root), Use for an existing one the provider could not enable silently.
+   * Nothing is asked while quitting, or again after "Don't ask again"; "Not now" is remembered for
+   * the session, but only a `'close'` honours it.
+   */
+  async function offerRepository(
+    projectId: ProjectId,
+    reason: 'close' | 'save',
+  ): Promise<RepositoryOffer> {
+    const project = watched.get(projectId)
+    const backend = deps.localBackend()
+    if (project == null || backend == null || quitting) return 'unavailable'
+    await refresh(projectId)
+    const status = statuses.get(projectId)
+    if (status == null) return 'unavailable'
+    if (!status.git) return 'noGit'
+    if (status.enabled) return 'ready'
+    if (status.optedOut) return 'declined'
+    const kind = status.repoRoot == null ? 'create' : 'use'
+    const folder = status.repoRoot ?? backend.rootPath()
+    // A saved local directory outside the root is versioned only if already in a repository.
+    if (kind === 'create' && !isAtOrUnder(project.path, folder)) return 'outsideRoot'
+    const { declinedRoots, declinedRepositories } = deps.prompts.getState()
+    if ((kind === 'create' ? declinedRoots : declinedRepositories).includes(folder)) {
+      return 'declined'
+    }
+    if (reason === 'close' && notNowThisSession.has(folder)) return 'declined'
+    switch (await askRepository(kind, folder)) {
+      case 'notNow':
+        notNowThisSession.add(folder)
+        return 'declined'
+      case 'dontAskAgain':
+        deps.prompts.setState(
+          kind === 'create' ?
+            { declinedRoots: [...declinedRoots, folder] }
+          : { declinedRepositories: [...declinedRepositories, folder] },
+        )
+        return 'declined'
+      case 'accept':
+        try {
+          if (kind === 'create') await backend.initVersioning(folder)
+          else await backend.enableVersioning(folder)
+        } catch (error) {
+          deps.toasts.show(
+            `${deps.getText('versioningSetupError')}: ${getMessageOrToString(error)}`,
+            {
+              type: 'error',
+            },
+          )
+          return 'declined'
+        }
+        await refresh(projectId)
+        return statuses.get(projectId)?.enabled === true ? 'ready' : 'declined'
+    }
+  }
+
+  /** While quitting nothing is asked. */
+  function setQuitting(value: boolean) {
+    quitting = value
+  }
+
+  /** Forget every "Don't ask again" and "Not now". */
+  function resetPrompts() {
+    deps.prompts.setState({ declinedRoots: [], declinedRepositories: [] })
+    notNowThisSession.clear()
+  }
+
+  return {
+    watchProject,
+    unwatchProject,
+    refresh,
+    statusOf,
+    isStatusUnknown,
+    isVersioned,
+    offerRepository,
+    setQuitting,
+    resetPrompts,
+  }
 }
 
 /** The store's type. */

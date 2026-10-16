@@ -198,6 +198,9 @@ interface PlaceholderOverrides {
 
   readonly xTags: [count: number]
 
+  readonly versioningCreateMessage: [folder: string]
+  readonly versioningUseMessage: [repository: string]
+
   readonly dragAnnouncementOneAsset: [assetTitle: string]
   readonly dragAnnouncementAssets: [count: number]
   readonly dragAnnouncementStarted: [assets: string]

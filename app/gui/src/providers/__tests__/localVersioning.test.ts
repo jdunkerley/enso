@@ -49,6 +49,8 @@ function setup(backendOverrides: Partial<LocalVersioningBackend> = {}) {
     rootPath: () => ROOT,
     versioningStatus: vi.fn(async (_path: Path) => status()),
     enableVersioningIfInside: vi.fn(async () => ({ enabled: false })),
+    initVersioning: vi.fn(async (root: Path) => ({ repoRoot: root })),
+    enableVersioning: vi.fn(async () => {}),
     ...backendOverrides,
   }
   const modals = createModalsStore()
@@ -291,5 +293,130 @@ describe('a repository that is not enabled', () => {
     store.watchProject(PROJECT, FLUSHED)
     await vi.advanceTimersByTimeAsync(0)
     expect(enableVersioningIfInside).not.toHaveBeenCalled()
+  })
+})
+
+/** Answer the repository prompt on top of the stack, and take it off, as the host would. */
+async function answerPrompt(
+  modals: ReturnType<typeof createModalsStore>,
+  answer: 'accept' | 'notNow' | 'dontAskAgain',
+) {
+  await vi.waitFor(() => expect(modals.stack.value).toHaveLength(1))
+  const entry = modals.stack.value[0]!
+  const props = entry.props as {
+    onConfirm: () => Promise<void>
+    onCancel: () => Promise<void>
+    onDontAskAgain: () => void
+  }
+  if (answer === 'accept') await props.onConfirm()
+  else {
+    if (answer === 'dontAskAgain') props.onDontAskAgain()
+    await props.onCancel()
+  }
+  modals.close(entry.key)
+}
+
+describe('offerRepository', () => {
+  const noRepository = () => status({ repoRoot: null, enabled: false, changed: true })
+
+  test('Create makes a repository at the root; the project is then versioned', async () => {
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockResolvedValueOnce(noRepository())
+      .mockResolvedValueOnce(noRepository())
+      .mockResolvedValue(status({ changed: true }))
+    const { backend, modals, store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    const offered = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'accept')
+    await expect(offered).resolves.toBe('ready')
+    expect(backend.initVersioning).toHaveBeenCalledWith(ROOT)
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('Not now: a close does not ask again this session, a save does', async () => {
+    const { modals, store } = setup({ versioningStatus: vi.fn(async () => noRepository()) })
+    store.watchProject(PROJECT, FLUSHED)
+    const first = store.offerRepository(PROJECT, 'close')
+    await answerPrompt(modals, 'notNow')
+    await expect(first).resolves.toBe('declined')
+    await expect(store.offerRepository(PROJECT, 'close')).resolves.toBe('declined')
+    expect(modals.stack.value).toHaveLength(0)
+    const save = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'notNow')
+    await expect(save).resolves.toBe('declined')
+  })
+
+  test("Don't ask again is remembered per root, until reset", async () => {
+    const { modals, prompts, store } = setup({
+      versioningStatus: vi.fn(async () => noRepository()),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    const first = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'dontAskAgain')
+    await expect(first).resolves.toBe('declined')
+    expect(prompts.getState().declinedRoots).toEqual([ROOT])
+    await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('declined')
+    expect(modals.stack.value).toHaveLength(0)
+    store.resetPrompts()
+    expect(prompts.getState()).toEqual({ declinedRoots: [], declinedRepositories: [] })
+    void store.offerRepository(PROJECT, 'save')
+    await vi.waitFor(() => expect(modals.stack.value).toHaveLength(1))
+  })
+
+  test('Use enables an existing repository outside the root', async () => {
+    const outside = status({ repoRoot: Path('/'), enabled: false })
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockResolvedValueOnce(outside)
+      .mockResolvedValueOnce(outside)
+      .mockResolvedValue(status({ repoRoot: Path('/') }))
+    const { backend, modals, store } = setup({ versioningStatus })
+    store.watchProject(PROJECT, FLUSHED)
+    const offered = store.offerRepository(PROJECT, 'save')
+    await answerPrompt(modals, 'accept')
+    await expect(offered).resolves.toBe('ready')
+    expect(backend.enableVersioning).toHaveBeenCalledWith('/')
+  })
+
+  test('a repository the user turned off is not offered', async () => {
+    const { modals, store } = setup({
+      versioningStatus: vi.fn(async () => status({ enabled: false, optedOut: true })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('declined')
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('nothing is asked while quitting', async () => {
+    const { modals, store } = setup({ versioningStatus: vi.fn(async () => noRepository()) })
+    store.watchProject(PROJECT, FLUSHED)
+    store.setQuitting(true)
+    await expect(store.offerRepository(PROJECT, 'close')).resolves.toBe('unavailable')
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('nothing is asked for a project outside the root with no repository', async () => {
+    const { modals, store } = setup({ versioningStatus: vi.fn(async () => noRepository()) })
+    const elsewhere = newProjectId(Path('/elsewhere/Q'))
+    store.watchProject(elsewhere, FLUSHED)
+    await expect(store.offerRepository(elsewhere, 'save')).resolves.toBe('outsideRoot')
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('nothing is asked without git', async () => {
+    const { modals, store } = setup({
+      versioningStatus: vi.fn(async () => status({ git: false, repoRoot: null, enabled: false })),
+    })
+    store.watchProject(PROJECT, FLUSHED)
+    await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('noGit')
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('an enabled repository needs no question', async () => {
+    const { modals, store } = setup()
+    store.watchProject(PROJECT, FLUSHED)
+    await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('ready')
+    expect(modals.stack.value).toHaveLength(0)
   })
 })
