@@ -969,3 +969,122 @@ describe('enableIfInside', () => {
     })
   })
 })
+
+describe('history across moves', () => {
+  /** A, saved twice, moved to `folder/A`, and saved once more. */
+  async function movedProject(root: string, versioning: LocalVersioning) {
+    const a = path.join(root, 'A')
+    const first = (await versioning.commit([a], 'first')).id!
+    await writeFiles(root, {
+      'A/src/Main.enso': 'main = 2\n',
+      'A/src/Extra.enso': 'x = 1\n',
+    })
+    const second = (await versioning.commit([a], 'second')).id!
+    await fs.mkdir(path.join(root, 'folder'))
+    await fs.rename(a, path.join(root, 'folder', 'A'))
+    await versioning.commitMove(a, path.join(root, 'folder', 'A'), ({ to }) => `Moved A to ${to}`)
+    const moved = await git(root, 'rev-parse', 'HEAD')
+    await writeFiles(root, { 'folder/A/src/Main.enso': 'main = 3\n' })
+    const third = (await versioning.commit([path.join(root, 'folder', 'A')], 'third')).id!
+    return { first, second, moved, third, project: path.join(root, 'folder', 'A') }
+  }
+
+  test('log lists the versions from before the move, newest first', async () => {
+    await withRepo(async (root, versioning) => {
+      const { first, second, moved, third, project } = await movedProject(root, versioning)
+      const log = await versioning.log(project)
+      expect(log.map((v) => v.id)).toEqual([third, moved, second, first])
+      expect(log.map((v) => v.comment)).toEqual(['third', 'Moved A to folder/A', 'second', 'first'])
+      expect(log.map((v) => v.isLatest)).toEqual([true, false, false, false])
+      expect(log[0]).not.toHaveProperty('relativePath')
+    })
+  })
+
+  test('follows a chain of moves', async () => {
+    await withRepo(async (root, versioning) => {
+      const first = (await versioning.commit([path.join(root, 'A')], 'first')).id!
+      await fs.rename(path.join(root, 'A'), path.join(root, 'B2'))
+      await versioning.commitMove(path.join(root, 'A'), path.join(root, 'B2'), 'Renamed to B2')
+      await fs.rename(path.join(root, 'B2'), path.join(root, 'C'))
+      await versioning.commitMove(path.join(root, 'B2'), path.join(root, 'C'), 'Renamed to C')
+      const log = await versioning.log(path.join(root, 'C'))
+      expect(log.map((v) => v.comment)).toEqual(['Renamed to C', 'Renamed to B2', 'first'])
+      expect(log.at(-1)?.id).toBe(first)
+    })
+  })
+
+  test('ignores a trailer naming a path outside the repository', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      await versioning.commit([a], 'first')
+      await writeFiles(root, { 'A/src/Main.enso': 'main = 2\n' })
+      await git(root, 'add', '-A', '--', 'A')
+      await git(root, 'commit', '-q', '-m', 'Hand-made', '-m', 'Enso-Moved-From: ../B', '--', 'A')
+      const log = await versioning.log(a)
+      expect(log.map((v) => v.comment)).toEqual(['Hand-made', 'first'])
+    })
+  })
+
+  test('fileAt reads a version from before the move at its old path', async () => {
+    await withRepo(async (root, versioning) => {
+      const { first, project } = await movedProject(root, versioning)
+      expect(await versioning.fileAt(project, first, 'src/Main.enso')).toBe('main = 1\n')
+    })
+  })
+
+  test('exportAt exports a version from before the move', async () => {
+    await withRepo(async (root, versioning) => {
+      const { second, project } = await movedProject(root, versioning)
+      const target = path.join(path.dirname(root), 'exported')
+      await versioning.exportAt(project, second, target)
+      expect(await fs.readFile(path.join(target, 'src', 'Main.enso'), 'utf8')).toBe('main = 2\n')
+      expect(await fs.readFile(path.join(target, 'src', 'Extra.enso'), 'utf8')).toBe('x = 1\n')
+    })
+  })
+
+  test('restore brings a version from before the move back to the current path', async () => {
+    await withRepo(async (root, versioning) => {
+      const { first, project } = await movedProject(root, versioning)
+      const { id } = await versioning.restore(project, first)
+      expect(await fs.readFile(path.join(project, 'src', 'Main.enso'), 'utf8')).toBe('main = 1\n')
+      await expect(fs.access(path.join(project, 'src', 'Extra.enso'))).rejects.toThrow()
+      await expect(fs.access(path.join(root, 'A'))).rejects.toThrow()
+      expect(await git(root, 'log', '-1', '--format=%H')).toBe(id)
+      expect(await git(root, 'log', '-1', '--format=%s')).toMatch(/^Restored version from /)
+      expect(await git(root, 'status', '--porcelain', '--', 'folder/A')).toBe('')
+      await fs.access(path.join(project, '.enso', 'project.json'))
+    })
+  })
+
+  test('a version from before the move can be commented', async () => {
+    await withRepo(async (root, versioning) => {
+      const { first, project } = await movedProject(root, versioning)
+      await versioning.setComment(project, first, 'The original')
+      expect((await versioning.log(project)).at(-1)?.comment).toBe('The original')
+    })
+  })
+})
+
+describe('setComment with an empty comment', () => {
+  test('removes the note, so the commit message shows again', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const { id } = await versioning.commit([a], 'Saved')
+      await versioning.setComment(a, id!, 'Mine')
+      await versioning.setComment(a, id!, '  ')
+      expect((await versioning.log(a))[0]?.comment).toBe('Saved')
+      await versioning.setComment(a, id!, '')
+    })
+  })
+
+  test('works without a git identity (the notes commit uses the fallback)', async () => {
+    await withProjects(async (root, versioning) => {
+      await versioning.init(root)
+      const a = path.join(root, 'A')
+      const { id } = await versioning.commit([a], 'Saved')
+      await versioning.setComment(a, id!, 'Mine')
+      await versioning.setComment(a, id!, '')
+      expect((await versioning.log(a))[0]?.comment).toBe('Saved')
+    })
+  })
+})

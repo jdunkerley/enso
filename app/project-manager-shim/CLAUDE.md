@@ -199,7 +199,8 @@ is never versioned even in a repository that tracks it.
 
 Comments on versions are git notes under `refs/notes/enso`. Each commit has at
 most one; `setComment` overwrites it. `log` shows the note, else the commit
-message without any `Enso-Moved-From` trailer.
+message without any `Enso-Moved-From` trailer. An empty comment removes the note
+(`notes remove`, with the identity fallback).
 
 ### Close hook and moves
 
@@ -214,7 +215,14 @@ close still succeeds.
 
 A rename (`renameProject`) or a filesystem move of a project directory commits
 both paths together (`commitMove`), with an `Enso-Moved-From: <old path>`
-trailer (repository-relative) so the earlier history can be followed (PR 5).
+trailer (repository-relative). `log` follows it: when the oldest commit at the
+current path carries the trailer, the commits before it at the old path follow
+(at most 100 moves). A trailer path that is not plain and repository-relative
+(absolute, with `.`/`..` segments, starting with `:` or `-`) is ignored, since
+anyone can write a commit message. `fileAt`, `exportAt` and `restore` use the
+path the project had at the version; a restore across a move replaces the
+current path's files with the old path's tree (`rm --cached`,
+`read-tree --prefix`, `restore --worktree`, `clean`).
 
 ### Timeouts and robustness
 
@@ -244,5 +252,7 @@ trailer (repository-relative) so the earlier history can be followed (PR 5).
   old path's removal uncommitted.
 - Deleting a project, or moving a folder that contains projects, leaves the
   removal uncommitted too; it shows in the user's `git status`.
-- `log` does not yet follow `Enso-Moved-From`, so a renamed project lists only
-  its versions since the rename (PR 5).
+- A restore across a move does not work in a repository that tracks a project's
+  `.enso/`: `read-tree --prefix` fails with "already exists", by which point
+  only the index has changed. Nor can a version from before a move be restored
+  into a project at the repository root.
