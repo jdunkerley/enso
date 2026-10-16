@@ -273,10 +273,7 @@ export class EnsoRunner implements Runner {
   /** Creates a new EnsoRunner with the path to the Enso executable. */
   constructor(private ensoPath: Path) {}
 
-  private async runProcess<T extends childProcess.ChildProcess>(
-    args: readonly string[],
-    spawnCallback: (cmd: string, cmdArgs: readonly string[]) => T,
-  ) {
+  private resolveCommandAndArgs(args: readonly string[]): [string, readonly string[]] {
     const [cmd, cmdArgs] =
       this.ensoPath.endsWith('.bat') ?
         ['cmd.exe', ['/c', this.ensoPath, ...args]]
@@ -285,6 +282,14 @@ export class EnsoRunner implements Runner {
     if (isDevMode) {
       console.log('runProcess', cmd, cmdArgs.join(' '))
     }
+    return [cmd, cmdArgs]
+  }
+
+  private async runProcess<T extends childProcess.ChildProcess>(
+    args: readonly string[],
+    spawnCallback: (cmd: string, cmdArgs: readonly string[]) => T,
+  ) {
+    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args)
     return spawnCallback(cmd, cmdArgs)
   }
 
@@ -292,15 +297,7 @@ export class EnsoRunner implements Runner {
     args: readonly string[],
     options?: childProcess.SpawnOptionsWithoutStdio,
   ): Promise<void> {
-    const [cmd, cmdArgs] =
-      this.ensoPath.endsWith('.bat') ?
-        ['cmd.exe', ['/c', this.ensoPath, ...args]]
-      : [this.ensoPath, args]
-
-    const isDevMode = process.env.NODE_ENV === 'development'
-    if (isDevMode) {
-      console.log('runProcess', cmd, cmdArgs.join(' '))
-    }
+    const [cmd, cmdArgs] = this.resolveCommandAndArgs(args)
 
     const commandOptions: { readonly cwd?: string; readonly env?: NodeJS.ProcessEnv } | undefined =
       !options ? undefined : (

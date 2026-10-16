@@ -34,34 +34,44 @@ export function runCommand(
   options?: { readonly cwd?: string; readonly env?: NodeJS.ProcessEnv; readonly input?: string },
 ): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    const process = childProcess.spawn(command, args as string[], {
+    const child = childProcess.spawn(command, args as string[], {
       cwd: options?.cwd,
       env: options?.env,
       shell: false,
       windowsHide: true,
     })
 
-    let stdout = ''
-    let stderr = ''
+    const stdoutChunks: Buffer[] = []
+    const stderrChunks: Buffer[] = []
 
-    process.stdout.on('data', (data) => {
-      stdout += data.toString()
+    child.stdout.on('data', (data) => {
+      stdoutChunks.push(data instanceof Buffer ? data : Buffer.from(data))
     })
 
-    process.stderr.on('data', (data) => {
-      stderr += data.toString()
+    child.stderr.on('data', (data) => {
+      stderrChunks.push(data instanceof Buffer ? data : Buffer.from(data))
     })
 
     if (options?.input) {
-      process.stdin.write(options.input)
-      process.stdin.end()
+      child.stdin.write(options.input)
     }
 
-    process.on('error', (error) => {
+    // Always close stdin (even with no input, so children reading to EOF don't hang)
+    child.stdin.end()
+
+    // Handle stdin errors (e.g., EPIPE when child exits before reading)
+    child.stdin.on('error', () => {
+      // Ignore stdin errors; exit code will determine outcome
+    })
+
+    child.on('error', (error) => {
       reject(error)
     })
 
-    process.on('close', (code) => {
+    child.on('close', (code) => {
+      const stdout = Buffer.concat(stdoutChunks).toString('utf8')
+      const stderr = Buffer.concat(stderrChunks).toString('utf8')
+
       if (code === 0) {
         resolve({ stdout, stderr })
       } else {
