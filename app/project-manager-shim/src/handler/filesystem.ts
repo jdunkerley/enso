@@ -11,6 +11,7 @@ import * as yaml from 'yaml'
 import { getEngineLogDirectory } from '../distributionManager.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import { updateJsonFile } from '../localMetadata/jsonFile.js'
+import { readPackageLabels, readProjectLabels } from '../localMetadata/packageYaml.js'
 import * as projectManagement from '../projectManagement.js'
 import { resolveClashingProjectIds } from '../projectService/resolveClashingProjectIds.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
@@ -163,13 +164,17 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-/** The label names stored in a parsed `project.json`, ignoring anything malformed. */
-function extractProjectLabels(jsonObj: unknown): readonly string[] {
-  if (typeof jsonObj !== 'object' || jsonObj == null || !('labels' in jsonObj)) return []
-  const labels = jsonObj.labels
-  return Array.isArray(labels) ?
-      labels.filter((label): label is string => typeof label === 'string')
-    : []
+/**
+ * The label names of the project at `projectPath`. A failure to move old labels into
+ * `package.yaml` is logged and the labels already there are used, so the project still lists.
+ */
+async function readLabels(projectPath: string): Promise<readonly string[]> {
+  try {
+    return await readProjectLabels(projectPath)
+  } catch (error) {
+    console.error(`Failed to read the labels of '${projectPath}':`, error)
+    return readPackageLabels(projectPath)
+  }
 }
 
 /**
@@ -411,7 +416,7 @@ export async function getFileSystemEntry(entryPath: string): Promise<FileSystemE
   return (await readFileSystemEntry(entryPath)).entry
 }
 
-/** Read a file system entry, and for a project the label names stored in its `project.json`. */
+/** Read a file system entry, and for a project the label names stored in its `package.yaml`. */
 async function readFileSystemEntry(
   entryPath: string,
 ): Promise<{ readonly entry: FileSystemEntry; readonly labels: readonly string[] }> {
@@ -468,7 +473,7 @@ async function readFileSystemEntry(
             attributes,
             metadata,
           },
-          labels: extractProjectLabels(projectMetadataJson),
+          labels: await readLabels(entryPath),
         }
       } else {
         // This error moves control flow to the

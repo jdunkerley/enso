@@ -42,4 +42,13 @@ describe('package.yaml labels', () => {
     withTempDirectory(async (dir) => {
       await expect(writePackageLabels(dir, ['a'])).rejects.toThrow()
     }))
+
+  test('a package.yaml with a syntax error is not rewritten', () =>
+    withTempDirectory(async (dir) => {
+      const broken = 'name: Example\nlist: [unclosed\n'
+      await project(dir, broken)
+      await expect(writePackageLabels(dir, ['a'])).rejects.toThrow(/package\.yaml/)
+      expect(await fs.readFile(path.join(dir, 'package.yaml'), 'utf8')).toBe(broken)
+      expect((await fs.readdir(dir)).filter((name) => name.includes('.tmp-'))).toEqual([])
+    }))
 })

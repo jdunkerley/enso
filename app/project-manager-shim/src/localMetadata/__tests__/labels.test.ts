@@ -4,6 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { LABELS_FILE_NAME, LocalMetadata } from '../index.js'
+import { readPackageLabels, readProjectLabels, writePackageLabels } from '../packageYaml.js'
 import { createProject, readProjectJson } from './testUtils.js'
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -122,20 +123,20 @@ describe('resolveLabelNames', () => {
 })
 
 describe('setProjectLabels', () => {
-  test('writes labels and keeps every other field', async () => {
+  test('writes package.yaml, not project.json, and keeps every other field', async () => {
     const project = await createProject(path.join(root, 'P'), 'id-1', {
       lastOpened: '2026-02-02T00:00:00.000Z',
       extra: { keep: true },
     })
     await store.createLabel(LabelName('a'), COLORS[0])
     await store.setProjectLabels(project, ['a'])
+    expect(await readPackageLabels(project)).toEqual(['a'])
     expect(await readProjectJson(project)).toEqual({
       id: 'id-1',
       kind: 'UserProject',
       created: '2026-01-01T00:00:00.000Z',
       lastOpened: '2026-02-02T00:00:00.000Z',
       extra: { keep: true },
-      labels: ['a'],
     })
   })
 
@@ -144,13 +145,22 @@ describe('setProjectLabels', () => {
     const gone = await store.createLabel(LabelName('gone'), COLORS[0])
     await store.deleteLabel(gone.id)
     await store.setProjectLabels(project, ['new', 'gone', 'new'])
-    expect((await readProjectJson(project)).labels).toEqual(['new'])
+    expect(await readPackageLabels(project)).toEqual(['new'])
     expect((await store.listLabels()).map((label) => label.value)).toEqual(['new'])
   })
 
   test('an empty list removes the field', async () => {
     const project = await createProject(path.join(root, 'P'), 'id-1', { labels: ['a'] })
+    await writePackageLabels(project, ['a'])
     await store.setProjectLabels(project, [])
+    expect(await readPackageLabels(project)).toEqual([])
+    expect(await readProjectJson(project)).not.toHaveProperty('labels')
+  })
+
+  test('labels left in project.json are removed when package.yaml is written', async () => {
+    const project = await createProject(path.join(root, 'P'), 'id-1', { labels: ['old'] })
+    await store.setProjectLabels(project, ['a'])
+    expect(await readPackageLabels(project)).toEqual(['a'])
     expect(await readProjectJson(project)).not.toHaveProperty('labels')
   })
 
@@ -165,5 +175,28 @@ describe('setProjectLabels', () => {
     await fs.writeFile(path.join(project, '.enso', 'project.json'), '{bad')
     await expect(store.setProjectLabels(project, ['a'])).rejects.toThrow()
     expect(await fs.readFile(path.join(project, '.enso', 'project.json'), 'utf8')).toBe('{bad')
+  })
+})
+
+describe('readProjectLabels', () => {
+  test('labels left in project.json move to package.yaml on read', async () => {
+    const project = await createProject(path.join(root, 'P'), 'id-1', { labels: ['old'] })
+    expect(await readProjectLabels(project)).toEqual(['old'])
+    expect(await readPackageLabels(project)).toEqual(['old'])
+    expect(await readProjectJson(project)).not.toHaveProperty('labels')
+  })
+
+  test("package.yaml's labels win over project.json's", async () => {
+    const project = await createProject(path.join(root, 'P'), 'id-1', { labels: ['old'] })
+    await writePackageLabels(project, ['new'])
+    expect(await readProjectLabels(project)).toEqual(['new'])
+    expect(await readProjectJson(project)).not.toHaveProperty('labels')
+  })
+
+  test('a project without labels anywhere has none and project.json is untouched', async () => {
+    const project = await createProject(path.join(root, 'P'), 'id-1')
+    const before = await fs.readFile(path.join(project, '.enso', 'project.json'), 'utf8')
+    expect(await readProjectLabels(project)).toEqual([])
+    expect(await fs.readFile(path.join(project, '.enso', 'project.json'), 'utf8')).toBe(before)
   })
 })

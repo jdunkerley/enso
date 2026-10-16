@@ -52,7 +52,11 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
   }
 }
 
-async function renameWithRetry(from: string, to: string): Promise<void> {
+/**
+ * Rename `from` over `to`, retrying a few times on the errors Windows reports while another
+ * process briefly holds either file.
+ */
+export async function renameWithRetry(from: string, to: string): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       await fs.rename(from, to)

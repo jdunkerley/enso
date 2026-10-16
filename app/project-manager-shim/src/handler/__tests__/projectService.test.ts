@@ -5,8 +5,9 @@ import type { AddressInfo } from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createProject, readProjectJson } from '../../localMetadata/__tests__/testUtils.js'
+import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import { LocalMetadata } from '../../localMetadata/index.js'
+import { readPackageLabels } from '../../localMetadata/packageYaml.js'
 import { handleProjectServiceRequest } from '../projectService.js'
 
 let root: string
@@ -74,7 +75,7 @@ describe('label routes', () => {
   test('project/set-labels writes the project', async () => {
     const project = await createProject(path.join(root, 'P'), 'id-1')
     expect((await call('project/set-labels', { path: project, labels: ['a'] })).result).toBeNull()
-    expect((await readProjectJson(project)).labels).toEqual(['a'])
+    expect(await readPackageLabels(project)).toEqual(['a'])
   })
 })
 

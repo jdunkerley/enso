@@ -19,6 +19,7 @@ import {
   updateJsonFile,
   writeJsonAtomic,
 } from './jsonFile.js'
+import { writePackageLabels } from './packageYaml.js'
 
 export const LABELS_FILE_NAME = 'labels.json'
 export const RECENT_FILE_NAME = 'recent.json'
@@ -74,7 +75,8 @@ const EMPTY_LABELS_FILE: LabelsFile = { labels: [], deletedNames: [] }
  * - `<userData>/recent.json` holds the recently opened projects, newest first, at most
  *   {@link RECENT_LIMIT}, unique by project UUID: `{ version: 1, entries: RecentEntry[] }`.
  * - Each project's labels are an optional `labels: string[]` of label names in its
- *   `.enso/project.json`. Other fields of that file are preserved.
+ *   `package.yaml` (see `readProjectLabels`); the engine preserves the key. Labels written
+ *   to `.enso/project.json` by earlier versions are moved over when read.
  *
  * A label name on a project counts only while `labels.json` has a label of that name. A name
  * that is neither a label nor a deleted label (for example on a project copied from another
@@ -170,20 +172,23 @@ export class LocalMetadata implements ProjectLifecycleListener {
 
   /**
    * Replace the labels of the project at `projectPath`. Names of deleted labels are dropped, and
-   * unknown names are added to `labels.json`. An empty list removes the field.
-   * @throws {Error} when `projectPath` holds no project, or its `project.json` cannot be parsed.
+   * unknown names are added to `labels.json`. An empty list removes the key from `package.yaml`.
+   * Any `labels` left in `project.json` are removed.
+   * @throws {Error} when `projectPath` holds no project, or its `package.yaml` or `project.json`
+   * cannot be parsed.
    */
   async setProjectLabels(projectPath: string, names: readonly string[]): Promise<void> {
     const projectJsonPath = path.join(projectPath, PROJECT_METADATA_RELATIVE_PATH)
     await assertProjectDirectory(projectPath)
     const live = await this.resolveLabelNames(names)
     const labels = [...new Set(names)].filter((name) => live.has(name))
+    await writePackageLabels(projectPath, labels)
     await updateJsonFile(projectJsonPath, (current) => {
       if (!isRecord(current)) {
         throw new Error(`'${projectJsonPath}' does not hold project metadata.`)
       }
       const { labels: _old, ...rest } = current
-      return labels.length === 0 ? rest : { ...rest, labels }
+      return rest
     })
   }
 
