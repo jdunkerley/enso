@@ -474,13 +474,26 @@ export class ProjectManager {
     return { ...status, repoRoot: status.repoRoot && normalizeSlashes(status.repoRoot) }
   }
 
-  /** Start versioning the projects under `rootPath`. */
+  /** Start versioning the projects under `rootPath` in a new repository, which is enabled. */
   async initVersioning(rootPath: Path): Promise<{ readonly repoRoot: Path }> {
     const result: { readonly repoRoot: Path } = await this.runProjectServiceCommand(
       'versioning/init',
       { rootPath },
     )
     return { repoRoot: normalizeSlashes(result.repoRoot) }
+  }
+
+  /**
+   * Agree to have the existing repository at `repoRoot` versioned. Until then nothing is committed
+   * to it, on close or otherwise.
+   */
+  async enableVersioning(repoRoot: Path): Promise<void> {
+    await this.runProjectServiceCommand('versioning/enable', { repoRoot })
+  }
+
+  /** Stop versioning the repository at `repoRoot`. Its history is left as it is. */
+  async disableVersioning(repoRoot: Path): Promise<void> {
+    await this.runProjectServiceCommand('versioning/disable', { repoRoot })
   }
 
   /** Save the project's current state as a version. `id` is `null` when nothing had changed. */

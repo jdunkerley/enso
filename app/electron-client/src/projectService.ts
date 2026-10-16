@@ -7,7 +7,7 @@ import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
-import { LocalVersioning } from 'project-manager-shim/localVersioning'
+import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
@@ -21,9 +21,11 @@ export function getLocalMetadata(): LocalMetadata {
   return localMetadata
 }
 
-/** The git-based versioning of local projects. */
+/** The git-based versioning of local projects; the repositories it may use are kept in `userData`. */
 export function getLocalVersioning(): LocalVersioning {
-  localVersioning ??= new LocalVersioning()
+  localVersioning ??= new LocalVersioning({
+    consent: new VersioningConsent({ userDataDirectory: app.getPath('userData') }),
+  })
   return localVersioning
 }
 

@@ -279,6 +279,11 @@ export interface VersioningStatus {
   readonly lastVersion: VersionSummary | null
   /** Git's message when the repository cannot be used (mid-merge, locked, ...). */
   readonly blocked: string | null
+  /**
+   * Whether the user has agreed to have the repository versioned. Nothing is committed to a
+   * repository until it is enabled (see `ProjectManager.enableVersioning`).
+   */
+  readonly enabled: boolean
 }
 
 /** A saved version of a local project. */

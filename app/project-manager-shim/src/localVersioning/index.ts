@@ -10,7 +10,9 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { CommandError } from '../childProcess/runCommand.js'
-import { findGit, findRepoRoot, identityArgs, runGit } from './git.js'
+import type { VersioningConsent } from './consent.js'
+import { findGit, findRepoRoot, identityArgs, repositoryKey, runGit } from './git.js'
+export { VersioningConsent, type VersioningConsentOptions } from './consent.js'
 
 /** A saved version of a project. */
 export interface VersionSummary {
@@ -27,6 +29,11 @@ export interface VersioningStatus {
   readonly lastVersion: VersionSummary | null
   /** Git's message when the repository cannot be used (mid-merge, locked, …). */
   readonly blocked: string | null
+  /**
+   * Whether the user has agreed to have the repository versioned (see {@link VersioningConsent}).
+   * `false` when git is unavailable or there is no repository.
+   */
+  readonly enabled: boolean
 }
 
 /** A saved version of a project, with who made it and its comment. */
@@ -107,6 +114,7 @@ const NO_GIT: VersioningStatus = {
   changed: false,
   lastVersion: null,
   blocked: null,
+  enabled: false,
 }
 const NO_REPOSITORY: VersioningStatus = { ...NO_GIT, git: true }
 
@@ -131,8 +139,7 @@ const operations = new Map<string, Promise<unknown>>()
  * unlocked `…In` helpers, never a public method, so they cannot wait on themselves.
  */
 async function exclusive<T>(repoRoot: string, work: () => Promise<T>): Promise<T> {
-  const real = await fs.realpath(repoRoot).catch(() => path.resolve(repoRoot))
-  const key = process.platform === 'win32' ? real.toLowerCase() : real
+  const key = await repositoryKey(repoRoot)
   const previous = operations.get(key) ?? Promise.resolve()
   const result = previous.then(work, work)
   const tail = result.then(
@@ -227,8 +234,38 @@ function withoutMoveTrailer(message: string): string {
   return lines.join('\n').trim()
 }
 
-/** Versioning of local projects in git repositories. */
+/** Options for {@link LocalVersioning}. */
+export interface LocalVersioningOptions {
+  /** Which repositories the user has agreed to have versioned. Nothing else is ever committed to. */
+  readonly consent: VersioningConsent
+}
+
+/** The message of the error thrown for an operation on a repository that is not enabled. */
+export function notEnabledMessage(repoRoot: string): string {
+  return `Versioning is not enabled for the repository at ${repoRoot}.`
+}
+
+/**
+ * Versioning of local projects in git repositories.
+ *
+ * A repository is versioned only once it is *enabled* (see {@link LocalVersioning.enable}): the
+ * user's home folder or work monorepo may enclose their projects, and committing to it unasked
+ * would be wrong. Automatic commits skip a repository that is not enabled, and the operations
+ * that write to it (`commit`, `restore`, `setComment`) reject. Reading history never needs consent.
+ */
 export class LocalVersioning {
+  private readonly consent: VersioningConsent
+
+  /** Create versioning that commits only to the repositories `options.consent` has enabled. */
+  constructor(options: LocalVersioningOptions) {
+    this.consent = options.consent
+  }
+
+  /** Fails unless the repository at `repoRoot` is enabled. Call it only under the lock. */
+  private async assertEnabledIn(repoRoot: string): Promise<void> {
+    if (!(await this.consent.isEnabled(repoRoot))) throw new Error(notEnabledMessage(repoRoot))
+  }
+
   /** Whether `projectPath` is in a repository, has unsaved changes, and when it was last saved. */
   async status(projectPath: string): Promise<VersioningStatus> {
     if ((await findGit()) == null) return NO_GIT
@@ -239,6 +276,7 @@ export class LocalVersioning {
 
   private async statusIn(repoRoot: string, projectPath: string): Promise<VersioningStatus> {
     const blocked = await blockedReason(repoRoot)
+    const enabled = await this.consent.isEnabled(repoRoot)
     try {
       const relative = await repoRelative(repoRoot, projectPath)
       const run = (args: string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
@@ -263,16 +301,30 @@ export class LocalVersioning {
         const [id, date] = log.split('\0')
         if (id && date) lastVersion = { id, date }
       }
-      return { git: true, repoRoot, changed: changes.trim() !== '', lastVersion, blocked }
+      return {
+        git: true,
+        repoRoot,
+        changed: changes.trim() !== '',
+        lastVersion,
+        blocked,
+        enabled,
+      }
     } catch (error) {
       const locked = lockMessage(error)
       if (locked == null) throw error
-      return { git: true, repoRoot, changed: false, lastVersion: null, blocked: locked }
+      return { git: true, repoRoot, changed: false, lastVersion: null, blocked: locked, enabled }
     }
   }
 
-  /** `git init` in `rootPath`, and the root `.gitignore`. Returns the repository root. */
+  /**
+   * `git init` in `rootPath`, and the root `.gitignore`, and enable versioning for the new
+   * repository. Returns the repository root. Runs under the lock of the repository it creates.
+   */
   async init(rootPath: string): Promise<{ readonly repoRoot: string }> {
+    return exclusive(rootPath, () => this.initIn(rootPath))
+  }
+
+  private async initIn(rootPath: string): Promise<{ readonly repoRoot: string }> {
     await runGit(rootPath, ['init'])
     const ignoreFile = path.join(rootPath, '.gitignore')
     let existing = ''
@@ -288,7 +340,26 @@ export class LocalVersioning {
     }
     const repoRoot = await findRepoRoot(rootPath)
     if (repoRoot == null) throw new Error(`Failed to initialise a repository in ${rootPath}`)
+    await this.consent.enable(repoRoot)
     return { repoRoot }
+  }
+
+  /**
+   * Agree to have the repository at `repoRoot` versioned.
+   * @throws {Error} when `repoRoot` is not the root of a repository.
+   */
+  async enable(repoRoot: string): Promise<void> {
+    await exclusive(repoRoot, async () => {
+      const found = await findRepoRoot(repoRoot).catch(() => null)
+      if (found == null || (await repositoryKey(found)) !== (await repositoryKey(repoRoot)))
+        throw new Error(`${repoRoot} is not the root of a git repository.`)
+      await this.consent.enable(repoRoot)
+    })
+  }
+
+  /** Stop versioning the repository at `repoRoot`. Its history is left as it is. */
+  async disable(repoRoot: string): Promise<void> {
+    await exclusive(repoRoot, () => this.consent.disable(repoRoot))
   }
 
   /**
@@ -317,6 +388,7 @@ export class LocalVersioning {
       const repoRoot = await this.repositoryOf(newPath)
       if (repoRoot == null || repoRoot !== (await this.repositoryOf(oldPath))) return
       await exclusive(repoRoot, async () => {
+        if (!(await this.consent.isEnabled(repoRoot))) return
         const moved = {
           from: await repoRelative(repoRoot, oldPath),
           to: await repoRelative(repoRoot, newPath),
@@ -344,6 +416,7 @@ export class LocalVersioning {
    * These are automatic, path-scoped snapshots, so the user's hooks (`--no-verify` and
    * {@link AUTOMATIC}'s `core.hooksPath`) and commit signing, made for hand-written commits, never
    * apply: they could block or hang a close, or push a snapshot somewhere.
+   * @throws {Error} when the repository is not enabled (see {@link commitIfEnabled}).
    */
   async commit(paths: readonly string[], message: string): Promise<{ readonly id: string | null }> {
     const first = paths[0]
@@ -351,7 +424,28 @@ export class LocalVersioning {
     // A path may have just been moved away, so look for the repository from one that exists.
     const repoRoot = await findRepoRoot(await existingAncestor(first))
     if (repoRoot == null) throw new Error(`${first} is not in a git repository`)
-    return exclusive(repoRoot, () => this.commitIn(repoRoot, paths, message))
+    return exclusive(repoRoot, async () => {
+      await this.assertEnabledIn(repoRoot)
+      return this.commitIn(repoRoot, paths, message)
+    })
+  }
+
+  /**
+   * {@link commit} for automatic saves (a close): when there is no repository, git is not
+   * installed, or the repository is not enabled, nothing is recorded and `id` is `null`.
+   */
+  async commitIfEnabled(
+    paths: readonly string[],
+    message: string,
+  ): Promise<{ readonly id: string | null }> {
+    const first = paths[0]
+    if (first == null) return { id: null }
+    const repoRoot = await this.repositoryOf(first)
+    if (repoRoot == null) return { id: null }
+    return exclusive(repoRoot, async () => {
+      if (!(await this.consent.isEnabled(repoRoot))) return { id: null }
+      return this.commitIn(repoRoot, paths, message)
+    })
   }
 
   /** {@link commit} without the lock; `trailers` form the message's last paragraph. */
@@ -487,6 +581,7 @@ export class LocalVersioning {
     const repoRoot = await findRepoRoot(projectPath)
     if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
     await exclusive(repoRoot, async () => {
+      await this.assertEnabledIn(repoRoot)
       await this.assertProjectVersionIn(repoRoot, projectPath, id)
       try {
         await runGit(
@@ -534,6 +629,7 @@ export class LocalVersioning {
     const repoRoot = await findRepoRoot(projectPath)
     if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
     return exclusive(repoRoot, async () => {
+      await this.assertEnabledIn(repoRoot)
       const version = await this.assertProjectVersionIn(repoRoot, projectPath, id)
       await this.commitIn(repoRoot, [projectPath], 'Saved before restore')
       const relative = await repoRelative(repoRoot, projectPath)

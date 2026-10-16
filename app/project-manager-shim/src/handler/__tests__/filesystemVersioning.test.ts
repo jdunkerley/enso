@@ -3,8 +3,12 @@ import type * as http from 'node:http'
 import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
-import { withTempRepo, writeFiles } from '../../localVersioning/__tests__/testRepo.js'
-import { LocalVersioning } from '../../localVersioning/index.js'
+import {
+  versioningFor,
+  withTempRepo,
+  writeFiles,
+} from '../../localVersioning/__tests__/testRepo.js'
+import type { LocalVersioning } from '../../localVersioning/index.js'
 import { handleFilesystemCommand } from '../filesystem.js'
 
 const REQUEST = {} as http.IncomingMessage
@@ -24,7 +28,7 @@ async function move(from: string, to: string, versioning: LocalVersioning): Prom
 describe('filesystem-move of a project directory', () => {
   test('commits the removal and the addition with a message naming the new path', async () => {
     await withTempRepo(async (root) => {
-      const versioning = new LocalVersioning()
+      const versioning = versioningFor(root)
       await writeFiles(root, { 'A/package.yaml': 'name: A\n', 'A/src/Main.enso': 'main = 1\n' })
       await fs.mkdir(path.join(root, 'folder'))
       await versioning.init(root)
@@ -43,9 +47,23 @@ describe('filesystem-move of a project directory', () => {
     })
   })
 
+  test('a repository that is not enabled is left alone', async () => {
+    await withTempRepo(
+      async (root) => {
+        const versioning = versioningFor(root)
+        await writeFiles(root, { 'A/package.yaml': 'name: A\n', 'A/src/Main.enso': 'main = 1\n' })
+        await fs.mkdir(path.join(root, 'folder'))
+        await move(path.join(root, 'A'), path.join(root, 'folder', 'A'), versioning)
+        await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+        await fs.access(path.join(root, 'folder', 'A', 'package.yaml'))
+      },
+      { init: true },
+    )
+  })
+
   test('a plain directory move commits nothing', async () => {
     await withTempRepo(async (root) => {
-      const versioning = new LocalVersioning()
+      const versioning = versioningFor(root)
       await writeFiles(root, { 'D/file.txt': 'x\n' })
       await versioning.init(root)
       await move(path.join(root, 'D'), path.join(root, 'E'), versioning)

@@ -2,6 +2,8 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { runCommand } from '../../childProcess/runCommand.js'
+import { VersioningConsent } from '../consent.js'
+import { LocalVersioning } from '../index.js'
 
 const ISOLATED_VARIABLES = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'] as const
 
@@ -42,4 +44,17 @@ export async function writeFiles(dir: string, files: Record<string, string>): Pr
     await fs.mkdir(path.dirname(target), { recursive: true })
     await fs.writeFile(target, content)
   }
+}
+
+/**
+ * A {@link LocalVersioning} whose consent store lives in `<userDataDirectory>`, which the caller
+ * removes (inside a {@link withTempRepo} directory's parent, that happens with the repository).
+ */
+export function createVersioning(userDataDirectory: string): LocalVersioning {
+  return new LocalVersioning({ consent: new VersioningConsent({ userDataDirectory }) })
+}
+
+/** {@link createVersioning} for a repository made by {@link withTempRepo}. */
+export function versioningFor(repoDir: string): LocalVersioning {
+  return createVersioning(path.join(path.dirname(repoDir), 'userData'))
 }

@@ -90,16 +90,46 @@ neither committed nor unstaged.
 
 ### Module and routes
 
-- `src/localVersioning/index.ts`: `LocalVersioning` with `status`, `init`,
-  `commit`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`, `commitMove`,
-  and the lookup `repositoryOf`.
+- `src/localVersioning/index.ts`: `LocalVersioning` (constructed with a
+  `VersioningConsent`) with `status`, `init`, `enable`, `disable`, `commit`,
+  `commitIfEnabled`, `log`, `fileAt`, `setComment`, `restore`, `exportAt`,
+  `commitMove`, and the lookup `repositoryOf`.
+- `src/localVersioning/consent.ts`: `VersioningConsent`, the persisted record of
+  enabled repositories (see _Consent_ below).
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
-  `identityArgs` (see _Identity fallback_ below).
+  `repositoryKey`, `identityArgs` (see _Identity fallback_ below).
 - Routes (POST to `/api/project-service/versioning/*`): `status`, `init`,
-  `commit`, `log`, `file-at`, `restore`, `duplicate-at`, `set-comment`. See
-  `handler/projectService.ts` for request/response shapes. `commit` with an
-  empty or whitespace-only `message` saves as `Saved`. The `restore` route (not
-  `LocalVersioning.restore`) refuses a running project.
+  `enable`, `disable`, `commit`, `log`, `file-at`, `restore`, `duplicate-at`,
+  `set-comment`. See `handler/projectService.ts` for request/response shapes.
+  `commit` with an empty or whitespace-only `message` saves as `Saved`. The
+  `restore` route (not `LocalVersioning.restore`) refuses a running project.
+
+### Consent: a repository is versioned only once it is enabled
+
+`findRepoRoot` finds _any_ enclosing repository: a dotfiles repo in the user's
+home, a work monorepo above the projects folder. Committing to it unasked would
+put "Saved on close" commits on whatever branch is checked out. So the shim
+versions a repository only once it is _enabled_.
+
+- Consent is a per-repository record in `<userData>/versioning.json`
+  (`{ version: 1, enabledRepositories: [...] }`, written by `VersioningConsent`
+  through the `jsonFile.ts` helpers, so a corrupt or newer file is moved aside
+  and read as empty, as for `labels.json`). It is never written into the user's
+  repository or git configuration. Repositories are compared by real path,
+  lowercased on Windows (`repositoryKey`, which the operation lock uses too).
+- Hosts construct `LocalVersioning` with a store in `<userData>` (Electron:
+  `app.getPath('userData')`; dev middleware: `DEV_USER_DATA_DIRECTORY`). A
+  `LocalVersioning` without one must not exist outside tests.
+- `status` reports `enabled` (`false` with no git or repository); `changed`,
+  `lastVersion` and `blocked` are computed regardless, so the GUI can show a
+  prompt. `init` enables the repository it creates. `enable(repoRoot)` rejects a
+  path that is not a repository root.
+- Not enabled: the close hook (`commitIfEnabled`) and `commitMove` skip silently
+  (no warning); `commit`, `restore` and `setComment` reject with
+  `Versioning is not enabled for the repository at <repoRoot>.`. `log`, `fileAt`
+  and `exportAt` change nothing in the repository and work regardless.
+- The check runs inside the locked operation, through `this.consent` (never a
+  public locked method).
 
 ### Serialisation: an operation lock and a call queue
 
@@ -171,8 +201,9 @@ before any rename hook, so a project is saved before its directory moves. The
 runner runs shutdown hooks in registration order, and `remove-from-list` is
 registered first (when the engine starts), so the project is no longer listed as
 running while its close commit is made. The hook commits the project as
-`Saved on close` if it changed; a failure is logged and returned as
-`versioningWarning` on the `closeProject` result, and the close still succeeds.
+`Saved on close` if it changed and the repository is enabled; a failure is
+logged and returned as `versioningWarning` on the `closeProject` result, and the
+close still succeeds.
 
 A rename (`renameProject`) or a filesystem move of a project directory commits
 both paths together (`commitMove`), with an `Enso-Moved-From: <old path>`

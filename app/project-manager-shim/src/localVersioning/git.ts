@@ -1,3 +1,4 @@
+import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { CommandError, runCommand } from '../childProcess/runCommand.js'
 
@@ -119,6 +120,15 @@ export async function runGit(
     if (queues.get(key) === tail) queues.delete(key)
   })
   return result
+}
+
+/**
+ * A key identifying the repository at `repoRoot`: its real path, lowercased on Windows where paths
+ * are case-insensitive. Operation locks and the consent store both compare repositories by it.
+ */
+export async function repositoryKey(repoRoot: string): Promise<string> {
+  const real = await fs.realpath(repoRoot).catch(() => path.resolve(repoRoot))
+  return process.platform === 'win32' ? real.toLowerCase() : real
 }
 
 /** The repository containing `dir` (its `--show-toplevel`), or `null`. */

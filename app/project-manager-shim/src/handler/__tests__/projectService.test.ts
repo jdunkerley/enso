@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createProject, readProjectJson } from '../../localMetadata/__tests__/testUtils.js'
 import { LocalMetadata } from '../../localMetadata/index.js'
 import { readPackageLabels } from '../../localMetadata/packageYaml.js'
-import { withTempRepo } from '../../localVersioning/__tests__/testRepo.js'
-import { LocalVersioning } from '../../localVersioning/index.js'
+import { createVersioning, withTempRepo } from '../../localVersioning/__tests__/testRepo.js'
+import type { LocalVersioning } from '../../localVersioning/index.js'
 import type { Runner } from '../../projectService/ensoRunner.js'
 import { ProjectService } from '../../projectService/index.js'
 import { handleProjectServiceRequest } from '../projectService.js'
@@ -31,7 +31,7 @@ beforeEach(async () => {
     logger: { warn: vi.fn() },
   })
   running = false
-  versioning = new LocalVersioning()
+  versioning = createVersioning(path.join(root, 'userData'))
   server = http.createServer((request, response) => {
     void handleProjectServiceRequest(
       request,
@@ -123,6 +123,7 @@ describe('versioning routes', () => {
   async function withProject(body: (repo: string, project: string) => Promise<void>) {
     await withTempRepo(
       async (repo) => {
+        await versioning!.enable(repo)
         await body(repo, await createProject(path.join(repo, 'P'), 'id-1'))
       },
       { init: true },
@@ -175,6 +176,37 @@ describe('versioning routes', () => {
       expect((result as { id: string }).id).toMatch(/^[0-9a-f]{40}$/)
       expect((await call('versioning/log', { path: project })).result).toMatchObject({
         versions: [{ comment: 'Saved' }],
+      })
+    })
+  })
+
+  test('enable and disable switch consent for a repository', async () => {
+    await withTempRepo(
+      async (repo) => {
+        const project = await createProject(path.join(repo, 'P'), 'id-1')
+        const status = async () =>
+          ((await call('versioning/status', { path: project })).result as { enabled: boolean })
+            .enabled
+        expect(await status()).toBe(false)
+        expect((await call('versioning/enable', { repoRoot: repo })).result).toBeNull()
+        expect(await status()).toBe(true)
+        expect((await call('versioning/disable', { repoRoot: repo })).result).toBeNull()
+        expect(await status()).toBe(false)
+      },
+      { init: true },
+    )
+  })
+
+  test('enable and disable need a repoRoot, and enable needs a repository', async () => {
+    expect((await call('versioning/enable', {})).error).toMatchObject({
+      message: expect.stringContaining("'repoRoot' must be a string."),
+    })
+    expect((await call('versioning/disable', {})).error).toMatchObject({
+      message: expect.stringContaining("'repoRoot' must be a string."),
+    })
+    await withTempRepo(async (dir) => {
+      expect((await call('versioning/enable', { repoRoot: dir })).error).toMatchObject({
+        message: expect.stringContaining('not the root of a git repository'),
       })
     })
   })

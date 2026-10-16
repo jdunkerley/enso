@@ -9,7 +9,7 @@ import {
   VERSIONING_TIMEOUT_MESSAGE,
   VERSIONING_TIMEOUT_MS,
 } from '../index.js'
-import { withTempRepo, writeFiles } from './testRepo.js'
+import { versioningFor, withTempRepo, writeFiles } from './testRepo.js'
 
 vi.mock('../git.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../git.js')>()
@@ -36,7 +36,7 @@ const project = (name: string) => ({
 async function withProjects(body: (root: string, versioning: LocalVersioning) => Promise<void>) {
   await withTempRepo(async (root) => {
     await writeFiles(root, { ...project('A'), ...project('B') })
-    await body(root, new LocalVersioning())
+    await body(root, versioningFor(root))
   })
 }
 
@@ -60,6 +60,7 @@ describe('status', () => {
         changed: false,
         lastVersion: null,
         blocked: null,
+        enabled: false,
       })
     })
   })
@@ -72,6 +73,7 @@ describe('status', () => {
         changed: false,
         lastVersion: null,
         blocked: null,
+        enabled: false,
       })
     })
   })
@@ -207,6 +209,7 @@ describe('.enso exclusion without a .gitignore rule', () => {
       await git(root, 'config', 'user.name', 'Tester')
       await git(root, 'config', 'user.email', 'tester@example.com')
       const a = path.join(root, 'A')
+      await versioning.enable(root)
       await git(root, 'add', '-f', 'A/.enso/project.json')
       await git(root, 'commit', '-m', 'Tracked .enso')
       await versioning.commit([a], 'Saved')
@@ -327,7 +330,8 @@ describe('log, fileAt and setComment', () => {
         await writeFiles(root, { 'package.yaml': 'name: R\n', 'src/Main.enso': 'main = 1\n' })
         await git(root, 'config', 'user.name', 'Tester')
         await git(root, 'config', 'user.email', 'tester@example.com')
-        const versioning = new LocalVersioning()
+        const versioning = versioningFor(root)
+        await versioning.enable(root)
         const { id } = await versioning.commit([root], 'Root')
         expect((await versioning.log(root)).map((e) => e.id)).toEqual([id])
         expect(await versioning.fileAt(root, id!, 'src/Main.enso')).toBe('main = 1\n')
@@ -498,7 +502,7 @@ describe('restore and exportAt', () => {
         await writeFiles(root, { 'package.yaml': 'name: R\n', 'src/Main.enso': 'v1' })
         await git(root, 'config', 'user.name', 'Tester')
         await git(root, 'config', 'user.email', 'tester@example.com')
-        const versioning = new LocalVersioning()
+        const versioning = versioningFor(root)
         await versioning.init(root)
         const v1 = (await versioning.commit([root], 'one')).id!
         await fs.writeFile(path.join(root, 'src', 'Main.enso'), 'v2')
@@ -639,7 +643,7 @@ describe('paths with spaces and non-ASCII characters', () => {
       const root = path.join(tmp, 'r é')
       const project = path.join(root, 'Mój projekt ü')
       await writeFiles(project, { 'package.yaml': 'name: P\n', 'src/Main.enso': 'v1' })
-      const versioning = new LocalVersioning()
+      const versioning = versioningFor(root)
       await versioning.init(root)
       await git(root, 'config', 'user.name', 'Tester')
       await git(root, 'config', 'user.email', 'tester@example.com')
@@ -767,6 +771,121 @@ describe('commitMove', () => {
         vi.useRealTimers()
         spy.mockRestore()
       }
+    })
+  })
+})
+
+describe('consent', () => {
+  /** A repository made with plain `git init`, which nothing has agreed to version. */
+  async function withUnenabledRepo(
+    body: (root: string, versioning: LocalVersioning, a: string) => Promise<void>,
+  ) {
+    await withTempRepo(
+      async (root) => {
+        await writeFiles(root, { ...project('A'), ...project('B') })
+        await git(root, 'config', 'user.name', 'Tester')
+        await git(root, 'config', 'user.email', 'tester@example.com')
+        await body(root, versioningFor(root), path.join(root, 'A'))
+      },
+      { init: true },
+    )
+  }
+  const notEnabled = () =>
+    expect.objectContaining({
+      message: expect.stringContaining('Versioning is not enabled for the repository at'),
+    })
+
+  test('status.enabled is false, then true after enable, then false after disable', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      expect(await versioning.status(a)).toMatchObject({ git: true, enabled: false, changed: true })
+      await versioning.enable(root)
+      expect((await versioning.status(a)).enabled).toBe(true)
+      await versioning.disable(root)
+      expect((await versioning.status(a)).enabled).toBe(false)
+    })
+  })
+
+  test('init enables the repository it creates', async () => {
+    await withProjects(async (root, versioning) => {
+      await versioning.init(root)
+      expect((await versioning.status(path.join(root, 'A'))).enabled).toBe(true)
+    })
+  })
+
+  test('enable rejects a path that is not a repository root', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      await expect(versioning.enable(a)).rejects.toThrow(/not the root of a git repository/)
+      await expect(versioning.enable(path.join(root, 'missing'))).rejects.toThrow(
+        /not the root of a git repository/,
+      )
+      expect((await versioning.status(a)).enabled).toBe(false)
+    })
+    await withProjects(async (root, versioning) => {
+      await expect(versioning.enable(root)).rejects.toThrow(/not the root of a git repository/)
+    })
+  })
+
+  test('a manual commit rejects with the exact message', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      const repoRoot = (await versioning.status(a)).repoRoot!
+      await expect(versioning.commit([a], 'x')).rejects.toThrow(
+        new Error(`Versioning is not enabled for the repository at ${repoRoot}.`),
+      )
+      await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+    })
+  })
+
+  test('commitIfEnabled records nothing until the repository is enabled', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      expect(await versioning.commitIfEnabled([a], 'Saved on close')).toEqual({ id: null })
+      await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+      await versioning.enable(root)
+      expect((await versioning.commitIfEnabled([a], 'Saved on close')).id).toMatch(/^[0-9a-f]{40}$/)
+    })
+  })
+
+  test('commitMove skips a repository that is not enabled, silently', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        const moved = path.join(root, 'C')
+        await fs.rename(a, moved)
+        expect(await versioning.commitMove(a, moved, 'Moved')).toBeUndefined()
+        expect(error).not.toHaveBeenCalled()
+        await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+      } finally {
+        error.mockRestore()
+      }
+    })
+  })
+
+  test('restore and setComment reject, and read-only operations work', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      await versioning.enable(root)
+      const id = (await versioning.commit([a], 'one')).id!
+      await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'main = 2\n')
+      await versioning.disable(root)
+      const head = await git(root, 'rev-parse', 'HEAD')
+      await expect(versioning.restore(a, id)).rejects.toThrow(notEnabled())
+      await expect(versioning.setComment(a, id, 'c')).rejects.toThrow(notEnabled())
+      expect(await git(root, 'rev-parse', 'HEAD')).toBe(head)
+      expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe('main = 2\n')
+      expect((await versioning.log(a)).map((e) => e.id)).toEqual([id])
+      expect(await versioning.fileAt(a, id, 'src/Main.enso')).toBe('main = 1\n')
+      const copy = path.join(path.dirname(root), 'copy')
+      await versioning.exportAt(a, id, copy)
+      expect(await fs.readFile(path.join(copy, 'src', 'Main.enso'), 'utf8')).toBe('main = 1\n')
+    })
+  })
+
+  test('consent is per repository', async () => {
+    await withUnenabledRepo(async (root, versioning, a) => {
+      await versioning.enable(root)
+      const nested = path.join(a, 'nested')
+      await fs.mkdir(nested)
+      await git(nested, 'init')
+      expect((await versioning.status(nested)).enabled).toBe(false)
+      expect((await versioning.status(a)).enabled).toBe(true)
     })
   })
 })

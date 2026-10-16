@@ -35,6 +35,7 @@ describe('ProjectManager versioning methods', () => {
       changed: false,
       lastVersion: { id: 'a'.repeat(40), date: '2026-10-16T00:00:00Z' },
       blocked: null,
+      enabled: true,
     }
     nextResult = status
     expect(await manager().versioningStatus(project)).toEqual(status)
@@ -48,6 +49,15 @@ describe('ProjectManager versioning methods', () => {
     expect(await manager().initVersioning(Path('/root'))).toEqual({ repoRoot: '/root' })
     expect(calls).toEqual([
       { url: '/api/project-service/versioning/init', body: { rootPath: '/root' } },
+    ])
+  })
+
+  it('enableVersioning and disableVersioning', async () => {
+    await manager().enableVersioning(Path('/root'))
+    await manager().disableVersioning(Path('/root'))
+    expect(calls).toEqual([
+      { url: '/api/project-service/versioning/enable', body: { repoRoot: '/root' } },
+      { url: '/api/project-service/versioning/disable', body: { repoRoot: '/root' } },
     ])
   })
 

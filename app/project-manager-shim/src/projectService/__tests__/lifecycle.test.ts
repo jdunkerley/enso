@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import type { ProjectLifecycleListener } from '../../localMetadata/index.js'
-import { LocalVersioning, VERSIONING_TIMEOUT_MS } from '../../localVersioning/index.js'
+import { createVersioning } from '../../localVersioning/__tests__/testRepo.js'
+import { VERSIONING_TIMEOUT_MS, type LocalVersioning } from '../../localVersioning/index.js'
 import type { Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path, UUID } from '../types.js'
@@ -102,7 +103,7 @@ describe('versioning on close', () => {
     saved = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'].map((n) => [n, process.env[n]])
     process.env.GIT_CONFIG_GLOBAL = config
     process.env.GIT_CONFIG_NOSYSTEM = '1'
-    versioning = new LocalVersioning()
+    versioning = createVersioning(path.join(root, 'userData'))
     service = new ProjectService(fakeRunner(), [], console, listener, versioning)
   })
 
@@ -138,10 +139,33 @@ describe('versioning on close', () => {
     await expect(fs.access(path.join(root, '.git'))).rejects.toThrow()
   })
 
+  test('closing a project in a repository that is not enabled commits nothing, without a warning', async () => {
+    await git(root, 'init')
+    await createProject(path.join(root, 'A'), 'id-1')
+    const logger = { ...console, error: vi.fn(), warn: vi.fn(), debug: vi.fn(), info: vi.fn() }
+    const svc = new ProjectService(fakeRunner(), [], logger as Console, listener, versioning)
+    const result = await openThenClose('id-1', svc)
+    expect(result.versioningWarning).toBeUndefined()
+    expect(logger.error).not.toHaveBeenCalled()
+    expect(logger.warn).not.toHaveBeenCalled()
+    await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+    await versioning.enable(root)
+    await createProject(path.join(root, 'B'), 'id-2')
+    await openThenClose('id-2', svc)
+    expect(await git(root, 'log', '-1', '--format=%s')).toBe('Saved on close')
+  })
+
+  test('renaming a project in a repository that is not enabled commits nothing', async () => {
+    await git(root, 'init')
+    await createProject(path.join(root, 'Old'), 'id-1')
+    await service.renameProject(UUID('id-1'), 'New', Path(root))
+    await expect(git(root, 'rev-parse', 'HEAD')).rejects.toThrow()
+  })
+
   test('a failing commit is logged and reported on the close result', async () => {
     await versioning.init(root)
     await createProject(path.join(root, 'A'), 'id-1')
-    vi.spyOn(versioning, 'commit').mockRejectedValue(new Error('index is locked'))
+    vi.spyOn(versioning, 'commitIfEnabled').mockRejectedValue(new Error('index is locked'))
     const logger = { ...console, error: vi.fn(), debug: vi.fn(), info: vi.fn() } as Console
     const svc = new ProjectService(fakeRunner(), [], logger, listener, versioning)
     const result = await openThenClose('id-1', svc)
@@ -227,7 +251,7 @@ describe('versioning on close', () => {
   test('a commit that never finishes times out, and the close still resolves', async () => {
     await createProject(path.join(root, 'A'), 'id-1')
     vi.spyOn(versioning, 'repositoryOf').mockResolvedValue(root)
-    vi.spyOn(versioning, 'commit').mockReturnValue(new Promise(() => {}))
+    vi.spyOn(versioning, 'commitIfEnabled').mockReturnValue(new Promise(() => {}))
     running = true
     await service.openProject(UUID('id-1'), Path(root))
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })

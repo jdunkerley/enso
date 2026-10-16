@@ -262,8 +262,7 @@ export class ProjectService {
           // The repository lookup is git too, so it counts towards the timeout.
           await withinVersioningTimeout(
             (async () => {
-              if ((await versioning.repositoryOf(project.path)) == null) return
-              await versioning.commit([project.path], 'Saved on close')
+              await versioning.commitIfEnabled([project.path], 'Saved on close')
             })(),
           )
         } catch (error) {
