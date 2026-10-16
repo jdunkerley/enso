@@ -91,3 +91,11 @@ succeeds. Renames and `filesystem-move` of a project directory call
 are in one repository and never throws. `commit` skips a path git knows nothing
 about (never versioned, or only ignored files), and resolves a path that no
 longer exists through its nearest existing ancestor.
+
+Every commit and note is an automatic snapshot: `LocalVersioning.commit` passes
+`--no-verify` and `-c commit.gpgsign=false` (and `notes add` the latter), so the
+user's git hooks and signing never block or hang it. Callers that make someone
+wait (the close hook, `commitMove`) bound the commit with
+`withinVersioningTimeout` (15 s, `Saving a version timed out.`); the git process
+is deliberately left running, since killing it mid-commit can leave
+`index.lock`.

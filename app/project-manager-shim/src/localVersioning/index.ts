@@ -38,6 +38,9 @@ export interface VersionEntry extends VersionSummary {
 
 const NOTES_REF = '--ref=enso'
 
+/** Notes are commits too, and can be signed. */
+const NO_SIGNING: readonly string[] = ['-c', 'commit.gpgsign=false']
+
 /**
  * Throws unless `id` is a full commit hash (40 or 64 hex digits, as {@link LocalVersioning.log}
  * returns). Ids come from callers over HTTP, so nothing git could read as an option or a revision
@@ -45,6 +48,30 @@ const NOTES_REF = '--ref=enso'
  */
 export function assertVersionId(id: string): void {
   if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(id)) throw new Error(`Invalid version id: ${id}`)
+}
+
+/** How long a caller that waits for a commit (a close, a move) waits before giving up. */
+export const VERSIONING_TIMEOUT_MS = 15_000
+
+/** The message of the error {@link withinVersioningTimeout} throws. */
+export const VERSIONING_TIMEOUT_MESSAGE = 'Saving a version timed out.'
+
+/**
+ * Settle with `work`, or reject with {@link VERSIONING_TIMEOUT_MESSAGE} after
+ * {@link VERSIONING_TIMEOUT_MS}. The git process behind `work` is deliberately not killed (killing
+ * git mid-commit can leave an `index.lock`): it keeps running, and keeps its repository's queue
+ * busy, until it ends.
+ */
+export async function withinVersioningTimeout<T>(work: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(VERSIONING_TIMEOUT_MESSAGE)), VERSIONING_TIMEOUT_MS)
+  })
+  try {
+    return await Promise.race([work, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Lines the root `.gitignore` must contain. */
@@ -205,15 +232,18 @@ export class LocalVersioning {
   /**
    * Commit the move of a project from `oldPath` to `newPath`, when both are in the same
    * repository; otherwise nothing is recorded. The move has already happened, so a failure is
-   * logged and never thrown.
+   * logged and never thrown, and waiting is bounded by {@link VERSIONING_TIMEOUT_MS}. Returns the
+   * failure's message, if any.
    */
-  async commitMove(oldPath: string, newPath: string, message: string): Promise<void> {
+  async commitMove(oldPath: string, newPath: string, message: string): Promise<string | undefined> {
     try {
       const repoRoot = await this.repositoryOf(newPath)
-      if (repoRoot == null || repoRoot !== (await this.repositoryOf(oldPath))) return
-      await this.commit([oldPath, newPath], message)
+      if (repoRoot == null || repoRoot !== (await this.repositoryOf(oldPath))) return undefined
+      await withinVersioningTimeout(this.commit([oldPath, newPath], message))
+      return undefined
     } catch (error) {
       console.error(`Failed to commit the move of ${oldPath} to ${newPath}:`, error)
+      return error instanceof Error ? error.message : String(error)
     }
   }
 
@@ -223,7 +253,13 @@ export class LocalVersioning {
     return repoRoot == null ? null : repoRelative(repoRoot, p)
   }
 
-  /** Commit everything under `paths` (all in one repository). `null` when nothing changed. */
+  /**
+   * Commit everything under `paths` (all in one repository). `null` when nothing changed.
+   *
+   * These are automatic, path-scoped snapshots, so the user's `pre-commit`/`commit-msg` hooks
+   * (`--no-verify`) and commit signing (`commit.gpgsign=false`), made for hand-written commits,
+   * never apply: they could block or hang a close.
+   */
   async commit(paths: readonly string[], message: string): Promise<{ readonly id: string | null }> {
     const first = paths[0]
     if (first == null) return { id: null }
@@ -265,7 +301,16 @@ export class LocalVersioning {
         },
       )
       if (unchanged) return { id: null }
-      await run([...(await identityArgs(repoRoot)), 'commit', '-m', message, '--', ...pathspecs])
+      await run([
+        ...(await identityArgs(repoRoot)),
+        ...NO_SIGNING,
+        'commit',
+        '--no-verify',
+        '-m',
+        message,
+        '--',
+        ...pathspecs,
+      ])
       return { id: (await run(['rev-parse', 'HEAD'])).trim() }
     } catch (error) {
       throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
@@ -345,6 +390,7 @@ export class LocalVersioning {
         repoRoot,
         [
           ...(await identityArgs(repoRoot)),
+          ...NO_SIGNING,
           'notes',
           NOTES_REF,
           'add',

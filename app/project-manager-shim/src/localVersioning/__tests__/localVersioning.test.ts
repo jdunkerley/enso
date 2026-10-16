@@ -522,3 +522,25 @@ describe('commit across a move', () => {
     })
   })
 })
+
+describe('commits are automatic snapshots', () => {
+  test('a failing pre-commit hook does not block a commit', async () => {
+    await withRepo(async (root, versioning) => {
+      const hook = path.join(root, '.git', 'hooks', 'pre-commit')
+      await fs.mkdir(path.dirname(hook), { recursive: true })
+      await fs.writeFile(hook, '#!/bin/sh\nexit 1\n', { mode: 0o755 })
+      expect((await versioning.commit([path.join(root, 'A')], 'Saved')).id).not.toBeNull()
+    })
+  })
+
+  test('signing with an unusable gpg program does not block a commit or a comment', async () => {
+    await withRepo(async (root, versioning) => {
+      await git(root, 'config', 'commit.gpgsign', 'true')
+      await git(root, 'config', 'gpg.program', path.join(root, 'no-such-gpg'))
+      const { id } = await versioning.commit([path.join(root, 'A')], 'Saved')
+      expect(id).not.toBeNull()
+      await versioning.setComment(path.join(root, 'A'), id!, 'Note')
+      expect((await versioning.log(path.join(root, 'A')))[0]?.comment).toBe('Note')
+    })
+  })
+})

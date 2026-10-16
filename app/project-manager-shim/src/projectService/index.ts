@@ -9,7 +9,7 @@ import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import KSUID from 'ksuid'
 import * as crypto from 'node:crypto'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
-import type { LocalVersioning } from '../localVersioning/index.js'
+import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import {
   EnsoRunner,
   findEnsoExecutable,
@@ -260,7 +260,7 @@ export class ProjectService {
       await this.runner.registerShutdownHook(project.path, 'version-on-close', async () => {
         try {
           if ((await versioning.repositoryOf(project.path)) == null) return
-          await versioning.commit([project.path], 'Saved on close')
+          await withinVersioningTimeout(versioning.commit([project.path], 'Saved on close'))
         } catch (error) {
           this.logger.error(`Failed to save project ${projectId} on close:`, error)
           this.versioningWarnings.set(
@@ -422,7 +422,14 @@ export class ProjectService {
         try {
           const newPath = await repo.renameProjectDirectory(project.path, newNormalizedName)
           this.logger.info(`Successfully renamed project directory for ${projectId}`)
-          await this.versioning?.commitMove(project.path, newPath, 'Saved on close')
+          const warning = await this.versioning?.commitMove(
+            project.path,
+            newPath,
+            `Renamed ${project.name} to ${newName}`,
+          )
+          if (warning != null && !this.versioningWarnings.has(project.path)) {
+            this.versioningWarnings.set(project.path, warning)
+          }
           await this.notifyLifecycle((listener) => listener.projectMoved(projectId, newPath))
         } catch (error) {
           this.logger.error(`Failed to rename project directory for ${projectId}:`, error)

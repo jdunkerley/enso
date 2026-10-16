@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
 import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import type { ProjectLifecycleListener } from '../../localMetadata/index.js'
-import { LocalVersioning } from '../../localVersioning/index.js'
+import { LocalVersioning, VERSIONING_TIMEOUT_MS } from '../../localVersioning/index.js'
 import type { Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path, UUID } from '../types.js'
@@ -158,9 +158,35 @@ describe('versioning on close', () => {
     await service.renameProject(UUID('id-1'), 'New', Path(root))
     await service.closeProject(UUID('id-1'), Path(root))
     const files = await git(root, 'show', '--name-status', '--format=%s', 'HEAD')
-    expect(files).toContain('Saved on close')
+    expect(files).toContain('Renamed Old to New')
     expect(files).toContain('Old/package.yaml')
     expect(files).toContain('New/package.yaml')
     expect(await git(root, 'status', '--porcelain', '--', 'Old', 'New')).toBe('')
+  })
+
+  test('renaming a closed project commits the move as "Renamed X to Y"', async () => {
+    await versioning.init(root)
+    await createProject(path.join(root, 'Old'), 'id-1')
+    await versioning.commit([path.join(root, 'Old')], 'Before')
+    await service.renameProject(UUID('id-1'), 'New', Path(root))
+    expect(await git(root, 'log', '-1', '--format=%s')).toBe('Renamed Old to New')
+  })
+
+  test('a commit that never finishes times out, and the close still resolves', async () => {
+    await createProject(path.join(root, 'A'), 'id-1')
+    vi.spyOn(versioning, 'repositoryOf').mockResolvedValue(root)
+    vi.spyOn(versioning, 'commit').mockReturnValue(new Promise(() => {}))
+    running = true
+    await service.openProject(UUID('id-1'), Path(root))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const closing = service.closeProject(UUID('id-1'), Path(root))
+      // The close reads the filesystem before it starts waiting on the commit.
+      while (vi.getTimerCount() === 0) await new Promise((resolve) => setImmediate(resolve))
+      await vi.advanceTimersByTimeAsync(VERSIONING_TIMEOUT_MS + 1)
+      expect(await closing).toEqual({ versioningWarning: 'Saving a version timed out.' })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
