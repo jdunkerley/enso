@@ -366,3 +366,123 @@ describe('untrusted arguments', () => {
     })
   })
 })
+
+describe('restore and exportAt', () => {
+  /** `A` at v1 (`Main` = v1, `data/x.csv`), v2 (`v2`, no x, `data/y.csv`), then an uncommitted `v3`. */
+  async function twoVersionsAndEdit(root: string, versioning: LocalVersioning) {
+    const a = path.join(root, 'A')
+    await writeFiles(root, { 'A/src/Main.enso': 'v1', 'A/data/x.csv': 'x' })
+    const v1 = (await versioning.commit([a], 'one')).id!
+    await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'v2')
+    await fs.rm(path.join(a, 'data', 'x.csv'))
+    await fs.writeFile(path.join(a, 'data', 'y.csv'), 'y')
+    await versioning.commit([a], 'two')
+    await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'v3')
+    return { a, v1 }
+  }
+
+  test('restore saves the current state, then restores the version', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a, v1 } = await twoVersionsAndEdit(root, versioning)
+      const b = path.join(root, 'B')
+      await versioning.commit([b], 'b')
+      await fs.writeFile(path.join(b, 'src', 'Main.enso'), 'b-edit')
+      const ensoBefore = await fs.readFile(path.join(a, '.enso', 'project.json'))
+      const date = (await versioning.log(a)).find((e) => e.id === v1)!.date
+
+      const { id } = await versioning.restore(a, v1)
+
+      const entries = await versioning.log(a)
+      expect(id).toBe(entries[0]!.id)
+      expect(entries.map((e) => e.comment)).toEqual([
+        `Restored version from ${date}`,
+        'Saved before restore',
+        'two',
+        'one',
+      ])
+      expect(await versioning.fileAt(a, entries[1]!.id, 'src/Main.enso')).toBe('v3')
+      expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe('v1')
+      await expect(fs.access(path.join(a, 'data', 'x.csv'))).resolves.toBeUndefined()
+      await expect(fs.access(path.join(a, 'data', 'y.csv'))).rejects.toBeDefined()
+      expect(await fs.readFile(path.join(a, '.enso', 'project.json'))).toEqual(ensoBefore)
+      expect((await versioning.status(a)).changed).toBe(false)
+      expect(await fs.readFile(path.join(b, 'src', 'Main.enso'), 'utf8')).toBe('b-edit')
+    })
+  })
+
+  test('restore without changes makes no "Saved before restore" version', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a, v1 } = await twoVersionsAndEdit(root, versioning)
+      await versioning.commit([a], 'three')
+      await versioning.restore(a, v1)
+      expect((await versioning.log(a)).map((e) => e.comment.split(' from ')[0])).toEqual([
+        'Restored version',
+        'three',
+        'two',
+        'one',
+      ])
+    })
+  })
+
+  test('restore and exportAt reject bad ids and other projects versions', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a } = await twoVersionsAndEdit(root, versioning)
+      const b = path.join(root, 'B')
+      await fs.writeFile(path.join(b, 'src', 'Main.enso'), 'b2')
+      const other = (await versioning.commit([b], 'b')).id!
+      const target = path.join(root, 'out')
+      await expect(versioning.restore(a, 'HEAD')).rejects.toThrow(/version id/i)
+      await expect(versioning.exportAt(a, '--output=x', target)).rejects.toThrow(/version id/i)
+      await expect(versioning.restore(a, other)).rejects.toThrow(/not a version/i)
+      await expect(versioning.exportAt(a, other, target)).rejects.toThrow(/not a version/i)
+      await expect(fs.access(target)).rejects.toBeDefined()
+      expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe('v3')
+    })
+  })
+
+  test('exportAt writes the version into a new directory and leaves the repository alone', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a, v1 } = await twoVersionsAndEdit(root, versioning)
+      await git(root, 'add', '-A')
+      const indexBefore = await git(root, 'ls-files', '-s')
+      const copy = path.join(root, 'A-copy')
+      await versioning.exportAt(a, v1, copy)
+      expect(await fs.readFile(path.join(copy, 'src', 'Main.enso'), 'utf8')).toBe('v1')
+      await expect(fs.access(path.join(copy, 'data', 'x.csv'))).resolves.toBeUndefined()
+      await expect(fs.access(path.join(copy, 'package.yaml'))).resolves.toBeUndefined()
+      await expect(fs.access(path.join(copy, '.enso'))).rejects.toBeDefined()
+      expect(await git(root, 'ls-files', '-s')).toBe(indexBefore)
+      expect(await fs.readFile(path.join(a, 'src', 'Main.enso'), 'utf8')).toBe('v3')
+    })
+  })
+
+  test('exportAt rejects an existing target', async () => {
+    await withRepo(async (root, versioning) => {
+      const { a, v1 } = await twoVersionsAndEdit(root, versioning)
+      const copy = path.join(root, 'taken')
+      await fs.mkdir(copy)
+      await expect(versioning.exportAt(a, v1, copy)).rejects.toThrow(/exists/i)
+    })
+  })
+
+  test('both work for a project at the repository root', async () => {
+    await withTempRepo(
+      async (root) => {
+        await writeFiles(root, { 'package.yaml': 'name: R\n', 'src/Main.enso': 'v1' })
+        await git(root, 'config', 'user.name', 'Tester')
+        await git(root, 'config', 'user.email', 'tester@example.com')
+        const versioning = new LocalVersioning()
+        await versioning.init(root)
+        const v1 = (await versioning.commit([root], 'one')).id!
+        await fs.writeFile(path.join(root, 'src', 'Main.enso'), 'v2')
+        const copy = path.join(path.dirname(root), 'copy')
+        await versioning.exportAt(root, v1, copy)
+        expect(await fs.readFile(path.join(copy, 'src', 'Main.enso'), 'utf8')).toBe('v1')
+        await versioning.restore(root, v1)
+        expect(await fs.readFile(path.join(root, 'src', 'Main.enso'), 'utf8')).toBe('v1')
+        expect((await versioning.status(root)).changed).toBe(false)
+      },
+      { init: true },
+    )
+  })
+})

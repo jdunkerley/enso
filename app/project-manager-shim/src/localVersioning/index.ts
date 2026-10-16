@@ -6,6 +6,7 @@
  * as the queue key, so calls on one repository are serialised.
  */
 import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import { CommandError } from '../childProcess/runCommand.js'
 import { findGit, findRepoRoot, identityArgs, runGit } from './git.js'
@@ -282,6 +283,80 @@ export class LocalVersioning {
       )
     } catch (error) {
       throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+    }
+  }
+
+  /** Fails unless `id` is a version of the project (see {@link assertVersionId}). */
+  private async assertProjectVersion(projectPath: string, id: string): Promise<VersionEntry> {
+    assertVersionId(id)
+    const entry = (await this.log(projectPath)).find((e) => e.id === id)
+    if (entry == null) throw new Error(`${id} is not a version of this project`)
+    return entry
+  }
+
+  /**
+   * Restore the project to version `id`. The caller must ensure the project is closed: this does
+   * not know whether the engine has it open. The state before the restore is saved as a version
+   * first (if it had changes), so nothing is lost. The project's `.enso` folder is never touched.
+   * Returns the id of the new version.
+   */
+  async restore(projectPath: string, id: string): Promise<{ readonly id: string }> {
+    const version = await this.assertProjectVersion(projectPath, id)
+    const repoRoot = await findRepoRoot(projectPath)
+    if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
+    await this.commit([projectPath], 'Saved before restore')
+    const relative = await repoRelative(repoRoot, projectPath)
+    try {
+      await runGit(
+        repoRoot,
+        [
+          'restore',
+          `--source=${id}`,
+          '--staged',
+          '--worktree',
+          '--',
+          relative,
+          excludeEnso(relative),
+        ],
+        { queueKey: repoRoot },
+      )
+    } catch (error) {
+      throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+    }
+    const restored = await this.commit([projectPath], `Restored version from ${version.date}`)
+    if (restored.id != null) return { id: restored.id }
+    // Restoring the latest version changes nothing, so there is nothing new to commit.
+    return { id }
+  }
+
+  /**
+   * Write the project as it was at version `id` into the new directory `targetPath`, which must
+   * not exist. The repository's index and work tree are not touched. The copy has no `.enso`
+   * folder; the caller gives it a new project id and name.
+   */
+  async exportAt(projectPath: string, id: string, targetPath: string): Promise<void> {
+    await this.assertProjectVersion(projectPath, id)
+    const repoRoot = await findRepoRoot(projectPath)
+    if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
+    if (await exists(targetPath)) throw new Error(`${targetPath} already exists`)
+    const relative = await repoRelative(repoRoot, projectPath)
+    const tree = relative === '.' ? `${id}^{tree}` : `${id}:${relative}`
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'enso-export-'))
+    let created = false
+    try {
+      await fs.mkdir(targetPath, { recursive: true })
+      created = true
+      const env = { GIT_INDEX_FILE: path.join(tmpDir, 'index') }
+      await runGit(repoRoot, ['read-tree', tree], { queueKey: repoRoot, env })
+      await runGit(repoRoot, [`--work-tree=${targetPath}`, 'checkout-index', '--all', '--force'], {
+        queueKey: repoRoot,
+        env,
+      })
+    } catch (error) {
+      if (created) await fs.rm(targetPath, { recursive: true, force: true })
+      throw error
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
     }
   }
 }
