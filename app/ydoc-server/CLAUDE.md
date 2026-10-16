@@ -64,3 +64,36 @@ This server:
 - The Polyglot variant runs on GraalJS — only a subset of Node APIs is
   available. Check that any new dep works in both `node` and `graaljs` before
   importing.
+- **This code runs in the engine's JVM** (`ydoc-server-polyglot`, packed into
+  the engine's `ydoc-server` jar), so a change reaches the IDE only through a
+  rebuilt engine — an installer built with `--backend-source local` against an
+  old engine still runs the old server.
+
+## Control channel
+
+`ydoc:control` (`ydoc-shared/ydocControl`) is a JSON `YjsChannel` on each
+project's index doc, beside the visualization bridge's `vis:control`. Its one
+request is `flush`, which the GUI sends before saving a version
+(`app/gui/src/providers/openedProjects/project/flush.ts`). The request carries
+each module doc's guid and the GUI's state vector for it, as `[clientId, clock]`
+pairs (JSON, not base64: `lib0`'s base64 is Node- or browser-specific, and
+GraalJS is neither). `LanguageServerSession.flush` answers `flushed` with `ok`
+or an `error` text, after `ModulePersistence.flush` has, for each module:
+
+1. waited (`FLUSH_WAIT_MS`, 4 s) until the shared doc covers that state vector,
+   which proves the GUI's last edit arrived over the module's own socket;
+2. waited (the same 4 s) until those edits reached the Language Server
+   (`updateToApply` empty, state `Synchronized`);
+3. checked the disk time: the file's `lastModifiedTime` must equal the one the
+   session recorded after its last open, reload, `text/autoSave` or own save. A
+   mismatch is checked again after `DISK_RECHECK_MS` (500 ms), so an auto-save
+   already on its way is not an outside change. Plain `text/save` overwrites
+   unconditionally, so without this check a flush could overwrite an outside
+   edit that the Language Server's own auto-save would have declined;
+4. sent `text/save` with the version it holds (it is the write-lock holder, so
+   the save is never denied for the lock or the version).
+
+Any refusal writes nothing, so the Language Server's pending auto-save stays in
+place. A `text/save` that fails is reported and tried once more after
+`SAVE_RETRY_MS` (6 s, the engine's auto-save delay), unless the module has moved
+on. Modules the session does not know are skipped.

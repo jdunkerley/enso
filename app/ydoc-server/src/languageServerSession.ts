@@ -4,7 +4,7 @@ import * as json from 'lib0/json'
 import * as map from 'lib0/map'
 import { ObservableV2 } from 'lib0/observable'
 import * as zlib from 'node:zlib'
-import type { YjsChannelServer } from 'ydoc-channel'
+import { YjsChannel, type YjsChannelServer } from 'ydoc-channel'
 import * as Ast from 'ydoc-shared/ast'
 import { astCount } from 'ydoc-shared/ast'
 import { combineFileParts, splitFileContents, type EnsoFileParts } from 'ydoc-shared/ensoFile'
@@ -21,6 +21,13 @@ import type {
 import { assertNever } from 'ydoc-shared/util/assert'
 import { AbortScope, exponentialBackoff, printingCallbacks } from 'ydoc-shared/util/net'
 import { YjsServerTransport } from 'ydoc-shared/util/net/YjsTransport'
+import {
+  YDOC_CONTROL_CHANNEL,
+  encodeControlMessage,
+  parseControlMessage,
+  stateVectorCovers,
+  type StateVectorEntries,
+} from 'ydoc-shared/ydocControl'
 import {
   DistributedProject,
   IdMap,
@@ -60,6 +67,8 @@ export class LanguageServerSession {
   clientScope: AbortScope
   unregister: () => void
   visualizationBridge: VisualizationBridge
+  /** The control channel (`ydoc-shared/ydocControl`): the GUI asks for its modules to be written. */
+  control: YjsChannel<string>
 
   static DEBUG = false
 
@@ -107,6 +116,9 @@ export class LanguageServerSession {
       visDataServer,
       byteBufferClass,
     )
+    // The control channel: the GUI asks for its modules to be written before a version is saved.
+    this.control = new YjsChannel<string>(this.indexDoc.doc, YDOC_CONTROL_CHANNEL)
+    this.control.subscribe((raw) => void this.handleControlMessage(raw))
 
     this.setupClient()
   }
@@ -164,6 +176,11 @@ export class LanguageServerSession {
       if (!result.ok) this.restartClient()
     }
     this.ls.on('text/fileModifiedOnDisk', fileModified)
+    // The Language Server wrote a module: remember its time, so that a flush does not take the
+    // write for an outside change.
+    this.ls.on('text/autoSave', ({ path }) => {
+      void this.tryGetExistingModuleModel(path)?.recordDiskTime()
+    })
     this.ls.on('text/didChange', (event) => {
       for (const edit of event.edits) {
         fileModified(edit)
@@ -282,6 +299,34 @@ export class LanguageServerSession {
     })
   }
 
+  private async handleControlMessage(raw: string) {
+    const message = parseControlMessage(raw)
+    if (message?.type !== 'flush') return
+    const result = await this.flush(message.modules)
+    this.control.send(
+      encodeControlMessage(
+        result.ok ?
+          { type: 'flushed', id: message.id, ok: true }
+        : { type: 'flushed', id: message.id, ok: false, error: result.error.message('') },
+      ),
+    )
+  }
+
+  /**
+   * Write every module `modules` names (by doc guid) to disk, once each contains the edits the
+   * caller had made (its state vector), so that a version taken next includes them. Modules this
+   * session does not know are skipped.
+   */
+  async flush(modules: Readonly<Record<string, StateVectorEntries>>): Promise<Result<void>> {
+    const flushes = Object.entries(modules).flatMap(([guid, wanted]) => {
+      const name = this.model.findModuleByDocId(guid)
+      const module = name != null ? this.authoritativeModules.get(name) : undefined
+      return module != null ? [module.flush(wanted)] : []
+    })
+    const results = await Promise.all(flushes)
+    return results.find((result) => !result.ok) ?? Ok()
+  }
+
   /** TODO: Add docs */
   retain(): void {
     this.retainCount += 1
@@ -293,6 +338,7 @@ export class LanguageServerSession {
     if (this.retainCount !== 0) return
     this.unregister()
     this.visualizationBridge.close()
+    this.control.close()
     const modules = this.authoritativeModules.values()
     const moduleDisposePromises = Array.from(modules, (mod) => mod.dispose())
     this.authoritativeModules.clear()
@@ -343,7 +389,8 @@ enum LsAction {
   Reload,
 }
 
-class ModulePersistence extends ObservableV2<{ removed: () => void }> {
+/** The ydoc session's copy of one module, kept in sync with the Language Server. */
+export class ModulePersistence extends ObservableV2<{ removed: () => void }> {
   ls: LanguageServer
   path: Path
   doc: ModuleDoc = new ModuleDoc(new Y.Doc())
@@ -357,12 +404,24 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
   syncedVersion: Checksum | null = null
   syncedMeta: fileFormat.Metadata = fileFormat.tryParseMetadataOrFallback(null)
   queuedAction: LsAction | null = null
+  /** The file's modification time, as of the last write or read this session knows of. */
+  diskTime: string | null = null
   cleanup = (): void => {}
+  private readonly sharedDoc: Y.Doc
 
+  /** How long a flush waits for the GUI's edits to arrive and to reach the Language Server. */
+  static FLUSH_WAIT_MS = 4_000
+  /** How long a flush waits, before refusing, for a `text/autoSave` that may be on its way. */
+  static DISK_RECHECK_MS = 500
+  /** After a failed save, when it is tried again (the engine's own auto-save delay). */
+  static SAVE_RETRY_MS = 6_000
+
+  /** Keep the module at `path` in sync between `sharedDoc` (the GUI's) and the Language Server. */
   constructor(ls: LanguageServer, path: Path, sharedDoc: Y.Doc) {
     super()
     this.ls = ls
     this.path = path
+    this.sharedDoc = sharedDoc
 
     const onRemoteUpdate = this.queueRemoteUpdate.bind(this)
     const onLocalUpdate = (update: Uint8Array, origin: unknown) => {
@@ -432,6 +491,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
     if (result) return result
   }
 
+  /** Open the file in the Language Server, taking its write capability, and read its contents. */
   async open(): Promise<Result<void>> {
     return await withContext(
       () => `When opening module ${this.path}`,
@@ -469,6 +529,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
                 )
               }
               this.syncFileContents(result.value.content, result.value.currentVersion)
+              await this.recordDiskTime()
               return Ok()
             })
           }
@@ -482,15 +543,18 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
     )
   }
 
+  /** The file's content root was removed: close it. */
   handleFileRemoved(): void {
     if (this.inState(LsSyncState.Closed)) return
     this.close()
   }
 
+  /** The file changed on disk. Nothing to do here: the session reloads it. */
   handleFileModified(): void {
     if (this.inState(LsSyncState.Closed)) return
   }
 
+  /** Queue an update to the shared doc for the Language Server. */
   queueRemoteUpdate(update: Uint8Array, origin: unknown): void {
     if (origin === this) return
     if (this.updateToApply != null) {
@@ -501,6 +565,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
     this.trySyncRemoteUpdates()
   }
 
+  /** Send the queued updates to the Language Server, if it is in sync. */
   trySyncRemoteUpdates(): void {
     if (this.updateToApply == null) return
     // apply updates to the ls-representation doc if we are already in sync with the LS.
@@ -743,6 +808,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
       )
   }
 
+  /** Close the file in the Language Server. */
   async close(): Promise<void> {
     this.queuedAction = LsAction.Close
     switch (this.state) {
@@ -780,6 +846,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
     }
   }
 
+  /** Read the file again from the Language Server. */
   async reload(): Promise<Result<void>> {
     return await withContext(
       () => `When reloading module ${this.path}`,
@@ -809,6 +876,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
               if (!contents.ok) return contents
               const checksum = computeTextChecksum(contents.value.contents)
               this.syncFileContents(contents.value.contents, checksum)
+              await this.recordDiskTime()
               return Ok()
             })
           }
@@ -842,6 +910,7 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
               const result = await reloading
               if (!result.ok) return result
               this.syncFileContents(result.value.content, result.value.currentVersion)
+              await this.recordDiskTime()
               return Ok()
             })
           }
@@ -853,6 +922,109 @@ class ModulePersistence extends ObservableV2<{ removed: () => void }> {
     )
   }
 
+  /**
+   * Remember the file's modification time, as it is after a write or a read this session knows.
+   * Never throws: a time it cannot read stays as it was (a later flush then refuses).
+   */
+  async recordDiskTime(): Promise<void> {
+    try {
+      const info = await this.ls.fileInfo(this.path)
+      if (info.ok) this.diskTime = info.value.attributes.lastModifiedTime
+    } catch (error) {
+      console.warn(`Could not read the modification time of ${this.path.segments.join('/')}`, error)
+    }
+  }
+
+  /**
+   * Write the module to disk once the shared doc covers `wanted` (the GUI's state vector) and the
+   * covered edits have reached the Language Server. Refuses, writing nothing (so the Language
+   * Server's pending auto-save is untouched), when the edits do not arrive in time, when the module
+   * is not in sync, or when the file changed on disk since this session last wrote or read it. A
+   * save that fails is reported and tried once more after {@link SAVE_RETRY_MS}.
+   */
+  async flush(wanted: StateVectorEntries): Promise<Result<void>> {
+    const where = this.path.segments.join('/')
+    if (!(await this.waitForCover(wanted, ModulePersistence.FLUSH_WAIT_MS)))
+      return Err(`The last edits to ${where} did not arrive.`)
+    const deadline = Date.now() + ModulePersistence.FLUSH_WAIT_MS
+    while (this.updateToApply != null || !this.inState(LsSyncState.Synchronized)) {
+      if (
+        this.inState(
+          LsSyncState.Closed,
+          LsSyncState.Closing,
+          LsSyncState.Disposed,
+          LsSyncState.WriteError,
+          LsSyncState.CapabilityError,
+        )
+      )
+        return Err(`${where} is not in sync with the Language Server.`)
+      if (Date.now() > deadline) return Err(`${where} did not reach the Language Server in time.`)
+      this.trySyncRemoteUpdates()
+      await Promise.race([this.lastAction, new Promise((resolve) => setTimeout(resolve, 50))])
+    }
+    const version = this.syncedVersion
+    if (version == null) return Err(`${where} is not in sync with the Language Server.`)
+    if (!(await this.diskUnchanged())) return Err(`${where} was changed on disk.`)
+    const saved = await this.ls.saveTextFile(this.path, version)
+    if (!saved.ok) {
+      this.retrySave(version)
+      // `LsRpcError.toString` names the request and the Language Server's own message.
+      return Err(`Could not save ${where}: ${saved.error.payload}`)
+    }
+    await this.recordDiskTime()
+    return Ok()
+  }
+
+  private waitForCover(wanted: StateVectorEntries, timeoutMs: number): Promise<boolean> {
+    if (stateVectorCovers(this.sharedDoc, wanted)) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      const done = (covered: boolean) => {
+        clearTimeout(timer)
+        this.sharedDoc.off('update', onUpdate)
+        resolve(covered)
+      }
+      // Registered after the constructor's own listener, so the update is already queued for the
+      // Language Server (`updateToApply`) when this sees it.
+      const onUpdate = () => {
+        if (stateVectorCovers(this.sharedDoc, wanted)) done(true)
+      }
+      const timer = setTimeout(() => done(false), timeoutMs)
+      this.sharedDoc.on('update', onUpdate)
+    })
+  }
+
+  /**
+   * Whether the file's modification time is still the one this session last saw. A mismatch is
+   * checked again after {@link DISK_RECHECK_MS}, so that a `text/autoSave` already on its way does
+   * not count as an outside change.
+   */
+  private async diskUnchanged(): Promise<boolean> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const info = await this.ls.fileInfo(this.path)
+      if (
+        info.ok &&
+        this.diskTime != null &&
+        info.value.attributes.lastModifiedTime === this.diskTime
+      )
+        return true
+      if (attempt === 0)
+        await new Promise((resolve) => setTimeout(resolve, ModulePersistence.DISK_RECHECK_MS))
+    }
+    return false
+  }
+
+  /** Try a failed save once more, unless the module has moved on (its own auto-save covers that). */
+  private retrySave(version: Checksum) {
+    setTimeout(() => {
+      if (this.syncedVersion !== version || !this.inState(LsSyncState.Synchronized)) return
+      void this.ls.saveTextFile(this.path, version).then((result) => {
+        if (result.ok) void this.recordDiskTime()
+        else result.error.log(`Could not save ${this.path.segments.join('/')} again`)
+      })
+    }, ModulePersistence.SAVE_RETRY_MS)
+  }
+
+  /** Stop syncing, and close the file in the Language Server. */
   async dispose(): Promise<void> {
     try {
       this.cleanup()
