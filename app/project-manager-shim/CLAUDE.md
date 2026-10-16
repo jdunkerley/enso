@@ -99,10 +99,13 @@ neither committed nor unstaged.
 - `src/localVersioning/git.ts`: `findGit`, `runGit`, `findRepoRoot`,
   `repositoryKey`, `identityArgs` (see _Identity fallback_ below).
 - Routes (POST to `/api/project-service/versioning/*`): `status`, `init`,
-  `enable`, `disable`, `commit`, `log`, `file-at`, `restore`, `duplicate-at`,
-  `set-comment`. See `handler/projectService.ts` for request/response shapes.
-  `commit` with an empty or whitespace-only `message` saves as `Saved`. The
-  `restore` route (not `LocalVersioning.restore`) refuses a running project.
+  `enable`, `disable`, `enable-if-inside`, `commit`, `log`, `file-at`,
+  `restore`, `duplicate-at`, `set-comment`. `enableIfInside(repoRoot, rootPath)`
+  enables a repository whose root is the GUI's local root or inside it,
+  comparing `repositoryKey`s (real paths), unless the user opted out of it. See
+  `handler/projectService.ts` for request/response shapes. `commit` with an
+  empty or whitespace-only `message` saves as `Saved`. The `restore` route (not
+  `LocalVersioning.restore`) refuses a running project.
 
 ### Consent: a repository is versioned only once it is enabled
 
@@ -112,11 +115,15 @@ put "Saved on close" commits on whatever branch is checked out. So the shim
 versions a repository only once it is _enabled_.
 
 - Consent is a per-repository record in `<userData>/versioning.json`
-  (`{ version: 1, enabledRepositories: [...] }`, written by `VersioningConsent`
-  through the `jsonFile.ts` helpers, so a corrupt or newer file is moved aside
-  and read as empty, as for `labels.json`). It is never written into the user's
-  repository or git configuration. Repositories are compared by real path,
-  lowercased on Windows (`repositoryKey`, which the operation lock uses too).
+  (`{ version: 1, enabledRepositories: [...], disabledRepositories?: [...] }`,
+  written by `VersioningConsent` through the `jsonFile.ts` helpers, so a corrupt
+  or newer file is moved aside and read as empty, as for `labels.json`). It is
+  never written into the user's repository or git configuration. Repositories
+  are compared by real path, lowercased on Windows (`repositoryKey`, which the
+  operation lock uses too).
+- `disable` records an opt-out (`disabledRepositories` in `versioning.json`,
+  still version 1); only `enable` clears it; `status` reports `optedOut`.
+  `enableIfInside` never re-enables an opted-out repository.
 - Hosts construct `LocalVersioning` with a store in `<userData>` (Electron:
   `app.getPath('userData')`; dev middleware: `DEV_USER_DATA_DIRECTORY`). A
   `LocalVersioning` without one must not exist outside tests.

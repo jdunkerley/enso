@@ -29,6 +29,12 @@ import { posix } from 'node:path'
 import type { Page, WebSocketRoute } from 'playwright'
 import { YjsChannel } from 'ydoc-channel'
 import { WSSharedDoc, YjsConnection, type YjsSocket } from 'ydoc-server'
+import { toJSONRPCError, toJSONRPCResult } from './jsonRpc'
+import {
+  createMockVersioning,
+  registerVersioningRoutes,
+  type VersioningMockContext,
+} from './localVersioning'
 import {
   clearPreprocessorOverrides,
   mockDataHandler,
@@ -36,6 +42,8 @@ import {
   mockYdocProvider,
   updateVisualizationData,
 } from './lsHandler'
+import { HISTORY_ROUTES } from './versioning/historyRoutes'
+import { SAVE_ROUTES } from './versioning/saveRoutes'
 
 function array<T>(): Readonly<T>[] {
   return []
@@ -238,6 +246,16 @@ export async function mockLocalApi(page: Page) {
     return addEntry(project.entry.path, project)
   }
 
+  /** The mocked git versioning (`mock/localVersioning.ts`). */
+  const versioning = createMockVersioning()
+  const versioningContext: VersioningMockContext = {
+    state: versioning,
+    rootPath: ROOT_PATH,
+    addProject: (options) => {
+      addProject(options)
+    },
+  }
+
   type FileEntryOptions = {
     path: Path
     attributes?: Partial<Attributes>
@@ -294,17 +312,6 @@ export async function mockLocalApi(page: Page) {
       }
 
   await test.step('Mock Local API', async () => {
-    const toJSONRPCResult = (result: unknown): JSONRPCResponse<unknown> => ({
-      jsonrpc: '2.0',
-      id: 0,
-      result,
-    })
-    const toJSONRPCError = (errorMessage: string): JSONRPCResponse<unknown> => ({
-      jsonrpc: '2.0',
-      id: 0,
-      error: { code: 0, message: errorMessage },
-    })
-
     await page.route('/api/project-service/project/create', async (route, request) => {
       if (request.method() !== 'POST') {
         return route.fulfill({ status: 400 })
@@ -592,6 +599,8 @@ export async function mockLocalApi(page: Page) {
       })
     })
 
+    await registerVersioningRoutes(page, versioningContext, { ...SAVE_ROUTES, ...HISTORY_ROUTES })
+
     await page.route('/api/root-directory-path', async (route, request) => {
       called('getRootDirectory', {})
       if (request.method() !== 'GET') {
@@ -865,6 +874,8 @@ export async function mockLocalApi(page: Page) {
     updateVisualization,
     addLabel,
     addRecentProject,
+    /** The mocked git versioning: change it in `setupApi.local`, before the page loads. */
+    versioning,
     /** The paths in the Recent list, newest first, whether or not a project is still there. */
     recentProjectPaths: () => recentProjects.map((entry) => entry.path),
   } as const

@@ -938,6 +938,22 @@ monorepo above the projects folder would get "Saved on close" commits unasked.
       `createVersioning`/`versioningFor` helper in `testRepo.ts` gives tests a
       store in a temporary directory.
 
+### Task 15b: shared foundations for PRs 4 and 5
+
+Added after the pre-flight review of PRs 4 and 5, so that neither adds these
+again.
+
+- [x] Consent records an opt-out: `disable` writes `disabledRepositories` (file
+      still version 1), only `enable` clears it, `status.optedOut`.
+- [x] `LocalVersioning.enableIfInside`, route `versioning/enable-if-inside`,
+      client `enableVersioningIfInside`; never re-enables an opted-out
+      repository.
+- [x] `LocalBackend.versioningStatus`; `__test__/localBackendTestUtils.ts`.
+- [x] `gui/src/utils/localVersioningQuery.ts` (nullable path); `mockBackends`
+      takes a `Partial<LocalBackend>`.
+- [x] Playwright mock: `mock/jsonRpc.ts`, `mock/localVersioning.ts` (git absent
+      by default) and empty `mock/versioning/{saveRoutes,historyRoutes}.ts`.
+
 ---
 
 ## PR 4 outline: saving in the GUI (detail when it starts)
