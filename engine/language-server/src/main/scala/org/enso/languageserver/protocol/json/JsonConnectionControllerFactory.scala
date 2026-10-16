@@ -14,7 +14,6 @@ import java.util.UUID
   * @param bufferRegistry the buffer registry actor ref
   * @param capabilityRouter the capability router actor ref
   * @param fileManager performs operations with file system
-  * @param vcsManager performs operations with VCS
   * @param contentRootManager manages the available content roots
   * @param contextRegistry a router that dispatches execution context requests
   * @param suggestionsHandler a reference to the suggestions requests handler
@@ -30,7 +29,6 @@ class JsonConnectionControllerFactory(
   bufferRegistry: ActorRef,
   capabilityRouter: ActorRef,
   fileManager: ActorRef,
-  vcsManager: ActorRef,
   contentRootManager: ActorRef,
   contextRegistry: ActorRef,
   suggestionsHandler: ActorRef,
@@ -59,7 +57,6 @@ class JsonConnectionControllerFactory(
         bufferRegistry         = bufferRegistry,
         capabilityRouter       = capabilityRouter,
         fileManager            = fileManager,
-        vcsManager             = vcsManager,
         contentRootManager     = contentRootManager,
         contextRegistry        = contextRegistry,
         suggestionsHandler     = suggestionsHandler,

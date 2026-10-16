@@ -6,7 +6,7 @@ import org.enso.languageserver.filemanager.ContentRootWithFile
 import org.enso.logger.masking.{MaskedPath, ToLogString}
 
 import java.io.File
-import java.nio.file.{Files, Path}
+import java.nio.file.Files
 
 import scala.concurrent.duration._
 
@@ -55,27 +55,7 @@ object FileManagerConfig {
     )
 }
 
-/** Configuration of the VCS manager.
-  *
-  * @param initTimeout vcs init operation timeout
-  * @param timeout default vcs operation timeout
-  * @param asyncInit flag indicating that vcs initialization should be non-blocking
-  */
-case class VcsManagerConfig(
-  initTimeout: FiniteDuration,
-  timeout: FiniteDuration,
-  asyncInit: Boolean
-) {
-  val dataDirectory: Path =
-    Path.of(ProjectDirectoriesConfig.DataDirectory)
-}
-
 case class AICompletionConfig(apiKey: String)
-
-object VcsManagerConfig {
-  def apply(asyncInit: Boolean = true): VcsManagerConfig =
-    VcsManagerConfig(initTimeout = 5.seconds, 5.seconds, asyncInit)
-}
 
 /** Configuration of the execution context.
   *
@@ -151,7 +131,6 @@ object ProjectDirectoriesConfig {
 case class Config(
   projectContentRoot: ContentRootWithFile,
   fileManager: FileManagerConfig,
-  vcsManager: VcsManagerConfig,
   pathWatcher: PathWatcherConfig,
   executionContext: ExecutionContextConfig,
   directories: ProjectDirectoriesConfig,
@@ -165,7 +144,6 @@ case class Config(
     s"Config(" +
     s"projectContentRoot=${projectContentRoot.toLogString(shouldMask)}, " +
     s"fileManager=$fileManager, " +
-    s"vcsManager=$vcsManager, " +
     s"pathWatcher=$pathWatcher, " +
     s"executionContext=$executionContext, " +
     s"directories=${directories.toLogString(shouldMask)}" +
