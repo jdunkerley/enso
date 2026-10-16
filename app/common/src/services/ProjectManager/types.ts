@@ -263,3 +263,27 @@ export interface RecentProjectEntry {
   readonly projectId: UUID
   readonly openedAt: dateTime.Rfc3339DateTime
 }
+
+/** A version summary: the id of a version and when it was saved. */
+export interface VersionSummary {
+  readonly id: string
+  /** ISO-8601. */
+  readonly date: string
+}
+
+/** What is known about a local project's versioning. */
+export interface VersioningStatus {
+  readonly git: boolean
+  readonly repoRoot: Path | null
+  readonly changed: boolean
+  readonly lastVersion: VersionSummary | null
+  /** Git's message when the repository cannot be used (mid-merge, locked, ...). */
+  readonly blocked: string | null
+}
+
+/** A saved version of a local project. */
+export interface VersionEntry extends VersionSummary {
+  readonly author: { readonly name: string; readonly email: string }
+  readonly comment: string
+  readonly isLatest: boolean
+}

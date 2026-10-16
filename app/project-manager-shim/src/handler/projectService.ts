@@ -1,6 +1,7 @@
 import { LabelName, Path, UUID, type LChColor } from 'enso-common/src/services/Backend'
 import type * as http from 'node:http'
 import type { LocalMetadata } from '../localMetadata/index.js'
+import type { LocalVersioning } from '../localVersioning/index.js'
 import { ProjectService, type CloudParams } from '../projectService/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
@@ -12,10 +13,11 @@ export function isProjectServiceRequest(requestPath: string): boolean {
   return requestPath.startsWith('/api/project-service/')
 }
 
+/** A route's handler: it gets the store that serves the route, and the request body. */
+type RouteHandler<Store> = (store: Store, body: Record<string, unknown>) => Promise<unknown>
+
 /** The routes served by {@link LocalMetadata}, with the handler for each request body. */
-const LOCAL_METADATA_ROUTES: Readonly<
-  Record<string, (store: LocalMetadata, body: Record<string, unknown>) => Promise<unknown>>
-> = {
+const LOCAL_METADATA_ROUTES: Readonly<Record<string, RouteHandler<LocalMetadata>>> = {
   'labels/list': (store) => store.listLabels(),
   'labels/create': (store, body) =>
     store.createLabel(LabelName(requireString(body, 'value')), requireColor(body, 'color')),
@@ -34,6 +36,56 @@ const LOCAL_METADATA_ROUTES: Readonly<
   },
   'recent/forget': async (store, body) => {
     await store.forgetRecent(requireString(body, 'path'))
+    return null
+  },
+}
+
+/** What the {@link LOCAL_VERSIONING_ROUTES} handlers use. */
+interface VersioningContext {
+  readonly versioning: LocalVersioning
+  readonly getProjectService: () => Promise<ProjectService>
+}
+
+/** The routes served by {@link LocalVersioning}. */
+const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningContext>>> = {
+  'versioning/status': ({ versioning }, body) => versioning.status(requireString(body, 'path')),
+  'versioning/init': ({ versioning }, body) => versioning.init(requireString(body, 'rootPath')),
+  'versioning/commit': ({ versioning }, body) =>
+    versioning.commit([requireString(body, 'path')], requireString(body, 'message')),
+  'versioning/log': async ({ versioning }, body) => ({
+    versions: await versioning.log(requireString(body, 'path')),
+  }),
+  'versioning/file-at': ({ versioning }, body) =>
+    versioning.fileAt(
+      requireString(body, 'path'),
+      requireString(body, 'id'),
+      requireString(body, 'relativePath'),
+    ),
+  'versioning/restore': async ({ versioning, getProjectService }, body) => {
+    const projectPath = requireString(body, 'path')
+    const id = requireString(body, 'id')
+    const projectService = await getProjectService()
+    if (await projectService.isProjectRunning(Path(projectPath))) {
+      throw new Error('The project is running. Close it before restoring a version.')
+    }
+    return versioning.restore(projectPath, id)
+  },
+  'versioning/duplicate-at': async ({ versioning, getProjectService }, body) => {
+    const projectPath = requireString(body, 'path')
+    const id = requireString(body, 'id')
+    const title = requireString(body, 'title')
+    const parentPath = requireString(body, 'parentPath')
+    const projectService = await getProjectService()
+    return projectService.duplicateProjectInto(title, Path(parentPath), (targetPath) =>
+      versioning.exportAt(projectPath, id, targetPath),
+    )
+  },
+  'versioning/set-comment': async ({ versioning }, body) => {
+    await versioning.setComment(
+      requireString(body, 'path'),
+      requireString(body, 'id'),
+      requireString(body, 'comment'),
+    )
     return null
   },
 }
@@ -76,24 +128,25 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Answer a {@link LOCAL_METADATA_ROUTES} request. */
-async function handleLocalMetadataRequest(
+/** Answer a request for one of the routes served by `store`. */
+async function handleStoreRequest<Store>(
   request: http.IncomingMessage,
   response: http.ServerResponse,
   name: string,
-  handle: (store: LocalMetadata, body: Record<string, unknown>) => Promise<unknown>,
-  localMetadata: LocalMetadata | undefined,
+  handle: RouteHandler<Store>,
+  store: Store | undefined,
+  unavailableMessage: string,
   headers: Record<string, string>,
 ): Promise<void> {
   try {
-    if (localMetadata == null) {
-      throw new Error('Local metadata is not available in this host.')
+    if (store == null) {
+      throw new Error(unavailableMessage)
     }
     const body = await bodyJsonOrEmpty(request)
     if (!isRecord(body)) {
       throw new Error('The request body must be a JSON object.')
     }
-    const result = await handle(localMetadata, body)
+    const result = await handle(store, body)
     response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))
   } catch (error) {
     console.error(error)
@@ -106,8 +159,8 @@ async function handleLocalMetadataRequest(
 /**
  * Handle project service requests.
  *
- * The label and Recent routes are served by `localMetadata`; without it they answer with an
- * error.
+ * The label and Recent routes are served by `localMetadata`, and the `versioning/` routes by
+ * `localVersioning`; without their store they answer with an error.
  */
 export async function handleProjectServiceRequest(
   request: http.IncomingMessage,
@@ -116,21 +169,33 @@ export async function handleProjectServiceRequest(
   getProjectService: () => Promise<ProjectService>,
   headers: Record<string, string>,
   localMetadata?: LocalMetadata,
+  localVersioning?: LocalVersioning,
 ): Promise<void> {
-  const localMetadataRouteName = requestPath.replace(/^\/api\/project-service\//, '')
-  const localMetadataRoute =
-    request.method === 'POST' && Object.hasOwn(LOCAL_METADATA_ROUTES, localMetadataRouteName) ?
-      LOCAL_METADATA_ROUTES[localMetadataRouteName]
-    : undefined
-  if (localMetadataRoute != null) {
-    return handleLocalMetadataRequest(
-      request,
-      response,
-      localMetadataRouteName,
-      localMetadataRoute,
-      localMetadata,
-      headers,
-    )
+  const routeName = requestPath.replace(/^\/api\/project-service\//, '')
+  if (request.method === 'POST') {
+    if (Object.hasOwn(LOCAL_METADATA_ROUTES, routeName)) {
+      return handleStoreRequest(
+        request,
+        response,
+        routeName,
+        LOCAL_METADATA_ROUTES[routeName]!,
+        localMetadata,
+        'Local metadata is not available in this host.',
+        headers,
+      )
+    }
+    if (Object.hasOwn(LOCAL_VERSIONING_ROUTES, routeName)) {
+      return handleStoreRequest(
+        request,
+        response,
+        routeName,
+        (store, body) =>
+          LOCAL_VERSIONING_ROUTES[routeName]!({ versioning: store, getProjectService }, body),
+        localVersioning,
+        'Local versioning is not available in this host.',
+        headers,
+      )
+    }
   }
   switch (`${request.method} ${requestPath}`) {
     case 'POST /api/project-service/project/create': {

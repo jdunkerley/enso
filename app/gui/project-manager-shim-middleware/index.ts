@@ -51,6 +51,7 @@ import {
   isWatcherRequest,
 } from 'project-manager-shim/handler'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
+import { LocalVersioning } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 import { tarFsPack, unzipEntries, zipWriteStream } from './archive'
 
@@ -92,6 +93,7 @@ const COOP_COEP_CORP_HEADERS = [
 export class ProjectManagerShimMiddleware {
   private projectService?: ProjectService
   private readonly localMetadata = new LocalMetadata({ userDataDirectory: DEV_USER_DATA_DIRECTORY })
+  private readonly localVersioning = new LocalVersioning()
   private watchers: Map<AssetId, Watcher> = new Map()
 
   /** Create the new middleware. */
@@ -201,6 +203,7 @@ export class ProjectManagerShimMiddleware {
         () => this.getProjectService(),
         COMMON_HEADERS,
         this.localMetadata,
+        this.localVersioning,
       )
     } else if (isWatcherRequest(requestPath)) {
       handleWatcherRequest(request, response, COMMON_HEADERS, this.watchers)

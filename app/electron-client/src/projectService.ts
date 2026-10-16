@@ -7,16 +7,24 @@ import type { Electron } from '@/electron'
 import * as paths from '@/paths'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
+import { LocalVersioning } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 let localMetadata: LocalMetadata | null = null
+let localVersioning: LocalVersioning | null = null
 let extraArgs: readonly string[] = []
 
 /** The local labels and Recent store, kept in Electron's `userData` directory. */
 export function getLocalMetadata(): LocalMetadata {
   localMetadata ??= new LocalMetadata({ userDataDirectory: app.getPath('userData') })
   return localMetadata
+}
+
+/** The git-based versioning of local projects. */
+export function getLocalVersioning(): LocalVersioning {
+  localVersioning ??= new LocalVersioning()
+  return localVersioning
 }
 
 /** Get the project service. */

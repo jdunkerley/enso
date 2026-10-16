@@ -319,6 +319,45 @@ export class ProjectService {
     }
   }
 
+  /**
+   * Creates a new project in `parentPath` named after `title` (made unique if taken), populating
+   * its directory with `populate` and giving it a new identity. The directory must not exist when
+   * `populate` is called, and `populate` may leave out `.enso/`.
+   */
+  async duplicateProjectInto(
+    title: string,
+    parentPath: Path,
+    populate: (targetPath: Path) => Promise<void>,
+  ): Promise<DuplicatedProject> {
+    const repo = new ProjectFileRepository(parentPath)
+    const newName = await this.getNameForNewProject(title, repo)
+    await this.validateProjectName(newName)
+    const targetPath = await repo.findPathForNewProject(newName)
+    await populate(targetPath)
+    try {
+      const newProject = await repo.giveNewIdentity(targetPath, newName, {
+        id: this.generateUUID(),
+        name: newName,
+        namespace: ProjectService.DEFAULT_NAMESPACE,
+        created: toRfc3339(new Date()),
+      })
+      return {
+        projectId: newProject.id,
+        projectName: newProject.name,
+        projectNormalizedName: nameValidation.normalizedName(newProject.name),
+        projectPath: newProject.path,
+      }
+    } catch (error) {
+      await repo.delete(targetPath).catch(() => {})
+      throw error
+    }
+  }
+
+  /** Whether the project at `projectPath` is running. */
+  async isProjectRunning(projectPath: Path): Promise<boolean> {
+    return this.runner.isProjectRunning(projectPath)
+  }
+
   /** Renames a project. */
   async renameProject(projectId: UUID, newName: string, projectsDirectory: Path): Promise<void> {
     this.logger.debug('Renaming project', projectId, 'to', newName)

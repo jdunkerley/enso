@@ -56,6 +56,22 @@ describe('project.json fields the repository does not know about', () => {
     })
   })
 
+  test('giveNewIdentity loads a directory without .enso/ as a project with a fresh id', async () => {
+    const dir = path.join(root, 'Exported')
+    await fs.mkdir(path.join(dir, 'src'), { recursive: true })
+    await fs.writeFile(path.join(dir, 'package.yaml'), 'name: Old\nnamespace: local\n')
+    await fs.writeFile(path.join(dir, 'src', 'Main.enso'), 'main = 1\n')
+    const project = await repo.giveNewIdentity(Path(dir), 'New', {
+      id: UUID('id-9'),
+      name: 'New',
+      namespace: 'local',
+      created: Rfc3339DateTime('2026-10-16T00:00:00.000Z'),
+    })
+    expect(project).toMatchObject({ id: 'id-9', name: 'New', namespace: 'local' })
+    expect(await readProjectJson(dir)).toMatchObject({ id: 'id-9', kind: 'UserProject' })
+    expect((await repo.tryLoadProject(Path(dir)))?.id).toBe('id-9')
+  })
+
   test('copyProject keeps labels on the copy, with the new id', async () => {
     const dir = await createProject(path.join(root, 'Source'), 'id-1', { labels: ['a'] })
     const project = (await repo.tryLoadProject(Path(dir)))!

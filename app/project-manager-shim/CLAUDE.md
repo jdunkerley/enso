@@ -23,6 +23,8 @@ Consumers import by subpath (see `package.json#exports`):
 - `project-manager-shim/handler` — JSON-RPC request handler.
 - `project-manager-shim/localMetadata` — local labels and Recent store (see
   below).
+- `project-manager-shim/localVersioning` — git-based versioning of local
+  projects.
 - `project-manager-shim/projectService` — project-lifecycle service.
 
 ## Engine download
