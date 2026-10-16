@@ -302,7 +302,9 @@ describe('log, fileAt and setComment', () => {
       const a = path.join(root, 'A')
       expect(await versioning.fileAt(a, ids[0]!, 'src/Main.enso')).toBe('main = 10\n')
       expect(await versioning.fileAt(a, ids[0]!, 'src\\Main.enso')).toBe('main = 10\n')
-      await expect(versioning.fileAt(a, ids[0]!, 'src/Missing.enso')).rejects.toBeDefined()
+      await expect(versioning.fileAt(a, ids[0]!, 'src/Missing.enso')).rejects.toThrow(
+        /does not exist/,
+      )
     })
   })
 
@@ -319,5 +321,48 @@ describe('log, fileAt and setComment', () => {
       },
       { init: true },
     )
+  })
+})
+
+describe('untrusted arguments', () => {
+  test.each(['--output=x', 'HEAD~1', '-h', ''])('version id %j is rejected', async (bad) => {
+    await withRepo(async (root, versioning) => {
+      const ids = await (async () => {
+        const a = path.join(root, 'A')
+        await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'main = 5\n')
+        return [(await versioning.commit([a], 'one')).id!]
+      })()
+      expect(ids).toHaveLength(1)
+      const a = path.join(root, 'A')
+      const target = bad.startsWith('--output=') ? bad : 'x'
+      await expect(versioning.fileAt(a, bad, 'src/Main.enso')).rejects.toThrow(/version id/i)
+      await expect(versioning.setComment(a, bad, 'c')).rejects.toThrow(/version id/i)
+      await expect(fs.access(path.join(a, target.replace('--output=', '')))).rejects.toBeDefined()
+    })
+  })
+
+  test('fileAt cannot leave the project', async () => {
+    await withRepo(async (root, versioning) => {
+      const { id } = await versioning.commit([root], 'All')
+      const a = path.join(root, 'A')
+      await expect(versioning.fileAt(a, id!, '../B/src/Main.enso')).rejects.toThrow(/project/i)
+      await expect(versioning.fileAt(a, id!, 'src\\..\\..\\B/src/Main.enso')).rejects.toThrow(
+        /project/i,
+      )
+      await expect(versioning.fileAt(a, id!, '/B/src/Main.enso')).rejects.toThrow(/project/i)
+    })
+  })
+
+  test("setComment rejects another project's version and writes no note", async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const b = path.join(root, 'B')
+      await fs.writeFile(path.join(a, 'src', 'Main.enso'), 'main = 7\n')
+      await versioning.commit([a], 'a')
+      await fs.writeFile(path.join(b, 'src', 'Main.enso'), 'main = 8\n')
+      const { id } = await versioning.commit([b], 'b')
+      await expect(versioning.setComment(a, id!, 'Hijacked')).rejects.toThrow(/not a version/i)
+      expect(await git(root, 'notes', '--ref=enso', 'list')).toBe('')
+    })
   })
 })

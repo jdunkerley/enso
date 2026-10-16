@@ -37,6 +37,15 @@ export interface VersionEntry extends VersionSummary {
 
 const NOTES_REF = '--ref=enso'
 
+/**
+ * Throws unless `id` is a full commit hash (40 or 64 hex digits, as {@link LocalVersioning.log}
+ * returns). Ids come from callers over HTTP, so nothing git could read as an option or a revision
+ * expression (`--output=…`, `HEAD~1`) may get through. Abbreviated ids are not accepted.
+ */
+export function assertVersionId(id: string): void {
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(id)) throw new Error(`Invalid version id: ${id}`)
+}
+
 /** Lines the root `.gitignore` must contain. */
 export const ENSO_IGNORE_LINES: readonly string[] = ['**/.enso/', '*.bak']
 
@@ -226,7 +235,10 @@ export class LocalVersioning {
         id,
         date,
         author: { name, email },
-        comment: noted.has(id) ? (await run(['notes', NOTES_REF, 'show', id])).trim() : message,
+        comment:
+          noted.has(id) ?
+            (await run(['notes', NOTES_REF, 'show', id])).replace(/\r?\n$/, '')
+          : message,
         isLatest: index === 0,
       })),
     )
@@ -234,22 +246,38 @@ export class LocalVersioning {
 
   /** The text of `relativePath` (relative to the project) at version `id`. */
   async fileAt(projectPath: string, id: string, relativePath: string): Promise<string> {
+    assertVersionId(id)
+    const file = relativePath.replace(/\\/g, '/').replace(/^\.\//, '')
+    if (file.startsWith('/') || /^[a-zA-Z]:/.test(file) || file.split('/').includes('..'))
+      throw new Error(`${relativePath} is not inside the project`)
     const repoRoot = await findRepoRoot(projectPath)
     if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
     const relative = await repoRelative(repoRoot, projectPath)
-    const file = relativePath.replace(/\\/g, '/').replace(/^\.?\//, '')
     const target = relative === '.' ? file : `${relative}/${file}`
     return runGit(repoRoot, ['show', `${id}:${target}`], { queueKey: repoRoot })
   }
 
   /** Set the comment shown for version `id`, as a git note (the commit itself is not rewritten). */
   async setComment(projectPath: string, id: string, comment: string): Promise<void> {
+    assertVersionId(id)
     const repoRoot = await findRepoRoot(projectPath)
     if (repoRoot == null) throw new Error(`${projectPath} is not in a git repository`)
+    if (!(await this.log(projectPath)).some((entry) => entry.id === id))
+      throw new Error(`${id} is not a version of this project`)
     try {
       await runGit(
         repoRoot,
-        [...(await identityArgs(repoRoot)), 'notes', NOTES_REF, 'add', '-f', '-m', comment, id],
+        [
+          ...(await identityArgs(repoRoot)),
+          'notes',
+          NOTES_REF,
+          'add',
+          '-f',
+          '-m',
+          comment,
+          '--end-of-options',
+          id,
+        ],
         { queueKey: repoRoot },
       )
     } catch (error) {
