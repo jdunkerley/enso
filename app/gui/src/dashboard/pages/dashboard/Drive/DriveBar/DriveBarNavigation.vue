@@ -18,7 +18,7 @@ import { MENU_CONTAINER_PADDING, MENU_STYLES } from '$/components/Menu/variants'
 import { portalTarget } from '$/components/portal'
 import Scroller from '$/components/Scroller/Scroller.vue'
 import { resolveDuplications } from '$/components/Drive/duplicateAssets'
-import { useCategories } from '$/providers/category'
+import { isRecentCategory, useCategories } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useDriveStore } from '$/providers/driveStore'
 import { useRightPanelData } from '$/providers/rightPanel'
@@ -68,7 +68,7 @@ const finalPath = computed((): readonly PathItem[] => {
     getCategoryByDirectoryId: categories.getCategoryByDirectoryId,
     categoryLabel: categories.categoryLabel,
   })
-  if (category.value.type === 'recent') {
+  if (isRecentCategory(category.value)) {
     return [
       {
         id: location.value.rootDirectoryId,
@@ -196,16 +196,16 @@ function onMenuSelect(item: PathItem) {
   <div
     :class="[
       'flex w-full flex-none items-center',
-      category.type === 'trash' || category.type === 'recent' ? 'py-2' : undefined,
+      category.type === 'trash' || isRecentCategory(category) ? 'py-2' : undefined,
     ]"
   >
-    <template v-if="category.type === 'trash' || category.type === 'recent'">
+    <template v-if="category.type === 'trash' || isRecentCategory(category)">
       <Button
         variant="icon"
         icon="navigate_up"
         :aria-label="getText('up')"
         :isLoading="driveView.isNavigatingFrom(UP_SOURCE)"
-        :isDisabled="category.type === 'recent' || !canNavigateUp"
+        :isDisabled="isRecentCategory(category) || !canNavigateUp"
         @press="navigateToParent"
       />
     </template>

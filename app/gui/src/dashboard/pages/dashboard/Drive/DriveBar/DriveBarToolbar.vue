@@ -25,7 +25,7 @@ import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import { useVisualTooltip } from '$/components/Tooltip/useVisualTooltip'
 import VisualTooltipPopup from '$/components/Tooltip/VisualTooltipPopup.vue'
-import { canTransferBetweenCategories, useCategories } from '$/providers/category'
+import { canTransferBetweenCategories, isRecentCategory, useCategories } from '$/providers/category'
 import { useDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
 import { useIsOnline } from '$/providers/online'
@@ -200,7 +200,7 @@ function openClearTrash() {
 </script>
 
 <template>
-  <ButtonGroup v-if="category.type === 'recent'" class="grow-0">
+  <ButtonGroup v-if="isRecentCategory(category)" class="grow-0">
     <PasteStatus v-if="effectivePasteData" :pasteData="effectivePasteData" />
     <AssetSearchBar :backend="backend" :isCloud="isCloud" :query="query" :setQuery="setQuery" />
   </ButtonGroup>

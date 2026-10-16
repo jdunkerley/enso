@@ -85,6 +85,12 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'open_in_file_browser',
       category: 'other',
     },
+    removeFromRecent: {
+      bindings: [],
+      rebindable: false,
+      icon: 'history',
+      category: 'fileManagement',
+    },
     signOut: { bindings: [], icon: 'logout', color: 'rgb(243 24 10 / 0.87)', category: 'other' },
     // These should not appear in any menus.
     closeModal: { bindings: ['Escape'], rebindable: false, category: 'other' },

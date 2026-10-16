@@ -22,9 +22,10 @@ import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useCopy } from '$/components/Button/copy'
 import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useMenuEntries } from '$/composables/menuEntries'
+import type { DashboardBindingKey } from '$/configurations/inputBindings'
 import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
-import { isCloudCategory, useCategories } from '$/providers/category'
+import { isCloudCategory, isRecentCategory, useCategories } from '$/providers/category'
 import { useContainerData, type Tab } from '$/providers/container'
 import { useDriveStore } from '$/providers/driveStore'
 import { useFeatureFlag } from '$/providers/featureFlags'
@@ -137,7 +138,7 @@ const canEditThisAsset = computed(
 )
 const canAddToThisDirectory = computed(
   () =>
-    category.value.type !== 'recent' &&
+    !isRecentCategory(category.value) &&
     asset.type === backendModule.AssetType.directory &&
     canEditThisAsset.value,
 )
@@ -453,7 +454,40 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
   ]
 })
 
-const presentEntries = useMenuEntries(entries, () => bindingTarget)
+/** The entries of the full list that local Recent keeps; it adds "Remove from Recent". */
+const LOCAL_RECENT_ACTIONS: ReadonlySet<DashboardBindingKey> = new Set([
+  'open',
+  'close',
+  'label',
+  'openInFileBrowser',
+  'copyId',
+])
+const forgetRecentProject = useMutationCallback(() => ({
+  mutationFn: async (projectId: backendModule.ProjectId) => {
+    await localBackend?.forgetRecentProject(projectId)
+  },
+  meta: {
+    invalidates: [[backendModule.BackendType.local, 'listDirectory']],
+    awaitInvalidates: true,
+    refetchType: 'all' as const,
+  },
+}))
+const shownEntries = computed((): (ContextMenuEntry | false | null | undefined)[] =>
+  category.value.type !== 'localRecent' ?
+    entries.value
+  : [
+      ...entries.value.filter((entry) => entry && LOCAL_RECENT_ACTIONS.has(entry.action)),
+      asset.type === backendModule.AssetType.project &&
+        localBackend != null && {
+          action: 'removeFromRecent',
+          doAction: () => {
+            void forgetRecentProject(asset.id)
+          },
+        },
+    ],
+)
+
+const presentEntries = useMenuEntries(shownEntries, () => bindingTarget)
 </script>
 
 <template>

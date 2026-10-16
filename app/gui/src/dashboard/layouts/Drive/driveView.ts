@@ -12,7 +12,7 @@
  * the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom} is true for it.
  */
 import { useAuth } from '$/providers/auth'
-import { categoryKey, useCategories, type Category } from '$/providers/category'
+import { categoryKey, isLocalCategory, useCategories, type Category } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useLocalPaths } from '$/providers/localDirectories'
 import { listDirectoryQueryOptions } from '$/utils/driveQueries'
@@ -122,7 +122,11 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     invariant(user != null, 'The drive is only shown to a signed-in user.')
     const category = drive.currentCategory
     const categoryHomeDir = categories.categoryDirectoryId(category)
-    const rootDirectoryId = categoryHomeDir ?? user.rootDirectoryId
+    // A category with no home directory (a Recent) is rooted at its backend's root.
+    const rootDirectoryId =
+      categoryHomeDir ??
+      (isLocalCategory(category) ? categories.categoryDirectoryId({ type: 'local' }) : null) ??
+      user.rootDirectoryId
     const directoryId = drive.currentDirectory
     const queryDirectoryId = directoryId ?? categoryHomeDir
     return {

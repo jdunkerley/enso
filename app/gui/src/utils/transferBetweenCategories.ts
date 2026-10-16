@@ -11,6 +11,7 @@ import {
   dropOperationBetweenCategories,
   isCloudCategory,
   isLocalCategory,
+  isRecentCategory,
   type Category,
 } from '$/providers/category'
 import type { Resolution } from '$/providers/modals'
@@ -131,7 +132,7 @@ export async function transferBetweenCategories(
   const { getText, categoryLabel } = context
   const operation = dropOperationBetweenCategories(from, to, newParentId)
   if (operation === 'cancel') return
-  if (to.type === 'recent') return
+  if (isRecentCategory(to)) return
   const assetsArray = Array.from(assets)
   const keysArray = assetsArray.map((asset) => asset.id)
 
@@ -268,7 +269,8 @@ export async function transferBetweenCategories(
       void baseMutation()
       return
     }
-    case 'recent': {
+    case 'recent':
+    case 'localRecent': {
       return
     }
   }

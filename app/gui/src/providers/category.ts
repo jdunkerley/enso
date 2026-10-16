@@ -21,7 +21,7 @@ import { useLocalPaths } from './localDirectories'
 import { useText } from './text'
 
 export interface PredefinedCategory {
-  type: 'cloud' | 'recent' | 'trash' | 'local'
+  type: 'cloud' | 'recent' | 'trash' | 'local' | 'localRecent'
 }
 
 export interface TeamDirectory {
@@ -43,6 +43,7 @@ export const CATEGORY_BACKEND: Record<CategoryType, BackendType> = {
   trash: BackendType.remote,
   team: BackendType.remote,
   local: BackendType.local,
+  localRecent: BackendType.local,
   localDirectory: BackendType.local,
 }
 const TEAM_CATEGORY_KEY_PREFIX = 'team-'
@@ -55,6 +56,7 @@ export function categoryKey(category: Category) {
     case 'recent':
     case 'trash':
     case 'local':
+    case 'localRecent':
       return category.type
     case 'team':
       return `${TEAM_CATEGORY_KEY_PREFIX}${category.groupId}`
@@ -70,6 +72,7 @@ export function categoryFromKey(key: Opt<string>): Category | null {
     case 'recent':
     case 'trash':
     case 'local':
+    case 'localRecent':
       return { type: key }
     default:
       if (key == null) return null
@@ -104,6 +107,12 @@ export function isLocalCategory(category: Category) {
   return CATEGORY_BACKEND[category.type] === BackendType.local
 }
 
+/** Whether the category is a Recent list: the cloud's, or the local one. */
+export function isRecentCategory(category: Category | CategoryType) {
+  const type = typeof category === 'string' ? category : category.type
+  return type === 'recent' || type === 'localRecent'
+}
+
 /** Get icon representing given category type. */
 export function categoryIcon(category: CategoryType): Icon {
   switch (category) {
@@ -111,6 +120,7 @@ export function categoryIcon(category: CategoryType): Icon {
     case 'trash':
       return category
     case 'recent':
+    case 'localRecent':
       return 'history'
     case 'local':
       return 'system'
@@ -170,6 +180,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
   ])
   const localCategoriesList = computed((): Category[] => [
     { type: 'local' },
+    { type: 'localRecent' },
     ...localDirectoryCategories.value,
   ])
 
@@ -178,6 +189,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
       case 'cloud':
         return getText('cloudCategory')
       case 'recent':
+      case 'localRecent':
         return getText('recentCategory')
       case 'trash':
         return getText('trashCategory')
@@ -196,6 +208,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
       case 'cloud':
         return user?.rootDirectoryId ?? null
       case 'recent':
+      case 'localRecent':
         return null
       case 'trash':
         return user != null ? organizationIdToDirectoryId(user?.organizationId) : null
@@ -283,7 +296,7 @@ export function dropOperationBetweenCategories(
     return 'cancel'
   }
 
-  if (to.type === 'recent' || from.type === 'recent') {
+  if (isRecentCategory(to) || isRecentCategory(from)) {
     return 'cancel'
   }
 
