@@ -20,12 +20,21 @@ const FALLBACK_IDENTITY: readonly string[] = [
 
 let gitLookup: Promise<string | null> | undefined
 
-/** The git executable, or `null` when git is not installed. Found once and cached. */
+/**
+ * The git executable, or `null` when git is not installed. Only a git that was found is cached: a
+ * failed lookup is tried again next time, so installing git needs no restart of the IDE.
+ */
 export function findGit(): Promise<string | null> {
-  gitLookup ??= runCommand('git', ['--version']).then(
-    () => 'git',
-    () => null,
-  )
+  if (gitLookup == null) {
+    const lookup = runCommand('git', ['--version']).then(
+      () => 'git',
+      () => null,
+    )
+    gitLookup = lookup
+    void lookup.then((git) => {
+      if (git == null && gitLookup === lookup) gitLookup = undefined
+    })
+  }
   return gitLookup
 }
 
@@ -34,13 +43,42 @@ export function resetGitCache(): void {
   gitLookup = undefined
 }
 
+/**
+ * Inherited variables that would point git at another repository, index or object store (set, for
+ * example, when the IDE is started from a git hook or an editor's terminal). They are never passed
+ * on; a caller that needs one (`exportAt`'s `GIT_INDEX_FILE`) passes it in `options.env`.
+ */
+const REPOSITORY_VARIABLES: readonly string[] = [
+  'GIT_DIR',
+  'GIT_WORK_TREE',
+  'GIT_INDEX_FILE',
+  'GIT_OBJECT_DIRECTORY',
+  'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+  'GIT_COMMON_DIR',
+  'GIT_NAMESPACE',
+  'GIT_PREFIX',
+]
+
+/** `process.env` without {@link REPOSITORY_VARIABLES}. */
+function inheritedEnvironment(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const name of REPOSITORY_VARIABLES) delete env[name]
+  return env
+}
+
 /** The tail of the work queued for each queue key; entries are removed once the queue drains. */
 const queues = new Map<string, Promise<unknown>>()
 
 /**
  * Run git in `cwd` after every earlier call queued for the same `queueKey` (a repository root)
- * has finished. Adds `GIT_TERMINAL_PROMPT=0` and `-c core.quotepath=false`. The queue key defaults
- * to `cwd`. Git runs without a shell. Returns stdout unchanged.
+ * has finished. The queue orders single calls only; `LocalVersioning` holds its own lock
+ * around each operation's sequence of calls.
+ *
+ * Adds `-c core.quotepath=false`, `GIT_TERMINAL_PROMPT=0` (never prompt for credentials) and
+ * `GIT_OPTIONAL_LOCKS=0`, so read-only commands such as `status` never take the index lock just to
+ * refresh it, racing the user's own git (commands that change the index take it regardless).
+ * Inherited {@link REPOSITORY_VARIABLES} are dropped. The queue key defaults to `cwd`. Git runs
+ * without a shell. Returns stdout unchanged.
  * @throws {GitUnavailableError} when git is not installed; {@link CommandError} on failure.
  */
 export async function runGit(
@@ -59,7 +97,12 @@ export async function runGit(
   const execute = async () => {
     const { stdout } = await runCommand(git, ['-c', 'core.quotepath=false', ...args], {
       cwd,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...options?.env },
+      env: {
+        ...inheritedEnvironment(),
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_OPTIONAL_LOCKS: '0',
+        ...options?.env,
+      },
       ...(options?.input != null ? { input: options.input } : {}),
     })
     return stdout

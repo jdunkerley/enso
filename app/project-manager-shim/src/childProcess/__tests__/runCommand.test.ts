@@ -18,7 +18,24 @@ describe('runCommand', () => {
     expect(error.message).toContain('bad')
   })
 
-  test('the message falls back to the exit code when there is no stderr', async () => {
+  test('the message is stdout when there is no stderr', async () => {
+    const error = await runCommand(process.execPath, [
+      '-e',
+      'console.log("  nothing to commit  "); process.exit(1)',
+    ]).catch((e) => e)
+    expect(error).toBeInstanceOf(CommandError)
+    expect(error.message).toBe('nothing to commit')
+  })
+
+  test('stderr wins over stdout in the message', async () => {
+    const error = await runCommand(process.execPath, [
+      '-e',
+      'console.log("out"); console.error("err"); process.exit(1)',
+    ]).catch((e) => e)
+    expect(error.message).toBe('err')
+  })
+
+  test('the message falls back to the exit code when there is no output', async () => {
     const error = await runCommand(process.execPath, ['-e', 'process.exit(4)']).catch((e) => e)
     expect(error.message).toContain('exited with code 4')
   })

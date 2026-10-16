@@ -42,10 +42,17 @@ describe('findGit', () => {
     expect(await findGit()).toEqual(expect.any(String))
   })
 
-  test('is null when git cannot be run, and the outcome is cached', async () => {
+  test('is null when git cannot be run, and looks again next time', async () => {
     vi.mocked(runCommand).mockRejectedValueOnce(new Error('ENOENT'))
     expect(await findGit()).toBeNull()
-    expect(await findGit()).toBeNull()
+    // Installing git while the IDE runs is picked up without a restart.
+    expect(await findGit()).toEqual(expect.any(String))
+    expect(runCommand).toHaveBeenCalledTimes(2)
+  })
+
+  test('a found git is cached', async () => {
+    expect(await findGit()).toEqual(expect.any(String))
+    expect(await findGit()).toEqual(expect.any(String))
     expect(runCommand).toHaveBeenCalledTimes(1)
   })
 
@@ -123,6 +130,39 @@ describe('runGit', () => {
     expect(options?.input).toBe('in')
     expect(options?.env?.GIT_TERMINAL_PROMPT).toBe('0')
     expect(options?.env?.GIT_INDEX_FILE).toBe('idx')
+    expect(options?.env?.GIT_OPTIONAL_LOCKS).toBe('0')
+  })
+
+  test("drops inherited variables that point git elsewhere, but keeps the caller's", async () => {
+    const names = [
+      'GIT_DIR',
+      'GIT_WORK_TREE',
+      'GIT_INDEX_FILE',
+      'GIT_OBJECT_DIRECTORY',
+      'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+      'GIT_COMMON_DIR',
+      'GIT_NAMESPACE',
+      'GIT_PREFIX',
+    ]
+    const saved = names.map((name) => [name, process.env[name]] as const)
+    await findGit()
+    vi.mocked(runCommand).mockClear()
+    vi.mocked(runCommand).mockResolvedValue({ stdout: '', stderr: '' })
+    try {
+      for (const name of names) process.env[name] = 'inherited'
+      await runGit('somewhere', ['status'])
+      await runGit('somewhere', ['status'], { env: { GIT_INDEX_FILE: 'mine' } })
+    } finally {
+      for (const [name, value] of saved) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+    const [first, second] = vi.mocked(runCommand).mock.calls.map(([, , options]) => options?.env)
+    for (const name of names) expect(first).not.toHaveProperty(name)
+    expect(second?.GIT_INDEX_FILE).toBe('mine')
+    expect(second).not.toHaveProperty('GIT_DIR')
+    expect(first?.GIT_CONFIG_NOSYSTEM ?? null).toBe(process.env.GIT_CONFIG_NOSYSTEM ?? null)
   })
 
   test('calls on the same queue key run one after another', async () => {

@@ -6,7 +6,10 @@ export interface CommandResult {
   readonly stderr: string
 }
 
-/** A command that exited with a non-zero code. */
+/**
+ * A command that exited with a non-zero code. Its message is the trimmed stderr, else the trimmed
+ * stdout, else the exit code.
+ */
 export class CommandError extends Error {
   /**
    * @param command - The command that was executed
@@ -20,7 +23,8 @@ export class CommandError extends Error {
     readonly stdout: string,
     readonly stderr: string,
   ) {
-    super(stderr.trim() || `${command} exited with code ${code}`)
+    // Some commands (`git commit`: "nothing to commit") explain a failure on stdout only.
+    super(stderr.trim() || stdout.trim() || `${command} exited with code ${code}`)
   }
 }
 
