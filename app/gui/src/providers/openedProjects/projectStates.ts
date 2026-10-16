@@ -30,6 +30,7 @@ import {
 } from 'vue'
 import { useBackends } from '../backends'
 import { useHttpClient } from '../httpClient'
+import { useLocalVersioning } from '../localVersioning'
 import { useSession } from '../session'
 import { useText } from '../text'
 import { useUploadsToCloudStore } from '../upload'
@@ -159,6 +160,7 @@ export function useProjectStates() {
   const text = useText()
   const uploads = useUploadsToCloudStore()
   const queryClient = vueQuery.useQueryClient()
+  const localVersioning = useLocalVersioning()
   const httpClient = useHttpClient()
   const aiAvailability = useAiAvailability()
 
@@ -441,6 +443,12 @@ export function useProjectStates() {
 
       logger.send('ide_project_opened')
       onScopeDispose(() => logger.send('ide_project_closed'))
+
+      if (project.info.mode === 'local') {
+        const projectId = project.info.id
+        localVersioning.watchProject(projectId, () => store.flushModules())
+        onScopeDispose(() => localVersioning.unwatchProject(projectId))
+      }
 
       return Ok(
         markRaw({
