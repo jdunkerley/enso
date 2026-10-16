@@ -62,11 +62,11 @@ beforeEach(() => {
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
   labels = [label('alpha', COLORS[0]), label('beta', COLORS[3])]
-  listTags.mockReset().mockImplementation(async () => labels)
-  createTag.mockReset().mockImplementation(async ({ value, color }) => {
-    const created = { id: TagId(`tag-${value}`), value, color }
+  listTags.mockReset().mockImplementation(() => Promise.resolve(labels))
+  createTag.mockReset().mockImplementation(({ value, color }) => {
+    const created = { id: TagId(`tag-${value}`), value: LabelName(value), color }
     labels = [...labels, created]
-    return created
+    return Promise.resolve(created)
   })
   associateTag.mockReset().mockResolvedValue(undefined)
   deleteTag.mockReset().mockResolvedValue(undefined)
@@ -80,6 +80,15 @@ afterEach(() => {
   portalRoot.remove()
 })
 
+/**
+ * `value`, which the test needs to be there.
+ * @throws {Error} when it is missing.
+ */
+function required<T>(value: T | null | undefined): T {
+  if (value == null) throw new Error('Missing element.')
+  return value
+}
+
 async function openPopover(anchor: Element | null = null) {
   await mountWithProviders(ModalHost)
   const onClose = vi.fn()
@@ -92,14 +101,14 @@ async function openPopover(anchor: Element | null = null) {
 const searchField = () =>
   document.querySelector<HTMLInputElement>(`input[placeholder="${getText('search.placeholder')}"]`)
 const buttonNamed = (name: string) =>
-  [...document.querySelectorAll('button')].find((b) => b.textContent?.trim() === name)
+  [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === name)
 const labelButton = (name: string) => buttonNamed(name)
 const pillList = () =>
   document.querySelector(
     `[role="list"][aria-label="${getText('manageLabelsModal.selectedLabels')}"]`,
   )
 const pillNames = () =>
-  [...(pillList()?.querySelectorAll('[role="listitem"]') ?? [])].map((p) => p.textContent?.trim())
+  [...(pillList()?.querySelectorAll('[role="listitem"]') ?? [])].map((p) => p.textContent.trim())
 const checkOf = (name: string) => labelButton(name)?.querySelector('svg path')?.getAttribute('d')
 
 describe('ManageLabelsModal', () => {
@@ -107,7 +116,8 @@ describe('ManageLabelsModal', () => {
     await openPopover()
     expect(pillNames()).toEqual(['alpha'])
     expect(
-      (pillList()!.querySelector('[role="listitem"]') as HTMLElement).style.backgroundColor,
+      (required(pillList()).querySelector('[role="listitem"]') as HTMLElement).style
+        .backgroundColor,
     ).not.toBe('')
     expect(checkOf('alpha')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     expect(checkOf('beta')).toBe('')
@@ -118,11 +128,11 @@ describe('ManageLabelsModal', () => {
   test('checking and unchecking a label sets the asset labels at once', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.click(labelButton('beta')!)
+    await user.click(required(labelButton('beta')))
     await flushPromises()
     expect(associateTag).toHaveBeenLastCalledWith(ASSET.id, ['alpha', 'beta'], 'labelled')
     expect(checkOf('beta')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
-    await user.click(labelButton('alpha')!)
+    await user.click(required(labelButton('alpha')))
     await flushPromises()
     expect(associateTag).toHaveBeenLastCalledWith(ASSET.id, ['beta'], 'labelled')
   })
@@ -130,13 +140,13 @@ describe('ManageLabelsModal', () => {
   test('the pills follow the checks', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.click(labelButton('beta')!)
+    await user.click(required(labelButton('beta')))
     await flushPromises()
     expect(pillNames()).toEqual(['alpha', 'beta'])
-    await user.click(labelButton('alpha')!)
+    await user.click(required(labelButton('alpha')))
     await flushPromises()
     expect(pillNames()).toEqual(['beta'])
-    await user.click(labelButton('beta')!)
+    await user.click(required(labelButton('beta')))
     await flushPromises()
     expect(pillList()).toBeNull()
   })
@@ -145,15 +155,17 @@ describe('ManageLabelsModal', () => {
     await openPopover()
     const user = userEvent.setup()
     for (const name of ['gamma', 'delta']) {
-      await user.clear(searchField()!)
-      await user.type(searchField()!, name)
-      await user.click(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', name))!)
+      await user.clear(required(searchField()))
+      await user.type(required(searchField()), name)
+      await user.click(
+        required(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', name))),
+      )
       await flushPromises()
     }
     expect(associateTag).toHaveBeenLastCalledWith(ASSET.id, ['alpha', 'gamma', 'delta'], 'labelled')
     // And a check after that keeps them too.
-    await user.clear(searchField()!)
-    await user.click(labelButton('beta')!)
+    await user.clear(required(searchField()))
+    await user.click(required(labelButton('beta')))
     await flushPromises()
     expect(associateTag).toHaveBeenLastCalledWith(
       ASSET.id,
@@ -165,12 +177,12 @@ describe('ManageLabelsModal', () => {
   test('the search filters the list, and offers to create a missing label', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.type(searchField()!, 'BET')
+    await user.type(required(searchField()), 'BET')
     expect(labelButton('beta')).toBeDefined()
     expect(labelButton('alpha')).toBeUndefined()
-    await user.clear(searchField()!)
-    await user.type(searchField()!, 'gamma')
-    const create = buttonNamed(getText('manageLabelsModal.createLabelWithTitle', 'gamma'))!
+    await user.clear(required(searchField()))
+    await user.type(required(searchField()), 'gamma')
+    const create = required(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', 'gamma')))
     expect(create.getAttribute('type')).toBe('button')
     await user.click(create)
     await flushPromises()
@@ -186,10 +198,12 @@ describe('ManageLabelsModal', () => {
   test('"Next color" moves to the next colour, and the label is created in it', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.type(searchField()!, 'gamma')
-    const swatch = document.querySelector<HTMLElement>(
-      `button[aria-label="${getText('manageLabelsModal.nextColor')}"]`,
-    )!
+    await user.type(required(searchField()), 'gamma')
+    const swatch = required(
+      document.querySelector<HTMLElement>(
+        `button[aria-label="${getText('manageLabelsModal.nextColor')}"]`,
+      ),
+    )
     const cssColor = (color: (typeof COLORS)[number]) => {
       const probe = document.createElement('div')
       probe.style.backgroundColor = lChColorToCssColor(color)
@@ -201,7 +215,9 @@ describe('ManageLabelsModal', () => {
     expect(swatch.style.backgroundColor).toBe(cssColor(COLORS[2]))
     await user.click(swatch)
     expect(swatch.style.backgroundColor).toBe(cssColor(COLORS[3]))
-    await user.click(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', 'gamma'))!)
+    await user.click(
+      required(buttonNamed(getText('manageLabelsModal.createLabelWithTitle', 'gamma'))),
+    )
     await flushPromises()
     expect(createTag).toHaveBeenCalledExactlyOnceWith({ value: 'gamma', color: COLORS[3] })
   })
@@ -209,10 +225,10 @@ describe('ManageLabelsModal', () => {
   test('Enter in the search field keeps the search and the checks', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.click(labelButton('beta')!)
-    await user.type(searchField()!, 'be{Enter}')
+    await user.click(required(labelButton('beta')))
+    await user.type(required(searchField()), 'be{Enter}')
     await flushPromises()
-    expect(searchField()!.value).toBe('be')
+    expect(required(searchField()).value).toBe('be')
     expect(checkOf('beta')).toBe('M4 8.4L6.5 10.9L9.25 8.15L12 5.4')
     expect(createTag).not.toHaveBeenCalled()
   })
@@ -220,26 +236,26 @@ describe('ManageLabelsModal', () => {
   test('"Create Label" creates a label with the chosen colour, and rejects a duplicate', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.click(buttonNamed(getText('manageLabelsModal.createLabel'))!)
+    await user.click(required(buttonNamed(getText('manageLabelsModal.createLabel'))))
     await flushPromises()
-    const form = [...document.querySelectorAll('[role="dialog"]')].at(-1)!
-    const name = form.querySelector<HTMLInputElement>('input[type="text"]')!
+    const form = required([...document.querySelectorAll('[role="dialog"]')].at(-1))
+    const name = required(form.querySelector<HTMLInputElement>('input[type="text"]'))
     await vi.waitFor(() => expect(document.activeElement).toBe(name))
     const radios = form.querySelectorAll<HTMLInputElement>('input[type="radio"]')
     expect(radios).toHaveLength(COLORS.length)
     // The least used colour is chosen at first.
-    expect(radios[1]!.checked).toBe(true)
+    expect(required(radios[1]).checked).toBe(true)
     await user.keyboard('alpha')
-    await user.click(form.querySelector<HTMLButtonElement>('button[type="submit"]')!)
+    await user.click(required(form.querySelector<HTMLButtonElement>('button[type="submit"]')))
     await flushPromises()
     expect(form.textContent).toContain(getText('manageLabelsModal.labelAlreadyExists'))
     expect(createTag).not.toHaveBeenCalled()
 
     await user.clear(name)
     await user.type(name, 'delta')
-    await user.click(radios[5]!)
-    expect(radios[5]!.closest('label')!.hasAttribute('data-selected')).toBe(true)
-    await user.click(form.querySelector<HTMLButtonElement>('button[type="submit"]')!)
+    await user.click(required(radios[5]))
+    expect(required(required(radios[5]).closest('label')).hasAttribute('data-selected')).toBe(true)
+    await user.click(required(form.querySelector<HTMLButtonElement>('button[type="submit"]')))
     await flushPromises()
     expect(createTag).toHaveBeenCalledExactlyOnceWith({ value: 'delta', color: COLORS[5] })
     expect(labelButton('delta')).toBeDefined()
@@ -251,12 +267,14 @@ describe('ManageLabelsModal', () => {
     const deleteButtons = [
       ...document.querySelectorAll<HTMLButtonElement>(`button[aria-label="${getText('delete')}"]`),
     ]
-    await user.click(deleteButtons[1]!)
+    await user.click(required(deleteButtons[1]))
     await flushPromises()
-    const confirm = document.querySelector('[role="alertdialog"]')!
+    const confirm = required(document.querySelector('[role="alertdialog"]'))
     expect(confirm.textContent).toContain(getText('deleteLabelActionText', 'beta'))
     expect(confirm.textContent).toContain('cannot be undone')
-    await user.click(document.querySelector<HTMLElement>('[data-testid="alert-dialog-confirm"]')!)
+    await user.click(
+      required(document.querySelector<HTMLElement>('[data-testid="alert-dialog-confirm"]')),
+    )
     await flushPromises()
     expect(deleteTag).toHaveBeenCalledExactlyOnceWith(TagId('tag-beta'), 'beta')
     expect(labelButton('beta')).toBeUndefined()
@@ -265,14 +283,14 @@ describe('ManageLabelsModal', () => {
   test('Escape closes the inner form, then the popover, and never reaches the page', async () => {
     await openPopover()
     const user = userEvent.setup()
-    await user.click(buttonNamed(getText('manageLabelsModal.createLabel'))!)
+    await user.click(required(buttonNamed(getText('manageLabelsModal.createLabel'))))
     await flushPromises()
     expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(2)
     await user.keyboard('{Escape}')
     await flushPromises()
     await vi.waitFor(() => expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1))
     expect(useModals().stack.value).toHaveLength(1)
-    await user.click(searchField()!)
+    await user.click(required(searchField()))
     await user.keyboard('{Escape}')
     await flushPromises()
     await vi.waitFor(() => expect(useModals().stack.value).toHaveLength(0))
@@ -294,7 +312,7 @@ describe('ManageLabelsModal', () => {
 
   test('the colour dots and pills use the labels colours', async () => {
     await openPopover()
-    const dot = labelButton('beta')!.querySelector<HTMLElement>('.rounded-full')!
+    const dot = required(required(labelButton('beta')).querySelector<HTMLElement>('.rounded-full'))
     const expected = document.createElement('div')
     expected.style.backgroundColor = lChColorToCssColor(COLORS[3])
     expect(dot.style.backgroundColor).toBe(expected.style.backgroundColor)

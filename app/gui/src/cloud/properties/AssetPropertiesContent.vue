@@ -40,7 +40,8 @@ import { computed, useTemplateRef } from 'vue'
 import AssetLabel from './AssetLabel.vue'
 import DatalinkConfiguration from './DatalinkConfiguration.vue'
 import PermissionDisplay from './PermissionDisplay.vue'
-import { datalinkQueryOptions, labelsQueryOptions } from './queries'
+import { labelsQueryOptions } from '$/utils/labelsQuery'
+import { datalinkQueryOptions } from './queries'
 import SpotlightOverlay, { SPOTLIGHT_TARGET_STYLE } from './SpotlightOverlay.vue'
 
 const { backend, item, category } = defineProps<{

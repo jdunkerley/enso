@@ -61,12 +61,16 @@ export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
   [Column.createdBy]: `min-w-drive-created-by-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
 }
 
-/** Return the full list of columns given the relevant current state. */
+/**
+ * Return the full list of columns given the relevant current state. `supportsLabels` is whether the
+ * backend can label assets of any type (`supportsAnyLabels`).
+ */
 export function getColumnList(
   userPlan: backend.Plan,
   backendType: backend.BackendType,
   category: CategoryType,
   isSearching: boolean,
+  supportsLabels: boolean,
 ): readonly Column[] {
   const isCloud = backendType === backend.BackendType.remote
   const isEnterprise = userPlan === backend.Plan.enterprise
@@ -81,7 +85,7 @@ export function getColumnList(
     Column.createdAt,
     !isTrash && !isRecent && !isRoot && isCloud && isEnterprise && Column.sharedWith,
     (isTrash || isRecent || isSearching) && Column.path,
-    isCloud && Column.labels,
+    supportsLabels && Column.labels,
     isCloud && Column.size,
     isCloud && isTeam && Column.createdBy,
     // FIXME[sb]: https://github.com/enso-org/cloud-v2/issues/1525

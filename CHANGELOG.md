@@ -154,6 +154,12 @@
   recently, newest first, with the folder each is in. Right-click one to open
   it, show it in your file browser, or remove it from the list. A project you
   move or rename in the IDE keeps its place.
+- [Local projects can have labels][226], as cloud assets do. Right-click a
+  project in the Local category and choose "Label…", or use the edit button in
+  its Labels column, to add, create or remove labels; the search bar's label
+  chips then show only the projects that carry any of the chosen labels. Labels
+  are kept on this computer, and travel with a project when it is copied. Local
+  folders and files cannot be labelled yet.
 
 #### Enso Language & Runtime
 
@@ -292,6 +298,7 @@
 [188]: https://github.com/jdunkerley/enso/pull/188
 [219]: https://github.com/jdunkerley/enso/pull/219
 [227]: https://github.com/jdunkerley/enso/pull/227
+[226]: https://github.com/jdunkerley/enso/pull/226
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

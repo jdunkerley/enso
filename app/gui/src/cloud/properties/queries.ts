@@ -25,15 +25,3 @@ export function datalinkQueryOptions(
     refetchInterval: options.refetchInterval,
   })
 }
-
-/** Options for a query of the organization's labels. */
-export function labelsQueryOptions(backend: Backend) {
-  return queryOptions({
-    ...backendBaseOptions(backend),
-    queryKey: backendQueryKey(backend, 'listTags', []),
-    queryFn: () => backend.listTags(),
-    // As `backendQueryOptions` sets them for this method (`PERSISTENCE_MAP`).
-    staleTime: 0,
-    meta: { persist: false },
-  })
-}

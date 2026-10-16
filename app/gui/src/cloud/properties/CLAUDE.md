@@ -13,7 +13,7 @@ in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
 - `PermissionDisplay.vue`, `AssetLabel.vue` — the drive table's permission pill
   and label, as the tab shows them (never pressable). The drive's table uses
   `PermissionDisplay.vue` too; its pressable labels are its own `DriveLabel.vue`
-  (#91).
+  (#91, `#/components/labels/`).
 - `UpsertSecretForm.vue` (from `../credentials/`, #82) edits a secret's value.
 - `DatalinkConfiguration.vue` — the datalink's form, around the datalink editor
   (`../datalinks/DatalinkFormInput.vue`, shared with the drive's datalink
@@ -22,8 +22,8 @@ in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
   datalink (the asset context menu sets `spotlightOn`) opens around its section.
   It follows the section every frame, not only on resize, because the section
   moves as the right panel slides in.
-- `queries.ts` — the datalink and labels queries, with the keys and options
-  `backendQueryOptions` gives them, so the cache, its persistence and
-  `INVALIDATION_MAP` apply (the labels popover, `../labels/`, shares the labels
-  query).
+- `queries.ts` — the datalink query, with the key and options
+  `backendQueryOptions` gives it, so the cache, its persistence and
+  `INVALIDATION_MAP` apply. The labels query, which the drive's labels popover
+  shares, is `$/utils/labelsQuery.ts`.
 - Tests: `__tests__/AssetProperties.test.ts`, with the datalink editor stubbed.

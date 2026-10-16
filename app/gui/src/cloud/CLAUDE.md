@@ -19,9 +19,6 @@ community build without the cloud can leave it out (decision 6b of
     since #198 also the "New Credential" dialog (`CreateCredentialModal.vue`)
     and its forms, one per service (`credentialInfos.ts`), over the recipes in
     `serviceCredentials/`.
-  - `labels/`, since #198: the drive's labels popover (`ManageLabelsModal.vue`,
-    with `ManageLabelsForm.vue`, `NotFoundLabel.vue` and `ColorPicker.vue`), on
-    the modal stack and anchored to the button that opened it.
   - `datalinks/`, since #198: the datalink editor (`JSONSchemaInput.vue` over
     the datalink schema, with `FilePathInput.vue` and the cloud file browser),
     its form field (`DatalinkFormInput.vue`, which the Properties tab uses too)

@@ -429,6 +429,235 @@ passed to `ProjectService.default`), `server.ts` (`Server` takes and passes
 
 ---
 
+# PR 2: local labels
+
+> **For agentic workers:** execute task by task with TDD (failing test, watch it
+> fail, implement, watch it pass, commit). Steps use checkbox (`- [ ]`) syntax.
+
+**Goal:** Labels on local projects: `Backend.supportsLabels`, the `LocalBackend`
+tag methods over the PR 1 client, label filtering and search, the labels code
+moved out of `src/cloud/`, and every "is this the cloud?" gate on labels
+replaced by the capability. Changelog entry; waits for sign-off.
+
+**Spec:** sections 2, 3 (Labels) and 4, rollout item 2.
+
+**Base:** `feature/local-metadata` (PR 1, #225). PR 3 (local Recent) is stacked
+on the same base in parallel, so edits to `LocalBackend.ts`, `localApi.ts` and
+`backendQuery.ts` stay small and additive, away from the `filterBy` branch,
+`openProject` and the `openProject` invalidation.
+
+## Decisions taken while planning
+
+1. **All or any.** The cloud's `listDirectory` and `searchDirectory` send one
+   `label=<name>` query parameter per label (`RemoteBackend.ts`); the server is
+   not in this repository, the cloud Playwright mock ignores the parameter, and
+   the one label-filter spec (`assetSearchBar.spec.ts`, "labels") is skipped.
+   The cloud's semantics therefore **cannot be determined** here. The task's
+   fallback applied: "any". At sign-off the user chose **"all"**: an asset
+   matches when it carries every requested label; an "any" filter waits for the
+   search bar to be revisited. An empty or null `labels` filters nothing.
+2. **Where `labelsQueryOptions` goes.** The spec moves it with the labels code
+   to `src/dashboard/components/labels/`, and says the cloud imports it from
+   there. But the cloud's Properties tab
+   (`cloud/properties/AssetPropertiesContent.vue`) uses it too, and nothing
+   outside `src/dashboard/` may import `#/` (`DASHBOARD_IMPORT_PATTERN`; the
+   allowlist only shrinks). Closest faithful option: the query options, which
+   are framework-free, go to **`src/utils/labelsQuery.ts`**
+   (`$/utils/labelsQuery`), beside `backendQuery.ts`; the popover, the form,
+   `labelChanges.ts`, `ColorPicker.vue`, `NotFoundLabel.vue` and
+   `DriveLabel.vue` go to `src/dashboard/components/labels/`.
+   `cloud/properties/queries.ts` keeps `datalinkQueryOptions` only.
+3. **`labels` leaves `CLOUD_AREAS`** in `eslint.config.mjs`, since the area no
+   longer exists.
+4. **"Supports labels for any type"** is a free function in `enso-common`'s
+   `Backend.ts`, `supportsAnyLabels(backend)`, over `Object.values(AssetType)`,
+   so the column, the search chips and the `listTags` queries ask one thing.
+5. **A mixed selection.** The column's edit button opens the popover for the
+   whole selection when the row is in it. Locally the selection can hold folders
+   and files, whose `associateTag` throws; the popover gets only the selected
+   assets the backend can label (`labellableItems`), so a folder in the
+   selection is left alone rather than producing an error per folder.
+6. **`listTags` queries are disabled** (`enabled: false`) where the backend
+   supports no labels; both backends support some, so this is a guard for the
+   capability rather than a behaviour change today.
+7. **Invalidation needs no change.** `INVALIDATION_MAP` keys by `backend.type`,
+   so the local `createTag`/`deleteTag` refresh `listTags` and the local
+   `associateTag` refreshes `listDirectory`, `searchDirectory` and
+   `getAssetDetails`. A unit test pins this for the local backend.
+
+## File structure
+
+| File                                                                                                  | Change                                                                                                                                            |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app/common/src/services/Backend.ts`                                                                  | abstract `supportsLabels`; `supportsAnyLabels`; `doesAssetMatchQuery` matches `labels` (all).                                                     |
+| `app/common/src/services/RemoteBackend.ts`                                                            | `supportsLabels` returns `true`.                                                                                                                  |
+| `app/common/src/services/LocalBackend.ts`                                                             | `supportsLabels`; tag methods over the client; `labels` on project assets; `query.labels` filter.                                                 |
+| `app/common/src/services/__tests__/LocalBackend.labels.test.ts`                                       | **new.**                                                                                                                                          |
+| `app/common/src/services/__tests__/doesAssetMatchQuery.test.ts`                                       | **new.**                                                                                                                                          |
+| `app/gui/src/utils/labelsQuery.ts`                                                                    | **new.** `labelsQueryOptions` (moved from `cloud/properties/queries.ts`).                                                                         |
+| `app/gui/src/dashboard/components/labels/*`                                                           | **moved** from `src/cloud/labels/*` and `pages/dashboard/components/DriveLabel.vue`; new `labelSupport.ts` (`labellableItems`), tests, CLAUDE.md. |
+| `columnUtils.ts`, `LabelsColumn.vue`, `AssetContextMenu.vue`, `AssetSearchBar.vue`, `AssetsTable.vue` | capability gates.                                                                                                                                 |
+| `eslint.config.mjs`                                                                                   | drop `labels` from `CLOUD_AREAS`.                                                                                                                 |
+| `app/gui/src/cloud/CLAUDE.md`, `app/gui/CLAUDE.md`                                                    | point at the new home.                                                                                                                            |
+| `app/gui/integration-test/mock/localApi.ts`                                                           | label routes, `metadata.labels` in listings, `addLabel`.                                                                                          |
+| `app/gui/integration-test/dashboard/localLabels.spec.ts`                                              | **new.**                                                                                                                                          |
+| `CHANGELOG.md`                                                                                        | entry under `#### Enso IDE`.                                                                                                                      |
+
+## Interfaces
+
+```ts
+// Backend.ts
+export abstract class Backend {
+  /** Whether assets of the given type can carry labels on this backend. */
+  abstract supportsLabels(assetType: AssetType): boolean;
+}
+/** Whether the backend can label assets of at least one type. */
+export function supportsAnyLabels(
+  backend: Pick<Backend, "supportsLabels">,
+): boolean;
+
+// LocalBackend.ts
+// supportsLabels: project only
+// createTag(body)            -> projectManager.createLabel(body)
+// listTags()                 -> projectManager.listLabels()
+// deleteTag(tagId, value)    -> projectManager.deleteLabel({ id: tagId })
+// associateTag(id, labels)   -> project id: setProjectLabels({ projectPath, labels });
+//                               otherwise throws
+//                               "Labels are not supported for local files and folders yet"
+
+// dashboard/components/labels/labelSupport.ts
+export function labellableItems<T extends { readonly type: AssetType }>(
+  backend: Pick<Backend, "supportsLabels">,
+  items: readonly T[],
+): readonly T[];
+
+// columnUtils.ts: one more parameter
+export function getColumnList(
+  userPlan: Plan,
+  backendType: BackendType,
+  category: CategoryType,
+  isSearching: boolean,
+  supportsLabels: boolean,
+): readonly Column[];
+```
+
+## Tasks
+
+### Task 1: `supportsLabels` and the `LocalBackend` tag methods
+
+**Files:** `Backend.ts`, `RemoteBackend.ts`, `LocalBackend.ts`; test
+`app/common/src/services/__tests__/LocalBackend.labels.test.ts`.
+
+- [ ] Tests first, with a stub `ProjectManager` (`vi.fn()` per method,
+      `rootDirectory`), `location` stubbed with `vi.stubGlobal`:
+  - `supportsLabels` is `true` for `project` only; `supportsAnyLabels` is true.
+  - `listTags` returns `listLabels()`; `createTag({ value, color })` calls
+    `createLabel({ value, color })` and returns its label; `deleteTag(id, v)`
+    calls `deleteLabel({ id })`.
+  - `associateTag(newProjectId('/p/A'), ['x'], 'A')` calls
+    `setProjectLabels({ projectPath: '/p/A', labels: ['x'] })`.
+  - `associateTag` on a directory id or a file id rejects with "Labels are not
+    supported for local files and folders yet" and calls nothing.
+- [ ] Run (`corepack pnpm --filter enso-common test:unit`), watch fail;
+      implement; pass; commit.
+
+### Task 2: labels in the listing, the filter and search
+
+**Files:** `LocalBackend.ts`, `Backend.ts`; tests in the same new file and
+`__tests__/doesAssetMatchQuery.test.ts`.
+
+- [ ] Tests first:
+  - `listDirectory` copies `metadata.labels` onto project assets (`[]` when
+    absent); directories and files keep `labels` undefined.
+  - `listDirectory({ labels: ['a', 'b'] })` keeps projects carrying `a` _or_
+    `b`, and drops folders, files and unlabelled projects; `labels: []` and
+    `null` filter nothing.
+  - `doesAssetMatchQuery({ labels: ['a'], … })` matches an asset with `a`, and
+    rejects one without and one with no `labels`.
+- [ ] Implement: in the `ProjectEntry` case add
+      `labels: entry.metadata.labels ?? []`; after the entries are built, a
+      separate label filter (before the sort); in `doesAssetMatchQuery` an "all"
+      check (first written as "any"; the user chose "all" at sign-off). Pass;
+      commit.
+
+### Task 3: invalidation pin
+
+- [ ] Add to `utils/__tests__/backendQuery.test.ts`: the local `associateTag`,
+      `createTag` and `deleteTag` invalidate the `local` keys. (A verification
+      test: it passes without a code change.) Commit.
+
+### Task 4: move the labels code
+
+- [ ] `git mv`
+      `src/cloud/labels/{ColorPicker,ManageLabelsForm,ManageLabelsModal,NotFoundLabel}.vue`,
+      `labelChanges.ts`, `__tests__/*`, `CLAUDE.md`, and
+      `src/dashboard/pages/dashboard/components/DriveLabel.vue` to
+      `src/dashboard/components/labels/`.
+- [ ] New `src/utils/labelsQuery.ts` with `labelsQueryOptions`; remove it from
+      `cloud/properties/queries.ts`; update `AssetPropertiesContent.vue`.
+- [ ] Update every import (`AssetContextMenu.vue`, `LabelsColumn.vue`,
+      `AssetSearchBar.vue`, `AssetsTable.vue`, the form); drop `labels` from
+      `CLOUD_AREAS`; update the moved CLAUDE.md, `cloud/CLAUDE.md` and
+      `app/gui/CLAUDE.md`.
+- [ ] The moved tests pass; typecheck and lint pass; commit.
+
+### Task 5: capability gates
+
+**Files:** `labelSupport.ts` (+ test), `columnUtils.ts` (+ test
+`columnUtils.test.ts`), `LabelsColumn.vue`, `AssetContextMenu.vue`,
+`AssetSearchBar.vue`, `AssetsTable.vue`.
+
+- [ ] Tests first:
+  - `labellableItems(local, [project, folder, file])` gives `[project]`;
+    `labellableItems(remote, …)` gives all.
+  - `getColumnList(plan, local, 'local', false, true)` contains `Column.labels`;
+    with `false` it does not; the cloud keeps it.
+- [ ] Implement:
+  - `getColumnList(…, supportsLabels)`: `supportsLabels && Column.labels`;
+    `AssetsTable.vue` passes `supportsAnyLabels(backend)`.
+  - `LabelsColumn.vue`: the edit button only when
+    `backend.supportsLabels(item.type)`; the popover gets
+    `labellableItems(backend, selection)`.
+  - `AssetContextMenu.vue`: "Label…" when `backend.supportsLabels(asset.type)`
+    and the category is not Trash.
+  - `AssetSearchBar.vue`: chips under `supportsAnyLabels(backend)` instead of
+    `isCloud`; its `listTags` query `enabled` on the same. `AssetsTable.vue`'s
+    `listTags` likewise. The typed `label:` tag stays commented out.
+- [ ] Pass; typecheck; lint; commit.
+
+### Task 6: Playwright
+
+**Files:** `integration-test/mock/localApi.ts`,
+`integration-test/dashboard/localLabels.spec.ts`.
+
+- [ ] Mocks, in their own block inside `mockLocalApi`: a `labels` array, a
+      `deletedNames` set, routes `labels/list`, `labels/create` (a duplicate
+      answers with a JSON-RPC error), `labels/delete` (adds a tombstone),
+      `project/set-labels` (finds the project entry by `path`, sets
+      `metadata.labels`); the `filesystem-list` case returns each project's
+      `metadata.labels` minus deleted names (`[]` when none); `api.addLabel`.
+- [ ] Spec (`setupApi.local` adds a label and a second project):
+  1. Local category: the labels column is shown; "Mock Project" has no label.
+  2. Right-click, "Label…", check the label, close: the row shows the pill.
+  3. The search bar chip: the table lists only "Mock Project" (the unlabelled
+     project disappears); toggle it off and both are back.
+  4. Right-click the pill to remove it: the row has no label.
+  5. A local folder offers no "Label…" in its context menu.
+- [ ] Run it, the cloud label specs (`labelsPopover`, `assetsTableFeatures`),
+      then the whole suite (Playwright lock). Commit.
+
+### Task 7: docs, changelog, screenshots, PR
+
+- [ ] Delete caches; `corepack pnpm -r compile`; typecheck, lint, unit tests in
+      common and gui; full Playwright suite on Windows.
+- [ ] Push; open the PR (base `feature/local-metadata`); add the changelog entry
+      with the real number; push; grep for `[NNN]`.
+- [ ] Screenshots (before: the local drive on PR 1's head; after: the labels
+      column and the popover on a local project) on `pr-screenshots` under
+      `pr-<N>/`; embed in the PR body.
+
+---
+
 ## PR 3
 
 # Local labels and a local Recent list, PR 3 (local Recent): implementation plan
