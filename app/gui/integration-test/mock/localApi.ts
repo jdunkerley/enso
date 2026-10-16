@@ -686,19 +686,9 @@ export async function mockLocalApi(page: Page) {
     })
 
     await page.route('/api/run-project-manager-command?*', async (route, request) => {
-      const toJSONRPCResult = (result: unknown): JSONRPCResponse<unknown> => ({
-        jsonrpc: '2.0',
-        id: 0,
-        result,
-      })
       const succeed = (result: unknown, contentType = 'application/json') => {
         return route.fulfill({ contentType, body: JSON.stringify(toJSONRPCResult(result)) })
       }
-      const toJSONRPCError = (errorMessage: string): JSONRPCResponse<unknown> => ({
-        jsonrpc: '2.0',
-        id: 0,
-        error: { code: 0, message: errorMessage },
-      })
       const fail = (errorMessage: string) => {
         return route.fulfill({ body: JSON.stringify(toJSONRPCError(errorMessage)) })
       }

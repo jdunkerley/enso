@@ -22,7 +22,7 @@ export interface VersioningConsentOptions {
   readonly now?: () => Date
 }
 
-/** What  records: the repositories enabled, and those the user turned off. */
+/** What `versioning.json` records: the repositories enabled, and those the user turned off. */
 interface ConsentRecord {
   readonly enabledRepositories: readonly string[]
   readonly disabledRepositories: readonly string[]
@@ -64,7 +64,7 @@ export class VersioningConsent {
     this.now = options.now ?? (() => new Date())
   }
 
-  /** Whether versioning is enabled for the repository at . */
+  /** Whether versioning is enabled for the repository at `repoRoot`. */
   async isEnabled(repoRoot: string): Promise<boolean> {
     const key = await repositoryKey(repoRoot)
     return serialised(this.filePath, async () =>
