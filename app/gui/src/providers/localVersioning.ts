@@ -87,7 +87,7 @@ export type RepositoryOffer =
   /** No repository, and the project is outside the local root: none is offered. */
   | 'outsideRoot'
   | 'noGit'
-  /** Not watched, no local backend, or quitting. */
+  /** Not watched, or no local backend. */
   | 'unavailable'
   /** The user accepted, but creating or enabling the repository failed (a toast says why). */
   | 'failed'
@@ -111,7 +111,6 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   const pending = new Map<ProjectId, Promise<void>>()
   /** Repositories already offered to `enableVersioningIfInside` this session. */
   const offeredToShim = new Set<string>()
-  let quitting = false
   /** Folders answered "Not now" this session. */
   const notNowThisSession = new Set<string>()
 
@@ -322,7 +321,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   /**
    * Make sure the project's repository is enabled, asking once if need be: Create when there is
    * none (at the local root), Use for an existing one the provider could not enable silently.
-   * Nothing is asked while quitting, or again after "Don't ask again"; "Not now" is remembered for
+   * Nothing is asked again after "Don't ask again"; "Not now" is remembered for
    * the session, but only a `'close'` honours it. A request made while another is being answered
    * for the same project gets that one's result.
    */
@@ -345,7 +344,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   ): Promise<RepositoryOffer> {
     const project = watched.get(projectId)
     const backend = deps.localBackend()
-    if (project == null || backend == null || quitting) return 'unavailable'
+    if (project == null || backend == null) return 'unavailable'
     // A known status that asks nothing is answered as it is, so that a close (or a save) does not
     // wait for a git round trip, or for two request timeouts on a wedged shim; polling keeps it
     // current. Anything else is read again first, since the answer decides what is asked.
@@ -475,11 +474,6 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     deps.toasts.show(deps.getText('versionOnCloseWarning', title, warning), { type: 'warning' })
   }
 
-  /** While quitting nothing is asked. */
-  function setQuitting(value: boolean) {
-    quitting = value
-  }
-
   /** Forget every "Don't ask again" and "Not now". */
   function resetPrompts() {
     deps.prompts.setState({ declinedRoots: [], declinedRepositories: [] })
@@ -495,7 +489,6 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     hasGit,
     isVersioned,
     offerRepository,
-    setQuitting,
     resetPrompts,
     save,
     askToSave,

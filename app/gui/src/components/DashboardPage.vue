@@ -18,7 +18,6 @@ import { useBackends } from '$/providers/backends'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useModals } from '$/providers/modals'
 import { useOpenedProjects } from '$/providers/openedProjects'
-import { exitDialogKind } from '$/providers/openedProjects/quit'
 import { useText } from '$/providers/text'
 import { backendQueryOptions } from '@/composables/backend'
 import { useQuery } from '@tanstack/vue-query'
@@ -135,19 +134,15 @@ onUnmounted(() => {
   detach?.()
 })
 
-// While the opened projects sync or save their versions as the app exits, a dialog says so, and
-// nothing else is open. Mounting does not close the modals already open.
+// While the opened projects sync as the app exits, a dialog says so, and nothing else is open.
+// Mounting does not close the modals already open.
 let syncingDialog: { close: () => void } | undefined
 watch(
-  () =>
-    exitDialogKind(
-      openedProjects.closingOnAppExit.value,
-      openedProjects.savingVersionsOnAppExit.value,
-    ),
-  (kind) => {
-    if (kind != null) {
+  () => openedProjects.closingOnAppExit.value,
+  (closing) => {
+    if (closing) {
       modals.closeAll()
-      syncingDialog = modals.open(SyncingProjectsModal, { kind })
+      syncingDialog = modals.open(SyncingProjectsModal, {})
     } else if (syncingDialog != null) {
       modals.closeAll()
       syncingDialog = undefined

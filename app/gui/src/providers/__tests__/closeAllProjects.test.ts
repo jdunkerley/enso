@@ -12,9 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../openedProjects/projectStates', () => ({
   useProjectStates: () => mocks,
 }))
-vi.mock('../localVersioning', () => ({
-  useLocalVersioning: () => ({ statusOf: () => undefined, setQuitting: vi.fn() }),
-}))
+vi.mock('../localVersioning', () => ({ useLocalVersioning: () => ({}) }))
 
 import { createOpenedProjectsStore } from '../openedProjects'
 

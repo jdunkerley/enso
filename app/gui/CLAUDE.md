@@ -234,8 +234,8 @@ file with a comment explaining why).
 every 5 s by its own loop, one request in flight at a time), saving (the ydoc
 flush, `flush.ts`, then `versioning/commit`) and the repository prompts;
 `projectStates.ts` watches a local project when it initializes and offers a
-repository before it closes; the quit closes each versioned project
-(`openedProjects.ts`). The Playwright mock is
+repository before it closes. Versions are saved when a project closes or is
+saved; quitting the app saves none. The Playwright mock is
 `integration-test/mock/localVersioning.ts` (routes in `mock/versioning/`); git
 is absent by default, and a spec opts in with `setupApi.local`. See the design,
 `docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`.

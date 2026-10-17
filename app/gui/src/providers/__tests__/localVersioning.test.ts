@@ -410,14 +410,6 @@ describe('offerRepository', () => {
     expect(modals.stack.value).toHaveLength(0)
   })
 
-  test('nothing is asked while quitting', async () => {
-    const { modals, store } = setup({ versioningStatus: vi.fn(async () => noRepository()) })
-    store.watchProject(PROJECT, FLUSHED)
-    store.setQuitting(true)
-    await expect(store.offerRepository(PROJECT, 'close')).resolves.toBe('unavailable')
-    expect(modals.stack.value).toHaveLength(0)
-  })
-
   test('nothing is asked for a project outside the root with no repository', async () => {
     const { modals, store } = setup({ versioningStatus: vi.fn(async () => noRepository()) })
     const elsewhere = newProjectId(Path('/elsewhere/Q'))

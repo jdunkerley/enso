@@ -161,12 +161,11 @@
   are kept on this computer, and travel with a project when it is copied. Local
   folders and files cannot be labelled yet.
 - [Local projects can keep versions with git][235]. When git is installed, a
-  version is saved when a project closes and when the app quits, and on demand
-  with Ctrl/Cmd+S (or Ctrl/Cmd+Shift+S and the new save icon, to add a comment).
-  A dot beside the project name, and a ● on its tab, show changes since the last
-  version. The first time, the IDE offers to create a repository in the projects
-  folder (or to use the one it is already in); Settings → Local has a new
-  Versions section.
+  version is saved when a project closes, and on demand with Ctrl/Cmd+S (or
+  Ctrl/Cmd+Shift+S and the new save icon, to add a comment). A dot beside the
+  project name, and a ● on its tab, show changes since the last version. The
+  first time, the IDE offers to create a repository in the projects folder (or
+  to use the one it is already in); Settings → Local has a new Versions section.
 
 #### Enso Language & Runtime
 

@@ -6,9 +6,9 @@
 > checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Version local projects as git commits at the local root folder: commit
-on close, on quit and by hand, show a changed indicator, and serve the Versions
-tab for local projects. Move labels into `package.yaml`, and remove the engine's
-unused VCS.
+on close and by hand, show a changed indicator, and serve the Versions tab for
+local projects. Move labels into `package.yaml`, and remove the engine's unused
+VCS.
 
 **Architecture:** The git logic is a new `localVersioning` module in the
 project-manager shim, running the user's git CLI and exposed as
@@ -34,7 +34,7 @@ Read it first; this plan argues from it.
   is never overwritten; only a missing `**/.enso/` line is appended.
 - Notes ref: `refs/notes/enso` (`git notes --ref=enso`).
 - Every commit is path-scoped (`-- <project>`, or both paths for a move).
-- Git failures never fail a close or quit.
+- Git failures never fail a close.
 - Git runs without a shell, with `GIT_TERMINAL_PROMPT=0`, and serially per
   repository.
 - Rust/TS/Scala house rules: `docs/style-guide/`, the `typescript-guidelines`
@@ -54,7 +54,7 @@ Read it first; this plan argues from it.
 | 1   | `feature/labels-in-package-yaml` | `develop`     | Engine `labels` field; shim reads/writes/migrates |
 | 2   | `chore/remove-engine-vcs`        | `develop`     | Remove `vcsmanager`, its LSP methods, JGit        |
 | 3   | `feature/local-versioning-shim`  | PR 1          | `localVersioning` module, routes, client, hooks   |
-| 4   | `feature/local-versioning-save`  | PR 3          | GUI: save, indicator, init prompt, quit           |
+| 4   | `feature/local-versioning-save`  | PR 3          | GUI: save, indicator, init prompt                 |
 | 5   | `feature/local-versions-tab`     | PR 3          | GUI: local Versions tab                           |
 | 6   | `docs/local-versioning`          | after 4 and 5 | `CLAUDE.md` files; spec marked implemented        |
 
@@ -1053,7 +1053,6 @@ memory note "`--backend-source local` ships a stale engine" applies; follow the
 | `app/gui/src/project-view/assets/icons.svg`, `util/iconMetadata/iconName.ts` (generated)                                      | 20             | `save` icon                                        |
 | `app/gui/src/project-view/components/ChangedIndicator.vue` (new), `__tests__/ChangedIndicator.test.ts` (new), `TopBar.vue`    | 21             | the dot, the save button                           |
 | `app/gui/src/components/AppContainer/TabBar.vue`, `__tests__/TabBar.test.ts` (new)                                            | 21             | the ●                                              |
-| `app/gui/src/providers/openedProjects/quit.ts` (new), `__tests__/quit.test.ts` (new), `openedProjects.ts`                     | 23             | quit                                               |
 | `app/gui/src/components/SyncingProjectsModal.vue`, `DashboardPage.vue`, `__tests__/DashboardPage.test.ts`                     | 23             | "Saving versions…"                                 |
 | `app/gui/src/dashboard/layouts/Settings/LocalVersionsSettingsSection.vue` (new), `tabs.ts`, `__tests__/localTab.test.ts`      | 24             | Settings → Local → Versions                        |
 | `app/common/src/text/english.json`                                                                                            | 19–24          | strings, after `"syncingProjectsMessage"`          |
@@ -4201,328 +4200,12 @@ git commit -m "GUI: offer a repository when closing a local project, and show a 
 
 ---
 
-### Task 23: quitting: close each versioned local project properly, behind "Saving versions…"
+### Task 23: quitting (dropped)
 
-**Files:**
-
-- Create: `app/gui/src/providers/openedProjects/quit.ts`,
-  `__tests__/quit.test.ts`
-- Modify: `app/gui/src/providers/openedProjects.ts`,
-  `app/gui/src/components/SyncingProjectsModal.vue`,
-  `app/gui/src/components/DashboardPage.vue`,
-  `app/gui/src/components/__tests__/DashboardPage.test.ts`
-- Modify: `app/common/src/text/english.json`
-
-**Interfaces:**
-
-Consumes: `useLocalVersioning().isVersioned`, `setQuitting`; the store's own
-`closeProject` and `waitForProcess`.
-
-Produces:
-
-```ts
-// quit.ts
-export const QUIT_CLOSE_TIMEOUT_MS = 30_000;
-export function closeEachWithin<T>(
-  items: readonly T[],
-  close: (item: T) => Promise<unknown>,
-  timeoutMs?: number,
-): Promise<void>;
-/** The exit dialog's kind for the two flags, or `null` when neither is set. */
-export function exitDialogKind(
-  syncing: boolean,
-  savingVersions: boolean,
-): "sync" | "versions" | "both" | null;
-// openedProjects.ts store: savingVersionsOnAppExit: Ref<boolean>
-// SyncingProjectsModal.vue: prop kind?: 'sync' | 'versions' | 'both'
-```
-
-Texts:
-
-```json
-  "savingVersionsTitle": "Saving versions",
-  "savingVersionsMessage": "Saving versions of your open projects…",
-  "syncingAndSavingTitle": "Saving your projects",
-  "syncingAndSavingMessage": "Syncing projects with Cloud and saving versions of your open projects…",
-```
-
-- [ ] **Step 1: Write the failing tests.** `quit.test.ts`:
-
-```ts
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import {
-  closeEachWithin,
-  exitDialogKind,
-  QUIT_CLOSE_TIMEOUT_MS,
-} from "../quit";
-
-describe("closeEachWithin", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  test("closes all at once, and resolves when all have closed", async () => {
-    const started: string[] = [];
-    let finished = false;
-    const done = closeEachWithin(["a", "b"], async (item) => {
-      started.push(item);
-    }).then(() => (finished = true));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(started).toEqual(["a", "b"]);
-    await done;
-    expect(finished).toBe(true);
-  });
-
-  test("a project that never closes holds the quit for the timeout only", async () => {
-    let finished = false;
-    void closeEachWithin(["stuck"], () => new Promise(() => {})).then(
-      () => (finished = true),
-    );
-    await vi.advanceTimersByTimeAsync(QUIT_CLOSE_TIMEOUT_MS - 1);
-    expect(finished).toBe(false);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(finished).toBe(true);
-  });
-
-  test("a failed close is logged and does not stop the others", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const closed: string[] = [];
-    await closeEachWithin(["bad", "good"], async (item) => {
-      if (item === "bad") throw new Error("boom");
-      closed.push(item);
-    });
-    expect(closed).toEqual(["good"]);
-    expect(error).toHaveBeenCalled();
-  });
-});
-
-describe("exitDialogKind", () => {
-  test.each([
-    [false, false, null],
-    [true, false, "sync"],
-    [false, true, "versions"],
-    [true, true, "both"],
-  ] as const)("syncing %s, saving %s → %s", (syncing, saving, kind) => {
-    expect(exitDialogKind(syncing, saving)).toBe(kind);
-  });
-});
-```
-
-`DashboardPage.test.ts`:
-
-- in the `vi.hoisted` block, return also `savingVersionsOnAppExit: ref(false)`,
-  and destructure it;
-- change the `$/providers/openedProjects` mock to
-  `useOpenedProjects: () => ({ closingOnAppExit, savingVersionsOnAppExit })`;
-- add `savingVersionsOnAppExit.value = false` to `beforeEach`;
-- add, after the syncing test:
-
-```ts
-test('shows "Saving versions" alone while versioned projects close as the app exits', async () => {
-  await mountWithProviders(DashboardPage);
-  const modals = useModals();
-  modals.open(Blank, {});
-  savingVersionsOnAppExit.value = true;
-  await nextTick();
-  await flushPromises();
-  expect(modals.stack.value).toHaveLength(1);
-  expect(modals.stack.value[0]!.props).toMatchObject({ kind: "versions" });
-  savingVersionsOnAppExit.value = false;
-  await nextTick();
-  expect(modals.stack.value).toHaveLength(0);
-});
-
-test("both at once is one dialog saying both", async () => {
-  await mountWithProviders(DashboardPage);
-  closingOnAppExit.value = true;
-  savingVersionsOnAppExit.value = true;
-  await nextTick();
-  expect(useModals().stack.value).toHaveLength(1);
-  expect(useModals().stack.value[0]!.props).toMatchObject({ kind: "both" });
-});
-```
-
-The existing tests `'shows the syncing dialog alone …'` and
-`'does not close the modals already   open as it mounts'` must still pass, so
-the watch must not close modals when no exit is under way.
-
-- [ ] **Step 2: Run them and watch them fail.**
-
-```bash
-corepack pnpm -C app/gui exec vitest run src/providers/openedProjects/__tests__/quit.test.ts src/components/__tests__/DashboardPage.test.ts
-```
-
-- [ ] **Step 3: Implement.** `quit.ts`:
-
-```ts
-/** @file Closing projects as the app quits, within a time limit per project. */
-
-/**
- * How long the quit waits for one project to close. The shim bounds a close itself (the Language
- * Server is killed after 10 s, the close commit gives up after 15 s); this is a backstop, so that
- * a project that never answers cannot hold the quit for ever.
- */
-export const QUIT_CLOSE_TIMEOUT_MS = 30_000;
-
-/** Run `close` for each item at once; resolve when each has finished or `timeoutMs` has passed. */
-export async function closeEachWithin<T>(
-  items: readonly T[],
-  close: (item: T) => Promise<unknown>,
-  timeoutMs = QUIT_CLOSE_TIMEOUT_MS,
-): Promise<void> {
-  await Promise.all(
-    items.map((item) => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, timeoutMs);
-      });
-      const closing = close(item).then(
-        () => {},
-        (error: unknown) =>
-          console.error("Could not close a project on quit:", error),
-      );
-      return Promise.race([closing, timeout]).finally(() =>
-        clearTimeout(timer),
-      );
-    }),
-  );
-}
-
-/** Which exit dialog to show: syncing hybrid projects, saving versions, both, or none. */
-export function exitDialogKind(syncing: boolean, savingVersions: boolean) {
-  if (syncing) return savingVersions ? ("both" as const) : ("sync" as const);
-  return savingVersions ? ("versions" as const) : null;
-}
-```
-
-`openedProjects.ts`: import `useLocalVersioning` from `'./localVersioning'` and
-`closeEachWithin` from `'./openedProjects/quit'`. Add
-`const localVersioning = useLocalVersioning()` and
-`const savingVersionsOnAppExit = ref(false)`. Then replace the `beforeunload`
-listener:
-
-```ts
-// On quit: upload the unsynced hybrid projects (they are not removed from the local backend, but
-// synchronized with remote in case someone else opens it meanwhile), and close every open local
-// project whose versions are kept, so that each saves its "Saved on close" version. Then close
-// the window. `preventDefault` must be called synchronously, so the work runs afterwards.
-window.addEventListener("beforeunload", (event) => {
-  const hybridsToUpload = [...projects.values()].filter(
-    (proj): proj is Project & { state: Initialized | HybridLocallyClosed } =>
-      (proj.state.status === "initialized" ||
-        proj.state.status === "hybrid-closed") &&
-      proj.state.info.mode === "hybrid" &&
-      !proj.state.info.synced,
-  );
-  const versionedToClose = [...projects.values()].filter(
-    (proj) =>
-      proj.state.status === "initialized" &&
-      proj.state.info.mode === "local" &&
-      localVersioning.isVersioned(proj.state.info.id),
-  );
-  if (hybridsToUpload.length === 0 && versionedToClose.length === 0) {
-    // Do the project cleanup, but do not close projects entirely.
-    // Local projects's PM process will be killed anyway, and
-    // Cloud projects should be kept opened.
-    for (const project of projects.values()) {
-      if (project.state.status === "initialized") project.state.scope.stop();
-    }
-    return;
-  }
-  // Do not prevent default in browsers.
-  // In "real" browsers users will be unable to run hybrid projects anyway, but in dev
-  // servers the "data loss" messages are annoying.
-  if (!isOnElectron()) return;
-  event.preventDefault();
-  void finishBeforeQuit(hybridsToUpload, versionedToClose);
-});
-
-async function finishBeforeQuit(
-  hybridsToUpload: readonly (Project & {
-    state: Initialized | HybridLocallyClosed;
-  })[],
-  versionedToClose: readonly Project[],
-) {
-  closingOnAppExit.value = hybridsToUpload.length > 0;
-  savingVersionsOnAppExit.value = versionedToClose.length > 0;
-  localVersioning.setQuitting(true);
-  const [hybridErrors] = await Promise.all([
-    Promise.all(
-      hybridsToUpload.map(async (project) => {
-        assert(project.state.info.mode === "hybrid");
-        await projectStates.uploadHybridProject(project.state.info);
-        return project;
-      }),
-    ).then((uploaded) => uploaded.filter((proj) => proj.error != null)),
-    closeEachWithin(versionedToClose, (project) => {
-      closeProject(project.state.info.id);
-      return waitForProcess(project);
-    }),
-  ]);
-  closingOnAppExit.value = false;
-  savingVersionsOnAppExit.value = false;
-  if (hybridErrors.length === 0) window.close();
-  else localVersioning.setQuitting(false);
-}
-```
-
-Return `savingVersionsOnAppExit` from the store. On the second `beforeunload`
-(the one `window.close()` causes), the closed local projects are `not-opened`,
-so nothing holds the quit.
-
-`SyncingProjectsModal.vue`:
-
-```ts
-const { kind = "sync" } = defineProps<{
-  /** What the app is finishing as it exits: syncing hybrid projects, saving versions, or both. */
-  kind?: "sync" | "versions" | "both" | undefined;
-}>();
-
-const TEXTS = {
-  sync: ["syncingProjectsTitle", "syncingProjectsMessage"],
-  versions: ["savingVersionsTitle", "savingVersionsMessage"],
-  both: ["syncingAndSavingTitle", "syncingAndSavingMessage"],
-} as const;
-```
-
-In its template, use `:title="getText(TEXTS[kind][0])"` and
-`{{ getText(TEXTS[kind][1]) }}`. In the file comment, change "while the hybrid
-projects upload" to "while the hybrid projects upload, or the versioned local
-projects close,".
-
-`DashboardPage.vue`: import `exitDialogKind` from
-`'$/providers/openedProjects/quit'` and replace the watch:
-
-```ts
-// While the opened projects sync or save their versions as the app exits, a dialog says so, and
-// nothing else is open. Mounting does not close the modals already open.
-let syncingDialog: { close: () => void } | undefined;
-watch(
-  () =>
-    exitDialogKind(
-      openedProjects.closingOnAppExit.value,
-      openedProjects.savingVersionsOnAppExit.value,
-    ),
-  (kind) => {
-    if (kind != null) {
-      modals.closeAll();
-      syncingDialog = modals.open(SyncingProjectsModal, { kind });
-    } else if (syncingDialog != null) {
-      modals.closeAll();
-      syncingDialog = undefined;
-    }
-  },
-  { immediate: true },
-);
-```
-
-- [ ] **Step 4: Run the tests, typecheck and lint; they pass.**
-
-- [ ] **Step 5: Commit.**
-
-```bash
-git add app/gui/src app/common/src/text/english.json
-git commit -m "GUI: on quit, close each versioned local project so it saves a version"
-```
+Quitting the app saves no version, by the user's decision: only closing a
+project or saving it does. The quit stays as it was; there is no `quit.ts`, no
+exit dialog for versions, and no `setQuitting` (earlier snippets that mention it
+were removed from the code).
 
 ---
 
@@ -5307,12 +4990,11 @@ times with `--workers=2`.
 
 ```markdown
 - [Local projects can keep versions with git][NNN]. When git is installed, a
-  version is saved when a project closes and when the app quits, and on demand
-  with Ctrl/Cmd+S (or Ctrl/Cmd+Shift+S and the new save icon, to add a comment).
-  A dot beside the project name, and a ● on its tab, show changes since the last
-  version. The first time, the IDE offers to create a repository in the projects
-  folder (or to use the one it is already in); Settings → Local has a new
-  Versions section.
+  version is saved when a project closes, and on demand with Ctrl/Cmd+S (or
+  Ctrl/Cmd+Shift+S and the new save icon, to add a comment). A dot beside the
+  project name, and a ● on its tab, show changes since the last version. The
+  first time, the IDE offers to create a repository in the projects folder (or
+  to use the one it is already in); Settings → Local has a new Versions section.
 ```
 
 Add the matching link line,
@@ -5323,8 +5005,7 @@ Add the matching link line,
       (polled every 5 s by its own loop, one request in flight at a time),
       saving (the ydoc flush, `flush.ts`, then `versioning/commit`) and the
       repository prompts; `projectStates.ts` watches a local project when it
-      initializes and offers a repository before it closes; the quit closes each
-      versioned project (`openedProjects.ts`). See the design,
+      initializes and offers a repository before it closes. See the design,
       `docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`."
 
 - [ ] **Step 8: Commit.**
@@ -5344,7 +5025,7 @@ git commit -m "GUI: Playwright specs for saving local versions; changelog"
     - the prompts: Create; Use for an existing repository outside the root; a
       repository at or inside the root is enabled silently, unless the user
       turned it off;
-    - a version on close and on quit;
+    - a version on close (quitting saves none);
     - Settings → Local → Versions.
   - **Important notes.**
     - The ydoc flush: why `text/save` from the GUI cannot work; the handshake;
@@ -5352,12 +5033,10 @@ git commit -m "GUI: Playwright specs for saving local versions; changelog"
     - **The engine bundle**: `ydoc.cjs` is in the engine jar, so the installer
       test needs a rebuilt engine.
     - The non-overlapping poll.
-    - Quit: Electron only, with a 30 s backstop per project.
     - "Don't ask again" is kept in `localStorage`
       (`enso-local-versioning-prompts`); "Not now" lasts for the session.
     - M10: Ctrl/Cmd+S is graph-scoped. **Question for the user.**
-    - Not verified: `buildEngineDistribution` and the Electron quit (the
-      installer test covers both).
+    - Not verified: `buildEngineDistribution` (the installer test covers it).
   - **Also:** the screenshots, the "Closes" lines, the
     `🤖 Generated with [Claude Code](https://claude.com/claude-code)` footer and
     the session link.
