@@ -160,7 +160,8 @@
   chips then show only the projects that carry any of the chosen labels. Labels
   are kept on this computer, and travel with a project when it is copied. Local
   folders and files cannot be labelled yet.
-- [The Versions tab now works for local projects kept in git][234]: list a
+- [The Versions tab now works for local projects kept in git][234], including
+  from the graph editor, where it shows the open project's versions: list a
   project's versions (following it across renames and moves), see what changed
   in each, compare any two, restore one (an open project is closed and reopened
   around it), duplicate one, and edit a version's comment.
