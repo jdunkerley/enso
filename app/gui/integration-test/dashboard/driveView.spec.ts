@@ -1,9 +1,9 @@
 /** @file Test the drive view. */
-import { CLOUD_ONLY, expect, test, type Locator } from 'integration-test/base'
+import { expect, test, type Locator } from 'integration-test/base'
 
 import { TEXT } from '../actions'
 
-test.skip(true, CLOUD_ONLY)
+test.use({ setupApi: { addDefaultProject: false } })
 
 /** Find a button to close the project. */
 
@@ -13,7 +13,7 @@ function locateStopProjectButton(page: Locator) {
 
 test('drive view', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
+    .local()
     .withDriveView(async (view) => {
       await expect(view).toBeVisible()
     })
@@ -37,7 +37,7 @@ test('drive view', async ({ drivePage }) => {
       await locateStopProjectButton(rows.nth(1)).click()
     })
     .driveTable.rightClickRow(1)
-    .contextMenu.moveToTrash()
+    .contextMenu.delete()
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveCount(1)
     })

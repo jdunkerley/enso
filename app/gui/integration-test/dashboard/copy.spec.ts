@@ -1,69 +1,21 @@
-/** @file Test copying, moving, cutting and pasting. */
-import { CLOUD_ONLY, expect, test } from 'integration-test/base'
-
-import { TEXT } from '../actions'
-
-test.skip(true, CLOUD_ONLY)
-
-test('copy', async ({ drivePage }) => {
-  await drivePage.goToCategory
-    .cloud()
-    // Assets: [0: New Folder 1]
-    .createFolder()
-    // Assets: [0: New Folder 2, 1: New Folder 1]
-    .createFolder()
-    .driveTable.rightClickRow('New Folder 2')
-    // Assets: [0: New Folder 2 <copied>, 1: New Folder 1]
-    .contextMenu.copy()
-    .driveTable.rightClickRow('New Folder 1')
-    // Assets: [0: New Folder 2, 1: New Folder 1, 2: New Folder 2 (copy) <child { depth=1 }>]
-    .contextMenu.paste()
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 2/, /^New Folder 1/])
-    })
-    .driveTable.openDirectory('New Folder 1')
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 2 \(copy\)/])
-    })
-})
-
-test('copy (keyboard)', async ({ drivePage }) => {
-  await drivePage.goToCategory
-    .cloud()
-    // Assets: [0: New Folder 1]
-    .createFolder()
-    // Assets: [0: New Folder 2, 1: New Folder 1]
-    .createFolder()
-    .driveTable.clickRow('New Folder 2')
-    // Assets: [0: New Folder 2 <copied>, 1: New Folder 1]
-    .press('Mod+C')
-    .driveTable.clickRow('New Folder 1')
-    // Assets: [0: New Folder 2, 1: New Folder 1, 2: New Folder 2 (copy) <child { depth=1 }>]
-    .press('Mod+V')
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 2/, /^New Folder 1/])
-    })
-    .driveTable.openDirectory('New Folder 1')
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 2 \(copy\)/])
-    })
-})
+/** @file Test moving, cutting and duplicating. */
+import { expect, test } from 'integration-test/base'
 
 test('move', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
-    // Assets: [0: New Folder 1]
+    .local()
+    // Assets: [0: New Folder 1, 1: Mock Project]
     .createFolder()
-    // Assets: [0: New Folder 2, 1: New Folder 1]
+    // Assets: [0: New Folder 2, 1: New Folder 1, 2: Mock Project]
     .createFolder()
     .driveTable.rightClickRow('New Folder 2')
-    // Assets: [0: New Folder 2 <cut>, 1: New Folder 1]
+    // Assets: [0: New Folder 2 <cut>, 1: New Folder 1, 2: Mock Project]
     .contextMenu.cut()
     .driveTable.rightClickRow('New Folder 1')
-    // Assets: [0: New Folder 1, 1: New Folder 2 <child { depth=1 }>]
+    // Assets: [0: New Folder 1, 1: Mock Project, 2: New Folder 2 <child { depth=1 }>]
     .contextMenu.paste()
     .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 1/])
+      await expect(rows).toHaveText([/^New Folder 1/, /^Mock Project/])
     })
     .driveTable.openDirectory('New Folder 1')
     .driveTable.withRows(async (rows) => {
@@ -71,64 +23,45 @@ test('move', async ({ drivePage }) => {
     })
 })
 
-test('move (drag)', async ({ drivePage, cloudApi }) => {
-  cloudApi.addDirectory({ title: 'New Folder 1' })
-  cloudApi.addDirectory({ title: 'New Folder 2' })
-  await drivePage.goToCategory
-    .cloud()
-    .driveTable.dragRowToRow('New Folder 2', 'New Folder 1')
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 1/])
-    })
-    .driveTable.openDirectory('New Folder 1')
-    .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 2/])
-    })
-})
-
-test('move to trash', async ({ drivePage, cloudApi }) => {
-  cloudApi.addDirectory()
-  cloudApi.addDirectory()
-  await drivePage.goToCategory
-    .cloud()
-    // Release `Mod` before dragging: the drag does not start while `Mod` is still held.
-    // `withModPressed` releases the key once its callback ends.
-    .withModPressed((modActions) =>
-      modActions.driveTable.clickRow('New Folder 1').driveTable.clickRow('New Folder 2'),
-    )
-    .driveTable.dragRowToCategory('New Folder 1', 'Trash')
-    .do(async (page) => {
-      // Confirm the deletion in the dialog
-      await page.getByRole('button', { name: TEXT.delete }).getByText(TEXT.delete).click()
-    })
-    .driveTable.expectPlaceholderRow()
-    .goToCategory.trash()
-    .driveTable.withRows(async (rows) => {
-      // NOTE: the order of the rows is not guaranteed, because it depends on the modification time,
-      // and requests may be executed in arbitrary order.
-      const folder1 = rows.filter({ hasText: /New Folder 1/ })
-      const folder2 = rows.filter({ hasText: /New Folder 2/ })
-
-      await expect(folder1).toBeVisible()
-      await expect(folder2).toBeVisible()
-    })
+test.describe('move (drag)', () => {
+  // Added before the app loads: a change made once it has loaded is not listed.
+  test.use({
+    setupApi: {
+      local: (localApi) => {
+        localApi.addRootDirectory('New Folder 1')
+        localApi.addRootDirectory('New Folder 2')
+      },
+    },
+  })
+  test('move (drag)', async ({ drivePage }) => {
+    await drivePage.goToCategory
+      .local()
+      .driveTable.dragRowToRow('New Folder 2', 'New Folder 1')
+      .driveTable.withRows(async (rows) => {
+        await expect(rows).toHaveText([/^New Folder 1/, /^Mock Project/])
+      })
+      .driveTable.openDirectory('New Folder 1')
+      .driveTable.withRows(async (rows) => {
+        await expect(rows).toHaveText([/^New Folder 2/])
+      })
+  })
 })
 
 test('move (keyboard)', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
-    // Assets: [0: New Folder 1]
+    .local()
+    // Assets: [0: New Folder 1, 1: Mock Project]
     .createFolder()
-    // Assets: [0: New Folder 2, 1: New Folder 1]
+    // Assets: [0: New Folder 2, 1: New Folder 1, 2: Mock Project]
     .createFolder()
     .driveTable.clickRow('New Folder 2')
-    // Assets: [0: New Folder 2 <cut>, 1: New Folder 1]
+    // Assets: [0: New Folder 2 <cut>, 1: New Folder 1, 2: Mock Project]
     .press('Mod+X')
     .driveTable.clickRow('New Folder 1')
-    // Assets: [0: New Folder 1, 1: New Folder 2 <child { depth=1 }>]
+    // Assets: [0: New Folder 1, 1: Mock Project, 2: New Folder 2 <child { depth=1 }>]
     .press('Mod+V')
     .driveTable.withRows(async (rows) => {
-      await expect(rows).toHaveText([/^New Folder 1/])
+      await expect(rows).toHaveText([/^New Folder 1/, /^Mock Project/])
     })
     .driveTable.openDirectory('New Folder 1')
     .driveTable.withRows(async (rows) => {
@@ -138,7 +71,7 @@ test('move (keyboard)', async ({ drivePage }) => {
 
 test('cut (keyboard)', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
+    .local()
     .createFolder()
     .driveTable.clickRow(0)
     .press('Mod+X')
@@ -152,34 +85,36 @@ test('cut (keyboard)', async ({ drivePage }) => {
     })
 })
 
-test('duplicate', async ({ drivePage, cloudApi }) => {
-  cloudApi.addProject({ title: 'New Project 1' })
-  await drivePage.goToCategory
-    .cloud()
-    .driveTable.rightClickRow(0)
-    .contextMenu.duplicate()
-    .driveTable.withRows(async (rows) => {
-      // Assets: [0: New Project 1, 1: New Project 1 (copy)]
-      const project1 = rows.filter({ hasText: /New Project 1/, hasNotText: /\(copy\)/ })
-      const project1Copy = rows.filter({ hasText: /New Project 1 \(copy\)/ })
+test.describe('duplicate', () => {
+  test.use({ setupApi: { local: (localApi) => localApi.addRootProject('New Project 1') } })
+  test('duplicate', async ({ drivePage }) => {
+    await drivePage.goToCategory
+      .local()
+      .driveTable.rightClickRow('New Project 1')
+      .contextMenu.duplicate()
+      .driveTable.withRows(async (rows) => {
+        const project1 = rows.filter({ hasText: /New Project 1/, hasNotText: /\(copy\)/ })
+        const project1Copy = rows.filter({ hasText: /New Project 1 \(copy\)/ })
 
-      await expect(project1).toBeVisible()
-      await expect(project1Copy).toBeVisible()
-    })
+        await expect(project1).toBeVisible()
+        await expect(project1Copy).toBeVisible()
+      })
+  })
 })
 
-test('duplicate (keyboard)', async ({ drivePage, cloudApi }) => {
-  cloudApi.addProject({ title: 'New Project 1' })
-  await drivePage.goToCategory
-    .cloud()
-    .driveTable.clickRow('New Project 1')
-    .press('Mod+D')
-    .driveTable.withRows(async (rows) => {
-      // Assets: [0: New Project 1 (copy), 1: New Project 1]
-      const project1 = rows.filter({ hasText: /New Project 1/, hasNotText: /\(copy\)/ })
-      const project1Copy = rows.filter({ hasText: /New Project 1 \(copy\)/ })
+test.describe('duplicate (keyboard)', () => {
+  test.use({ setupApi: { local: (localApi) => localApi.addRootProject('New Project 1') } })
+  test('duplicate (keyboard)', async ({ drivePage }) => {
+    await drivePage.goToCategory
+      .local()
+      .driveTable.clickRow('New Project 1')
+      .press('Mod+D')
+      .driveTable.withRows(async (rows) => {
+        const project1 = rows.filter({ hasText: /New Project 1/, hasNotText: /\(copy\)/ })
+        const project1Copy = rows.filter({ hasText: /New Project 1 \(copy\)/ })
 
-      await expect(project1).toBeVisible()
-      await expect(project1Copy).toBeVisible()
-    })
+        await expect(project1).toBeVisible()
+        await expect(project1Copy).toBeVisible()
+      })
+  })
 })

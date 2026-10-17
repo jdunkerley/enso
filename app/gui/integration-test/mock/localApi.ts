@@ -338,13 +338,16 @@ export async function mockLocalApi(page: Page) {
   }
 
   /** Add a project under the root, by title; returns its directory. */
-  const addRootProject = (title: string, options: { attributes?: Partial<Attributes> } = {}) =>
+  const addRootProject = (
+    title: string,
+    options: { attributes?: Partial<Attributes>; created?: ReturnType<typeof toRfc3339> } = {},
+  ) =>
     addProject({
       metadata: {
         id: UUID(uuidv4()),
         name: title,
         namespace: 'local',
-        created: toRfc3339(new Date()),
+        created: options.created ?? toRfc3339(new Date()),
       },
       ...(options.attributes ? { attributes: options.attributes } : {}),
     }).entry.path
@@ -534,6 +537,34 @@ export async function mockLocalApi(page: Page) {
         })
       })
 
+    /** The project with `projectId` (the shim looks it up by ID too). */
+    const findProject = (params: Record<string, unknown>) => {
+      for (const entry of fileSystem.values()) {
+        if (entry.type === 'ProjectEntry' && entry.entry.metadata.id === params.projectId) {
+          return entry
+        }
+      }
+      return undefined
+    }
+    await projectServiceRoute('project/delete', (params) => {
+      const project = findProject(params)
+      if (project == null) {
+        return toJSONRPCError('Project not found')
+      }
+      called('deletePath', { path: project.entry.path })
+      removeEntry(project.entry.path)
+      recentPathDeleted(project.entry.path)
+      return toJSONRPCResult(null)
+    })
+    // Like the shim, this changes the name only: the project stays in its directory.
+    await projectServiceRoute('project/rename', (params) => {
+      const project = findProject(params)
+      if (project == null) {
+        return toJSONRPCError('Project not found')
+      }
+      unsafeMutable(project.entry.metadata).name = ProjectName(String(params.name))
+      return toJSONRPCResult(null)
+    })
     await projectServiceRoute('labels/list', () => toJSONRPCResult(labels))
     await projectServiceRoute('labels/create', (params) => {
       const value = String(params.value)
