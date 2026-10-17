@@ -16,7 +16,6 @@ import {
   useSetPath,
   useTextSecrets,
 } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
-import { useCloudBrowser } from '@/components/GraphEditor/widgets/WidgetFileBrowser/cloudBrowser'
 import { useLocalBrowser } from '@/components/GraphEditor/widgets/WidgetFileBrowser/localBrowser'
 import { withDropdownItems } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import {
@@ -85,12 +84,12 @@ const fileTypes = computed(() => {
 })
 
 const localBrowserItems = useLocalBrowser({ dialogKind, write, currentPath, setPath, fileTypes })
-const cloudBrowserItems = useCloudBrowser({ dialogKind, write, currentPath, setPath, fileTypes })
 const textSecretsItems = useTextSecrets({ dialogKind, reprType })
 
 const items = computed((): (CustomDropdownItem | ExpressionTag)[] => [
+  // The IDE is local-only: there is no cloud browser to offer (`WidgetFileBrowser/cloudBrowser.ts`
+  // is unused, and is deleted with the rest of the cloud UI).
   ...localBrowserItems.value,
-  ...cloudBrowserItems.value,
   ...textSecretsItems.value,
 ])
 
