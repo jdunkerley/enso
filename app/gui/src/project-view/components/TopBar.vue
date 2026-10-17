@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { useCurrentProject } from '$/components/WithCurrentProject.vue'
 import ActionButton from '@/components/ActionButton.vue'
+import ChangedIndicator from '@/components/ChangedIndicator.vue'
 import ControlGroup from '@/components/ControlGroup.vue'
 import ExtendedMenu from '@/components/ExtendedMenu.vue'
 import NavBreadcrumbs from '@/components/NavBreadcrumbs.vue'
@@ -15,6 +17,7 @@ const GAP = 8
 const projectNameEdited = defineModel<boolean>('projectNameEdited', { default: false })
 const props = defineProps<{ zoomLevel: number; menuActions: DisplayableActionName[] }>()
 const selection = useGraphSelection()
+const { id: projectId, info: projectInfo } = useCurrentProject()
 
 const rootElement = useTemplateRef('rootElement')
 const leftGroups = useTemplateRef('leftGroups')
@@ -45,6 +48,7 @@ const style = computed(() => ({
       <div ref="leftGroups" class="alwaysVisibleElements">
         <ExtendedMenu :actions="menuActions" :zoomControls="extendedMenuZoomControls" />
         <NavBreadcrumbs v-model:projectNameEdited="projectNameEdited" />
+        <ChangedIndicator :projectId="projectId" :mode="projectInfo.mode" />
       </div>
 
       <ControlGroup>
@@ -54,6 +58,7 @@ const style = computed(() => ({
       <ControlGroup>
         <ActionButton action="graph.undo" />
         <ActionButton action="graph.redo" />
+        <ActionButton action="graph.saveVersionWithComment" />
       </ControlGroup>
       <SelectionMenu v-if="selection.selected.size > 1" />
       <ControlGroup v-else>

@@ -1,20 +1,32 @@
 <script setup lang="ts">
+import { useLocalVersioning } from '$/providers/localVersioning'
 import { panelKey, useContainerData, type Tab } from '$/providers/container'
 import { useOpenedProjects, type Project } from '$/providers/openedProjects'
+import { useText } from '$/providers/text'
 import GrowingSpinner from '@/components/shared/GrowingSpinner.vue'
 import type { SpinnerPhase } from '@/components/shared/LoadingSpinner.vue'
 import type { Icon } from '@/util/iconMetadata/iconName'
+import type { ProjectId } from 'enso-common/src/services/Backend'
 import { computed, toRefs } from 'vue'
 import SelectableTab from './SelectableTab.vue'
 
 const { isCurrentTab, currentTab, tabList, closeTab } = toRefs(useContainerData())
 const openedProjects = useOpenedProjects()
+const localVersioning = useLocalVersioning()
+const { getText } = useText()
+
+/** Whether a versioned local project has changed since its last version (unknown: not changed). */
+function isChanged(id: ProjectId) {
+  const status = localVersioning.statusOf(id)
+  return status?.enabled === true && status.changed
+}
 
 type TabViewInfo = Tab & {
   dataTestId?: string
   icon: Icon | undefined
   label: string
   loadingPhase?: SpinnerPhase | undefined
+  changed?: boolean
 }
 
 const tabsViewInfos = computed(() =>
@@ -30,6 +42,7 @@ const tabsViewInfos = computed(() =>
             ...tab,
             dataTestId: 'project-view-tab-button',
             icon: projectIcon(project),
+            changed: project.state.info.mode === 'local' && isChanged(tab.id),
             label:
               project.state.status === 'initialized' ?
                 project.state.name.value
@@ -92,6 +105,14 @@ function projectIcon(project: Project): Icon | undefined {
         @close="closeTab(tab)"
         @update:selected="$event && (currentTab = tab)"
       >
+        <span
+          v-if="tab.changed"
+          role="img"
+          class="changed"
+          :aria-label="getText('changedSinceLastVersion')"
+          data-testid="tab-changed-indicator"
+          >●</span
+        >
         <GrowingSpinner v-if="tab.loadingPhase != null" :phase="tab.loadingPhase" :size="16" />
       </SelectableTab>
     </div>
@@ -104,6 +125,10 @@ function projectIcon(project: Project): Icon | undefined {
   padding-left: 24px;
   scrollbar-width: thin;
   scrollbar-color: rgb(180 180 180) var(--color-dashboard-background);
+}
+.changed {
+  font-size: 8px;
+  line-height: 1;
 }
 .tabs {
   display: flex;

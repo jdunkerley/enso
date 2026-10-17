@@ -1417,6 +1417,7 @@
   "versioningDontAskAgainForFolder": "Don't ask again for this folder",
   "versioningDontAskAgain": "Don't ask again",
   "versioningSetupError": "Could not set up versions",
+  "changedSinceLastVersion": "Changed since the last version",
   "saveVersionTitle": "Save a version",
   "saveVersionCommentLabel": "Comment (optional)",
   "saveVersionSave": "Save",
