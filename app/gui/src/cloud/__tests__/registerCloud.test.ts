@@ -4,6 +4,7 @@
  * running projects in the browser is disabled; and the developer tools, in development only (#172).
  */
 import { registerCloud } from '$/cloud'
+import { CLOUD_DISABLED_ROUTE } from '$/cloud/browserDisabled/routes'
 import {
   devtools,
   hasAgreementsGate,
@@ -12,7 +13,7 @@ import {
   resetLayoutContributions,
 } from '$/providers/layoutContributions'
 import { resetSettingsContributions } from '$/providers/settingsContributions'
-import { CLOUD_DISABLED_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
+import { PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 

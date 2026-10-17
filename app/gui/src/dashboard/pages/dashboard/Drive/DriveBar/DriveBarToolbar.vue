@@ -1,11 +1,8 @@
 <script setup lang="ts">
 /**
- * @file The drive's toolbar: the buttons creating assets (a project, a folder, a secret, a
- * credential, a datalink), uploading and downloading, the count of cut or copied assets, and the
- * search bar. In the trash, a button emptying it; in Recent, only the count and the search bar.
- *
- * The secret, credential and datalink dialogs open on the modal stack, over the page. Each of those
- * buttons has an `aria-expanded`, true while its dialog is open.
+ * @file The drive's toolbar: the buttons creating assets (a project, a folder), uploading and
+ * downloading, the count of cut or copied assets, and the search bar. In the trash, a button
+ * emptying it; in Recent, only the count and the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
 import {
@@ -16,9 +13,6 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
-import CreateCredentialModal from '$/secrets/CreateCredentialModal.vue'
-import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
-import UpsertDatalinkModal from '$/datalinks/UpsertDatalinkModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -31,18 +25,12 @@ import { useModals } from '$/providers/modals'
 import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
 import type AssetQuery from '$/utils/AssetQuery'
-import { backendMutationOptions } from '$/utils/backendQuery'
 import { deleteAssetsMutationOptions, downloadAssetsMutationOptions } from '$/utils/driveMutations'
 import { getAllTrashedItems, listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
-import {
-  BackendType,
-  isDirectoryId,
-  isProjectId,
-  type CredentialConfig,
-} from 'enso-common/src/services/Backend'
+import { BackendType, isDirectoryId, isProjectId } from 'enso-common/src/services/Backend'
 import { readUserSelectedFile } from 'enso-common/src/utilities/file'
-import { computed, ref, shallowRef } from 'vue'
+import { computed, ref } from 'vue'
 import PasteStatus from './PasteStatus.vue'
 
 const { query, setQuery } = defineProps<{
@@ -88,54 +76,12 @@ const effectivePasteData = computed(() => {
 const downloadAssets = useMutationCallback(() => downloadAssetsMutationOptions(backend.value))
 const newFolder = useNewFolder(backend, () => category.value.type, driveStore)
 const uploadFiles = useUploadFiles(backend, () => category.value.type, driveStore)
-const newSecret = useMutationCallback(() => backendMutationOptions(backend.value, 'createSecret'))
-const newCredential = useMutationCallback(() =>
-  backendMutationOptions(backend.value, 'createCredential'),
-)
-const newDatalink = useMutationCallback(() =>
-  backendMutationOptions(backend.value, 'createDatalink'),
-)
 const newProjectRaw = useNewProject(backend, () => category.value.type)
 const exportArchive = useExportArchive(backend, driveStore)
 const newProject = useMutationCallback({
   mutationKey: ['newProject'],
   mutationFn: async () => await newProjectRaw({}, currentDirectoryId.value),
 })
-
-/** Keys of the dialogs these buttons opened on the modal stack, for their `aria-expanded`. */
-const openedModals = shallowRef<Partial<Record<'secret' | 'credential' | 'datalink', number>>>({})
-function isOpened(which: 'secret' | 'credential' | 'datalink') {
-  const key = openedModals.value[which]
-  return key != null && modals.stack.value.some((entry) => entry.key === key)
-}
-
-function openNewSecret() {
-  const { key } = modals.open(UpsertSecretModal, {
-    onCreate: async (name: string, value: string) => {
-      await newSecret([{ name, value, parentDirectoryId: currentDirectoryId.value }])
-    },
-  })
-  openedModals.value = { ...openedModals.value, secret: key }
-}
-
-function openNewCredential() {
-  const { key } = modals.open(CreateCredentialModal, {
-    doCreate: (name: string, value: CredentialConfig) =>
-      newCredential([{ name, value, parentDirectoryId: currentDirectoryId.value }]),
-  })
-  openedModals.value = { ...openedModals.value, credential: key }
-}
-
-function openNewDatalink() {
-  const { key } = modals.open(UpsertDatalinkModal, {
-    doCreate: async (name: string, value: unknown) => {
-      await newDatalink([
-        { name, value, parentDirectoryId: currentDirectoryId.value, datalinkId: null },
-      ])
-    },
-  })
-  openedModals.value = { ...openedModals.value, datalink: key }
-}
 
 async function uploadFilesFromDialog() {
   const files = await readUserSelectedFile({ multiple: true })
@@ -242,33 +188,6 @@ function openClearTrash() {
           icon="folder_add"
           :aria-label="getText('newFolder')"
           @press="() => newFolder(currentDirectoryId)"
-        />
-        <Button
-          v-if="isCloud"
-          variant="icon"
-          size="medium"
-          icon="key_add"
-          :aria-label="getText('newSecret')"
-          :aria-expanded="isOpened('secret')"
-          @press="openNewSecret"
-        />
-        <Button
-          v-if="isCloud"
-          variant="icon"
-          size="medium"
-          icon="credential_add"
-          :aria-expanded="isOpened('credential')"
-          :aria-label="getText('newCredential')"
-          @press="openNewCredential"
-        />
-        <Button
-          v-if="isCloud"
-          variant="icon"
-          size="medium"
-          icon="connector_add"
-          :aria-expanded="isOpened('datalink')"
-          :aria-label="getText('newDatalink')"
-          @press="openNewDatalink"
         />
       </div>
       <div

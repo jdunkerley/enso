@@ -301,6 +301,18 @@ describe('useTransferBetweenCategories', () => {
     expect(remote.updateAsset).not.toHaveBeenCalled()
   })
 
+  test('does nothing for local assets dropped on the cloud', async () => {
+    const transfer = await setup()
+    const earlierToasts = new Set(useToasts().toasts.value.map((toast) => toast.id))
+    const localAsset = { ...asset('project-1', 'directory-local-root'), type: AssetType.project }
+    await transfer({ type: 'local' }, { type: 'cloud' }, [localAsset])
+    await flushPromises()
+    for (const mock of [...Object.values(remote), ...Object.values(local), uploadFile]) {
+      expect(mock).not.toHaveBeenCalled()
+    }
+    expect(useToasts().toasts.value.filter((toast) => !earlierToasts.has(toast.id))).toEqual([])
+  })
+
   test('does nothing for the Recent category, or within the trash', async () => {
     const transfer = await setup()
     await transfer({ type: 'cloud' }, { type: 'recent' }, [asset('file-1')])

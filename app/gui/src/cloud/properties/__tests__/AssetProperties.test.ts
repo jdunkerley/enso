@@ -44,7 +44,7 @@ vi.mock('$/providers/auth', () => ({
 }))
 
 // The datalink editor, stubbed: an input holding the datalink's `uri`.
-vi.mock('../../datalinks/DatalinkInput.vue', async () => {
+vi.mock('$/datalinks/DatalinkInput.vue', async () => {
   const { defineComponent, h } = await import('vue')
   return {
     default: defineComponent({

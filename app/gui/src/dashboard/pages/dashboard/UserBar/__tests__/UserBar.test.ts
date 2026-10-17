@@ -1,6 +1,6 @@
 /**
  * @file The Vue user bar (#83): the user menu (a dialog of buttons), its entries as global actions,
- * the notification tray, the offline notice and the cloud-only buttons.
+ * the notification tray and the offline notice; no cloud-only buttons, whatever the plan.
  */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import { useActionsStore } from '$/providers/actions'
@@ -14,6 +14,7 @@ import {
   EmailAddress,
   OrganizationId,
   Plan,
+  PLANS,
   UserId,
   type User,
 } from 'enso-common/src/services/Backend'
@@ -148,7 +149,6 @@ describe('UserBar', () => {
     expect(entryNames()).toEqual([
       getText('settingsShortcut'),
       getText('aboutThisAppShortcut'),
-      getText('upgradePlanShortcut'),
       getText('signOutShortcut'),
     ])
     await user.tab()
@@ -159,7 +159,7 @@ describe('UserBar', () => {
     expect(document.activeElement).toBe(userMenuButton())
   })
 
-  test('"Download app" without a local backend; no "Upgrade Plan" on a paid plan', async () => {
+  test('"Download app" without a local backend', async () => {
     localBackend.value = null
     auth.session = { user: makeUser({ plan: Plan.team }) }
     await mountUserBar()
@@ -198,18 +198,20 @@ describe('UserBar', () => {
     expect([...document.querySelectorAll('a')].map(textOf)).not.toContain(getText('upgrade'))
   })
 
-  test('signed in to the cloud on the free plan, "Upgrade Plan" and "Logout" are there', async () => {
-    auth.session = { user: makeUser({ plan: Plan.free }) }
-    await mountUserBar()
-    await userEvent.setup().click(userMenuButton())
-    await flushPromises()
-    expect(entryNames()).toEqual([
-      getText('settingsShortcut'),
-      getText('aboutThisAppShortcut'),
-      getText('upgradePlanShortcut'),
-      getText('signOutShortcut'),
-    ])
-    expect(must(userMenu()).textContent).toContain(getText(Plan.free))
+  test('no "Invite", "Upgrade" or "Upgrade Plan", whatever the plan', async () => {
+    const user = userEvent.setup()
+    for (const plan of PLANS) {
+      auth.session = { user: makeUser({ plan, isOrganizationAdmin: true }) }
+      const { unmount } = await mountUserBar()
+      const controls = [...document.querySelectorAll('a, button')].map(textOf)
+      expect(controls).not.toContain(getText('upgrade'))
+      expect(controls).not.toContain(getText('invite'))
+      await user.click(userMenuButton())
+      await flushPromises()
+      expect(entryNames()).not.toContain(getText('upgradePlanShortcut'))
+      unmount()
+      await flushPromises()
+    }
   })
 
   test('Settings, About and Logout close the menu and act', async () => {
@@ -260,18 +262,6 @@ describe('UserBar', () => {
     // The key of `Mod+,`, after its modifier.
     expect(entry(getText('settingsShortcut')).textContent).toMatch(/,$/)
     expect(textOf(entry(getText('signOutShortcut')))).toBe(getText('signOutShortcut'))
-  })
-
-  test('an organization admin on the free plan gets "Upgrade"', async () => {
-    auth.session = { user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }) }
-    const { router } = await mountUserBar()
-    const upgrade = must(
-      [...document.querySelectorAll('a')].find((link) => textOf(link) === getText('upgrade')),
-    )
-    expect(upgrade.getAttribute('href')).toBe('/subscribe')
-    await userEvent.setup().click(upgrade)
-    await flushPromises()
-    expect(router.currentRoute.value.path).toBe('/subscribe')
   })
 
   test('offline, it says so', async () => {

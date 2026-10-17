@@ -10,17 +10,15 @@
  * while it is open), on a press that starts and ends outside it, and when anything outside it
  * scrolls or is right-clicked; and, through the dialog context, when an entry is pressed.
  *
- * A locked entry (`isUnderPaywall`) shows the lock and the "upgrade" tooltip, and opens the paywall
- * dialog for its `feature` instead of running its action.
+ * A locked entry (`isUnderPaywall`) shows the lock and the "upgrade" tooltip; no entry is locked
+ * any more, so pressing one always runs its action.
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
-import PaywallModal from '#/layouts/Drive/PaywallModal.vue'
 import { POPOVER_STYLES } from '$/components/Dialog/variants'
 import { provideDialogContext } from '$/components/Dialog/dialogContext'
 import MenuEntry from '$/components/MenuEntry/MenuEntry.vue'
 import { portalTarget } from '$/components/portal'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
-import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useEventListener } from '@vueuse/core'
@@ -41,7 +39,6 @@ const emit = defineEmits<{
 }>()
 
 const { getText } = useText()
-const modals = useModals()
 const inputBindings = useDashboardInputBindings()
 const popover = ref<HTMLElement>()
 
@@ -132,12 +129,7 @@ useEventListener(
 )
 
 function press(entry: ContextMenuEntry) {
-  if (entry.isUnderPaywall === true && entry.feature != null) {
-    modals.closeAll()
-    modals.open(PaywallModal, { feature: entry.feature })
-  } else {
-    entry.doAction()
-  }
+  entry.doAction()
 }
 </script>
 
