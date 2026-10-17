@@ -316,13 +316,19 @@ export function createOpenedProjectsStore() {
         proj.state.info.mode === 'hybrid' &&
         !proj.state.info.synced,
     )
-    const versionedToClose = [...projects.values()].filter(
-      (proj) =>
-        proj.state.status === 'initialized' &&
-        proj.state.info.mode === 'local' &&
-        !closedOnQuit.has(proj.state.info.id) &&
-        localVersioning.isVersioned(proj.state.info.id),
-    )
+    // A project is closed unless it is known not to keep versions: one whose status could not be
+    // read, or has not been read yet, is closed too, since the shim commits only where the user
+    // has agreed to versions. Browsers hold nothing for local projects (dev servers only).
+    const versionedToClose =
+      isOnElectron() ?
+        [...projects.values()].filter(
+          (proj) =>
+            proj.state.status === 'initialized' &&
+            proj.state.info.mode === 'local' &&
+            !closedOnQuit.has(proj.state.info.id) &&
+            localVersioning.statusOf(proj.state.info.id)?.enabled !== false,
+        )
+      : []
     if (hybridsToUpload.length === 0 && versionedToClose.length === 0) {
       // Do the project cleanup, but do not close projects entirely.
       // Local projects's PM process will be killed anyway, and
@@ -356,6 +362,8 @@ export function createOpenedProjectsStore() {
     for (const project of versionedToClose) closedOnQuit.add(project.state.info.id)
     try {
       const [hybridErrors] = await Promise.all([
+        // Uploads have no time limit, deliberately: one would quit before unsynced changes reach
+        // the Cloud.
         Promise.all(
           hybridsToUpload.map(async (project) => {
             assert(project.state.info.mode === 'hybrid')
@@ -376,6 +384,7 @@ export function createOpenedProjectsStore() {
       savingVersionsOnAppExit.value = false
       finishingBeforeQuit = false
       if (hybridErrors.length === 0) window.close()
+      // The window stays open, but the versioned local projects have already closed.
       else stayOpen()
     } catch (error) {
       console.error('Could not finish before quitting:', error)

@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The dialog shown while the hybrid projects upload, or the versioned local projects close,
- * as the desktop app exits. The user cannot
- * close it with the mouse; it goes when the upload ends.
+ * as the desktop app exits. The user cannot close it with the mouse; it goes when the work ends.
  *
  * It is meant for the modal stack. It emits `close` once it has closed and its exit animation has
  * ended, which takes it off the stack.

@@ -13,7 +13,7 @@ vi.mock('../openedProjects/projectStates', () => ({
   useProjectStates: () => mocks,
 }))
 vi.mock('../localVersioning', () => ({
-  useLocalVersioning: () => ({ isVersioned: () => false, setQuitting: vi.fn() }),
+  useLocalVersioning: () => ({ statusOf: () => undefined, setQuitting: vi.fn() }),
 }))
 
 import { createOpenedProjectsStore } from '../openedProjects'
