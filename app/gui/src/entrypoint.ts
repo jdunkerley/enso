@@ -3,10 +3,10 @@ import './beforeMain' // Keep newline below to ensure that this import is always
 import '#/styles.css'
 import '#/tailwind.css'
 import App from '$/App.vue'
-import { registerCloud } from '$/cloud'
 import { setupLogger } from '$/log'
 import { setFeatureFlag } from '$/providers/featureFlags'
 import { widgetDevtools } from '$/providers/openedProjects/widgetRegistry/devtools'
+import { registerCore } from '$/registerCore'
 import router from '$/router'
 import { createQueryClient } from '$/utils/queryClient'
 import * as sentry from '@sentry/vue'
@@ -39,7 +39,7 @@ async function main() {
   const app = createApp(App)
   setupSentry(app)
   app.use(VueQueryPlugin, { queryClient, enableDevtoolsV6Plugin: true })
-  registerCloud(router)
+  registerCore()
   app.use(router)
   app.use(widgetDevtools)
   app.provide('rootDirPath', rootDirPath)

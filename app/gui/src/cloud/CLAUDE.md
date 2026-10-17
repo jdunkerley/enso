@@ -90,18 +90,20 @@ community build without the cloud can leave it out (decision 6b of
     storage editor) and the list of active overrides, contributed with
     `contributeDevtools` in development builds only (`registerCloud` checks
     `process.env.NODE_ENV`, so a production build carries none of it).
-- `index.ts`: `registerCloud(router)`, the one entry point.
+- `index.ts`: `registerCloud(router)`, the one entry point. Not called since the
+  IDE became local-only (PR 1); PR 2 deletes this folder.
 
 ## Rules
 
-- **The core never imports an area, nor `$/cloud` itself.** `entrypoint.ts`
-  calls `registerCloud` before the router starts, and that is the only way in.
-  An ESLint rule enforces it (`CLOUD_AREAS` in `eslint.config.mjs`; add a new
-  area there). The dashboard (all of `src/dashboard/`) is exempt: it mixes cloud
-  and core code. The areas from #82 and #83 predate the registries and are
-  imported directly, with a note (`UpsertSecretPanel.vue`, `UserBar.vue`,
-  `UserMenu.vue`, `App.vue`); `billing` and `organization` joined `CLOUD_AREAS`
-  with #87, since their only direct importers are in the exempt dashboard.
+- **The core never imports an area, nor `$/cloud` itself.** `entrypoint.ts` used
+  to call `registerCloud` before the router started, the only way in; it no
+  longer does (PR 1). An ESLint rule enforces it (`CLOUD_AREAS` in
+  `eslint.config.mjs`; add a new area there). The dashboard (all of
+  `src/dashboard/`) is exempt: it mixes cloud and core code. The areas from #82
+  and #83 predate the registries and are imported directly, with a note
+  (`UpsertSecretPanel.vue`, `UserBar.vue`, `UserMenu.vue`, `App.vue`); `billing`
+  and `organization` joined `CLOUD_AREAS` with #87, since their only direct
+  importers are in the exempt dashboard.
 - Nothing here imports `#/` (the dashboard).
 - **An area contributes through registries**, not by being imported. Routes are
   the first: `registerCloud` adds them with `router.addRoute`, under a named
