@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { YjsChannel } from 'ydoc-channel'
 import {
+  deleteSetEntries,
   encodeControlMessage,
   FLUSH_DEADLINE_MS,
   parseControlMessage,
@@ -60,6 +61,33 @@ describe('createModuleFlusher', () => {
     ])
   })
 
+  test('a module subdoc sends only this client’s own insertions and deletions', async () => {
+    const indexDoc = new Y.Doc()
+    const { requests } = serverEnd(indexDoc, () => ({ ok: true }))
+    // Made before the module doc is added, as the project store does.
+    const flusher = createModuleFlusher(indexDoc, () => [moduleDoc])
+    const moduleDoc = new Y.Doc()
+    indexDoc.getMap<Y.Doc>('modules').set('Main', moduleDoc)
+    const other = new Y.Doc()
+    other.getMap('m').set('a', 1)
+    other.getMap('m').set('b', 1)
+    Y.applyUpdate(moduleDoc, Y.encodeStateAsUpdate(other))
+    // A deletion that arrived from elsewhere, and one this client made.
+    other.getMap('m').delete('a')
+    Y.applyUpdate(moduleDoc, Y.encodeStateAsUpdate(other))
+    moduleDoc.getMap('m').delete('b')
+    await flusher.flush()
+    // The doc holds both deletions; only this client's is sent.
+    expect(deleteSetEntries(moduleDoc)).toEqual({ [other.clientID]: [[0, 2]] })
+    expect(requests).toEqual([
+      expect.objectContaining({
+        modules: {
+          [moduleDoc.guid]: { stateVector: [], deleteSet: { [other.clientID]: [[1, 1]] } },
+        },
+      }),
+    ])
+  })
+
   test('a refusal is "declined", with the server’s reason', async () => {
     const indexDoc = new Y.Doc()
     serverEnd(indexDoc, () => ({ ok: false, error: 'Main.enso was changed on disk.' }))
@@ -95,6 +123,45 @@ describe('createModuleFlusher', () => {
     server.answerLater(requestId!, { ok: false, error: 'late' })
     await vi.advanceTimersByTimeAsync(0)
     expect(outcome).toEqual({ kind: 'declined', reason: 'late' })
+  })
+
+  test('not connected: "declined" at once, with the caller’s reason, and nothing is sent', async () => {
+    const indexDoc = new Y.Doc()
+    const { requests } = serverEnd(indexDoc, () => ({ ok: true }))
+    const flusher = createModuleFlusher(indexDoc, () => [], {
+      connection: { isConnected: () => false, notConnectedReason: () => 'Not connected' },
+    })
+    expect(await flusher.flush()).toEqual({ kind: 'declined', reason: 'Not connected' })
+    expect(requests).toEqual([])
+  })
+
+  test('connected, but no answer (an engine without the channel): still "waited"', async () => {
+    vi.useFakeTimers()
+    const indexDoc = new Y.Doc()
+    serverEnd(indexDoc, () => null)
+    const flusher = createModuleFlusher(indexDoc, () => [], {
+      connection: { isConnected: () => true, notConnectedReason: () => 'Not connected' },
+    })
+    let outcome: unknown
+    void flusher.flush().then((result) => (outcome = result))
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_FALLBACK_MS)
+    expect(outcome).toEqual({ kind: 'waited' })
+  })
+
+  test('disconnected while waiting: "declined", not "waited"', async () => {
+    vi.useFakeTimers()
+    const indexDoc = new Y.Doc()
+    serverEnd(indexDoc, () => null)
+    let connected = true
+    const flusher = createModuleFlusher(indexDoc, () => [], {
+      connection: { isConnected: () => connected, notConnectedReason: () => 'Not connected' },
+    })
+    let outcome: unknown
+    void flusher.flush().then((result) => (outcome = result))
+    await vi.advanceTimersByTimeAsync(1_000)
+    connected = false
+    await vi.advanceTimersByTimeAsync(AUTOSAVE_FALLBACK_MS)
+    expect(outcome).toEqual({ kind: 'declined', reason: 'Not connected' })
   })
 
   test('answers for another request are ignored', async () => {

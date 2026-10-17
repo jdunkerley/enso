@@ -6,7 +6,11 @@
  *
  * The GUI describes its edits by each module doc's state vector and delete set. Both are needed:
  * a deletion (such as `Y.Map.delete`) advances no clock, so a last edit that only deletes is
- * invisible in the state vector. They travel as JSON pairs, not as base64: `lib0`'s base64 picks
+ * invisible in the state vector. Only the GUI's own edits are described: every other client's
+ * reached the GUI through the ydoc server, which therefore has them. For insertions that is the
+ * GUI's own entry of the state vector; for deletions it is those the GUI's own transactions made
+ * ({@link trackLocalDeletions}), whichever client created the deleted items, since a delete set is
+ * keyed by the deleted item's creator and the GUI mostly deletes what the server loaded. They travel as JSON pairs, not as base64: `lib0`'s base64 picks
  * a Node or a browser implementation, and the polyglot runtime the ydoc server runs in inside the
  * engine is neither.
  */
@@ -43,20 +47,26 @@ export type YdocControlMessage =
   | { readonly type: 'flushed'; readonly id: string; readonly ok: true }
   | { readonly type: 'flushed'; readonly id: string; readonly ok: false; readonly error: string }
 
-/** The state vector of `doc`. */
+/**
+ * The state vector of `doc`, of this client's own insertions only (see the file comment). Empty
+ * while this client has inserted nothing.
+ */
 export function stateVectorEntries(doc: Y.Doc): StateVectorEntries {
-  return [...Y.decodeStateVector(Y.encodeStateVector(doc)).entries()]
+  const clock = Y.getState(doc.store, doc.clientID)
+  return clock > 0 ? [[doc.clientID, clock]] : []
 }
 
 /** Whether `doc` contains every insertion `wanted` describes. */
 export function stateVectorCovers(doc: Y.Doc, wanted: StateVectorEntries): boolean {
-  const have = Y.decodeStateVector(Y.encodeStateVector(doc))
-  return wanted.every(([client, clock]) => (have.get(client) ?? 0) >= clock)
+  return wanted.every(([client, clock]) => Y.getState(doc.store, client) >= clock)
 }
 
-/** The deletions `doc` contains. */
+/** Every deletion `doc` contains, whoever made it. */
 export function deleteSetEntries(doc: Y.Doc): DeleteSetEntries {
-  const deleteSet = Y.createDeleteSetFromStructStore(doc.store)
+  return toEntries(Y.createDeleteSetFromStructStore(doc.store))
+}
+
+function toEntries(deleteSet: ReturnType<typeof Y.createDeleteSet>): DeleteSetEntries {
   return Object.fromEntries(
     Array.from(deleteSet.clients, ([client, items]) => [
       String(client),
@@ -65,23 +75,74 @@ export function deleteSetEntries(doc: Y.Doc): DeleteSetEntries {
   )
 }
 
+/** The deletions this client's own transactions made in a doc, from {@link trackLocalDeletions}. */
+export interface LocalDeletions {
+  /** The deletions made so far, merged into ranges. */
+  entries(): DeleteSetEntries
+  /** Stop tracking. */
+  stop(): void
+}
+
 /**
- * Whether `doc` contains every deletion `wanted` describes. The ranges of a delete set built from
- * a struct store are maximal runs, so each wanted range must lie inside one of `doc`'s.
+ * Collect the deletions `doc`'s local transactions make from now on. Updates applied from
+ * elsewhere (the provider's) are not local, so they are left out.
+ */
+export function trackLocalDeletions(doc: Y.Doc): LocalDeletions {
+  let deletions = Y.createDeleteSet()
+  const onTransaction = (transaction: Y.Transaction) => {
+    if (!transaction.local || transaction.deleteSet.clients.size === 0) return
+    deletions = Y.mergeDeleteSets([deletions, transaction.deleteSet])
+  }
+  doc.on('afterTransaction', onTransaction)
+  return {
+    entries: () => toEntries(deletions),
+    stop: () => doc.off('afterTransaction', onTransaction),
+  }
+}
+
+/** Whether every struct of `structs` (one client's, sorted) in `[clock, clock + len)` is deleted. */
+function rangeDeleted(
+  structs: (Y.Item | Y.GC)[],
+  state: number,
+  clock: number,
+  len: number,
+): boolean {
+  const end = clock + len
+  if (len <= 0) return true
+  if (clock < 0 || end > state) return false
+  // A binary search for the first struct, then only the structs the range spans.
+  for (let index = Y.findIndexSS(structs, clock); index < structs.length; index++) {
+    const struct = structs[index]!
+    if (struct.id.clock >= end) return true
+    if (!struct.deleted) return false
+  }
+  return true
+}
+
+/**
+ * Whether `doc` contains every deletion `wanted` describes. Each range is looked up in the struct
+ * store by binary search, so a check costs about `log(structs)` per wanted range plus the structs
+ * the ranges span: it runs on every update of the module while a flush waits.
  */
 export function deleteSetCovers(doc: Y.Doc, wanted: DeleteSetEntries): boolean {
-  const have = Y.createDeleteSetFromStructStore(doc.store).clients
-  return Object.entries(wanted).every(([client, ranges]) => {
-    const items = have.get(Number(client)) ?? []
-    return ranges.every(([clock, len]) =>
-      items.some((item) => item.clock <= clock && clock + len <= item.clock + item.len),
-    )
+  return Object.entries(wanted).every(([key, ranges]) => {
+    const client = Number(key)
+    const structs = doc.store.clients.get(client)
+    if (structs == null) return ranges.every(([, len]) => len <= 0)
+    const state = Y.getState(doc.store, client)
+    return ranges.every(([clock, len]) => rangeDeleted(structs, state, clock, len))
   })
 }
 
-/** What `doc` contains, to send in a `flush`. */
-export function moduleState(doc: Y.Doc): ModuleState {
-  return { stateVector: stateVectorEntries(doc), deleteSet: deleteSetEntries(doc) }
+/**
+ * What `doc` contains of this client's own edits, to send in a `flush`: its own insertions, and
+ * `deletions` (by default every deletion in the doc, which is correct but larger).
+ */
+export function moduleState(
+  doc: Y.Doc,
+  deletions: DeleteSetEntries = deleteSetEntries(doc),
+): ModuleState {
+  return { stateVector: stateVectorEntries(doc), deleteSet: deletions }
 }
 
 /** Whether `doc` contains everything `wanted` describes: its insertions and its deletions. */

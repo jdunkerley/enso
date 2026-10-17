@@ -1,9 +1,11 @@
 /**
  * @file The client's end of the `flush` request on the ydoc control channel (`ydocControl.ts`):
  * ask the ydoc server, which holds the modules as the Language Server's client for them, to write
- * them to disk, sending what each loaded module doc contains. The server writes a module only once
- * it has those edits. With no answer (an engine without the channel, or a busy one), the client
- * waits for the engine's own auto-save instead. The GUI uses it through
+ * them to disk, sending what each loaded module doc contains of this client's own edits. The
+ * server writes a module only once it has those edits. With no answer (an engine without the
+ * channel, or a busy one), the client waits for the engine's own auto-save instead; but not while
+ * the index doc is disconnected, when the request cannot have reached the server, and the edits
+ * may not have either. The GUI uses it through
  * `app/gui/src/providers/openedProjects/project/flush.ts`.
  */
 import { YjsChannel } from 'ydoc-channel'
@@ -13,7 +15,9 @@ import {
   FLUSH_DEADLINE_MS,
   moduleState,
   parseControlMessage,
+  trackLocalDeletions,
   YDOC_CONTROL_CHANNEL,
+  type LocalDeletions,
 } from './ydocControl'
 
 /** What became of a flush. */
@@ -21,7 +25,10 @@ export type FlushOutcome =
   | { readonly kind: 'flushed' }
   /** No answer: waited {@link AUTOSAVE_FALLBACK_MS} for the engine's auto-save. */
   | { readonly kind: 'waited' }
-  /** The server refused (the file changed on disk, or is not in sync); nothing was written. */
+  /**
+   * The server refused (the file changed on disk, or is not in sync), or the index doc was not
+   * connected; nothing was written.
+   */
   | { readonly kind: 'declined'; readonly reason: string }
 
 /** By when the ydoc server answers: its own deadline ({@link FLUSH_DEADLINE_MS}), and a margin. */
@@ -33,18 +40,33 @@ export const FLUSH_TIMEOUT_MS = FLUSH_DEADLINE_MS + 2_000
  */
 export const AUTOSAVE_FALLBACK_MS = 7_000
 
+/** How the flusher learns whether its index doc is connected to the ydoc server. */
+export interface FlusherConnection {
+  /** Whether the index doc's provider is connected, and synced. */
+  readonly isConnected: () => boolean
+  /** The reason a flush gives when it is not. */
+  readonly notConnectedReason: () => string
+}
+
 /**
  * Create the flusher of a project, whose index doc is `indexDoc`. Of `moduleDocs`, only those this
- * client loaded are sent: an unloaded subdoc holds no edits of this client.
+ * client loaded are sent: an unloaded subdoc holds no edits of this client. Without `connection`
+ * the index doc is taken to be connected.
+ *
+ * The deletions of each module doc are tracked from when it is added to `indexDoc` as a subdoc, so
+ * that a flush sends only those this client made; the flusher must therefore be made before the
+ * module docs are added. A module doc it did not see added sends every deletion it contains
+ * instead, which is correct but larger.
  */
 export function createModuleFlusher(
   indexDoc: Y.Doc,
   moduleDocs: () => Iterable<Y.Doc>,
-  options: { readonly fallbackMs?: number } = {},
+  options: { readonly fallbackMs?: number; readonly connection?: FlusherConnection } = {},
 ) {
   const fallbackMs = options.fallbackMs ?? AUTOSAVE_FALLBACK_MS
   if (fallbackMs < FLUSH_TIMEOUT_MS)
     throw new Error(`The fallback (${fallbackMs} ms) is shorter than the server's answer time.`)
+  const connection = options.connection
   const control = new YjsChannel<string>(indexDoc, YDOC_CONTROL_CHANNEL)
   const pending = new Map<string, (outcome: FlushOutcome) => void>()
   control.subscribe((raw) => {
@@ -55,13 +77,38 @@ export function createModuleFlusher(
     )
   })
 
+  // Only module docs are tracked: the index doc has other subdocs (the visualizations').
+  const deletions = new Map<Y.Doc, LocalDeletions>()
+  const trackModules = (docs: ReadonlySet<Y.Doc>) => {
+    if (docs.size === 0) return
+    const modules = new Set(moduleDocs())
+    for (const doc of docs)
+      if (modules.has(doc) && !deletions.has(doc)) deletions.set(doc, trackLocalDeletions(doc))
+  }
+  const onSubdocs = ({ added, removed }: { added: Set<Y.Doc>; removed: Set<Y.Doc> }) => {
+    removed.forEach((doc) => {
+      deletions.get(doc)?.stop()
+      deletions.delete(doc)
+    })
+    trackModules(added)
+  }
+  trackModules(indexDoc.getSubdocs())
+  indexDoc.on('subdocs', onSubdocs)
+
+  const notConnected = (): FlushOutcome | undefined =>
+    connection != null && !connection.isConnected() ?
+      { kind: 'declined', reason: connection.notConnectedReason() }
+    : undefined
+
   /** Ask the ydoc server to write every loaded module, as this client has it now. */
   function flush(): Promise<FlushOutcome> {
+    const offline = notConnected()
+    if (offline != null) return Promise.resolve(offline)
     const id = crypto.randomUUID()
     const modules = Object.fromEntries(
       Array.from(moduleDocs())
         .filter((doc) => doc.shouldLoad)
-        .map((doc) => [doc.guid, moduleState(doc)]),
+        .map((doc) => [doc.guid, moduleState(doc, deletions.get(doc)?.entries())]),
     )
     return new Promise<FlushOutcome>((resolve) => {
       const finish = (outcome: FlushOutcome) => {
@@ -69,11 +116,20 @@ export function createModuleFlusher(
         pending.delete(id)
         resolve(outcome)
       }
-      const timer = setTimeout(() => finish({ kind: 'waited' }), fallbackMs)
+      // No answer: an engine without the channel, or a busy one, unless the connection dropped
+      // meanwhile, when the request (or the edits) may never have reached the server.
+      const timer = setTimeout(() => finish(notConnected() ?? { kind: 'waited' }), fallbackMs)
       pending.set(id, finish)
       control.send(encodeControlMessage({ type: 'flush', id, modules }))
     })
   }
 
-  return { flush, close: () => control.close() }
+  function close() {
+    control.close()
+    indexDoc.off('subdocs', onSubdocs)
+    deletions.forEach((tracked) => tracked.stop())
+    deletions.clear()
+  }
+
+  return { flush, close }
 }

@@ -82,6 +82,17 @@ needed because a deletion advances no clock: a last edit that only deletes is
 invisible in a state vector. Both travel as JSON, not base64: `lib0`'s base64 is
 Node- or browser-specific, and GraalJS is neither.
 
+Only the GUI's **own** edits are sent: every other client's reached the GUI
+through this server, which therefore has them. The state vector is the GUI's own
+entry (`doc.clientID`); the delete set is the deletions the GUI's own (local)
+transactions made, tracked from when the module doc was added
+(`trackLocalDeletions`). It cannot be filtered by client id instead: a delete
+set is keyed by the deleted item's _creator_, and the GUI mostly deletes items
+this server loaded from disk. The server checks the delete set against its
+struct store directly (`deleteSetCovers`: a binary search per wanted range, then
+only the structs it spans), since the check reruns on every update of the module
+while a flush waits, on the engine's ydoc thread.
+
 `LanguageServerSession.flush` answers `flushed` with `ok` or an `error` text
 (also when the flush throws). Everything is bounded by **one deadline**,
 `FLUSH_DEADLINE_MS` (4 s) from the request, the Language Server's requests
