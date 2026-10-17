@@ -1,9 +1,9 @@
 # src/cloud/versions/
 
 The right panel's **Versions** tab (#89): an asset's versions in the Enso Cloud,
-with their tags and comments, and restore, duplicate and compare; and its
-**Schedule** tab (#183): a project's scheduled executions. Vue; it lives under
-`cloud/` by decision 6b of
+or a local project's git versions, with their tags and comments, and restore,
+duplicate and compare; and its **Schedule** tab (#183): a project's scheduled
+executions. Vue; it lives under `cloud/` by decision 6b of
 `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`, and its other
 decisions are under "Rulings from #89" and "Rulings from #183" there.
 `rightPanel.ts` contributes both tabs (`registerVersionsTabs`, called by
@@ -17,6 +17,13 @@ decisions are under "Rulings from #89" and "Rulings from #183" there.
   local project that is open (or opening) closes it first, since the shim
   refuses to restore a running project, then opens it again in the background; a
   failed close restores nothing, and a failed restore still reopens it.
+- Local projects (`LocalBackend`, over the shim's `versioning/*` routes):
+  `AssetVersions.vue` gates the tab on `localVersioningStatusQueryOptions`
+  (folders and files, no git, no repository and a repository that is not enabled
+  each get a placeholder); `AssetVersion.vue`'s `hasTags` hides tags, since a
+  local version is a git commit and git tags are repository-wide ("Latest"
+  stays); `AssetVersionList.vue`'s `restoreVersion` closes, restores and reopens
+  an open project.
 - `AssetVersion.vue` — one version. Its tags collapse into "N tags" when they
   would not fit; that is measured on hidden copies of the title and one tag.
 - `VersionComment.vue`, `VersionCommentButton.vue`, `VersionTag.vue`,
@@ -54,4 +61,9 @@ decisions are under "Rulings from #89" and "Rulings from #183" there.
   registers the `preferredTimeZone` local-storage key, which `App.vue` registers
   in the app.
 - The mocked cloud API (`integration-test/mock/cloudApi.ts`) has no versions or
-  executions endpoints, so no Playwright spec covers these tabs.
+  executions endpoints, so the cloud's tabs have no Playwright spec. The local
+  Versions tab is covered by `integration-test/dashboard/localVersions.spec.ts`,
+  against the mocked `versioning/*` routes
+  (`integration-test/mock/versioning/historyRoutes.ts`).
+- Follow-up (PR 6): the tab now serves the core (the local drive) too, so it
+  should move out of `cloud/`.
