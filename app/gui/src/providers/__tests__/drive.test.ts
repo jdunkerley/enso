@@ -49,6 +49,19 @@ describe('the drive location', () => {
     expect(mountDriveLocation().currentCategory).toEqual({ type: 'local' })
   })
 
+  test.each(['cloud', 'recent', 'trash', 'team-usergroup-abc', 'team-x'])(
+    'a saved `%s` category reads as Local, and its directory is not carried over',
+    (key) => {
+      LocalStorage.getInstance().set('driveDisplay', {
+        currentCategory: key,
+        currentDirectoryId: CHILD,
+      })
+      const drive = mountDriveLocation()
+      expect(drive.currentCategory).toEqual({ type: 'local' })
+      expect(drive.currentDirectory).toBeNull()
+    },
+  )
+
   test('with nothing saved, the drive starts on Local', () => {
     expect(mountDriveLocation().currentCategory).toEqual({ type: 'local' })
   })

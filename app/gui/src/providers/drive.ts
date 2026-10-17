@@ -54,11 +54,14 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore('driv
   // version (or a team's) is not shown, since nothing lists it.
   const defaultCategory: Category = { type: 'local' }
 
+  /** The saved category, unless it is missing, unreadable or a cloud one: then there is none. */
+  const storedCategory = computed(() => {
+    const stored = categoryFromKey(storedDriveDisplay.value?.currentCategory)
+    return stored != null && !isCloudCategory(stored) ? stored : null
+  })
+
   const currentCategory = computed({
-    get: () => {
-      const stored = categoryFromKey(storedDriveDisplay.value?.currentCategory)
-      return stored != null && !isCloudCategory(stored) ? stored : defaultCategory
-    },
+    get: () => storedCategory.value ?? defaultCategory,
     set: (category) =>
       localStorage.set('driveDisplay', {
         currentCategory: categoryKey(category),
@@ -67,7 +70,9 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore('driv
   })
 
   const currentDirectory = computed({
-    get: () => storedDriveDisplay.value?.currentDirectoryId ?? null,
+    // A directory saved beside a category that fell back to Local belongs to the old category.
+    get: () =>
+      storedCategory.value != null ? (storedDriveDisplay.value?.currentDirectoryId ?? null) : null,
     set: (dir) =>
       localStorage.set('driveDisplay', {
         currentCategory: categoryKey(currentCategory.value),
