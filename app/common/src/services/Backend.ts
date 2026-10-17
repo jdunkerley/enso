@@ -66,6 +66,7 @@ type AssetTypeAndId<Id extends AssetId = AssetId> =
   | (DirectoryId extends Id ? AssetTypeAndIdRaw<AssetType.directory> : never)
   | (FileId extends Id ? AssetTypeAndIdRaw<AssetType.file> : never)
   | (ProjectId extends Id ? AssetTypeAndIdRaw<AssetType.project> : never)
+  | (DatalinkId extends Id ? AssetTypeAndIdRaw<AssetType.datalink> : never)
 
 export function extractTypeAndPath<Id extends AssetId>(id: Id): AssetTypeAndId<Id>
 /**
@@ -78,6 +79,7 @@ export function extractTypeAndPath<Id extends AssetId>(id: Id): AssetTypeAndId {
   switch (typeRaw) {
     case AssetType.directory:
     case AssetType.project:
+    case AssetType.datalink:
     case AssetType.file: {
       return {
         type: typeRaw,

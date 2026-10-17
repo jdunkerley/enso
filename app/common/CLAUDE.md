@@ -48,6 +48,10 @@ neutral ground — anything Vue-specific belongs in its own package.
   comment) call `log`, `file-at`, `restore`, `duplicate-at` and `set-comment`. A
   version id is a commit hash in the `S3ObjectVersionId` brand; only projects
   have versions; local versions have no tags.
+- **Datalinks** are `.datalink` files: the shim lists them as `DatalinkEntry`;
+  the id is `datalink-<encoded path>`, the title the name without the extension;
+  `createDatalink` with a `datalinkId` rewrites in place; download goes through
+  the file's own details.
 - The store, its files and its rules (cap, validation, following moves, git) are
   the shim's; see `app/project-manager-shim/CLAUDE.md`.
 

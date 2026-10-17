@@ -100,7 +100,14 @@ export interface Attributes {
 }
 
 /** Metadata for an arbitrary file system entry. */
-export type FileSystemEntry = DirectoryEntry | FileEntry | ProjectEntry
+export type FileSystemEntry = DirectoryEntry | FileEntry | ProjectEntry | DatalinkEntry
+
+/** Metadata for a `<name>.datalink` file. */
+export interface DatalinkEntry {
+  readonly type: 'DatalinkEntry'
+  readonly path: Path
+  readonly attributes: Attributes
+}
 
 /** Metadata for a file. */
 export interface FileEntry {
