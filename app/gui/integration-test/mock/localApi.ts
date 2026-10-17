@@ -8,6 +8,7 @@ import {
   type CloseProjectParams,
   type CreateProject,
   type CreateProjectParams,
+  type DatalinkEntry,
   type DirectoryEntry,
   type FileEntry,
   type FileSystemEntry,
@@ -99,7 +100,10 @@ type ProjectEntryWithData = {
 
 type FileEntryWithData = { type: 'FileEntry'; entry: FileEntry; content: string }
 
-type FileSystemEntryWithData = DirectoryEntryWithData | ProjectEntryWithData | FileEntryWithData
+type DatalinkEntryWithData = { type: 'DatalinkEntry'; entry: DatalinkEntry; content: string }
+
+type FileSystemEntryWithData =
+  DatalinkEntryWithData | DirectoryEntryWithData | ProjectEntryWithData | FileEntryWithData
 
 /** The return type of {@link mockLocalApi}. */
 export interface MockLocalApi extends Awaited<ReturnType<typeof mockLocalApi>> {}
@@ -274,6 +278,25 @@ export async function mockLocalApi(page: Page) {
     return { type: 'FileEntry', entry, content }
   }
 
+  const addDatalink = ({ path, value }: { path: Path; value: unknown }) => {
+    const entry: DatalinkEntry = {
+      type: 'DatalinkEntry',
+      path,
+      attributes: createAttributes(),
+    }
+    return addEntry(path, {
+      type: 'DatalinkEntry',
+      entry,
+      content: JSON.stringify(value, null, 2),
+    })
+  }
+
+  /** The parsed content of the datalink at `path`; `undefined` when there is none. */
+  const datalinkValue = (path: string): unknown => {
+    const entry = fileSystem.get(path)
+    return entry?.type === 'DatalinkEntry' ? JSON.parse(entry.content) : undefined
+  }
+
   const addFile = (options: FileEntryOptions) => {
     addEntry(options.path, createFile(options))
   }
@@ -396,7 +419,7 @@ export async function mockLocalApi(page: Page) {
       })
     })
 
-    const labelRoute = (
+    const projectServiceRoute = (
       name: string,
       handler: (params: Record<string, unknown>) => JSONRPCResponse<unknown>,
     ) =>
@@ -410,27 +433,64 @@ export async function mockLocalApi(page: Page) {
         })
       })
 
-    await labelRoute('labels/list', () => toJSONRPCResult(labels))
-    await labelRoute('labels/create', (params) => {
+    await projectServiceRoute('labels/list', () => toJSONRPCResult(labels))
+    await projectServiceRoute('labels/create', (params) => {
       const value = String(params.value)
       if (labels.some((label) => label.value === value)) {
         return toJSONRPCError(`A label named '${value}' already exists.`)
       }
       return toJSONRPCResult(addLabel(value, params.color as backend.LChColor))
     })
-    await labelRoute('labels/delete', (params) => {
+    await projectServiceRoute('labels/delete', (params) => {
       const index = labels.findIndex((label) => label.id === params.id)
       const [label] = index === -1 ? [] : labels.splice(index, 1)
       if (label != null) deletedLabelNames.add(label.value)
       return toJSONRPCResult(null)
     })
-    await labelRoute('project/set-labels', (params) => {
+    await projectServiceRoute('project/set-labels', (params) => {
       const project = fileSystem.get(String(params.path))
       if (project?.type !== 'ProjectEntry') {
         return toJSONRPCError(`No project at '${String(params.path)}'`)
       }
       const names = (params.labels as string[]).filter((name) => !deletedLabelNames.has(name))
       unsafeMutable(project.entry.metadata).labels = names.map(backend.LabelName)
+      return toJSONRPCResult(null)
+    })
+
+    const datalinkName = (path: string) => posix.basename(path)
+    await projectServiceRoute('datalink/read', ({ path }) => {
+      const entry = fileSystem.get(String(path))
+      if (entry?.type !== 'DatalinkEntry')
+        return toJSONRPCError('datalink/read failed: no such file')
+      try {
+        return toJSONRPCResult(JSON.parse(entry.content))
+      } catch (error) {
+        return toJSONRPCError(
+          `datalink/read failed: '${datalinkName(String(path))}' is not valid JSON: ${String(error)}`,
+        )
+      }
+    })
+    await projectServiceRoute('datalink/create', ({ path, value }) => {
+      if (fileSystem.has(String(path))) {
+        return toJSONRPCError(
+          `datalink/create failed: '${datalinkName(String(path))}' already exists.`,
+        )
+      }
+      addDatalink({ path: Path(String(path)), value })
+      return toJSONRPCResult(null)
+    })
+    await projectServiceRoute('datalink/update', ({ path, value }) => {
+      const entry = fileSystem.get(String(path))
+      if (entry?.type !== 'DatalinkEntry') {
+        return toJSONRPCError(
+          `datalink/update failed: '${datalinkName(String(path))}' does not exist.`,
+        )
+      }
+      entry.content = JSON.stringify(value, null, 2)
+      return toJSONRPCResult(null)
+    })
+    await projectServiceRoute('datalink/delete', ({ path }) => {
+      removeEntry(Path(String(path)))
       return toJSONRPCResult(null)
     })
 
@@ -859,6 +919,8 @@ export async function mockLocalApi(page: Page) {
     addDirectory,
     addProject,
     addFile,
+    addDatalink,
+    datalinkValue,
     removeEntry,
     addProjectSession,
     updateVisualization,
