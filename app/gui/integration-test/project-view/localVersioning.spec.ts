@@ -54,7 +54,7 @@ test.describe('with versions kept at the root, and changes', () => {
     await page.getByTestId(saveButton).click()
     const comment = page.getByRole('textbox', { name: 'Comment (optional)' })
     await expect(comment).toBeFocused()
-    await expectScreenshot(page.getByTestId('modal-dialog'), 'save-version-dialog.png')
+    await expectScreenshot(page.getByRole('dialog'), 'save-version-dialog.png')
     await comment.fill('Joined the sales table')
     await comment.press('Enter')
     await expect(page.getByTestId('toast-host')).toContainText('Version saved')
