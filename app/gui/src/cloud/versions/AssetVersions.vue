@@ -6,8 +6,9 @@
  *
  * With nothing selected, for an asset without versions (in the cloud, only projects, files and
  * datalinks have them; locally, only projects), or for a local project whose versions are not kept
- * (no git, no repository, or the repository is not enabled) it says so. The list itself (`AssetVersionList.vue`) loads in a
- * `SuspenseLoader`, and is remounted for each asset.
+ * (no git, no repository, or the repository is not enabled) it says so, and if its status cannot be
+ * read, it shows the error. The list itself (`AssetVersionList.vue`) loads in a `SuspenseLoader`,
+ * and is remounted for each asset.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'
@@ -29,6 +30,7 @@ import {
   type FileAsset,
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
+import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { computed } from 'vue'
 import AssetVersionList from './AssetVersionList.vue'
 
@@ -61,6 +63,7 @@ const localStatusQuery = useQuery(
 
 type State =
   | { readonly placeholder: string }
+  | { readonly error: string }
   | { readonly loading: true }
   | {
       readonly asset: DatalinkAsset | FileAsset | ProjectAsset
@@ -83,7 +86,12 @@ const state = computed((): State => {
     return { placeholder: getText('assetVersions.localProjectsOnly') }
   }
   const status = localStatusQuery.data.value
-  if (status == null) return { loading: true }
+  if (status == null) {
+    const error: unknown = localStatusQuery.error.value
+    return localStatusQuery.isError.value ?
+        { error: getText('assetVersions.localStatusError', getMessageOrToString(error)) }
+      : { loading: true }
+  }
   if (!status.git) return { placeholder: getText('assetVersions.localNoGit') }
   if (status.repoRoot == null) return { placeholder: getText('assetVersions.localNoRepository') }
   if (!status.enabled) return { placeholder: getText('assetVersions.localNotEnabled') }
@@ -92,7 +100,13 @@ const state = computed((): State => {
 </script>
 
 <template>
-  <Result v-if="'placeholder' in state" status="info" :centered="true" :title="state.placeholder" />
+  <Result v-if="'error' in state" status="error" :centered="true" :title="state.error" />
+  <Result
+    v-else-if="'placeholder' in state"
+    status="info"
+    :centered="true"
+    :title="state.placeholder"
+  />
   <Loader v-else-if="'loading' in state" />
   <ErrorBoundary v-else :key="state.asset.id">
     <SuspenseLoader>

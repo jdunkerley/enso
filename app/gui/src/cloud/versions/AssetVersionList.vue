@@ -68,11 +68,13 @@ const versions = computed<Version[]>(() => {
 const latestVersion = computed(() => versions.value.find((version) => version.isLatest))
 
 /**
- * Restore a version. A local project that is open (or opening) is closed first, saving its "Saved on
- * close" version, so nothing is lost; the shim refuses to restore a running project. It is then
- * restored and opened again in the background, so the drive, where Restore was chosen, stays in
- * front. If the close fails, nothing is restored and the error is shown; if the restore fails, the
- * project is still opened again, unchanged.
+ * Restore a version. A local project that is open (or opening) is closed first, saving its "Saved
+ * on close" version, so nothing is lost; the shim refuses to restore a running project. A project
+ * that is still opening has its opening aborted, but the backend open may still be in flight: then
+ * the shim refuses the restore (an error toast) and the project is opened again; the data is safe.
+ * Otherwise it is restored and opened again in the background, so the drive, where Restore was
+ * chosen, stays in front. If the close fails, nothing is restored and the error is shown; if the
+ * restore fails, the project is still opened again, unchanged.
  */
 async function restoreVersion(versionId: S3ObjectVersionId) {
   if (backend.type !== BackendType.local || item.type !== AssetType.project) {

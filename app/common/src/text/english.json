@@ -1210,6 +1210,7 @@
   "assetVersions.removeTag": "Remove tag",
   "assetVersions.localProjectsOnly": "In the local drive, only projects have versions.",
   "assetVersions.localUnavailable": "The local drive is not available.",
+  "assetVersions.localStatusError": "Versions could not be read: $0",
   "assetVersions.localNoGit": "Install git to keep versions of local projects.",
   "assetVersions.localNoRepository": "This project is not in a git repository, so it has no versions.",
   "assetVersions.localNotEnabled": "Versions are not kept in this project's git repository.",

@@ -288,6 +288,11 @@ stays staged).
 - A project at the repository root can only be restored to a version recorded at
   `.` (which, as it never follows moves, is every version it lists); a version
   from another path is refused, never restored over the whole repository.
+- `restore --worktree` can overwrite a file that is now ignored but was tracked
+  in the old version; "Saved before restore" does not capture it, as it commits
+  only tracked and unignored files.
+- The root-project history cut (`--diff-filter=A` on `package.yaml`) misses a
+  `package.yaml` added by a merge commit; the whole history is then listed.
 - At a move boundary `log` follows first parents only (`<move commit>^`): a move
   recorded in a merge commit follows its first parent.
 - If a cross-move restore fails after its `restore --worktree` step, the index

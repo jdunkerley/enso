@@ -47,8 +47,12 @@ const localBackend = vi.hoisted(() => ({
   updateAsset: vi.fn(),
   getMainFileContent: vi.fn(),
 }))
+const backends = vi.hoisted(() => ({ localAvailable: true }))
 vi.mock('$/providers/backends', () => ({
-  useBackends: () => ({ remoteBackend: backend, localBackend }),
+  useBackends: () => ({
+    remoteBackend: backend,
+    localBackend: backends.localAvailable ? localBackend : null,
+  }),
 }))
 const openedProjects = vi.hoisted(() => ({
   get: vi.fn(),
@@ -117,6 +121,7 @@ beforeEach(() => {
   portalRoot = document.createElement('div')
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
+  backends.localAvailable = true
   category.value = { type: 'cloud' }
   asset.value = project
   versions = [
@@ -262,6 +267,21 @@ describe('in a local category', () => {
     expect(backend.listAssetVersions).not.toHaveBeenCalled()
     expect(wrapper.text()).toMatch(/Version 2.*Version 1/)
     expect(wrapper.text()).toContain('Saved')
+  })
+
+  test('without a local backend, says the drive is not available', async () => {
+    backends.localAvailable = false
+    const { wrapper } = await renderTab()
+    expect(wrapper.text()).toContain('The local drive is not available.')
+  })
+
+  test('a status that cannot be read shows the error, not the loader', async () => {
+    localBackend.versioningStatus.mockRejectedValue(new Error('git exploded'))
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain('Versions could not be read: git exploded'),
+    )
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
 
   test('a folder: only projects have versions', async () => {
