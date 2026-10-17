@@ -5,7 +5,7 @@ import LATEST_GITHUB_RELEASES from './data/latestGithubReleases.json' with { typ
 
 /** Enso Cloud, its test mocks and its identity provider: a local-only IDE requests none of them. */
 export const CLOUD_URL =
-  /^https:\/\/(?:mock|mock-s3-bucket\.com|mock-cognito\.com|(?:[^/]+\.)?cloud\.enso\.org|[^/]+\.amazoncognito\.com|[^/]+\.amazonaws\.com)(?:[:/]|$)/
+  /^https:\/\/(?:mock|mock-s3-bucket\.com|mock-cognito\.com|(?:[^/]+\.)?cloud\.enso\.org|[^/]+\.amazoncognito\.com|[^/]+\.amazonaws\.com|(?:[^/]+\.)?stripe\.com)(?:[:/]|$)/
 
 /** Abort every request to {@link CLOUD_URL}, and record it as `METHOD url`. */
 export async function recordCloudRequests(page: Page): Promise<string[]> {

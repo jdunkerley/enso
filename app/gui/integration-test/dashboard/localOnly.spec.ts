@@ -3,43 +3,20 @@
  * it starts on the local drive, with no login, offers no cloud entry points, and asks Enso Cloud
  * for nothing. Every request to the cloud fails here, so one that is made also breaks the app.
  */
-import { expect, test, type Page } from 'integration-test/base'
-import { registerMocks } from 'integration-test/mock/registerMocks'
+import { expect, test } from 'integration-test/base'
 import { TEXT } from '../actions'
 import BaseActions from '../actions/BaseActions'
 
-/** The mocked Enso Cloud (`mock/cloudApi.ts`), the real one, and Cognito/Stripe. */
-const CLOUD_URL =
-  /^https:\/\/(mock\/|api\.cloud\.enso\.org\/|[^/]*(cognito|amazonaws|stripe)[^/]*\/)/
-
-// A fresh install: no saved state.
-test.use({ storageState: { cookies: [], origins: [] } })
-
-/** Fail every Enso Cloud request, and record it. */
-async function failCloudRequests(page: Page) {
-  const requests: string[] = []
-  await page.route(CLOUD_URL, async (route) => {
-    requests.push(`${route.request().method()} ${route.request().url()}`)
-    await route.abort('failed')
-  })
-  return requests
-}
-
 test('starts on the local drive with no login, and asks Enso Cloud for nothing', async ({
+  drivePage,
   page,
-  localApi,
-  appConfig,
 }) => {
-  // Only the local mock: the cloud mock is not registered, so nothing answers a cloud request.
-  const _ = { localApi }
-  await registerMocks(page, {}, { appConfig })
-  const cloudRequests = await failCloudRequests(page)
-  await page.goto('/')
+  // The suite-wide `cloudRequests` fixture fails the test on any request to Enso Cloud.
+  await drivePage
 
   const drive = page.getByTestId('drive-view')
   await expect(drive).toBeVisible()
   await expect(drive).toHaveAttribute('data-category', 'local')
-  await expect(page.getByPlaceholder(TEXT.emailPlaceholder)).toHaveCount(0)
   await expect(page.getByTestId('agreements-modal')).toHaveCount(0)
 
   const categories = page.locator('.LeftPanel .leftBar .categories')
@@ -48,8 +25,8 @@ test('starts on the local drive with no login, and asks Enso Cloud for nothing',
   }
   await expect(categories.getByRole('button', { name: 'Local', exact: true })).toBeVisible()
 
-  await expect(page.getByRole('button', { name: TEXT.newSecret })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: TEXT.newCredential })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New Secret' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'New Credential' })).toHaveCount(0)
 
   await expect(page.getByRole('tab', { name: TEXT.versions })).toBeVisible()
   for (const name of [TEXT.properties, TEXT.executionsCalendar, 'Description']) {
@@ -73,6 +50,4 @@ test('starts on the local drive with no login, and asks Enso Cloud for nothing',
     .getByRole('button', { name: TEXT.localSettingsTab, exact: true })
     .click()
   await expect(page.getByTestId('settings-panel')).toContainText(TEXT.mapsSettingsSection)
-
-  expect(cloudRequests).toEqual([])
 })
