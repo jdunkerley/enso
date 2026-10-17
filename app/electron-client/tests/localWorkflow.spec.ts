@@ -3,6 +3,7 @@ import fs from 'node:fs/promises'
 import pathModule from 'node:path'
 import { expect, type Page } from 'playwright/test'
 import {
+  answerRepositoryPrompt,
   closeWelcome,
   createNewProject,
   getNewestProject,
@@ -46,7 +47,10 @@ test('Project Duplicate', async ({ page }) => {
   // be there when the graph appears, and then the click times out (#212).
   const driveView = page.getByTestId('drive-view')
   await driveView.getByTestId('stop-project').click()
-  await expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0)
+  // The first close in the projects folder offers to keep versions with git; answer "Not now".
+  await answerRepositoryPrompt(page, () =>
+    expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0),
+  )
   // The project's play button is enabled again only once the project has finished closing.
   await expect(driveView.getByTestId('open-project')).toBeEnabled()
 

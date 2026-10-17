@@ -10,7 +10,7 @@ Give local projects a version history when the user has git installed:
 1. **Versions are commits** in a git repository at (or above) the local root
    folder. If the root is not in a repository, the IDE offers to create one.
 2. **A version is committed when a project is closed** (message "Saved on
-   close"), including when the app quits with projects open.
+   close"), but not when the app quits.
 3. **The user can save a version by hand**: Ctrl/Cmd+S saves at once with the
    comment "Saved"; Ctrl/Cmd+Shift+S or the save icon asks for a comment first.
 4. **A "changed" indicator** shows when a project differs from its last version.
@@ -30,7 +30,7 @@ Along the way, two tidy-ups:
 | Which git                      | The user's git CLI, if installed; one repository at the root folder (or the repository the root is already inside).                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | What a version contains        | Everything in the project folder except `.enso/` (the engine's caches, `suggestions.db`, the old `.vcs/`, and `project.json`) and `*.bak`.                                                                                                                                                                                                                                                                                                                                                                                                |
 | Labels                         | Moved into `package.yaml` as a `labels` list, which the engine learns to preserve.                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| When versions are committed    | On close ("Saved on close"), on app quit (each open local project is closed properly first), and by hand (Ctrl+S "Saved"; Ctrl+Shift+S or the save icon with a comment).                                                                                                                                                                                                                                                                                                                                                                  |
+| When versions are committed    | On close ("Saved on close"), and by hand (Ctrl+S "Saved"; Ctrl+Shift+S or the save icon with a comment).                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Using an existing repository   | Never without consent. A repository is versioned only once enabled, recorded per repository by the shim in `<userData>/versioning.json` (not in the user's repository or git config). `init` enables the repository it creates; PR 4 enables silently a repository rooted at or inside the projects root, and asks before using any other; a repository the user turned off stays off, even inside the root. Until enabled: close and move do nothing, `commit`, `restore` and `setComment` are refused, and reading history still works. |
 | Offering `git init`            | In context, once: the first save or close of a local project when the root is in no repository. "Create", "Not now", "Don't ask again for this folder". Also in Settings → Local.                                                                                                                                                                                                                                                                                                                                                         |
 | The changed indicator          | A dot beside the project name in the project view's top bar, a ● on its tab, and the save icon enabled only when there is something to save.                                                                                                                                                                                                                                                                                                                                                                                              |
@@ -61,9 +61,11 @@ Out of scope:
   `OpenedProject.close()` (`ensoRunner.ts`): a graceful LS shutdown (newline on
   stdin, SIGKILL after 10 s), then its **shutdown hooks**. The HTTP response
   goes out after the hooks.
-- **Quitting the app does not close local projects.** `beforeunload` in
-  `openedProjects.ts` only waits for unsynced hybrid projects (with
-  `SyncingProjectsModal.vue`); the LS processes lose their stdin.
+- **Quitting the app does not close local projects**, and stays so:
+  `beforeunload` in `openedProjects.ts` only waits for unsynced hybrid projects
+  (with `SyncingProjectsModal.vue`); the LS processes lose their stdin. Versions
+  are saved when a project is closed or saved; quitting the app saves none
+  (decided by the user).
 - **Opening a project rewrites `.enso/project.json`** (`lastOpened`), and moving
   nodes rewrites `Main.enso`'s metadata block. The first is why `.enso/` is
   ignored; the second is accepted: a layout change counts as a change.
@@ -205,10 +207,12 @@ after the project's files change through the drive. Nothing is shown when
 
 ### Saving
 
-- **Flush first.** Before `commit`, the GUI asks the Language Server to write
-  each open module (`text/save` with the buffer's current version, through the
-  project's existing LS connection), so a save does not wait for the 6 s
-  autosave.
+- **Flush first.** The ydoc server, the Language Server's client for the
+  modules, writes them (`text/save`) when the GUI asks over the index doc's
+  `ydoc:control` channel. The request carries each loaded module doc's state
+  vector and delete set, so a module is written only once the GUI's last edit
+  has reached it. A refusal (changed on disk) is a failure; without an answer
+  the GUI waits for the 6 s auto-save.
 - **Ctrl/Cmd+S** (`graph.saveVersion`) commits "Saved". **Ctrl/Cmd+Shift+S**
   (`graph.saveVersionWithComment`) and the save icon open a small dialog with an
   optional comment; Enter saves, an empty comment saves "Saved". Both are
@@ -245,17 +249,14 @@ title in `TabBar.vue`, while `changed` is true. Both have accessible names
 
 ### Quitting
 
-`beforeunload` (`openedProjects.ts`) also holds the quit while any local project
-is open and in a repository: it closes each one properly (so each commits "Saved
-on close") behind a "Saving versions…" dialog modelled on
-`SyncingProjectsModal.vue`, then closes the window. A project that fails to
-close within the shim's own timeout does not block the quit.
+Quitting the app saves no version. Only closing a project (or saving it) does;
+the quit is left exactly as it was.
 
 ### Errors
 
-A failed save shows a toast with git's message. A failed commit on close or quit
-is a warning toast at most. `blocked` greys out the save icon with git's message
-as its tooltip.
+A failed save shows a toast with git's message. A failed commit on close is a
+warning toast at most. `blocked` greys out the save icon with git's message as
+its tooltip.
 
 Feature PR: a changelog entry, screenshots, and the user's installer test before
 it merges.

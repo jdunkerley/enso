@@ -79,7 +79,10 @@ test('settings open on the offline user, and ask nothing of the cloud', async ({
 
   // The other personal tabs work as ever.
   await sidebarTab(page, TEXT.localSettingsTab).click()
-  await expect(sectionHeadings(page)).toHaveText([TEXT.localSettingsSection])
+  await expect(sectionHeadings(page)).toHaveText([
+    TEXT.localSettingsSection,
+    TEXT.localVersionsSettingsSection,
+  ])
   await expect(
     settingsPanel(page).getByRole('textbox', { name: TEXT.localRootPathSettingsInput }),
   ).toBeVisible()

@@ -6,6 +6,7 @@ import {
 } from '@/components/GraphEditor/widgets/WidgetFunction/consts'
 import * as Ast from '@/util/ast/abstract'
 import type { QualifiedName } from '@/util/qualifiedName'
+import { YjsChannel } from 'ydoc-channel'
 import { ErrorCode } from 'ydoc-shared/languageServer'
 import type {
   ContextId,
@@ -20,6 +21,11 @@ import {
   Visualizations,
   type VisRequestPreprocessor,
 } from 'ydoc-shared/visualizations'
+import {
+  YDOC_CONTROL_CHANNEL,
+  encodeControlMessage,
+  parseControlMessage,
+} from 'ydoc-shared/ydocControl'
 import { VISUALIZATIONS_SUBDOC_KEY } from 'ydoc-shared/yjsModel'
 import { Doc, Map as YMap } from 'yjs'
 import mockDb from './data/mockSuggestions.json' with { type: 'json' }
@@ -665,6 +671,13 @@ export const mockYdocProvider = (room: string, doc: Doc) => {
     // vis room when that second connection arrives.
     const visContainer = doc.getMap<Doc>('visualizations')
     visContainer.set(VISUALIZATIONS_SUBDOC_KEY, new Doc({ guid: MOCK_VIS_SUBDOC_GUID }))
+    // The ydoc server's control channel (`ydoc-shared/ydocControl`): every flush succeeds.
+    const control = new YjsChannel<string>(doc, YDOC_CONTROL_CHANNEL)
+    control.subscribe((raw) => {
+      const message = parseControlMessage(raw)
+      if (message?.type === 'flush')
+        control.send(encodeControlMessage({ type: 'flushed', id: message.id, ok: true }))
+    })
   } else if (room === MOCK_VIS_SUBDOC_GUID) {
     const vis = new Visualizations(doc)
     // Retained for the lifetime of the mock process. Playwright page teardown

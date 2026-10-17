@@ -18,3 +18,17 @@ describe('components.tidyUp action', () => {
     expect(shortcut?.key).toBe('L')
   })
 })
+
+describe('saving actions', () => {
+  test('are registered with the save icon, their names and Mod+S / Mod+Shift+S', () => {
+    const actions = withSetup(() => initializeActions())
+    const save = actions['graph.saveVersion']
+    const withComment = actions['graph.saveVersionWithComment']
+    expect(save.icon).toBe('save')
+    expect(save.description).toBe('Save Version')
+    expect(toValue(save.shortcut)?.key).toBe('S')
+    expect(toValue(save.shortcut)?.modifiers).toEqual(['Mod'])
+    expect(withComment.description).toBe('Save Version with Comment')
+    expect(toValue(withComment.shortcut)?.modifiers).toEqual(['Mod', 'Shift'])
+  })
+})

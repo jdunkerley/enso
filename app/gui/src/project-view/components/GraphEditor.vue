@@ -14,7 +14,9 @@ import type { RequiredImport } from '$/providers/openedProjects/module/imports'
 import { provideNodeExecution } from '$/providers/openedProjects/project/nodeExecution'
 import type { SuggestionId, Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
+import { useLocalVersioning } from '$/providers/localVersioning'
 import { useRightPanelData } from '$/providers/rightPanel'
+import { useText } from '$/providers/text'
 import { graphBindings } from '@/bindings'
 import BottomPanel from '@/components/BottomPanel.vue'
 import CodeEditor from '@/components/CodeEditor.vue'
@@ -234,6 +236,18 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 const showCodeEditor = ref(false)
 const graphTidy = useGraphTidy(graphStore, module)
 
+const localVersioning = useLocalVersioning()
+const { getText } = useText()
+
+// The last known `git`, so that the save icon stays (disabled) while a status read fails.
+const savingAvailable = () =>
+  projectInfo.value.mode === 'local' && localVersioning.hasGit(assetId.value)
+/** Git's message while the repository is blocked; otherwise the action's own description. */
+const blockedDescription = () => {
+  const blocked = localVersioning.statusOf(assetId.value)?.blocked
+  return blocked != null ? getText('versioningBlocked', blocked) : undefined
+}
+
 const actionHandlers = registerHandlers({
   'graphEditor.showHelp': {
     action: () => rightPanel.toggleTab('help'),
@@ -269,6 +283,18 @@ const actionHandlers = registerHandlers({
   'graph.redo': {
     enabled: () => module.value.undoManager.canRedo,
     action: () => module.value.undoManager.redo(),
+  },
+  'graph.saveVersion': {
+    available: savingAvailable,
+    enabled: () => localVersioning.canSave(assetId.value),
+    description: blockedDescription,
+    action: () => void localVersioning.save(assetId.value),
+  },
+  'graph.saveVersionWithComment': {
+    available: savingAvailable,
+    enabled: () => localVersioning.canSave(assetId.value),
+    description: blockedDescription,
+    action: () => localVersioning.askToSave(assetId.value),
   },
   'graph.fitAll': {
     action: zoomToSelected,

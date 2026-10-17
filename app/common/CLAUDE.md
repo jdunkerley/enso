@@ -39,7 +39,11 @@ neutral ground — anything Vue-specific belongs in its own package.
   `ProjectManager` methods (`versioningStatus`, `initVersioning`,
   `commitVersion`, `listVersions`, `versionFileContent`, `restoreVersion`,
   `duplicateVersion`, `setVersionComment`) call the shim's `versioning/*`
-  endpoints, which wrap `LocalVersioning` (git-based snapshots).
+  endpoints, which wrap `LocalVersioning` (git-based snapshots). PR 4 adds the
+  writes the saving GUI uses (`initVersioning`, `enableVersioning`,
+  `disableVersioning`, `enableVersioningIfInside`, `commitVersion`) and
+  `closeProjectReportingVersioning`, whose `versioningWarning` the GUI shows as
+  a warning toast.
 - The store, its files and its rules (cap, validation, following moves, git) are
   the shim's; see `app/project-manager-shim/CLAUDE.md`.
 

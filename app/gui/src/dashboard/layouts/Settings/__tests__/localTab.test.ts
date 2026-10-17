@@ -3,6 +3,7 @@
  * category reads (`useLocalPaths`), so a change shows there at once (#182): by editing the path, by
  * browsing for a folder, and by resetting it to the default.
  */
+import { doesSettingsEntryMatch, settingsQueryMatcher } from '$/configurations/settings'
 import { localPathsStore, useLocalPaths } from '$/providers/localDirectories'
 import type * as QueryParamsModule from '$/providers/queryParams'
 import { useText } from '$/providers/text'
@@ -20,6 +21,23 @@ import { required } from './dom'
 const USER = { name: 'user name', email: 'user@example.com', plan: Plan.solo } as User
 const DEFAULT_ROOT = Path('/projects')
 const DEFAULT_DOWNLOADS = Path('/downloads')
+
+const versioning = vi.hoisted(() => ({
+  status: {
+    git: true,
+    repoRoot: null as string | null,
+    enabled: false,
+    optedOut: false,
+    changed: false,
+    blocked: null,
+    lastVersion: null,
+  },
+  versioningStatus: vi.fn<(path: string) => Promise<unknown>>(),
+  initVersioning: vi.fn<(path: string) => Promise<{ repoRoot: string }>>(),
+  enableVersioning: vi.fn<(path: string) => Promise<void>>(),
+  disableVersioning: vi.fn<(path: string) => Promise<void>>(),
+  resetPrompts: vi.fn(),
+}))
 
 vi.mock('$/providers/auth', () => ({
   useAuth: () => ({
@@ -42,10 +60,20 @@ vi.mock('$/providers/backends', async () => {
     useBackends: () =>
       mockBackends({
         remoteBackend: { getOrganization: vi.fn(() => Promise.resolve(null)) },
-        localBackend: { rootPath: () => Path('/projects') },
+        localBackend: {
+          rootPath: () => Path('/projects'),
+          versioningStatus: (path: Path) => versioning.versioningStatus(path),
+          initVersioning: (path: Path) => versioning.initVersioning(path),
+          enableVersioning: (path: Path) => versioning.enableVersioning(path),
+          disableVersioning: (path: Path) => versioning.disableVersioning(path),
+        },
       }),
   }
 })
+
+vi.mock('$/providers/localVersioning', () => ({
+  useLocalVersioning: () => ({ resetPrompts: versioning.resetPrompts }),
+}))
 
 const { getText } = useText()
 const openFileBrowser = vi.fn<() => Promise<string[]>>()
@@ -167,5 +195,119 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(shownPaths()).toBe(`${DEFAULT_ROOT}|${DEFAULT_DOWNLOADS}`)
     expect(input('downloadDirectorySettingsInput').value).toBe(DEFAULT_DOWNLOADS)
+  })
+})
+
+/** The Versions section's text. */
+const versionsSection = () =>
+  required(document.querySelector('[data-testid="local-versions-section"]')).textContent
+
+describe('the Versions section', () => {
+  beforeEach(() => {
+    versioning.status = {
+      git: true,
+      repoRoot: null,
+      enabled: false,
+      optedOut: false,
+      changed: false,
+      blocked: null,
+      lastVersion: null,
+    }
+    versioning.versioningStatus
+      .mockReset()
+      .mockImplementation(() => Promise.resolve({ ...versioning.status }))
+    versioning.initVersioning.mockReset().mockImplementation(() => {
+      versioning.status = { ...versioning.status, repoRoot: '/projects', enabled: true }
+      return Promise.resolve({ repoRoot: '/projects' })
+    })
+    versioning.enableVersioning.mockReset().mockImplementation(() => {
+      versioning.status = { ...versioning.status, enabled: true, optedOut: false }
+      return Promise.resolve()
+    })
+    versioning.disableVersioning.mockReset().mockImplementation(() => {
+      versioning.status = { ...versioning.status, enabled: false, optedOut: true }
+      return Promise.resolve()
+    })
+    versioning.resetPrompts.mockReset()
+  })
+
+  test('without a repository, Create makes one at the root', async () => {
+    await openLocalTab()
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('Your projects are not in a git repository.'),
+    )
+    await userEvent.setup().click(button('Create repository'))
+    expect(versioning.initVersioning).toHaveBeenCalledWith('/projects')
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('Versions are kept in the git repository at /projects.'),
+    )
+  })
+
+  test('Stop turns versions off, and Use turns them on again', async () => {
+    versioning.status = { ...versioning.status, repoRoot: '/projects', enabled: true }
+    await openLocalTab()
+    const user = userEvent.setup()
+    await vi.waitFor(() => button('Stop keeping versions'))
+    await user.click(button('Stop keeping versions'))
+    expect(versioning.disableVersioning).toHaveBeenCalledWith('/projects')
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain(
+        'Versions are turned off for the git repository at /projects.',
+      ),
+    )
+    await user.click(button('Use this repository'))
+    expect(versioning.enableVersioning).toHaveBeenCalledWith('/projects')
+  })
+
+  test('an existing repository that is not used offers Use', async () => {
+    versioning.status = { ...versioning.status, repoRoot: '/home' }
+    await openLocalTab()
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain(
+        'Your projects are in the git repository at /home, but versions are not kept there.',
+      ),
+    )
+    await userEvent.setup().click(button('Use this repository'))
+    expect(versioning.enableVersioning).toHaveBeenCalledWith('/home')
+  })
+
+  test('without git it says so, and offers no button', async () => {
+    versioning.status = { ...versioning.status, git: false }
+    await openLocalTab()
+    await vi.waitFor(() => expect(versionsSection()).toContain('Git was not found.'))
+    expect(document.querySelector('[data-testid="local-versions-section"] button')).toBeNull()
+  })
+
+  test('while the status is read it says so', async () => {
+    let answer!: (value: unknown) => void
+    versioning.versioningStatus.mockReset().mockReturnValueOnce(new Promise((r) => (answer = r)))
+    await openLocalTab()
+    await vi.waitFor(() => expect(versionsSection()).toContain('Reading the versions status'))
+    answer({ ...versioning.status })
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('Your projects are not in a git repository.'),
+    )
+  })
+
+  test('a failed read says why, and offers no button', async () => {
+    versioning.versioningStatus.mockReset().mockRejectedValue(new Error('git timed out'))
+    await openLocalTab()
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('The versions status could not be read: git timed out'),
+    )
+    expect(document.querySelector('[data-testid="local-versions-section"] button')).toBeNull()
+  })
+
+  test(`Ask again resets the "Don't ask again" answers`, async () => {
+    await openLocalTab()
+    await vi.waitFor(() => button('Ask again'))
+    await userEvent.setup().click(button('Ask again'))
+    expect(versioning.resetPrompts).toHaveBeenCalledOnce()
+  })
+
+  test('the settings search finds the section by "git" and "repository"', () => {
+    const entry = { type: 'custom', aliasesId: 'localVersionsSettingsCustomEntryAliases' } as const
+    expect(doesSettingsEntryMatch(entry, settingsQueryMatcher('git'), getText)).toBe(true)
+    expect(doesSettingsEntryMatch(entry, settingsQueryMatcher('repository'), getText)).toBe(true)
   })
 })

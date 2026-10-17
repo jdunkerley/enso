@@ -52,6 +52,7 @@ export function createOpenedProjectsStore() {
   const projects = shallowReactive(new Map<ProjectId, Project>())
 
   const projectStates = useProjectStates()
+  /** Whether the unsynced hybrid projects are being uploaded as the app exits. */
   const closingOnAppExit = ref(false)
   const projectReadyCallbacks: ((project: Project) => void)[] = []
 
@@ -107,6 +108,7 @@ export function createOpenedProjectsStore() {
   function closeProject(
     id: ProjectId,
     backendProject?: { asset: ProjectAsset; backendType: BackendType },
+    { offer = true }: { offer?: boolean } = {},
   ) {
     const project = projects.get(id)
     if (project == null) {
@@ -118,12 +120,16 @@ export function createOpenedProjectsStore() {
 
       return
     }
-    performProcess(project, 'closing')
+    if (!offer) closingWithoutOffer.add(id)
+    void performProcess(project, 'closing').finally(() => closingWithoutOffer.delete(id))
   }
+
+  /** Projects being closed without the repository question (see {@link closeAllProjects}). */
+  const closingWithoutOffer = new Set<ProjectId>()
 
   /** Close all projects run by this app instance. */
   function closeAllProjects() {
-    for (const id of projects.keys()) closeProject(id)
+    for (const id of projects.keys()) closeProject(id, undefined, { offer: false })
   }
 
   /** Rename a running project. */
@@ -217,7 +223,9 @@ export function createOpenedProjectsStore() {
           return projectStates.closeHybridProject(state)
         case 'opened':
         case 'initialized':
-          return projectStates.closeProject(state)
+          return projectStates.closeProject(state, {
+            offer: !closingWithoutOffer.has(state.info.id),
+          })
         case 'hybrid-closed':
           return projectStates.uploadHybridProjectOnClose(state)
         case 'hybrid-uploaded':

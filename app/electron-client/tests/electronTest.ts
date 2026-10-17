@@ -209,7 +209,30 @@ export async function closeWelcome(page: Page) {
   ])
   if (await welcomeProjectTab.isVisible()) {
     await welcomeProjectTab.locator('.CloseButton').click()
+    await answerRepositoryPrompt(page, () =>
+      expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
+    )
   }
+}
+
+/**
+ * Closing a local project may first ask "Keep versions of your projects with git?" (the first save
+ * or close in a folder that is not a repository, when git is installed), and the close waits for the
+ * answer. Call this right after triggering a close: it waits for either the prompt or the
+ * `closed` condition, answers the prompt with "Not now" if it appeared, and then waits for `closed`.
+ * Returns whether the prompt appeared.
+ */
+export async function answerRepositoryPrompt(
+  page: Page,
+  closed: () => Promise<unknown>,
+): Promise<boolean> {
+  const prompt = page.getByTestId('repository-prompt')
+  // Whichever comes first; a failure of `closed` is reported by the final wait below.
+  await Promise.race([prompt.waitFor({ state: 'visible' }), closed().catch(() => {})])
+  const appeared = await prompt.isVisible()
+  if (appeared) await prompt.getByTestId('alert-dialog-cancel').click()
+  await closed()
+  return appeared
 }
 
 /**
