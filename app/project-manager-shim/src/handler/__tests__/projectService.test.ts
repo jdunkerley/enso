@@ -362,3 +362,17 @@ describe('datalink route paths', () => {
     expect(await fs.readdir(root)).not.toContain('Web.datalink')
   })
 })
+
+describe('datalink routes with forward-slash paths', () => {
+  // `ProjectManager.listDirectory` gives every Windows path forward slashes (`C:/Users/x.datalink`);
+  // on POSIX hosts this is the unchanged path.
+  test('create, read and update accept the GUI path form', async () => {
+    const file = path.join(root, 'Slash.datalink').replace(/\\/g, '/')
+    const created = await call('datalink/create', { path: file, value: { type: 'S3' } })
+    expect(created.error).toBeUndefined()
+    expect((await call('datalink/read', { path: file })).result).toEqual({ type: 'S3' })
+    const updated = await call('datalink/update', { path: file, value: { type: 'HTTP' } })
+    expect(updated.error).toBeUndefined()
+    expect((await call('datalink/read', { path: file })).result).toEqual({ type: 'HTTP' })
+  })
+})

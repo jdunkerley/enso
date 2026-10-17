@@ -68,18 +68,35 @@ export async function writeJsonExclusive(filePath: string, value: unknown): Prom
     path.dirname(filePath),
     `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomUUID()}`,
   )
-  await fs.writeFile(temporaryPath, text)
   try {
-    await fs.link(temporaryPath, filePath)
-  } catch (error) {
-    if (NO_HARD_LINK_CODES.has(errorCode(error) ?? '')) {
-      await fs.writeFile(filePath, text, { flag: 'wx' })
-    } else {
-      throw error
+    await fs.writeFile(temporaryPath, text)
+    try {
+      await fs.link(temporaryPath, filePath)
+    } catch (error) {
+      if (!NO_HARD_LINK_CODES.has(errorCode(error) ?? '')) throw error
+      await writeFileExclusively(filePath, text)
     }
   } finally {
     await fs.rm(temporaryPath, { force: true })
   }
+}
+
+/**
+ * Create `filePath` with `text`, failing with `EEXIST` if anything is there; a write that fails
+ * part way removes the partial file. Unlike the hard-link path this is not atomic: a crash (not an
+ * error) mid-write leaves a truncated file that readers can see.
+ */
+async function writeFileExclusively(filePath: string, text: string): Promise<void> {
+  const handle = await fs.open(filePath, 'wx')
+  try {
+    await handle.writeFile(text)
+    await handle.sync()
+  } catch (error) {
+    await handle.close().catch(() => {})
+    await fs.rm(filePath, { force: true })
+    throw error
+  }
+  await handle.close()
 }
 
 /**

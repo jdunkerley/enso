@@ -22,18 +22,33 @@ export function isDatalinkPath(filePath: string): boolean {
   return name.length > DATALINK_EXTENSION.length && name.endsWith(DATALINK_EXTENSION)
 }
 
+/** The part of `pathModule`'s syntax this rule depends on: Windows or POSIX. */
+type PathModule = Pick<typeof path, 'isAbsolute' | 'parse' | 'basename' | 'sep'>
+
 /**
- * Refuse anything but an absolute, normalised path (so no `.` or `..` segments) to a `.datalink`
- * file. Datalinks live in any folder the user picks, so there is no root to confine them to.
+ * Whether `filePath` is an absolute path to a `.datalink` file with no `.` or `..` segment and no
+ * empty interior segment (`a//b`). Either separator is accepted on Windows, as the GUI sends
+ * forward-slash paths; a rooted path without a drive letter or UNC share (`\\a\\x.datalink`)
+ * is not absolute there. Datalinks live in any folder the user picks, so there is no root to
+ * confine them to. `pathModule` is a parameter so the Windows rules can be tested anywhere.
  */
+export function isAcceptableDatalinkPath(filePath: string, pathModule: PathModule = path): boolean {
+  const windows = pathModule.sep === '\\'
+  if (!pathModule.isAbsolute(filePath)) return false
+  const { root } = pathModule.parse(filePath)
+  if (windows && !/^(?:[A-Za-z]:[\\/]|[\\/]{2}[^\\/]+[\\/]+[^\\/]+)/.test(root)) return false
+  const segments = filePath.slice(root.length).split(windows ? /[\\/]/ : '/')
+  if (segments.some((segment) => segment === '' || segment === '.' || segment === '..')) {
+    return false
+  }
+  const name = pathModule.basename(filePath)
+  return name.length > DATALINK_EXTENSION.length && name.endsWith(DATALINK_EXTENSION)
+}
+
 function requireDatalinkPath(filePath: string): void {
-  if (
-    !path.isAbsolute(filePath) ||
-    path.normalize(filePath) !== filePath ||
-    !isDatalinkPath(filePath)
-  ) {
+  if (!isAcceptableDatalinkPath(filePath)) {
     throw new Error(
-      `'${filePath}' is not a normalised absolute path to a '${DATALINK_EXTENSION}' file.`,
+      `'${filePath}' is not an absolute path to a '${DATALINK_EXTENSION}' file without '.' or '..' segments.`,
     )
   }
 }
@@ -109,7 +124,8 @@ export async function updateDatalink(filePath: string, value: unknown): Promise<
     if (!(await statOrNull(filePath))?.isFile()) {
       throw new Error(`'${path.basename(filePath)}' does not exist.`)
     }
-    await writeJsonAtomic(filePath, value)
+    // Write through a symlink rather than replacing it with a regular file.
+    await writeJsonAtomic(await fs.realpath(filePath), value)
   })
 }
 

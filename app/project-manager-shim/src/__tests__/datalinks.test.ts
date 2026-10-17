@@ -90,9 +90,7 @@ describe('datalink files', () => {
 
   test('every operation refuses a path that is not an absolute .datalink path', async () => {
     for (const bad of [path.join(root, 'x.json'), 'Sales.datalink']) {
-      await expect(readDatalink(bad)).rejects.toThrow(
-        /is not a normalised absolute path to a '\.datalink'/,
-      )
+      await expect(readDatalink(bad)).rejects.toThrow(/is not an absolute path to a '\.datalink'/)
       await expect(createDatalink(bad, S3)).rejects.toThrow(/'\.datalink'/)
       await expect(deleteDatalink(bad)).rejects.toThrow(/'\.datalink'/)
     }
@@ -104,10 +102,10 @@ describe('datalink path confinement', () => {
     const sneaky = `${root}${path.sep}sub${path.sep}..${path.sep}Sales.datalink`
     expect(path.normalize(sneaky)).not.toBe(sneaky)
     await createDatalink(file, S3)
-    await expect(readDatalink(sneaky)).rejects.toThrow(/normalised absolute path/)
-    await expect(createDatalink(sneaky, S3)).rejects.toThrow(/normalised absolute path/)
-    await expect(updateDatalink(sneaky, S3)).rejects.toThrow(/normalised absolute path/)
-    await expect(deleteDatalink(sneaky)).rejects.toThrow(/normalised absolute path/)
+    await expect(readDatalink(sneaky)).rejects.toThrow(/absolute path to a/)
+    await expect(createDatalink(sneaky, S3)).rejects.toThrow(/absolute path to a/)
+    await expect(updateDatalink(sneaky, S3)).rejects.toThrow(/absolute path to a/)
+    await expect(deleteDatalink(sneaky)).rejects.toThrow(/absolute path to a/)
     await expect(fs.stat(file)).resolves.toBeDefined()
   })
 
