@@ -1,9 +1,12 @@
 /** @file `LocalBackend`'s version methods (the right panel's Versions tab) over the shim. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { EmailAddress, S3ObjectVersionId, type AnyAsset } from '../Backend'
-import { newDirectoryId, newProjectId } from '../LocalBackend'
+import { EmailAddress, S3ObjectVersionId } from '../Backend'
+import { newDirectoryId, newProjectId, type LocalBackend } from '../LocalBackend'
 import { Path, UUID, type VersionEntry } from '../ProjectManager/types'
 import { makeLocalBackend } from './localBackendTestUtils'
+
+/** What the `getAssetDetails` stubs return: only the fields `copyAsset` reads. */
+type Details = NonNullable<Awaited<ReturnType<LocalBackend['getAssetDetails']>>>
 
 const PROJECT = Path('/root/P')
 const ID = 'a'.repeat(40)
@@ -75,11 +78,9 @@ describe('LocalBackend versions', () => {
   it('copyAsset with a version duplicates it into the same folder, under the project’s title', async () => {
     const { projectManager, localBackend } = makeLocalBackend()
     vi.spyOn(projectManager, 'duplicateVersion').mockResolvedValue(DUPLICATE)
-    const asset = (id: string, title: string) => ({ id, title }) as unknown as AnyAsset
+    const details = (id: string, title: string) => ({ id, title }) as Details
     vi.spyOn(localBackend, 'getAssetDetails').mockImplementation(async (assetId) =>
-      assetId === newProjectId(PROJECT) ?
-        (asset(assetId, 'P') as never)
-      : (asset(assetId, 'P (2)') as never),
+      assetId === newProjectId(PROJECT) ? details(assetId, 'P') : details(assetId, 'P (2)'),
     )
     const { asset: copy } = await localBackend.copyAsset(
       newProjectId(PROJECT),
@@ -125,5 +126,63 @@ describe('LocalBackend versions', () => {
         'P',
       ),
     ).rejects.toThrow('Local versions have no tags.')
+  })
+
+  it('maps a non-latest entry with isLatest false', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    vi.spyOn(projectManager, 'listVersions').mockResolvedValue({
+      versions: [{ ...ENTRY, isLatest: false }],
+    })
+    const { versions } = await localBackend.listAssetVersions(newProjectId(PROJECT))
+    expect(versions[0]?.isLatest).toBe(false)
+  })
+
+  it('restoreAsset rejects a non-project', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    const restore = vi.spyOn(projectManager, 'restoreVersion')
+    await expect(
+      localBackend.restoreAsset(newDirectoryId(Path('/root/d')), S3ObjectVersionId(ID)),
+    ).rejects.toThrow('Only projects have versions on the Local Backend.')
+    expect(restore).not.toHaveBeenCalled()
+  })
+
+  it('copyAsset rejects a non-project, even with a version', async () => {
+    const { localBackend } = makeLocalBackend()
+    await expect(
+      localBackend.copyAsset(
+        newDirectoryId(Path('/root/d')),
+        newDirectoryId(Path('/root')),
+        S3ObjectVersionId(ID),
+      ),
+    ).rejects.toThrow('Only projects can be copied on the Local Backend.')
+  })
+
+  it('copyAsset with a version throws when the project’s details are missing', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    const duplicate = vi.spyOn(projectManager, 'duplicateVersion')
+    vi.spyOn(localBackend, 'getAssetDetails').mockResolvedValue(null)
+    await expect(
+      localBackend.copyAsset(
+        newProjectId(PROJECT),
+        newDirectoryId(Path('/root')),
+        S3ObjectVersionId(ID),
+      ),
+    ).rejects.toThrow('Could not retrieve details of the project.')
+    expect(duplicate).not.toHaveBeenCalled()
+  })
+
+  it('copyAsset with a version throws when the copy’s details are missing', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    vi.spyOn(projectManager, 'duplicateVersion').mockResolvedValue(DUPLICATE)
+    vi.spyOn(localBackend, 'getAssetDetails')
+      .mockResolvedValueOnce({ id: newProjectId(PROJECT), title: 'P' } as Details)
+      .mockResolvedValueOnce(null)
+    await expect(
+      localBackend.copyAsset(
+        newProjectId(PROJECT),
+        newDirectoryId(Path('/root')),
+        S3ObjectVersionId(ID),
+      ),
+    ).rejects.toThrow('Could not retrieve details of duplicated project.')
   })
 })

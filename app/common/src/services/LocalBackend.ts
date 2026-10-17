@@ -560,7 +560,7 @@ export class LocalBackend extends backend.Backend {
         packageName: project.projectNormalizedName,
         organizationId: backend.OrganizationId('organization-'),
         state: { type: backend.ProjectState.closed, volumeId: '' },
-        ensoPath: backend.EnsoPath(`${project.projectPath}`),
+        ensoPath: backend.EnsoPath(normalizePath(project.projectPath)),
       }
     }
     const project = await this.projectManager.duplicateProject({ projectPath: path })
@@ -757,6 +757,8 @@ export class LocalBackend extends backend.Backend {
   /**
    * Change the parent directory of an asset.
    * Changing the description is NOT supported.
+   * With `body.versionId`, sets or clears that local version's comment instead.
+   * `_title` is unused locally; the abstract signature passes it.
    */
   override async updateAsset(
     assetId: backend.AssetId,
