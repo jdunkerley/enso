@@ -357,7 +357,7 @@ describe('in a local category', () => {
     const user = await openMenu(1)
     await choose(user, 'Restore')
     await vi.waitFor(() => expect(order).toEqual(['close', 'closed', 'restore', 'open']))
-    expect(openedProjects.closeProject).toHaveBeenCalledWith(LOCAL_PROJECT.id)
+    expect(openedProjects.closeProject).toHaveBeenCalledWith(LOCAL_PROJECT.id, undefined, { offer: false })
     expect(localBackend.restoreAsset).toHaveBeenCalledWith(
       LOCAL_PROJECT.id,
       localVersions[1]!.versionId,

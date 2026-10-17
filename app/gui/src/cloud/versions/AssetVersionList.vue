@@ -89,7 +89,7 @@ async function restoreVersion(versionId: S3ObjectVersionId) {
     await backend.restoreAsset(item.id, versionId)
     return
   }
-  openedProjects.closeProject(item.id)
+  openedProjects.closeProject(item.id, undefined, { offer: false })
   await openedProjects.waitForProcess(opened)
   if (opened.error != null) {
     throw opened.error instanceof ResultError ? new Error(opened.error.message('')) : opened.error
