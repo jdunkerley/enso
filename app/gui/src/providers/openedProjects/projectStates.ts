@@ -544,9 +544,14 @@ export function useProjectStates() {
     }
   }
 
-  /** Close opened project. A local one may first be offered a repository (`localVersioning`). */
+  /**
+   * Close opened project. A local one is first offered a repository (`localVersioning`), unless
+   * `offer` is false (sign-out closes every project without asking). Neither the question nor the
+   * close commit's warning can stop the close.
+   */
   async function closeProject(
     project: Opened | Initialized,
+    { offer = true }: { offer?: boolean } = {},
   ): Promise<Result<NotOpened | HybridLocallyClosed>> {
     switch (project.info.mode) {
       case 'local': {
@@ -555,14 +560,24 @@ export function useProjectStates() {
           return Err('Cannot close local project: no local backend')
         }
         // The question needs the project to be watched, and stopping the scope unwatches it.
-        await localVersioning.offerRepository(project.info.id, 'close')
+        if (offer) {
+          try {
+            await localVersioning.offerRepository(project.info.id, 'close')
+          } catch (error) {
+            console.error('Could not offer a repository before closing the project:', error)
+          }
+        }
         project.scope.stop()
         const { versioningWarning } = await closeLocalProject.mutateAsync([
           project.info.id,
           project.info.title,
         ])
         if (versioningWarning != null) {
-          localVersioning.showCloseWarning(project.info.title, versioningWarning)
+          try {
+            localVersioning.showCloseWarning(project.info.title, versioningWarning)
+          } catch (error) {
+            console.error('Could not show the close commit warning:', error)
+          }
         }
         return Ok({
           status: 'not-opened',
