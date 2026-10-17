@@ -78,4 +78,20 @@ describe('the map visualization', () => {
     expect(MapMock.mock.instances[1].remove).toHaveBeenCalledTimes(1)
     expect(MapMock).toHaveBeenCalledTimes(2)
   })
+
+  test('logs map errors with the token redacted', async () => {
+    mapboxSettingsStore.setState({ accessToken: 'pk.secret' })
+    await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
+    const onError = (MapMock.mock.instances[0].on as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([name]) => name === 'error',
+    )?.[1]
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    onError({
+      error: new Error(
+        'AJAXError: Forbidden (403): https://api.mapbox.com/s?access_token=pk.secret',
+      ),
+    })
+    expect(JSON.stringify(log.mock.calls)).not.toContain('pk.secret')
+    log.mockRestore()
+  })
 })

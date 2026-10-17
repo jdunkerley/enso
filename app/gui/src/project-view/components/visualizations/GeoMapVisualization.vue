@@ -60,6 +60,7 @@ declare const mapboxgl: typeof import('mapbox-gl')
 
 <script setup lang="ts">
 import { useMapboxToken } from '$/providers/mapboxToken'
+import { redactAccessToken } from '$/utils/redact'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import bbox from '@turf/bbox'
 import { computed, effectScope, onScopeDispose, useTemplateRef, watch, type EffectScope } from 'vue'
@@ -184,6 +185,15 @@ class GeoMapVisualizationMap {
       this._containerWidth = width
       this._containerHeight = height
     }
+    // Mapbox's own errors name the failed URL, token included; log them redacted instead of letting
+    // mapbox-gl print them raw.
+    this.map.on('error', (event) => {
+      const error: unknown = event.error
+      console.error(
+        'Mapbox error:',
+        redactAccessToken(String(error instanceof Error ? error.message : error)),
+      )
+    })
     this.map.on('style.load', () => {
       // This is for suppressing "Cutoff is currently disabled on terrain"
       // warning (and enabling better polygon rendering).

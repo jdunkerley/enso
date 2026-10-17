@@ -4,42 +4,65 @@
  */
 import type { Breadcrumb, Event } from '@sentry/vue'
 
-const ACCESS_TOKEN_PARAM = /([?&]access_token=)[^&#\s]*/gi
+const ACCESS_TOKEN_PARAM = /(access(?:_|%5F)token(?:=|%3D))[^&#\s'"]*/gi
 const SENSITIVE_KEY = /token|secret|password/i
 
-/** The same URL with the value of its `access_token` query parameter replaced by `REDACTED`. */
+/**
+ * The same text with the value of every `access_token` query parameter (any case, plain or
+ * percent-encoded) replaced by `REDACTED`.
+ */
 export function redactAccessToken(url: string): string {
   return url.replace(ACCESS_TOKEN_PARAM, '$1REDACTED')
 }
 
-/** A copy of a value with the string values of an object's fields passed through the redactor. */
-function redactStrings(data: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(data).map(([key, value]) => [
-      key,
-      typeof value === 'string' ? redactAccessToken(value) : value,
-    ]),
+function isLeaf(value: object): boolean {
+  return (
+    value instanceof Date ||
+    value instanceof RegExp ||
+    value instanceof Map ||
+    value instanceof Set ||
+    value instanceof ArrayBuffer ||
+    ArrayBuffer.isView(value)
   )
 }
 
-/** Sentry's `beforeBreadcrumb`: redacts the URLs of fetch, xhr and navigation breadcrumbs. */
-export function scrubBreadcrumb<T extends Breadcrumb>(breadcrumb: T): T {
-  return breadcrumb.data ? { ...breadcrumb, data: redactStrings(breadcrumb.data) } : breadcrumb
+/**
+ * A deep copy of any value with {@link redactAccessToken} applied to every string in it: object
+ * fields, array items, and the message and stack of errors (which are copied, as their text is not
+ * an own enumerable property). Cycles and shared references are preserved.
+ */
+export function scrubDeep<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (typeof value === 'string') return redactAccessToken(value) as T
+  if (value == null || typeof value !== 'object' || isLeaf(value)) return value
+  const original = value as object
+  if (seen.has(original)) return seen.get(original) as T
+  if (original instanceof Error) {
+    const copy = Object.create(Object.getPrototypeOf(original)) as Record<string, unknown>
+    seen.set(original, copy)
+    for (const key of Object.getOwnPropertyNames(original))
+      copy[key] = scrubDeep((original as unknown as Record<string, unknown>)[key], seen)
+    return copy as T
+  }
+  if (Array.isArray(original)) {
+    const copy: unknown[] = []
+    seen.set(original, copy)
+    for (const item of original) copy.push(scrubDeep(item, seen))
+    return copy as T
+  }
+  const copy = Object.create(Object.getPrototypeOf(original)) as Record<string, unknown>
+  seen.set(original, copy)
+  for (const [key, field] of Object.entries(original)) copy[key] = scrubDeep(field, seen)
+  return copy as T
 }
 
-/** Sentry's `beforeSend`: redacts the request URL and the breadcrumbs of an event. */
+/** Sentry's `beforeBreadcrumb`: scrubs the whole breadcrumb. */
+export function scrubBreadcrumb<T extends Breadcrumb>(breadcrumb: T): T {
+  return scrubDeep(breadcrumb)
+}
+
+/** Sentry's `beforeSend` and `beforeSendTransaction`: scrubs the whole event. */
 export function scrubEvent<T extends Event>(event: T): T {
-  const result: T = { ...event }
-  if (result.request?.url != null)
-    result.request = { ...result.request, url: redactAccessToken(result.request.url) }
-  if (result.breadcrumbs) result.breadcrumbs = result.breadcrumbs.map(scrubBreadcrumb)
-  if (result.spans)
-    result.spans = result.spans.map((span) =>
-      span.description != null ?
-        { ...span, description: redactAccessToken(span.description) }
-      : span,
-    )
-  return result
+  return scrubDeep(event)
 }
 
 /** A copy of `value` with every field whose key looks secret (token, secret, password) redacted. */
