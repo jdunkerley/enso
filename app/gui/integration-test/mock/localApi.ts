@@ -278,7 +278,8 @@ export async function mockLocalApi(page: Page) {
     return { type: 'FileEntry', entry, content }
   }
 
-  const addDatalink = ({ path, value }: { path: Path; value: unknown }) => {
+  /** `raw` replaces the serialised `value`, to make a datalink that is not valid JSON. */
+  const addDatalink = ({ path, value, raw }: { path: Path; value: unknown; raw?: string }) => {
     const entry: DatalinkEntry = {
       type: 'DatalinkEntry',
       path,
@@ -287,7 +288,7 @@ export async function mockLocalApi(page: Page) {
     return addEntry(path, {
       type: 'DatalinkEntry',
       entry,
-      content: JSON.stringify(value, null, 2),
+      content: raw ?? JSON.stringify(value, null, 2),
     })
   }
 
@@ -458,10 +459,30 @@ export async function mockLocalApi(page: Page) {
     })
 
     const datalinkName = (path: string) => posix.basename(path)
+    /** The shim's `isAcceptableDatalinkPath` for the mock's POSIX paths. */
+    const acceptableDatalinkPath = (path: string) =>
+      posix.isAbsolute(path) &&
+      posix.basename(path).length > '.datalink'.length &&
+      path.endsWith('.datalink') &&
+      !path
+        .split('/')
+        .slice(1)
+        .some((segment) => ['', '.', '..'].includes(segment))
+    const requireDatalinkPath = (route: string, path: string) =>
+      acceptableDatalinkPath(path) ? null : (
+        toJSONRPCError(
+          `${route} failed: '${path}' is not an absolute path to a '.datalink' file without '.' or '..' segments.`,
+        )
+      )
+    const isObject = (value: unknown) =>
+      typeof value === 'object' && value != null && !Array.isArray(value)
     await projectServiceRoute('datalink/read', ({ path }) => {
+      const invalid = requireDatalinkPath('datalink/read', String(path))
+      if (invalid) return invalid
       const entry = fileSystem.get(String(path))
-      if (entry?.type !== 'DatalinkEntry')
-        return toJSONRPCError('datalink/read failed: no such file')
+      if (entry?.type !== 'DatalinkEntry') {
+        return toJSONRPCError(`datalink/read failed: Datalink not found: '${String(path)}'.`)
+      }
       try {
         return toJSONRPCResult(JSON.parse(entry.content))
       } catch (error) {
@@ -471,6 +492,15 @@ export async function mockLocalApi(page: Page) {
       }
     })
     await projectServiceRoute('datalink/create', ({ path, value }) => {
+      const invalid = requireDatalinkPath('datalink/create', String(path))
+      if (invalid) return invalid
+      if (!isObject(value)) {
+        return toJSONRPCError('datalink/create failed: A datalink must be a JSON object.')
+      }
+      const folder = posix.dirname(String(path))
+      if (fileSystem.get(folder)?.type !== 'DirectoryEntry') {
+        return toJSONRPCError(`datalink/create failed: The folder '${folder}' does not exist.`)
+      }
       if (fileSystem.has(String(path))) {
         return toJSONRPCError(
           `datalink/create failed: '${datalinkName(String(path))}' already exists.`,
@@ -480,6 +510,11 @@ export async function mockLocalApi(page: Page) {
       return toJSONRPCResult(null)
     })
     await projectServiceRoute('datalink/update', ({ path, value }) => {
+      const invalid = requireDatalinkPath('datalink/update', String(path))
+      if (invalid) return invalid
+      if (!isObject(value)) {
+        return toJSONRPCError('datalink/update failed: A datalink must be a JSON object.')
+      }
       const entry = fileSystem.get(String(path))
       if (entry?.type !== 'DatalinkEntry') {
         return toJSONRPCError(
@@ -490,6 +525,13 @@ export async function mockLocalApi(page: Page) {
       return toJSONRPCResult(null)
     })
     await projectServiceRoute('datalink/delete', ({ path }) => {
+      const invalid = requireDatalinkPath('datalink/delete', String(path))
+      if (invalid) return invalid
+      if (fileSystem.get(String(path))?.type !== 'DatalinkEntry') {
+        return toJSONRPCError(
+          `datalink/delete failed: '${datalinkName(String(path))}' is not a file.`,
+        )
+      }
       removeEntry(Path(String(path)))
       return toJSONRPCResult(null)
     })
