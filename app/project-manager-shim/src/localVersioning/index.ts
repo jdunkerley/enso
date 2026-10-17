@@ -156,13 +156,28 @@ async function exclusive<T>(repoRoot: string, work: () => Promise<T>): Promise<T
   return result
 }
 
-/** A pathspec excluding the `.enso` folder of the project at `relative` (a version never holds it). */
+/** The repository-relative path of the `.enso` folder of the project at `relative`. */
 function ensoFolder(relative: string): string {
   return relative === '.' ? '.enso' : `${relative}/.enso`
 }
 
+/**
+ * `relative` as a literal pathspec. Every path from data (a project's path, a trailer's) reaches
+ * git through this or {@link excludeEnso}: as a plain pathspec, `*`, `?` and `[` in a folder name
+ * would be globs and could match a sibling (and `clean` would delete its files).
+ */
+function literal(relative: string): string {
+  return `:(literal)${relative}`
+}
+
+/** A literal pathspec excluding the `.enso` folder of the project at `relative` (a version never holds it). */
 function excludeEnso(relative: string): string {
-  return `:(exclude)${ensoFolder(relative)}`
+  return `:(exclude,literal)${ensoFolder(relative)}`
+}
+
+/** The pathspecs of the project at `relative`, without its `.enso` folder. */
+function projectPathspecs(relative: string): readonly string[] {
+  return [literal(relative), excludeEnso(relative)]
 }
 
 /** `p` relative to `repoRoot` (resolving links first), with `/` separators; `.` for the root. */
@@ -239,9 +254,10 @@ function withoutMoveTrailer(message: string): string {
 
 /**
  * The path in a commit message's {@link MOVED_FROM_TRAILER} trailer, or `null`. A path that is not
- * a plain repository-relative one (absolute, with a `.` or `..` segment, or one git could read as an
- * option, pathspec magic or a glob) is ignored: a trailer is only text in a commit message, which
- * anyone can write.
+ * a plain repository-relative one (absolute, with a backslash or an empty, `.` or `..` segment, or
+ * one git could read as an option or pathspec magic) is ignored: a trailer is only text in a commit
+ * message, which anyone can write. Glob characters are fine: every pathspec is literal (see
+ * {@link literal}).
  */
 function movedFrom(message: string): string | null {
   const prefix = `${MOVED_FROM_TRAILER}: `
@@ -255,7 +271,7 @@ function movedFrom(message: string): string | null {
     from === '' ||
     /^[/:-]/.test(from) ||
     /^[a-zA-Z]:/.test(from) ||
-    /[\\*?[\]]/.test(from) ||
+    from.includes('\\') ||
     from.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
   return unsafe ? null : from
 }
@@ -335,8 +351,7 @@ export class LocalVersioning {
         '--porcelain=v1',
         '--untracked-files=all',
         '--',
-        relative,
-        excludeEnso(relative),
+        ...projectPathspecs(relative),
       ])
       let lastVersion: VersionSummary | null = null
       if (
@@ -346,7 +361,7 @@ export class LocalVersioning {
         )
       ) {
         const log = (
-          await run(['log', '-1', '--format=%H%x00%cI', '--', relative, excludeEnso(relative)])
+          await run(['log', '-1', '--format=%H%x00%cI', '--', ...projectPathspecs(relative)])
         ).trim()
         const [id, date] = log.split('\0')
         if (id && date) lastVersion = { id, date }
@@ -545,21 +560,27 @@ export class LocalVersioning {
       // `git add` and `git commit` fail on a pathspec that matches nothing known to git (the old
       // path of a project that was never versioned, a new path holding only ignored files).
       const isTracked = async (relative: string) =>
-        (await run(['ls-files', '--cached', '--', relative])).trim() !== '' ||
+        (await run(['ls-files', '--cached', '--', literal(relative)])).trim() !== '' ||
         (hasHead &&
-          (await run(['ls-tree', '-r', '--name-only', 'HEAD', '--', relative])).trim() !== '')
+          (await run(['ls-tree', '-r', '--name-only', 'HEAD', '--', literal(relative)])).trim() !==
+            '')
       const toAdd: string[] = []
       for (const [i, relative] of allRelatives.entries()) {
         if ((await exists(paths[i]!)) || (await isTracked(relative))) toAdd.push(relative)
       }
       if (toAdd.length === 0) return { id: null }
       // `add` rejects an exclude pathspec that matches an ignored folder, so unstage `.enso` afterwards.
-      await run(['add', '-A', '--', ...toAdd])
-      await run(['reset', '--quiet', '--', ...toAdd.map(ensoFolder)])
+      await run(['add', '-A', '--', ...toAdd.map(literal)])
+      await run([
+        'reset',
+        '--quiet',
+        '--',
+        ...toAdd.map((relative) => literal(ensoFolder(relative))),
+      ])
       const relatives: string[] = []
       for (const relative of toAdd) if (await isTracked(relative)) relatives.push(relative)
       if (relatives.length === 0) return { id: null }
-      const pathspecs = [...relatives, ...relatives.map(excludeEnso)]
+      const pathspecs = [...relatives.map(literal), ...relatives.map(excludeEnso)]
       const unchanged = await run(['diff', '--cached', '--quiet', '--', ...pathspecs]).then(
         () => true,
         (error: unknown) => {
@@ -621,7 +642,9 @@ export class LocalVersioning {
     const atRoot = relative === '.'
     const rootSince =
       atRoot ?
-        (await run(['log', '-1', '--format=%H', '--diff-filter=A', '--', 'package.yaml'])).trim()
+        (
+          await run(['log', '-1', '--format=%H', '--diff-filter=A', '--', literal('package.yaml')])
+        ).trim()
       : ''
     let before: string | null = null
     const seen = new Set<string>()
@@ -639,8 +662,7 @@ export class LocalVersioning {
         '--format=%H%x00%cI%x00%an%x00%ae%x00%B%x1e',
         ...(before != null ? [`${before}^`] : []),
         '--',
-        relative,
-        excludeEnso(relative),
+        ...projectPathspecs(relative),
       ])
       const segment = output
         .split('\x1e')
@@ -797,10 +819,23 @@ export class LocalVersioning {
       if (
         moved &&
         (await objectExists(repoRoot, `${id}:${ensoFolder(version.relativePath)}`)) &&
-        (await run(['ls-files', '--cached', '--', ensoFolder(relative)])).trim() !== ''
+        (await run(['ls-files', '--cached', '--', literal(ensoFolder(relative))])).trim() !== ''
       )
         throw new Error(TRACKED_ENSO_MESSAGE)
-      await this.commitIn(repoRoot, [projectPath], 'Saved before restore')
+      const saved = await this.commitIn(repoRoot, [projectPath], 'Saved before restore')
+      // Once the work is saved, a failure says where it is, so the user can get it back.
+      const failed = (error: unknown) => {
+        const reason =
+          lockMessage(error) ??
+          (error instanceof CommandError ? error.stderr.trim() || error.message : null) ??
+          (error instanceof Error ? error.message : String(error))
+        if (saved.id == null)
+          return lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+        return new Error(
+          `Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (${reason})`,
+          { cause: error },
+        )
+      }
       try {
         if (!moved) {
           await run([
@@ -809,8 +844,7 @@ export class LocalVersioning {
             '--staged',
             '--worktree',
             '--',
-            relative,
-            excludeEnso(relative),
+            ...projectPathspecs(relative),
           ])
         } else {
           // The version is from before a move: its files were at another path. Everything at the
@@ -824,15 +858,14 @@ export class LocalVersioning {
               '--cached',
               '--ignore-unmatch',
               '--',
-              relative,
-              excludeEnso(relative),
+              ...projectPathspecs(relative),
             ])
             await run(['read-tree', `--prefix=${relative}/`, source])
-            await run(['restore', '--worktree', '--', relative, excludeEnso(relative)])
-            await run(['clean', '-f', '-d', '-q', '--', relative, excludeEnso(relative)])
+            await run(['restore', '--worktree', '--', ...projectPathspecs(relative)])
+            await run(['clean', '-f', '-d', '-q', '--', ...projectPathspecs(relative)])
           } catch (error) {
             // Put the index back as the commit above left it, so no deletion stays staged.
-            await run(['reset', '-q', '--', relative, excludeEnso(relative)]).catch(
+            await run(['reset', '-q', '--', ...projectPathspecs(relative)]).catch(
               (resetError: unknown) =>
                 console.error(`Failed to reset the index for ${relative}:`, resetError),
             )
@@ -842,13 +875,15 @@ export class LocalVersioning {
           }
         }
       } catch (error) {
-        throw lockMessage(error) != null ? new Error(lockMessage(error)!) : error
+        throw failed(error)
       }
       const restored = await this.commitIn(
         repoRoot,
         [projectPath],
         `Restored version from ${version.date}`,
-      )
+      ).catch((error: unknown) => {
+        throw failed(error)
+      })
       if (restored.id != null) return { id: restored.id }
       // Restoring the latest version changes nothing, so there is nothing new to commit.
       return { id }

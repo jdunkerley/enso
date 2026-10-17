@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { runCommand } from '../../childProcess/runCommand.js'
-import { findGit } from '../git.js'
+import { findGit, runGit } from '../git.js'
 import {
   ENSO_IGNORE_LINES,
   LocalVersioning,
@@ -13,7 +13,7 @@ import { versioningFor, withTempRepo, writeFiles } from './testRepo.js'
 
 vi.mock('../git.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../git.js')>()
-  return { ...actual, findGit: vi.fn(actual.findGit) }
+  return { ...actual, findGit: vi.fn(actual.findGit), runGit: vi.fn(actual.runGit) }
 })
 
 const git = (cwd: string, ...args: string[]) =>
@@ -1013,8 +1013,9 @@ describe('history across moves', () => {
     })
   })
 
-  test.each(['../B', '/A', 'A*', 'A?', '[A]', ':(top)A', '-A', './A'])(
-    'ignores a trailer naming the unsafe path %s',
+  // `A*`, `A?` and `[A]` are not unsafe: the pathspec is literal, so they match no `A`.
+  test.each(['../B', '/A', 'A\\B', ':(top)A', '-A', './A', 'A//B', 'A*', 'A?', '[A]'])(
+    'a trailer naming %s does not lead to A',
     async (from) => {
       await withRepo(async (root, versioning) => {
         await versioning.commit([path.join(root, 'A')], 'first')
@@ -1165,6 +1166,72 @@ describe('history across moves', () => {
       const { first, project } = await movedProject(root, versioning)
       await versioning.setComment(project, first, 'The original')
       expect((await versioning.log(project)).at(-1)?.comment).toBe('The original')
+    })
+  })
+})
+
+describe('paths with glob characters are literal', () => {
+  test('status, commit and a cross-move restore never touch a sibling the path would match as a glob', async () => {
+    await withRepo(async (root, versioning) => {
+      const project = path.join(root, 'P [x]')
+      // An untracked file, which `P [x]` matches as a glob.
+      const sibling = path.join(root, 'P x')
+      const old = path.join(root, 'A')
+      const first = (await versioning.commit([old], 'first')).id!
+      await fs.rename(old, project)
+      await versioning.commitMove(old, project, 'Moved')
+      await writeFiles(root, { 'P [x]/src/Extra.enso': 'x = 1\n' })
+      await versioning.commit([project], 'extra')
+      await fs.writeFile(sibling, 'mine\n')
+      expect((await versioning.status(project)).changed).toBe(false)
+      await writeFiles(root, { 'P [x]/src/Main.enso': 'main = 5\n' })
+      await versioning.commit([project], 'edited')
+      expect(await git(root, 'show', '--name-only', '--format=', 'HEAD')).toBe(
+        'P [x]/src/Main.enso',
+      )
+      await versioning.restore(project, first)
+      expect(await fs.readFile(path.join(project, 'src', 'Main.enso'), 'utf8')).toBe('main = 1\n')
+      await expect(fs.access(path.join(project, 'src', 'Extra.enso'))).rejects.toThrow()
+      expect(await fs.readFile(sibling, 'utf8')).toBe('mine\n')
+      expect(await git(root, 'status', '--porcelain', '--', 'P x')).toBe('?? "P x"')
+    })
+  })
+
+  test('renaming inside a folder whose name has glob characters keeps the earlier history', async () => {
+    await withRepo(async (root, versioning) => {
+      await writeFiles(root, project('P [x]/A'))
+      const a = path.join(root, 'P [x]', 'A')
+      const b = path.join(root, 'P [x]', 'B')
+      const first = (await versioning.commit([a], 'first')).id!
+      await fs.rename(a, b)
+      await versioning.commitMove(a, b, 'Renamed')
+      const log = await versioning.log(b)
+      expect(log.map((v) => v.comment)).toEqual(['Renamed', 'first'])
+      expect(log.at(-1)?.id).toBe(first)
+    })
+  })
+})
+
+describe('a restore that fails after saving', () => {
+  test('says the work was saved as "Saved before restore"', async () => {
+    await withRepo(async (root, versioning) => {
+      const a = path.join(root, 'A')
+      const v1 = (await versioning.commit([a], 'one')).id!
+      await writeFiles(root, { 'A/src/Main.enso': 'unsaved\n' })
+      const real = vi.mocked(runGit).getMockImplementation()!
+      vi.mocked(runGit).mockImplementation((cwd, args, options) =>
+        args[0] === 'restore' ? Promise.reject(new Error('boom')) : real(cwd, args, options),
+      )
+      try {
+        await expect(versioning.restore(a, v1)).rejects.toThrow(
+          "Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (boom)",
+        )
+      } finally {
+        vi.mocked(runGit).mockImplementation(real)
+      }
+      const [latest] = await versioning.log(a)
+      expect(latest?.comment).toBe('Saved before restore')
+      expect(await versioning.fileAt(a, latest!.id, 'src/Main.enso')).toBe('unsaved\n')
     })
   })
 })

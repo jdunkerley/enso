@@ -169,6 +169,16 @@ and drops inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
 `GIT_INDEX_FILE`, still applies). `findGit` caches only a git it found, so
 installing git while the IDE runs needs no restart.
 
+**Every path from data reaches git as a literal pathspec**: `literal(p)` gives
+`:(literal)<p>`, `excludeEnso(p)` gives `:(exclude,literal)<p>/.enso`, and
+`projectPathspecs(p)` is the pair, used by `status`, `log`, `add`, `reset`,
+`diff`, `commit`, `restore`, `rm`, `clean`, `ls-files` and `ls-tree`. A plain
+pathspec would read `*`, `?` and `[` in a folder name as a glob, matching a
+sibling (`P [x]` matches a file `P x`) — and `clean` would delete it.
+`GIT_LITERAL_PATHSPECS=1` is no alternative: it disables the exclude magic too.
+`<id>:<path>` revisions are not pathspecs, and are resolved (`cat-file -e`)
+before use.
+
 ### Version ids
 
 `fileAt`, `setComment`, `restore` and `exportAt` accept only a full commit hash
@@ -226,11 +236,12 @@ current path newest first up to the first one with a trailer:
   neither it nor anything older at that path is listed.
 
 A trailer path that is not plain and repository-relative (absolute, with
-empty/`.`/`..` segments, starting with `:` or `-`, or containing `\`, `*`, `?`,
-`[` or `]`) is ignored, since anyone can write a commit message. A project at
-the repository root never follows trailers; as `git log -- .` lists every
-commit, its history starts at the commit that last added the root
-`package.yaml`.
+empty/`.`/`..` segments, starting with `:` or `-`, or containing `\`) is
+ignored, since anyone can write a commit message. Glob characters are allowed
+(folders such as `Projects [2026]` are real): every pathspec is literal, see
+_How git is run_. A project at the repository root never follows trailers; as
+`git log -- .` lists every commit, its history starts at the commit that last
+added the root `package.yaml`.
 
 `fileAt`, `exportAt` and `restore` use the path the project had at the version,
 and resolve `<id>:<path>` (`cat-file -e`) before using it, so a missing path
@@ -281,4 +292,6 @@ stays staged).
   recorded in a merge commit follows its first parent.
 - If a cross-move restore fails after its `restore --worktree` step, the index
   is reset but the work tree may hold part of the old version; `HEAD` (the
-  `Saved before restore` commit) still has everything.
+  `Saved before restore` commit) still has everything. Any restore that fails
+  after that commit says so:
+  `Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (<git's message>)`.
