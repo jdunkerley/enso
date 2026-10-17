@@ -67,9 +67,9 @@ class DropDownLocator {
   }
 }
 
-const CHOOSE_CLOUD_FILE = 'Choose file in cloud…'
 const CHOOSE_LOCAL_FILE = 'Choose file…'
-const CHOOSE_FILE_OPTIONS = [CHOOSE_CLOUD_FILE, CHOOSE_LOCAL_FILE]
+// Only the system file dialog: the IDE is local-only, so there is no "Choose file in cloud…".
+const CHOOSE_FILE_OPTIONS = [CHOOSE_LOCAL_FILE]
 
 test('Widget in plain AST', async ({ editorPage, page }) => {
   await editorPage
@@ -434,7 +434,7 @@ test.describe('Dynamic configuration updates', () => {
         },
       ],
     ])
-    await pathDropdown.expectVisibleWithOptions(['Choose directory…', 'Choose directory in cloud…'])
+    await pathDropdown.expectVisibleWithOptions(['Choose directory…'])
   })
 
   /**

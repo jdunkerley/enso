@@ -10,7 +10,6 @@ import {
   useExportArchive,
   useMutationCallback,
   useNewProject,
-  useUploadFileToCloud,
   useUploadFileToLocal,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
@@ -97,7 +96,6 @@ const createProjectExecution = useMutationCallback(() =>
   backendMutationOptions(backend.value, 'createProjectExecution'),
 )
 const { copy } = useCopy()
-const uploadFileToCloud = useUploadFileToCloud()
 const uploadFileToLocal = useUploadFileToLocal(category)
 const exportArchive = useExportArchive(backend, driveStore)
 const newProject = useNewProject(backend, () => category.value.type)
@@ -187,7 +185,6 @@ const isOtherUserUsingProject = computed(
     asset.projectState.openedBy != null &&
     asset.projectState.openedBy !== user.value.email,
 )
-const canUploadToCloud = computed(() => user.value.plan !== backendModule.Plan.free)
 
 const globalContextMenuEntries = useGlobalContextMenuEntries({
   backend,
@@ -328,19 +325,6 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
         })
       },
     },
-    isUploadableAsset(asset) &&
-      !isCloud.value &&
-      localBackend != null && {
-        isUnderPaywall: !canUploadToCloud.value,
-        action: 'uploadToCloud',
-        feature: 'uploadToCloud',
-        doAction: () => {
-          void uploadFileToCloud(localBackend, {
-            assets: [asset],
-            targetDirectoryId: user.value.rootDirectoryId,
-          })
-        },
-      },
     isUploadableAsset(asset) &&
       isCloud.value &&
       localBackend != null && {

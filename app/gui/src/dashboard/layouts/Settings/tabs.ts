@@ -16,6 +16,7 @@ import {
 } from '$/configurations/settings'
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
+import { mapboxSettingsStore, setMapboxToken } from '$/providers/mapboxToken'
 import { isUserOnPlanWithMultipleSeats, Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
@@ -181,6 +182,29 @@ const LOCAL_TAB: SettingsTabData = {
           aliasesId: 'localVersionsSettingsCustomEntryAliases',
           component: LocalVersionsSettingsSection,
         },
+      ],
+    },
+    {
+      nameId: 'mapsSettingsSection',
+      entries: [
+        settingsFormEntryData({
+          type: 'form',
+          schema: z.object({ mapboxToken: z.string() }),
+          getValue: () => ({ mapboxToken: mapboxSettingsStore.state.value.accessToken ?? '' }),
+          onSubmit: (_, { mapboxToken }) => {
+            setMapboxToken(mapboxToken)
+          },
+          inputs: [
+            {
+              nameId: 'mapboxTokenSettingsInput',
+              name: 'mapboxToken',
+              autoComplete: 'off',
+              // Masked, so that the token does not show on a shared screen.
+              type: 'password',
+              descriptionId: 'mapboxTokenSettingsInputDescription',
+            },
+          ],
+        }),
       ],
     },
   ],

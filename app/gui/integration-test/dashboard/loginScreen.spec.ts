@@ -1,7 +1,9 @@
 /** @file Test the login flow. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { INVALID_PASSWORD, TEXT, VALID_EMAIL, VALID_PASSWORD } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /**
  * Set in `localStorage`, it makes the mocked Cognito (`src/authentication/cognito.mock.ts`) ask for a

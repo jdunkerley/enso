@@ -18,7 +18,6 @@ vi.mock('$/providers/category', async (importOriginal) => ({
   useCategories: () =>
     reactive({
       localCategoriesList: [{ type: 'local' }],
-      cloudCategoriesList: [{ type: 'cloud' }],
     }),
 }))
 
@@ -42,6 +41,31 @@ function mountDriveLocation() {
 const CHILD = 'directory-child' as DirectoryId
 
 describe('the drive location', () => {
+  test('a cloud category saved by an earlier version reads as Local', () => {
+    LocalStorage.getInstance().set('driveDisplay', {
+      currentCategory: 'cloud',
+      currentDirectoryId: null,
+    })
+    expect(mountDriveLocation().currentCategory).toEqual({ type: 'local' })
+  })
+
+  test.each(['cloud', 'recent', 'trash', 'team-usergroup-abc', 'team-x'])(
+    'a saved `%s` category reads as Local, and its directory is not carried over',
+    (key) => {
+      LocalStorage.getInstance().set('driveDisplay', {
+        currentCategory: key,
+        currentDirectoryId: CHILD,
+      })
+      const drive = mountDriveLocation()
+      expect(drive.currentCategory).toEqual({ type: 'local' })
+      expect(drive.currentDirectory).toBeNull()
+    },
+  )
+
+  test('with nothing saved, the drive starts on Local', () => {
+    expect(mountDriveLocation().currentCategory).toEqual({ type: 'local' })
+  })
+
   test('a change applies at once', () => {
     const drive = mountDriveLocation()
     drive.currentDirectory = CHILD

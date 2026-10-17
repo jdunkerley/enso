@@ -1,7 +1,9 @@
 /** @file Test copying, moving, cutting and pasting. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 test('copy', async ({ drivePage }) => {
   await drivePage.goToCategory

@@ -3,12 +3,13 @@ import './beforeMain' // Keep newline below to ensure that this import is always
 import '#/styles.css'
 import '#/tailwind.css'
 import App from '$/App.vue'
-import { registerCloud } from '$/cloud'
 import { setupLogger } from '$/log'
 import { setFeatureFlag } from '$/providers/featureFlags'
 import { widgetDevtools } from '$/providers/openedProjects/widgetRegistry/devtools'
+import { registerCore } from '$/registerCore'
 import router from '$/router'
 import { createQueryClient } from '$/utils/queryClient'
+import { replayPrivacyOptions, scrubBreadcrumb, scrubEvent } from '$/utils/redact'
 import * as sentry from '@sentry/vue'
 import type { Vue } from '@sentry/vue/types/types'
 import { VueQueryPlugin } from '@tanstack/vue-query'
@@ -39,7 +40,7 @@ async function main() {
   const app = createApp(App)
   setupSentry(app)
   app.use(VueQueryPlugin, { queryClient, enableDevtoolsV6Plugin: true })
-  registerCloud(router)
+  registerCore()
   app.use(router)
   app.use(widgetDevtools)
   app.provide('rootDirPath', rootDirPath)
@@ -57,7 +58,10 @@ function setupSentry(app: Vue) {
       integrations: [
         sentry.browserTracingIntegration({ router }),
         sentry.extraErrorDataIntegration({ captureErrorCause: true }),
-        sentry.replayIntegration(),
+        // Replay records no request or response details (`networkDetailAllowUrls` is empty), its
+        // network entries are redacted (Mapbox URLs carry the user's own access token), and it does
+        // not record the map at all, as Mapbox GL writes the token into the DOM.
+        sentry.replayIntegration(replayPrivacyOptions),
         new sentry.BrowserProfilingIntegration(),
       ],
       app,
@@ -65,6 +69,9 @@ function setupSentry(app: Vue) {
       tracesSampleRate: SENTRY_SAMPLE_RATE,
       replaysSessionSampleRate: SENTRY_SAMPLE_RATE,
       replaysOnErrorSampleRate: 1.0,
+      beforeBreadcrumb: scrubBreadcrumb,
+      beforeSend: scrubEvent,
+      beforeSendTransaction: scrubEvent,
     })
   }
 }

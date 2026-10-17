@@ -21,3 +21,16 @@ describe('getColumnList: the labels column', () => {
     )
   })
 })
+
+describe('getColumnList: sharing', () => {
+  test('there is no "Shared with" column, even for an enterprise cloud folder', () => {
+    for (const plan of [Plan.free, Plan.enterprise]) {
+      expect(getColumnList(plan, BackendType.remote, 'team', false, true)).not.toContain(
+        Column.sharedWith,
+      )
+      expect(getColumnList(plan, BackendType.local, 'local', false, true)).not.toContain(
+        Column.sharedWith,
+      )
+    }
+  })
+})

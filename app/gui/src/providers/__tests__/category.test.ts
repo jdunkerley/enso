@@ -22,6 +22,15 @@ vi.mock('$/providers/localDirectories', () => ({
 vi.mock('$/providers/text', () => ({ useText: () => ({ getText: (key: string) => key }) }))
 
 describe('the local Recent category', () => {
+  test('only the local categories are listed', () => {
+    const categories = useCategories()
+    expect(categories).not.toHaveProperty('cloudCategoriesList')
+    expect(categories.localCategoriesList.map((category) => category.type)).toEqual([
+      'local',
+      'localRecent',
+    ])
+  })
+
   test('`isRecentCategory` is true for both Recents only', () => {
     expect(isRecentCategory({ type: 'recent' })).toBe(true)
     expect(isRecentCategory({ type: 'localRecent' })).toBe(true)

@@ -1,7 +1,9 @@
 /** @file Test the drive view. */
 import { EmailAddress, ProjectState } from 'enso-common/src/services/Backend'
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 import { getText, TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find an extra columns button panel. */
 function locateExtraColumns(page: Page) {

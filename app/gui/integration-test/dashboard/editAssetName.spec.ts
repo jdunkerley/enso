@@ -1,7 +1,9 @@
 /** @file Test copying, moving, cutting and pasting. */
-import { expect, test, type Locator, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Locator, type Page } from 'integration-test/base'
 
 import { TEXT, getText } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 const NEW_NAME = 'foo bar baz'
 const NEW_NAME_2 = 'foo bar baz quux'

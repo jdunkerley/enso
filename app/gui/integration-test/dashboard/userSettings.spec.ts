@@ -1,7 +1,9 @@
 /** @file Test the user settings tab. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { INVALID_PASSWORD, TEXT, VALID_PASSWORD } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 const NEW_USERNAME = 'another user-name'
 const NEW_PASSWORD = '1234!' + VALID_PASSWORD

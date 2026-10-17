@@ -6,9 +6,11 @@
  * nothing at all (#200).
  */
 import { FilterBy, type DirectoryId } from 'enso-common/src/services/Backend'
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 import type { MockCloudApi } from 'integration-test/mock/cloudApi'
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 const TEAM_A = 'Team Alpha'
 const TEAM_B = 'Team Beta'

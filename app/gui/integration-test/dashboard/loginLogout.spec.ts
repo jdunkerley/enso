@@ -1,7 +1,9 @@
 /** @file Test the login flow. */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find a "login" button.on the current locator. */
 function locateLoginButton(page: Page) {

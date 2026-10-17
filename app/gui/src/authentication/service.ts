@@ -6,15 +6,11 @@
 import * as appUtils from '$/appUtils'
 import { Cognito } from '$/authentication/cognito'
 import * as listen from '$/authentication/listen'
-import { useConfig, type RemoteConfig } from '$/providers/config'
-import { useFeatureFlag } from '$/providers/featureFlags'
-import type { ToValue } from '$/utils/reactivity'
 import { parseEnsoDeeplink } from '@/util/url'
 import { Amplify } from 'aws-amplify'
 import type * as saveAccessTokenModule from 'enso-common/src/accessToken'
-import * as common from 'enso-common/src/constants'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed, toRef, toValue, type ComputedRef, type Ref } from 'vue'
+import { computed, shallowRef, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 /**
@@ -106,11 +102,7 @@ export interface AuthConfig {
 export interface AuthService {
   /** @see {@link Cognito}. */
   readonly cognito: Ref<Cognito | undefined>
-  /**
-   * `true` once the remote configuration has settled without providing the Cognito details
-   * required for authentication (e.g. a deployment with no Enso Cloud backend). While this is
-   * `true` there is no {@link Cognito} client and the app runs in a signed-out, local-only mode.
-   */
+  /** Always `true`: the IDE is local-only. */
   readonly authDisabled: Ref<boolean>
   /** @see {@link listen.ListenFunction}. */
   readonly registerAuthEventListener: listen.ListenFunction
@@ -125,125 +117,16 @@ export interface AuthService {
  * Amplify library.
  */
 export function useInitAuthService(): AuthService {
-  const enableDeepLinks = useFeatureFlag('enableDeepLinks')
   const router = useRouter()
-  const config = useConfig()
-
-  const amplifyConfig = loadAmplifyConfig(toRef(config, 'remoteConfig'), enableDeepLinks.value)
-  const cognito = computed<Cognito | undefined>((oldValue) => {
-    if (oldValue != undefined) {
-      console.error('Remote config changed, but cannot update once initialized Cognito client.')
-      return oldValue
-    } else if (amplifyConfig.value != null) {
-      return new Cognito(console, enableDeepLinks.value, amplifyConfig.value)
-    } else {
-      return undefined
-    }
-  })
-
-  const authDisabled = useAuthDisabled(config, amplifyConfig)
-
+  // The IDE is local-only (`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`): there
+  // is no Cognito, so authentication is disabled and the session is always the offline stand-in
+  // (`makeOfflineSession` in `$/providers/session`). PR 2 deletes this module.
+  const cognito = shallowRef<Cognito | undefined>(undefined)
+  const authDisabled = computed(() => true)
   if (detect.isOnElectron()) {
     setDeepLinkHandler((url) => void router.push(url), cognito)
   }
-
   return { cognito, authDisabled, registerAuthEventListener: listen.registerAuthEventListener }
-}
-
-/** The parts of the remote configuration's fetch state that decide {@link useAuthDisabled}. */
-export interface RemoteConfigState {
-  readonly remoteConfig: RemoteConfig | undefined
-  readonly isError: boolean
-  readonly isFetching: boolean
-}
-
-/**
- * Whether authentication is disabled: the remote configuration has settled (either loaded or
- * failed) but carries no usable Cognito configuration, so authentication cannot run and the app
- * falls back to a local-only mode.
- *
- * Once `true`, it stays `true` for the rest of the session. The remote configuration cannot change
- * within a session (see `cognito` in {@link useInitAuthService}), and a re-fetch of it passes
- * through states that look unsettled (`isFetching`, and a cleared error for a query that has no
- * data). Following those would briefly re-enable authentication with no Cognito client, which
- * signs the local user out, closes the open project and blanks the window.
- */
-export function useAuthDisabled(
-  config: RemoteConfigState,
-  amplifyConfig: ToValue<AmplifyConfig | undefined>,
-): ComputedRef<boolean> {
-  return computed(
-    (wasDisabled) =>
-      wasDisabled === true ||
-      ((config.remoteConfig !== undefined || config.isError) &&
-        !config.isFetching &&
-        toValue(amplifyConfig) == null),
-  )
-}
-
-/** Return the appropriate Amplify configuration for the current platform. */
-function loadAmplifyConfig(
-  remoteConfig: ToValue<RemoteConfig | undefined>,
-  supportsDeepLinks: boolean,
-): Ref<AmplifyConfig | undefined> {
-  let urlOpener: ((url: string) => void) | null = null
-  let saveAccessToken: ((accessToken: saveAccessTokenModule.AccessToken | null) => void) | null =
-    null
-  if (window.api != null) {
-    const { authentication } = window.api
-    // When running on desktop we want to have option to save access token to a file,
-    // so it can be reused later when issuing requests to the Cloud API.
-    //
-    // Note: Wrapping this function in an arrow function ensures that the current Authentication API
-    // is always used.
-    saveAccessToken = (accessToken: saveAccessTokenModule.AccessToken | null) => {
-      authentication.saveAccessToken(accessToken)
-    }
-  }
-  if (supportsDeepLinks && window.api != null) {
-    const { authentication } = window.api
-    // The default URL opener opens the URL in the desktop app, but the user should be sent to
-    // their system browser instead, because:
-    // - users trust their system browser with their credentials more than they trust the app;
-    // - the app can keep itself on the relevant page until the user is sent back to it, avoiding
-    // unnecessary reloading caused by redirects.
-    //
-    // Note: Wrapping this function in an arrow function ensures that the current Authentication API
-    // is always used.
-    urlOpener = (url: string) => {
-      authentication.openUrlInSystemBrowser(url)
-    }
-  }
-
-  // Even when using deeplinks, we register a current location as origin to handle sign-outs.
-  // (See Cognito.signInWithRedirectOptions method).
-  const signInOutRedirect = [
-    ...(supportsDeepLinks ? [`${common.DEEP_LINK_SCHEME}://auth`] : []),
-    window.location.origin,
-  ]
-  return computed(() => {
-    const cfg = toValue(remoteConfig)
-    // Cognito needs at least a user pool and a client id to work. When the remote
-    // configuration omits them (e.g. a deployment with no Enso Cloud backend),
-    // authentication is disabled entirely rather than initialized with blanks.
-    const userPoolId = cfg?.ENSO_IDE_COGNITO_USER_POOL_ID
-    const userPoolWebClientId = cfg?.ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID
-    if (cfg != null && userPoolId && userPoolWebClientId) {
-      return {
-        endpoint: cfg.ENSO_IDE_AUTH_ENDPOINT,
-        userPoolId,
-        userPoolWebClientId,
-        domain: cfg.ENSO_IDE_COGNITO_DOMAIN ?? '',
-        region: cfg.ENSO_IDE_COGNITO_REGION ?? '',
-        redirectsSignIn: signInOutRedirect,
-        redirectsSignOut: signInOutRedirect,
-        scope: ['email', 'openid', 'aws.cognito.signin.user.admin'],
-        responseType: 'code',
-        urlOpener,
-        saveAccessToken,
-      }
-    } else return undefined
-  })
 }
 
 /**

@@ -1,7 +1,9 @@
 /** @file Test the drive view. */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 
 import { COLORS } from 'enso-common/src/services/Backend'
+
+test.skip(true, CLOUD_ONLY)
 
 const LABEL_NAME = 'aaaa'
 

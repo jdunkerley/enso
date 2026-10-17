@@ -152,13 +152,6 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
   const backends = useBackends()
   const localPaths = useLocalPaths()
 
-  const teamCategories = computed(
-    () =>
-      toValue(userData)?.groups?.map((group): TeamDirectory => ({
-        type: 'team',
-        groupId: group.id,
-      })) ?? [],
-  )
   const groupById = computed(
     () => new Map(toValue(userData)?.groups?.map((group) => [group.id, group])),
   )
@@ -178,12 +171,6 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
     localDirectories.value.map((dir): LocalDirectory => ({ type: 'localDirectory', path: dir })),
   )
 
-  const cloudCategoriesList = computed((): Category[] => [
-    { type: 'cloud' },
-    ...teamCategories.value,
-    { type: 'recent' },
-    { type: 'trash' },
-  ])
   const localCategoriesList = computed((): Category[] => [
     { type: 'local' },
     { type: 'localRecent' },
@@ -229,9 +216,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
   }
 
   function getCategoryByDirectoryId(dirId: DirectoryId) {
-    return [...cloudCategoriesList.value, ...localCategoriesList.value].find(
-      (category) => categoryDirectoryId(category) === dirId,
-    )
+    return localCategoriesList.value.find((category) => categoryDirectoryId(category) === dirId)
   }
 
   function categoryRootPath(category: Category): Path | null {
@@ -275,7 +260,6 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
   }
 
   return proxyRefs({
-    cloudCategoriesList,
     localCategoriesList,
     categoryLabel,
     categoryDirectoryId,
