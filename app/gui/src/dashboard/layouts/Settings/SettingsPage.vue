@@ -4,10 +4,8 @@
  * narrows the tabs, sections and entries to those matching it, and the current tab, kept in the
  * `SettingsTab` query parameter.
  *
- * Every tab is laid out by `SettingsTab.vue`. The sections of the Account tab and of the cloud's tabs
- * (Organization, Billing & Plans, Members, User groups, Activity log, API keys, Usage) come from the
- * cloud (`$/providers/settingsContributions`), and so does the paywall screen shown in place of a
- * tab whose feature the user's plan lacks.
+ * Every tab is laid out by `SettingsTab.vue`. Further sections of a tab may be contributed
+ * (`$/providers/settingsContributions`).
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import Button from '$/components/Button/Button.vue'
@@ -28,14 +26,9 @@ import { useBackends } from '$/providers/backends'
 import { localPathsStore } from '$/providers/localDirectories'
 import { useQueryParams } from '$/providers/queryParams'
 import { provideSettingsContext } from '$/providers/settingsContext'
-import {
-  loadSettingsContributions,
-  settingsContributions,
-  settingsPaywall,
-} from '$/providers/settingsContributions'
+import { loadSettingsContributions, settingsContributions } from '$/providers/settingsContributions'
 import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
-import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { includesPredicate } from '$/utils/data/array'
 import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
@@ -190,14 +183,6 @@ const sections = computed((): readonly SettingsSectionData[] => {
   return filterSettingsSections(data, isMatch.value, getText, SETTINGS_NO_RESULTS_SECTION_DATA)
 })
 
-const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
-/** The feature the current tab is locked behind, while the user's plan lacks it. */
-const paywallFeature = computed(() => {
-  const data = tabData.value
-  if (data.feature == null) return null
-  return isFeatureUnderPaywall(data.feature) ? data.feature : null
-})
-
 const title = computed(() =>
   tabData.value.organizationOnly === true ?
     (organization.value?.name ?? 'your organization')
@@ -257,10 +242,7 @@ const title = computed(() =>
           />
         </aside>
         <main class="flex flex-1 flex-col overflow-y-auto pb-12 pl-1 scrollbar-gutter-stable">
-          <template v-if="paywallFeature != null">
-            <component :is="settingsPaywall()" v-if="settingsPaywall()" :feature="paywallFeature" />
-          </template>
-          <SettingsTab v-else :key="effectiveTab" :sections="sections" />
+          <SettingsTab :key="effectiveTab" :sections="sections" />
         </main>
       </div>
     </div>

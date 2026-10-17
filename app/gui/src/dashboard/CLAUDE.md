@@ -1,8 +1,8 @@
 # dashboard/
 
-The **Dashboard feature** subtree: sign-up/sign-in, cloud project browser,
-settings. Everything whose meaning is tied to the Enso Cloud shell (before a
-project is opened, or alongside it) lives here. Import via the `#/` path alias.
+The **Dashboard feature** subtree: the local project browser and settings.
+Everything whose meaning is tied to the dashboard shell (before a project is
+opened, or alongside it) lives here. Import via the `#/` path alias.
 
 **Vue** (#75). Common UI primitives and utilities live at `src/` directly (see
 the sibling project-view structure for the same principle); this directory holds

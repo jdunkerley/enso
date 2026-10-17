@@ -4,7 +4,6 @@
  * (`#/layouts/Settings`) and the sections contributed through
  * `$/providers/settingsContributions`.
  */
-import type { PaywallFeatureName } from '$/composables/paywall'
 import type SettingsTabType from '$/configurations/settingsTabs'
 import type { GetText } from '$/providers/text'
 import { regexEscape } from '$/utils/data/string'
@@ -262,10 +261,4 @@ export interface SettingsSectionData extends SettingsSearchableSection<SettingsE
  * (`$/providers/settingsContributions`) is hidden while nothing has been contributed to it, so that
  * a build without the cloud does not list the organization's tabs.
  */
-export interface SettingsTabData extends SettingsSearchableTab<SettingsSectionData> {
-  /**
-   * The feature behind which the tab is locked: while the user's plan lacks it, the contributed
-   * paywall screen replaces the tab's sections.
-   */
-  readonly feature?: PaywallFeatureName
-}
+export type SettingsTabData = SettingsSearchableTab<SettingsSectionData>

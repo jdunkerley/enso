@@ -40,13 +40,8 @@ const backends = vi.hoisted(() => ({
   hasLocalBackend: true,
   organization: null as { readonly subscription?: object } | null,
 }))
-const paywall = vi.hoisted(() => ({ locked: new Set<string>() }))
 
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
-vi.mock('$/composables/paywall', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useIsFeatureUnderPaywall: () => (feature: string) => paywall.locked.has(feature),
-}))
 // The global store keeps the first router it sees; each test has its own.
 vi.mock('$/providers/queryParams', async (importOriginal) => {
   const original = await importOriginal<typeof QueryParamsModule>()
@@ -83,7 +78,6 @@ beforeEach(async () => {
   }
   backends.hasLocalBackend = true
   backends.organization = null
-  paywall.locked.clear()
   contributeSettingsSections(SettingsTabType.account, () =>
     Promise.resolve([
       {

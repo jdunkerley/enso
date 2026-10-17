@@ -9,9 +9,6 @@
  * Space, and no focus taken on opening. It closes on Escape (the dashboard's `closeModal` binding,
  * while it is open), on a press that starts and ends outside it, and when anything outside it
  * scrolls or is right-clicked; and, through the dialog context, when an entry is pressed.
- *
- * A locked entry (`isUnderPaywall`) shows the lock and the "upgrade" tooltip; no entry is locked
- * any more, so pressing one always runs its action.
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import { POPOVER_STYLES } from '$/components/Dialog/variants'
@@ -19,7 +16,6 @@ import { provideDialogContext } from '$/components/Dialog/dialogContext'
 import MenuEntry from '$/components/MenuEntry/MenuEntry.vue'
 import { portalTarget } from '$/components/portal'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
-import { useText } from '$/providers/text'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { useEventListener } from '@vueuse/core'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
@@ -38,7 +34,6 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const { getText } = useText()
 const inputBindings = useDashboardInputBindings()
 const popover = ref<HTMLElement>()
 
@@ -164,8 +159,8 @@ function press(entry: ContextMenuEntry) {
             variant="context-menu"
             :action="entry.action"
             :label="entry.label"
-            :icon="entry.isUnderPaywall === true ? 'lock' : entry.icon"
-            :tooltip="entry.isUnderPaywall === true ? getText('upgradeToUseCloud') : entry.tooltip"
+            :icon="entry.icon"
+            :tooltip="entry.tooltip"
             :isDisabled="entry.isDisabled"
             :color="entry.color"
             :onPress="() => press(entry)"

@@ -12,15 +12,16 @@ context entries receive, and the search over tabs, sections and entries are in
 `$/configurations/settings.ts`, framework-free, so that one search spans every
 tab.
 
-- **The tabs** (`tabs.ts`), all Vue since #88: Account, Organization, Local,
-  Billing & Plans, Members, User groups, Appearance, Keyboard shortcuts,
-  Activity log, API keys, Usage. `SettingsTab.vue` lays out their sections; a
-  form entry is `SettingsFormEntry.vue`, a component entry reads the page's
-  context with `useSettingsContext` (`$/providers/settingsContext`).
+- **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance,
+  Keyboard shortcuts, and the Organization, Billing & Plans, Members, User
+  groups, Activity log, API keys and Usage tabs that PR 3 of the local-only
+  programme removes. `SettingsTab.vue` lays out their sections; a form entry is
+  `SettingsFormEntry.vue`, a component entry reads the page's context with
+  `useSettingsContext` (`$/providers/settingsContext`).
 - **Tabs without sections.** The core declares Organization, Billing & Plans,
   Members, User groups, Activity log, API keys and Usage (name, icon,
-  visibility, the paywall features) with no sections of its own, and nothing
-  contributes any now (the cloud areas are gone). A Vue tab with no sections is
+  visibility) with no sections of its own, and nothing contributes any now (the
+  cloud sources are gone, and so is the paywall). A Vue tab with no sections is
   not listed, so none of them shows.
 - **The Account tab has one section of its own: the offline user.** In
   local-only mode (authentication disabled, `isAuthDisabled` in the context) it
@@ -68,12 +69,9 @@ scopes) and names it; a conflict a reset brings back is shown in red.
 
 ## Tests
 
-`__tests__/`: the shell (`SettingsPage.test.ts`), the Account tab with the
-cloud's sections (`accountTab.test.ts`), the Organization and Members tabs with
-theirs (`organizationTabs.test.ts`), User groups, Activity log, API keys and
-Usage with theirs (`cloudTabs.test.ts`), Billing & Plans with its
-(`billingTab.test.ts`), and the Keyboard shortcuts tab with its capture modal.
-The Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
+`__tests__/`: the shell (`SettingsPage.test.ts`), the Local tab
+(`localTab.test.ts`) and the Keyboard shortcuts tab with its capture modal. The
+Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
 `organizationSettings.spec.ts` and `localModeSettings.spec.ts` (local-only mode,
 which also shows how to start the app with authentication disabled), and the
 settings check of `accessibility.spec.ts`.
