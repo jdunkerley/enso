@@ -26,21 +26,28 @@ const changed = computed(() => {
 </script>
 
 <template>
-  <span
-    v-if="changed"
-    role="img"
-    class="ChangedIndicator"
-    :aria-label="getText('changedSinceLastVersion')"
-    data-testid="project-changed-indicator"
-  />
+  <!-- The top bar gives its children a `min-height`; the wrapper takes it and stretches with the
+       row, so the dot inside keeps its own size. -->
+  <span v-if="changed" class="ChangedIndicator">
+    <span
+      role="img"
+      class="dot"
+      :aria-label="getText('changedSinceLastVersion')"
+      data-testid="project-changed-indicator"
+    />
+  </span>
 </template>
 
 <style scoped>
 .ChangedIndicator {
-  align-self: center;
+  display: flex;
+  align-items: center;
+}
+
+.dot {
+  flex: none;
   width: 8px;
   height: 8px;
-  min-height: 8px;
   border-radius: var(--radius-full);
   background: currentColor;
   opacity: 0.6;
