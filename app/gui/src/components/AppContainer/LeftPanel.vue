@@ -105,8 +105,7 @@ async function onAddDirectoryClick() {
   const [newDirectory] = (await window.api?.fileBrowser.openFileBrowser('directory')) ?? []
 
   if (newDirectory != null) {
-    const path = Path(newDirectory)
-    categories.addLocalDirectory(path)
+    const path = categories.addLocalDirectory(Path(newDirectory))
     currentCategory.value = { type: 'localDirectory', path }
   }
 }
