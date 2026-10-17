@@ -392,7 +392,7 @@ export async function mockLocalApi(page: Page) {
       openProjects.delete(params.projectId)
       return route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify(toJSONRPCResult(null)),
+        body: JSON.stringify(toJSONRPCResult({})),
       })
     })
 
