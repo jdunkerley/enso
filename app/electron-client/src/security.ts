@@ -9,23 +9,14 @@ import * as electron from 'electron'
 // === Constants ===
 // =================
 
-/** The list of hosts that the app can access. They are required for user authentication to work. */
-const TRUSTED_HOSTS = [
-  'accounts.google.com',
-  'accounts.youtube.com',
-  'github.com',
-  'production-enso-domain.auth.eu-west-1.amazoncognito.com',
-  'production-enso-organizations-files.s3.amazonaws.com',
-  'production-enso-projects-templates.s3.eu-west-1.amazonaws.com',
-  'staging-enso-domain.auth.eu-west-1.amazoncognito.com',
-  'pb-enso-domain.auth.eu-west-1.amazoncognito.com',
-  '7aqkn3tnbc.execute-api.eu-west-1.amazonaws.com',
-  'lkxuay3ha1.execute-api.eu-west-1.amazonaws.com',
-  '8rf1a7iy49.execute-api.eu-west-1.amazonaws.com',
-  'opk1cxpwec.execute-api.eu-west-1.amazonaws.com',
-  'xw0g8j3tsb.execute-api.eu-west-1.amazonaws.com',
-  's3.eu-west-1.amazonaws.com',
-]
+/**
+ * Hosts the main window may navigate to, beyond its own origin: none.
+ *
+ * This list gates only top-level navigation (`will-navigate`). It does not affect `fetch`, XHR,
+ * WebSocket or image requests from either process, so the update checker, Sentry and map tiles
+ * are unaffected; external links open in the system browser via `TRUSTED_EXTERNAL_PROTOCOLS`.
+ */
+const TRUSTED_HOSTS: string[] = []
 
 /** The list of protocols that the app can open external links to. */
 const TRUSTED_EXTERNAL_PROTOCOLS = ['mailto:', 'http:', 'https:']

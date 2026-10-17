@@ -9,24 +9,20 @@
 
 import './cjs-shim' // must be imported first
 
-import { createRemoteBackend } from '@/backend'
 import { appPath, assetsPath } from '@/paths'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
-import { DEEP_LINK_SCHEME, PRODUCT_NAME } from 'enso-common/src/constants'
+import { PRODUCT_NAME } from 'enso-common/src/constants'
 import {
   buildWebAppURLSearchParamsFromArgs,
   defaultOptions,
   type Options,
 } from 'enso-common/src/options'
-import { EnsoPath } from 'enso-common/src/services/Backend'
 import { Path } from 'enso-common/src/utilities/file'
 import { access, constants, readFile, writeFile } from 'node:fs/promises'
-import { platform } from 'node:os'
 import { join as joinPath } from 'node:path'
 import process from 'node:process'
-import { downloadSamples, runHybridProjectByUrl, runLocalProjectByPath } from 'project-manager-shim'
+import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import { initAuthentication } from './authentication.js'
 import { parseArgs } from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
@@ -51,7 +47,6 @@ import {
 } from './projectService.js'
 import { enableAll } from './security.js'
 import { Config, Server } from './server.js'
-import { getUrlToOpen, handleOpenUrl, registerAssociations } from './urlAssociations.js'
 
 type Electron = typeof import('electron')
 
@@ -70,7 +65,6 @@ function pathToURL(path: string): URL {
 interface ParsedArguments {
   readonly args: Options
   readonly fileToOpen: string | null
-  readonly urlToOpen: URL | null
 }
 
 /**
@@ -122,12 +116,11 @@ class App {
     }
   }
 
-  runElectronApp(args: Options, fileToOpen: string | null, urlToOpen: URL | null) {
+  runElectronApp(args: Options, fileToOpen: string | null) {
     if (!this.electron) {
       throw new Error('Electron is not available, cannot run Electron app.')
     }
     const electron = this.electron
-    registerAssociations(this.electron, this.electronIsDev)
     // Register file associations for macOS.
     setOpenFileEventHandler((path) => {
       if (electron.app.isReady()) {
@@ -137,12 +130,9 @@ class App {
         this.setProjectToOpenOnStartup(pathToURL(path))
       }
     }, this.electron)
-    const isOriginalInstance = this.electron.app.requestSingleInstanceLock({
-      fileToOpen,
-      urlToOpen,
-    })
+    const isOriginalInstance = this.electron.app.requestSingleInstanceLock({ fileToOpen })
     if (isOriginalInstance) {
-      this.handleItemOpening(fileToOpen, urlToOpen)
+      this.handleItemOpening(fileToOpen)
       setChromeOptions(electron)
       enableAll()
 
@@ -160,16 +150,6 @@ class App {
 
       this.electron.app.on('second-instance', (_event, argv) => {
         console.error(`Got data from 'second-instance' event: '${argv.toString()}'.`)
-
-        const isWin = platform() === 'win32'
-
-        if (isWin) {
-          const ensoLinkInArgs = argv.find((arg) => arg.startsWith(DEEP_LINK_SCHEME))
-
-          if (ensoLinkInArgs != null) {
-            electron.app.emit('open-url', new CustomEvent('open-url'), ensoLinkInArgs)
-          }
-        }
 
         // The second instances will close themselves, but our window likely is not in the
         // foreground - the focus went to the "second instance" of the application.
@@ -233,12 +213,11 @@ class App {
     // We parse only "client arguments", so we don't have to worry about the Electron-Dev vs
     // Electron-Proper distinction.
     const fileToOpen = getFileToOpen(args)
-    const urlToOpen = getUrlToOpen(args)
     // If we are opening a file (i.e. we were spawned with just a path of the file to open as
-    // the argument) or URL, it means that effectively we don't have any non-standard arguments.
+    // the argument), it means that effectively we don't have any non-standard arguments.
     // We just need to let the caller know that we are opening a file.
-    const argsToParse = fileToOpen != null || urlToOpen != null ? [] : args
-    return { args: parseArgs(argsToParse), fileToOpen, urlToOpen }
+    const argsToParse = fileToOpen != null ? [] : args
+    return { args: parseArgs(argsToParse), fileToOpen }
   }
 
   /**
@@ -270,19 +249,15 @@ class App {
 
   /**
    * This method is invoked when the application was spawned due to being a default application
-   * for a URL protocol or file extension.
+   * for a file extension.
    */
-  handleItemOpening(fileToOpen: string | null, urlToOpen: URL | null) {
-    console.log('Opening file or URL.', { fileToOpen, urlToOpen })
+  handleItemOpening(fileToOpen: string | null) {
+    console.log('Opening file.', { fileToOpen })
     try {
       if (fileToOpen != null) {
         // The IDE must receive the project path, otherwise if the IDE has a custom root directory
         // set then it is added to the (incorrect) default root directory.
         this.setProjectToOpenOnStartup(pathToURL(fileToOpen))
-      }
-
-      if (urlToOpen != null) {
-        handleOpenUrl(urlToOpen)
       }
     } catch {
       // If we failed to open the file, we should enter the usual welcome screen.
@@ -304,15 +279,6 @@ class App {
       await this.createWindowIfEnabled(args)
       initIpc(this.window, this.electron, this.electronIsDev)
       await this.loadWindowContent(args)
-      if (this.electron) {
-        /**
-         * The non-null assertion on the following line is safe because the window
-         * initialization is guarded by the `createWindowIfEnabled` method. The window is
-         * not yet created at this point, but it will be created by the time the
-         * authentication module uses the lambda providing the window.
-         */
-        initAuthentication(this.electron, () => this.window!)
-      }
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()
@@ -521,7 +487,7 @@ class App {
     if (!this.parsedArguments) {
       throw new Error('Parsed arguments are not available, call `init()` first.')
     }
-    const { args, fileToOpen, urlToOpen } = this.parsedArguments
+    const { args, fileToOpen } = this.parsedArguments
     process.on('uncaughtException', (err, origin) => {
       console.error(`Uncaught exception: ${err.toString()}\nException origin: ${origin}`)
       this.showErrorBox(PRODUCT_NAME, err.stack ?? err.toString())
@@ -536,21 +502,12 @@ class App {
       await printInfo()
       return this.quit()
     } else if (this.electron) {
-      this.runElectronApp(args, fileToOpen, urlToOpen)
+      this.runElectronApp(args, fileToOpen)
     } else if (args.headless) {
       const projectToOpen = args.startup.project
-      if (projectToOpen.startsWith(`${DEEP_LINK_SCHEME}:`)) {
-        try {
-          const exitCode = await runHybridProjectByUrl(
-            EnsoPath(projectToOpen.toString()),
-            await createRemoteBackend(),
-          )
-          // Forward exact failure exit code if available (or 0 if no error).
-          this.exit(exitCode)
-        } catch (error) {
-          console.error(`Error starting hybrid project '${projectToOpen}':`, error)
-          return this.exit(1)
-        }
+      if (projectToOpen.startsWith('enso:')) {
+        console.error('Cloud projects are not supported; pass a local project path.')
+        return this.exit(1)
       } else if (projectToOpen) {
         try {
           const exitCode = await runLocalProjectByPath(Path(projectToOpen))
@@ -561,7 +518,7 @@ class App {
           return this.exit(1)
         }
       } else {
-        console.error('Usage: `--headless --startup.project <project path or url>`')
+        console.error('Usage: `--headless --startup.project <project path>`')
         return this.exit(1)
       }
     }

@@ -15,7 +15,7 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
   headless: {
     flag: '--headless',
     description:
-      'Run in headless mode (single execution). Requires `--startup.project <project path or url>`.',
+      'Run in headless mode (single execution). Requires `--startup.project <project path>`.',
   },
   displayWindow: {
     flag: '--no-window',
@@ -30,14 +30,6 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
   'startup.project': {
     flag: '--startup.project <name>',
     description: 'Project to open or create at startup',
-  },
-  'authentication.enabled': {
-    flag: '--authentication.enabled',
-    description: 'Enable user authentication (always true in cloud)',
-  },
-  'authentication.email': {
-    flag: '--authentication.email <email>',
-    description: 'User email for authentication',
   },
   'server.port': {
     flag: '--server.port',

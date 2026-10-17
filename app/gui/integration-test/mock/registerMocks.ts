@@ -84,11 +84,6 @@ async function mockElectronApi(page: Page, aiAvailable: boolean) {
     return page.addInitScript((aiAvailable) => {
       Object.defineProperty(window, 'api', {
         value: {
-          authentication: {
-            openUrlInSystemBrowser: () => {},
-            setDeepLinkHandler: () => {},
-            saveAccessToken: () => {},
-          },
           navigation: {
             goBack: () => {},
             goForward: () => {},
