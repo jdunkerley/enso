@@ -5,7 +5,13 @@
  */
 import * as fs from 'node:fs/promises'
 import * as path from 'node:path'
-import { errorCode, isRecord, serialised, writeJsonAtomic } from './localMetadata/jsonFile.js'
+import {
+  errorCode,
+  isRecord,
+  serialised,
+  writeJsonAtomic,
+  writeJsonExclusive,
+} from './localMetadata/jsonFile.js'
 
 /** The extension of a datalink file. The standard library compares it case-sensitively. */
 export const DATALINK_EXTENSION = '.datalink'
@@ -16,9 +22,19 @@ export function isDatalinkPath(filePath: string): boolean {
   return name.length > DATALINK_EXTENSION.length && name.endsWith(DATALINK_EXTENSION)
 }
 
+/**
+ * Refuse anything but an absolute, normalised path (so no `.` or `..` segments) to a `.datalink`
+ * file. Datalinks live in any folder the user picks, so there is no root to confine them to.
+ */
 function requireDatalinkPath(filePath: string): void {
-  if (!path.isAbsolute(filePath) || !isDatalinkPath(filePath)) {
-    throw new Error(`'${filePath}' is not an absolute path to a '${DATALINK_EXTENSION}' file.`)
+  if (
+    !path.isAbsolute(filePath) ||
+    path.normalize(filePath) !== filePath ||
+    !isDatalinkPath(filePath)
+  ) {
+    throw new Error(
+      `'${filePath}' is not a normalised absolute path to a '${DATALINK_EXTENSION}' file.`,
+    )
   }
 }
 
@@ -38,11 +54,19 @@ async function statOrNull(filePath: string) {
 /**
  * The parsed JSON of the datalink file. It is not checked against the datalink schema: the GUI's
  * editor validates what it shows.
- * @throws {Error} when the file is missing, or is not valid JSON (the file is left as it is).
+ * @throws {Error} when the file is missing (`Datalink not found`), or is not valid JSON (the file is left as it is).
  */
 export async function readDatalink(filePath: string): Promise<unknown> {
   requireDatalinkPath(filePath)
-  const text = await fs.readFile(filePath, 'utf8')
+  let text: string
+  try {
+    text = await fs.readFile(filePath, 'utf8')
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') {
+      throw new Error(`Datalink not found: '${filePath}'.`, { cause: error })
+    }
+    throw error
+  }
   try {
     return JSON.parse(text)
   } catch (error) {
@@ -63,10 +87,14 @@ export async function createDatalink(filePath: string, value: unknown): Promise<
     if (!(await statOrNull(folder))?.isDirectory()) {
       throw new Error(`The folder '${folder}' does not exist.`)
     }
-    if ((await statOrNull(filePath)) != null) {
-      throw new Error(`'${path.basename(filePath)}' already exists.`)
+    try {
+      await writeJsonExclusive(filePath, value)
+    } catch (error) {
+      if (errorCode(error) === 'EEXIST') {
+        throw new Error(`'${path.basename(filePath)}' already exists.`, { cause: error })
+      }
+      throw error
     }
-    await writeJsonAtomic(filePath, value)
   })
 }
 

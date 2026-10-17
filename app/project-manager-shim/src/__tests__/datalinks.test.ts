@@ -90,9 +90,56 @@ describe('datalink files', () => {
 
   test('every operation refuses a path that is not an absolute .datalink path', async () => {
     for (const bad of [path.join(root, 'x.json'), 'Sales.datalink']) {
-      await expect(readDatalink(bad)).rejects.toThrow(/is not an absolute path to a '\.datalink'/)
+      await expect(readDatalink(bad)).rejects.toThrow(
+        /is not a normalised absolute path to a '\.datalink'/,
+      )
       await expect(createDatalink(bad, S3)).rejects.toThrow(/'\.datalink'/)
       await expect(deleteDatalink(bad)).rejects.toThrow(/'\.datalink'/)
     }
+  })
+})
+
+describe('datalink path confinement', () => {
+  test('a path with a .. segment or a non-normalised form is refused by every operation', async () => {
+    const sneaky = `${root}${path.sep}sub${path.sep}..${path.sep}Sales.datalink`
+    expect(path.normalize(sneaky)).not.toBe(sneaky)
+    await createDatalink(file, S3)
+    await expect(readDatalink(sneaky)).rejects.toThrow(/normalised absolute path/)
+    await expect(createDatalink(sneaky, S3)).rejects.toThrow(/normalised absolute path/)
+    await expect(updateDatalink(sneaky, S3)).rejects.toThrow(/normalised absolute path/)
+    await expect(deleteDatalink(sneaky)).rejects.toThrow(/normalised absolute path/)
+    await expect(fs.stat(file)).resolves.toBeDefined()
+  })
+
+  test('a path that does not end in .datalink is refused', async () => {
+    await expect(createDatalink(path.join(root, 'Sales.json'), S3)).rejects.toThrow(/\.datalink/)
+    await expect(readDatalink(path.join(root, 'x.txt'))).rejects.toThrow(/\.datalink/)
+  })
+})
+
+describe('exclusive create', () => {
+  test('a missing datalink reads as "Datalink not found"', async () => {
+    await expect(readDatalink(file)).rejects.toThrow(/^Datalink not found: /)
+  })
+
+  test('a dangling symlink is not written through', async () => {
+    const target = path.join(root, 'elsewhere.txt')
+    try {
+      await fs.symlink(target, file)
+    } catch {
+      return // Creating symlinks needs a privilege some Windows accounts lack.
+    }
+    await expect(createDatalink(file, S3)).rejects.toThrow(/already exists/)
+    await expect(fs.stat(target)).rejects.toThrow()
+  })
+
+  test('a file that appears after the existence check is not overwritten', async () => {
+    // The check and the write are one operation (a hard link that fails on an existing target), so
+    // a file created by another process in between survives.
+    const { writeJsonExclusive } = await import('../localMetadata/jsonFile.js')
+    await fs.writeFile(file, 'someone else')
+    await expect(writeJsonExclusive(file, S3)).rejects.toMatchObject({ code: 'EEXIST' })
+    expect(await fs.readFile(file, 'utf8')).toBe('someone else')
+    expect(await fs.readdir(root)).toEqual(['Sales.datalink'])
   })
 })

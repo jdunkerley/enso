@@ -52,6 +52,36 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
   }
 }
 
+/** Error codes meaning the file system cannot hard-link, so an exclusive write falls back. */
+const NO_HARD_LINK_CODES = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS'])
+
+/**
+ * Write `value` as JSON to `filePath` only if nothing is there (an existing file or a dangling
+ * symlink included), failing with `EEXIST` otherwise. The content is written to a temporary file
+ * that is hard-linked into place, so readers never see a partial write and a file created by
+ * another process in the meantime is never overwritten. Where the file system has no hard links
+ * the write is exclusive (`wx`) but not atomic.
+ */
+export async function writeJsonExclusive(filePath: string, value: unknown): Promise<void> {
+  const text = JSON.stringify(value, null, 2)
+  const temporaryPath = path.join(
+    path.dirname(filePath),
+    `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomUUID()}`,
+  )
+  await fs.writeFile(temporaryPath, text)
+  try {
+    await fs.link(temporaryPath, filePath)
+  } catch (error) {
+    if (NO_HARD_LINK_CODES.has(errorCode(error) ?? '')) {
+      await fs.writeFile(filePath, text, { flag: 'wx' })
+    } else {
+      throw error
+    }
+  } finally {
+    await fs.rm(temporaryPath, { force: true })
+  }
+}
+
 /**
  * Rename `from` over `to`, retrying a few times on the errors Windows reports while another
  * process briefly holds either file.

@@ -303,3 +303,62 @@ describe('unknown routes', () => {
     expect((await call('nope', {})).error).toBeDefined()
   })
 })
+
+describe('datalink routes', () => {
+  const VALUE = {
+    type: 'HTTP',
+    libraryName: 'Standard.Base',
+    uri: 'https://x',
+    method: 'GET',
+  }
+
+  test('create, read, update and delete', async () => {
+    const file = path.join(root, 'Web.datalink')
+    expect((await call('datalink/create', { path: file, value: VALUE })).result).toBeNull()
+    expect((await call('datalink/read', { path: file })).result).toEqual(VALUE)
+    const changed = { ...VALUE, uri: 'https://y' }
+    expect((await call('datalink/update', { path: file, value: changed })).result).toBeNull()
+    expect(JSON.parse(await fs.readFile(file, 'utf8'))).toEqual(changed)
+    expect((await call('datalink/delete', { path: file })).result).toBeNull()
+    await expect(fs.stat(file)).rejects.toThrow()
+  })
+
+  test('invalid JSON is reported as an error naming the file', async () => {
+    const file = path.join(root, 'Broken.datalink')
+    await fs.writeFile(file, '{ not json')
+    const read = await call('datalink/read', { path: file })
+    expect(read).not.toHaveProperty('result')
+    expect(read.error).toMatchObject({
+      message: expect.stringMatching(
+        /^datalink\/read failed: 'Broken\.datalink' is not valid JSON/,
+      ),
+    })
+  })
+
+  test('a malformed body or an existing file is an error', async () => {
+    const file = path.join(root, 'Web.datalink')
+    expect((await call('datalink/create', { path: file })).error).toBeDefined()
+    expect((await call('datalink/read', { path: 3 })).error).toBeDefined()
+    await call('datalink/create', { path: file, value: VALUE })
+    const again = await call('datalink/create', { path: file, value: VALUE })
+    expect(again.error).toMatchObject({
+      message: expect.stringContaining('already exists'),
+    })
+  })
+})
+
+describe('datalink route paths', () => {
+  test('a .. path or a path not ending in .datalink is refused', async () => {
+    const value = { type: 'HTTP' }
+    const dotDot = `${root}${path.sep}sub${path.sep}..${path.sep}Web.datalink`
+    for (const bad of [dotDot, path.join(root, 'Web.json'), 'Web.datalink']) {
+      for (const name of ['create', 'update']) {
+        expect((await call(`datalink/${name}`, { path: bad, value })).error).toBeDefined()
+      }
+      for (const name of ['read', 'delete']) {
+        expect((await call(`datalink/${name}`, { path: bad })).error).toBeDefined()
+      }
+    }
+    expect(await fs.readdir(root)).not.toContain('Web.datalink')
+  })
+})
