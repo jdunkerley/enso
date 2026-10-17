@@ -87,8 +87,6 @@ const localBrowserItems = useLocalBrowser({ dialogKind, write, currentPath, setP
 const textSecretsItems = useTextSecrets({ dialogKind, reprType })
 
 const items = computed((): (CustomDropdownItem | ExpressionTag)[] => [
-  // The IDE is local-only: there is no cloud browser to offer (`WidgetFileBrowser/cloudBrowser.ts`
-  // is unused, and is deleted with the rest of the cloud UI).
   ...localBrowserItems.value,
   ...textSecretsItems.value,
 ])

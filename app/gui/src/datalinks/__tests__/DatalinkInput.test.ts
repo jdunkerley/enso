@@ -1,8 +1,7 @@
-/* eslint-disable vue/one-component-per-file -- a stub of the file browser and a host holding the value. */
 /**
  * @file The datalink editor (#198): what it builds from the datalink schema, choosing a type,
  * optional properties, invalid values and their descriptions, number fields, the secret combo box
- * and the file path with its file browser.
+ * and the file path.
  */
 import { useText } from '$/providers/text'
 import SCHEMA from '$/utils/datalinkSchema.json' with { type: 'json' }
@@ -25,29 +24,6 @@ vi.mock('$/providers/backends', async () => {
 vi.mock('$/providers/auth', () => ({
   useAuth: () => ({ session: { user: { name: 'me' } } }),
 }))
-// The project view's cloud file browser, stubbed: a button accepting a fixed path.
-vi.mock('@/components/widgets/FileBrowserWidget.vue', async () => {
-  const { defineComponent, h } = await import('vue')
-  return {
-    default: defineComponent({
-      props: { choosenPath: String, type: String, writeMode: Boolean, allowOverride: Boolean },
-      emits: ['pathAccepted'],
-      setup(props, { emit }) {
-        return () =>
-          h(
-            'button',
-            {
-              'data-testid': 'file-browser',
-              'data-path': props.choosenPath,
-              onClick: () => emit('pathAccepted', 'enso://Users/me/data.csv'),
-            },
-            'browse',
-          )
-      },
-    }),
-  }
-})
-
 const { getText } = useText()
 const DEFS: Record<string, object> = SCHEMA.$defs
 const INITIAL = constantValueOfSchema(DEFS, SCHEMA.$defs.DataLink, true)[0]
@@ -176,19 +152,6 @@ describe('DatalinkInput', () => {
     })
     await vi.waitFor(() => expect(listSecrets).toHaveBeenCalled())
     expect(element().textContent?.match(/Choose a secret\./g)).toHaveLength(1)
-  })
-
-  test('a file path opens the file browser, which sets the path', async () => {
-    const { value } = await mountEditor()
-    await chooseType('Enso File')
-    const input = placeholder(getText('enterText'))[0]!
-    expect(element().querySelector('[data-testid="file-browser"]')).toBeNull()
-    await userEvent.setup().click(input)
-    const browser = element().querySelector<HTMLElement>('[data-testid="file-browser"]')!
-    expect(browser).not.toBeNull()
-    await userEvent.setup().click(browser)
-    expect(value.value).toMatchObject({ path: 'enso://Users/me/data.csv' })
-    expect(input.value).toBe('enso://Users/me/data.csv')
   })
 
   test('read-only: the fields cannot be edited', async () => {

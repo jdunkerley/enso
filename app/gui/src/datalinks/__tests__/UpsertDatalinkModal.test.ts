@@ -16,10 +16,6 @@ vi.mock('$/providers/backends', async () => {
   return { useBackends: () => backends }
 })
 vi.mock('$/providers/auth', () => ({ useAuth: () => ({ session: { user: { name: 'me' } } }) }))
-vi.mock('@/components/widgets/FileBrowserWidget.vue', async () => {
-  const { defineComponent, h } = await import('vue')
-  return { default: defineComponent({ setup: () => () => h('div') }) }
-})
 
 const { getText } = useText()
 

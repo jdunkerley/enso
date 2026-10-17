@@ -627,6 +627,7 @@
   "localStorage": "Local Storage",
   "addLocalDirectory": "Add Folder",
   "browseForNewLocalRootDirectory": "Browse for new Root Folder",
+  "datalinkFilePathBrowse": "Browse…",
   "resetLocalRootDirectory": "Reset Root Folder",
   "browseForNewDownloadDirectory": "Browse for new Download Folder",
   "resetDownloadDirectory": "Reset Download Folder",
