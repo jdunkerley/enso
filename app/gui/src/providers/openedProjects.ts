@@ -304,6 +304,13 @@ export function createOpenedProjectsStore() {
   // synchronized with remote in case someone else opens it meanwhile), and close every open local
   // project whose versions are kept, so that each saves its "Saved on close" version. Then close
   // the window. `preventDefault` must be called synchronously, so the work runs afterwards.
+  //
+  // `beforeunload` cannot tell a quit from a reload, so a reload (the dev shortcut, or
+  // DevtoolsPanel's `location.reload()`) on Electron with a versioned local project open takes this
+  // path too: the projects are closed, each saving its version, and then the window is closed
+  // rather than reloaded. That was already so for an unsynced hybrid project. It is left so: letting
+  // the reload through would skip the "Saved on close" versions. To reload, close the local
+  // projects first.
   window.addEventListener('beforeunload', (event) => {
     // A second quit while the first is finishing (which only happens on Electron) waits for it.
     if (finishingBeforeQuit) {

@@ -95,6 +95,8 @@ function projectIcon(project: Project): Icon | undefined {
 <template>
   <div class="TabBar">
     <div class="tabs" role="tablist">
+      <!-- The tab's `aria-label` (its tooltip, else its label) replaces the name its content would
+        give it, so a changed tab says so there and the ● is hidden from assistive technology. -->
       <SelectableTab
         v-for="tab in tabsViewInfos"
         :key="panelKey(tab)"
@@ -102,14 +104,14 @@ function projectIcon(project: Project): Icon | undefined {
         :selected="isCurrentTab(tab)"
         :icon="tab.icon"
         :label="tab.label"
+        :tooltip="tab.changed ? `${tab.label} (${getText('changedSinceLastVersion')})` : undefined"
         @close="closeTab(tab)"
         @update:selected="$event && (currentTab = tab)"
       >
         <span
           v-if="tab.changed"
-          role="img"
           class="changed"
-          :aria-label="getText('changedSinceLastVersion')"
+          aria-hidden="true"
           data-testid="tab-changed-indicator"
           >●</span
         >

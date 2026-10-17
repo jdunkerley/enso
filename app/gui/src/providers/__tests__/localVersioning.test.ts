@@ -158,6 +158,25 @@ describe('polling', () => {
     expect(store.isStatusUnknown(PROJECT)).toBe(false)
   })
 
+  test('hasGit keeps the last known answer while the status is unknown', async () => {
+    const versioningStatus = vi
+      .fn<(path: Path) => Promise<VersioningStatus>>()
+      .mockResolvedValueOnce(status())
+      .mockRejectedValueOnce(new Error('shim down'))
+      .mockResolvedValue(status({ git: false, repoRoot: null, enabled: false }))
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { store } = setup({ versioningStatus })
+    expect(store.hasGit(PROJECT)).toBe(false)
+    store.watchProject(PROJECT, FLUSHED)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(store.hasGit(PROJECT)).toBe(true)
+    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    expect(store.isStatusUnknown(PROJECT)).toBe(true)
+    expect(store.hasGit(PROJECT)).toBe(true)
+    await vi.advanceTimersByTimeAsync(VERSIONING_POLL_INTERVAL_MS)
+    expect(store.hasGit(PROJECT)).toBe(false)
+  })
+
   test('re-watching a project with a request pending waits for it', async () => {
     const first = deferred<VersioningStatus>()
     const versioningStatus = vi
@@ -421,6 +440,26 @@ describe('offerRepository', () => {
     store.watchProject(PROJECT, FLUSHED)
     await expect(store.offerRepository(PROJECT, 'save')).resolves.toBe('ready')
     expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('a known status that asks nothing is not read again, even from a wedged shim', async () => {
+    const cases = [
+      [status(), 'ready'],
+      [status({ enabled: false, optedOut: true }), 'declined'],
+      [status({ git: false, repoRoot: null, enabled: false }), 'noGit'],
+    ] as const
+    for (const [known, expected] of cases) {
+      const versioningStatus = vi
+        .fn<(path: Path) => Promise<VersioningStatus>>()
+        .mockResolvedValueOnce(known)
+        .mockReturnValue(new Promise(() => {}))
+      const { store } = setup({ versioningStatus })
+      store.watchProject(PROJECT, FLUSHED)
+      await vi.waitFor(() => expect(store.statusOf(PROJECT)).toEqual(known))
+      await expect(store.offerRepository(PROJECT, 'close')).resolves.toBe(expected)
+      expect(versioningStatus).toHaveBeenCalledTimes(1)
+      store.unwatchProject(PROJECT)
+    }
   })
 
   test('concurrent offers share one prompt, one init and one result', async () => {

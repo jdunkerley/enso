@@ -239,8 +239,9 @@ const graphTidy = useGraphTidy(graphStore, module)
 const localVersioning = useLocalVersioning()
 const { getText } = useText()
 
+// The last known `git`, so that the save icon stays (disabled) while a status read fails.
 const savingAvailable = () =>
-  projectInfo.value.mode === 'local' && localVersioning.statusOf(assetId.value)?.git === true
+  projectInfo.value.mode === 'local' && localVersioning.hasGit(assetId.value)
 /** Git's message while the repository is blocked; otherwise the action's own description. */
 const blockedDescription = () => {
   const blocked = localVersioning.statusOf(assetId.value)?.blocked

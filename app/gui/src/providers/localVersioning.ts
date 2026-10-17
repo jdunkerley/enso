@@ -101,6 +101,8 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   const statuses = shallowReactive(new Map<ProjectId, VersioningStatus>())
   /** Projects whose status could not be read (failed or timed out): no status, not a stale one. */
   const unknown = shallowReactive(new Set<ProjectId>())
+  /** Whether git was found, as last read for each project: kept while a read fails. */
+  const gitFound = shallowReactive(new Map<ProjectId, boolean>())
   const watched = new Map<ProjectId, WatchedProject>()
   /**
    * The real request pending for each project, kept apart from the watch so that re-watching a
@@ -162,6 +164,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
       project.failing = false
       unknown.delete(projectId)
       statuses.set(projectId, status)
+      gitFound.set(projectId, status.git)
     } catch (error) {
       // A transient failure must not suppress the offer for the session.
       if (offered != null) offeredToShim.delete(offered)
@@ -240,6 +243,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     watched.delete(projectId)
     statuses.delete(projectId)
     unknown.delete(projectId)
+    gitFound.delete(projectId)
   }
 
   /** The last status read, or `undefined` while none is known (see {@link isStatusUnknown}). */
@@ -250,6 +254,15 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
   /** Whether the last read failed or timed out, so the project's status is not known. */
   function isStatusUnknown(projectId: ProjectId) {
     return unknown.has(projectId)
+  }
+
+  /**
+   * Whether git was found, by the last read that succeeded; `false` before any did. Unlike
+   * {@link statusOf}, it is kept while the status is unknown, so that UI shown only with git (the
+   * save icon) does not flicker when one read fails.
+   */
+  function hasGit(projectId: ProjectId) {
+    return gitFound.get(projectId) === true
   }
 
   function isVersioned(projectId: ProjectId) {
@@ -333,7 +346,12 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     const project = watched.get(projectId)
     const backend = deps.localBackend()
     if (project == null || backend == null || quitting) return 'unavailable'
-    await refresh(projectId)
+    // A known status that asks nothing is answered as it is, so that a close (or a save) does not
+    // wait for a git round trip, or for two request timeouts on a wedged shim; polling keeps it
+    // current. Anything else is read again first, since the answer decides what is asked.
+    const known = statuses.get(projectId)
+    const settled = known != null && (!known.git || known.enabled || known.optedOut)
+    if (!settled) await refresh(projectId)
     const status = statuses.get(projectId)
     if (status == null) return 'unavailable'
     if (!status.git) return 'noGit'
@@ -474,6 +492,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     refresh,
     statusOf,
     isStatusUnknown,
+    hasGit,
     isVersioned,
     offerRepository,
     setQuitting,

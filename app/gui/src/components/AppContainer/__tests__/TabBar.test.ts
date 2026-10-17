@@ -50,13 +50,17 @@ vi.mock('$/providers/localVersioning', () => ({
 const indicator = () => document.querySelector('[data-testid="tab-changed-indicator"]')
 
 describe('TabBar', () => {
-  test('shows ● with an accessible name while the project has changed', async () => {
+  test('shows ● while the project has changed, and says so in the tab’s accessible name', async () => {
     current.changed = true
     await mountWithProviders(TabBar)
+    const tab = () => document.querySelector('[role="tab"]')
     expect(indicator()?.textContent).toBe('●')
-    expect(indicator()?.getAttribute('aria-label')).toBe('Changed since the last version')
+    // The tab's `aria-label` replaces its content's name, so the ● is hidden and the tab says it.
+    expect(indicator()?.getAttribute('aria-hidden')).toBe('true')
+    expect(tab()?.getAttribute('aria-label')).toBe('P (Changed since the last version)')
     current.changed = false
     await flushPromises()
     expect(indicator()).toBeNull()
+    expect(tab()?.getAttribute('aria-label')).toBe('P')
   })
 })

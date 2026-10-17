@@ -36,6 +36,12 @@ export async function expectScreenshot(
     })
     return
   }
-  // `Page` and `Locator` assertions share the screenshot options that matter here.
-  await expect(page as Page).toHaveScreenshot(name, options)
+  // Each has its own assertion; they share the screenshot options that matter here.
+  if (isPage(page)) await expect(page).toHaveScreenshot(name, options)
+  else await expect(page).toHaveScreenshot(name, options)
+}
+
+/** Whether `target` is a whole page, rather than a locator in one. */
+function isPage(target: Page | Locator): target is Page {
+  return 'mainFrame' in target
 }

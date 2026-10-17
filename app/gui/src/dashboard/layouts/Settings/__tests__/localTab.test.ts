@@ -278,6 +278,26 @@ describe('the Versions section', () => {
     expect(document.querySelector('[data-testid="local-versions-section"] button')).toBeNull()
   })
 
+  test('while the status is read it says so', async () => {
+    let answer!: (value: unknown) => void
+    versioning.versioningStatus.mockReset().mockReturnValueOnce(new Promise((r) => (answer = r)))
+    await openLocalTab()
+    await vi.waitFor(() => expect(versionsSection()).toContain('Reading the versions status'))
+    answer({ ...versioning.status })
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('Your projects are not in a git repository.'),
+    )
+  })
+
+  test('a failed read says why, and offers no button', async () => {
+    versioning.versioningStatus.mockReset().mockRejectedValue(new Error('git timed out'))
+    await openLocalTab()
+    await vi.waitFor(() =>
+      expect(versionsSection()).toContain('The versions status could not be read: git timed out'),
+    )
+    expect(document.querySelector('[data-testid="local-versions-section"] button')).toBeNull()
+  })
+
   test(`Ask again resets the "Don't ask again" answers`, async () => {
     await openLocalTab()
     await vi.waitFor(() => button('Ask again'))

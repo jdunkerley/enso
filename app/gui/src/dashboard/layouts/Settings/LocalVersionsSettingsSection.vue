@@ -2,7 +2,8 @@
 /**
  * @file The Local tab's Versions section: whether git was found, the repository the local projects
  * are versioned in (or a button to create one at the root, to use the existing one, or to stop),
- * and a reset of the "Don't ask again" answers.
+ * and a reset of the "Don't ask again" answers. While the status is read it says so, and if the
+ * read fails it says why.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
@@ -29,6 +30,10 @@ const statusOptions = computed(() =>
 )
 const statusQuery = useQuery(statusOptions)
 const status = computed(() => statusQuery.data.value ?? undefined)
+/** Why the status could not be read; `undefined` unless the read failed. */
+const statusError = computed(() =>
+  statusQuery.isError.value ? (statusQuery.error.value?.message ?? '') : undefined,
+)
 
 const change = useMutation({
   mutationFn: async (action: 'create' | 'use' | 'stop') => {
@@ -50,8 +55,10 @@ const change = useMutation({
 </script>
 
 <template>
-  <div v-if="status != null" class="flex flex-col gap-2" data-testid="local-versions-section">
-    <Text v-if="!status.git">{{ getText('localVersionsNoGit') }}</Text>
+  <div v-if="backend != null" class="flex flex-col gap-2" data-testid="local-versions-section">
+    <Text v-if="statusError != null">{{ getText('localVersionsStatusError', statusError) }}</Text>
+    <Text v-else-if="status == null">{{ getText('localVersionsLoading') }}</Text>
+    <Text v-else-if="!status.git">{{ getText('localVersionsNoGit') }}</Text>
     <template v-else>
       <Text v-if="status.repoRoot == null">{{ getText('localVersionsNoRepository') }}</Text>
       <Text v-else-if="status.optedOut">
