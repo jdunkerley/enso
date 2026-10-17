@@ -281,6 +281,31 @@ describe('in a local category', () => {
     expect(wrapper.text()).toContain(message)
     expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
+
+  test('no tags: no "Add tag" button, no suggestions; "Latest" still shows', async () => {
+    const { wrapper } = await renderTab()
+    expect(wrapper.text()).toContain('Latest')
+    // In the cloud, each version has an "add" button for a tag (see the tags tests).
+    expect(buttonsWithIcon('add')).toHaveLength(0)
+    expect(localBackend.listAssetVersionTags).not.toHaveBeenCalled()
+  })
+
+  test('a comment is added from the comment button, and saved with Enter', async () => {
+    await renderTab()
+    const user = userEvent.setup()
+    const addComment = document.querySelector<HTMLElement>('button[aria-label="Add comment"]')!
+    await user.click(addComment)
+    const textArea = document.querySelector<HTMLTextAreaElement>('textarea')!
+    expect(document.activeElement).toBe(textArea)
+    await user.keyboard('The first draft{Enter}')
+    await flushPromises()
+    expect(localBackend.updateAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      { versionId: localVersions[1]!.versionId, comment: 'The first draft' },
+      'P',
+    )
+    expect(text()).toContain('The first draft')
+  })
 })
 
 describe('the list', () => {
