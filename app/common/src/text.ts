@@ -51,6 +51,7 @@ interface PlaceholderOverrides {
   readonly userIsAlreadyInTheOrganization: [userEmail: string]
   readonly youAreAlreadyAddingUser: [userEmail: string]
   readonly lastModifiedOn: [dateString: string]
+  readonly 'assetVersions.localStatusError': [message: string]
   readonly versionX: [version: number | string]
   readonly compareVersionXWithY: [versionNumber: number | string, versionNumber: string | number]
   readonly compareWithVersionY: [versionNumber: number | string]

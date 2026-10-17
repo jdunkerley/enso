@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/vue-query'
 import { useElementBounding } from '@vueuse/core'
 import {
   AssetType,
+  BackendType,
   type Backend,
   type DatalinkAsset,
   type FileAsset,
@@ -77,7 +78,14 @@ const comparableVersions = computed(() =>
     .filter((other) => other.versionId !== version.versionId),
 )
 
-const tagsQuery = useQuery(versionTagsQueryOptions(backend))
+/** Only the cloud tags versions; a local version is a git commit, and git tags are repository-wide. */
+const hasTags = computed(() => backend.type !== BackendType.local)
+const tagsQuery = useQuery(
+  computed(() => ({
+    ...versionTagsQueryOptions(backend),
+    enabled: hasTags.value,
+  })),
+)
 const availableTags = computed(() => tagsQuery.data.value ?? [])
 
 const removeVersionTag = useRemoveVersionTag(backend)
@@ -184,6 +192,7 @@ const shouldCollapseTags = computed(() => {
               </div>
             </template>
             <AddVersionTag
+              v-if="hasTags"
               :availableTags="availableTags"
               :item="item"
               :version="version"

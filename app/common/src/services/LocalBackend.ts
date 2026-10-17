@@ -9,7 +9,7 @@ import { markRaw } from 'vue'
 import { PRODUCT_NAME } from '../constants.js'
 import type { DownloadOptions } from '../download.js'
 import type { DefaultGetText } from '../text.js'
-import { toReadableIsoString } from '../utilities/data/dateTime.js'
+import { Rfc3339DateTime, toReadableIsoString } from '../utilities/data/dateTime.js'
 import { tryGetMessage } from '../utilities/errors.js'
 import {
   fileExtension,
@@ -583,8 +583,28 @@ export class LocalBackend extends backend.Backend {
   }
 
   /** Duplicate a specific version of a project. */
-  override async duplicateProject(projectId: backend.ProjectId): Promise<backend.CreatedProject> {
+  override async duplicateProject(
+    projectId: backend.ProjectId,
+    versionId?: backend.S3ObjectVersionId,
+    title?: string,
+  ): Promise<backend.CreatedProject> {
     const { path } = backend.extractTypeAndPath(projectId)
+    if (versionId != null) {
+      const project = await this.projectManager.duplicateVersion(
+        path,
+        versionId,
+        title ?? getFileName(path),
+        getDirectoryAndName(path).directoryPath,
+      )
+      return {
+        projectId: newProjectId(project.projectPath),
+        name: project.projectName,
+        packageName: project.projectNormalizedName,
+        organizationId: backend.OrganizationId('organization-'),
+        state: { type: backend.ProjectState.closed, volumeId: '' },
+        ensoPath: backend.EnsoPath(normalizePath(project.projectPath)),
+      }
+    }
     const project = await this.projectManager.duplicateProject({ projectPath: path })
     return {
       projectId: newProjectId(project.projectPath),
@@ -632,11 +652,26 @@ export class LocalBackend extends backend.Backend {
   override async copyAsset(
     assetId: backend.AssetId,
     parentDirectoryId: backend.DirectoryId,
+    versionId?: backend.S3ObjectVersionId,
   ): Promise<backend.CopyAssetResponse> {
     const { type, path } = backend.extractTypeAndPath(assetId)
     if (type !== backend.AssetType.project) {
       throw new Error('Only projects can be copied on the Local Backend.')
     } else {
+      if (versionId != null) {
+        const original = await this.getAssetDetails(assetId, undefined)
+        if (original == null) throw new Error('Could not retrieve details of the project.')
+        const { title } = original
+        const project = await this.projectManager.duplicateVersion(
+          path,
+          versionId,
+          title,
+          backend.extractTypeAndPath(parentDirectoryId).path,
+        )
+        const asset = await this.getAssetDetails(newProjectId(project.projectPath), undefined)
+        if (asset == null) throw new Error('Could not retrieve details of duplicated project.')
+        return { asset }
+      }
       const project = await this.projectManager.duplicateProject({ projectPath: path })
       const parentPath = getDirectoryAndName(path).directoryPath
       if (parentPath !== backend.extractTypeAndPath(parentDirectoryId).path) {
@@ -764,11 +799,24 @@ export class LocalBackend extends backend.Backend {
   /**
    * Change the parent directory of an asset.
    * Changing the description is NOT supported.
+   * With `body.versionId`, sets or clears that local version's comment instead.
+   * `_title` is unused locally; the abstract signature passes it.
    */
   override async updateAsset(
     assetId: backend.AssetId,
     body: backend.UpdateAssetRequestBody,
+    _title?: string,
   ): Promise<void> {
+    if (body.versionId != null) {
+      const { type, path } = backend.extractTypeAndPath(assetId)
+      if (body.tag != null) throw new Error('Local versions have no tags.')
+      if (type !== backend.AssetType.project) {
+        throw new Error('Only projects have versions on the Local Backend.')
+      }
+      // An empty comment removes it (the shim deletes the note), so the version shows its message.
+      await this.projectManager.setVersionComment(path, body.versionId, body.comment ?? '')
+      return
+    }
     // Changing description is not supported on the Local Backend.
     const { parentDirectoryId, title } = body
     const { type, path } = backend.extractTypeAndPath(assetId)
@@ -927,11 +975,15 @@ export class LocalBackend extends backend.Backend {
   override async resolveProjectAssetData(
     projectId: backend.ProjectId,
     relativePath: string,
+    versionId?: backend.S3ObjectVersionId,
   ): Promise<Response> {
-    return await this.projectManager.getFileContent(
-      backend.extractTypeAndPath(projectId).path,
-      relativePath,
-    )
+    const { path } = backend.extractTypeAndPath(projectId)
+    if (versionId != null) {
+      return new Response(
+        await this.projectManager.versionFileContent(path, versionId, relativePath),
+      )
+    }
+    return await this.projectManager.getFileContent(path, relativePath)
   }
 
   /** Download an asset. */
@@ -1071,15 +1123,38 @@ export class LocalBackend extends backend.Backend {
     return response.status === httpStatusIsDirty
   }
 
-  /** Invalid operation. */
-  override restoreAsset() {
-    return this.invalidOperation()
+  // === Versions tab (local project versions are git commits) ===
+
+  /** The versions of a local project (git commits), newest first. Folders and files have none. */
+  override async listAssetVersions(assetId: backend.AssetId): Promise<backend.AssetVersions> {
+    const { type, path } = backend.extractTypeAndPath(assetId)
+    if (type !== backend.AssetType.project) return { versions: [] }
+    const { versions } = await this.projectManager.listVersions(path)
+    return {
+      versions: versions.map((version) => ({
+        versionId: backend.S3ObjectVersionId(version.id),
+        lastModified: Rfc3339DateTime(version.date),
+        isLatest: version.isLatest,
+        key: version.id,
+        user: { name: version.author.name, email: backend.EmailAddress(version.author.email) },
+        comment: version.comment,
+      })),
+    }
   }
 
-  /** Invalid operation. */
-  override listAssetVersions() {
-    return this.invalidOperation()
+  /** Restore a local project to a version. The project must be closed. */
+  override async restoreAsset(
+    assetId: backend.AssetId,
+    versionId: backend.S3ObjectVersionId,
+  ): Promise<void> {
+    const { type, path } = backend.extractTypeAndPath(assetId)
+    if (type !== backend.AssetType.project) {
+      throw new Error('Only projects have versions on the Local Backend.')
+    }
+    await this.projectManager.restoreVersion(path, versionId)
   }
+
+  // === End of Versions tab ===
 
   /** List project sessions by scanning engine log files. */
   override async listProjectSessions(

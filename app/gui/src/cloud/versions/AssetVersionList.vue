@@ -6,19 +6,24 @@
  */
 import Result from '$/components/Result/Result.vue'
 import { useContainerData } from '$/providers/container'
+import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
+import { localVersioningStatusQueryOptions } from '$/utils/localVersioningQuery'
 import { backendMutationOptions } from '@/composables/backend'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   AssetType,
+  BackendType,
+  extractTypeAndPath,
   S3ObjectVersionId,
   type AssetVersions,
+  type Backend,
   type DatalinkAsset,
   type FileAsset,
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
-import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
+import { ResultError } from 'enso-common/src/utilities/data/result'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { computed } from 'vue'
@@ -27,7 +32,7 @@ import { assetVersionsQueryOptions } from './queries'
 import type { DuplicateOptions, Version } from './version'
 
 const { backend, item } = defineProps<{
-  backend: RemoteBackend
+  backend: Backend
   item: DatalinkAsset | FileAsset | ProjectAsset
 }>()
 
@@ -35,6 +40,7 @@ const { getText } = useText()
 const toasts = useToasts()
 const queryClient = useQueryClient()
 const { openProjectLocally } = useContainerData()
+const openedProjects = useOpenedProjects()
 
 /** Show an error toast, and log it. */
 function toastAndLog(textId: 'restoreProjectError' | 'updateAssetBackendError', error: unknown) {
@@ -61,11 +67,54 @@ const versions = computed<Version[]>(() => {
 })
 const latestVersion = computed(() => versions.value.find((version) => version.isLatest))
 
+/**
+ * Restore a version. A local project that is open (or opening) is closed first, saving its "Saved
+ * on close" version, so nothing is lost; the shim refuses to restore a running project. A project
+ * that is still opening has its opening aborted, but the backend open may still be in flight: then
+ * the shim refuses the restore (an error toast) and the project is opened again; the data is safe.
+ * Otherwise it is restored and opened again in the background, so the drive, where Restore was
+ * chosen, stays in front; chosen in the project's own tab, that tab stays current, so the project
+ * reopens in front. Closing the project unmounts its graph, and this list may go with it: the
+ * sequence needs nothing of the component (the mutation's callbacks live in the mutation), so it
+ * still finishes. If the close fails, nothing is restored and the error is shown; if the
+ * restore fails, the project is still opened again, unchanged.
+ */
+async function restoreVersion(versionId: S3ObjectVersionId) {
+  if (backend.type !== BackendType.local || item.type !== AssetType.project) {
+    await backend.restoreAsset(item.id, versionId)
+    return
+  }
+  const opened = openedProjects.get(item.id)
+  if (opened == null || (opened.nextTask == null && opened.state.status === 'not-opened')) {
+    await backend.restoreAsset(item.id, versionId)
+    return
+  }
+  openedProjects.closeProject(item.id, undefined, { offer: false })
+  await openedProjects.waitForProcess(opened)
+  if (opened.error != null) {
+    throw opened.error instanceof ResultError ? new Error(opened.error.message('')) : opened.error
+  }
+  try {
+    await backend.restoreAsset(item.id, versionId)
+  } finally {
+    openProjectLocally(item, BackendType.local, false)
+  }
+}
+
 const restoreMutation = useMutation({
   mutationFn: (variables: { versionId: S3ObjectVersionId; placeholderId: S3ObjectVersionId }) =>
-    backend.restoreAsset(item.id, variables.versionId),
+    restoreVersion(variables.versionId),
   onError: (error: unknown) => toastAndLog('restoreProjectError', error),
-  meta: { invalidates: [versionsQueryOptions.queryKey], awaitInvalidates: true },
+  meta: {
+    invalidates:
+      backend.type === BackendType.local ?
+        [
+          versionsQueryOptions.queryKey,
+          localVersioningStatusQueryOptions(null, extractTypeAndPath(item.id).path).queryKey,
+        ]
+      : [versionsQueryOptions.queryKey],
+    awaitInvalidates: true,
+  },
 })
 
 const duplicateMutation = useMutation(backendMutationOptions('copyAsset', backend))
