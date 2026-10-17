@@ -73,7 +73,10 @@ const latestVersion = computed(() => versions.value.find((version) => version.is
  * that is still opening has its opening aborted, but the backend open may still be in flight: then
  * the shim refuses the restore (an error toast) and the project is opened again; the data is safe.
  * Otherwise it is restored and opened again in the background, so the drive, where Restore was
- * chosen, stays in front. If the close fails, nothing is restored and the error is shown; if the
+ * chosen, stays in front; chosen in the project's own tab, that tab stays current, so the project
+ * reopens in front. Closing the project unmounts its graph, and this list may go with it: the
+ * sequence needs nothing of the component (the mutation's callbacks live in the mutation), so it
+ * still finishes. If the close fails, nothing is restored and the error is shown; if the
  * restore fails, the project is still opened again, unchanged.
  */
 async function restoreVersion(versionId: S3ObjectVersionId) {

@@ -1,10 +1,11 @@
 /**
  * @file The right panel's Versions tab for local projects: the list, See changes, restore,
- * duplicate and comments. The shim's `versioning/*` routes are mocked (`mock/localVersioning.ts`,
- * `mock/versioning/historyRoutes.ts`).
+ * duplicate and comments, in the drive and in the graph editor. The shim's `versioning/*` routes
+ * are mocked (`mock/localVersioning.ts`, `mock/versioning/historyRoutes.ts`).
  */
 import { Path, type VersionEntry } from 'enso-common/src/services/ProjectManager/types'
 import { expect, test, type Page } from 'integration-test/base'
+import * as locate from 'integration-test/project-view/locate'
 import { posix } from 'node:path'
 
 const ROOT = '/home/user/enso/enso-projects'
@@ -134,6 +135,42 @@ test.describe('with versions kept', () => {
       .toEqual([[MOCK_PROJECT_PATH, VERSIONS[2]!.id]])
     expect(calls.closeProject).toHaveLength(1)
     await expect.poll(() => calls.openProject.length).toBe(2)
+  })
+
+  test('in the graph editor, lists the opened project’s versions', async ({ page, drivePage }) => {
+    await drivePage.goToCategory
+      .local()
+      .driveTable.openProject('Mock Project')
+      .expectProjectEditorOpened('Mock Project')
+    const panel = await openVersions(page)
+    await expect(panel.getByText(/^(Joined the sales table|Saved on close|Saved)$/)).toHaveText([
+      'Joined the sales table',
+      'Saved on close',
+      'Saved',
+    ])
+    await expect(panel).not.toContainText('Select a single asset')
+  })
+
+  test('restoring from the graph editor opens the project again, in front', async ({
+    page,
+    drivePage,
+    localApi,
+  }) => {
+    const calls = localApi.trackCalls()
+    await drivePage.goToCategory
+      .local()
+      .driveTable.openProject('Mock Project')
+      .expectProjectEditorOpened('Mock Project')
+    await openVersions(page)
+    const menu = await openVersionMenu(page, 2)
+    await menu.getByRole('menuitem', { name: /^Restore/ }).click()
+    await expect
+      .poll(() => localApi.versioning.restores)
+      .toEqual([[MOCK_PROJECT_PATH, VERSIONS[2]!.id]])
+    expect(calls.closeProject).toHaveLength(1)
+    await expect.poll(() => calls.openProject.length).toBe(2)
+    await expect(page.getByRole('tab', { name: 'Mock Project' })).toHaveClass(/selected/)
+    await expect(locate.graphEditor(page)).toBeVisible()
   })
 
   test('duplicates a version into the same folder', async ({ page, drivePage, localApi }) => {

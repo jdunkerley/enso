@@ -75,8 +75,15 @@ function useRightPanelTabs(
       rightPanelContext.value?.category != null &&
       isLocalCategory(rightPanelContext.value.category),
   )
-  const enabledInDrive = computed(() =>
-    isCloudDirectoryView.value || isLocalDirectoryView.value ? Ok() : Err('Exclusive to the drive'),
+  /** In the drive, for the selected asset; in a project tab, for the opened project. */
+  const enabledInDriveOrProject = computed(() =>
+    (
+      isCloudDirectoryView.value ||
+      isLocalDirectoryView.value ||
+      rightPanelContext.value?.openedProject != null
+    ) ?
+      Ok()
+    : Err('Exclusive to the drive and projects'),
   )
   const enabledInCloudOnly = computed(() =>
     isCloudDirectoryView.value ? Ok() : Err('Exclusive to Cloud'),
@@ -112,7 +119,7 @@ function useRightPanelTabs(
       'versions',
       {
         icon: 'history',
-        enabled: enabledInDrive,
+        enabled: enabledInDriveOrProject,
         hidden: () => rightPanelTabContribution('versions') == null,
         title: textRef('versions'),
       },

@@ -36,6 +36,7 @@ const backend = vi.hoisted(() => ({
   copyAsset: vi.fn(),
   updateAsset: vi.fn(),
   getMainFileContent: vi.fn(),
+  getAssetDetails: vi.fn(),
 }))
 const localBackend = vi.hoisted(() => ({
   type: 'local',
@@ -46,6 +47,7 @@ const localBackend = vi.hoisted(() => ({
   copyAsset: vi.fn(),
   updateAsset: vi.fn(),
   getMainFileContent: vi.fn(),
+  getAssetDetails: vi.fn(),
 }))
 const backends = vi.hoisted(() => ({ localAvailable: true }))
 vi.mock('$/providers/backends', () => ({
@@ -92,12 +94,16 @@ function localStatus(extra: object = {}) {
   }
 }
 
-const category = ref<Category>({ type: 'cloud' })
+const category = ref<Category>()
 const asset = ref<AnyAsset>()
+const openedProject = ref<{ id: ProjectId; title: string; mode: 'local' | 'cloud' | 'hybrid' }>()
 const rightPanel = reactive({
   context: {
     get category() {
       return category.value
+    },
+    get openedProject() {
+      return openedProject.value
     },
   },
   focusedAsset: asset,
@@ -124,6 +130,7 @@ beforeEach(() => {
   backends.localAvailable = true
   category.value = { type: 'cloud' }
   asset.value = project
+  openedProject.value = undefined
   versions = [
     version(3, {
       isLatest: true,
@@ -481,6 +488,103 @@ describe('in a local category', () => {
     expect(openProjectLocally).toHaveBeenCalledWith(
       expect.objectContaining({ id: copyId }),
       'local',
+    )
+  })
+})
+
+describe('in a project tab', () => {
+  // The project view's context: no category, the project's id as the item, and the opened project.
+  beforeEach(() => {
+    category.value = undefined
+    asset.value = undefined
+    localBackend.versioningStatus.mockReset().mockResolvedValue(localStatus())
+    localBackend.getAssetDetails.mockReset().mockResolvedValue(LOCAL_PROJECT)
+    localBackend.listAssetVersions.mockReset().mockResolvedValue({
+      versions: [version(2, { isLatest: true, comment: 'Saved' }), version(1)],
+    })
+    localBackend.listAssetVersionTags.mockReset().mockResolvedValue([])
+    localBackend.restoreAsset.mockReset().mockResolvedValue(undefined)
+    backend.getAssetDetails.mockReset().mockResolvedValue(project)
+    openedProjects.closeProject.mockReset()
+    openedProjects.waitForProcess.mockReset().mockResolvedValue(undefined)
+  })
+
+  test('a local project: lists its versions from the local backend', async () => {
+    openedProject.value = { id: LOCAL_PROJECT.id as ProjectId, title: 'P', mode: 'local' }
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 2.*Version 1/))
+    expect(localBackend.getAssetDetails).toHaveBeenCalledWith(LOCAL_PROJECT.id, undefined)
+    expect(localBackend.versioningStatus).toHaveBeenCalledWith('/root/P')
+    expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
+    expect(backend.listAssetVersions).not.toHaveBeenCalled()
+    expect(wrapper.text()).not.toContain('Select a single asset')
+  })
+
+  test('a local project whose versions are not kept says so', async () => {
+    openedProject.value = { id: LOCAL_PROJECT.id as ProjectId, title: 'P', mode: 'local' }
+    localBackend.versioningStatus.mockResolvedValue(localStatus({ enabled: false }))
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() =>
+      expect(wrapper.text()).toContain("Versions are not kept in this project's git repository."),
+    )
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
+  })
+
+  test('a local project without a local backend says the drive is not available', async () => {
+    backends.localAvailable = false
+    openedProject.value = { id: LOCAL_PROJECT.id as ProjectId, title: 'P', mode: 'local' }
+    const { wrapper } = await renderTab()
+    expect(wrapper.text()).toContain('The local drive is not available.')
+  })
+
+  test('a cloud project: lists its versions from the cloud', async () => {
+    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'cloud' }
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 3.*Version 2.*Version 1/))
+    expect(backend.getAssetDetails).toHaveBeenCalledWith(PROJECT_ID, undefined)
+    expect(backend.listAssetVersions).toHaveBeenCalledWith(PROJECT_ID)
+    expect(localBackend.getAssetDetails).not.toHaveBeenCalled()
+    expect(localBackend.versioningStatus).not.toHaveBeenCalled()
+  })
+
+  test('a hybrid project: lists the cloud project’s versions', async () => {
+    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'hybrid' }
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 3/))
+    expect(backend.listAssetVersions).toHaveBeenCalledWith(PROJECT_ID)
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
+  })
+
+  test('a project whose details cannot be read shows the error', async () => {
+    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'cloud' }
+    backend.getAssetDetails.mockRejectedValue(new Error('no such project'))
+    const { wrapper } = await renderTab()
+    await vi.waitFor(() => expect(wrapper.text()).toContain('no such project'), { timeout: 5000 })
+    expect(backend.listAssetVersions).not.toHaveBeenCalled()
+  })
+
+  test('restoring finishes, and the project opens again, even if the list unmounts', async () => {
+    openedProject.value = { id: LOCAL_PROJECT.id as ProjectId, title: 'P', mode: 'local' }
+    const opened = { state: { status: 'initialized' }, nextTask: undefined, error: undefined }
+    openedProjects.get.mockReturnValue(opened)
+    let closed!: () => void
+    openedProjects.waitForProcess.mockImplementation(
+      () => new Promise<void>((resolve) => (closed = resolve)),
+    )
+    const { wrapper, unmount } = await renderTab()
+    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 2/))
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    expect(openedProjects.closeProject).toHaveBeenCalledWith(LOCAL_PROJECT.id)
+    // The project's tab closes its graph, and with it the panel, while the project closes.
+    unmount()
+    closed()
+    await vi.waitFor(() =>
+      expect(openProjectLocally).toHaveBeenCalledWith(LOCAL_PROJECT, 'local', false),
+    )
+    expect(localBackend.restoreAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      S3ObjectVersionId('version-1'),
     )
   })
 })

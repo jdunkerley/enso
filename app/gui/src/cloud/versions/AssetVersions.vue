@@ -2,7 +2,9 @@
 /**
  * @file The right panel's Versions tab: the versions of the asset selected in a cloud category, or
  * of a local project in an enabled git repository, newest first, with their tags and comments, and
- * actions to compare, restore or duplicate them.
+ * actions to compare, restore or duplicate them. In a project tab, it lists the opened project's
+ * versions: a local project's are the local backend's, a cloud or hybrid project's the cloud's (by
+ * its `id`). The project view gives only the project's id, so its asset is fetched first.
  *
  * With nothing selected, for an asset without versions (in the cloud, only projects, files and
  * datalinks have them; locally, only projects), or for a local project whose versions are not kept
@@ -19,11 +21,13 @@ import { isCloudCategory, isLocalCategory } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
 import { includes } from '$/utils/data/array'
+import { backendQueryOptions } from '$/utils/backendQuery'
 import { localVersioningStatusQueryOptions } from '$/utils/localVersioningQuery'
 import { useQuery } from '@tanstack/vue-query'
 import {
   AssetType,
   extractTypeAndPath,
+  ProjectId,
   type AnyAsset,
   type Backend,
   type DatalinkAsset,
@@ -48,8 +52,34 @@ function hasVersions(asset: AnyAsset): asset is DatalinkAsset | FileAsset | Proj
   return includes([AssetType.project, AssetType.datalink, AssetType.file], asset.type)
 }
 
-/** The selected local project's path, while a local category is shown. */
+/**
+ * The project opened in this project tab, and the backend which holds it: the local backend for a
+ * local project (`null` when there is none), the cloud for a cloud or hybrid one. `null` outside a
+ * project tab.
+ */
+const openedProject = computed(() => {
+  const opened = rightPanel.context?.openedProject
+  if (opened == null) return null
+  const local = opened.mode === 'local'
+  return { id: opened.id, local, backend: local ? (localBackend ?? null) : remoteBackend }
+})
+/** The opened project's asset, which the list needs whole (its title and parent, too). */
+const openedProjectQuery = useQuery(
+  computed(() => {
+    const backend = openedProject.value?.backend ?? null
+    // Without an opened project the query is disabled, so its placeholder id is never fetched.
+    const id = openedProject.value?.id ?? ProjectId('')
+    return {
+      ...backendQueryOptions(backend, 'getAssetDetails', [id, undefined]),
+      enabled: backend != null,
+    }
+  }),
+)
+
+/** The path of the local project whose versions are listed, if it is one. */
 const localProjectPath = computed(() => {
+  const opened = openedProject.value
+  if (opened != null) return opened.local ? extractTypeAndPath(opened.id).path : null
   const category = rightPanel.context?.category
   const asset = rightPanel.focusedAsset
   if (category == null || !isLocalCategory(category) || asset?.type !== AssetType.project) {
@@ -70,7 +100,41 @@ type State =
       readonly backend: Backend
     }
 
+/** A local project's versions, if they are kept: it must be in an enabled git repository. */
+function localProjectState(asset: ProjectAsset, backend: Backend): State {
+  const status = localStatusQuery.data.value
+  if (status == null) {
+    const error: unknown = localStatusQuery.error.value
+    return localStatusQuery.isError.value ?
+        { error: getText('assetVersions.localStatusError', getMessageOrToString(error)) }
+      : { loading: true }
+  }
+  if (!status.git) return { placeholder: getText('assetVersions.localNoGit') }
+  if (status.repoRoot == null) return { placeholder: getText('assetVersions.localNoRepository') }
+  if (!status.enabled) return { placeholder: getText('assetVersions.localNotEnabled') }
+  return { asset, backend }
+}
+
+/** The versions of the project opened in this project tab. */
+function openedProjectState(opened: NonNullable<typeof openedProject.value>): State {
+  if (opened.backend == null) return { placeholder: getText('assetVersions.localUnavailable') }
+  const asset = openedProjectQuery.data.value
+  if (asset === undefined) {
+    const error: unknown = openedProjectQuery.error.value
+    return openedProjectQuery.isError.value ?
+        { error: getMessageOrToString(error) }
+      : { loading: true }
+  }
+  if (asset?.type !== AssetType.project) {
+    return { placeholder: getText('assetVersions.notSelected') }
+  }
+  return opened.local ?
+      localProjectState(asset, opened.backend)
+    : { asset, backend: opened.backend }
+}
+
 const state = computed((): State => {
+  if (openedProject.value != null) return openedProjectState(openedProject.value)
   const category = rightPanel.context?.category
   const asset = rightPanel.focusedAsset
   if (category == null || asset == null) {
@@ -85,17 +149,7 @@ const state = computed((): State => {
   if (asset.type !== AssetType.project) {
     return { placeholder: getText('assetVersions.localProjectsOnly') }
   }
-  const status = localStatusQuery.data.value
-  if (status == null) {
-    const error: unknown = localStatusQuery.error.value
-    return localStatusQuery.isError.value ?
-        { error: getText('assetVersions.localStatusError', getMessageOrToString(error)) }
-      : { loading: true }
-  }
-  if (!status.git) return { placeholder: getText('assetVersions.localNoGit') }
-  if (status.repoRoot == null) return { placeholder: getText('assetVersions.localNoRepository') }
-  if (!status.enabled) return { placeholder: getText('assetVersions.localNotEnabled') }
-  return { asset, backend: localBackend }
+  return localProjectState(asset, localBackend)
 })
 </script>
 

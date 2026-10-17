@@ -11,12 +11,17 @@ decisions are under "Rulings from #89" and "Rulings from #183" there.
 
 - `AssetVersions.vue` — the tab: placeholders (outside the cloud, nothing
   selected, an asset without versions), then `AssetVersionList.vue` in a
-  `SuspenseLoader`, remounted per asset.
+  `SuspenseLoader`, remounted per asset. In a project tab (the context has
+  `openedProject` and no category) it lists the opened project's versions: the
+  local backend's for a local project, the cloud's (by `id`) for a cloud or
+  hybrid one, fetching the project's asset with `getAssetDetails` first.
 - `AssetVersionList.vue` — the list, and the actions every version offers
   (restore, duplicate, comment edits with an optimistic update). Restoring a
   local project that is open (or opening) closes it first, since the shim
   refuses to restore a running project, then opens it again in the background; a
-  failed close restores nothing, and a failed restore still reopens it.
+  failed close restores nothing, and a failed restore still reopens it. From the
+  project's own tab the tab stays current, and the sequence survives the list
+  unmounting with the graph.
 - Local projects (`LocalBackend`, over the shim's `versioning/*` routes):
   `AssetVersions.vue` gates the tab on `localVersioningStatusQueryOptions`
   (folders and files, no git, no repository and a repository that is not enabled
