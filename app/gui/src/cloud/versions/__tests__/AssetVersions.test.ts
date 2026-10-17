@@ -11,12 +11,14 @@ import {
   AssetType,
   DirectoryId,
   EmailAddress,
+  Path,
   ProjectId,
   S3ObjectVersionId,
   type AnyAsset,
   type AssetVersions as AssetVersionsResponse,
   type S3ObjectVersion,
 } from 'enso-common/src/services/Backend'
+import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBackend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, ref } from 'vue'
 import AssetVersions from '../AssetVersions.vue'
@@ -33,7 +35,25 @@ const backend = vi.hoisted(() => ({
   updateAsset: vi.fn(),
   getMainFileContent: vi.fn(),
 }))
-vi.mock('$/providers/backends', () => ({ useBackends: () => ({ remoteBackend: backend }) }))
+const localBackend = vi.hoisted(() => ({
+  type: 'local',
+  versioningStatus: vi.fn(),
+  listAssetVersions: vi.fn(),
+  listAssetVersionTags: vi.fn(),
+  restoreAsset: vi.fn(),
+  copyAsset: vi.fn(),
+  updateAsset: vi.fn(),
+  getMainFileContent: vi.fn(),
+}))
+vi.mock('$/providers/backends', () => ({
+  useBackends: () => ({ remoteBackend: backend, localBackend }),
+}))
+const openedProjects = vi.hoisted(() => ({
+  get: vi.fn(),
+  closeProject: vi.fn(),
+  waitForProcess: vi.fn(async () => {}),
+}))
+vi.mock('$/providers/openedProjects', () => ({ useOpenedProjects: () => openedProjects }))
 const openProjectLocally = vi.fn()
 vi.mock('$/providers/container', () => ({ useContainerData: () => ({ openProjectLocally }) }))
 
@@ -45,6 +65,26 @@ const project = {
   title: 'My Project',
   parentId: PARENT_ID,
 } as unknown as AnyAsset
+
+const LOCAL_PROJECT = {
+  type: AssetType.project,
+  id: newProjectId(Path('/root/P')),
+  title: 'P',
+  parentId: newDirectoryId(Path('/root')),
+} as unknown as AnyAsset
+
+function localStatus(extra: object = {}) {
+  return {
+    git: true,
+    repoRoot: '/root',
+    enabled: true,
+    optedOut: false,
+    changed: false,
+    blocked: null,
+    lastVersion: null,
+    ...extra,
+  }
+}
 
 const category = ref<Category>({ type: 'cloud' })
 const asset = ref<AnyAsset>()
@@ -97,6 +137,7 @@ beforeEach(() => {
     Promise.resolve(`main = "${String(versionId)}"`),
   )
   openProjectLocally.mockReset()
+  openedProjects.get.mockReset().mockReturnValue(undefined)
   // jsdom lays nothing out: give the version's header room for its tags, so that they show
   // one by one instead of collapsing into "N tags".
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
@@ -143,14 +184,29 @@ function buttonsWithIcon(icon: string) {
   )
 }
 
-describe('placeholders', () => {
-  test('outside the cloud, local assets have no versions', async () => {
-    category.value = { type: 'local' }
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Local assets do not have versions.')
-    expect(backend.listAssetVersions).not.toHaveBeenCalled()
-  })
+/** Open a version's actions menu from the keyboard. */
+async function openMenu(index: number) {
+  const user = userEvent.setup()
+  const triggers = document.querySelectorAll<HTMLElement>('button[aria-haspopup="menu"]')
+  triggers[index]!.focus()
+  await user.keyboard('{Enter}')
+  await flushPromises()
+  return user
+}
 
+/** Move to the item with the given text in the innermost open menu, and choose it. */
+async function choose(user: ReturnType<typeof userEvent.setup>, label: string) {
+  const menu = [...document.querySelectorAll<HTMLElement>('[role="menu"]')].at(-1)!
+  const items = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+  const index = items.findIndex((item) => item.textContent?.includes(label))
+  expect(index, `menu item "${label}"`).toBeGreaterThanOrEqual(0)
+  for (let i = 0; i < index; i++) await user.keyboard('{ArrowDown}')
+  expect(document.activeElement?.textContent).toContain(label)
+  await user.keyboard('{Enter}')
+  await flushPromises()
+}
+
+describe('placeholders', () => {
   test('with nothing selected, it asks for an asset', async () => {
     asset.value = undefined
     const { wrapper } = await renderTab()
@@ -170,6 +226,60 @@ describe('placeholders', () => {
     versions = []
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('No versions found')
+  })
+})
+
+describe('in a local category', () => {
+  /** Newest first. */
+  let localVersions: S3ObjectVersion[]
+
+  beforeEach(() => {
+    category.value = { type: 'local' }
+    asset.value = LOCAL_PROJECT
+    localVersions = [version(2, { isLatest: true, comment: 'Saved' }), version(1)]
+    localBackend.versioningStatus.mockReset().mockResolvedValue(localStatus())
+    localBackend.listAssetVersions
+      .mockReset()
+      .mockImplementation(() => Promise.resolve({ versions: localVersions }))
+    localBackend.listAssetVersionTags.mockReset().mockResolvedValue([])
+    localBackend.restoreAsset.mockReset().mockResolvedValue(undefined)
+    localBackend.copyAsset.mockReset()
+    localBackend.updateAsset.mockReset().mockResolvedValue(undefined)
+    localBackend.getMainFileContent.mockReset().mockResolvedValue('main = 1')
+  })
+
+  test('lists a project’s versions from the local backend', async () => {
+    const { wrapper } = await renderTab()
+    expect(localBackend.versioningStatus).toHaveBeenCalledWith('/root/P')
+    expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
+    expect(backend.listAssetVersions).not.toHaveBeenCalled()
+    expect(wrapper.text()).toMatch(/Version 2.*Version 1/)
+    expect(wrapper.text()).toContain('Saved')
+  })
+
+  test('a folder: only projects have versions', async () => {
+    asset.value = { ...LOCAL_PROJECT, type: AssetType.directory } as unknown as AnyAsset
+    const { wrapper } = await renderTab()
+    expect(wrapper.text()).toContain('In the local drive, only projects have versions.')
+    expect(localBackend.versioningStatus).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    [
+      { git: false, repoRoot: null, enabled: false },
+      'Install git to keep versions of local projects.',
+    ],
+    [
+      { repoRoot: null, enabled: false },
+      'This project is not in a git repository, so it has no versions.',
+    ],
+    [{ enabled: false }, "Versions are not kept in this project's git repository."],
+    [{ enabled: false, optedOut: true }, "Versions are not kept in this project's git repository."],
+  ])('status %j says why there is no list', async (extra, message) => {
+    localBackend.versioningStatus.mockResolvedValue(localStatus(extra))
+    const { wrapper } = await renderTab()
+    expect(wrapper.text()).toContain(message)
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
 })
 
@@ -194,28 +304,6 @@ describe('the list', () => {
 })
 
 describe('actions', () => {
-  /** Open a version's actions menu from the keyboard. */
-  async function openMenu(index: number) {
-    const user = userEvent.setup()
-    const triggers = document.querySelectorAll<HTMLElement>('button[aria-haspopup="menu"]')
-    triggers[index]!.focus()
-    await user.keyboard('{Enter}')
-    await flushPromises()
-    return user
-  }
-
-  /** Move to the item with the given text in the innermost open menu, and choose it. */
-  async function choose(user: ReturnType<typeof userEvent.setup>, label: string) {
-    const menu = [...document.querySelectorAll<HTMLElement>('[role="menu"]')].at(-1)!
-    const items = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')]
-    const index = items.findIndex((item) => item.textContent?.includes(label))
-    expect(index, `menu item "${label}"`).toBeGreaterThanOrEqual(0)
-    for (let i = 0; i < index; i++) await user.keyboard('{ArrowDown}')
-    expect(document.activeElement?.textContent).toContain(label)
-    await user.keyboard('{Enter}')
-    await flushPromises()
-  }
-
   test('the latest version cannot be restored', async () => {
     await renderTab()
     await openMenu(0)

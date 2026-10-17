@@ -14,11 +14,11 @@ import {
   AssetType,
   S3ObjectVersionId,
   type AssetVersions,
+  type Backend,
   type DatalinkAsset,
   type FileAsset,
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
-import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { computed } from 'vue'
@@ -27,7 +27,7 @@ import { assetVersionsQueryOptions } from './queries'
 import type { DuplicateOptions, Version } from './version'
 
 const { backend, item } = defineProps<{
-  backend: RemoteBackend
+  backend: Backend
   item: DatalinkAsset | FileAsset | ProjectAsset
 }>()
 

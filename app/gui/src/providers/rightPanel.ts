@@ -1,6 +1,11 @@
 import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useBackends } from '$/providers/backends'
-import { CATEGORY_BACKEND, isCloudCategory, type Category } from '$/providers/category'
+import {
+  CATEGORY_BACKEND,
+  isCloudCategory,
+  isLocalCategory,
+  type Category,
+} from '$/providers/category'
 import { rightPanelTabContribution } from '$/providers/rightPanelContributions'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import { useSyncLocalStorage } from '@/composables/syncLocalStorage'
@@ -65,6 +70,14 @@ function useRightPanelTabs(
       rightPanelContext.value?.category != null &&
       isCloudCategory(rightPanelContext.value.category),
   )
+  const isLocalDirectoryView = computed(
+    () =>
+      rightPanelContext.value?.category != null &&
+      isLocalCategory(rightPanelContext.value.category),
+  )
+  const enabledInDrive = computed(() =>
+    isCloudDirectoryView.value || isLocalDirectoryView.value ? Ok() : Err('Exclusive to the drive'),
+  )
   const enabledInCloudOnly = computed(() =>
     isCloudDirectoryView.value ? Ok() : Err('Exclusive to Cloud'),
   )
@@ -99,7 +112,7 @@ function useRightPanelTabs(
       'versions',
       {
         icon: 'history',
-        enabled: enabledInCloudOnly,
+        enabled: enabledInDrive,
         hidden: () => rightPanelTabContribution('versions') == null,
         title: textRef('versions'),
       },
