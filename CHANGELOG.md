@@ -160,7 +160,7 @@
   chips then show only the projects that carry any of the chosen labels. Labels
   are kept on this computer, and travel with a project when it is copied. Local
   folders and files cannot be labelled yet.
-- [The Versions tab now works for local projects kept in git][NNN]: list a
+- [The Versions tab now works for local projects kept in git][234]: list a
   project's versions (following it across renames and moves), see what changed
   in each, compare any two, restore one (an open project is closed and reopened
   around it), duplicate one, and edit a version's comment.
@@ -303,7 +303,7 @@
 [219]: https://github.com/jdunkerley/enso/pull/219
 [227]: https://github.com/jdunkerley/enso/pull/227
 [226]: https://github.com/jdunkerley/enso/pull/226
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[234]: https://github.com/jdunkerley/enso/pull/234
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
