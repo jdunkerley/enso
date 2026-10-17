@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import * as Y from 'yjs'
+import { MutableModule } from '../ast/mutableModule'
 import {
   encodeControlMessage,
   moduleState,
@@ -7,7 +8,6 @@ import {
   parseControlMessage,
   stateVectorCovers,
   stateVectorEntries,
-  trackLocalDeletions,
 } from '../ydocControl'
 
 describe('state vectors', () => {
@@ -60,63 +60,45 @@ describe('module states', () => {
   })
 })
 
-describe('only this client’s own edits are sent', () => {
-  // Every other client's edits reached this one through the ydoc server, which therefore has them.
-  test('the state vector names only this client', () => {
-    const other = new Y.Doc()
-    other.getMap('m').set('o', 1)
-    const a = new Y.Doc()
-    Y.applyUpdate(a, Y.encodeStateAsUpdate(other))
-    a.getMap('m').set('k', 1)
-    expect(moduleState(a).stateVector).toEqual([[a.clientID, 1]])
+describe('graph edits (MutableModule.edit and applyEdit)', () => {
+  // A graph edit is made in a fresh doc (a random client ID per edit) and applied to the GUI's doc
+  // by `applyEdit`, which is not a local transaction. The flush must still describe it, whoever
+  // created the nodes it inserts or deletes.
+  const syncedPair = (code: string) => {
+    const serverDoc = new Y.Doc()
+    new MutableModule(serverDoc).syncToCode(code)
+    const guiDoc = new Y.Doc()
+    Y.applyUpdate(guiDoc, Y.encodeStateAsUpdate(serverDoc))
+    return { serverDoc, guiDoc, gui: new MutableModule(guiDoc) }
+  }
+
+  test('an edit that inserts is not covered until the server applies it', () => {
+    const { serverDoc, guiDoc, gui } = syncedPair('a = 1\n')
+    const since = Y.encodeStateVector(serverDoc)
+    const edit = gui.edit()
+    edit.syncToCode('a = 1\nb = 2\n')
+    gui.applyEdit(edit)
+    const state = moduleState(guiDoc)
+    expect(moduleStateCovers(serverDoc, state)).toBe(false)
+    Y.applyUpdate(serverDoc, Y.encodeStateAsUpdate(guiDoc, since))
+    expect(moduleStateCovers(serverDoc, state)).toBe(true)
   })
 
-  test('an own edit the server lacks is still not covered', () => {
-    const other = new Y.Doc()
-    other.getMap('m').set('o', 1)
-    const a = new Y.Doc()
-    Y.applyUpdate(a, Y.encodeStateAsUpdate(other))
-    const server = new Y.Doc()
-    Y.applyUpdate(server, Y.encodeStateAsUpdate(other))
-    const deletions = trackLocalDeletions(a)
-    a.getMap('m').set('k', 1)
-    expect(moduleStateCovers(server, moduleState(a, deletions.entries()))).toBe(false)
-    Y.applyUpdate(server, Y.encodeStateAsUpdate(a))
-    expect(moduleStateCovers(server, moduleState(a, deletions.entries()))).toBe(true)
+  test('an edit that deletes a node another client created is not covered until applied', () => {
+    const { serverDoc, guiDoc, gui } = syncedPair('a = 1\nb = 2\n')
+    const since = Y.encodeStateVector(serverDoc)
+    const edit = gui.edit()
+    edit.syncToCode('a = 1\n')
+    gui.applyEdit(edit)
+    const state = moduleState(guiDoc)
+    expect(moduleStateCovers(serverDoc, state)).toBe(false)
+    Y.applyUpdate(serverDoc, Y.encodeStateAsUpdate(guiDoc, since))
+    expect(moduleStateCovers(serverDoc, state)).toBe(true)
+    expect(new MutableModule(serverDoc).root()?.code()).toBe('a = 1\n')
   })
+})
 
-  test('deleting another client’s item counts: the delete set is keyed by the item’s creator', () => {
-    const other = new Y.Doc()
-    other.getMap('m').set('o', 1)
-    other.getMap('m').set('p', 1)
-    const a = new Y.Doc()
-    Y.applyUpdate(a, Y.encodeStateAsUpdate(other))
-    const server = new Y.Doc()
-    Y.applyUpdate(server, Y.encodeStateAsUpdate(other))
-    const deletions = trackLocalDeletions(a)
-    const before = Y.encodeStateVector(server)
-    a.getMap('m').delete('o')
-    const state = moduleState(a, deletions.entries())
-    // A deletion advances no clock, and is recorded under the deleted item's client.
-    expect(state.stateVector).toEqual([])
-    expect(Object.keys(state.deleteSet)).toEqual([String(other.clientID)])
-    expect(moduleStateCovers(server, state)).toBe(false)
-    Y.applyUpdate(server, Y.encodeStateAsUpdate(a, before))
-    expect(moduleStateCovers(server, state)).toBe(true)
-  })
-
-  test('deletions that arrive from elsewhere are not this client’s', () => {
-    const other = new Y.Doc()
-    other.getMap('m').set('o', 1)
-    const a = new Y.Doc()
-    const deletions = trackLocalDeletions(a)
-    Y.applyUpdate(a, Y.encodeStateAsUpdate(other))
-    other.getMap('m').delete('o')
-    Y.applyUpdate(a, Y.encodeStateAsUpdate(other))
-    expect(deletions.entries()).toEqual({})
-    deletions.stop()
-  })
-
+describe('large delete sets', () => {
   test('covering many deletion ranges is fast', () => {
     const a = new Y.Doc()
     const array = a.getArray<number>('a')

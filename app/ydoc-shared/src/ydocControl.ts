@@ -4,14 +4,14 @@
  * the named modules to disk once each contains the edits the GUI had made, so that a version of
  * the project is not taken before the last edit is on disk.
  *
- * The GUI describes its edits by each module doc's state vector and delete set. Both are needed:
- * a deletion (such as `Y.Map.delete`) advances no clock, so a last edit that only deletes is
- * invisible in the state vector. Only the GUI's own edits are described: every other client's
- * reached the GUI through the ydoc server, which therefore has them. For insertions that is the
- * GUI's own entry of the state vector; for deletions it is those the GUI's own transactions made
- * ({@link trackLocalDeletions}), whichever client created the deleted items, since a delete set is
- * keyed by the deleted item's creator and the GUI mostly deletes what the server loaded. They travel as JSON pairs, not as base64: `lib0`'s base64 picks
- * a Node or a browser implementation, and the polyglot runtime the ydoc server runs in inside the
+ * The GUI describes the whole of each module doc it has: its full state vector and its full delete
+ * set. Both are needed: a deletion (such as `Y.Map.delete`) advances no clock, so a last edit that
+ * only deletes is invisible in the state vector. Nothing is filtered to the GUI's "own" edits: a
+ * graph edit is made in a fresh `Y.Doc` (a random client ID per edit) and applied by
+ * `MutableModule.applyEdit`, which is not a local transaction, so its insertions are under a client
+ * ID nothing else names. The ydoc server checks the whole description against its own doc (see
+ * {@link moduleStateCovers}). They travel as JSON pairs, not as base64: `lib0`'s base64 picks a
+ * Node or a browser implementation, and the polyglot runtime the ydoc server runs in inside the
  * engine is neither.
  */
 import * as Y from 'yjs'
@@ -47,13 +47,9 @@ export type YdocControlMessage =
   | { readonly type: 'flushed'; readonly id: string; readonly ok: true }
   | { readonly type: 'flushed'; readonly id: string; readonly ok: false; readonly error: string }
 
-/**
- * The state vector of `doc`, of this client's own insertions only (see the file comment). Empty
- * while this client has inserted nothing.
- */
+/** The whole state vector of `doc`: every client's insertions. */
 export function stateVectorEntries(doc: Y.Doc): StateVectorEntries {
-  const clock = Y.getState(doc.store, doc.clientID)
-  return clock > 0 ? [[doc.clientID, clock]] : []
+  return Array.from(Y.decodeStateVector(Y.encodeStateVector(doc)))
 }
 
 /** Whether `doc` contains every insertion `wanted` describes. */
@@ -61,7 +57,7 @@ export function stateVectorCovers(doc: Y.Doc, wanted: StateVectorEntries): boole
   return wanted.every(([client, clock]) => Y.getState(doc.store, client) >= clock)
 }
 
-/** Every deletion `doc` contains, whoever made it. */
+/** Every deletion `doc` contains, whoever made it, keyed by the deleted item's creator. */
 export function deleteSetEntries(doc: Y.Doc): DeleteSetEntries {
   return toEntries(Y.createDeleteSetFromStructStore(doc.store))
 }
@@ -73,31 +69,6 @@ function toEntries(deleteSet: ReturnType<typeof Y.createDeleteSet>): DeleteSetEn
       items.map((item) => [item.clock, item.len] as const),
     ]),
   )
-}
-
-/** The deletions this client's own transactions made in a doc, from {@link trackLocalDeletions}. */
-export interface LocalDeletions {
-  /** The deletions made so far, merged into ranges. */
-  entries(): DeleteSetEntries
-  /** Stop tracking. */
-  stop(): void
-}
-
-/**
- * Collect the deletions `doc`'s local transactions make from now on. Updates applied from
- * elsewhere (the provider's) are not local, so they are left out.
- */
-export function trackLocalDeletions(doc: Y.Doc): LocalDeletions {
-  let deletions = Y.createDeleteSet()
-  const onTransaction = (transaction: Y.Transaction) => {
-    if (!transaction.local || transaction.deleteSet.clients.size === 0) return
-    deletions = Y.mergeDeleteSets([deletions, transaction.deleteSet])
-  }
-  doc.on('afterTransaction', onTransaction)
-  return {
-    entries: () => toEntries(deletions),
-    stop: () => doc.off('afterTransaction', onTransaction),
-  }
 }
 
 /** Whether every struct of `structs` (one client's, sorted) in `[clock, clock + len)` is deleted. */
@@ -134,15 +105,9 @@ export function deleteSetCovers(doc: Y.Doc, wanted: DeleteSetEntries): boolean {
   })
 }
 
-/**
- * What `doc` contains of this client's own edits, to send in a `flush`: its own insertions, and
- * `deletions` (by default every deletion in the doc, which is correct but larger).
- */
-export function moduleState(
-  doc: Y.Doc,
-  deletions: DeleteSetEntries = deleteSetEntries(doc),
-): ModuleState {
-  return { stateVector: stateVectorEntries(doc), deleteSet: deletions }
+/** What `doc` contains, to send in a `flush`: its whole state vector and delete set. */
+export function moduleState(doc: Y.Doc): ModuleState {
+  return { stateVector: stateVectorEntries(doc), deleteSet: deleteSetEntries(doc) }
 }
 
 /** Whether `doc` contains everything `wanted` describes: its insertions and its deletions. */

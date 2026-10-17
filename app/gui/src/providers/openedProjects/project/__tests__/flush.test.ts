@@ -1,11 +1,13 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, assert, describe, expect, test, vi } from 'vitest'
 import { YjsChannel } from 'ydoc-channel'
+import { MutableModule } from 'ydoc-shared/ast'
 import {
-  deleteSetEntries,
   encodeControlMessage,
   FLUSH_DEADLINE_MS,
+  moduleStateCovers,
   parseControlMessage,
   YDOC_CONTROL_CHANNEL,
+  type ModuleState,
 } from 'ydoc-shared/ydocControl'
 import * as Y from 'yjs'
 import { AUTOSAVE_FALLBACK_MS, createModuleFlusher, FLUSH_TIMEOUT_MS } from '../flush'
@@ -61,32 +63,36 @@ describe('createModuleFlusher', () => {
     ])
   })
 
-  test('a module subdoc sends only this client’s own insertions and deletions', async () => {
-    const indexDoc = new Y.Doc()
-    const { requests } = serverEnd(indexDoc, () => ({ ok: true }))
-    // Made before the module doc is added, as the project store does.
-    const flusher = createModuleFlusher(indexDoc, () => [moduleDoc])
-    const moduleDoc = new Y.Doc()
-    indexDoc.getMap<Y.Doc>('modules').set('Main', moduleDoc)
-    const other = new Y.Doc()
-    other.getMap('m').set('a', 1)
-    other.getMap('m').set('b', 1)
-    Y.applyUpdate(moduleDoc, Y.encodeStateAsUpdate(other))
-    // A deletion that arrived from elsewhere, and one this client made.
-    other.getMap('m').delete('a')
-    Y.applyUpdate(moduleDoc, Y.encodeStateAsUpdate(other))
-    moduleDoc.getMap('m').delete('b')
-    await flusher.flush()
-    // The doc holds both deletions; only this client's is sent.
-    expect(deleteSetEntries(moduleDoc)).toEqual({ [other.clientID]: [[0, 2]] })
-    expect(requests).toEqual([
-      expect.objectContaining({
-        modules: {
-          [moduleDoc.guid]: { stateVector: [], deleteSet: { [other.clientID]: [[1, 1]] } },
-        },
-      }),
-    ])
-  })
+  test.each([
+    ['inserts', 'a = 1\n', 'a = 1\nb = 2\n'],
+    ['only deletes a node another client created', 'a = 1\nb = 2\n', 'a = 1\n'],
+  ])(
+    'a graph edit (MutableModule.edit and applyEdit) that %s is not covered until the server has it',
+    async (_name, before, after) => {
+      const indexDoc = new Y.Doc()
+      const { requests } = serverEnd(indexDoc, () => ({ ok: true }))
+      // Made before the module doc is added, as the project store does.
+      const flusher = createModuleFlusher(indexDoc, () => [moduleDoc])
+      const serverDoc = new Y.Doc()
+      new MutableModule(serverDoc).syncToCode(before)
+      const moduleDoc = new Y.Doc()
+      indexDoc.getMap<Y.Doc>('modules').set('Main', moduleDoc)
+      Y.applyUpdate(moduleDoc, Y.encodeStateAsUpdate(serverDoc))
+      const sent = Y.encodeStateVector(serverDoc)
+      // As the GUI edits: in a fresh doc, applied by a non-local transaction.
+      const module = new MutableModule(moduleDoc)
+      const edit = module.edit()
+      edit.syncToCode(after)
+      module.applyEdit(edit)
+      await flusher.flush()
+      const message = requests[0]
+      assert(message != null && (message as { type: string }).type === 'flush')
+      const state = (message as { modules: Record<string, ModuleState> }).modules[moduleDoc.guid]!
+      expect(moduleStateCovers(serverDoc, state)).toBe(false)
+      Y.applyUpdate(serverDoc, Y.encodeStateAsUpdate(moduleDoc, sent))
+      expect(moduleStateCovers(serverDoc, state)).toBe(true)
+    },
+  )
 
   test('a refusal is "declined", with the server’s reason', async () => {
     const indexDoc = new Y.Doc()
