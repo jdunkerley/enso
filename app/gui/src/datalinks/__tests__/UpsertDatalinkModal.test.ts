@@ -6,16 +6,8 @@ import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import type { Backend } from 'enso-common/src/services/Backend'
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import UpsertDatalinkModal from '../UpsertDatalinkModal.vue'
-
-vi.mock('$/providers/backends', async () => {
-  const { mockBackends } = await import('$/utils/testing/mountWithProviders')
-  const backends = mockBackends({ remoteBackend: { listSecrets: vi.fn() } as Partial<Backend> })
-  return { useBackends: () => backends }
-})
-vi.mock('$/providers/auth', () => ({ useAuth: () => ({ session: { user: { name: 'me' } } }) }))
 
 const { getText } = useText()
 
@@ -30,10 +22,10 @@ beforeEach(() => {
 })
 afterEach(() => portalRoot.remove())
 
-async function mountModal() {
+async function mountModal(props: Record<string, unknown> = {}) {
   const doCreate = vi.fn()
   const onClose = vi.fn()
-  await mountWithProviders(UpsertDatalinkModal, { props: { doCreate, onClose } })
+  await mountWithProviders(UpsertDatalinkModal, { props: { doCreate, onClose, ...props } })
   return { doCreate, onClose }
 }
 
@@ -90,5 +82,35 @@ describe('UpsertDatalinkModal', () => {
     await userEvent.setup().click(button(getText('cancel'))!)
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
     expect(doCreate).not.toHaveBeenCalled()
+  })
+
+  test('edit mode: "Edit Datalink", the name read-only, the value loaded, and Save', async () => {
+    const existing = {
+      name: 'my link',
+      value: {
+        type: 'S3',
+        libraryName: 'Standard.AWS',
+        uri: 's3://bucket/old',
+        auth: { type: 'aws_auth', subType: 'default' },
+      },
+    }
+    const { doCreate, onClose } = await mountModal({ existing })
+    expect(dialog().querySelector('h2')!.textContent).toBe(getText('editDatalink'))
+    expect(nameInput().value).toBe('my link')
+    expect(nameInput().readOnly).toBe(true)
+    const uri = dialog().querySelector<HTMLInputElement>(
+      `input[placeholder="${getText('enterText')}"]`,
+    )!
+    expect(uri.value).toBe('s3://bucket/old')
+    const user = userEvent.setup()
+    await user.clear(uri)
+    await user.type(uri, 's3://bucket/new')
+    await user.click(button(getText('save'))!)
+    await flushPromises()
+    expect(doCreate).toHaveBeenCalledExactlyOnceWith('my link', {
+      ...existing.value,
+      uri: 's3://bucket/new',
+    })
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalled())
   })
 })

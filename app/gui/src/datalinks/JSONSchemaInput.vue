@@ -4,13 +4,14 @@
  * editor (`DatalinkInput.vue`) is this over the datalink schema.
  *
  * - A `const` schema shows nothing: the value cannot change.
- * - `string` is a text field; `format: "enso-secret"` a combo box of the user's secrets,
- *   `format: "enso-file"` a path with the cloud file browser (`FilePathInput.vue`).
+ * - `string` is a text field; `format: "enso-secret"` shows the secret's path read-only (there are
+ *   no local secrets), `format: "enso-file"` is a plain text field.
  * - `number` and `integer` are number fields; `boolean` a checkbox.
  * - `object` lists its properties that are not constant, each under a button that adds or removes
  *   an optional one.
  * - `$ref` shows the referenced schema; `anyOf` a list choosing one of its members (the one the
- *   value matches), and that member's editor; `allOf` every member's editor.
+ *   value matches), and that member's editor; `allOf` every member's editor. A `$ref` member in
+ *   `unavailable` is left out of the list (its note shown), unless it is the chosen one.
  *
  * A part whose value fails its validator (`getValidator(path)`) gets a red border, and the
  * schema's description under it. The parts are wrapped in a column only when there are several; a
@@ -21,20 +22,14 @@
  */
 import Button from '$/components/Button/Button.vue'
 import Checkbox from '$/components/Checkbox/Checkbox.vue'
-import Form from '$/components/Form/Form.vue'
-import ComboBox from '$/components/Inputs/ComboBox.vue'
 import Dropdown from '$/components/Inputs/Dropdown.vue'
 import Text from '$/components/Text/Text.vue'
-import { useAuth } from '$/providers/auth'
-import { useBackends } from '$/providers/backends'
 import { useText } from '$/providers/text'
-import { backendBaseOptions, backendQueryKey } from '$/utils/backendQuery'
 import { constantValueOfSchema, getSchemaName, lookupDef } from '$/utils/jsonSchema'
 import { twJoin, twMerge } from '$/utils/style/tailwindMerge'
-import { useQuery } from '@tanstack/vue-query'
+import type { TextId } from 'enso-common/src/text'
 import { asObject, singletonObjectOrNull } from 'enso-common/src/utilities/data/object'
 import { computed, h, ref, watch, type FunctionalComponent } from 'vue'
-import FilePathInput from './FilePathInput.vue'
 import SchemaTextInput from './SchemaTextInput.vue'
 
 const props = withDefaults(
@@ -47,15 +42,15 @@ const props = withDefaults(
     getValidator: (path: string) => (value: unknown) => boolean
     noBorder?: boolean | undefined
     isAbsent?: boolean | undefined
+    /** `$ref`s of `anyOf` members to leave out, and the note shown where one is. */
+    unavailable?: ReadonlyMap<string, TextId | null> | undefined
     value: unknown
     onChange: (value: unknown) => void
   }>(),
-  { readOnly: false, noBorder: false, isAbsent: false },
+  { readOnly: false, noBorder: false, isAbsent: false, unavailable: () => new Map() },
 )
 
 const { getText } = useText()
-const auth = useAuth()
-const { remoteBackend } = useBackends()
 
 /** Wraps its content in a column when `wrap`, or renders it as it is. */
 const Parts: FunctionalComponent<{ wrap: boolean }> = (wrapProps, { slots }) =>
@@ -64,32 +59,6 @@ const Parts: FunctionalComponent<{ wrap: boolean }> = (wrapProps, { slots }) =>
 const noChildBorder = computed(() => props.dropdownTitle != null)
 const schemaType = computed(() => ('type' in props.schema ? props.schema.type : undefined))
 const schemaFormat = computed(() => ('format' in props.schema ? props.schema.format : undefined))
-const isSecret = computed(
-  () => schemaType.value === 'string' && schemaFormat.value === 'enso-secret',
-)
-
-// The functionality for inputting `enso-secret`s SHOULD be injected using a plugin, but it is more
-// convenient to avoid having plugin infrastructure. Keys and options as
-// `backendQueryOptions(remoteBackend, 'listSecrets', [])` gives them.
-const secretsQuery = useQuery(
-  computed(() => ({
-    ...backendBaseOptions(remoteBackend),
-    queryKey: backendQueryKey(remoteBackend, 'listSecrets', []),
-    queryFn: () => remoteBackend.listSecrets(),
-    staleTime: 0,
-    meta: { persist: true },
-    enabled: isSecret.value,
-  })),
-)
-const userPathPrefix = computed(() => `enso://Users/${auth.session?.user.name}/`)
-const secretAutocompleteItems = computed(() =>
-  (secretsQuery.data.value ?? []).map((secret) =>
-    secret.path.startsWith(userPathPrefix.value) ?
-      secret.path.replace(userPathPrefix.value, 'enso://~/')
-    : secret.path,
-  ),
-)
-
 const isInvalid = computed(() => !props.isAbsent && !props.getValidator(props.path)(props.value))
 const validationErrorClass = computed(() =>
   isInvalid.value ? 'border border-danger focus:border-danger focus:outline-danger' : undefined,
@@ -190,6 +159,26 @@ function syncSelectedChild() {
 syncSelectedChild()
 watch(() => [props.value, anyOfSchemas.value], syncSelectedChild, { flush: 'sync' })
 
+const isUnavailable = (schema: object) =>
+  '$ref' in schema && typeof schema.$ref === 'string' && props.unavailable.has(schema.$ref)
+/** The members offered: the available ones, and an unavailable one while it is the chosen one. */
+const offeredMembers = computed(() =>
+  (anyOfSchemas.value ?? []).flatMap((schema, index) =>
+    index === selectedChildIndex.value || !isUnavailable(schema) ? [{ schema, index }] : [],
+  ),
+)
+/** The note for this list's unavailable members, if any has one. */
+const unavailableNote = computed(() => {
+  for (const schema of anyOfSchemas.value ?? []) {
+    const note =
+      '$ref' in schema && typeof schema.$ref === 'string' ?
+        props.unavailable.get(schema.$ref)
+      : null
+    if (note != null) return getText(note)
+  }
+  return null
+})
+
 const selectedChildSchema = computed(() => anyOfSchemas.value?.[selectedChildIndex.value])
 const anyOfClass = computed(() =>
   twMerge(
@@ -221,7 +210,7 @@ const allOfSchemas = computed(() =>
 const partCount = computed(() => {
   if (isConst.value) return 0
   let count = 0
-  if (schemaType.value === 'string') count += isSecret.value && error.value != null ? 2 : 1
+  if (schemaType.value === 'string') count += 1
   else if (
     schemaType.value === 'number' ||
     schemaType.value === 'integer' ||
@@ -239,38 +228,11 @@ const partCount = computed(() => {
 <template>
   <Parts v-if="!isConst && partCount > 0" :wrap="partCount > 1">
     <template v-if="schemaType === 'string'">
-      <template v-if="schemaFormat === 'enso-secret'">
-        <div class="flex flex-col">
-          <Form
-            :schema="(z) => z.object({ path: z.string() })"
-            :defaultValues="{
-              path:
-                typeof value === 'string' ?
-                  value.startsWith(userPathPrefix) ?
-                    value.replace(userPathPrefix, 'enso://~/')
-                  : value
-                : '',
-            }"
-            :onChange="
-              (_key: string, newValue: unknown) => {
-                if (newValue !== value) onChange(newValue)
-              }
-            "
-          >
-            <ComboBox
-              name="path"
-              :items="secretAutocompleteItems"
-              :placeholder="getText('enterSecretPath')"
-              :class="twMerge('rounded-2xl', validationErrorClass)"
-            />
-          </Form>
-          <Text v-if="error != null" class="px-2 text-danger">{{ error }}</Text>
-        </div>
-      </template>
-      <FilePathInput
-        v-else-if="schemaFormat === 'enso-file'"
-        :readOnly="readOnly"
-        :value="typeof value === 'string' ? value : ''"
+      <SchemaTextInput
+        v-if="schemaFormat === 'enso-secret'"
+        type="text"
+        :readOnly="true"
+        :value="value"
         :validationErrorClass="validationErrorClass"
         :error="error"
         @change="onChange"
@@ -332,6 +294,7 @@ const partCount = computed(() => {
               :path="`${path}/properties/${definition.key}`"
               :getValidator="getValidator"
               :isAbsent="!isPresent(definition.key)"
+              :unavailable="unavailable"
               :noBorder="noChildBorder"
               :value="propertyValue(definition.key)"
               :onChange="(newValue: unknown) => setProperty(definition.key, newValue)"
@@ -352,6 +315,7 @@ const partCount = computed(() => {
       :getValidator="getValidator"
       :noBorder="noBorder"
       :isAbsent="isAbsent"
+      :unavailable="unavailable"
       :value="value"
       :onChange="onChange"
     />
@@ -361,10 +325,12 @@ const partCount = computed(() => {
       <Dropdown
         :ariaLabel="getText('options')"
         :readOnly="readOnly"
-        :items="anyOfSchemas"
-        :selectedIndex="selectedChildIndex"
+        :items="offeredMembers.map((member) => member.schema)"
+        :selectedIndex="offeredMembers.findIndex((member) => member.index === selectedChildIndex)"
         class="w-full self-start"
-        @update:selectedIndex="selectChild"
+        @update:selectedIndex="
+          (i: number | null) => selectChild(i == null ? null : (offeredMembers[i]?.index ?? null))
+        "
       >
         <template #default="{ item }">
           <Text>{{ getSchemaName(defs, item) }}</Text>
@@ -380,9 +346,13 @@ const partCount = computed(() => {
         :getValidator="getValidator"
         :noBorder="noChildBorder"
         :isAbsent="isAbsent"
+        :unavailable="unavailable"
         :value="value"
         :onChange="onChange"
       />
+      <Text v-if="unavailableNote != null" variant="body-sm" class="px-2">
+        {{ unavailableNote }}
+      </Text>
     </div>
 
     <JSONSchemaInput
@@ -395,6 +365,7 @@ const partCount = computed(() => {
       :getValidator="getValidator"
       :noBorder="noChildBorder"
       :isAbsent="isAbsent"
+      :unavailable="unavailable"
       :value="value"
       :onChange="onChange"
     />

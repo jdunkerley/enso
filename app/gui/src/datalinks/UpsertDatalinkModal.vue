@@ -7,6 +7,10 @@
  * does not close it; Escape and Cancel do. The datalink starts as the schema's first
  * type with its defaults; `doCreate` gets the name and the datalink once the form is submitted with
  * a valid one.
+ *
+ * With `existing` it edits that datalink ("Edit Datalink", Save) and keeps the name, which is
+ * read-only: renaming is the drive's name cell's (it keeps `.datalink` and checks uniqueness), and
+ * a save that also moved the file could half-fail.
  */
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Dialog from '$/components/Dialog/Dialog.vue'
@@ -22,8 +26,10 @@ import { constantValueOfSchema } from '$/utils/jsonSchema'
 import { ref } from 'vue'
 import DatalinkFormInput from './DatalinkFormInput.vue'
 
-const { doCreate } = defineProps<{
+const { doCreate, existing } = defineProps<{
   doCreate: (name: string, datalink: unknown) => Promise<void> | void
+  /** The datalink to edit, if any. */
+  existing?: { readonly name: string; readonly value: unknown } | undefined
 }>()
 
 const emit = defineEmits<{
@@ -41,7 +47,7 @@ const open = ref(true)
 <template>
   <Dialog
     v-model:open="open"
-    :title="getText('createDatalink')"
+    :title="existing ? getText('editDatalink') : getText('createDatalink')"
     :isDismissable="false"
     @closed="emit('close')"
   >
@@ -50,12 +56,16 @@ const open = ref(true)
       :schema="
         (z) => z.object({ name: z.string().min(1), value: z.unknown().refine(validateDatalink) })
       "
-      :defaultValues="{ name: '', value: INITIAL_DATALINK_VALUE }"
+      :defaultValues="{
+        name: existing?.name ?? '',
+        value: existing?.value ?? INITIAL_DATALINK_VALUE,
+      }"
       @submit="({ name, value }) => doCreate(name, value)"
     >
       <Input
         name="name"
-        autoFocus
+        :readOnly="existing != null"
+        :autoFocus="existing == null"
         :label="getText('name')"
         :placeholder="getText('datalinkNamePlaceholder')"
       />
@@ -65,7 +75,7 @@ const open = ref(true)
       </div>
 
       <ButtonGroup>
-        <Submit>{{ getText('create') }}</Submit>
+        <Submit>{{ existing ? getText('save') : getText('create') }}</Submit>
         <DialogClose variant="outline">{{ getText('cancel') }}</DialogClose>
       </ButtonGroup>
 
