@@ -126,13 +126,8 @@ test('secret fields take plain values only', async ({ drivePage }) => {
   await drivePage.goToCategory.local().do(async (page) => {
     await page.getByRole('button', { name: TEXT.newDatalink }).click()
     const created = dialog(page, TEXT.createDatalink)
-    const typeList = created.getByRole('listbox', { name: TEXT.options }).first()
     // Open the type dropdown as a user does, then pick the option with a real click.
-    await typeList
-      .locator('xpath=ancestor::div[@tabindex="-1"][1]')
-      .locator('.select-none')
-      .last()
-      .click()
+    await created.getByTestId('dropdown-trigger').first().click()
     await created.getByRole('option', { name: 'Postgres Database Connection' }).click()
     // The secure value's own dropdown rendered and lists its (only) choice, so the absences below
     // are not vacuous.

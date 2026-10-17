@@ -8,6 +8,7 @@ import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
 import { useExportArchive, useMutationCallback, useNewProject } from '#/layouts/Drive/driveActions'
+import { canDownloadAsset } from '#/layouts/Drive/downloadEntry'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
 import ManageLabelsModal from '#/components/labels/ManageLabelsModal.vue'
@@ -301,9 +302,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
         },
       },
     pasteMenuEntry,
-    (isCloud.value ?
-      asset.type !== backendModule.AssetType.directory
-    : asset.type === backendModule.AssetType.project) && {
+    canDownloadAsset(isCloud.value, asset.type) && {
       isDisabled: asset.type === backendModule.AssetType.secret,
       action: 'download',
       doAction: () => {

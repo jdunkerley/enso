@@ -47,8 +47,7 @@ export function dialogFileFilters(
   const filters = fileTypesToFileFilters(fileTypes)
   if (write || filters.length === 0) return filters
   const admitsDatalinks = filters.some(
-    ({ extensions }) =>
-      extensions === 'all' || extensions.includes('*') || extensions.includes('datalink'),
+    ({ extensions }) => extensions.includes('*') || extensions.includes('datalink'),
   )
   return admitsDatalinks ? filters : [...filters, DATALINK_FILE_FILTER]
 }

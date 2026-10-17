@@ -52,8 +52,18 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
   }
 }
 
-/** Error codes meaning the file system cannot hard-link, so an exclusive write falls back. */
-const NO_HARD_LINK_CODES = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS'])
+/**
+ * Error codes meaning the file system cannot hard-link, so an exclusive write falls back.
+ * - `EPERM`, `ENOTSUP`, `EOPNOTSUPP`, `ENOSYS`: the volume or driver has no hard links.
+ * - `EXDEV`: the link would cross devices.
+ * - `EISDIR`: on Windows, `CreateHardLinkW` on a volume without hard links (exFAT, FAT32) fails
+ *   with `ERROR_INVALID_FUNCTION`, which libuv maps to `EISDIR`. A link onto an existing path,
+ *   directory or not, reports `EEXIST`, so a genuine directory is never mistaken for this.
+ *
+ * `UNKNOWN` is deliberately left out: nothing shows it means "no hard links", and the fallback
+ * must not hide other failures.
+ */
+const NO_HARD_LINK_CODES = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS', 'EISDIR'])
 
 /**
  * Write `value` as JSON to `filePath` only if nothing is there (an existing file or a dangling
