@@ -1,4 +1,5 @@
 /** @file Project states definitions and a composable for transitions between them. */
+import { backendMutationOptions as backendMutationOptionsFor } from '$/utils/backendQuery'
 import { backendMutationOptions } from '@/composables/backend'
 import { useAiAvailability } from '@/stores/aiAvailability'
 import { assert, assertDefined } from '@/util/assert'
@@ -18,6 +19,7 @@ import {
   type ProjectId,
   type ProjectSessionId,
 } from 'enso-common/src/services/Backend'
+import { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { Err, Ok, rejectionToResult, type Result } from 'enso-common/src/utilities/data/result'
 import {
   computed,
@@ -170,9 +172,20 @@ export function useProjectStates() {
   const openRemoteProject = vueQuery.useMutation(
     backendMutationOptions('openProject', backends.remoteBackend),
   )
-  const closeLocalProject = vueQuery.useMutation(
-    backendMutationOptions('closeProject', backends.localBackend),
-  )
+  // The plain options (`$/utils/backendQuery`), not the Vue wrapper's `computed`: their key,
+  // network mode and invalidations are kept, while the call returns the close commit's warning.
+  const localCloseOptions = backendMutationOptionsFor(backends.localBackend, 'closeProject')
+  const closeLocalProject = vueQuery.useMutation({
+    ...(localCloseOptions.mutationKey != null && { mutationKey: localCloseOptions.mutationKey }),
+    ...(localCloseOptions.networkMode != null && { networkMode: localCloseOptions.networkMode }),
+    ...(localCloseOptions.meta != null && { meta: localCloseOptions.meta }),
+    mutationFn: ([id, title]: readonly [ProjectId, string]) => {
+      const localBackend = backends.localBackend
+      if (!(localBackend instanceof LocalBackend))
+        throw new Error('Cannot close local project: no local backend')
+      return localBackend.closeProjectReportingVersioning(id, title)
+    },
+  })
   const closeRemoteProject = vueQuery.useMutation(
     backendMutationOptions('closeProject', backends.remoteBackend),
   )
@@ -531,27 +544,40 @@ export function useProjectStates() {
     }
   }
 
-  /** Close opened project. */
+  /** Close opened project. A local one may first be offered a repository (`localVersioning`). */
   async function closeProject(
     project: Opened | Initialized,
   ): Promise<Result<NotOpened | HybridLocallyClosed>> {
-    project.scope.stop()
     switch (project.info.mode) {
-      case 'local':
-        if (backends.localBackend == null)
+      case 'local': {
+        if (backends.localBackend == null) {
+          project.scope.stop()
           return Err('Cannot close local project: no local backend')
-        await closeLocalProject.mutateAsync([project.info.id, project.info.title])
+        }
+        // The question needs the project to be watched, and stopping the scope unwatches it.
+        await localVersioning.offerRepository(project.info.id, 'close')
+        project.scope.stop()
+        const { versioningWarning } = await closeLocalProject.mutateAsync([
+          project.info.id,
+          project.info.title,
+        ])
+        if (versioningWarning != null) {
+          localVersioning.showCloseWarning(project.info.title, versioningWarning)
+        }
         return Ok({
           status: 'not-opened',
           info: project.info,
         })
+      }
       case 'cloud':
+        project.scope.stop()
         await closeRemoteProject.mutateAsync([project.info.id, project.info.title])
         return Ok({
           status: 'not-opened',
           info: project.info,
         })
       case 'hybrid':
+        project.scope.stop()
         if (backends.localBackend == null)
           return Err('Cannot close hybrid project: no local backend')
         await backends.localBackend.closeProject(project.runningId, project.info.title)
@@ -638,6 +664,7 @@ export function useProjectStates() {
       renameProjectMut.mutateAsync({ project: project.info, newName, backend }),
     )
     if (!result.ok) return result
+    if (project.info.mode === 'local') void localVersioning.refresh(project.info.id)
     return Ok(markRaw({ ...project, info: { ...project.info, title: newName } }))
   }
 

@@ -640,3 +640,14 @@ describe('save', () => {
     expect(backend.commitVersion).toHaveBeenCalledWith(PROJECT, 'From the dialog')
   })
 })
+
+describe('showCloseWarning', () => {
+  test('is a warning toast with the project and git’s message', () => {
+    const { toasts, store } = setup()
+    store.showCloseWarning('Sales', 'index.lock exists')
+    expect(toasts.toasts.value[0]).toMatchObject({
+      type: 'warning',
+      content: "'Sales' was closed, but its version could not be saved: index.lock exists",
+    })
+  })
+})

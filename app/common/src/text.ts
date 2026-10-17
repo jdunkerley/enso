@@ -201,6 +201,7 @@ interface PlaceholderOverrides {
   readonly versioningCreateMessage: [folder: string]
   readonly versioningUseMessage: [repository: string]
   readonly versioningBlocked: [reason: string]
+  readonly versionOnCloseWarning: [title: string, warning: string]
 
   readonly dragAnnouncementOneAsset: [assetTitle: string]
   readonly dragAnnouncementAssets: [count: number]

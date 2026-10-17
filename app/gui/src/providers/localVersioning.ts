@@ -452,6 +452,11 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     return !status.enabled || status.repoRoot == null || status.changed
   }
 
+  /** Tell the user that a project was closed, but its "Saved on close" version was not saved. */
+  function showCloseWarning(title: string, warning: string) {
+    deps.toasts.show(deps.getText('versionOnCloseWarning', title, warning), { type: 'warning' })
+  }
+
   /** While quitting nothing is asked. */
   function setQuitting(value: boolean) {
     quitting = value
@@ -476,6 +481,7 @@ export function createLocalVersioningStore(deps: LocalVersioningDependencies) {
     save,
     askToSave,
     canSave,
+    showCloseWarning,
   }
 }
 
