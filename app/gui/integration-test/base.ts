@@ -7,7 +7,7 @@ import type EditorPageActions from './actions/EditorPageActions'
 import LoginPageActions from './actions/LoginPageActions'
 import { mockCloudApi, type MockCloudApi } from './mock/cloudApi'
 import { mockLocalApi, type MockLocalApi } from './mock/localApi'
-import { registerMocks } from './mock/registerMocks'
+import { recordCloudRequests, registerMocks } from './mock/registerMocks'
 
 export type * from 'playwright/test'
 
@@ -47,6 +47,11 @@ export const test = base.extend<{
     local?: (api: MockLocalApi) => void
     addDefaultProject?: boolean
   }
+  /**
+   * Every request the page made to Enso Cloud (`CLOUD_URL`), as `METHOD url`. An automatic fixture:
+   * each is aborted unless a later route answers it, and a test that leaves one recorded fails.
+   */
+  cloudRequests: string[]
   cloudApi: MockCloudApi
   localApi: MockLocalApi
   loginPage: LoginPageActions
@@ -57,6 +62,14 @@ export const test = base.extend<{
   aiAvailable: [false, { option: true }],
   appConfig: [{}, { option: true }],
   setupApi: [{}, { option: true }],
+  cloudRequests: [
+    async ({ page }, use) => {
+      const requests = await recordCloudRequests(page)
+      await use(requests)
+      baseExpect(requests, 'requests to Enso Cloud').toEqual([])
+    },
+    { auto: true },
+  ],
   cloudApi: async ({ page, setupApi }, use) => {
     const api = await mockCloudApi(page)
     setupApi.cloud?.(api)

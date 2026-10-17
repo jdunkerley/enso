@@ -3,6 +3,20 @@ import { test } from 'integration-test/base'
 import type { Page, Route } from 'playwright'
 import LATEST_GITHUB_RELEASES from './data/latestGithubReleases.json' with { type: 'json' }
 
+/** Enso Cloud, its test mocks and its identity provider: a local-only IDE requests none of them. */
+export const CLOUD_URL =
+  /^https:\/\/(?:mock|mock-s3-bucket\.com|mock-cognito\.com|(?:[^/]+\.)?cloud\.enso\.org|[^/]+\.amazoncognito\.com|[^/]+\.amazonaws\.com)(?:[:/]|$)/
+
+/** Abort every request to {@link CLOUD_URL}, and record it as `METHOD url`. */
+export async function recordCloudRequests(page: Page): Promise<string[]> {
+  const requests: string[] = []
+  page.on('request', (request) => {
+    if (CLOUD_URL.test(request.url())) requests.push(`${request.method()} ${request.url()}`)
+  })
+  await page.route(CLOUD_URL, (route) => route.abort('blockedbyclient'))
+  return requests
+}
+
 export interface RegisterMocksOptions {
   readonly aiAvailable?: boolean
   readonly appConfig?: Record<string, string | undefined>
@@ -234,19 +248,6 @@ async function mockDate(page: Page) {
 
 /** Mock unneeded URLs. */
 async function mockUnneededUrls(page: Page) {
-  const eulaJsonBody = JSON.stringify({
-    path: '/eula.md',
-    size: 9472,
-    modified: '2024-05-21T10:47:27.000Z',
-    hash: '1c8a655202e59f0efebf5a83a703662527aa97247052964f959a8488382604b8',
-  })
-  const privacyJsonBody = JSON.stringify({
-    path: '/privacy.md',
-    size: 1234,
-    modified: '2024-05-21T10:47:27.000Z',
-    hash: '1c8a655202e59f0efebf5a83a703662527aa97247052964f959a8488382604b8',
-  })
-
   await test.step('Mock unneeded URLs', async () => {
     const fulfillWith =
       (...options: Parameters<Route['fulfill']>) =>
@@ -265,14 +266,6 @@ async function mockUnneededUrls(page: Page) {
       page.route(
         'https://api.mapbox.com/mapbox-gl-js/*/mapbox-gl.css',
         fulfillWith({ contentType: 'text/css', body: '' }),
-      ),
-      page.route(
-        'https://ensoanalytics.com/eula.json',
-        fulfillWith({ contentType: 'text/json', body: eulaJsonBody }),
-      ),
-      page.route(
-        'https://ensoanalytics.com/privacy.json',
-        fulfillWith({ contentType: 'text/json', body: privacyJsonBody }),
       ),
       page.route(
         'https://fonts.googleapis.com/css2*',
