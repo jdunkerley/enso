@@ -1,5 +1,7 @@
 /** @file Secrets (the user's Mapbox token above all) must not reach Sentry. */
-import { describe, expect, test } from 'vitest'
+import { mapboxSettingsStore } from '$/providers/mapboxToken'
+import * as sentry from '@sentry/vue'
+import { afterEach, describe, expect, test } from 'vitest'
 import {
   redactAccessToken,
   redactSensitiveFields,
@@ -139,5 +141,107 @@ describe('whole Sentry payloads', () => {
       data: { tag: 'breadcrumb', payload: { category: 'console', message: MAPBOX } },
     })
     expect(event.data.payload.message).toBe(REDACTED)
+  })
+})
+
+describe('scrubDeep safety', () => {
+  test('keeps class instances as they are, without copying them', () => {
+    class Holder {
+      url = MAPBOX
+    }
+    const holder = new Holder()
+    const out = scrubDeep({ holder, when: new Date(0) })
+    expect(out.holder).toBe(holder)
+    expect(out.when).toBeInstanceOf(Date)
+  })
+  test('copies objects without a prototype', () => {
+    const bare = Object.assign(Object.create(null) as Record<string, string>, { url: MAPBOX })
+    expect(scrubDeep(bare).url).toBe(REDACTED)
+  })
+  test('does not throw on a 10,000-node linked list, and stops at the depth cap', () => {
+    type Node = { url: string; next: Node | null }
+    let list: Node | null = null
+    for (let i = 0; i < 10_000; i++) list = { url: MAPBOX, next: list }
+    const out = scrubDeep(list)
+    expect(out?.url).toBe(REDACTED)
+    expect(JSON.stringify(out)).not.toContain('pk.secret')
+  })
+  test('passes sdkProcessingMetadata through untouched', () => {
+    const metadata = { capturedSpanScope: { url: MAPBOX } }
+    const out = scrubEvent({ message: MAPBOX, sdkProcessingMetadata: metadata })
+    expect(out.sdkProcessingMetadata).toBe(metadata)
+    expect(out.message).toBe(REDACTED)
+  })
+  test('never throws, even on a getter that does', () => {
+    const hostile = {
+      url: MAPBOX,
+      get boom(): string {
+        throw new Error('no')
+      },
+    }
+    const out = scrubDeep(hostile)
+    expect(out.url).toBe(REDACTED)
+  })
+})
+
+describe('the stored token', () => {
+  afterEach(() => mapboxSettingsStore.setState({ accessToken: null }))
+
+  test('is replaced wherever it appears, in any shape', () => {
+    mapboxSettingsStore.setState({ accessToken: 'pk.longSecretValue' })
+    const out = scrubEvent({
+      message: 'props {"accessToken":"pk.longSecretValue"}',
+      extra: { bare: 'token pk.longSecretValue here', encoded: encodeURIComponent('x') },
+    })
+    expect(out.message).toBe('props {"accessToken":"REDACTED"}')
+    expect(out.extra?.bare).toBe('token REDACTED here')
+  })
+  test('is not searched for when shorter than 8 characters, or empty', () => {
+    mapboxSettingsStore.setState({ accessToken: 'pk.a' })
+    expect(scrubDeep('pk.abc and pk.a')).toBe('pk.abc and pk.a')
+    mapboxSettingsStore.setState({ accessToken: null })
+    expect(scrubDeep('plain text')).toBe('plain text')
+  })
+})
+
+describe('a real Sentry transaction', () => {
+  test('its live spans are sent scrubbed, and the client graph is not walked', async () => {
+    const sent: string[] = []
+    // A stand-in for the Vue app that `@sentry/vue` copies into the client's options.
+    type Node = { url: string; next: Node | null }
+    let app: Node | null = null
+    for (let i = 0; i < 20_000; i++) app = { url: MAPBOX, next: app }
+    const client = new sentry.BrowserClient({
+      dsn: 'https://key@o0.ingest.sentry.io/0',
+      integrations: [],
+      stackParser: sentry.defaultStackParser,
+      transport: () => ({
+        send: (envelope) => {
+          sent.push(JSON.stringify(envelope))
+          return Promise.resolve({})
+        },
+        flush: () => Promise.resolve(true),
+      }),
+      tracesSampleRate: 1,
+      beforeSendTransaction: scrubEvent,
+      ...({ app } as object),
+    })
+    sentry.setCurrentClient(client)
+    client.init()
+    sentry.addTracingExtensions()
+    sentry.startSpan({ name: 'pageload' }, () => {
+      sentry
+        .startInactiveSpan({
+          name: `GET ${MAPBOX}`,
+          op: 'resource.fetch',
+          attributes: { url: MAPBOX },
+        })
+        ?.end()
+    })
+    await client.flush(2000)
+    const envelope = sent.find((text) => text.includes('"type":"transaction"'))
+    expect(envelope).toBeDefined()
+    expect(envelope).toContain('access_token=REDACTED')
+    expect(envelope).not.toContain('pk.secret')
   })
 })

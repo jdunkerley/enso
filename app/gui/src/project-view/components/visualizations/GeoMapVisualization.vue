@@ -357,11 +357,14 @@ config.setToolbarOverlay(true)
     crossorigin="anonymous"
   />
   <MapboxTokenMissing v-if="mapboxToken == null" />
+  <!-- Sentry Replay must not record the map (`REPLAY_BLOCK_SELECTORS` in `$/utils/redact`):
+       Mapbox GL writes the access token into a link inside it. -->
   <div
     v-else
     :key="mapboxToken"
     ref="mapNode"
     class="GeoMapVisualization"
+    data-sentry-block
     @pointerdown.stop
     @wheel.stop.passive
   ></div>

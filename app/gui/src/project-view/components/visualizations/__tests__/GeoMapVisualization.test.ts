@@ -1,6 +1,7 @@
 /** @file The map visualization needs the user's Mapbox token, and says where to set it. */
 import { mapboxSettingsStore } from '$/providers/mapboxToken'
 import { useText } from '$/providers/text'
+import { replayPrivacyOptions } from '$/utils/redact'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -77,6 +78,14 @@ describe('the map visualization', () => {
     expect(wrapper.text()).toContain(getText('mapboxTokenMissing'))
     expect(MapMock.mock.instances[1].remove).toHaveBeenCalledTimes(1)
     expect(MapMock).toHaveBeenCalledTimes(2)
+  })
+
+  test('the map is not recorded by Sentry Replay', async () => {
+    mapboxSettingsStore.setState({ accessToken: 'pk.one' })
+    const { wrapper } = await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
+    const map = wrapper.get('.GeoMapVisualization').element
+    expect(map.hasAttribute('data-sentry-block')).toBe(true)
+    expect(map.matches(replayPrivacyOptions.block.join(','))).toBe(true)
   })
 
   test('logs map errors with the token redacted', async () => {
