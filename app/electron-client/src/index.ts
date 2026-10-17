@@ -23,7 +23,7 @@ import { join as joinPath } from 'node:path'
 import process from 'node:process'
 import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import { parseArgs } from './configParser.js'
+import { parseArgs, withoutDeepLink } from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
 import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
@@ -59,6 +59,31 @@ function pathToURL(path: string): URL {
     return new URL(encodeURI(`file:///${path.replaceAll('\\', '/')}`))
   } else {
     return new URL(encodeURI(`file://${path}`))
+  }
+}
+
+/**
+ * Stop the OS routing `enso://` links to this executable.
+ *
+ * Installs from before the IDE was local-only registered the scheme at run time
+ * (`setAsDefaultProtocolClient`), and the installer does not own that registration, so it outlives
+ * an upgrade. This removes only the OS registration: the in-app `enso://` asset protocol
+ * (`protocol.handle`) is a per-session scheme handler and does not depend on it.
+ *
+ * - Windows: deletes the `HKCU\Software\Classes\enso` handler if it points at this executable.
+ * - macOS: hands the scheme to another handler (or none) if this app is the default.
+ * - Linux: Electron implements neither the removal nor a cheap check (it spawns `xdg-settings`), so
+ *   nothing is done; a stale link that still launches the IDE is ignored by `withoutDeepLink`.
+ */
+function unregisterDeepLinks(electron: Electron) {
+  if (process.platform === 'linux') return
+  try {
+    if (electron.app.isDefaultProtocolClient('enso')) {
+      const removed = electron.app.removeAsDefaultProtocolClient('enso')
+      console.log(`Removed the stale 'enso://' OS registration: ${removed}.`)
+    }
+  } catch (error) {
+    console.error(`Failed to remove the stale 'enso://' OS registration.`, error)
   }
 }
 
@@ -121,6 +146,7 @@ class App {
       throw new Error('Electron is not available, cannot run Electron app.')
     }
     const electron = this.electron
+    unregisterDeepLinks(electron)
     // Register file associations for macOS.
     setOpenFileEventHandler((path) => {
       if (electron.app.isReady()) {
@@ -159,7 +185,7 @@ class App {
           }
           this.window.focus()
         } else {
-          console.error('No window found after receiving URL from second instance.')
+          console.error('No window to focus for the second instance.')
         }
       })
       electron.app.whenReady().then(
@@ -212,11 +238,12 @@ class App {
   processArguments(args: readonly string[]): ParsedArguments {
     // We parse only "client arguments", so we don't have to worry about the Electron-Dev vs
     // Electron-Proper distinction.
-    const fileToOpen = getFileToOpen(args)
+    const clientArgs = withoutDeepLink(args)
+    const fileToOpen = getFileToOpen(clientArgs)
     // If we are opening a file (i.e. we were spawned with just a path of the file to open as
     // the argument), it means that effectively we don't have any non-standard arguments.
     // We just need to let the caller know that we are opening a file.
-    const argsToParse = fileToOpen != null ? [] : args
+    const argsToParse = fileToOpen != null ? [] : clientArgs
     return { args: parseArgs(argsToParse), fileToOpen }
   }
 
