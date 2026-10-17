@@ -244,30 +244,30 @@ function openClearTrash() {
           @press="() => newFolder(currentDirectoryId)"
         />
         <Button
-          :isDisabled="!isCloud"
+          v-if="isCloud"
           variant="icon"
           size="medium"
           icon="key_add"
-          :aria-label="isCloud ? getText('newSecret') : getText('newSecret.cloudOnly')"
+          :aria-label="getText('newSecret')"
           :aria-expanded="isOpened('secret')"
           @press="openNewSecret"
         />
         <Button
-          :isDisabled="!isCloud"
+          v-if="isCloud"
           variant="icon"
           size="medium"
           icon="credential_add"
           :aria-expanded="isOpened('credential')"
-          :aria-label="isCloud ? getText('newCredential') : getText('newCredential.cloudOnly')"
+          :aria-label="getText('newCredential')"
           @press="openNewCredential"
         />
         <Button
-          :isDisabled="!isCloud"
+          v-if="isCloud"
           variant="icon"
           size="medium"
           icon="connector_add"
           :aria-expanded="isOpened('datalink')"
-          :aria-label="isCloud ? getText('newDatalink') : getText('newDatalink.cloudOnly')"
+          :aria-label="getText('newDatalink')"
           @press="openNewDatalink"
         />
       </div>

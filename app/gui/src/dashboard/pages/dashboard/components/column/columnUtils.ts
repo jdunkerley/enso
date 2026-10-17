@@ -63,27 +63,25 @@ export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
 
 /**
  * Return the full list of columns given the relevant current state. `supportsLabels` is whether the
- * backend can label assets of any type (`supportsAnyLabels`).
+ * backend can label assets of any type (`supportsAnyLabels`). The plan no longer matters: it decided
+ * only the "Shared with" column, which is gone; the parameter can go with the cloud code.
  */
 export function getColumnList(
-  userPlan: backend.Plan,
+  _userPlan: backend.Plan,
   backendType: backend.BackendType,
   category: CategoryType,
   isSearching: boolean,
   supportsLabels: boolean,
 ): readonly Column[] {
   const isCloud = backendType === backend.BackendType.remote
-  const isEnterprise = userPlan === backend.Plan.enterprise
   const isTrash = category === 'trash'
   const isRecent = isRecentCategory(category)
-  const isRoot = category === 'cloud'
   const isTeam = category === 'team'
 
   const columns = [
     Column.name,
     Column.modified,
     Column.createdAt,
-    !isTrash && !isRecent && !isRoot && isCloud && isEnterprise && Column.sharedWith,
     (isTrash || isRecent || isSearching) && Column.path,
     supportsLabels && Column.labels,
     isCloud && Column.size,
