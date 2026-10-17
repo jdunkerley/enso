@@ -56,6 +56,7 @@ import {
   usePendingMutations,
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
+import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
@@ -156,6 +157,7 @@ const localStorage = LocalStorage.getInstance()
 
 const location = computed(() => driveView.location)
 const backend = computed(() => location.value.backend)
+const editDatalink = useEditDatalink(backend)
 const category = computed(() => location.value.category)
 const currentDirectoryId = computed(() => location.value.currentDirectoryId)
 const user = computed(() => {
@@ -741,7 +743,7 @@ function onKeyDown(event: KeyboardEvent) {
             case AssetType.datalink: {
               event.preventDefault()
               event.stopPropagation()
-              rightPanel.setTemporaryTab('settings')
+              void editDatalink(item)
               break
             }
             case AssetType.file:

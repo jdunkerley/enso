@@ -121,6 +121,44 @@ describe('local datalinks', () => {
     expect(move).toHaveBeenCalledExactlyOnceWith(LINK, Path('/root/Revenue.datalink'))
   })
 
+  it('renaming to a name already ending in .datalink does not double the extension', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    const move = vi.spyOn(projectManager, 'moveFile').mockResolvedValue()
+    await localBackend.updateAsset(newDatalinkId(LINK), {
+      title: 'Revenue.datalink',
+      parentDirectoryId: null,
+      description: null,
+      metadataId: null,
+    })
+    expect(move).toHaveBeenCalledExactlyOnceWith(LINK, Path('/root/Revenue.datalink'))
+  })
+
+  it.each(['a/b', 'a\\b'])('refuses to rename a datalink to %j', async (title) => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    const move = vi.spyOn(projectManager, 'moveFile').mockResolvedValue()
+    await expect(
+      localBackend.updateAsset(newDatalinkId(LINK), {
+        title,
+        parentDirectoryId: null,
+        description: null,
+        metadataId: null,
+      }),
+    ).rejects.toThrow("A datalink's name cannot contain '/' or '\\'.")
+    expect(move).not.toHaveBeenCalled()
+  })
+
+  it('creating with a name already ending in .datalink does not double the extension', async () => {
+    const { projectManager, localBackend } = makeLocalBackend()
+    const create = vi.spyOn(projectManager, 'createDatalink').mockResolvedValue()
+    await localBackend.createDatalink({
+      name: 'Sales.datalink',
+      value: VALUE,
+      parentDirectoryId: newDirectoryId(Path('/root')),
+      datalinkId: null,
+    })
+    expect(create).toHaveBeenCalledExactlyOnceWith(LINK, VALUE)
+  })
+
   it('downloads the file itself, by its file id', async () => {
     const downloader = vi.fn()
     const { localBackend } = makeLocalBackend({ downloader })

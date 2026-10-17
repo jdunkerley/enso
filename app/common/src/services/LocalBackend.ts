@@ -81,6 +81,16 @@ export function newDatalinkId(path: Path) {
   return backend.DatalinkId(`${DATALINK_ID_PREFIX}${encodeURIComponent(path)}`)
 }
 
+/**
+ * A datalink's file name: the title and `.datalink`, once (a title that already ends in the
+ * extension is not given it twice).
+ * @throws {Error} when the title contains a path separator.
+ */
+function datalinkFileName(title: string) {
+  if (/[/\\]/.test(title)) throw new Error("A datalink's name cannot contain '/' or '\\'.")
+  return title.endsWith(DATALINK_EXTENSION) ? title : `${title}${DATALINK_EXTENSION}`
+}
+
 /** A datalink's title: its file name without `.datalink`, as the cloud titled datalinks. */
 function datalinkTitle(path: Path) {
   return getFileName(path).slice(0, -DATALINK_EXTENSION.length)
@@ -854,7 +864,7 @@ export class LocalBackend extends backend.Backend {
     const newParentDirectoryPath = (() => {
       const fileName =
         title == null ? getFileName(currentParentDirectoryPath)
-        : type === backend.AssetType.datalink ? `${title}${DATALINK_EXTENSION}`
+        : type === backend.AssetType.datalink ? datalinkFileName(title)
         : title
 
       if (parentDirectoryId == null) {
@@ -1276,14 +1286,11 @@ export class LocalBackend extends backend.Backend {
       )
       return { id: body.datalinkId }
     }
-    if (/[/\\]/.test(body.name)) {
-      throw new Error("A datalink's name cannot contain '/' or '\\'.")
-    }
     const parentPath =
       body.parentDirectoryId == null ?
         this.projectManager.rootDirectory
       : backend.extractTypeAndPath(body.parentDirectoryId).path
-    const path = joinPath(parentPath, `${body.name}${DATALINK_EXTENSION}`)
+    const path = joinPath(parentPath, datalinkFileName(body.name))
     await this.projectManager.createDatalink(path, body.value)
     return { id: newDatalinkId(path) }
   }

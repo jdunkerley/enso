@@ -6,6 +6,7 @@
 import ContextMenu from '#/components/ContextMenu.vue'
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
+import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
 import { useExportArchive, useMutationCallback, useNewProject } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
@@ -75,6 +76,7 @@ const user = computed(() => {
   return value
 })
 
+const editDatalink = useEditDatalink(backend)
 const deleteAssets = useMutationCallback(() => deleteAssetsMutationOptions(backend.value))
 const restoreAssets = useMutationCallback(() => restoreAssetsMutationOptions(backend.value))
 const copyAssets = useMutationCallback(() => copyAssetsMutationOptions(backend.value))
@@ -321,8 +323,14 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
           driveStore.update({ assetToRename: asset.id })
         },
       },
-    (asset.type === backendModule.AssetType.secret ||
-      asset.type === backendModule.AssetType.datalink) &&
+    asset.type === backendModule.AssetType.datalink &&
+      canEditThisAsset.value && {
+        action: 'edit',
+        doAction: () => {
+          void editDatalink(asset)
+        },
+      },
+    asset.type === backendModule.AssetType.secret &&
       canEditThisAsset.value && {
         action: 'edit',
         doAction: () => {
@@ -332,7 +340,6 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
             ctx.item = asset
             switch (asset.type) {
               case backendModule.AssetType.secret:
-              case backendModule.AssetType.datalink:
                 ctx.spotlightOn = asset.type
                 break
             }

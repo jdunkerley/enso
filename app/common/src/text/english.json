@@ -460,7 +460,6 @@
   "uploadFilesToCloud": "Export Projects to Cloud",
   "downloadFilesToLocal": "Export Projects to Local",
   "newDatalink": "New Datalink",
-  "newDatalink.cloudOnly": "New Datalink (Exclusive to Cloud)",
   "newCredential": "New Credential",
   "editCredential": "Edit Credential",
   "newCredential.cloudOnly": "New Credential (Exclusive to Cloud)",
