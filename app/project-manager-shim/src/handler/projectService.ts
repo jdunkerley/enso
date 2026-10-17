@@ -58,6 +58,8 @@ const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningCo
     await versioning.disable(requireString(body, 'repoRoot'))
     return null
   },
+  'versioning/enable-if-inside': ({ versioning }, body) =>
+    versioning.enableIfInside(requireString(body, 'repoRoot'), requireString(body, 'rootPath')),
   'versioning/commit': ({ versioning }, body) => {
     const message = requireString(body, 'message')
     // An empty message is a save without a comment.

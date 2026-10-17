@@ -34,6 +34,8 @@ export interface VersioningStatus {
    * `false` when git is unavailable or there is no repository.
    */
   readonly enabled: boolean
+  /** The user turned versioning off for this repository (`disable`); it is enabled again only explicitly. */
+  readonly optedOut: boolean
 }
 
 /** A saved version of a project, with who made it and its comment. */
@@ -115,6 +117,7 @@ const NO_GIT: VersioningStatus = {
   lastVersion: null,
   blocked: null,
   enabled: false,
+  optedOut: false,
 }
 const NO_REPOSITORY: VersioningStatus = { ...NO_GIT, git: true }
 
@@ -277,6 +280,7 @@ export class LocalVersioning {
   private async statusIn(repoRoot: string, projectPath: string): Promise<VersioningStatus> {
     const blocked = await blockedReason(repoRoot)
     const enabled = await this.consent.isEnabled(repoRoot)
+    const optedOut = await this.consent.isOptedOut(repoRoot)
     try {
       const relative = await repoRelative(repoRoot, projectPath)
       const run = (args: string[]) => runGit(repoRoot, args, { queueKey: repoRoot })
@@ -308,11 +312,20 @@ export class LocalVersioning {
         lastVersion,
         blocked,
         enabled,
+        optedOut,
       }
     } catch (error) {
       const locked = lockMessage(error)
       if (locked == null) throw error
-      return { git: true, repoRoot, changed: false, lastVersion: null, blocked: locked, enabled }
+      return {
+        git: true,
+        repoRoot,
+        changed: false,
+        lastVersion: null,
+        blocked: locked,
+        enabled,
+        optedOut,
+      }
     }
   }
 
@@ -360,6 +373,25 @@ export class LocalVersioning {
   /** Stop versioning the repository at `repoRoot`. Its history is left as it is. */
   async disable(repoRoot: string): Promise<void> {
     await exclusive(repoRoot, () => this.consent.disable(repoRoot))
+  }
+
+  /**
+   * Enable the repository at `repoRoot` if its root is `rootPath` (the user's local projects
+   * folder) or inside it, unless the user opted out of it. Paths are compared by
+   * {@link repositoryKey}, so a root reached through a link or junction (OneDrive), or spelt in
+   * another case on Windows, still matches git's real path. A repository above the root (a home
+   * folder's dotfiles, a work monorepo) is left for the user to decide. Returns whether the
+   * repository is enabled afterwards.
+   */
+  async enableIfInside(repoRoot: string, rootPath: string): Promise<{ readonly enabled: boolean }> {
+    if (await this.consent.isEnabled(repoRoot)) return { enabled: true }
+    if (await this.consent.isOptedOut(repoRoot)) return { enabled: false }
+    const repoKey = await repositoryKey(repoRoot)
+    const rootKey = await repositoryKey(rootPath)
+    const rootPrefix = rootKey.endsWith(path.sep) ? rootKey : rootKey + path.sep
+    if (repoKey !== rootKey && !repoKey.startsWith(rootPrefix)) return { enabled: false }
+    await this.enable(repoRoot)
+    return { enabled: true }
   }
 
   /**

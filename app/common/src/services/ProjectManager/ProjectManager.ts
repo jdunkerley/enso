@@ -496,6 +496,17 @@ export class ProjectManager {
     await this.runProjectServiceCommand('versioning/disable', { repoRoot })
   }
 
+  /**
+   * Enable the repository at `repoRoot` if it is at or inside `rootPath` (compared by real path in
+   * the shim), unless the user opted out of it. Returns whether it is enabled afterwards.
+   */
+  async enableVersioningIfInside(
+    repoRoot: Path,
+    rootPath: Path,
+  ): Promise<{ readonly enabled: boolean }> {
+    return this.runProjectServiceCommand('versioning/enable-if-inside', { repoRoot, rootPath })
+  }
+
   /** Save the project's current state as a version. `id` is `null` when nothing had changed. */
   async commitVersion(path: Path, message: string): Promise<{ readonly id: string | null }> {
     return this.runProjectServiceCommand('versioning/commit', { path, message })

@@ -30,6 +30,7 @@ import {
   Path,
   ProjectName,
   type IpWithSocket,
+  type VersioningStatus,
 } from './ProjectManager/types.js'
 
 const LOCAL_API_URL = '/api/'
@@ -362,6 +363,13 @@ export class LocalBackend extends backend.Backend {
         { cause: error },
       )
     }
+  }
+
+  // === Versioning (git, through the shim's `versioning/*` routes) ===
+
+  /** Whether `path` is in a repository, whether that is enabled, and its unsaved changes. */
+  versioningStatus(path: backend.Path): Promise<VersioningStatus> {
+    return this.projectManager.versioningStatus(path)
   }
 
   /**

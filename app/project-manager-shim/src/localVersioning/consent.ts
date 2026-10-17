@@ -22,17 +22,32 @@ export interface VersioningConsentOptions {
   readonly now?: () => Date
 }
 
-function parseEnabledRepositories(json: unknown): readonly string[] | undefined {
+/** What `versioning.json` records: the repositories enabled, and those the user turned off. */
+interface ConsentRecord {
+  readonly enabledRepositories: readonly string[]
+  readonly disabledRepositories: readonly string[]
+}
+
+const EMPTY_RECORD: ConsentRecord = { enabledRepositories: [], disabledRepositories: [] }
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+
+function parseConsentRecord(json: unknown): ConsentRecord | undefined {
   if (!isRecord(json)) return undefined
-  const { enabledRepositories } = json
-  if (!Array.isArray(enabledRepositories)) return undefined
-  if (!enabledRepositories.every((entry) => typeof entry === 'string')) return undefined
-  return enabledRepositories as string[]
+  const { enabledRepositories, disabledRepositories } = json
+  if (!isStringArray(enabledRepositories)) return undefined
+  // Written before opt-outs were recorded: none.
+  if (disabledRepositories === undefined) return { enabledRepositories, disabledRepositories: [] }
+  if (!isStringArray(disabledRepositories)) return undefined
+  return { enabledRepositories, disabledRepositories }
 }
 
 /**
  * The repositories the user has agreed to have versioned, persisted in
- * `<userDataDirectory>/versioning.json` as `{ version: 1, enabledRepositories: string[] }`.
+ * `<userDataDirectory>/versioning.json` as `{ version: 1, enabledRepositories: string[],
+ * disabledRepositories?: string[] }`; a repository in `disabledRepositories` was turned off by the
+ * user and is never enabled implicitly.
  * Repositories are recorded by real path (lowercased on Windows, where paths are
  * case-insensitive), so a link or a different spelling of the same repository matches. A corrupt
  * or newer file is moved aside and read as empty, as for `labels.json`.
@@ -52,38 +67,59 @@ export class VersioningConsent {
   /** Whether versioning is enabled for the repository at `repoRoot`. */
   async isEnabled(repoRoot: string): Promise<boolean> {
     const key = await repositoryKey(repoRoot)
-    return serialised(this.filePath, async () => (await this.read()).includes(key))
+    return serialised(this.filePath, async () =>
+      (await this.read()).enabledRepositories.includes(key),
+    )
   }
 
-  /** Enable versioning for the repository at `repoRoot`. */
+  /** Whether the user turned versioning off for the repository, and has not turned it on since. */
+  async isOptedOut(repoRoot: string): Promise<boolean> {
+    const key = await repositoryKey(repoRoot)
+    return serialised(this.filePath, async () =>
+      (await this.read()).disabledRepositories.includes(key),
+    )
+  }
+
+  /** Enable versioning for the repository at `repoRoot`, clearing an opt-out. */
   async enable(repoRoot: string): Promise<void> {
     const key = await repositoryKey(repoRoot)
     await serialised(this.filePath, async () => {
-      const current = await this.read()
-      if (!current.includes(key)) await this.write([...current, key])
+      const { enabledRepositories, disabledRepositories } = await this.read()
+      if (enabledRepositories.includes(key) && !disabledRepositories.includes(key)) return
+      await this.write({
+        enabledRepositories: [...enabledRepositories.filter((entry) => entry !== key), key],
+        disabledRepositories: disabledRepositories.filter((entry) => entry !== key),
+      })
     })
   }
 
-  /** Disable versioning for the repository at `repoRoot`. */
+  /**
+   * Disable versioning for the repository at `repoRoot`, and record that the user opted out, so
+   * that nothing enables it again implicitly (`LocalVersioning.enableIfInside`).
+   */
   async disable(repoRoot: string): Promise<void> {
     const key = await repositoryKey(repoRoot)
     await serialised(this.filePath, async () => {
-      const current = await this.read()
-      if (current.includes(key)) await this.write(current.filter((entry) => entry !== key))
+      const { enabledRepositories, disabledRepositories } = await this.read()
+      if (!enabledRepositories.includes(key) && disabledRepositories.includes(key)) return
+      await this.write({
+        enabledRepositories: enabledRepositories.filter((entry) => entry !== key),
+        disabledRepositories: [...disabledRepositories.filter((entry) => entry !== key), key],
+      })
     })
   }
 
-  private async read(): Promise<readonly string[]> {
-    const entries = await readVersionedJson(this.filePath, {
+  private async read(): Promise<ConsentRecord> {
+    const record = await readVersionedJson(this.filePath, {
       version: VERSIONING_FILE_VERSION,
-      parse: parseEnabledRepositories,
+      parse: parseConsentRecord,
       logger: this.logger,
       now: this.now,
     })
-    return entries ?? []
+    return record ?? EMPTY_RECORD
   }
 
-  private write(enabledRepositories: readonly string[]): Promise<void> {
-    return writeJsonAtomic(this.filePath, { version: VERSIONING_FILE_VERSION, enabledRepositories })
+  private write(record: ConsentRecord): Promise<void> {
+    return writeJsonAtomic(this.filePath, { version: VERSIONING_FILE_VERSION, ...record })
   }
 }

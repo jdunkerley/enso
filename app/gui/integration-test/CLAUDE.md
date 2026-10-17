@@ -224,6 +224,9 @@ description and ticks it off. The flake baseline it compares against is
 
 - Use page-object-style helpers from `actions/`, not raw selectors.
 - Mock at the boundary (HTTP / Amplify / LS), not inside components.
+- Local versioning is mocked in `mock/localVersioning.ts` (state,
+  `versioning/status`), with each feature's routes in `mock/versioning/`. Git is
+  absent by default; a spec opts in through `setupApi.local`.
 - Avoid `page.waitForTimeout` — prefer role-based `toBeVisible` / `toHaveText`
   assertions.
 - **Never leave the cursor on the dashboard's left bar.** It expands over the

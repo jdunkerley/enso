@@ -43,6 +43,7 @@ import {
   type VueWrapper,
 } from '@vue/test-utils'
 import { BackendType, type Backend } from 'enso-common/src/services/Backend'
+import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { Language } from 'enso-common/src/text'
 import { afterEach } from 'vitest'
 import { defineComponent, h, reactive, type Component, type VNodeProps } from 'vue'
@@ -174,14 +175,14 @@ export async function mountWithProviders<C extends Component>(
 export function mockBackends(
   backends: {
     readonly remoteBackend?: Partial<Backend>
-    readonly localBackend?: Partial<Backend> | null
+    readonly localBackend?: Partial<LocalBackend> | null
   } = {},
 ): BackendsStore {
   const remoteBackend = { type: BackendType.remote, ...backends.remoteBackend } as Backend
   const localBackend =
     backends.localBackend === undefined || backends.localBackend === null ?
       null
-    : ({ type: BackendType.local, ...backends.localBackend } as Backend)
+    : ({ type: BackendType.local, ...backends.localBackend } as LocalBackend)
   return reactive({
     remoteBackend,
     localBackend,
