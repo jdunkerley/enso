@@ -4,6 +4,7 @@
  */
 import type { Category } from '$/providers/category'
 import { useModals } from '$/providers/modals'
+import { createQueryClient, type QueryClient } from '$/utils/queryClient'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
@@ -19,6 +20,7 @@ import {
   type S3ObjectVersion,
 } from 'enso-common/src/services/Backend'
 import { newDirectoryId, newProjectId } from 'enso-common/src/services/LocalBackend'
+import { ResultError } from 'enso-common/src/utilities/data/result'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, ref } from 'vue'
 import AssetVersions from '../AssetVersions.vue'
@@ -169,8 +171,11 @@ afterEach(() => {
   useModals().closeAll()
 })
 
-async function renderTab() {
-  const mounted = await mountWithProviders(AssetVersions, { stores: { rightPanel } })
+async function renderTab(queryClient?: QueryClient) {
+  const mounted = await mountWithProviders(AssetVersions, {
+    stores: { rightPanel },
+    ...(queryClient != null ? { queryClient } : {}),
+  })
   await flushPromises()
   return mounted
 }
@@ -246,6 +251,8 @@ describe('in a local category', () => {
     localBackend.copyAsset.mockReset()
     localBackend.updateAsset.mockReset().mockResolvedValue(undefined)
     localBackend.getMainFileContent.mockReset().mockResolvedValue('main = 1')
+    openedProjects.closeProject.mockReset()
+    openedProjects.waitForProcess.mockReset().mockResolvedValue(undefined)
   })
 
   test('lists a project’s versions from the local backend', async () => {
@@ -305,6 +312,156 @@ describe('in a local category', () => {
       'P',
     )
     expect(text()).toContain('The first draft')
+  })
+
+  test('restoring an open project closes it, restores, and opens it again', async () => {
+    const order: string[] = []
+    const opened = { state: { status: 'initialized' }, nextTask: undefined, error: undefined }
+    openedProjects.get.mockReturnValue(opened)
+    openedProjects.closeProject.mockImplementation(() => order.push('close'))
+    openedProjects.waitForProcess.mockImplementation(async () => {
+      order.push('closed')
+    })
+    localBackend.restoreAsset.mockImplementation(async () => {
+      order.push('restore')
+    })
+    openProjectLocally.mockImplementation(() => order.push('open'))
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() => expect(order).toEqual(['close', 'closed', 'restore', 'open']))
+    expect(openedProjects.closeProject).toHaveBeenCalledWith(LOCAL_PROJECT.id)
+    expect(localBackend.restoreAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      localVersions[1]!.versionId,
+    )
+    // In the background: the drive, where Restore was chosen, stays in front.
+    expect(openProjectLocally).toHaveBeenCalledWith(LOCAL_PROJECT, 'local', false)
+  })
+
+  test('if the close fails, nothing is restored and the error is shown', async () => {
+    const opened = {
+      state: { status: 'initialized' },
+      nextTask: undefined,
+      error: undefined as Error | undefined,
+    }
+    openedProjects.get.mockReturnValue(opened)
+    openedProjects.waitForProcess.mockImplementation(async () => {
+      opened.error = new Error('engine did not stop')
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('engine did not stop')),
+    )
+    expect(localBackend.restoreAsset).not.toHaveBeenCalled()
+    expect(openProjectLocally).not.toHaveBeenCalled()
+  })
+
+  test('a close that fails with a `ResultError` shows its message', async () => {
+    const opened = {
+      state: { status: 'initialized' },
+      nextTask: undefined,
+      error: undefined as ResultError | undefined,
+    }
+    openedProjects.get.mockReturnValue(opened)
+    openedProjects.waitForProcess.mockImplementation(async () => {
+      opened.error = new ResultError('no local backend')
+    })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(/: no local backend$/)),
+    )
+    expect(localBackend.restoreAsset).not.toHaveBeenCalled()
+  })
+
+  test('if the restore fails after the close, the project is opened again', async () => {
+    openedProjects.get.mockReturnValue({
+      state: { status: 'initialized' },
+      nextTask: undefined,
+      error: undefined,
+    })
+    localBackend.restoreAsset.mockRejectedValue(new Error('the project is running'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('the project is running')),
+    )
+    expect(openProjectLocally).toHaveBeenCalledWith(LOCAL_PROJECT, 'local', false)
+  })
+
+  test('a project that is still opening is closed and opened again', async () => {
+    const order: string[] = []
+    openedProjects.get.mockReturnValue({
+      state: { status: 'not-opened' },
+      nextTask: { process: 'opening' },
+      error: undefined,
+    })
+    openedProjects.closeProject.mockImplementation(() => order.push('close'))
+    localBackend.restoreAsset.mockImplementation(async () => {
+      order.push('restore')
+    })
+    openProjectLocally.mockImplementation(() => order.push('open'))
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() => expect(order).toEqual(['close', 'restore', 'open']))
+  })
+
+  test('a closed project is restored without opening it', async () => {
+    openedProjects.get.mockReturnValue({
+      state: { status: 'not-opened' },
+      nextTask: undefined,
+      error: undefined,
+    })
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() => expect(localBackend.restoreAsset).toHaveBeenCalled())
+    expect(openedProjects.closeProject).not.toHaveBeenCalled()
+    expect(openProjectLocally).not.toHaveBeenCalled()
+  })
+
+  test('a project never opened in this app is restored without opening it', async () => {
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() => expect(localBackend.restoreAsset).toHaveBeenCalled())
+    expect(openedProjects.closeProject).not.toHaveBeenCalled()
+    expect(openProjectLocally).not.toHaveBeenCalled()
+  })
+
+  test('restoring refreshes the project’s versioning status', async () => {
+    // The app's query client, which applies a mutation's invalidations.
+    await renderTab(await createQueryClient())
+    expect(localBackend.versioningStatus).toHaveBeenCalledTimes(1)
+    const user = await openMenu(1)
+    await choose(user, 'Restore')
+    await vi.waitFor(() => expect(localBackend.versioningStatus).toHaveBeenCalledTimes(2))
+  })
+
+  test('"Duplicate and open" opens the local copy with the local backend', async () => {
+    const copyId = newProjectId(Path('/root/P_1'))
+    localBackend.copyAsset.mockResolvedValue({ asset: { ...LOCAL_PROJECT, id: copyId } })
+    await renderTab()
+    const user = await openMenu(1)
+    await choose(user, 'Duplicate and open')
+    expect(localBackend.copyAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      newDirectoryId(Path('/root')),
+      localVersions[1]!.versionId,
+    )
+    expect(openProjectLocally).toHaveBeenCalledWith(
+      expect.objectContaining({ id: copyId }),
+      'local',
+    )
   })
 })
 

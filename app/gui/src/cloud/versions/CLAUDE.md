@@ -13,7 +13,10 @@ decisions are under "Rulings from #89" and "Rulings from #183" there.
   selected, an asset without versions), then `AssetVersionList.vue` in a
   `SuspenseLoader`, remounted per asset.
 - `AssetVersionList.vue` — the list, and the actions every version offers
-  (restore, duplicate, comment edits with an optimistic update).
+  (restore, duplicate, comment edits with an optimistic update). Restoring a
+  local project that is open (or opening) closes it first, since the shim
+  refuses to restore a running project, then opens it again in the background; a
+  failed close restores nothing, and a failed restore still reopens it.
 - `AssetVersion.vue` — one version. Its tags collapse into "N tags" when they
   would not fit; that is measured on hidden copies of the title and one tag.
 - `VersionComment.vue`, `VersionCommentButton.vue`, `VersionTag.vue`,
