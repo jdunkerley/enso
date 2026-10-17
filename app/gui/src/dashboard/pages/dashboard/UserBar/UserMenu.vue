@@ -8,9 +8,8 @@
  * (`useMenuEntries`): they are in the command palette, and their shortcuts (`Mod+,` for Settings,
  * `Mod+/` for About) work anywhere.
  *
- * In local mode (`isAuthDisabled`: no Cognito, an offline stand-in session) there is no cloud
- * account to sign out of: "Working locally" stands in for the plan, and "Logout" is left out, from
- * the menu and from the global actions alike.
+ * There is no account to sign out of: the app always runs as the local user, and "Working locally"
+ * stands in for the plan.
  */
 import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import Button from '$/components/Button/Button.vue'
@@ -22,7 +21,6 @@ import { useMenuEntries, type MenuEntryAction } from '$/composables/menuEntries'
 import type { UserSession } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { useModals } from '$/providers/modals'
-import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { download } from '$/utils/download'
@@ -40,10 +38,7 @@ const {
   goToSettingsPage: () => void
 }>()
 
-const emit = defineEmits<{ signOut: [] }>()
-
 const backends = useBackends()
-const { signOut } = useSession()
 const { getText } = useText()
 const toasts = useToasts()
 const modals = useModals()
@@ -70,16 +65,6 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
   },
   { action: 'settings', doAction: goToSettingsPage },
   { action: 'aboutThisApp', doAction: openAboutModal },
-])
-
-const tailEntries = useMenuEntries<MenuEntryAction>(() => [
-  !isAuthDisabled && {
-    action: 'signOut',
-    doAction: () => {
-      emit('signOut')
-      void signOut()
-    },
-  },
 ])
 
 // Local mode has no plan: the synthetic user's ("Community") would mislead.
@@ -112,15 +97,6 @@ const planText = computed(() =>
     <div class="flex flex-col overflow-hidden">
       <MenuEntry
         v-for="entry in entries"
-        :key="entry.action"
-        :action="entry.action"
-        @press="entry.doAction"
-      />
-    </div>
-
-    <div class="flex flex-col overflow-hidden">
-      <MenuEntry
-        v-for="entry in tailEntries"
         :key="entry.action"
         :action="entry.action"
         @press="entry.doAction"

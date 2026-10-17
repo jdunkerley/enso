@@ -27,9 +27,6 @@ const auth = reactive<{ session: { user: User; isAuthDisabled?: boolean } | null
 })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
-const signOut = vi.fn(async () => {})
-vi.mock('$/providers/session', () => ({ useSession: () => ({ signOut }) }))
-
 const localBackend = shallowRef<object | null>({})
 vi.mock('$/providers/backends', async () => {
   const { mockBackends: mock } = await import('$/utils/testing/mountWithProviders')
@@ -92,11 +89,8 @@ function makeUser(overrides: Partial<User> = {}): User {
 
 async function mountUserBar() {
   const goToSettingsPage = vi.fn()
-  const onSignOut = vi.fn()
-  const mounted = await mountWithProviders(UserBar, {
-    props: { goToSettingsPage, onSignOut },
-  })
-  return { ...mounted, goToSettingsPage, onSignOut }
+  const mounted = await mountWithProviders(UserBar, { props: { goToSettingsPage } })
+  return { ...mounted, goToSettingsPage }
 }
 
 const userMenuButton = () =>
@@ -116,7 +110,6 @@ const entry = (name: string) =>
 beforeEach(() => {
   auth.session = { user: makeUser() }
   localBackend.value = {}
-  signOut.mockClear()
 })
 
 afterEach(() => {
@@ -146,11 +139,7 @@ describe('UserBar', () => {
     expect(document.activeElement).toBe(menu)
     expect(menu.textContent).toContain('Ada Lovelace')
     expect(menu.textContent).toContain(getText(Plan.solo))
-    expect(entryNames()).toEqual([
-      getText('settingsShortcut'),
-      getText('aboutThisAppShortcut'),
-      getText('signOutShortcut'),
-    ])
+    expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
     await user.tab()
     expect(document.activeElement).toBe(entry(getText('settingsShortcut')))
     await user.keyboard('{Escape}')
@@ -169,7 +158,6 @@ describe('UserBar', () => {
       getText('downloadAppShortcut'),
       getText('settingsShortcut'),
       getText('aboutThisAppShortcut'),
-      getText('signOutShortcut'),
     ])
   })
 
@@ -214,8 +202,8 @@ describe('UserBar', () => {
     }
   })
 
-  test('Settings, About and Logout close the menu and act', async () => {
-    const { goToSettingsPage, onSignOut } = await mountUserBar()
+  test('Settings and About close the menu and act; there is no Logout', async () => {
+    const { goToSettingsPage } = await mountUserBar()
     const user = userEvent.setup()
 
     await user.click(userMenuButton())
@@ -233,10 +221,7 @@ describe('UserBar', () => {
 
     await user.click(userMenuButton())
     await flushPromises()
-    await user.click(entry(getText('signOutShortcut')))
-    await flushPromises()
-    expect(onSignOut).toHaveBeenCalledOnce()
-    expect(signOut).toHaveBeenCalledOnce()
+    expect(entryNames()).not.toContain(getText('signOutShortcut'))
   })
 
   test('the entries are global actions while the bar is mounted, the menu closed', async () => {
@@ -245,9 +230,8 @@ describe('UserBar', () => {
       useActionsStore()
         .findActions('')
         .map((action) => action.name)
-    expect(names()).toEqual(
-      expect.arrayContaining([getText('settingsShortcut'), getText('signOutShortcut')]),
-    )
+    expect(names()).toContain(getText('settingsShortcut'))
+    expect(names()).not.toContain(getText('signOutShortcut'))
     // `Mod+,` is Settings' default shortcut.
     await userEvent.setup().keyboard('{Control>},{/Control}')
     expect(goToSettingsPage).toHaveBeenCalledOnce()
@@ -261,7 +245,6 @@ describe('UserBar', () => {
     await flushPromises()
     // The key of `Mod+,`, after its modifier.
     expect(entry(getText('settingsShortcut')).textContent).toMatch(/,$/)
-    expect(textOf(entry(getText('signOutShortcut')))).toBe(getText('signOutShortcut'))
   })
 
   test('offline, it says so', async () => {

@@ -27,13 +27,12 @@ import { localPathsStore } from '$/providers/localDirectories'
 import { useQueryParams } from '$/providers/queryParams'
 import { provideSettingsContext } from '$/providers/settingsContext'
 import { loadSettingsContributions, settingsContributions } from '$/providers/settingsContributions'
-import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
 import { includesPredicate } from '$/utils/data/array'
 import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
-import { backendMutationOptions, backendQueryOptions } from '@/composables/backend'
-import { useMutation, useQuery } from '@tanstack/vue-query'
+import { backendQueryOptions } from '@/composables/backend'
+import { useQuery } from '@tanstack/vue-query'
 import type { Path } from 'enso-common/src/services/Backend'
 import { computed, inject, onScopeDispose, ref, watch } from 'vue'
 import SettingsSearchBar from './SettingsSearchBar.vue'
@@ -43,7 +42,6 @@ import { SETTINGS_DATA, SETTINGS_NO_RESULTS_SECTION_DATA } from './tabs'
 
 const auth = useAuth()
 const backends = useBackends()
-const sessionStore = useSession()
 const { getText } = useText()
 
 // === The current tab ===
@@ -80,7 +78,7 @@ const session = computed(() => {
   if (value == null) throw new Error('The settings page needs a signed-in user.')
   return value
 })
-const isCloudDataUnavailable = computed(() => session.value.isCloudDataUnavailable ?? false)
+const isCloudDataUnavailable = computed(() => session.value.isCloudDataUnavailable)
 
 const organizationQuery = useQuery(
   backendQueryOptions(
@@ -90,11 +88,6 @@ const organizationQuery = useQuery(
   ),
 )
 const organization = computed(() => organizationQuery.data.value ?? null)
-
-const updateUserMutation = useMutation(backendMutationOptions('updateUser', backends.remoteBackend))
-const updateOrganizationMutation = useMutation(
-  backendMutationOptions('updateOrganization', backends.remoteBackend),
-)
 
 const localStorage = LocalStorage.getInstance()
 const preferredTimeZone = ref(localStorage.get('preferredTimeZone'))
@@ -112,21 +105,13 @@ const storedDownloadDirectory = computed(() => localPathsStore.state.value.downl
 const defaultDownloadDirectory = inject<Path | null>('defaultDownloadPath', null)
 
 const context = computed<SettingsContext>(() => ({
-  accessToken: session.value.accessToken,
   user: session.value.user,
   backend: backends.remoteBackend,
   localBackend: backends.localBackend,
   organization: organization.value,
   isCloudDataUnavailable: isCloudDataUnavailable.value,
-  isAuthDisabled: session.value.isAuthDisabled ?? false,
+  isAuthDisabled: session.value.isAuthDisabled,
   getText,
-  updateUser: async (body) => {
-    await updateUserMutation.mutateAsync([body])
-  },
-  updateOrganization: async (body) => {
-    await updateOrganizationMutation.mutateAsync([body])
-  },
-  changePassword: sessionStore.changePassword,
   preferredTimeZone: preferredTimeZone.value,
   setPreferredTimeZone,
   localRootDirectory: storedLocalRootDirectory.value ?? backends.localBackend?.rootPath() ?? null,

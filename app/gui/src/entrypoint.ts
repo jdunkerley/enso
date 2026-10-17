@@ -21,13 +21,11 @@ import { createApp, markRaw } from 'vue'
 
 /** The fraction of non-erroring interactions that should be sampled by Sentry. */
 const SENTRY_SAMPLE_RATE = 0.005
-const INITIAL_URL_KEY = `Enso-initial-url`
 
 markRaw(HttpClient.prototype)
 
 async function main() {
   setupLogger()
-  const onAuthenticated = imNotSureButPerhapsFixingRefreshingWithAuthentication()
   const queryClient = await createQueryClientOfPersistCache()
   const rootDirPath = await getRootDirPath()
   // The local backend exists exactly when there is a root directory for its projects
@@ -45,7 +43,6 @@ async function main() {
   app.use(widgetDevtools)
   app.provide('rootDirPath', rootDirPath)
   app.provide('defaultDownloadPath', defaultDownloadPath)
-  app.provide('onAuthenticated', onAuthenticated)
   app.mount('#enso-app')
 }
 
@@ -87,41 +84,6 @@ function createQueryClientOfPersistCache() {
       entries: () => idbKeyval.entries(store),
     },
   })
-}
-
-function imNotSureButPerhapsFixingRefreshingWithAuthentication() {
-  /**
-   * Note: Signing out always redirects to `/`. It is impossible to make this work,
-   * as it is not possible to distinguish between having just logged out, and explicitly
-   * opening a page with no URL parameters set.
-   *
-   * Client-side routing endpoints are explicitly not supported for live-reload, as they are
-   * transitional pages that should not need live-reload when running `gui watch`.
-   */
-  const url = new URL(location.href)
-  const isInAuthenticationFlow = url.searchParams.has('code') && url.searchParams.has('state')
-  const authenticationUrl = location.href
-
-  if (isInAuthenticationFlow) {
-    history.replaceState(null, '', localStorage.getItem(INITIAL_URL_KEY))
-  }
-  if (isInAuthenticationFlow) {
-    history.replaceState(null, '', authenticationUrl)
-  } else {
-    localStorage.setItem(INITIAL_URL_KEY, location.href)
-  }
-
-  function onAuthenticated() {
-    if (isInAuthenticationFlow) {
-      const initialUrl = localStorage.getItem(INITIAL_URL_KEY)
-      if (initialUrl != null) {
-        // This is not used past this point, however it is set to the initial URL
-        // to make refreshing work as expected.
-        history.replaceState(null, '', initialUrl)
-      }
-    }
-  }
-  return onAuthenticated
 }
 
 async function getRootDirPath() {

@@ -3,8 +3,7 @@
  * @file The user bar, at the right of the app container's top bar: the offline notice, the
  * notification tray and the user menu (#83), mounted by `AppContainer.vue`.
  *
- * In local mode (authentication disabled, the offline stand-in session) the user menu leaves out
- * its account entries.
+ * The user menu has no account entries: the app always runs as the local user.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'
@@ -16,7 +15,6 @@ import NotificationTray from './NotificationTray/NotificationTray.vue'
 import UserMenu from './UserMenu.vue'
 
 const { goToSettingsPage } = defineProps<{ goToSettingsPage: () => void }>()
-const emit = defineEmits<{ signOut: [] }>()
 
 const auth = useAuth()
 const { getText } = useText()
@@ -40,7 +38,6 @@ const isAuthDisabled = computed(() => auth.session?.isAuthDisabled === true)
         :user="user"
         :isAuthDisabled="isAuthDisabled"
         :goToSettingsPage="goToSettingsPage"
-        @signOut="emit('signOut')"
       />
     </div>
   </div>

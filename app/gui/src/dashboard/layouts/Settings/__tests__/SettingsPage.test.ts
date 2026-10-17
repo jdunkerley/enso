@@ -30,10 +30,7 @@ const USER = {
 } as User
 
 const auth = vi.hoisted(() => {
-  const value: { session: unknown; deleteUser: () => void } = {
-    session: null,
-    deleteUser: () => {},
-  }
+  const value: { session: unknown } = { session: null }
   return value
 })
 const backends = vi.hoisted(() => ({
@@ -47,7 +44,6 @@ vi.mock('$/providers/queryParams', async (importOriginal) => {
   const original = await importOriginal<typeof QueryParamsModule>()
   return { ...original, useQueryParams: () => original.createQueryParams() }
 })
-vi.mock('$/providers/session', () => ({ useSession: () => ({ changePassword: vi.fn() }) }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return {
@@ -71,10 +67,13 @@ beforeAll(() => {
 })
 
 beforeEach(async () => {
+  // Both flags are part of the session's type; `false` keeps the cloud-era tabs under test.
   auth.session = {
     user: USER,
     email: USER.email,
     accessToken: `.${btoa(JSON.stringify({ username: USER.email }))}.`,
+    isCloudDataUnavailable: false,
+    isAuthDisabled: false,
   }
   backends.hasLocalBackend = true
   backends.organization = null
@@ -165,7 +164,13 @@ describe('SettingsPage', () => {
   test('lists only the local tabs, whatever is contributed', async () => {
     // An admin of an organization with a subscription: the cloud's tabs would all be listed.
     const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
+    auth.session = {
+      user: admin,
+      email: admin.email,
+      accessToken: '',
+      isCloudDataUnavailable: false,
+      isAuthDisabled: false,
+    }
     backends.organization = { subscription: {} }
     const section =
       (

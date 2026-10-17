@@ -53,7 +53,6 @@ vi.mock('$/providers/queryParams', async (importOriginal) => {
   const original = await importOriginal<typeof QueryParamsModule>()
   return { ...original, useQueryParams: () => original.createQueryParams() }
 })
-vi.mock('$/providers/session', () => ({ useSession: () => ({ changePassword: vi.fn() }) }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return {

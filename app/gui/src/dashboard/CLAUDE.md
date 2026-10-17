@@ -56,10 +56,10 @@ the Vue toast store (`$/providers/toasts`), modals through the modal stack
 
 ## Auth / cloud
 
-The IDE is local-only: there is no sign-in, and the session is always the
-offline one (`makeOfflineSession`). The shared logic is Vue
-(`src/authentication/`, `src/providers/{auth,session}.ts`); the sign-in, sign-up
-and password pages are gone.
+The IDE is local-only: there is no sign-in and no authentication code. The
+session is always the local one (`makeLocalSession` in
+`src/providers/session.ts`), and the user the local user (`makeLocalUser` in
+`src/providers/auth.ts`, named "Working locally").
 
 ## Talking to ProjectView
 

@@ -36,7 +36,6 @@ type BackendAPI<B extends Backend> = Pick<B, 'rootPath' | 'listDirectory'>
 /** Redirect from "ensoPath" route to proper asset's tab for this route. */
 export async function redirectFromPath(to: RouteLocation) {
   if (to.params.path == null) return false
-  const auth = useAuth()
   const { localBackend, remoteBackend } = useBackends()
 
   const path = EnsoPath(to.params.path instanceof Array ? to.params.path.join('/') : to.params.path)
@@ -44,7 +43,6 @@ export async function redirectFromPath(to: RouteLocation) {
 
   const backend = isRemoteAssetPath(path) ? remoteBackend : localBackend
   if (backend == null) return false
-  await auth.waitForSession()
   const resolvedPath = await backend.resolveEnsoPath(path).catch(() => null)
   const typedAsset = resolvedPath && extractTypeFromId(resolvedPath.id)
   switch (typedAsset?.type) {
@@ -108,9 +106,8 @@ export async function maybeRedirectToProject(to: RouteLocation): Promise<Navigat
   const backends = useBackends()
   const config = useConfig()
   const auth = useAuth()
-  await auth.waitForSession()
 
-  // In case of not being logged in, the redirection should be managed by ProtectedLayout.
+  // Always set: the local session. PR 3 makes it non-null.
   if (auth.session == null) return
 
   const pathFromOptions =

@@ -1,4 +1,4 @@
-/** @file The Vue info bar and menu (#83): the logo button and About; no Sign out in local-only mode. */
+/** @file The Vue info bar and menu (#83): the logo button and About; there is no Logout. */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import InfoBar from '$/components/InfoBar/InfoBar.vue'
 import { useText } from '$/providers/text'
@@ -55,7 +55,7 @@ describe('InfoBar', () => {
     expect(useAboutModal().isOpen.value).toBe(true)
   })
 
-  test('signed in: there is no Sign out entry, as the app runs on the offline session only', async () => {
+  test('the info menu has no Logout', async () => {
     auth.session = {}
     await mountWithProviders(InfoBar)
     const user = userEvent.setup()

@@ -1,4 +1,3 @@
-import { useAuth } from '$/providers/auth'
 import { loadSettingsContributions } from '$/providers/settingsContributions'
 import {
   maybeRedirectToProject,
@@ -8,7 +7,6 @@ import {
 } from '$/router/dashboardGuards'
 import { withDataLoader } from '$/router/dataLoader'
 import { APP_CONTAINER_LAYOUT_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
-import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const UNAVAILABLE_PATH = '/UNAVAILABLE'
@@ -17,12 +15,11 @@ const routes = [
   {
     name: PROTECTED_LAYOUT_ROUTE,
     path: UNAVAILABLE_PATH,
-    component: withDataLoader(() => import('$/components/ProtectedLayout.vue')),
+    component: () => import('$/components/ProtectedLayout.vue'),
     children: [
       {
         name: APP_CONTAINER_LAYOUT_ROUTE,
         path: UNAVAILABLE_PATH,
-        meta: { access: 'anyLoggedIn' },
         component: withDataLoader(() => import('$/components/AppContainerLayout.vue')),
         children: [
           {
@@ -73,13 +70,6 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, from) => {
-  const auth = useAuth()
-
-  if (shouldWaitForResolvedSession(to.meta.access, from.meta.access, auth.session)) {
-    await auth.waitForSession()
-  }
-})
 router.beforeEach(openTab)
 
 router.onError((error) => console.error('Router error', error))

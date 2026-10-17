@@ -25,7 +25,8 @@ code. When you add something new, ask: is it ProjectView-only, Dashboard-only,
 or shared? Shared goes at `src/`.
 
 **Local-only.** The IDE runs with no Enso Cloud: no remote configuration fetch,
-always the offline session (`makeOfflineSession`), core contributions are in
+always the one local user and session (`makeLocalSession` in
+`src/providers/session.ts`, no authentication), core contributions are in
 `src/registerCore.ts`. See
 `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`.
 

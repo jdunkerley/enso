@@ -77,10 +77,6 @@ useEvent(globalEventRegistry, 'keydown', (event) => {
   return keydownHandler(event)
 })
 
-const onSignOut = () => {
-  openedProjects.closeAllProjects()
-}
-
 onMounted(() => {
   window.api?.menu?.setMenuItemHandler('closeTab', closeCurrentTab)
   window.api?.projectManagement.setOpenProjectHandler((project) => {
@@ -117,7 +113,7 @@ onUnmounted(() => {
         <div class="tabPanel" :class="{ noMiddlePanel: !middlePanelShown }">
           <div class="bar">
             <TabBar />
-            <UserBar :goToSettingsPage="goToSettingsPage" @signOut="onSignOut" />
+            <UserBar :goToSettingsPage="goToSettingsPage" />
           </div>
           <div class="belowBar">
             <MiddlePanel v-if="middlePanelShown" />
