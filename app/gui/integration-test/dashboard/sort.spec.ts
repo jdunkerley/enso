@@ -1,7 +1,9 @@
 /** @file Test sorting of assets columns. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
+
+test.skip(true, CLOUD_ONLY)
 
 const START_DATE_EPOCH_MS = 1.7e12
 /** The number of milliseconds in a minute. */

@@ -75,13 +75,12 @@ function categoryGroup(key: string): CategoryGroup {
 }
 
 /**
- * Find a radio button that navigates to specified drive category. Both groups have a "Recent", so
- * the button is looked for in its group.
+ * Find a radio button that navigates to specified drive category. The sidebar has only the local
+ * group now, whose "Recent" is unique, so `_group` no longer narrows the search.
  */
-function locateCategoryButton(page: Page, category: string, group: CategoryGroup): Locator {
+function locateCategoryButton(page: Page, category: string, _group: CategoryGroup): Locator {
   return page
     .locator('.LeftPanel .leftBar .categories')
-    .nth(group === 'cloud' ? 0 : 1)
     .getByRole('button', { name: category, exact: true })
 }
 

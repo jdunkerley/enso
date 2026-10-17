@@ -4,7 +4,7 @@
  * are mocked (`mock/localVersioning.ts`, `mock/versioning/historyRoutes.ts`).
  */
 import { Path, type VersionEntry } from 'enso-common/src/services/ProjectManager/types'
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 import * as locate from 'integration-test/project-view/locate'
 import { posix } from 'node:path'
 
@@ -291,6 +291,7 @@ test('the cloud Versions tab still works: a directory has no versions', async ({
   drivePage,
   cloudApi,
 }) => {
+  test.skip(true, CLOUD_ONLY)
   cloudApi.addDirectory({ title: 'Cloud folder' })
   await drivePage.goToCategory.cloud().driveTable.clickRow('Cloud folder')
   const panel = await openVersions(page)

@@ -1,5 +1,7 @@
 /** @file Test the search bar and its suggestions. */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find a search bar. */
 function locateSearchBar(page: Page) {

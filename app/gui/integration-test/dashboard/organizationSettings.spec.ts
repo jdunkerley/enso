@@ -1,7 +1,9 @@
 /** @file Test the organization settings tab. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { Plan } from 'enso-common/src/services/Backend'
+
+test.skip(true, CLOUD_ONLY)
 
 const NEW_NAME = 'another organization-name'
 const INVALID_EMAIL = 'invalid@email'

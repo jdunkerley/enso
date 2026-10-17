@@ -1,7 +1,9 @@
 /** @file Test the drive view. */
-import { expect, test, type Locator } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Locator } from 'integration-test/base'
 
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find a button to close the project. */
 

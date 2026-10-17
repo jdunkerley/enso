@@ -1,5 +1,5 @@
 /** @file Test copying, moving, cutting and pasting. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 /** The name of the uploaded file. */
 const FILE_NAME = 'foo.txt'
@@ -11,6 +11,7 @@ const SECRET_NAME = 'a secret name'
 const SECRET_VALUE = 'a secret value'
 
 test('create folder (remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .createFolder()
@@ -23,8 +24,7 @@ test('create folder (remote)', async ({ drivePage }) => {
 
 test('create folder (local)', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
-    .goToCategory.local()
+    .local()
     .createFolder()
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveCount(2)
@@ -34,6 +34,7 @@ test('create folder (local)', async ({ drivePage }) => {
 })
 
 test('create project (remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .newEmptyProject()
@@ -53,6 +54,7 @@ test('create project (local)', async ({ drivePage }) => {
 })
 
 test('upload file (remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .uploadFile(FILE_NAME, FILE_CONTENTS)
@@ -75,6 +77,7 @@ test('upload file (local)', async ({ drivePage }) => {
 })
 
 test('create secret (remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .createSecret(SECRET_NAME, SECRET_VALUE)

@@ -4,10 +4,12 @@
  * and then waiting on the payments success page for the new plan; the Billing settings tab opening
  * the Stripe customer portal; and a paywalled menu entry opening the paywall dialog.
  */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 
 import { Plan } from 'enso-common/src/services/Backend'
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Stripe's pages, which the app opens in a new window: answer them without the network. */
 async function mockStripe(page: Page) {

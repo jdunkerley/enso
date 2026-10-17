@@ -1,5 +1,7 @@
 /** @file Test the user settings tab. */
-import { test } from 'integration-test/base'
+import { CLOUD_ONLY, test } from 'integration-test/base'
+
+test.skip(true, CLOUD_ONLY)
 
 const DATA_LINK_NAME = 'a data link'
 

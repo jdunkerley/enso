@@ -1,5 +1,7 @@
 /** @file Test the login flow. */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find an editor container. */
 function locateEditor(page: Page) {

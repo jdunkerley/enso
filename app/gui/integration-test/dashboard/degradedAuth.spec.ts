@@ -1,7 +1,9 @@
 /** @file Verify the degraded-auth mode triggered when `users/me` fails for a non-auth reason. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { TEXT, VALID_EMAIL, VALID_PASSWORD } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 const HTTP_INTERNAL_SERVER_ERROR = 500
 const HTTP_UNAUTHORIZED = 401
