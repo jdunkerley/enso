@@ -13,21 +13,24 @@ import { Plan, type Backend } from 'enso-common/src/services/Backend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { nextTick } from 'vue'
 
-const { closingOnAppExit, getOrganization } = await vi.hoisted(async () => {
-  const { ref } = await import('vue')
-  const { vi } = await import('vitest')
-  return {
-    closingOnAppExit: ref(false),
-    getOrganization: vi.fn<Backend['getOrganization']>(),
-  }
-})
+const { closingOnAppExit, savingVersionsOnAppExit, getOrganization } = await vi.hoisted(
+  async () => {
+    const { ref } = await import('vue')
+    const { vi } = await import('vitest')
+    return {
+      closingOnAppExit: ref(false),
+      savingVersionsOnAppExit: ref(false),
+      getOrganization: vi.fn<Backend['getOrganization']>(),
+    }
+  },
+)
 
 vi.mock('$/components/AppContainer', async () => {
   const { h } = await import('vue')
   return { default: { render: () => h('div', { 'data-testid': 'app-container' }) } }
 })
 vi.mock('$/providers/openedProjects', () => ({
-  useOpenedProjects: () => ({ closingOnAppExit }),
+  useOpenedProjects: () => ({ closingOnAppExit, savingVersionsOnAppExit }),
 }))
 vi.mock('$/providers/auth', () => ({
   useAuth: () => ({
@@ -54,6 +57,7 @@ const Blank = { render: () => null }
 
 beforeEach(() => {
   closingOnAppExit.value = false
+  savingVersionsOnAppExit.value = false
   getOrganization.mockReset().mockResolvedValue({ subscription: {} } as never)
   useModals().closeAll()
 })
@@ -135,6 +139,29 @@ describe('DashboardPage', () => {
     closingOnAppExit.value = false
     await nextTick()
     expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('shows "Saving versions" alone while versioned projects close as the app exits', async () => {
+    await mountWithProviders(DashboardPage)
+    const modals = useModals()
+    modals.open(Blank, {})
+    savingVersionsOnAppExit.value = true
+    await nextTick()
+    await flushPromises()
+    expect(modals.stack.value).toHaveLength(1)
+    expect(modals.stack.value[0]!.props).toMatchObject({ kind: 'versions' })
+    savingVersionsOnAppExit.value = false
+    await nextTick()
+    expect(modals.stack.value).toHaveLength(0)
+  })
+
+  test('both at once is one dialog saying both', async () => {
+    await mountWithProviders(DashboardPage)
+    closingOnAppExit.value = true
+    savingVersionsOnAppExit.value = true
+    await nextTick()
+    expect(useModals().stack.value).toHaveLength(1)
+    expect(useModals().stack.value[0]!.props).toMatchObject({ kind: 'both' })
   })
 
   test('does not close the modals already open as it mounts', async () => {

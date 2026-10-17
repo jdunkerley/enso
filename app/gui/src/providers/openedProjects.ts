@@ -10,6 +10,7 @@ import {
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
 import { isOnElectron } from 'enso-common/src/utilities/detect'
 import { ref, shallowReactive } from 'vue'
+import { useLocalVersioning } from './localVersioning'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
 import {
   useProjectStates,
@@ -17,6 +18,7 @@ import {
   type Initialized,
   type ProjectState,
 } from './openedProjects/projectStates'
+import { closeEachWithin } from './openedProjects/quit'
 
 /** A reason given to AbortController when opening, restoring or closing process is being aborted. */
 const PROCESS_ABORTED = 'aborted'
@@ -52,7 +54,11 @@ export function createOpenedProjectsStore() {
   const projects = shallowReactive(new Map<ProjectId, Project>())
 
   const projectStates = useProjectStates()
+  const localVersioning = useLocalVersioning()
+  /** Whether the unsynced hybrid projects are being uploaded as the app exits. */
   const closingOnAppExit = ref(false)
+  /** Whether the versioned local projects are being closed (saving a version) as the app exits. */
+  const savingVersionsOnAppExit = ref(false)
   const projectReadyCallbacks: ((project: Project) => void)[] = []
 
   /** Open project. */
@@ -286,48 +292,105 @@ export function createOpenedProjectsStore() {
     return projects.get(id)?.nextTask?.process === 'closing'
   }
 
-  // A handler for uploading hybrid projects before app close.
-  //
-  // They are not removed from local backend, but synchronized with remote in case someone else
-  // would open it in the meantime.
-  window.addEventListener('beforeunload', async (event) => {
+  /** Whether {@link finishBeforeQuit} is under way. */
+  let finishingBeforeQuit = false
+  /**
+   * Projects the quit has already tried to close. One that failed or ran out of time is not tried
+   * again, so the `beforeunload` from `window.close()` does not hold the quit a second time.
+   */
+  const closedOnQuit = new Set<ProjectId>()
+
+  // On quit: upload the unsynced hybrid projects (they are not removed from the local backend, but
+  // synchronized with remote in case someone else opens it meanwhile), and close every open local
+  // project whose versions are kept, so that each saves its "Saved on close" version. Then close
+  // the window. `preventDefault` must be called synchronously, so the work runs afterwards.
+  window.addEventListener('beforeunload', (event) => {
+    // A second quit while the first is finishing (which only happens on Electron) waits for it.
+    if (finishingBeforeQuit) {
+      event.preventDefault()
+      return
+    }
     const hybridsToUpload = [...projects.values()].filter(
       (proj): proj is Project & { state: Initialized | HybridLocallyClosed } =>
         (proj.state.status === 'initialized' || proj.state.status === 'hybrid-closed') &&
         proj.state.info.mode === 'hybrid' &&
         !proj.state.info.synced,
     )
-    if (hybridsToUpload.length > 0) {
-      // Do not prevent default in browsers.
-      // In "real" browsers users will be unable to run hybrid projects anyway, but in dev
-      // servers the "data loss" messages are annoying.
-      if (!isOnElectron()) return
-      event.preventDefault()
-      closingOnAppExit.value = true
-      const errors = (
-        await Promise.all(
-          hybridsToUpload.map(async (project) => {
-            assert(project.state.info.mode === 'hybrid')
-            await projectStates.uploadHybridProject(project.state.info)
-            return project
-          }),
-        )
-      ).filter((proj) => proj.error != null)
-      closingOnAppExit.value = false
-      if (errors.length == 0) {
-        window.close()
-      }
-    } else {
+    const versionedToClose = [...projects.values()].filter(
+      (proj) =>
+        proj.state.status === 'initialized' &&
+        proj.state.info.mode === 'local' &&
+        !closedOnQuit.has(proj.state.info.id) &&
+        localVersioning.isVersioned(proj.state.info.id),
+    )
+    if (hybridsToUpload.length === 0 && versionedToClose.length === 0) {
       // Do the project cleanup, but do not close projects entirely.
       // Local projects's PM process will be killed anyway, and
       // Cloud projects should be kept opened.
       for (const project of projects.values()) {
-        if (project.state.status === 'initialized') {
-          project.state.scope.stop()
-        }
+        if (project.state.status === 'initialized') project.state.scope.stop()
       }
+      return
     }
+    // Do not prevent default in browsers.
+    // In "real" browsers users will be unable to run hybrid projects anyway, but in dev
+    // servers the "data loss" messages are annoying.
+    if (!isOnElectron()) return
+    event.preventDefault()
+    void finishBeforeQuit(hybridsToUpload, versionedToClose)
   })
+
+  /**
+   * Upload the hybrid projects and close the versioned local ones, all at once, behind the exit
+   * dialog; then close the window, unless a hybrid project is in error. No repository is offered
+   * meanwhile: the closes pass `offer: false`, and {@link localVersioning} is told the app quits.
+   */
+  async function finishBeforeQuit(
+    hybridsToUpload: readonly (Project & { state: Initialized | HybridLocallyClosed })[],
+    versionedToClose: readonly Project[],
+  ) {
+    finishingBeforeQuit = true
+    closingOnAppExit.value = hybridsToUpload.length > 0
+    savingVersionsOnAppExit.value = versionedToClose.length > 0
+    localVersioning.setQuitting(true)
+    for (const project of versionedToClose) closedOnQuit.add(project.state.info.id)
+    try {
+      const [hybridErrors] = await Promise.all([
+        Promise.all(
+          hybridsToUpload.map(async (project) => {
+            assert(project.state.info.mode === 'hybrid')
+            await projectStates
+              .uploadHybridProject(project.state.info)
+              .catch((error: unknown) =>
+                console.error('Could not sync a hybrid project on quit:', error),
+              )
+            return project
+          }),
+        ).then((uploaded) => uploaded.filter((proj) => proj.error != null)),
+        closeEachWithin(versionedToClose, (project) => {
+          closeProject(project.state.info.id, undefined, { offer: false })
+          return waitForProcess(project)
+        }),
+      ])
+      closingOnAppExit.value = false
+      savingVersionsOnAppExit.value = false
+      finishingBeforeQuit = false
+      if (hybridErrors.length === 0) window.close()
+      else stayOpen()
+    } catch (error) {
+      console.error('Could not finish before quitting:', error)
+      closingOnAppExit.value = false
+      savingVersionsOnAppExit.value = false
+      finishingBeforeQuit = false
+      stayOpen()
+    }
+  }
+
+  /** The app is not quitting after all: the next quit tries every project again. */
+  function stayOpen() {
+    closedOnQuit.clear()
+    localVersioning.setQuitting(false)
+  }
 
   return {
     openProject,
@@ -342,6 +405,7 @@ export function createOpenedProjectsStore() {
     isProjectClosing,
     waitForProcess,
     closingOnAppExit,
+    savingVersionsOnAppExit,
   }
 }
 
