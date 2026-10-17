@@ -1040,7 +1040,7 @@
   "offlineUserName": "Offline user",
   "offlineUserSettingsSection": "User Account",
   "offlineUserStatus": "Working locally",
-  "offlineUserDescription": "Enso is running without an Enso Cloud account, so you are working with local projects only. Cloud account settings (your profile and picture, password, two-factor authentication, organization and plan) are not available.",
+  "offlineUserDescription": "Your projects are kept on this computer. No sign-in is needed.",
   "userNameSettingsInput": "Name",
   "userEmailSettingsInput": "Email",
   "userTimeZoneSettingsInput": "Preferred time zone",
