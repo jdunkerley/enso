@@ -12,6 +12,9 @@ const ROOT = '/home/user/enso/enso-projects'
 const MOCK_PROJECT_PATH = posix.join(ROOT, 'Mock_Project')
 const saveButton = 'action:graph.saveVersionWithComment'
 
+/** The dialogs are translucent over a blurred page, which renders slightly differently each time. */
+const BLUR_TOLERANT = { threshold: 0.3, maxDiffPixelRatio: 0.02 }
+
 test.describe('with versions kept at the root, and changes', () => {
   test.use({
     setupApi: {
@@ -54,7 +57,7 @@ test.describe('with versions kept at the root, and changes', () => {
     await page.getByTestId(saveButton).click()
     const comment = page.getByRole('textbox', { name: 'Comment (optional)' })
     await expect(comment).toBeFocused()
-    await expectScreenshot(page.getByRole('dialog'), 'save-version-dialog.png')
+    await expectScreenshot(page.getByRole('dialog'), 'save-version-dialog.png', BLUR_TOLERANT)
     await comment.fill('Joined the sales table')
     await comment.press('Enter')
     await expect(page.getByTestId('toast-host')).toContainText('Version saved')
@@ -139,7 +142,7 @@ test.describe('with git and no repository', () => {
     await expect(prompt).toContainText(
       `Keep versions of your projects with git? This creates a repository in ${ROOT}.`,
     )
-    await expectScreenshot(prompt, 'create-repository-prompt.png')
+    await expectScreenshot(prompt, 'create-repository-prompt.png', BLUR_TOLERANT)
     await prompt.getByRole('button', { name: 'Create' }).click()
     await expect(page.getByTestId('toast-host')).toContainText('Version saved')
     expect(localApi.versioning.repoRoot).toBe(ROOT)
@@ -197,7 +200,7 @@ test.describe('with an existing repository outside the root', () => {
     await expect(prompt).toContainText(
       'Keep versions of your projects in the existing repository at /home/user?',
     )
-    await expectScreenshot(prompt, 'use-repository-prompt.png')
+    await expectScreenshot(prompt, 'use-repository-prompt.png', BLUR_TOLERANT)
     await prompt.getByRole('button', { name: 'Use' }).click()
     await expect(page.getByTestId('toast-host')).toContainText('Version saved')
     expect(localApi.versioning.enabled).toBe(true)
