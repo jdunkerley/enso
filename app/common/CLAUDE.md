@@ -39,7 +39,13 @@ neutral ground — anything Vue-specific belongs in its own package.
   `ProjectManager` methods (`versioningStatus`, `initVersioning`,
   `commitVersion`, `listVersions`, `versionFileContent`, `restoreVersion`,
   `duplicateVersion`, `setVersionComment`) call the shim's `versioning/*`
-  endpoints, which wrap `LocalVersioning` (git-based snapshots).
+  endpoints, which wrap `LocalVersioning` (git-based snapshots). PR 5: the
+  Versions tab's methods (`listAssetVersions`, `resolveProjectAssetData` with a
+  version, `restoreAsset`, `copyAsset`/`duplicateProject` with a version,
+  `updateAsset` with a version comment) call `log`, `file-at`, `restore`,
+  `duplicate-at` and `set-comment`. A version id is a commit hash in the
+  `S3ObjectVersionId` brand; only projects have versions; local versions have no
+  tags.
 - The store, its files and its rules (cap, validation, following moves, git) are
   the shim's; see `app/project-manager-shim/CLAUDE.md`.
 
