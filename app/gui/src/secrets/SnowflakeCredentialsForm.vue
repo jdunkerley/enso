@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
  * @file The form creating a Snowflake credential. The recipe is
- * `$/cloud/serviceCredentials/snowflake`. Remember to list a new form in `credentialInfos.ts`.
+ * `$/secrets/serviceCredentials/snowflake`. Remember to list a new form in `credentialInfos.ts`.
  */
-import * as snowflake from '$/cloud/serviceCredentials/snowflake'
-import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'
+import * as snowflake from '$/secrets/serviceCredentials/snowflake'
+import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
 import Button from '$/components/Button/Button.vue'
 import Form from '$/components/Form/Form.vue'
 import Input from '$/components/Inputs/Input.vue'

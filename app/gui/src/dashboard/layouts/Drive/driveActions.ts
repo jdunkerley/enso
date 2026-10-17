@@ -5,7 +5,6 @@
  * giving them the drive's stores (#192, ruling 12). Call them in a component's `setup`; the
  * functions they return may be called at any time.
  */
-import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
 import { uploadAssetsToCloud, type UploadFileToCloudOptions } from '$/cloud/uploadToCloud'
 import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import { useTransferBetweenCategories } from '$/composables/transferBetweenCategories'
@@ -25,6 +24,7 @@ import type { ProjectInfo } from '$/providers/openedProjects/projectInfo'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { uploadFiles, useUploadsToCloudStore } from '$/providers/upload'
+import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
 import { backendMutationOptions, executeMutation } from '$/utils/backendQuery'
 import {
   ensureListDirectory,

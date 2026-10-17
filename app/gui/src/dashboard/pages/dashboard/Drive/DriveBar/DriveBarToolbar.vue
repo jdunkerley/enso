@@ -16,9 +16,9 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
-import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
-import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
-import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
+import CreateCredentialModal from '$/secrets/CreateCredentialModal.vue'
+import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
+import UpsertDatalinkModal from '$/datalinks/UpsertDatalinkModal.vue'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'

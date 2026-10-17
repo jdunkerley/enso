@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
  * @file The form creating a Microsoft 365 credential. The recipe is
- * `$/cloud/serviceCredentials/ms365`. Each permission's description follows the chosen one.
+ * `$/secrets/serviceCredentials/ms365`. Each permission's description follows the chosen one.
  * Remember to list a new form in `credentialInfos.ts`.
  */
-import * as ms365 from '$/cloud/serviceCredentials/ms365'
-import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'
+import * as ms365 from '$/secrets/serviceCredentials/ms365'
+import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
 import Checkbox from '$/components/Checkbox/Checkbox.vue'
 import CheckboxGroup from '$/components/Checkbox/CheckboxGroup.vue'
 import Form from '$/components/Form/Form.vue'

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 /**
- * @file The file browser's "New Secret" panel. Secrets exist only in the Enso Cloud, so the form is
- * cloud code (`$/cloud/credentials/`); this core component imports it directly until the cloud
- * contribution registries exist (see `src/cloud/CLAUDE.md`).
+ * @file The file browser's "New Secret" panel, over `$/secrets/UpsertSecretForm.vue`. Dormant:
+ * secrets are cloud-only until local secrets exist, decision 5 of
+ * `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`.
  */
-import UpsertSecretForm from '$/cloud/credentials/UpsertSecretForm.vue'
+import UpsertSecretForm from '$/secrets/UpsertSecretForm.vue'
 import DashboardDialogContent from '@/components/DashboardDialogContent.vue'
 
 const emit = defineEmits<{

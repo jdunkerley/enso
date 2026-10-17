@@ -11,5 +11,5 @@ export function registerCore() {
   // The tab moves to `$/versions/` in PR 2; until then it lives under `src/cloud/`. A dynamic
   // `import()` is outside `no-restricted-imports` (static imports only), so the core boundary
   // rule does not flag it.
-  contributeRightPanelTab('versions', () => import('$/cloud/versions/AssetVersions.vue'))
+  contributeRightPanelTab('versions', () => import('$/versions/AssetVersions.vue'))
 }

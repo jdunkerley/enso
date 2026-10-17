@@ -1,6 +1,9 @@
-# src/cloud/credentials/
+# src/secrets/
 
 Secrets and service credentials, which exist only in the Enso Cloud. Vue.
+Dormant: no UI entry point opens them; their unit tests are the guard against
+rot. `UpsertSecretPanel.vue` (the file browser's "New Secret" panel) and
+`serviceCredentials/` (the recipes) live here too.
 
 - `UpsertSecretForm.vue` (#82) — creating or updating a secret; the project
   view's file browser (`UpsertSecretPanel.vue`) and the Properties tab use it.

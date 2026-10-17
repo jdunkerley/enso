@@ -8,26 +8,15 @@ community build without the cloud can leave it out (decision 6b of
 ## Layout
 
 - Top level: framework-free helpers (`validation.ts` with the Cognito password
-  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, `serviceCredentials/`,
-  and `uploadToCloud.ts`, which packs local projects and uploads them to the
-  cloud when assets move from a local category to a cloud one, #192). The
-  dashboard and the core may import them.
+  rule, `parseUserEmails.ts`, `permissionsClasses.ts`, and `uploadToCloud.ts`,
+  which packs local projects and uploads them to the cloud when assets move from
+  a local category to a cloud one, #192). The dashboard and the core may import
+  them.
 - `<area>/`: a cloud-only feature, Vue. So far:
-  - `credentials/` — `UpsertSecretForm.vue` (#82), used by the project view's
-    file browser to create a secret, and the drive's secret dialog around it,
-    `UpsertSecretModal.vue` (#92), which the drive opens on the modal stack;
-    since #198 also the "New Credential" dialog (`CreateCredentialModal.vue`)
-    and its forms, one per service (`credentialInfos.ts`), over the recipes in
-    `serviceCredentials/`.
-  - `datalinks/`, since #198: the datalink editor (`JSONSchemaInput.vue` over
-    the datalink schema, with `FilePathInput.vue` and the cloud file browser),
-    its form field (`DatalinkFormInput.vue`, which the Properties tab uses too)
-    and the "Create Datalink" dialog (`UpsertDatalinkModal.vue`).
   - From the top bar (#83): `billing/` (the trial indicator, "Upgrade", the user
     menu's "Upgrade Plan"; since #192 also the plans' constants, `plans.ts`, and
-    the subscription price query, `subscriptionPrice.ts`), `organization/` (the
-    user menu's organization switcher) and `versionChecker/` (the "new version
-    available" dialog, mounted by `App.vue`).
+    the subscription price query, `subscriptionPrice.ts`) and `organization/`
+    (the user menu's organization switcher).
   - `organization/`, since #87: the Organization and Members settings tabs'
     sections (`settingsSections.ts`, contributed by
     `registerOrganizationSettings`), and since #191 the User groups tab's
@@ -62,19 +51,12 @@ community build without the cloud can leave it out (decision 6b of
     shared: `$/providers/session`, `$/providers/auth`, `$/authentication/`. Also
     the Account settings tab's two-factor authentication section
     (`SetupTwoFaForm.vue`, `TwoFaSetup.vue`).
-  - `versions/` — the right panel's Versions tab (#89), and the query options of
-    a project's scheduled executions (`projectExecutions.ts`, #192) for the
-    Schedule tab (#183). Imported directly by `RightPanel.vue`; see its
-    `CLAUDE.md`.
   - `account/` — the Account settings tab's sections (`settingsSections.ts`: the
     profile and password forms as data, the 2FA section, the account's deletion
     and the profile picture), contributed by `registerAccountSettings`
     (`settings.ts`); since #191 also the API keys tab's
     (`ApiKeysSettingsSection.vue`, the "New API Key" popover and the dialog
     showing a new key's secret).
-  - `versions/` — the right panel's Versions tab (#89) and Schedule tab
-    (executions calendar, #183), contributed by `registerVersionsTabs`
-    (`rightPanel.ts`).
   - `properties/` — the right panel's Properties tab (#183), with the secret and
     datalink configuration, contributed by `registerPropertiesTab`.
   - From the layouts (#84): `agreements/` (the Terms of Service and Privacy

@@ -1,8 +1,9 @@
-# src/cloud/datalinks/
+# src/datalinks/
 
 The **datalink editor** and the drive's "Create Datalink" dialog (#198). Vue;
 the decisions behind it are under "Rulings from #198" in
-`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Dormant: no UI
+entry point opens them; their unit tests are the guard against rot.
 
 - `JSONSchemaInput.vue` — an editor built from a JSON schema, recursively
   (`const`, `string` with the `enso-secret` and `enso-file` formats, `number`,
@@ -15,7 +16,7 @@ the decisions behind it are under "Rulings from #198" in
 - `DatalinkInput.vue` — `JSONSchemaInput` over `$/utils/datalinkSchema.json`,
   validated by `$/utils/datalinkValidator`'s compiled validators.
 - `DatalinkFormInput.vue` — the editor as a form field; the Properties tab
-  (`../properties/DatalinkConfiguration.vue`) uses it too.
+  (`../cloud/properties/DatalinkConfiguration.vue`) uses it too.
 - `UpsertDatalinkModal.vue` — the dialog, for the modal stack (`useModals()`
   from the Vue drive).
 - Tests: `__tests__/`, with the file browser stubbed.

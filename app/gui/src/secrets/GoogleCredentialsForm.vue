@@ -1,11 +1,11 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Google credential. The recipe is `$/cloud/serviceCredentials/google`. A
+ * @file The form creating a Google credential. The recipe is `$/secrets/serviceCredentials/google`. A
  * failure shows under the form, not as a toast. Remember to list a new form in
  * `credentialInfos.ts`.
  */
-import * as google from '$/cloud/serviceCredentials/google'
-import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'
+import * as google from '$/secrets/serviceCredentials/google'
+import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
 import Checkbox from '$/components/Checkbox/Checkbox.vue'
 import CheckboxGroup from '$/components/Checkbox/CheckboxGroup.vue'
 import Form from '$/components/Form/Form.vue'

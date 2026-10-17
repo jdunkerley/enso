@@ -13,7 +13,7 @@ LocalStorage.registerKey('loginRedirect', { isUserSpecific: true, schema: z.stri
 </script>
 
 <script setup lang="ts">
-import { useVersionCheckerEnabled } from '$/cloud/versionChecker/versionChecker'
+import { useVersionCheckerEnabled } from '$/versionChecker/versionChecker'
 import { openAboutModal, useAboutModal } from '$/components/AboutModal/aboutModal'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import ToastHost from '$/components/Toast/ToastHost.vue'
@@ -101,11 +101,8 @@ watch(about.isOpen, (isOpen) => {
 window.api?.menu.setMenuItemHandler('about', openAboutModal)
 
 // The "new version available" dialog, mounted on every page, only while the check is enabled (the desktop app), and loaded then: it brings the dialog
-// and the stepper. It is cloud-area code (decision 6b), imported directly until the registries
-// exist.
-const VersionChecker = defineAsyncComponent(
-  () => import('$/cloud/versionChecker/VersionChecker.vue'),
-)
+// and the stepper. It is core code, `$/versionChecker/`.
+const VersionChecker = defineAsyncComponent(() => import('$/versionChecker/VersionChecker.vue'))
 const versionCheckerEnabled = useVersionCheckerEnabled()
 </script>
 

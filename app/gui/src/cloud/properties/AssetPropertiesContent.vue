@@ -10,7 +10,7 @@
 import CopyButton from '$/components/Button/CopyButton.vue'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import Text from '$/components/Text/Text.vue'
-import UpsertSecretForm from '$/cloud/credentials/UpsertSecretForm.vue'
+import UpsertSecretForm from '$/secrets/UpsertSecretForm.vue'
 import { useAuth } from '$/providers/auth'
 import type { Category } from '$/providers/category'
 import { useFeatureFlag } from '$/providers/featureFlags'

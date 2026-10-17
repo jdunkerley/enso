@@ -8,7 +8,7 @@
  * does not close it; Escape does. Submitting a form creates the credential with `doCreate`, opens
  * the provider's sign-in page in the browser, and closes it.
  */
-import { makeCredentialCreationHandler } from '$/cloud/serviceCredentials/logic'
+import { makeCredentialCreationHandler } from '$/secrets/serviceCredentials/logic'
 import Dialog from '$/components/Dialog/Dialog.vue'
 import Dropdown from '$/components/Inputs/Dropdown.vue'
 import Text from '$/components/Text/Text.vue'

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /**
- * @file The form creating a Strava credential. The recipe is `$/cloud/serviceCredentials/strava`.
+ * @file The form creating a Salesforce credential. The recipe is
+ * `$/secrets/serviceCredentials/salesforce`; its scopes are fixed, so the form asks only for a name.
  * Remember to list a new form in `credentialInfos.ts`.
  */
-import * as strava from '$/cloud/serviceCredentials/strava'
-import type { CredentialRecipe } from '$/cloud/serviceCredentials/types'
-import Checkbox from '$/components/Checkbox/Checkbox.vue'
-import CheckboxGroup from '$/components/Checkbox/CheckboxGroup.vue'
+import * as salesforce from '$/secrets/serviceCredentials/salesforce'
+import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
 import Form from '$/components/Form/Form.vue'
 import Input from '$/components/Inputs/Input.vue'
+import Text from '$/components/Text/Text.vue'
 import { useConfig } from '$/providers/config'
 import { useText } from '$/providers/text'
 import CredentialsFormFooter from './CredentialsFormFooter.vue'
@@ -21,11 +21,11 @@ const { createCredentials } = defineProps<{
 const { getText } = useText()
 const config = useConfig()
 
-async function submit(values: Parameters<typeof strava.submitForm>[3]) {
+async function submit(values: Parameters<typeof salesforce.submitForm>[3]) {
   try {
-    await strava.submitForm(
+    await salesforce.submitForm(
       config.remoteConfig?.ENSO_IDE_API_URL,
-      config.remoteConfig?.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
+      config.remoteConfig?.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
       createCredentials,
       values,
     )
@@ -38,16 +38,16 @@ async function submit(values: Parameters<typeof strava.submitForm>[3]) {
 <template>
   <Form
     method="dialog"
-    :schema="strava.FORM_SCHEMA"
-    :defaultValues="{ name: '', scopes: ['read', 'activity:read'] }"
+    :schema="salesforce.FORM_SCHEMA"
+    :defaultValues="{
+      ...salesforce.DEFAULT_FORM_VALUES,
+      scopes: [...salesforce.DEFAULT_FORM_VALUES.scopes],
+    }"
     class="w-full"
     @submit="submit"
   >
     <Input name="name" :label="getText('name')" />
-    <CheckboxGroup name="scopes" :label="getText('stravaCredentialScopes')">
-      <Checkbox value="read">{{ getText('stravaCredentialReadScope') }}</Checkbox>
-      <Checkbox value="activity:read">{{ getText('stravaCredentialActivityReadScope') }}</Checkbox>
-    </CheckboxGroup>
+    <Text variant="body" color="primary">{{ getText('salesforceCredentialScopesSummary') }}</Text>
     <CredentialsFormFooter :isCreating="true" :canCancel="false" :canReset="false" />
   </Form>
 </template>

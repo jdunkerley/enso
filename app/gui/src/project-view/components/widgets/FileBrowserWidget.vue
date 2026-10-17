@@ -9,7 +9,7 @@ import { useBackends } from '$/providers/backends'
 import type { FileType } from '$/providers/openedProjects/widgetRegistry/configuration'
 import ActionButton from '@/components/ActionButton.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
-import UpsertSecretPanel from '@/components/UpsertSecretPanel.vue'
+import UpsertSecretPanel from '$/secrets/UpsertSecretPanel.vue'
 import { useEnsoPaths } from '@/components/widgets/FileBrowserWidget/ensoPath'
 import {
   listDirectoryArgs,

@@ -1,7 +1,7 @@
 /**
  * @file The right panel's Properties tab (#183): what it shows for each selection, the secret and
  * datalink configuration, and the spotlight the asset's "Edit" opens. The datalink editor is
- * replaced by a stub: it has tests of its own (`$/cloud/datalinks/__tests__/`).
+ * replaced by a stub: it has tests of its own (`$/datalinks/__tests__/`).
  */
 import type { Category } from '$/providers/category'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'

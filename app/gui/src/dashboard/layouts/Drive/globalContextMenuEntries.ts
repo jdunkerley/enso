@@ -3,12 +3,12 @@
  * secret, credential and datalink, and paste).
  */
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
-import CreateCredentialModal from '$/cloud/credentials/CreateCredentialModal.vue'
-import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
-import UpsertDatalinkModal from '$/cloud/datalinks/UpsertDatalinkModal.vue'
+import UpsertDatalinkModal from '$/datalinks/UpsertDatalinkModal.vue'
 import type { CategoryType } from '$/providers/category'
 import { useDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
+import CreateCredentialModal from '$/secrets/CreateCredentialModal.vue'
+import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
 import { backendMutationOptions } from '$/utils/backendQuery'
 import {
   BackendType,

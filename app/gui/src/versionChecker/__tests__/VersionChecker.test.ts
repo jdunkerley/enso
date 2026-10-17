@@ -2,11 +2,11 @@
  * @file The Vue version checker (#83), forced open as the devtools do (this build's version is not
  * a release one): "Remind me later" hides it; "Download" downloads, then it can be closed.
  */
-import VersionChecker from '$/cloud/versionChecker/VersionChecker.vue'
 import { useDevtoolsStore } from '$/providers/devTools'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
+import VersionChecker from '$/versionChecker/VersionChecker.vue'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
