@@ -9,6 +9,7 @@ import { widgetDevtools } from '$/providers/openedProjects/widgetRegistry/devtoo
 import { registerCore } from '$/registerCore'
 import router from '$/router'
 import { createQueryClient } from '$/utils/queryClient'
+import { redactAccessToken, scrubBreadcrumb, scrubEvent } from '$/utils/redact'
 import * as sentry from '@sentry/vue'
 import type { Vue } from '@sentry/vue/types/types'
 import { VueQueryPlugin } from '@tanstack/vue-query'
@@ -57,7 +58,16 @@ function setupSentry(app: Vue) {
       integrations: [
         sentry.browserTracingIntegration({ router }),
         sentry.extraErrorDataIntegration({ captureErrorCause: true }),
-        sentry.replayIntegration(),
+        // Replay records no request or response details (`networkDetailAllowUrls` is empty), and its
+        // network entries are redacted: Mapbox URLs carry the user's own access token.
+        sentry.replayIntegration({
+          beforeAddRecordingEvent: (event) => {
+            const payload = (event.data as { payload?: { description?: unknown } }).payload
+            if (typeof payload?.description === 'string')
+              payload.description = redactAccessToken(payload.description)
+            return event
+          },
+        }),
         new sentry.BrowserProfilingIntegration(),
       ],
       app,
@@ -65,6 +75,9 @@ function setupSentry(app: Vue) {
       tracesSampleRate: SENTRY_SAMPLE_RATE,
       replaysSessionSampleRate: SENTRY_SAMPLE_RATE,
       replaysOnErrorSampleRate: 1.0,
+      beforeBreadcrumb: scrubBreadcrumb,
+      beforeSend: scrubEvent,
+      beforeSendTransaction: scrubEvent,
     })
   }
 }

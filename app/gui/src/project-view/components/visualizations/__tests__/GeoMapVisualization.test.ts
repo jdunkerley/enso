@@ -23,6 +23,7 @@ const MapMock = vi.fn(function (this: Record<string, unknown>) {
   })
 })
 const mapboxgl = { Map: MapMock, Popup: vi.fn(() => ({})), accessToken: '' }
+// eslint-disable-next-line camelcase
 const DATA = { df_latitude: [1], df_longitude: [2] }
 
 beforeEach(() => {
@@ -60,14 +61,21 @@ describe('the map visualization', () => {
     expect(router.currentRoute.value.query['cloud-ide_SettingsTab']).toBe('"local"')
   })
 
-  test('with a token, builds the map with it, and rebuilds it when the token changes', async () => {
+  test('with a token, builds the map with it; rebuilds it when the token changes; removes it when cleared', async () => {
     mapboxSettingsStore.setState({ accessToken: 'pk.one' })
-    await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
+    const { wrapper } = await mountWithProviders(GeoMapVisualization, { props: { data: DATA } })
     expect(MapMock).toHaveBeenCalledTimes(1)
-    expect(mapboxgl.accessToken).toBe('pk.one')
+    expect(MapMock.mock.calls[0]?.[0]).toMatchObject({ accessToken: 'pk.one' })
     mapboxSettingsStore.setState({ accessToken: 'pk.two' })
     await flushPromises()
     expect(MapMock).toHaveBeenCalledTimes(2)
-    expect(mapboxgl.accessToken).toBe('pk.two')
+    expect(MapMock.mock.calls[1]?.[0]).toMatchObject({ accessToken: 'pk.two' })
+    expect(MapMock.mock.instances[0].remove).toHaveBeenCalledTimes(1)
+    expect(MapMock.mock.instances[1].remove).not.toHaveBeenCalled()
+    mapboxSettingsStore.setState({ accessToken: null })
+    await flushPromises()
+    expect(wrapper.text()).toContain(getText('mapboxTokenMissing'))
+    expect(MapMock.mock.instances[1].remove).toHaveBeenCalledTimes(1)
+    expect(MapMock).toHaveBeenCalledTimes(2)
   })
 })

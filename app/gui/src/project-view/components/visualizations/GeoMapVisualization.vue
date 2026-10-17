@@ -163,12 +163,14 @@ class GeoMapVisualizationMap {
    */
   constructor(
     container: HTMLElement,
+    accessToken: string,
     private readonly scope: EffectScope,
   ) {
     this.map = new mapboxgl.Map({
       container,
       projection: 'mercator',
       zoom: DEFAULT_MAP_ZOOM,
+      accessToken,
     })
     this.scope.run(() => onScopeDispose(() => this.map.remove()))
     this.tooltip = this.setupTooltip()
@@ -322,10 +324,9 @@ watch(
     mapScope = undefined
     const token = mapboxToken.value
     if (node == null || token == null) return
-    ;(mapboxgl as any).accessToken = token
     const scope = effectScope()
     mapScope = scope
-    const map = new GeoMapVisualizationMap(node, scope)
+    const map = new GeoMapVisualizationMap(node, token, scope)
     scope.run(() =>
       watch(
         () => config.size,
