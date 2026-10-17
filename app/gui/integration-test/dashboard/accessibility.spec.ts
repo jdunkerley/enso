@@ -9,11 +9,12 @@
  * When a port changes one of these trees on purpose, update the snapshot in the same PR and say
  * why in its description.
  */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 import { expectNoNewAxeViolations } from '../accessibility'
 import { TEXT } from '../actions'
 
 test.describe('logged out', () => {
+  test.skip(true, CLOUD_ONLY)
   test.use({ storageState: { cookies: [], origins: [] } })
 
   test('login screen: no new axe violations', async ({ loginPage }) => {
@@ -25,6 +26,7 @@ test.describe('logged out', () => {
 })
 
 test('drive: no new axe violations; drive table header tree', async ({ drivePage, cloudApi }) => {
+  test.skip(true, CLOUD_ONLY)
   cloudApi.addDirectory({ title: 'Folder' })
   cloudApi.addProject({ title: 'Project' })
   cloudApi.addFile({ title: 'File' })
@@ -64,6 +66,7 @@ test('drive table: a grid with row positions, selection and one roving tab stop'
   drivePage,
   cloudApi,
 }) => {
+  test.skip(true, CLOUD_ONLY)
   cloudApi.addDirectory({ title: 'Folder' })
   cloudApi.addProject({ title: 'Project' })
   cloudApi.addFile({ title: 'File' })
@@ -123,6 +126,7 @@ test('drive table: a grid with row positions, selection and one roving tab stop'
 })
 
 test('drive table: dragging rows is announced', async ({ drivePage, cloudApi }) => {
+  test.skip(true, CLOUD_ONLY)
   cloudApi.addDirectory({ title: 'Folder' })
   cloudApi.addFile({ title: 'File' })
   await drivePage.goToCategory
@@ -151,6 +155,7 @@ test('drive table: dragging rows is announced', async ({ drivePage, cloudApi }) 
 })
 
 test('asset panel: no new axe violations', async ({ drivePage, cloudApi }) => {
+  test.skip(true, CLOUD_ONLY)
   cloudApi.addProject({ title: 'Project', description: 'A description' })
   await drivePage.goToCategory
     .cloud()
@@ -172,12 +177,10 @@ test('user menu tree', async ({ drivePage }) => {
     await expect(menu).toBeVisible()
     await expect(menu).toMatchAriaSnapshot(`
       - dialog "User Settings":
-        - img "user name"
-        - text: user name Solo
+        - img "Offline user"
+        - text: Offline user Working locally
         - button /^Settings/
         - button /^About Enso/
-        - button "Upgrade Plan"
-        - button "Logout"
     `)
   })
 })
@@ -192,15 +195,9 @@ test('settings: no new axe violations; settings sidebar tree', async ({ drivePag
       - heading "General" [level=1]
       - button "Account"
       - button "Local"
-      - heading "Access" [level=1]
-      - button "Billing"
       - heading "Look and feel" [level=1]
       - button "Appearance"
       - button "Keyboard shortcuts"
-      - heading "Security" [level=1]
-      - button "API Keys"
-      - heading "Usage" [level=1]
-      - button "Usage"
     `)
   })
 })

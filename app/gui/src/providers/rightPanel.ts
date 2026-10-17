@@ -94,6 +94,7 @@ function useRightPanelTabs(
       {
         icon: 'info',
         enabled: enabledInCloudOnly,
+        hidden: () => !isCloudDirectoryView.value,
         title: 'Description',
       },
     ],

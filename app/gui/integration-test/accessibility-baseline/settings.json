@@ -7,32 +7,17 @@
   {
     "rule": "aria-required-parent",
     "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(2)"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
     "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(3)"
   },
   {
     "rule": "aria-required-parent",
     "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(6)"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(7)"
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(4)"
   },
   {
     "rule": "aria-required-parent",
     "impact": "critical",
     "target": "button[aria-label=\"Activity\"]"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": "button[aria-label=\"Scheduler - Exclusive to Cloud\"]"
   },
   {
     "rule": "button-name",

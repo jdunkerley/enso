@@ -1,118 +1,40 @@
 import { proxyRefs } from '$/utils/reactivity'
-import { waitForData } from '@/util/tanstack'
-import * as sentry from '@sentry/vue'
-import { useQuery } from '@tanstack/vue-query'
 import { createGlobalState } from '@vueuse/core'
 import { parseWebAppOptionsFromSearchParams } from 'enso-common/src/options'
-import { CONFIGURATION_PATH } from 'enso-common/src/services/Backend/remoteBackendPaths'
-import { computed, watch, watchEffect } from 'vue'
-import * as z from 'zod'
+import { computed } from 'vue'
 
-const HTTP_STATUS_BAD_REQUEST = 400
+/**
+ * The keys the Enso Cloud's remote configuration used to carry. The IDE is local-only
+ * (`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`): nothing is fetched, and the
+ * configuration is always empty. The type stays while the dormant secrets forms read it (decision
+ * 5); PR 4 removes it with the cloud variables.
+ */
+export interface RemoteConfig {
+  readonly ENSO_IDE_ENVIRONMENT?: string
+  readonly ENSO_IDE_API_URL?: string
+  readonly ENSO_IDE_AUTH_ENDPOINT?: string
+  readonly ENSO_IDE_STRIPE_KEY?: string
+  readonly ENSO_IDE_COGNITO_USER_POOL_ID?: string
+  readonly ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID?: string
+  readonly ENSO_IDE_COGNITO_DOMAIN?: string
+  readonly ENSO_IDE_COGNITO_REGION?: string
+  readonly ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID?: string
+  readonly ENSO_IDE_STRAVA_OAUTH_CLIENT_ID?: string
+  readonly ENSO_IDE_MS365_OAUTH_CLIENT_ID?: string
+  readonly ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID?: string
+}
 
-/** The time this app run started. A configuration fetched before this time belongs to a previous run. */
-const SESSION_START = Date.now()
-
-const REMOTE_CONFIG_SCHEMA = z.object({
-  ENSO_IDE_ENVIRONMENT: z.optional(z.string()),
-  ENSO_IDE_API_URL: z.optional(z.string()),
-  ENSO_IDE_AUTH_ENDPOINT: z.optional(z.string()),
-  ENSO_IDE_STRIPE_KEY: z.optional(z.string()),
-  ENSO_IDE_COGNITO_USER_POOL_ID: z.optional(z.string()),
-  ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID: z.optional(z.string()),
-  ENSO_IDE_COGNITO_DOMAIN: z.optional(z.string()),
-  ENSO_IDE_COGNITO_REGION: z.optional(z.string()),
-  ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: z.optional(z.string()),
-  ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: z.optional(z.string()),
-  ENSO_IDE_MS365_OAUTH_CLIENT_ID: z.optional(z.string()),
-  ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: z.optional(z.string()),
-})
-
-export type RemoteConfig = z.infer<typeof REMOTE_CONFIG_SCHEMA>
+const EMPTY_REMOTE_CONFIG: RemoteConfig = Object.freeze({})
 
 export type ConfigStore = ReturnType<typeof createConfigStore>
 
 function createConfigStore() {
-  const remoteConfigUrl = $config.API_URL ?? 'https://api.cloud.enso.org'
-
-  const remoteConfig = useQuery<RemoteConfig>({
-    queryKey: ['config', remoteConfigUrl],
-    queryFn: async ({ queryKey: [_, url] }) => {
-      const response = await fetch(`${url}/${CONFIGURATION_PATH}`)
-      if (!response.ok) {
-        throw new Error(`Fetch config returned ${response.status}`)
-      }
-      // The endpoint may serve something other than JSON (e.g. an HTML fallback
-      // page when there is no cloud backend). Treat any non-JSON body as an
-      // empty configuration rather than failing the whole app.
-      let body: unknown = {}
-      try {
-        body = await response.json()
-      } catch {
-        console.warn('Remote configuration response was not valid JSON; using empty configuration.')
-      }
-      return REMOTE_CONFIG_SCHEMA.parse(body)
-    },
-    // The configuration is fixed for the session: Cognito is set up from it once and never again.
-    // Re-fetching it in the background (the defaults do so on every window focus and reconnect)
-    // only flips a local-only session out of local-only mode while the fetch is in flight, which
-    // signs the user out and closes the open project. So a configuration fetched during this run
-    // never goes stale, while one restored from the persisted query cache (written by a previous
-    // run) is stale at once, and is therefore re-fetched once on start.
-    staleTime: (query) => (query.state.dataUpdatedAt < SESSION_START ? 0 : Infinity),
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  })
-
-  watchEffect(() => {
-    if (remoteConfig.error.value != null)
-      console.error('Error while fetching configuration', remoteConfig.error.value)
-  })
-
-  watch(
-    () => remoteConfig.data.value?.ENSO_IDE_ENVIRONMENT,
-    (env) => {
-      if (env != null) console.log('Loaded config:', env)
-    },
-    { flush: 'sync', immediate: true },
-  )
-
-  watch(
-    () => remoteConfig.data.value?.ENSO_IDE_API_URL,
-    (apiUrl) => {
-      const sentryOptions = sentry.getClient()?.getOptions()
-      if (sentryOptions != null && apiUrl != null) {
-        const host = new URL(apiUrl).host
-        sentryOptions.tracePropagationTargets = [apiUrl.split('//')[1] ?? '']
-        sentryOptions.beforeSend = (event) => {
-          if (
-            (event.breadcrumbs ?? []).some(
-              (breadcrumb) =>
-                breadcrumb.type === 'http' &&
-                breadcrumb.category === 'fetch' &&
-                breadcrumb.data &&
-                breadcrumb.data.status_code === HTTP_STATUS_BAD_REQUEST &&
-                typeof breadcrumb.data.url === 'string' &&
-                new URL(breadcrumb.data.url).host === host,
-            )
-          ) {
-            return null
-          }
-          return event
-        }
-      }
-    },
-    { flush: 'sync', immediate: true },
-  )
-
   return proxyRefs({
     params: computed(() =>
       parseWebAppOptionsFromSearchParams(new URLSearchParams(window.location.search)),
     ),
-    remoteConfig: remoteConfig.data,
-    isFetching: remoteConfig.isFetching,
-    isError: remoteConfig.isError,
-    waitForRemoteConfig: () => waitForData(remoteConfig),
+    remoteConfig: computed((): RemoteConfig => EMPTY_REMOTE_CONFIG),
+    waitForRemoteConfig: () => Promise.resolve(EMPTY_REMOTE_CONFIG),
   })
 }
 

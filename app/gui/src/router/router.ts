@@ -1,5 +1,4 @@
 import { useAuth } from '$/providers/auth'
-import { useConfig } from '$/providers/config'
 import { flagsStore } from '$/providers/featureFlags'
 import { loadSettingsContributions } from '$/providers/settingsContributions'
 import {
@@ -91,12 +90,6 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async () => {
-  const config = useConfig()
-  // A failed configuration fetch must not block navigation: `useConfig` records the error and
-  // the app continues in local-only mode (see `authDisabled` in the authentication service).
-  await config.waitForRemoteConfig().catch(() => {})
-})
 router.beforeEach(async (to, from) => {
   const auth = useAuth()
 

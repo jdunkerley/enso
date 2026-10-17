@@ -1,7 +1,7 @@
 /** @file Tests for the multiline CodeMirror editor panels: documentation editor and code editor. */
 import type EditorPageActions from 'integration-test/actions/EditorPageActions'
 import type { Page } from 'integration-test/base'
-import { expect, type Locator, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, type Locator, test } from 'integration-test/base'
 import { mockMethodCallInfo, mockUserDefinedFunctionInfo } from './expressionUpdates'
 import { DELETE_KEY } from './keyboard'
 import * as locate from './locate'
@@ -80,6 +80,7 @@ test.describe('Main method documentation rendering', () => {
   })
 
   test('Enso links', async ({ drivePage, editorPage }) => {
+    test.skip(true, CLOUD_ONLY)
     const { docsContent } = await goToGraphAndGetDocs(editorPage)
     const link = docsContent.locator('a').nth(1)
     await expect(link).toHaveText('A reference to another project')

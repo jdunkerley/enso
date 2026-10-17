@@ -1,7 +1,9 @@
 /** @file The drive's labels popover (#198, #207): where it opens from the context menu. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { COLORS } from 'enso-common/src/services/Backend'
+
+test.skip(true, CLOUD_ONLY)
 
 const LABEL_NAME = 'a label'
 

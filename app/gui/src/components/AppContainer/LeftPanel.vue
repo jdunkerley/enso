@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import DriveView from '#/layouts/DriveView.vue'
 import HelpBar from '$/components/AppContainer/HelpBar.vue'
-import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { categoryKey, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
-import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
 import { optPx } from '$/utils/dom'
 import ActionMenu from '@/components/ActionMenu.vue'
@@ -37,9 +35,7 @@ const ENSO_ICON_MENU_ACTIONS: DisplayableActionName[] = [
 
 const categories = useCategories()
 const containerData = useContainerData()
-const auth = useAuth()
 const { getText } = useText()
-const isOnline = useIsOnline()
 const { localBackend } = useBackends()
 const {
   leftPanelWidth: width,
@@ -50,18 +46,6 @@ const {
 const currentCategory = toRef(useDriveLocation(), 'currentCategory')
 const fullscreen = ref(false)
 const driveToolbar = shallowRef<HTMLElement | null>(null)
-
-const cloudDisabledReason = computed(() => {
-  if (!isOnline.value) {
-    return getText('unavailableOffline')
-  } else if (auth.session?.isCloudDataUnavailable) {
-    return getText('cloudDataUnavailable')
-  } else if (!auth.session?.user.isEnabled) {
-    return getText('notEnabledSubtitle')
-  } else {
-    return false
-  }
-})
 
 const localDisabledReason = computed(() => {
   if (localBackend == null) {
@@ -126,15 +110,6 @@ registerHandlers({
       @mouseenter="onEnter"
       @mouseleave="onLeave"
     >
-      <div class="categories">
-        <CategoryButton
-          v-for="category of categories.cloudCategoriesList"
-          :key="categoryKey(category)"
-          :category="category"
-          :extended="leftBarExtended"
-          :disabled="cloudDisabledReason"
-        />
-      </div>
       <div class="categories">
         <CategoryButton
           v-for="category of categories.localCategoriesList"

@@ -24,6 +24,11 @@ into `src/` proper so each feature subtree holds only its own feature-specific
 code. When you add something new, ask: is it ProjectView-only, Dashboard-only,
 or shared? Shared goes at `src/`.
 
+**Local-only.** The IDE runs with no Enso Cloud: no remote configuration fetch,
+always the offline session (`makeOfflineSession`), no `registerCloud`; core
+contributions are in `src/registerCore.ts`. See
+`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`.
+
 **Rule of thumb for new work:** default to Vue, put cross-feature code at
 `src/`, put feature-specific code in the matching subtree.
 

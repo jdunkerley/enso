@@ -1,5 +1,5 @@
 /** @file Test the user menu. */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 
 import { TEXT } from '../actions'
 
@@ -10,6 +10,7 @@ test('user menu', async ({ drivePage }) => {
 })
 
 test.describe(() => {
+  test.skip(true, CLOUD_ONLY)
   test.use({ featureFlags: { enableLocalBackend: false } })
   test('download app', async ({ drivePage }) => {
     await drivePage.openUserMenu().userMenu.downloadApp(async (download) => {
@@ -23,6 +24,7 @@ const userMenuEntries = (page: Page) =>
   page.getByTestId('user-menu').getByRole('button').allInnerTexts()
 
 test('signed in to the cloud: "Upgrade Plan" and "Logout"', async ({ drivePage, page }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.openUserMenu()
   const entries = (await userMenuEntries(page)).join('\n')
   expect(entries).toContain(TEXT.upgradePlanShortcut)

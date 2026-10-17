@@ -20,6 +20,7 @@
 import { injectDialogContext } from '$/components/Dialog/dialogContext'
 import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
+import { redactSensitiveFields } from '$/utils/redact'
 import * as sentry from '@sentry/vue'
 import * as errorUtils from 'enso-common/src/utilities/errors'
 import {
@@ -373,7 +374,12 @@ export function useForm<Schema extends TSchema, SubmitResult = void>(
     const isJSError = errorUtils.isJSError(error)
     if (isJSError) {
       sentry.captureException(error, {
-        contexts: { form: { values: submittedValues as Record<string, unknown>, debugName } },
+        contexts: {
+          form: {
+            values: redactSensitiveFields(submittedValues) as Record<string, unknown>,
+            debugName,
+          },
+        },
       })
     }
     const fallback = getText('arbitraryFormErrorMessage')

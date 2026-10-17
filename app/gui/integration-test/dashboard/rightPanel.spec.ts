@@ -1,11 +1,13 @@
 /** @file Tests for the asset panel. */
-import { expect, test, type Locator, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Locator, type Page } from 'integration-test/base'
 
 import { EmailAddress, UserId } from 'enso-common/src/services/Backend'
 
 import { PermissionAction } from 'enso-common/src/utilities/permissions'
 
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 /** Find an asset panel. */
 function locateRightPanel(page: Page) {

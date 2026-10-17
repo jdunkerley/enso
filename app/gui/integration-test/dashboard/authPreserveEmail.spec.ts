@@ -1,7 +1,9 @@
 /** @file Test that emails are preserved when navigating between auth pages. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { VALID_EMAIL } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 // Reset storage state for this file to avoid being authenticated
 test.use({ storageState: { cookies: [], origins: [] } })

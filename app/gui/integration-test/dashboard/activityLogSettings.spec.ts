@@ -2,9 +2,11 @@
  * @file The activity log settings tab's paging (#196): a log shorter than the view is fetched a
  * bounded number of times, and a long one still loads further pages as it is scrolled.
  */
-import { expect, test, type Page } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
 
 import { Plan, type AuditLogEvent } from 'enso-common/src/services/Backend'
+
+test.skip(true, CLOUD_ONLY)
 
 /** The page size the tab asks for: `DEFAULT_GET_LOG_EVENTS_PAGE_SIZE`. */
 const PAGE_SIZE = 100

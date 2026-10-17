@@ -1,5 +1,5 @@
 /** @file Test copying, moving, cutting and pasting. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 test.skip(
   'export from remote to local (local+remote)',
@@ -56,6 +56,7 @@ test.skip(
 )
 
 test('export from local to remote (local+remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .goToCategory.local()
@@ -75,6 +76,7 @@ test('export from local to remote (local+remote)', async ({ drivePage }) => {
 })
 
 test('export from local to remote (drag) (local+remote)', async ({ drivePage }) => {
+  test.skip(true, CLOUD_ONLY)
   await drivePage.goToCategory
     .cloud()
     .goToCategory.local()

@@ -1,8 +1,10 @@
 /** @file The user groups settings tab's "Add Users" popover (#191, #207): Escape. */
-import { expect, test } from 'integration-test/base'
+import { CLOUD_ONLY, expect, test } from 'integration-test/base'
 
 import { Plan } from 'enso-common/src/services/Backend'
 import { TEXT } from '../actions'
+
+test.skip(true, CLOUD_ONLY)
 
 test.use({
   setupApi: {

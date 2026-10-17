@@ -4,6 +4,8 @@
  * a cloud-only area (an ESLint rule enforces it), so that a community build can drop this folder
  * and that one call. See decision 6b in
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.
+ *
+ * Not called since the IDE became local-only (PR 1); PR 2 deletes this folder.
  */
 import { contributeAppContainerModals } from '$/providers/layoutContributions'
 import type { Router } from 'vue-router'

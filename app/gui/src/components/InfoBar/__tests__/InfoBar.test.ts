@@ -1,4 +1,4 @@
-/** @file The Vue info bar and menu (#83): the logo button, About, and Logout when signed in. */
+/** @file The Vue info bar and menu (#83): the logo button and About; no Sign out in local-only mode. */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import InfoBar from '$/components/InfoBar/InfoBar.vue'
 import { useText } from '$/providers/text'
@@ -10,9 +10,6 @@ import { reactive } from 'vue'
 
 const auth = reactive<{ session: object | null }>({ session: null })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
-
-const signOut = vi.fn(async () => {})
-vi.mock('$/providers/session', () => ({ useSession: () => ({ signOut }) }))
 
 const { getText } = useText()
 
@@ -58,15 +55,13 @@ describe('InfoBar', () => {
     expect(useAboutModal().isOpen.value).toBe(true)
   })
 
-  test('signed in: Logout signs out, then goes to the login page', async () => {
+  test('signed in: there is no Sign out entry, as the app runs on the offline session only', async () => {
     auth.session = {}
-    const { router } = await mountWithProviders(InfoBar, { route: '/registration' })
+    await mountWithProviders(InfoBar)
     const user = userEvent.setup()
     await user.click(logoButton())
     await flushPromises()
-    await user.click(entry(getText('signOutShortcut'))!)
-    await flushPromises()
-    expect(signOut).toHaveBeenCalledOnce()
-    expect(router.currentRoute.value.path).toBe('/login')
+    expect(entry(getText('aboutThisAppShortcut'))).toBeDefined()
+    expect(entry(getText('signOutShortcut'))).toBeUndefined()
   })
 })

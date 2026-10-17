@@ -12,6 +12,13 @@ import { registerMocks } from './mock/registerMocks'
 export type * from 'playwright/test'
 
 /**
+ * The reason every skipped cloud-only test gives (`test.skip(true, CLOUD_ONLY)`). Each skip goes when
+ * its test is ported to the local mock or deleted, and this with the last of them.
+ */
+export const CLOUD_ONLY =
+  'Cloud-only: the IDE is local-only since PR 1 of docs/superpowers/specs/2026-10-17-local-only-ide-design.md; PR 4 deletes or ports this test.'
+
+/**
  * The `$config` the page should boot with, injected before any app script runs. Supplied by
  * each Playwright project in `playwright.config.ts` so the AG Grid licence key is set
  * explicitly per project rather than inherited from whatever the build happened to bake in.
