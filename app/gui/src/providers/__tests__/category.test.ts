@@ -1,4 +1,4 @@
-/** @file The drive's categories: the local Recent category beside the cloud's. */
+/** @file The drive's categories: the local Recent category beside the cloud's, and added folders. */
 import {
   CATEGORY_BACKEND,
   categoryFromKey,
@@ -10,7 +10,8 @@ import {
   type Category,
 } from '$/providers/category'
 import { BackendType, Path } from 'enso-common/src/services/Backend'
-import { describe, expect, test, vi } from 'vitest'
+import { newDirectoryId } from 'enso-common/src/services/LocalBackend'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive } from 'vue'
 
 vi.mock('$/providers/auth', () => ({ useAuth: () => reactive({ session: null }) }))
@@ -63,5 +64,48 @@ describe('the local Recent category', () => {
     ])
     expect(categories.categoryLabel({ type: 'localRecent' })).toBe('recentCategory')
     expect(categories.categoryDirectoryId({ type: 'localRecent' })).toBeNull()
+  })
+})
+
+describe('a folder added on Windows', () => {
+  const DIALOG_PATH = Path('C:\\Users\\me\\Empty folder')
+  const NORMALISED = Path('C:/Users/me/Empty folder')
+
+  beforeEach(() => {
+    vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' })
+    localStorage.clear()
+    vi.resetModules()
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    localStorage.clear()
+  })
+
+  test('is kept with forward slashes, the way the local backend lists it', async () => {
+    const categories = (await import('$/providers/category')).useCategories()
+    const added = categories.addLocalDirectory(DIALOG_PATH)
+    expect(added).toBe(NORMALISED)
+    expect(categories.localCategoriesList.slice(2)).toEqual([
+      { type: 'localDirectory', path: NORMALISED },
+    ])
+    expect(categories.categoryDirectoryId({ type: 'localDirectory', path: added })).toBe(
+      newDirectoryId(NORMALISED),
+    )
+    // Adding it again, spelt either way, does not list it twice.
+    categories.addLocalDirectory(NORMALISED)
+    expect(categories.localCategoriesList).toHaveLength(3)
+  })
+
+  test('saved with backslashes before, is listed with forward slashes and can be removed', async () => {
+    localStorage.setItem(
+      'enso-local-saved-directories',
+      JSON.stringify({ state: { localDirectories: [DIALOG_PATH] }, version: 1 }),
+    )
+    const categories = (await import('$/providers/category')).useCategories()
+    expect(categories.localCategoriesList.slice(2)).toEqual([
+      { type: 'localDirectory', path: NORMALISED },
+    ])
+    expect(categories.removeLocalDirectory(NORMALISED)).toBe(true)
+    expect(categories.localCategoriesList).toHaveLength(2)
   })
 })

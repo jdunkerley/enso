@@ -13,7 +13,7 @@ import {
 } from 'enso-common/src/services/Backend'
 import { newDirectoryId } from 'enso-common/src/services/LocalBackend'
 import { organizationIdToDirectoryId } from 'enso-common/src/services/RemoteBackend/ids'
-import { getFileName } from 'enso-common/src/utilities/file'
+import { getFileName, normalizeSlashes } from 'enso-common/src/utilities/file'
 import { computed, toValue } from 'vue'
 import { useAuth } from './auth'
 import { useBackends } from './backends'
@@ -166,7 +166,13 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
     () => localPaths.localRootDirectory ?? backends.localBackend?.rootPath(),
   )
 
-  const localDirectories = computed(() => localDirectoryStore.state.value.localDirectories)
+  /**
+   * The added folders, spelt as the local backend lists them: with forward slashes on Windows. The
+   * file dialog returns backslashes there, and a folder added by an earlier version may have them.
+   */
+  const localDirectories = computed(() => [
+    ...new Set(localDirectoryStore.state.value.localDirectories.map(normalizeSlashes)),
+  ])
 
   const localDirectoryCategories = computed(() =>
     localDirectories.value.map((dir): LocalDirectory => ({ type: 'localDirectory', path: dir })),
@@ -243,20 +249,25 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
     }
   }
 
-  function addLocalDirectory(path: Path) {
+  /**
+   * Add a folder, unless it is there already. Returns its path as the category names it, which is
+   * not the path given when that has backslashes on Windows: the local backend finds a folder only
+   * by its forward-slash path, so a category with backslashes cannot be shown.
+   */
+  function addLocalDirectory(path: Path): Path {
+    const normalized = normalizeSlashes(path)
     const state = localDirectoryStore.getState()
-    if (!state.localDirectories.includes(path)) {
-      localDirectoryStore.setState({ localDirectories: [...state.localDirectories, path] })
-      return true
+    if (!state.localDirectories.some((p) => normalizeSlashes(p) === normalized)) {
+      localDirectoryStore.setState({ localDirectories: [...state.localDirectories, normalized] })
     }
-    return false
+    return normalized
   }
 
   function removeLocalDirectory(path: Path) {
+    const normalized = normalizeSlashes(path)
     const state = localDirectoryStore.getState()
-    const index = state.localDirectories.findIndex((p) => p === path)
-    if (index >= 0) {
-      const newList = state.localDirectories.filter((_, i) => i !== index)
+    const newList = state.localDirectories.filter((p) => normalizeSlashes(p) !== normalized)
+    if (newList.length !== state.localDirectories.length) {
       localDirectoryStore.setState({ localDirectories: newList })
       return true
     }
