@@ -12,6 +12,11 @@
   {
     "rule": "aria-required-parent",
     "impact": "critical",
+    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(3)"
+  },
+  {
+    "rule": "aria-required-parent",
+    "impact": "critical",
     "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(6)"
   },
   {
@@ -28,11 +33,6 @@
     "rule": "aria-required-parent",
     "impact": "critical",
     "target": "button[aria-label=\"Scheduler - Exclusive to Cloud\"]"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": "button[aria-label=\"Versions - Exclusive to Cloud\"]"
   },
   {
     "rule": "button-name",

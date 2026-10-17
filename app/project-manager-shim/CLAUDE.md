@@ -169,6 +169,16 @@ and drops inherited `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`,
 `GIT_INDEX_FILE`, still applies). `findGit` caches only a git it found, so
 installing git while the IDE runs needs no restart.
 
+**Every path from data reaches git as a literal pathspec**: `literal(p)` gives
+`:(literal)<p>`, `excludeEnso(p)` gives `:(exclude,literal)<p>/.enso`, and
+`projectPathspecs(p)` is the pair, used by `status`, `log`, `add`, `reset`,
+`diff`, `commit`, `restore`, `rm`, `clean`, `ls-files` and `ls-tree`. A plain
+pathspec would read `*`, `?` and `[` in a folder name as a glob, matching a
+sibling (`P [x]` matches a file `P x`) — and `clean` would delete it.
+`GIT_LITERAL_PATHSPECS=1` is no alternative: it disables the exclude magic too.
+`<id>:<path>` revisions are not pathspecs, and are resolved (`cat-file -e`)
+before use.
+
 ### Version ids
 
 `fileAt`, `setComment`, `restore` and `exportAt` accept only a full commit hash
@@ -199,7 +209,8 @@ is never versioned even in a repository that tracks it.
 
 Comments on versions are git notes under `refs/notes/enso`. Each commit has at
 most one; `setComment` overwrites it. `log` shows the note, else the commit
-message without any `Enso-Moved-From` trailer.
+message without any `Enso-Moved-From` trailer. An empty comment removes the note
+(`notes remove`, with the identity fallback).
 
 ### Close hook and moves
 
@@ -214,7 +225,31 @@ close still succeeds.
 
 A rename (`renameProject`) or a filesystem move of a project directory commits
 both paths together (`commitMove`), with an `Enso-Moved-From: <old path>`
-trailer (repository-relative) so the earlier history can be followed (PR 5).
+trailer (repository-relative). `log` follows it, reading the commits at the
+current path newest first up to the first one with a trailer:
+
+- a trailer naming another path is a move _in_: that commit is listed, and the
+  commits before it at the old path follow (at most 100 moves), so A → B → A
+  lists all three stretches, and a reused name (B deleted, A renamed to B) shows
+  A's history, not the deleted B's;
+- a trailer naming the current path is a move _away_ by an earlier project:
+  neither it nor anything older at that path is listed.
+
+A trailer path that is not plain and repository-relative (absolute, with
+empty/`.`/`..` segments, starting with `:` or `-`, or containing `\`) is
+ignored, since anyone can write a commit message. Glob characters are allowed
+(folders such as `Projects [2026]` are real): every pathspec is literal, see
+_How git is run_. A project at the repository root never follows trailers; as
+`git log -- .` lists every commit, its history starts at the commit that last
+added the root `package.yaml`.
+
+`fileAt`, `exportAt` and `restore` use the path the project had at the version,
+and resolve `<id>:<path>` (`cat-file -e`) before using it, so a missing path
+fails as such. A restore across a move replaces the current path's files with
+the old path's tree (`rm --cached`, `read-tree --prefix`, `restore --worktree`,
+`clean`). Every precondition is checked before the work tree or index changes;
+if a step still fails, the index is reset to `HEAD` for the project (no deletion
+stays staged).
 
 ### Timeouts and robustness
 
@@ -244,5 +279,24 @@ trailer (repository-relative) so the earlier history can be followed (PR 5).
   old path's removal uncommitted.
 - Deleting a project, or moving a folder that contains projects, leaves the
   removal uncommitted too; it shows in the user's `git status`.
-- `log` does not yet follow `Enso-Moved-From`, so a renamed project lists only
-  its versions since the rename (PR 5).
+- A restore across a move is refused when the repository tracks the project's
+  `.enso/` both in the version's tree (at the old path) and in the index at the
+  current path: `read-tree --prefix` would fail with
+  `error: Entry '<path>/.enso/…' overlaps with '<path>/.enso/…'.  Cannot bind.`
+  The check runs first, so nothing changes. A tracked `.enso/` on one side only
+  does not block it.
+- A project at the repository root can only be restored to a version recorded at
+  `.` (which, as it never follows moves, is every version it lists); a version
+  from another path is refused, never restored over the whole repository.
+- `restore --worktree` can overwrite a file that is now ignored but was tracked
+  in the old version; "Saved before restore" does not capture it, as it commits
+  only tracked and unignored files.
+- The root-project history cut (`--diff-filter=A` on `package.yaml`) misses a
+  `package.yaml` added by a merge commit; the whole history is then listed.
+- At a move boundary `log` follows first parents only (`<move commit>^`): a move
+  recorded in a merge commit follows its first parent.
+- If a cross-move restore fails after its `restore --worktree` step, the index
+  is reset but the work tree may hold part of the old version; `HEAD` (the
+  `Saved before restore` commit) still has everything. Any restore that fails
+  after that commit says so:
+  `Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (<git's message>)`.
