@@ -1,4 +1,5 @@
 /** @file "New Datalink" and opening a datalink: the dialog's props, and what a save writes. */
+import { createDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import {
@@ -21,16 +22,20 @@ const ASSET = {
   parentId: DirectoryId('directory-%2Froot'),
 } as DatalinkAsset
 
+const driveStore = createDriveStore()
+const listing = (assets: unknown[] = []) =>
+  vi.fn().mockResolvedValue({ assets, paginationToken: null })
+
 async function setup(backend: Partial<Backend>) {
   let actions!: {
     edit: ReturnType<typeof useEditDatalink>
     create: ReturnType<typeof useNewDatalink>
   }
-  const full = { type: BackendType.local, ...backend } as Backend
+  const full = { type: BackendType.local, listDirectory: listing(), ...backend } as Backend
   await mountWithProviders(
     defineComponent({
       setup() {
-        actions = { edit: useEditDatalink(full), create: useNewDatalink(full) }
+        actions = { edit: useEditDatalink(full), create: useNewDatalink(full, 'local', driveStore) }
         return () => null
       },
     }),
@@ -91,4 +96,30 @@ test('New Datalink creates in the given folder', async () => {
     parentDirectoryId: ASSET.parentId,
     datalinkId: null,
   })
+})
+
+test('a created datalink is selected, titled without its extension', async () => {
+  const createDatalink = vi.fn().mockResolvedValue({ id: ASSET.id })
+  const { create } = await setup({ createDatalink })
+  create(ASSET.parentId)
+  await topProps().doCreate('Sales.datalink', VALUE)
+  expect(driveStore.state.selectedAssets).toEqual([
+    {
+      type: AssetType.datalink,
+      id: ASSET.id,
+      title: 'Sales',
+      parentId: ASSET.parentId,
+    },
+  ])
+})
+
+test('a typed .datalink name clashes with a datalink of that title', async () => {
+  const createDatalink = vi.fn()
+  const { create } = await setup({
+    createDatalink,
+    listDirectory: listing([{ ...ASSET, id: DatalinkId('datalink-other') }]),
+  })
+  create(ASSET.parentId)
+  await expect(topProps().doCreate('Sales.datalink', VALUE)).rejects.toThrow()
+  expect(createDatalink).not.toHaveBeenCalled()
 })

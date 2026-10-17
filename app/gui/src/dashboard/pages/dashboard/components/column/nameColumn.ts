@@ -6,7 +6,8 @@ import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useRenameAsset } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useDriveStore } from '$/providers/driveStore'
-import { titleSchema, type AnyAsset } from 'enso-common/src/services/Backend'
+import { AssetType, titleSchema, type AnyAsset } from 'enso-common/src/services/Backend'
+import { DATALINK_EXTENSION } from 'enso-common/src/services/LocalBackend'
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 
 /** The rename state and actions of a name cell. */
@@ -39,7 +40,11 @@ export function useNameCell(
   /** The check of a new name: it must be valid, and unique among the asset's siblings. */
   const schema = () => {
     const asset = toValue(item)
-    return titleSchema({ id: asset.id, siblings: assetItems.getAssetChildren(asset.parentId) })
+    return titleSchema({
+      id: asset.id,
+      siblings: assetItems.getAssetChildren(asset.parentId),
+      ...(asset.type === AssetType.datalink && { extension: DATALINK_EXTENSION }),
+    })
   }
 
   return { isEditingName, setIsEditing, doRename, schema }

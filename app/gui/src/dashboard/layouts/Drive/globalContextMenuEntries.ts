@@ -29,7 +29,7 @@ export function useGlobalContextMenuEntries(options: GlobalContextMenuEntriesOpt
 
   const target = () => toValue(options.directoryId) ?? toValue(options.currentDirectoryId)
   const newFolder = useNewFolder(options.backend, options.category, driveStore)
-  const newDatalink = useNewDatalink(options.backend)
+  const newDatalink = useNewDatalink(options.backend, options.category, driveStore)
   const newProject = useNewProject(options.backend, options.category)
   const uploadFiles = useUploadFiles(options.backend, options.category, driveStore)
 

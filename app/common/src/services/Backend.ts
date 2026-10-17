@@ -1678,6 +1678,16 @@ export function extractProjectExtension(name: string) {
 export interface TitleSchemaOptions {
   readonly id: AssetId
   readonly siblings?: readonly AnyAsset[] | null
+  /** A file extension the asset's title does not include (`.datalink`): a typed one is dropped. */
+  readonly extension?: string
+}
+
+/** A title without a trailing extension, if it has it. */
+export function titleWithoutExtension(title: string, extension: string | undefined) {
+  const trimmed = title.trim()
+  return extension != null && trimmed.endsWith(extension) ?
+      trimmed.slice(0, -extension.length)
+    : trimmed
 }
 
 /** Check if the title contains invalid characters. */
@@ -1705,7 +1715,7 @@ export function doesContainInvalidNames(title: string) {
 
 /** A Zod schema for validating a title. */
 export function titleSchema(options: TitleSchemaOptions) {
-  const { id, siblings } = options
+  const { id, siblings, extension } = options
 
   const dictionary = resolveDictionary()
 
@@ -1720,7 +1730,7 @@ export function titleSchema(options: TitleSchemaOptions) {
     .refine((value) => !doesTitleContainInvalidCharacters(value), {
       message: getText(dictionary, 'nameShouldNotContainInvalidCharacters'),
     })
-    .refine((value) => isNewTitleUnique(id, value, siblings), {
+    .refine((value) => isNewTitleUnique(id, titleWithoutExtension(value, extension), siblings), {
       message: getText(dictionary, 'nameShouldBeUnique'),
     })
 }

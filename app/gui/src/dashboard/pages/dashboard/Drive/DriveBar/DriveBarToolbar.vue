@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * @file The drive's toolbar: the buttons creating assets (a project, a folder, a datalink, which
- * opens the datalink dialog on the modal stack), uploading and downloading, the count of cut or copied assets, and the search bar. In the trash, a button
- * emptying it; in Recent, only the count and the search bar.
+ * opens the datalink dialog on the modal stack), uploading and downloading, the count of cut or
+ * copied assets, and the search bar. In the trash, a button emptying it; in Recent, only the count
+ * and the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
 import { useNewDatalink } from '#/layouts/Drive/datalinkActions'
@@ -79,7 +80,7 @@ const newFolder = useNewFolder(backend, () => category.value.type, driveStore)
 const uploadFiles = useUploadFiles(backend, () => category.value.type, driveStore)
 const newProjectRaw = useNewProject(backend, () => category.value.type)
 const exportArchive = useExportArchive(backend, driveStore)
-const newDatalink = useNewDatalink(backend)
+const newDatalink = useNewDatalink(backend, () => category.value.type, driveStore)
 /** Key of the datalink dialog this button opened on the modal stack, for its `aria-expanded`. */
 const openedDatalinkModal = shallowRef<number>()
 const isDatalinkModalOpen = computed(() => {
