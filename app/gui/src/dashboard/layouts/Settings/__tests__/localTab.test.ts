@@ -145,6 +145,7 @@ describe('the Local settings tab', () => {
     mapboxSettingsStore.setState({ accessToken: null })
     await openLocalTab()
     expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    expect(input('mapboxTokenSettingsInput').type).toBe('password')
     const user = userEvent.setup()
     await user.type(input('mapboxTokenSettingsInput'), ' pk.typed ')
     await user.click(button(getText('save')))

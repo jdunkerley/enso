@@ -199,6 +199,8 @@ const LOCAL_TAB: SettingsTabData = {
               nameId: 'mapboxTokenSettingsInput',
               name: 'mapboxToken',
               autoComplete: 'off',
+              // Masked, so that the token does not show on a shared screen.
+              type: 'password',
               descriptionId: 'mapboxTokenSettingsInputDescription',
             },
           ],
