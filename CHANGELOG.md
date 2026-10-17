@@ -160,7 +160,7 @@
   chips then show only the projects that carry any of the chosen labels. Labels
   are kept on this computer, and travel with a project when it is copied. Local
   folders and files cannot be labelled yet.
-- [Local projects can keep versions with git][NNN]. When git is installed, a
+- [Local projects can keep versions with git][235]. When git is installed, a
   version is saved when a project closes and when the app quits, and on demand
   with Ctrl/Cmd+S (or Ctrl/Cmd+Shift+S and the new save icon, to add a comment).
   A dot beside the project name, and a ● on its tab, show changes since the last
@@ -306,7 +306,7 @@
 [219]: https://github.com/jdunkerley/enso/pull/219
 [227]: https://github.com/jdunkerley/enso/pull/227
 [226]: https://github.com/jdunkerley/enso/pull/226
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[235]: https://github.com/jdunkerley/enso/pull/235
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64
