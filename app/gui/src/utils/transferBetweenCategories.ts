@@ -4,7 +4,6 @@
  * (`$/composables/transferBetweenCategories`) gives it the app's stores, and the mutations run
  * through the shared query client, with the options in `$/utils/driveMutations`.
  */
-import type { UploadFileToCloudOptions } from '$/cloud/uploadToCloud'
 import {
   CATEGORY_BACKEND,
   categoryEq,
@@ -54,11 +53,6 @@ export interface TransferBetweenCategoriesContext {
   readonly resolveDuplications: DuplicationResolver
   /** Ask whether to copy instead (`askToCopyInstead`, `$/components/Drive/copyInstead`). */
   readonly askToCopyInstead: (message: string, description: string) => Promise<Resolution>
-  /** `uploadAssetsToCloud` (`$/cloud/uploadToCloud`), with its context. */
-  readonly uploadToCloud: (
-    localBackend: LocalBackend,
-    options: UploadFileToCloudOptions,
-  ) => Promise<unknown>
   /** Show a loading toast while the promise is pending, then its outcome. */
   readonly toastPromise: (
     promise: Promise<unknown>,
@@ -118,7 +112,7 @@ function askToCopyInsteadOfMoving(context: TransferBetweenCategoriesContext, fro
  *   they come from a team's folder);
  * - out of the trash, they are restored, except that assets of a team's folder cannot be restored
  *   into another category, and the user is asked whether to copy them instead;
- * - from a local category to the cloud, local projects are uploaded;
+ * - from a local category to the cloud, nothing happens;
  * - within the local drive, they are moved or copied.
  */
 export async function transferBetweenCategories(
@@ -258,14 +252,11 @@ export async function transferBetweenCategories(
     }
     case 'local':
     case 'localDirectory': {
-      const { localBackend } = context
       invariant(
-        localBackend != null,
+        context.localBackend != null,
         'The Local backend must be present to transfer assets from or to the local category.',
       )
-      if (isCloudCategory(to)) {
-        return context.uploadToCloud(localBackend, { assets: assetsArray, targetDirectoryId })
-      }
+      if (isCloudCategory(to)) return
       void baseMutation()
       return
     }

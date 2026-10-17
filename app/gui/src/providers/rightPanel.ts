@@ -1,4 +1,3 @@
-import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useBackends } from '$/providers/backends'
 import {
   CATEGORY_BACKEND,
@@ -62,9 +61,8 @@ interface RightPanelTabInfo {
 function useRightPanelTabs(
   focusedPanel: ToValue<Panel>,
   rightPanelContext: Ref<RightPanelContext | undefined>,
-  { textRef, getText }: TextStore,
+  { textRef }: TextStore,
 ) {
-  const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
   const isCloudDirectoryView = computed(
     () =>
       rightPanelContext.value?.category != null &&
@@ -137,12 +135,7 @@ function useRightPanelTabs(
       'executionsCalendar',
       {
         icon: 'schedule',
-        enabled: computed(() => {
-          if (!enabledInCloudOnly.value.ok) return enabledInCloudOnly.value
-          if (isFeatureUnderPaywall('scheduler'))
-            return Err(getText('assetProjectExecutionsCalendar.teamPlanOnly'))
-          return Ok()
-        }),
+        enabled: computed(() => enabledInCloudOnly.value),
         hidden: () => rightPanelTabContribution('executionsCalendar') == null,
         title: textRef('executionsCalendar'),
       },

@@ -6,7 +6,6 @@ neutral ground — anything Vue-specific belongs in its own package.
 
 ## Contents
 
-- `src/accessToken.ts` — token persistence (AWS Cognito / Enso Cloud).
 - `src/services/` — the `Backend` interface and its two implementations:
   `RemoteBackend` (Enso Cloud over HTTPS) and `LocalBackend` (the local drive,
   over the project-manager shim's `ProjectManager` client). Shared helpers such

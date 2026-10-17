@@ -1,9 +1,13 @@
+import type { GraphDb } from '$/providers/openedProjects/graph/graphDatabase'
+import { Score, WidgetInput, type WidgetProps } from '$/providers/openedProjects/widgetRegistry'
 import {
   useBrowserTypeInfo,
   useCurrentPath,
   useSetPath,
+  withBrowserItems,
   type BrowserTypeInfo,
 } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
+import { widgetDefinition as selectionWidget } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import { assertDefined } from '@/util/assert'
 import { Ast } from '@/util/ast'
 import type { DynamicConfig } from '@/util/callTree'
@@ -349,5 +353,25 @@ describe('Set path', () => {
     expect(widgetUpdate.portUpdate).toHaveProperty('value')
     expect((widgetUpdate.portUpdate as any).value.code()).toBe(expected)
     expect(addMissingConstructorImports).toHaveBeenCalled()
+  })
+})
+
+describe('withBrowserItems', () => {
+  const selectionScore = (input: WidgetInput) =>
+    selectionWidget.score({ input } as WidgetProps<WidgetInput>, {} as GraphDb)
+
+  test('with no items, leaves the input unwrapped, so it gets no dropdown arrow', () => {
+    // An argument that takes only a secret: there is no secret browser, so nothing to choose.
+    const input = WidgetInput.FromAst(Ast.parseExpression('secret')!)
+    const inner = withBrowserItems(input, [])
+    expect(inner).toBe(input)
+    expect(selectionScore(inner)).not.toBe(Score.Perfect)
+  })
+
+  test('with items, adds them as a dropdown for the selection widget', () => {
+    const input = WidgetInput.FromAst(Ast.parseExpression('path')!)
+    const inner = withBrowserItems(input, [{ label: 'Browse…', onClick: () => {} }])
+    expect(inner).not.toBe(input)
+    expect(selectionScore(inner)).toBe(Score.Perfect)
   })
 })

@@ -1,38 +1,13 @@
-/** @file A store that contains the state of the Enso devtools. */
-import {
-  PAYWALL_FEATURES,
-  type PaywallFeatureName,
-} from '$/composables/paywall/FeaturesConfiguration'
+/** @file A store with the developer overrides that outlived the Enso devtools panel. */
 import { createGlobalState } from '@vueuse/core'
-import { unsafeEntries, unsafeFromEntries } from 'enso-common/src/utilities/data/object'
-import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
 import { reactive } from 'vue'
 
-/** Configuration for a paywall feature. */
-export interface PaywallDevtoolsFeatureConfiguration {
-  readonly isForceEnabled: boolean | null
-}
-
-/** A store keeping state of the Enso devtools. */
+/** A store keeping the developer overrides. */
 export type EnsoDevtoolsStore = ReturnType<typeof createDevtoolsStore>
 
-/** create {@link EnsoDevtoolsStore} */
+/** Create an {@link EnsoDevtoolsStore}. */
 export function createDevtoolsStore() {
-  const paywallFeatures: Record<PaywallFeatureName, PaywallDevtoolsFeatureConfiguration> =
-    unsafeFromEntries(
-      unsafeEntries(PAYWALL_FEATURES).map(([feature]) => [feature, { isForceEnabled: null }]),
-    )
-
-  function setPaywallFeature(feature: PaywallFeatureName, isForceEnabled: boolean | null) {
-    paywallFeatures[feature] = { isForceEnabled }
-  }
-
-  return reactive({
-    showEnsoDevtools: IS_DEV_MODE,
-    showVersionChecker: false as boolean | null,
-    paywallFeatures,
-    setPaywallFeature,
-  })
+  return reactive({ showVersionChecker: false as boolean | null })
 }
 
 export const useDevtoolsStore = createGlobalState(createDevtoolsStore)

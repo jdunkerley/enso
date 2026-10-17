@@ -25,8 +25,9 @@ code. When you add something new, ask: is it ProjectView-only, Dashboard-only,
 or shared? Shared goes at `src/`.
 
 **Local-only.** The IDE runs with no Enso Cloud: no remote configuration fetch,
-always the offline session (`makeOfflineSession`), no `registerCloud`; core
-contributions are in `src/registerCore.ts`. See
+always the one local user and session (`makeLocalSession` in
+`src/providers/session.ts`, no authentication), core contributions are in
+`src/registerCore.ts`. See
 `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`.
 
 **Rule of thumb for new work:** default to Vue, put cross-feature code at
@@ -108,23 +109,24 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md` ("Rulings from
 #170").
 
-- `src/cloud/` — code that only makes sense against the Enso Cloud: at the top,
-  framework-free logic (service-credential recipes, organization-invite email
-  parsing, the Cognito password rule, permission classes); in
-  `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
-  and password pages; `account/`: the Account and API keys settings tabs'
-  sections; `organization/`: the Organization, Members, User groups and Activity
-  log tabs' sections and the "Invite" dialog; `billing/`: the paywall, the
-  Billing & Plans and Usage tabs, the subscription page with the Stripe
-  checkout, the payments success page and the top bar's billing parts;
-  `versions/` and `properties/`: the right panel's Versions, Schedule and
-  Properties tabs; `credentials/` and `datalinks/`: the drive's secret,
-  credential and datalink dialogs). Keep cloud-only code here rather than in
-  `src/utils/`, so a build without the cloud can drop one folder. The core
-  reaches the areas only through `registerCloud` (`src/cloud/index.ts`), which
-  `entrypoint.ts` calls; see `src/cloud/CLAUDE.md`. Labels are not cloud-only:
-  the drive's labels code is in `src/dashboard/components/labels/`, and asks the
-  backend's `supportsLabels` rather than whether it is the cloud.
+- `src/versions/` — the Versions tab, registered by `src/registerCore.ts` (local
+  git versions; until PR 3 also the cloud's version branches).
+- `src/versionChecker/` — the "new version available" dialog (GitHub releases),
+  mounted by `App.vue`.
+- `src/secrets/` — dormant: the secret and per-service credential forms and the
+  project view's `UpsertSecretPanel`, kept compiling and tested for local
+  secrets later (decision 5); nothing opens them.
+- `src/datalinks/` — dormant until PR 2b: the datalink editor and its dialog.
+- **Contribution registries.** The core reaches optional parts of the UI through
+  registries, not by importing them: `contributeRightPanelTab` in
+  `$/providers/rightPanelContributions` (the Versions tab uses it, from
+  `registerCore.ts`), `contributeSettingsSections` in
+  `$/providers/settingsContributions`, and `contributeAppContainerModals` in
+  `$/providers/layoutContributions`. The last two have no contributor now. A
+  contribution is a loader (`() => import(…)`), so its code stays out of the
+  initial chunk; a tab or modal that nothing contributes is hidden. Labels are
+  not cloud-only: the drive's labels code is in
+  `src/dashboard/components/labels/`, and asks the backend's `supportsLabels`.
 
 ## Entry points
 
@@ -150,10 +152,10 @@ side uses the Rust parser compiled to WASM (`rust-ffi` package →
 
 ## Dashboard ↔ backend
 
-The Dashboard subtree talks to the Enso Cloud over HTTPS (AWS Amplify +
-Cognito). In local/desktop mode it also talks to the local TypeScript Project
-Manager (`app/project-manager-shim/`), which is used in both dev and the
-packaged Electron build. The old Scala Project Manager is no longer wired in.
+The Dashboard talks to the local Project Manager shim; the remote backend that
+remains until PR 3 is never reached. The shim (`app/project-manager-shim/`) is
+the local TypeScript Project Manager, used in both dev and the packaged Electron
+build. The old Scala Project Manager is no longer wired in.
 
 The drive's sidebar is a list of **categories** (`$/providers/category`), each
 on one backend (`CATEGORY_BACKEND`): the cloud's Cloud, Recent, Trash and teams;

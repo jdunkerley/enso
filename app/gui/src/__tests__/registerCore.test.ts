@@ -4,7 +4,11 @@ import {
   rightPanelTabContribution,
 } from '$/providers/rightPanelContributions'
 import { registerCore } from '$/registerCore'
-import { afterEach, expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
+
+// The loader is asserted to import this module, not the real component: transforming
+// `AssetVersions.vue` and its imports took about 4 s, which timed the test out under the full suite.
+vi.mock('$/versions/AssetVersions.vue', () => ({ default: { __name: 'AssetVersions' } }))
 
 afterEach(resetRightPanelContributions)
 

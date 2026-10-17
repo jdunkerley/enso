@@ -15,7 +15,7 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
   headless: {
     flag: '--headless',
     description:
-      'Run in headless mode (single execution). Requires `--startup.project <project path or url>`.',
+      'Run in headless mode (single execution). Requires `--startup.project <project path>`.',
   },
   displayWindow: {
     flag: '--no-window',
@@ -30,14 +30,6 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
   'startup.project': {
     flag: '--startup.project <name>',
     description: 'Project to open or create at startup',
-  },
-  'authentication.enabled': {
-    flag: '--authentication.enabled',
-    description: 'Enable user authentication (always true in cloud)',
-  },
-  'authentication.email': {
-    flag: '--authentication.email <email>',
-    description: 'User email for authentication',
   },
   'server.port': {
     flag: '--server.port',
@@ -68,6 +60,30 @@ const OPTIONS_META: Readonly<Record<string, { flag: string; description: string 
     description: 'Duration (s) to collect backend profiling data',
   },
 } as const
+
+/**
+ * The prefix of the `enso:` deep links that installs from before the IDE was local-only registered
+ * with the OS.
+ */
+const DEEP_LINK_PREFIX = 'enso:'
+
+/**
+ * The client arguments without a stale `enso:` deep link.
+ *
+ * Older installs registered `enso://` with the OS, so a stale link or bookmark can still launch the
+ * IDE with the URL as its only argument. The parser would reject it as an excess argument and exit
+ * before the window opens, or before a second instance hands over to the running one. The link is
+ * dropped instead, so the IDE opens normally. Only a sole argument is dropped: that is the shape the
+ * OS launches with, and `--startup.project enso:…` must still reach the headless refusal.
+ */
+export function withoutDeepLink(args: readonly string[]): readonly string[] {
+  const [arg] = args
+  if (args.length === 1 && arg != null && arg.toLowerCase().startsWith(DEEP_LINK_PREFIX)) {
+    console.log(`Ignoring the deep link '${arg}': the IDE no longer handles 'enso:' links.`)
+    return []
+  }
+  return args
+}
 
 /** Parse command line arguments to validated options. */
 export function parseArgs(argv: readonly string[]): Options {

@@ -34,7 +34,6 @@ import { useToasts } from '$/providers/toasts'
 import AssetQuery from '$/utils/AssetQuery'
 import { download } from '$/utils/download'
 import { getDownloadUrl } from '$/utils/github'
-import LocalStorage from '$/utils/LocalStorage'
 import { BackendType, DirectoryDoesNotExistError } from 'enso-common/src/services/Backend'
 import { OfflineError } from 'enso-common/src/utilities/errors'
 import { computed, shallowRef, watch } from 'vue'
@@ -58,29 +57,15 @@ const isOnline = useIsOnline()
 const toasts = useToasts()
 const toastAndLog = useToastAndLog()
 const { localBackend } = useBackends()
-const localStorage = LocalStorage.getInstance()
 
 const session = computed(() => auth.session)
 const isCloud = computed(() => isCloudCategory(drive.currentCategory))
-/**
- * Whether the user has chosen a category. While they have not, the cloud-unavailable stub shows
- * whichever category the default picked, so that a cloud failure is always surfaced; once they
- * have, the local categories work without the cloud.
- */
-const hasExplicitCategory = computed(() => localStorage.get('driveDisplay') != null)
 const supportLocalBackend = localBackend != null
 
 const status = computed(() => {
-  const currentSession = session.value
-  // When authentication is disabled there is no cloud to retry: the user lands on the local drive.
-  const showCloudUnavailableStub =
-    currentSession?.isCloudDataUnavailable === true &&
-    !currentSession.isAuthDisabled &&
-    (isCloud.value || !hasExplicitCategory.value)
   return (
     isCloud.value && !isOnline.value ? 'offline'
-    : showCloudUnavailableStub ? 'cloud-unavailable'
-    : isCloud.value && currentSession?.user.isEnabled !== true ? 'not-enabled'
+    : isCloud.value && session.value?.user.isEnabled !== true ? 'not-enabled'
     : 'ok'
   )
 })
@@ -132,23 +117,7 @@ function onFocusIn() {
 <template>
   <ErrorBoundary>
     <Result
-      v-if="status === 'cloud-unavailable'"
-      status="error"
-      :title="getText('cloudDataUnavailableTitle')"
-      testId="cloud-unavailable-stub"
-      :subtitle="getText('cloudDataUnavailableSubtitle')"
-    >
-      <ButtonGroup align="center">
-        <Button variant="primary" size="medium" @press="() => auth.refetchSession()">
-          {{ getText('retry') }}
-        </Button>
-        <Button v-if="supportLocalBackend" size="medium" variant="outline" @press="switchToLocal">
-          {{ getText('switchToLocal') }}
-        </Button>
-      </ButtonGroup>
-    </Result>
-    <Result
-      v-else-if="status === 'not-enabled'"
+      v-if="status === 'not-enabled'"
       status="error"
       :title="getText('notEnabledTitle')"
       testId="not-enabled-stub"

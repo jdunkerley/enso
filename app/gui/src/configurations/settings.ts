@@ -1,21 +1,14 @@
 /**
  * @file The declarative model of the settings page: its tabs, sections and entries, the context
  * their predicates and callbacks receive, and the search over them. Shared by the settings page
- * (`#/layouts/Settings`) and the cloud-only sections registered from `src/cloud/`
- * (`$/providers/settingsContributions`).
+ * (`#/layouts/Settings`) and the sections contributed through
+ * `$/providers/settingsContributions`.
  */
-import type { PaywallFeatureName } from '$/composables/paywall'
 import type SettingsTabType from '$/configurations/settingsTabs'
 import type { GetText } from '$/providers/text'
 import { regexEscape } from '$/utils/data/string'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import type {
-  OrganizationInfo,
-  Path,
-  UpdateOrganizationRequestBody,
-  UpdateUserRequestBody,
-  User,
-} from 'enso-common/src/services/Backend'
+import type { OrganizationInfo, Path, User } from 'enso-common/src/services/Backend'
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import type { TextId } from 'enso-common/src/text'
@@ -24,7 +17,6 @@ import type { z } from 'zod'
 
 /** What the visibility predicates of every tab are given. */
 export interface SettingsBaseContext {
-  readonly accessToken: string
   readonly user: User
   readonly organization: OrganizationInfo | null
   readonly localBackend: LocalBackend | null
@@ -35,7 +27,7 @@ export interface SettingsBaseContext {
   readonly isCloudDataUnavailable: boolean
   /**
    * `true` in local-only mode: authentication is disabled (no Enso Cloud is configured), so `user`
-   * is the offline stand-in and `accessToken` is empty. Implies `isCloudDataUnavailable`. Nothing
+   * is the local user. Implies `isCloudDataUnavailable`. Nothing
    * that needs Enso Cloud or Cognito can work here, and there is no way to sign in.
    */
   readonly isAuthDisabled: boolean
@@ -45,9 +37,6 @@ export interface SettingsBaseContext {
 /** What the entries of the Vue tabs are given. */
 export interface SettingsContext extends SettingsBaseContext {
   readonly backend: RemoteBackend
-  readonly updateUser: (body: UpdateUserRequestBody) => Promise<void>
-  readonly updateOrganization: (body: UpdateOrganizationRequestBody) => Promise<void>
-  readonly changePassword: (oldPassword: string, newPassword: string) => Promise<boolean>
   readonly preferredTimeZone: string | undefined
   readonly setPreferredTimeZone: (preferredTimeZone: string | undefined) => void
   readonly localRootDirectory: Path | null
@@ -258,14 +247,7 @@ export interface SettingsSectionData extends SettingsSearchableSection<SettingsE
 }
 
 /**
- * A settings tab rendered in Vue. A tab whose `sections` are all contributed
- * (`$/providers/settingsContributions`) is hidden while nothing has been contributed to it, so that
- * a build without the cloud does not list the organization's tabs.
+ * A settings tab rendered in Vue. A tab with no sections, its own or contributed
+ * (`$/providers/settingsContributions`), is not listed.
  */
-export interface SettingsTabData extends SettingsSearchableTab<SettingsSectionData> {
-  /**
-   * The feature behind which the tab is locked: while the user's plan lacks it, the contributed
-   * paywall screen replaces the tab's sections.
-   */
-  readonly feature?: PaywallFeatureName
-}
+export type SettingsTabData = SettingsSearchableTab<SettingsSectionData>

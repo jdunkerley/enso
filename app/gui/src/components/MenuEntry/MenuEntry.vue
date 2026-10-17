@@ -9,9 +9,6 @@
  * enclosing popover or dialog (or every modal, outside one), then calls `onPress`.
  *
  * `tooltip` shows a visual tooltip to the right of the entry (#91, for the drive's context menus).
- * The entry has no paywall lock of its own: the paywall is cloud code, which the core may not
- * import, so the drive's menus (which are dashboard code) give a locked entry the lock icon, the
- * "upgrade" tooltip and an `onPress` opening the paywall dialog themselves.
  */
 import Icon from '$/components/Icon/Icon.vue'
 import { injectDialogContext } from '$/components/Dialog/dialogContext'

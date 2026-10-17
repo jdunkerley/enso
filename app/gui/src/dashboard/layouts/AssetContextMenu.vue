@@ -6,20 +6,12 @@
 import ContextMenu from '#/components/ContextMenu.vue'
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
-import {
-  useExportArchive,
-  useMutationCallback,
-  useNewProject,
-  useUploadFileToLocal,
-} from '#/layouts/Drive/driveActions'
+import { useExportArchive, useMutationCallback, useNewProject } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
 import ManageLabelsModal from '#/components/labels/ManageLabelsModal.vue'
-import { isUploadableAsset } from '$/cloud/uploadToCloud'
-import { usePreferredTimeZone } from '$/cloud/versions/schedule'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useCopy } from '$/components/Button/copy'
-import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useMenuEntries } from '$/composables/menuEntries'
 import type { DashboardBindingKey } from '$/configurations/inputBindings'
 import { useAuth } from '$/providers/auth'
@@ -32,20 +24,17 @@ import { useModals } from '$/providers/modals'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
-import { backendMutationOptions } from '$/utils/backendQuery'
 import {
   copyAssetsMutationOptions,
   deleteAssetsMutationOptions,
   downloadAssetsMutationOptions,
   restoreAssetsMutationOptions,
 } from '$/utils/driveMutations'
-import { now } from '@internationalized/date'
 import * as backendModule from 'enso-common/src/services/Backend'
 import {
   TEAMS_DIRECTORY_ID,
   USERS_DIRECTORY_ID,
 } from 'enso-common/src/services/Backend/remoteBackendPaths'
-import { IanaTimeZone, toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import * as permissions from 'enso-common/src/utilities/permissions'
 import { computed } from 'vue'
 
@@ -75,9 +64,7 @@ const driveView = useDriveView()
 const assetItems = useAssetItems()
 const modals = useModals()
 const { localBackend } = useBackends()
-const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
 const showDeveloperIds = useFeatureFlag('showDeveloperIds')
-const preferredTimeZone = usePreferredTimeZone()
 
 const category = computed(() => driveView.location.category)
 const backend = computed(() => driveView.location.backend)
@@ -92,11 +79,7 @@ const deleteAssets = useMutationCallback(() => deleteAssetsMutationOptions(backe
 const restoreAssets = useMutationCallback(() => restoreAssetsMutationOptions(backend.value))
 const copyAssets = useMutationCallback(() => copyAssetsMutationOptions(backend.value))
 const downloadAssets = useMutationCallback(() => downloadAssetsMutationOptions(backend.value))
-const createProjectExecution = useMutationCallback(() =>
-  backendMutationOptions(backend.value, 'createProjectExecution'),
-)
 const { copy } = useCopy()
-const uploadFileToLocal = useUploadFileToLocal(category)
 const exportArchive = useExportArchive(backend, driveStore)
 const newProject = useNewProject(backend, () => category.value.type)
 
@@ -194,7 +177,6 @@ const globalContextMenuEntries = useGlobalContextMenuEntries({
   doPaste: (id) => doPaste(id),
 })
 
-const MAX_DURATION_MAXIMUM_MINUTES = 180
 const systemApi = window.api?.system
 
 const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => {
@@ -275,28 +257,6 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
         },
       },
     asset.type === backendModule.AssetType.project &&
-      isCloud.value && {
-        action: 'runAsTask',
-        isDisabled: isFeatureUnderPaywall('scheduler'),
-        doAction: () => {
-          const timeZone = IanaTimeZone(preferredTimeZone.value)
-          const startDateTime = toRfc3339(new Date(now(timeZone).toAbsoluteString()))
-          void createProjectExecution([
-            {
-              startDate: startDateTime,
-              endDate: null,
-              parallelMode: 'ignore',
-              maxDurationMinutes: MAX_DURATION_MAXIMUM_MINUTES,
-              repeat: { type: 'none' },
-              projectId: asset.id,
-              timeZone,
-              tag: undefined,
-            },
-            asset.title,
-          ])
-        },
-      },
-    asset.type === backendModule.AssetType.project &&
       canExecute.value &&
       isRunningProject.value &&
       !isOtherUserUsingProject.value && {
@@ -325,14 +285,6 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
         })
       },
     },
-    isUploadableAsset(asset) &&
-      isCloud.value &&
-      localBackend != null && {
-        action: 'downloadToLocal',
-        doAction: () => {
-          void uploadFileToLocal([asset])
-        },
-      },
     {
       action: 'copy',
       doAction: () => {

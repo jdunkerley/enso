@@ -1,12 +1,11 @@
 /**
  * @file The Vue settings page's shell: the sidebar, the `SettingsTab` query parameter (deep links,
- * invalid values), the search, and the cloud's contributed sections and paywall.
+ * invalid values), the search and the contributed sections; the cloud's tabs are gone.
  */
 import SettingsTabType from '$/configurations/settingsTabs'
 import type * as QueryParamsModule from '$/providers/queryParams'
 import { useSettingsContext } from '$/providers/settingsContext'
 import {
-  contributeSettingsPaywall,
   contributeSettingsSections,
   loadSettingsContributions,
   resetSettingsContributions,
@@ -31,29 +30,20 @@ const USER = {
 } as User
 
 const auth = vi.hoisted(() => {
-  const value: { session: unknown; deleteUser: () => void } = {
-    session: null,
-    deleteUser: () => {},
-  }
+  const value: { session: unknown } = { session: null }
   return value
 })
 const backends = vi.hoisted(() => ({
   hasLocalBackend: true,
   organization: null as { readonly subscription?: object } | null,
 }))
-const paywall = vi.hoisted(() => ({ locked: new Set<string>() }))
 
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
-vi.mock('$/composables/paywall', async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  useIsFeatureUnderPaywall: () => (feature: string) => paywall.locked.has(feature),
-}))
 // The global store keeps the first router it sees; each test has its own.
 vi.mock('$/providers/queryParams', async (importOriginal) => {
   const original = await importOriginal<typeof QueryParamsModule>()
   return { ...original, useQueryParams: () => original.createQueryParams() }
 })
-vi.mock('$/providers/session', () => ({ useSession: () => ({ changePassword: vi.fn() }) }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return {
@@ -77,14 +67,16 @@ beforeAll(() => {
 })
 
 beforeEach(async () => {
+  // The reachable state: the local session, whose flags are always `true`.
   auth.session = {
     user: USER,
     email: USER.email,
-    accessToken: `.${btoa(JSON.stringify({ username: USER.email }))}.`,
+    accessToken: '',
+    isCloudDataUnavailable: true,
+    isAuthDisabled: true,
   }
   backends.hasLocalBackend = true
   backends.organization = null
-  paywall.locked.clear()
   contributeSettingsSections(SettingsTabType.account, () =>
     Promise.resolve([
       {
@@ -140,7 +132,7 @@ describe('SettingsPage', () => {
     expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
       'hello user name',
     )
-    expect(document.querySelector('[data-testid="offline-user-settings"]')).toBeNull()
+    expect(document.querySelector('[data-testid="offline-user-settings"]')).not.toBeNull()
   })
 
   test('in local-only mode, the Account tab shows the offline user', async () => {
@@ -169,24 +161,18 @@ describe('SettingsPage', () => {
     expect(offline.querySelector('svg')).not.toBeNull()
   })
 
-  test("hides the organization's tabs when the cloud does not fill them", async () => {
+  test('lists only the local tabs, whatever is contributed', async () => {
+    // An admin of an organization with a subscription, with both flags `false` (unreachable now):
+    // the cloud's tabs would all have been listed.
     const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
+    auth.session = {
+      user: admin,
+      email: admin.email,
+      accessToken: '',
+      isCloudDataUnavailable: false,
+      isAuthDisabled: false,
+    }
     backends.organization = { subscription: {} }
-    await mountWithProviders(SettingsPage)
-    await flushPromises()
-    expect(sidebarTabs()).not.toContain(getText('organizationSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('billingAndPlansSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('membersSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('userGroupsSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('activityLogSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('apiKeysSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('usageSettingsTab'))
-  })
-
-  test("lists the organization's tabs once the cloud fills them", async () => {
-    const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
     const section =
       (
         nameId:
@@ -213,53 +199,14 @@ describe('SettingsPage', () => {
     contributeSettingsSections(SettingsTabType.apiKeys, section('apiKeysSettingsSection'))
     contributeSettingsSections(SettingsTabType.usage, section('usageSettingsSection'))
     await loadSettingsContributions()
-    // Billing & Plans is listed for an organization with a subscription.
-    backends.organization = { subscription: {} }
-    await mountWithProviders(SettingsPage, {
-      route: `/settings?${TAB_PARAM}=${encodeURIComponent('"members"')}`,
-    })
+    await mountWithProviders(SettingsPage)
     await flushPromises()
     expect(sidebarTabs()).toEqual([
       getText('accountSettingsTab'),
-      getText('organizationSettingsTab'),
       getText('localSettingsTab'),
-      getText('billingAndPlansSettingsTab'),
-      getText('membersSettingsTab'),
-      getText('userGroupsSettingsTab'),
       getText('appearanceSettingsTab'),
       getText('keyboardShortcutsSettingsTab'),
-      getText('activityLogSettingsTab'),
-      getText('apiKeysSettingsTab'),
-      getText('usageSettingsTab'),
     ])
-    expect(headings()).toEqual([getText('membersSettingsSection')])
-    // An organization's tab is titled with the organization, here the placeholder.
-    expect(document.querySelector('h1.flex')?.textContent).toContain('your organization')
-  })
-
-  test("shows the contributed paywall in place of a tab the user's plan lacks", async () => {
-    const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
-    paywall.locked.add('inviteUser')
-    contributeSettingsSections(SettingsTabType.members, () =>
-      Promise.resolve([
-        {
-          nameId: 'membersSettingsSection',
-          entries: [{ type: 'custom' as const, component: ContributedEntry }],
-        },
-      ]),
-    )
-    const Paywall = (props: { feature: string }) =>
-      h('p', { 'data-testid': 'paywall' }, `locked ${props.feature}`)
-    Paywall.props = ['feature']
-    contributeSettingsPaywall(() => Promise.resolve(Paywall))
-    await loadSettingsContributions()
-    await mountWithProviders(SettingsPage, {
-      route: `/settings?${TAB_PARAM}=${encodeURIComponent('"members"')}`,
-    })
-    expect(document.querySelector('[data-testid="paywall"]')?.textContent).toBe('locked inviteUser')
-    expect(headings()).toEqual([])
-    expect(document.querySelector('[data-testid="contributed"]')).toBeNull()
   })
 
   test('hides the Local tab without a local backend', async () => {
@@ -297,49 +244,6 @@ describe('SettingsPage', () => {
     expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
   })
 
-  test('lists Billing & Plans only for an admin of an organization with a subscription', async () => {
-    contributeSettingsSections(SettingsTabType.billingAndPlans, () =>
-      Promise.resolve([
-        {
-          nameId: 'billingAndPlansSettingsSection',
-          entries: [
-            {
-              type: 'custom' as const,
-              aliasesId: 'billingAndPlansSettingsCustomEntryAliases' as const,
-              component: ContributedEntry,
-            },
-          ],
-        },
-      ]),
-    )
-    await loadSettingsContributions()
-    const admin = { ...USER, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
-    // No organization: no subscription.
-    let { unmount } = await mountWithProviders(SettingsPage)
-    await flushPromises()
-    expect(sidebarTabs()).not.toContain(getText('billingAndPlansSettingsTab'))
-    unmount()
-    // Not the admin.
-    backends.organization = { subscription: {} }
-    auth.session = { user: USER, email: USER.email, accessToken: '' }
-    ;({ unmount } = await mountWithProviders(SettingsPage))
-    await flushPromises()
-    expect(sidebarTabs()).not.toContain(getText('billingAndPlansSettingsTab'))
-    unmount()
-    // The admin of an organization with a subscription.
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
-    await mountWithProviders(SettingsPage)
-    await flushPromises()
-    expect(sidebarTabs()).toContain(getText('billingAndPlansSettingsTab'))
-    await userEvent.setup().click(sidebarButton(getText('billingAndPlansSettingsTab')))
-    await flushPromises()
-    expect(headings()).toEqual([getText('billingAndPlansSettingsSection')])
-    expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
-      'hello user name',
-    )
-  })
-
   test('the search narrows the tabs, sections and entries', async () => {
     await mountWithProviders(SettingsPage)
     const user = userEvent.setup()
@@ -372,36 +276,5 @@ describe('SettingsPage', () => {
     await flushPromises()
     expect(sidebarTabs()).toEqual([])
     expect(document.body.textContent).toContain(getText('noResultsFound'))
-  })
-
-  test('the search finds Billing & Plans by its aliases', async () => {
-    contributeSettingsSections(SettingsTabType.billingAndPlans, () =>
-      Promise.resolve([
-        {
-          nameId: 'billingAndPlansSettingsSection',
-          entries: [
-            {
-              type: 'custom' as const,
-              aliasesId: 'billingAndPlansSettingsCustomEntryAliases' as const,
-              component: ContributedEntry,
-            },
-          ],
-        },
-      ]),
-    )
-    await loadSettingsContributions()
-    const admin = { ...USER, isOrganizationAdmin: true }
-    auth.session = { user: admin, email: admin.email, accessToken: '' }
-    backends.organization = { subscription: {} }
-    await mountWithProviders(SettingsPage, {
-      route: `/settings?${TAB_PARAM}=${encodeURIComponent('"billing-and-plans"')}`,
-    })
-    await flushPromises()
-    await userEvent.setup().type(searchBox(), 'billing and plans')
-    await flushPromises()
-    expect(sidebarTabs()).toContain(getText('billingAndPlansSettingsTab'))
-    expect(sidebarTabs()).not.toContain(getText('accountSettingsTab'))
-    expect(headings()).toEqual([getText('billingAndPlansSettingsSection')])
-    expect(document.querySelector('[data-testid="contributed"]')).not.toBeNull()
   })
 })

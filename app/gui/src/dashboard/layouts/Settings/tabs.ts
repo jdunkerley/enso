@@ -1,8 +1,7 @@
 /**
- * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`. The sections
- * of the Account tab and of the cloud's tabs (Organization, Billing & Plans, Members, User groups,
- * Activity log, API keys, Usage) come from the cloud (`$/providers/settingsContributions`); the
- * cloud's tabs have none of their own, so a build without the cloud does not list them.
+ * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`: Account,
+ * Local, Appearance and Keyboard shortcuts. A tab may also show sections contributed through
+ * `$/providers/settingsContributions`, after its own.
  */
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
 // does), so to ESLint the components imported here have an error type.
@@ -17,7 +16,7 @@ import {
 import SettingsTabType, { SETTINGS_TAB_ICONS } from '$/configurations/settingsTabs'
 import { setDownloadDirectory, setLocalRootDirectory } from '$/providers/localDirectories'
 import { mapboxSettingsStore, setMapboxToken } from '$/providers/mapboxToken'
-import { isUserOnPlanWithMultipleSeats, Path } from 'enso-common/src/services/Backend'
+import { Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
 import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection.vue'
@@ -38,9 +37,7 @@ const ACCOUNT_TAB: SettingsTabData = {
   nameId: 'accountSettingsTab',
   settingsTab: SettingsTabType.account,
   icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
-  // Every other section is contributed by `src/cloud/` (`registerCloud`), and hides itself in
-  // local-only mode. The tab stays visible in degraded-auth mode, so that the Cognito-only sections
-  // (password change, 2FA setup) remain reachable; the cloud-dependent sections hide themselves.
+  // Its one section is the local user.
   sections: [
     {
       nameId: 'offlineUserSettingsSection',
@@ -54,79 +51,6 @@ const ACCOUNT_TAB: SettingsTabData = {
       ],
     },
   ],
-}
-
-const ORGANIZATION_TAB: SettingsTabData = {
-  nameId: 'organizationSettingsTab',
-  settingsTab: SettingsTabType.organization,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
-  organizationOnly: true,
-  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
-  // Contributed by `src/cloud/organization/`.
-  sections: [],
-}
-
-const BILLING_AND_PLANS_TAB: SettingsTabData = {
-  nameId: 'billingAndPlansSettingsTab',
-  settingsTab: SettingsTabType.billingAndPlans,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
-  organizationOnly: true,
-  visible: ({ user, organization }) =>
-    user.isOrganizationAdmin && organization?.subscription != null,
-  // Contributed by `src/cloud/billing/`.
-  sections: [],
-}
-
-const MEMBERS_TAB: SettingsTabData = {
-  nameId: 'membersSettingsTab',
-  settingsTab: SettingsTabType.members,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
-  organizationOnly: true,
-  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
-  feature: 'inviteUser',
-  // Contributed by `src/cloud/organization/`.
-  sections: [],
-}
-
-const USER_GROUPS_TAB: SettingsTabData = {
-  nameId: 'userGroupsSettingsTab',
-  settingsTab: SettingsTabType.userGroups,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
-  organizationOnly: true,
-  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user) && user.isOrganizationAdmin,
-  feature: 'userGroups',
-  // Contributed by `src/cloud/organization/`.
-  sections: [],
-}
-
-const ACTIVITY_LOG_TAB: SettingsTabData = {
-  nameId: 'activityLogSettingsTab',
-  settingsTab: SettingsTabType.activityLog,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
-  organizationOnly: true,
-  visible: ({ user }) => isUserOnPlanWithMultipleSeats(user),
-  // Contributed by `src/cloud/organization/`.
-  sections: [],
-}
-
-const API_KEYS_TAB: SettingsTabData = {
-  nameId: 'apiKeysSettingsTab',
-  settingsTab: SettingsTabType.apiKeys,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.apiKeys],
-  visible: ({ isCloudDataUnavailable }) => !isCloudDataUnavailable,
-  // Contributed by `src/cloud/account/`.
-  sections: [],
-}
-
-const USAGE_TAB: SettingsTabData = {
-  nameId: 'usageSettingsTab',
-  settingsTab: SettingsTabType.usage,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.usage],
-  feature: 'scheduler',
-  // Scheduled executions run in Enso Cloud: in local-only mode the tab could only offer a plan.
-  visible: ({ isAuthDisabled }) => !isAuthDisabled,
-  // Contributed by `src/cloud/billing/`.
-  sections: [],
 }
 
 const LOCAL_TAB: SettingsTabData = {
@@ -258,18 +182,6 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 
 /** The settings tabs, in their sidebar groups. */
 export const SETTINGS_DATA: readonly SettingsTabSectionData<SettingsTabData>[] = [
-  {
-    nameId: 'generalSettingsTabSection',
-    tabs: [ACCOUNT_TAB, ORGANIZATION_TAB, LOCAL_TAB],
-  },
-  {
-    nameId: 'accessSettingsTabSection',
-    tabs: [BILLING_AND_PLANS_TAB, MEMBERS_TAB, USER_GROUPS_TAB],
-  },
+  { nameId: 'generalSettingsTabSection', tabs: [ACCOUNT_TAB, LOCAL_TAB] },
   { nameId: 'lookAndFeelSettingsTabSection', tabs: [APPEARANCE_TAB, KEYBOARD_SHORTCUTS_TAB] },
-  {
-    nameId: 'securitySettingsTabSection',
-    tabs: [ACTIVITY_LOG_TAB, API_KEYS_TAB],
-  },
-  { nameId: 'usageSettingsTabSection', tabs: [USAGE_TAB] },
 ]

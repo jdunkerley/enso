@@ -62,7 +62,7 @@ export const dataLoader: DataLoader<Props> = {
       // query auto-fires once `users/me` recovers without re-running the data loader.
       enabled: computed(() => !cloudDataUnavailable.value),
     })
-    // The modals come from the cloud (`registerCloud`), loaded before the layout renders.
+    // The modals are contributed (`$/providers/layoutContributions`), loaded before the layout renders.
     await Promise.all([
       cloudDataUnavailable.value ? undefined : waitForData(organizationQuery),
       loadAppContainerModals(),

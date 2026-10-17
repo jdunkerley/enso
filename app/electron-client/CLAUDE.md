@@ -23,9 +23,11 @@ desktop binary (AppImage/DMG/exe + installer).
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).
-- Implements the custom `enso://` protocol handler used by Enso Cloud links.
-- Handles deep-links, auto-update (electron-updater via electron-builder),
-  custom window chrome.
+- Implements the in-app `enso://` protocol (`handleProjectProtocol`), which
+  serves project assets to the window. It is not registered with the OS: there
+  are no deep links, no sign-in, and the IDE writes no `~/.enso/credentials`.
+- Handles auto-update (electron-updater via electron-builder), custom window
+  chrome.
 
 ## Build
 

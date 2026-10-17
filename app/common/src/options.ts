@@ -17,12 +17,6 @@ export const OptionsSchema = z.object({
       project: z.string().default(''),
     })
     .default({}),
-  authentication: z
-    .object({
-      enabled: z.boolean().default(true),
-      email: z.string().default(''),
-    })
-    .default({}),
   server: z
     .object({
       port: z.number().int().default(DEFAULT_PORT),
@@ -56,12 +50,7 @@ export function defaultOptions(): Options {
  * Dotted keys which should be synced to the web application via URL params.
  * Other options are only used by Electron and not passed to the web application.
  */
-export const PASS_TO_WEB: ReadonlySet<string> = new Set([
-  'startup.project',
-  'authentication.enabled',
-  'authentication.email',
-  'engine.ydocUrl',
-])
+export const PASS_TO_WEB: ReadonlySet<string> = new Set(['startup.project', 'engine.ydocUrl'])
 
 /** Possible values for options. */
 export type OptionValue = string | number | boolean

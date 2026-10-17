@@ -1,15 +1,12 @@
 /**
  * @file The drive's actions, for its Vue components: thin wrappers over the framework-free queries
  * and mutations (`$/utils/backendQuery`, `$/utils/driveQueries`, `$/utils/driveMutations`), the
- * uploads (`$/providers/upload`, `$/cloud/uploadToCloud`) and the transfer between categories,
- * giving them the drive's stores (#192, ruling 12). Call them in a component's `setup`; the
- * functions they return may be called at any time.
+ * uploads (`$/providers/upload`) and the transfer between categories, giving them the drive's
+ * stores (#192, ruling 12). Call them in a component's `setup`; the functions they return may be
+ * called at any time.
  */
-import UpsertSecretModal from '$/cloud/credentials/UpsertSecretModal.vue'
-import { uploadAssetsToCloud, type UploadFileToCloudOptions } from '$/cloud/uploadToCloud'
 import { resolveDuplications } from '$/components/Drive/duplicateAssets'
 import { useTransferBetweenCategories } from '$/composables/transferBetweenCategories'
-import { useBackends } from '$/providers/backends'
 import {
   dropOperationBetweenCategories,
   type Category,
@@ -18,9 +15,7 @@ import {
 import { useContainerData } from '$/providers/container'
 import type { DrivePastePayload, DriveStore } from '$/providers/driveStore'
 import { useFeatureFlag } from '$/providers/featureFlags'
-import { useHttpClient } from '$/providers/httpClient'
 import { useLocalPaths } from '$/providers/localDirectories'
-import { useModals } from '$/providers/modals'
 import type { ProjectInfo } from '$/providers/openedProjects/projectInfo'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
@@ -44,9 +39,7 @@ import {
   type Backend,
   type DirectoryId,
   type MetadataId,
-  type SecretAsset,
 } from 'enso-common/src/services/Backend'
-import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { TextId } from 'enso-common/src/text'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
@@ -198,36 +191,6 @@ export function useUploadFiles(
     )
 }
 
-/**
- * A function packing local projects into files and uploading them to the cloud. Only for an
- * environment with a local backend.
- */
-export function useUploadFileToCloud() {
-  const { getText } = useText()
-  const httpClient = useHttpClient()
-  const toastAndLog = useToastAndLog()
-  const toasts = useToasts()
-  const backends = useBackends()
-  const uploads = useUploadsToCloudStore()
-  const queryClient = useQueryClient()
-
-  return (localBackend: LocalBackend, options: UploadFileToCloudOptions) =>
-    uploadAssetsToCloud(
-      {
-        queryClient,
-        remoteBackend: backends.remoteBackend,
-        httpClient,
-        uploadFile: (file, params, kind) => uploads.uploadFile(file, params, kind),
-        resolveDuplications,
-        getText,
-        toastSuccess: (message) => toasts.show(message, { type: 'success' }),
-        toastAndLogError: (textId, error) => toastAndLog(textId, error),
-      },
-      localBackend,
-      options,
-    )
-}
-
 /** A function copying cloud assets to the local drive. */
 export function useUploadFileToLocal(category: MaybeRefOrGetter<Category>) {
   const transferBetweenCategories = useTransferBetweenCategories()
@@ -298,31 +261,6 @@ export function useExportArchive(backend: MaybeRefOrGetter<Backend>, driveStore:
         error: getText('exportArchive.failure'),
       },
     )
-  }
-}
-
-/**
- * A function opening the secret dialog to change a secret's value, replacing the open modals.
- */
-export function useEditSecret(backend: MaybeRefOrGetter<Backend>) {
-  const modals = useModals()
-  const toastAndLog = useToastAndLog()
-  const updateSecret = useMutationCallback(() =>
-    backendMutationOptions(toValue(backend), 'updateSecret'),
-  )
-  return (item: SecretAsset) => {
-    modals.closeAll()
-    modals.open(UpsertSecretModal, {
-      secretId: item.id,
-      name: item.title,
-      onCreate: async (title: string, value: string) => {
-        try {
-          await updateSecret([item.id, { title, value }, item.title])
-        } catch (error) {
-          toastAndLog(null, error)
-        }
-      },
-    })
   }
 }
 

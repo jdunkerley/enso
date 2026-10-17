@@ -1,5 +1,4 @@
 /** @file Shared API types exposed on `window.api` for both GUI and Electron. */
-import type * as saveAccessToken from 'enso-common/src/accessToken'
 import type {
   AiAvailability,
   AiComponentIpcReply,
@@ -12,12 +11,6 @@ import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { Path } from 'enso-common/src/services/Backend'
 import type { FileFilter } from './project-view/util/fileFilter'
 import type { MenuItem, MenuItemHandler } from './project-view/util/menuItems'
-
-export interface AuthenticationApi {
-  readonly openUrlInSystemBrowser: (url: string) => void
-  readonly setDeepLinkHandler: (callback: (url: string) => void) => void
-  readonly saveAccessToken: (accessToken: saveAccessToken.AccessToken | null) => void
-}
 
 export interface NavigationApi {
   readonly goBack: () => void
@@ -98,7 +91,6 @@ export interface AiApi {
 }
 
 export interface ElectronApi {
-  readonly authentication: AuthenticationApi
   readonly navigation: NavigationApi
   readonly menu: MenuApi
   readonly system?: SystemApi

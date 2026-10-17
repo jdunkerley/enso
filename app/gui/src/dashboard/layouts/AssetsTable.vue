@@ -51,7 +51,6 @@ import { useAutoScroll } from '#/layouts/Drive/autoScroll'
 import { useDragAnnouncements } from '#/layouts/Drive/dragAnnouncements'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/layouts/Drive/drag'
 import {
-  useEditSecret,
   useListDirectoryRefetchInterval,
   usePaste,
   usePendingMutations,
@@ -112,7 +111,6 @@ import { useDebounceFn, useEventListener, useResizeObserver } from '@vueuse/core
 import {
   AssetType,
   IS_OPENING_OR_OPENED,
-  isAssetCredential,
   isUnauthorizedError,
   LabelName,
   supportsAnyLabels,
@@ -676,8 +674,6 @@ function setMostRecentlySelectedIndex(index: number | null, isKeyboard = false) 
   keyboardSelectedIndex.value = isKeyboard ? index : null
 }
 
-const editSecret = useEditSecret(backend)
-
 /** The grid's one tab stop: the row focused last (or the first selected, or the first). */
 const rovingTabStop = useRovingTabStop(
   () => assets.value.map((asset) => asset.id),
@@ -746,16 +742,6 @@ function onKeyDown(event: KeyboardEvent) {
               event.preventDefault()
               event.stopPropagation()
               rightPanel.setTemporaryTab('settings')
-              break
-            }
-            case AssetType.secret: {
-              if (isAssetCredential(item)) {
-                toasts.show(getText('cannotEditCredentialError'), { type: 'warning' })
-              } else {
-                event.preventDefault()
-                event.stopPropagation()
-                editSecret(item)
-              }
               break
             }
             case AssetType.file:

@@ -80,10 +80,3 @@ export function stdlibRoot(
 export const PACKAGE_METADATA_RELATIVE = 'package.yaml'
 /** Relative path of Enso Project PM metadata relative to the project root. */
 export const PROJECT_METADATA_RELATIVE = path.join('.enso', 'project.json')
-
-/** Path to the credentials file stored in the user's home directory. */
-export const CREDENTIALS_PATH = path.join(
-  homedir(),
-  `.${PRODUCT_NAME.toLowerCase()}`,
-  'credentials',
-)

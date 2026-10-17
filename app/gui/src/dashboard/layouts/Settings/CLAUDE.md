@@ -12,30 +12,21 @@ context entries receive, and the search over tabs, sections and entries are in
 `$/configurations/settings.ts`, framework-free, so that one search spans every
 tab.
 
-- **The tabs** (`tabs.ts`), all Vue since #88: Account, Organization, Local,
-  Billing & Plans, Members, User groups, Appearance, Keyboard shortcuts,
-  Activity log, API keys, Usage. `SettingsTab.vue` lays out their sections; a
-  form entry is `SettingsFormEntry.vue`, a component entry reads the page's
-  context with `useSettingsContext` (`$/providers/settingsContext`).
-- **The cloud's tabs (#87, #191, #88).** The core declares Organization, Billing
-  & Plans, Members, User groups, Activity log, API keys and Usage (name, icon,
-  visibility, the paywall features: Members' `inviteUser`, User groups'
-  `userGroups`, Usage's `scheduler`) with no sections; the cloud contributes
-  them (`$/cloud/organization/` Organization, Members, User groups and Activity
-  log, `$/cloud/account/` API keys, `$/cloud/billing/` Billing & Plans and
-  Usage). A Vue tab with no sections is not listed, so a build without the cloud
-  shows none of them. While a tab's `feature` is under the paywall, the page
-  shows the paywall screen the cloud contributes (`contributeSettingsPaywall`,
-  from `$/cloud/billing/`) instead of the tab's sections.
-- **The Account tab has one section of its own: the offline user.** In
-  local-only mode (authentication disabled, `isAuthDisabled` in the context) it
-  shows the stand-in user and why the cloud account's settings are missing
-  (`OfflineUserSettingsSection.vue`); it is core, so a build without the cloud
-  has it. Every other section comes from the cloud (`$/cloud/account/`,
-  registered by `registerCloud`), through `$/providers/settingsContributions`;
-  the settings route waits for them to load. They hide themselves in local-only
-  mode and must never reach for Enso Cloud or Cognito there: the stand-in
-  session's access token is empty, not a JWT.
+- **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance and
+  Keyboard shortcuts. The cloud's tabs (Organization, Billing & Plans, Members,
+  User groups, Activity log, API keys, Usage) were deleted with the cloud UI;
+  their `SettingsTabType` values remain for now. `SettingsTab.vue` lays out a
+  tab's sections; a form entry is `SettingsFormEntry.vue`, a component entry
+  reads the page's context with `useSettingsContext`
+  (`$/providers/settingsContext`). A tab with no sections is not listed.
+- **The Account tab has one section of its own: the local user.** There is no
+  sign-in (`isAuthDisabled` in the context is always `true`), so it shows the
+  local user and why there are no account settings
+  (`OfflineUserSettingsSection.vue`). Other sections could come through
+  `$/providers/settingsContributions` (see "Contribution registries" in
+  `app/gui/CLAUDE.md`), which nothing uses now; the settings route waits for
+  them to load. Nothing may reach for Enso Cloud: the session's tokens are
+  empty.
 
 ## Local directories
 
@@ -74,12 +65,8 @@ scopes) and names it; a conflict a reset brings back is shown in red.
 
 ## Tests
 
-`__tests__/`: the shell (`SettingsPage.test.ts`), the Account tab with the
-cloud's sections (`accountTab.test.ts`), the Organization and Members tabs with
-theirs (`organizationTabs.test.ts`), User groups, Activity log, API keys and
-Usage with theirs (`cloudTabs.test.ts`), Billing & Plans with its
-(`billingTab.test.ts`), and the Keyboard shortcuts tab with its capture modal.
-The Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
-`organizationSettings.spec.ts` and `localModeSettings.spec.ts` (local-only mode,
-which also shows how to start the app with authentication disabled), and the
-settings check of `accessibility.spec.ts`.
+`__tests__/`: the shell (`SettingsPage.test.ts`), the Local tab
+(`localTab.test.ts`) and the Keyboard shortcuts tab with its capture modal. The
+Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
+`organizationSettings.spec.ts` and `localModeSettings.spec.ts`, and the settings
+check of `accessibility.spec.ts`.
