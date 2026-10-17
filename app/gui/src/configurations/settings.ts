@@ -1,8 +1,8 @@
 /**
  * @file The declarative model of the settings page: its tabs, sections and entries, the context
  * their predicates and callbacks receive, and the search over them. Shared by the settings page
- * (`#/layouts/Settings`) and the cloud-only sections registered from `src/cloud/`
- * (`$/providers/settingsContributions`).
+ * (`#/layouts/Settings`) and the sections contributed through
+ * `$/providers/settingsContributions`.
  */
 import type { PaywallFeatureName } from '$/composables/paywall'
 import type SettingsTabType from '$/configurations/settingsTabs'

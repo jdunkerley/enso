@@ -73,21 +73,6 @@ const DASHBOARD_IMPORT_PATTERN = {
     'Shared code must not import from the dashboard (`#/`). Move framework-free code to `src/` and import it via `$/`; see `DASHBOARD_IMPORT_ALLOWLIST` in `eslint.config.mjs`.',
 }
 
-/**
- * The cloud-only areas (`src/cloud/<area>/`) that the core must not import. Framework-free cloud
- * helpers at the top of `src/cloud/` (`validation.ts`, …) are not areas.
- */
-const CLOUD_AREAS = [
-  'account',
-  'agreements',
-  'auth',
-  'billing',
-  'browserDisabled',
-  'devtools',
-  'organization',
-  'properties',
-]
-
 // =======================================
 // === Restricted syntactic constructs ===
 // =======================================
@@ -350,33 +335,6 @@ const config = [
       'no-restricted-imports': [
         'error',
         { paths: RESTRICTED_IMPORT_PATHS, patterns: [DASHBOARD_IMPORT_PATTERN] },
-      ],
-    },
-  },
-
-  // === The core must not depend on cloud-only code ===
-  // Decision 6b of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`: cloud-only areas
-  // live in `src/cloud/<area>/`, and the core reaches them only through `src/cloud/index.ts`
-  // (`registerCloud`, which only `entrypoint.ts` imports), so that a community build can drop the
-  // folder.
-  // The dashboard is exempt: it mixes cloud and core code.
-  {
-    files: ['app/gui/**/*.{ts,mts,cts,vue}'],
-    ignores: ['app/gui/src/dashboard/**', 'app/gui/src/cloud/**', 'app/gui/src/entrypoint.ts'],
-    rules: {
-      'no-restricted-imports': [
-        'error',
-        {
-          paths: RESTRICTED_IMPORT_PATHS,
-          patterns: [
-            DASHBOARD_IMPORT_PATTERN,
-            {
-              regex: `^\\$/cloud(?:/index)?$|^\\$/cloud/(?:${CLOUD_AREAS.join('|')})(?:/|$)`,
-              message:
-                'The core must not import a cloud-only area (`$/cloud/<area>/`). Register it in `src/cloud/index.ts` instead; see decision 6b in `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.',
-            },
-          ],
-        },
       ],
     },
   },

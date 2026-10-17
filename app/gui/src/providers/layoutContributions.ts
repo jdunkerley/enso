@@ -1,8 +1,7 @@
 /**
- * @file What other parts of the app add to the layouts: the contribution point through which the
- * cloud-only areas (`src/cloud/`) give `ProtectedLayout.vue` its agreements gate (and, in
- * development builds, the developer tools) and `AppContainerLayout.vue` its modals, without the
- * core importing them (decision 6b of
+ * @file What other parts of the app add to the layouts: the contribution point through which other
+ * parts of the app give `ProtectedLayout.vue` its agreements gate (and the developer tools) and
+ * `AppContainerLayout.vue` its modals, without the core importing them (decision 6b of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  *
  * The layouts keep deciding *when* each one shows, as before; a contribution supplies *what*
@@ -135,7 +134,7 @@ export function appContainerModals(): AppContainerModals | undefined {
 
 /**
  * Give the protected layout its developer tools (#172), shown over every page while signed in.
- * `registerCloud` contributes them in development builds only, so that a production build has none.
+ * Nothing contributes them in a production build.
  */
 export function contributeDevtools(load: AsyncComponentLoader) {
   loadedDevtools.value = markRaw(defineAsyncComponent(load))

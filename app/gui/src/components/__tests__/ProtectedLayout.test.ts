@@ -1,8 +1,8 @@
 /**
  * @file The protected layout's agreements gate (#84): when it applies, what it loads, and that the
- * page stays hidden behind the dialog until both agreements are given. The gate is the cloud's,
+ * page stays hidden behind the dialog until both agreements are given. The gate is
  * reached through `$/providers/layoutContributions`; here a stand-in is contributed, so that only
- * the layout's own rules are under test (`$/cloud/agreements/` has the dialog's and the state's).
+ * the layout's own rules are under test.
  * Also where the contributed developer tools show (#172).
  */
 import ProtectedLayout, { dataLoader } from '$/components/ProtectedLayout.vue'

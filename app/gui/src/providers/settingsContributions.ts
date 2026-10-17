@@ -1,7 +1,6 @@
 /**
  * @file What other parts of the app add to the settings page: the contribution point through which
- * the cloud-only areas (`src/cloud/`) fill the Account tab and the organization's tabs, and supply
- * the paywall screen, without the core importing them (decision 6b of
+ * other parts of the app fill the settings tabs and supply the paywall screen, without the core importing them (decision 6b of
  * `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
  *
  * A contribution is a loader, so that its components and schemas stay out of the initial chunk

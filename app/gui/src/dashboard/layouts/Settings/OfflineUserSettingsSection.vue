@@ -2,7 +2,7 @@
 /**
  * @file The Account tab in local-only mode (authentication disabled): the offline stand-in user,
  * with the default picture, and why the cloud account's settings are missing. It belongs to the
- * core, not to `src/cloud/`, so that a build without the cloud shows it too.
+ * core.
  */
 import ProfilePicture from '$/components/ProfilePicture/ProfilePicture.vue'
 import Text from '$/components/Text/Text.vue'

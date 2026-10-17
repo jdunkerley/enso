@@ -3,7 +3,7 @@
 The right panel's **Versions** tab (#89): an asset's versions in the Enso Cloud,
 or a local project's git versions, with their tags and comments, and restore,
 duplicate and compare; and its **Schedule** tab (#183): a project's scheduled
-executions. Vue; core code (moved out of `src/cloud/` by the local-only IDE,
+executions. Vue; core code (see
 `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`), and its other
 decisions are under "Rulings from #89" and "Rulings from #183" in
 `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`.

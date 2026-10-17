@@ -17,25 +17,19 @@ tab.
   Activity log, API keys, Usage. `SettingsTab.vue` lays out their sections; a
   form entry is `SettingsFormEntry.vue`, a component entry reads the page's
   context with `useSettingsContext` (`$/providers/settingsContext`).
-- **The cloud's tabs (#87, #191, #88).** The core declares Organization, Billing
-  & Plans, Members, User groups, Activity log, API keys and Usage (name, icon,
-  visibility, the paywall features: Members' `inviteUser`, User groups'
-  `userGroups`, Usage's `scheduler`) with no sections; the cloud contributes
-  them (`$/cloud/organization/` Organization, Members, User groups and Activity
-  log, `$/cloud/account/` API keys, `$/cloud/billing/` Billing & Plans and
-  Usage). A Vue tab with no sections is not listed, so a build without the cloud
-  shows none of them. While a tab's `feature` is under the paywall, the page
-  shows the paywall screen the cloud contributes (`contributeSettingsPaywall`,
-  from `$/cloud/billing/`) instead of the tab's sections.
+- **Tabs without sections.** The core declares Organization, Billing & Plans,
+  Members, User groups, Activity log, API keys and Usage (name, icon,
+  visibility, the paywall features) with no sections of its own, and nothing
+  contributes any now (the cloud areas are gone). A Vue tab with no sections is
+  not listed, so none of them shows.
 - **The Account tab has one section of its own: the offline user.** In
   local-only mode (authentication disabled, `isAuthDisabled` in the context) it
   shows the stand-in user and why the cloud account's settings are missing
   (`OfflineUserSettingsSection.vue`); it is core, so a build without the cloud
-  has it. Every other section comes from the cloud (`$/cloud/account/`,
-  registered by `registerCloud`), through `$/providers/settingsContributions`;
-  the settings route waits for them to load. They hide themselves in local-only
-  mode and must never reach for Enso Cloud or Cognito there: the stand-in
-  session's access token is empty, not a JWT.
+  has it. Other sections would come through `$/providers/settingsContributions`
+  (see "Contribution registries" in `app/gui/CLAUDE.md`); the settings route
+  waits for them to load. Nothing may reach for Enso Cloud or Cognito: the
+  stand-in session's access token is empty, not a JWT.
 
 ## Local directories
 

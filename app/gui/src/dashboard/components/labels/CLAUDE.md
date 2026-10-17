@@ -3,8 +3,8 @@
 The drive's **labels**, on both backends: the labels popover (#198) for
 choosing, creating and deleting labels for the selected assets, and the label
 pill. Vue; the decisions behind the popover are under "Rulings from #198" in
-`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. It moved here
-from `src/cloud/labels/` when local projects gained labels (spec
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Local projects
+have labels too (spec
 `docs/superpowers/specs/2026-10-11-local-labels-and-recent-design.md`).
 
 - `ManageLabelsModal.vue` — the popover, meant for the modal stack: the Vue

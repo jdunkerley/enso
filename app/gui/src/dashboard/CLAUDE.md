@@ -21,8 +21,9 @@ only Dashboard-specific code.
   (`driveView.ts`, the shown-versus-target location, which keeps the previous
   listing on screen until the new one has loaded; `driveActions.ts`;
   `assetItems.ts`; `suggestions.ts`; drag and drop). Its dialogs open on the
-  modal stack (`$/providers/modals`), the labels, credential and datalink ones
-  from `$/cloud/` (#198). Buttons inside a row bind `STOP_PRESS_PROPAGATION`
+  modal stack (`$/providers/modals`), the labels one from `labels/` (#198), the
+  secret, credential and datalink ones from `$/secrets/` and `$/datalinks/`.
+  Buttons inside a row bind `STOP_PRESS_PROPAGATION`
   (`layouts/Drive/pressPropagation.ts`), so that a press on them does not reach
   the row. The table is an ARIA `grid` with one roving tab stop, and drags of
   rows are announced in a live region (#208); `layouts/Drive/CLAUDE.md` has the
@@ -30,7 +31,8 @@ only Dashboard-specific code.
 - `components/` — The drive's `ContextMenu.vue`. Shared primitives are in
   `src/components/`.
 - `modals/` — `CaptureKeyboardShortcutModal.vue`. The drive's other dialogs are
-  in `$/components/Drive/`, `$/components/AlertDialog/` and `$/cloud/`.
+  in `$/components/Drive/`, `$/components/AlertDialog/`, `$/secrets/` and
+  `$/datalinks/`.
 - `styles.css`, `tailwind.css` — Tailwind plus global resets.
 
 The dashboard's keyboard shortcuts are the window's
@@ -54,11 +56,10 @@ the Vue toast store (`$/providers/toasts`), modals through the modal stack
 
 ## Auth / cloud
 
-The Dashboard authenticates against AWS Cognito via `aws-amplify`. The logic is
-Vue (`src/authentication/`, `src/providers/{auth,session}.ts`), and so are the
-sign-in, sign-up and password pages, in `src/cloud/auth/` (#85). Session tokens
-are stored via `accessToken.ts` in `app/common/` and mirrored into the Project
-Manager / LS so the engine can reach Enso Cloud.
+The IDE is local-only: there is no sign-in, and the session is always the
+offline one (`makeOfflineSession`). The shared logic is Vue
+(`src/authentication/`, `src/providers/{auth,session}.ts`); the sign-in, sign-up
+and password pages are gone.
 
 ## Talking to ProjectView
 
@@ -79,7 +80,7 @@ Utilities, types, configuration and Tailwind variants that import no framework
 live in shared `src/` (see "Where framework-free shared code lives" in
 `app/gui/CLAUDE.md`), and files here import them via `$/…`. When a dashboard
 module turns out to be framework-free, move it out rather than adding to this
-subtree; cloud-only logic goes to `src/cloud/`.
+subtree.
 
 ## Foundations
 
@@ -93,10 +94,6 @@ for new work:
   own message);
 - `useToast` on one Vue `ToastHost` (hand-built, not Reka's `Toast`);
 - a global modal stack;
-- cloud-only areas under top-level `src/cloud/<area>/`, reached only through
-  `registerCloud` (`src/cloud/index.ts`), so a community build can leave them
-  out; an ESLint rule keeps the core off them (add a new area to `CLOUD_AREAS`
-  in `eslint.config.mjs`). See `src/cloud/CLAUDE.md`;
 - stores use `createContextStore`, unless non-component code must reach them.
 
 For state styling, the components use the `selected:`, `pressed:`,

@@ -67,8 +67,8 @@ function redirect(auth: AuthStore, localStorage: LocalStorage) {
 }
 
 function requireUserAgreements(route: RouteLocation, auth: AuthStore) {
-  // The gate is the cloud's (`src/cloud/agreements/`, contributed through `registerCloud`): a build
-  // without the cloud has no agreements to accept.
+  // The gate is contributed through `$/providers/layoutContributions`; nothing contributes it now,
+  // so there are no agreements to accept.
   if (!hasAgreementsGate()) return false
   // The Terms of Service / Privacy Policy hashes are served by the Enso Cloud web host. On a
   // local-only deployment (no Cognito configuration) that host does not exist, so there is
@@ -149,7 +149,7 @@ const auth = useAuth()
 const route = useRoute()
 const router = useRouter()
 const queryClient = useQueryClient()
-// The developer tools, contributed in development builds only (`src/cloud/devtools/`, #172).
+// The developer tools, contributed through `$/providers/layoutContributions` (#172).
 const Devtools = computed(devtools)
 
 // Needed by devtools - act on feature flag changes
