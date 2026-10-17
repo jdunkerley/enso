@@ -8,7 +8,7 @@
  * it stays quiet: no dialog, no toast, no retry before the next check. When the release is newer
  * than this build (and this build is neither a development nor a nightly one), it asks the user to
  * download it, or to be reminded later, which hides it until the next check. After "Download" it
- * thanks the user and can be closed. The devtools can force it open in development.
+ * thanks the user and can be closed. Tests can force it open with `useDevtoolsStore().showVersionChecker`.
  */
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'

@@ -5,11 +5,9 @@ import * as z from 'zod'
 declare module '$/utils/LocalStorage' {
   interface LocalStorageData {
     readonly preferredTimeZone: string
-    readonly loginRedirect: string
   }
 }
 LocalStorage.registerKey('preferredTimeZone', { schema: z.string() })
-LocalStorage.registerKey('loginRedirect', { isUserSpecific: true, schema: z.string() })
 </script>
 
 <script setup lang="ts">

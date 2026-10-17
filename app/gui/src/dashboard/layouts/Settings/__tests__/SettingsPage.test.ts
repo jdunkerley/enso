@@ -67,13 +67,13 @@ beforeAll(() => {
 })
 
 beforeEach(async () => {
-  // Both flags are part of the session's type; `false` keeps the cloud-era tabs under test.
+  // The reachable state: the local session, whose flags are always `true`.
   auth.session = {
     user: USER,
     email: USER.email,
-    accessToken: `.${btoa(JSON.stringify({ username: USER.email }))}.`,
-    isCloudDataUnavailable: false,
-    isAuthDisabled: false,
+    accessToken: '',
+    isCloudDataUnavailable: true,
+    isAuthDisabled: true,
   }
   backends.hasLocalBackend = true
   backends.organization = null
@@ -132,7 +132,7 @@ describe('SettingsPage', () => {
     expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
       'hello user name',
     )
-    expect(document.querySelector('[data-testid="offline-user-settings"]')).toBeNull()
+    expect(document.querySelector('[data-testid="offline-user-settings"]')).not.toBeNull()
   })
 
   test('in local-only mode, the Account tab shows the offline user', async () => {
@@ -162,7 +162,8 @@ describe('SettingsPage', () => {
   })
 
   test('lists only the local tabs, whatever is contributed', async () => {
-    // An admin of an organization with a subscription: the cloud's tabs would all be listed.
+    // An admin of an organization with a subscription, with both flags `false` (unreachable now):
+    // the cloud's tabs would all have been listed.
     const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
     auth.session = {
       user: admin,

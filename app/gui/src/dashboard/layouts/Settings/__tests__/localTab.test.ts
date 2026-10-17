@@ -44,7 +44,9 @@ vi.mock('$/providers/auth', () => ({
     session: {
       user: USER,
       email: USER.email,
-      accessToken: `.${btoa(JSON.stringify({ username: USER.email }))}.`,
+      accessToken: '',
+      isCloudDataUnavailable: true,
+      isAuthDisabled: true,
     },
   }),
 }))

@@ -15,8 +15,8 @@ entry point opens them; their unit tests are the guard against rot.
   ("Browse…", desktop app only).
 - `DatalinkInput.vue` — `JSONSchemaInput` over `$/utils/datalinkSchema.json`,
   validated by `$/utils/datalinkValidator`'s compiled validators.
-- `DatalinkFormInput.vue` — the editor as a form field; the Properties tab
-  (`../cloud/properties/DatalinkConfiguration.vue`) uses it too.
+- `DatalinkFormInput.vue` — the editor as a form field. Unused since the cloud's
+  Properties tab was removed; kept for PR 2b's local datalinks.
 - `UpsertDatalinkModal.vue` — the dialog, for the modal stack (`useModals()`
   from the Vue drive).
 - Tests: `__tests__/`.

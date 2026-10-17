@@ -12,25 +12,21 @@ context entries receive, and the search over tabs, sections and entries are in
 `$/configurations/settings.ts`, framework-free, so that one search spans every
 tab.
 
-- **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance,
-  Keyboard shortcuts, and the Organization, Billing & Plans, Members, User
-  groups, Activity log, API keys and Usage tabs that PR 3 of the local-only
-  programme removes. `SettingsTab.vue` lays out their sections; a form entry is
-  `SettingsFormEntry.vue`, a component entry reads the page's context with
-  `useSettingsContext` (`$/providers/settingsContext`).
-- **Tabs without sections.** The core declares Organization, Billing & Plans,
-  Members, User groups, Activity log, API keys and Usage (name, icon,
-  visibility) with no sections of its own, and nothing contributes any now (the
-  cloud sources are gone, and so is the paywall). A Vue tab with no sections is
-  not listed, so none of them shows.
-- **The Account tab has one section of its own: the offline user.** In
-  local-only mode (authentication disabled, `isAuthDisabled` in the context) it
-  shows the stand-in user and why the cloud account's settings are missing
-  (`OfflineUserSettingsSection.vue`); it is core, so a build without the cloud
-  has it. Other sections would come through `$/providers/settingsContributions`
-  (see "Contribution registries" in `app/gui/CLAUDE.md`); the settings route
-  waits for them to load. Nothing may reach for Enso Cloud or Cognito: the
-  stand-in session's access token is empty, not a JWT.
+- **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance and
+  Keyboard shortcuts. The cloud's tabs (Organization, Billing & Plans, Members,
+  User groups, Activity log, API keys, Usage) were deleted with the cloud UI;
+  their `SettingsTabType` values remain for now. `SettingsTab.vue` lays out a
+  tab's sections; a form entry is `SettingsFormEntry.vue`, a component entry
+  reads the page's context with `useSettingsContext`
+  (`$/providers/settingsContext`). A tab with no sections is not listed.
+- **The Account tab has one section of its own: the local user.** There is no
+  sign-in (`isAuthDisabled` in the context is always `true`), so it shows the
+  local user and why there are no account settings
+  (`OfflineUserSettingsSection.vue`). Other sections could come through
+  `$/providers/settingsContributions` (see "Contribution registries" in
+  `app/gui/CLAUDE.md`), which nothing uses now; the settings route waits for
+  them to load. Nothing may reach for Enso Cloud: the session's tokens are
+  empty.
 
 ## Local directories
 
@@ -72,6 +68,5 @@ scopes) and names it; a conflict a reset brings back is shown in red.
 `__tests__/`: the shell (`SettingsPage.test.ts`), the Local tab
 (`localTab.test.ts`) and the Keyboard shortcuts tab with its capture modal. The
 Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
-`organizationSettings.spec.ts` and `localModeSettings.spec.ts` (local-only mode,
-which also shows how to start the app with authentication disabled), and the
-settings check of `accessibility.spec.ts`.
+`organizationSettings.spec.ts` and `localModeSettings.spec.ts`, and the settings
+check of `accessibility.spec.ts`.

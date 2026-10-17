@@ -247,8 +247,7 @@ export interface SettingsSectionData extends SettingsSearchableSection<SettingsE
 }
 
 /**
- * A settings tab rendered in Vue. A tab whose `sections` are all contributed
- * (`$/providers/settingsContributions`) is hidden while nothing has been contributed to it, so that
- * a build without the cloud does not list the organization's tabs.
+ * A settings tab rendered in Vue. A tab with no sections, its own or contributed
+ * (`$/providers/settingsContributions`), is not listed.
  */
 export type SettingsTabData = SettingsSearchableTab<SettingsSectionData>

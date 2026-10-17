@@ -6,11 +6,10 @@ import type { Opt } from 'enso-common/src/utilities/data/opt'
 import { computed, toValue, watch } from 'vue'
 
 /**
- * Composable for managing the app title based on user authentication and plan.
+ * Composable for managing the app title based on the user's plan.
  *
- * Appends "Not for commercial use" to the document title when:
- * - User is logged in (session exists)
- * - User is on the Free plan
+ * Appends "Not for commercial use" to the document title when the user is on the Free plan, as the
+ * local user always is. There is no sign-in: the session is the local one.
  * @param userSession - Reactive reference to the user session data
  */
 export function useAppTitle(userSession: ToValue<Opt<UserSession>>) {
