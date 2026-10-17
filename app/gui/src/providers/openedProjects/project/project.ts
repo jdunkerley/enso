@@ -5,8 +5,10 @@ import {
   visualizationConfigPreprocessorEqual,
   type NodeVisualizationConfiguration,
 } from '$/providers/openedProjects/project/executionContext'
+import { createModuleFlusher } from '$/providers/openedProjects/project/flush'
 import { VisualizationDataRegistry } from '$/providers/openedProjects/project/visualizationDataRegistry'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
+import { useText } from '$/providers/text'
 import { proxyRefs } from '$/utils/reactivity'
 import { Awareness } from '@/stores/awareness'
 import { attachProvider, useObserveYjs } from '@/util/crdt'
@@ -73,6 +75,7 @@ export function createProjectStore(
   const { projectId, projectAssetId } = props
   const abort = useAbortScope()
   const openedProjects = useOpenedProjects()
+  const { getText } = useText()
 
   const observedFileName = ref<string>()
 
@@ -123,6 +126,18 @@ export function createProjectStore(
   })
 
   const projectModel = new DistributedProject(doc)
+  // Writes the open modules before a version is saved (`flush.ts`). Made before any module doc is
+  // added to the index doc, so that it tracks each one's deletions from the start. A flush while
+  // the index doc is not connected and synced is refused: the request could not reach the ydoc
+  // server, and the module edits may not have either.
+  const moduleFlusher = createModuleFlusher(doc, () => projectModel.modules.values(), {
+    connection: {
+      isConnected: () =>
+        yDocsProvider?.provider.wsconnected === true && yDocsProvider.provider.synced,
+      notConnectedReason: () => getText('versioningNotConnected'),
+    },
+  })
+  onScopeDispose(() => moduleFlusher.close())
 
   const entryPoint = computed<MethodPointer>(() => {
     const mainModule = ProjectPath.create(undefined, 'Main' as Identifier)
@@ -459,6 +474,8 @@ export function createProjectStore(
     awareness: markRaw(awareness),
     computedValueRegistry: markRaw(computedValueRegistry),
     lsRpcConnection: markRaw(lsRpcConnection),
+    /** Write the open modules to disk, as the GUI has them now (`flush.ts`). */
+    flushModules: moduleFlusher.flush,
     dataConnection: markRaw(dataConnection),
     useVisualizationData,
     isRecordingEnabled,

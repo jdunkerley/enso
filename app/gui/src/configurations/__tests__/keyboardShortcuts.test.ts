@@ -52,7 +52,7 @@ const byId = (shortcuts: readonly Shortcut[], id: ShortcutId) => {
 }
 
 describe('the graph editor’s defaults', () => {
-  test('are exactly those before #170, in the same order', () => {
+  test('are those before #170, with saving after redo, in this order', () => {
     // Copied from `@/bindings` as it was on `develop` before the graph's shortcuts became
     // rebindable. The order is the order in which a key is offered to the actions.
     expect(mapEntries(GRAPH_BINDINGS, (_key, info) => info.bindings)).toStrictEqual({
@@ -60,6 +60,8 @@ describe('the graph editor’s defaults', () => {
       'graph.toggleDocumentationEditor': ['Mod+D'],
       'graph.undo': ['Mod+Z'],
       'graph.redo': isMacLike ? ['Mod+Shift+Z', 'Mod+Y'] : ['Mod+Y', 'Mod+Shift+Z'],
+      'graph.saveVersion': ['Mod+S'],
+      'graph.saveVersionWithComment': ['Mod+Shift+S'],
       'graph.openComponentBrowser': ['Enter'],
       'graph.toggleVisualization': ['Space'],
       'components.deleteSelected': ['Delete', 'Backspace'],
@@ -83,6 +85,8 @@ describe('the graph editor’s defaults', () => {
       'graph.toggleDocumentationEditor',
       'graph.undo',
       'graph.redo',
+      'graph.saveVersion',
+      'graph.saveVersionWithComment',
       'graph.openComponentBrowser',
       'graph.toggleVisualization',
       'components.deleteSelected',
@@ -286,4 +290,10 @@ describe('currentConflicts', () => {
     })
     expect(byId(shortcuts, 'graph.deleteSelectedEdge').bindings).toEqual(['X'])
   })
+})
+
+test('saving a version conflicts with nothing in the defaults', () => {
+  const conflicts = currentConflicts(defaultShortcuts())
+  expect([...conflicts.keys()]).not.toContain('graph.saveVersion')
+  expect([...conflicts.keys()]).not.toContain('graph.saveVersionWithComment')
 })

@@ -64,3 +64,61 @@ This server:
 - The Polyglot variant runs on GraalJS — only a subset of Node APIs is
   available. Check that any new dep works in both `node` and `graaljs` before
   importing.
+- **This code runs in the engine's JVM** (`ydoc-server-polyglot`, packed into
+  the engine's `ydoc-server` jar), so a change reaches the IDE only through a
+  rebuilt engine — an installer built with `--backend-source local` against an
+  old engine still runs the old server.
+
+## Control channel
+
+`ydoc:control` (`ydoc-shared/ydocControl`) is a JSON `YjsChannel` on each
+project's index doc, beside the visualization bridge's `vis:control`. Its one
+request is `flush`, which the GUI sends before saving a version (the client's
+end is `ydoc-shared/moduleFlusher`, used through
+`app/gui/src/providers/openedProjects/project/flush.ts`). The request carries,
+for each module doc the GUI loaded, its guid, state vector (`[clientId, clock]`
+pairs) and delete set (`{ clientId: [[clock, length]] }`). The delete set is
+needed because a deletion advances no clock: a last edit that only deletes is
+invisible in a state vector. Both travel as JSON, not base64: `lib0`'s base64 is
+Node- or browser-specific, and GraalJS is neither.
+
+The **whole** state vector and delete set of each module doc are sent, not only
+the GUI's "own" edits. Filtering them is wrong: a graph edit is made in a fresh
+`Y.Doc` (`MutableModule.edit()`, a random client ID per edit) and applied by
+`applyEdit`, which is a non-local transaction, so its insertions are under a
+client ID the GUI's doc never owns and its deletions are not local. A delete set
+is also keyed by the deleted item's _creator_, not the deleter. The server
+checks the description against its own doc directly (`deleteSetCovers`: a binary
+search per wanted range, then only the structs it spans), since the check reruns
+on every update of the module while a flush waits, on the engine's ydoc thread.
+
+`LanguageServerSession.flush` answers `flushed` with `ok` or an `error` text
+(also when the flush throws). Everything is bounded by **one deadline**,
+`FLUSH_DEADLINE_MS` (4 s) from the request, the Language Server's requests
+included. The GUI waits longer (`FLUSH_TIMEOUT_MS`, 6 s) and keeps listening
+until its auto-save fallback (7 s), so a refusal is never taken for a save. For
+each module, `ModulePersistence.flush`:
+
+1. waits until the shared doc covers that state vector and delete set, which
+   proves the GUI's last edit arrived over the module's own socket;
+2. waits until those edits reached the Language Server (`updateToApply` empty,
+   state `Synchronized`);
+3. checks the disk time: the file's `lastModifiedTime` must equal the one the
+   session recorded after its last open, reload, `text/autoSave` or own save. A
+   mismatch is checked again after `DISK_RECHECK_MS` (500 ms, or less near the
+   deadline), so an auto-save already on its way is not an outside change. Plain
+   `text/save` overwrites unconditionally, so without this check a flush could
+   overwrite an outside edit that the Language Server's own auto-save would have
+   declined;
+4. waits for sync again (edits made during the check), reads `syncedVersion` and
+   sends `text/save` in the same tick. The session holds the write lock and no
+   edit of its own is then in flight, so the lock and version checks pass unless
+   the Language Server's buffer changed by some other route.
+
+It refuses if the Language Server rejected one of the module's edits while it
+waited (`droppedEdits`): the module then reloads from disk and ends up
+`Synchronized` again, with the edit gone. Any refusal writes nothing, so the
+Language Server's pending auto-save stays in place. A `text/save` that fails is
+reported and tried once more after `SAVE_RETRY_MS` (6 s, the engine's auto-save
+delay), unless the module has moved on; one that times out is not retried, since
+it may still be carried out. Modules the session does not know are skipped.

@@ -233,6 +233,16 @@ const displayableActions = {
     description: 'Redo',
     shortcut: () => graphBindings.bindings['graph.redo'],
   },
+  'graph.saveVersion': {
+    icon: 'save',
+    description: 'Save Version',
+    shortcut: () => graphBindings.bindings['graph.saveVersion'],
+  },
+  'graph.saveVersionWithComment': {
+    icon: 'save',
+    description: 'Save Version with Comment',
+    shortcut: () => graphBindings.bindings['graph.saveVersionWithComment'],
+  },
   'graph.fitAll': {
     icon: 'show_all',
     description: 'Show All Components',

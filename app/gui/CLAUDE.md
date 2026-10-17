@@ -227,3 +227,15 @@ Instead add the exact file(s) TypeScript names in the error to
 `tsconfig.node.json`'s `include` list, one by one, until the error is gone — the
 closure is small and finite in practice (it was 13 files for #141, listed in the
 file with a comment explaining why).
+
+## Local versioning (saving versions)
+
+`$/providers/localVersioning` holds each open local project's git status (polled
+every 5 s by its own loop, one request in flight at a time), saving (the ydoc
+flush, `flush.ts`, then `versioning/commit`) and the repository prompts;
+`projectStates.ts` watches a local project when it initializes and offers a
+repository before it closes. Versions are saved when a project closes or is
+saved; quitting the app saves none. The Playwright mock is
+`integration-test/mock/localVersioning.ts` (routes in `mock/versioning/`); git
+is absent by default, and a spec opts in with `setupApi.local`. See the design,
+`docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`.

@@ -165,6 +165,12 @@
   project's versions (following it across renames and moves), see what changed
   in each, compare any two, restore one (an open project is closed and reopened
   around it), duplicate one, and edit a version's comment.
+- [Local projects can keep versions with git][235]. When git is installed, a
+  version is saved when a project closes, and on demand with Ctrl/Cmd+S (or
+  Ctrl/Cmd+Shift+S and the new save icon, to add a comment). A dot beside the
+  project name, and a ● on its tab, show changes since the last version. The
+  first time, the IDE offers to create a repository in the projects folder (or
+  to use the one it is already in); Settings → Local has a new Versions section.
 
 #### Enso Language & Runtime
 
@@ -305,6 +311,7 @@
 [227]: https://github.com/jdunkerley/enso/pull/227
 [226]: https://github.com/jdunkerley/enso/pull/226
 [234]: https://github.com/jdunkerley/enso/pull/234
+[235]: https://github.com/jdunkerley/enso/pull/235
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

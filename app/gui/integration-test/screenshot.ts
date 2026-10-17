@@ -9,7 +9,13 @@
  * else the comparison is skipped and recorded as an annotation, while the rest of the test (CSS,
  * layout, behaviour) still runs.
  */
-import { expect, test, type Page, type PageAssertionsToHaveScreenshotOptions } from './base'
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type PageAssertionsToHaveScreenshotOptions,
+} from './base'
 
 /** Whether this platform has screenshot baselines. */
 export const SCREENSHOT_BASELINES_AVAILABLE = process.platform === 'linux'
@@ -19,7 +25,7 @@ export const SCREENSHOT_BASELINES_AVAILABLE = process.platform === 'linux'
  * comparison was skipped.
  */
 export async function expectScreenshot(
-  page: Page,
+  page: Page | Locator,
   name: string,
   options?: PageAssertionsToHaveScreenshotOptions,
 ) {
@@ -30,5 +36,12 @@ export async function expectScreenshot(
     })
     return
   }
-  await expect(page).toHaveScreenshot(name, options)
+  // Each has its own assertion; they share the screenshot options that matter here.
+  if (isPage(page)) await expect(page).toHaveScreenshot(name, options)
+  else await expect(page).toHaveScreenshot(name, options)
+}
+
+/** Whether `target` is a whole page, rather than a locator in one. */
+function isPage(target: Page | Locator): target is Page {
+  return 'mainFrame' in target
 }

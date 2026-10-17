@@ -22,6 +22,7 @@ import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
 import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection.vue'
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection.vue'
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
+import LocalVersionsSettingsSection from './LocalVersionsSettingsSection.vue'
 import NoResults from './NoResults.vue'
 import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
 
@@ -169,6 +170,16 @@ const LOCAL_TAB: SettingsTabData = {
           aliasesId: 'downloadDirectoryButtonSettingsCustomEntryAliases',
           component: LocalDirectoryButtons,
           props: { directory: 'download' },
+        },
+      ],
+    },
+    {
+      nameId: 'localVersionsSettingsSection',
+      entries: [
+        {
+          type: 'custom',
+          aliasesId: 'localVersionsSettingsCustomEntryAliases',
+          component: LocalVersionsSettingsSection,
         },
       ],
     },
