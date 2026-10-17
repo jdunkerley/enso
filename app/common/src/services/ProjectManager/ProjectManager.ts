@@ -121,10 +121,11 @@ export class ProjectManager {
       })
     }
     this.projects.delete(cacheKey)
-    return this.runProjectServiceCommand<{ readonly versioningWarning?: string }>(
-      'project/close',
-      fullParams,
-    )
+    // An older shim (or a mock) may answer `null`; that means no warning.
+    const result = await this.runProjectServiceCommand<{
+      readonly versioningWarning?: string
+    } | null>('project/close', fullParams)
+    return result ?? {}
   }
 
   /** Create a new project. */

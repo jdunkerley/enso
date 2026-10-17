@@ -165,7 +165,8 @@ describe('ProjectManager', () => {
       missingComponentAction: MissingComponentAction.install,
     })
 
-    await projectManager.closeProject({ projectPath: SECOND_PROJECT_PATH })
+    // The mock answers `null`; that must read as "no versioning warning".
+    expect(await projectManager.closeProject({ projectPath: SECOND_PROJECT_PATH })).toEqual({})
 
     const firstProject = await projectManager.getProject(FIRST_PROJECT_PATH)
     expect(firstProject?.state).toBe(BackendProjectState.opened)
