@@ -29,3 +29,15 @@ test('without the desktop app, there is no Browse… button', async () => {
   })
   expect(wrapper.find('button[data-testid="file-path-browse"]').exists()).toBe(false)
 })
+
+test('read-only, there is no Browse… button, even in the desktop app', async () => {
+  Object.defineProperty(window, 'api', {
+    value: { fileBrowser: { openFileBrowser } },
+    configurable: true,
+  })
+  const { wrapper } = await mountWithProviders(FilePathInput, {
+    props: { value: '/old.csv', readOnly: true },
+  })
+  expect(wrapper.find('button[data-testid="file-path-browse"]').exists()).toBe(false)
+  expect(wrapper.get('input').attributes('readonly')).toBeDefined()
+})

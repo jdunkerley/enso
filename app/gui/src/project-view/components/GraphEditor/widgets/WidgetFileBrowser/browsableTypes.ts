@@ -1,6 +1,10 @@
-import type { WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
+import type { WidgetInput, WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
 import type { ToValue } from '$/utils/reactivity'
-import { ExpressionTag } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
+import { withDropdownItems } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
+import {
+  ExpressionTag,
+  type CustomDropdownItem,
+} from '@/components/GraphEditor/widgets/WidgetSelection/tags'
 import type { PortId } from '@/providers/portInfo'
 import { Ast } from '@/util/ast'
 import { Pattern } from '@/util/ast/match'
@@ -326,4 +330,17 @@ export function useTextSecrets({
       [secretTextItem]
     : [],
   )
+}
+
+/**
+ * The file browser's input for its inner widget: its items added as a dropdown, or the input
+ * unchanged when there are none. Any dropdown items, even an empty list, make the selection widget
+ * take the input, whose arrow would then open nothing: this is the case of an argument that takes
+ * only a secret, now that there is no secret browser.
+ */
+export function withBrowserItems(
+  input: WidgetInput,
+  items: readonly (CustomDropdownItem | ExpressionTag)[],
+): WidgetInput {
+  return items.length === 0 ? input : withDropdownItems(input, items)
 }
