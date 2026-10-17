@@ -104,10 +104,13 @@ async function openLocalTab() {
 }
 
 const shownPaths = () => required(document.querySelector('[data-testid="local-paths"]')).textContent
-const input = (labelId: 'downloadDirectorySettingsInput' | 'localRootPathSettingsInput') =>
+const input = (
+  labelId:
+    'downloadDirectorySettingsInput' | 'localRootPathSettingsInput' | 'mapboxTokenSettingsInput',
+) =>
   required(
-    [...document.querySelectorAll<HTMLInputElement>('input')].find(
-      (element) => element.labels?.[0]?.textContent.trim() === getText(labelId),
+    [...document.querySelectorAll<HTMLInputElement>('input')].find((element) =>
+      element.labels?.[0]?.textContent.trim().startsWith(getText(labelId)),
     ),
   )
 const button = (name: string) =>
@@ -137,6 +140,18 @@ afterEach(() => {
 })
 
 describe('the Local settings tab', () => {
+  test('the Maps section saves the Mapbox token to the local store', async () => {
+    const { mapboxSettingsStore } = await import('$/providers/mapboxToken')
+    mapboxSettingsStore.setState({ accessToken: null })
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    const user = userEvent.setup()
+    await user.type(input('mapboxTokenSettingsInput'), ' pk.typed ')
+    await user.click(button(getText('save')))
+    await flushPromises()
+    expect(mapboxSettingsStore.getState().accessToken).toBe('pk.typed')
+  })
+
   test('a typed directory, once saved, reaches the local paths', async () => {
     await openLocalTab()
     expect(shownPaths()).toBe(`${DEFAULT_ROOT}|${DEFAULT_DOWNLOADS}`)

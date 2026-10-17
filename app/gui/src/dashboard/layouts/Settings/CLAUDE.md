@@ -50,6 +50,16 @@ the category's directory through the categories store, #91), or it keeps listing
 the old root. Tests: `__tests__/localTab.test.ts` and
 `integration-test/dashboard/localDirectories.spec.ts`.
 
+## Maps
+
+The Maps section of the Local tab holds the user's own Mapbox access token. The
+build supplies none and nothing fetches one. The value lives in
+`mapboxSettingsStore` (`$/providers/mapboxToken`, `localStorage` key
+`enso-mapbox-settings`), declared here as a form like the other Local entries;
+`useMapboxToken()` reads it for the map visualization, `setMapboxToken` writes
+it (trimmed, blank clears). It is sent nowhere except Mapbox. Test:
+`__tests__/localTab.test.ts`.
+
 ## Keyboard shortcuts
 
 The Keyboard shortcuts tab edits the window's bindings

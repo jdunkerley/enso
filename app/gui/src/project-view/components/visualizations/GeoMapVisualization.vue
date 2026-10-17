@@ -62,28 +62,17 @@ declare const mapboxgl: typeof import('mapbox-gl')
 import { useMapboxToken } from '$/providers/mapboxToken'
 import { useVisualizationConfig } from '@/util/visualizationBuiltins'
 import bbox from '@turf/bbox'
-import {
-  computed,
-  effectScope,
-  onMounted,
-  onScopeDispose,
-  useTemplateRef,
-  watch,
-  watchEffect,
-} from 'vue'
+import { computed, effectScope, onScopeDispose, useTemplateRef, watch, type EffectScope } from 'vue'
+import MapboxTokenMissing from './GeoMapVisualization/MapboxTokenMissing.vue'
 
 const props = defineProps<{ data: Data }>()
 const config = useVisualizationConfig()
 
-const mapboxTokenStore = useMapboxToken()
 /**
- * Mapbox API access token.
- * All the limits of API are listed here: https://docs.mapbox.com/api/#rate-limits
+ * The user's Mapbox access token (Settings → Local → Maps), or `null`. API limits:
+ * https://docs.mapbox.com/api/#rate-limits
  */
-const token = await mapboxTokenStore.acquire()
-
-watchEffect(() => ((mapboxgl as any).accessToken = token.value.token))
-
+const mapboxToken = useMapboxToken()
 const mapNode = useTemplateRef('mapNode')
 
 const dataAsGeoJSONs = computed(() => {
@@ -158,8 +147,6 @@ function boundingBoxOfCurrentData() {
   return finalBBox
 }
 
-const scope = effectScope()
-
 class GeoMapVisualizationMap {
   map: mapboxgl.Map
   tooltip: mapboxgl.Popup
@@ -174,13 +161,16 @@ class GeoMapVisualizationMap {
    * The lifetime of the map is bound to current component scope; when scope is stopped, the
    * underlying mapboxgl.Map instance is destroyed.
    */
-  constructor(container: HTMLElement) {
+  constructor(
+    container: HTMLElement,
+    private readonly scope: EffectScope,
+  ) {
     this.map = new mapboxgl.Map({
       container,
       projection: 'mercator',
       zoom: DEFAULT_MAP_ZOOM,
     })
-    scope.run(() => onScopeDispose(() => this.map.remove()))
+    this.scope.run(() => onScopeDispose(() => this.map.remove()))
     this.tooltip = this.setupTooltip()
     // Hotfix for https://github.com/mapbox/mapbox-gl-js/issues/13355
     ;(this.map as any)._updateContainerDimensions = function () {
@@ -199,7 +189,7 @@ class GeoMapVisualizationMap {
     })
     this.map.on('load', () => {
       this.updateMap()
-      scope.run(() => watch(dataAsGeoJSONs, () => this.updateMap()))
+      this.scope.run(() => watch(dataAsGeoJSONs, () => this.updateMap()))
     })
   }
 
@@ -323,19 +313,29 @@ class GeoMapVisualizationMap {
   }
 }
 
-onMounted(() => {
-  if (mapNode.value == null) {
-    console.error('Cannot initialize MapBoxGL: no container element!')
-    return
-  }
-  const map = new GeoMapVisualizationMap(mapNode.value)
-  scope.run(() =>
-    watch(
-      () => config.size,
-      () => map.map.resize(),
-    ),
-  )
-})
+// One map per token: the map node is keyed on it, so a new token replaces the node and the map.
+let mapScope: EffectScope | undefined
+watch(
+  mapNode,
+  (node) => {
+    mapScope?.stop()
+    mapScope = undefined
+    const token = mapboxToken.value
+    if (node == null || token == null) return
+    ;(mapboxgl as any).accessToken = token
+    const scope = effectScope()
+    mapScope = scope
+    const map = new GeoMapVisualizationMap(node, scope)
+    scope.run(() =>
+      watch(
+        () => config.size,
+        () => map.map.resize(),
+      ),
+    )
+  },
+  { flush: 'post', immediate: true },
+)
+onScopeDispose(() => mapScope?.stop())
 config.setToolbarOverlay(true)
 </script>
 
@@ -345,7 +345,15 @@ config.setToolbarOverlay(true)
     rel="stylesheet"
     crossorigin="anonymous"
   />
-  <div ref="mapNode" class="GeoMapVisualization" @pointerdown.stop @wheel.stop.passive></div>
+  <MapboxTokenMissing v-if="mapboxToken == null" />
+  <div
+    v-else
+    :key="mapboxToken"
+    ref="mapNode"
+    class="GeoMapVisualization"
+    @pointerdown.stop
+    @wheel.stop.passive
+  ></div>
 </template>
 
 <style scoped>
