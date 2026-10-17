@@ -95,7 +95,7 @@ build_tools (CI generator).
   3 deletes it. Leave the cloud keyboard shortcuts until PR 3 deletes their
   actions.
 - **R4 (PR 1).** The cloud-driven drive checks in `accessibility.spec.ts` are
-  skipped until PR 4 ports them.
+  skipped until Task 42 ports them (at the start of PR 3, by the order).
 - **R5 (PR 2).** PR 2 takes the `CI: No changelog needed` label, since PR 1's
   entry covers what users see.
 - **R6 (PR 2).** The datalink path picker uses the system file dialog
@@ -142,6 +142,53 @@ build_tools (CI generator).
   - Keep `ENSO_IDE_HOST`, which builds the contact URL.
   - Keep the dormant secret forms' `ENSO_IDE_API_URL` parameter, which reads
     `undefined` once the variable is gone.
+
+**R18+ (pre-flight,
+`.superpowers/sdd/2026-10-17-local-only-ide/preflight.md`):**
+
+- **R18 (PR 2b).** When editing a datalink its name is read-only in the dialog;
+  renaming goes through the drive's name cell, which keeps `.datalink` (Task
+  24).
+- **R19 (Versions registration).** One name throughout: `registerCore()` (Task
+  3). Task 10 rewrites its import and deletes the uncalled
+  `versions/rightPanel.ts`; Task 13's docs name it; Task 32 narrows
+  `ContributedRightPanelTab` to `'versions'` and updates `registerCore.test.ts`.
+- **R20 (Electron).** Task 16 deletes `backend.ts`, `DEEP_LINK_SCHEME` and the
+  headless `enso:` branch, which it replaces with an exit-1 refusal. Task 34 has
+  no `index.ts` or `backend.ts` step; Task 39 expects Task 16's message. Task 16
+  also confirms what `TRUSTED_HOSTS` gates before emptying it (R8).
+- **R21 (PR 3, the cloud mock).** Nothing is frozen under
+  `integration-test/mock/cloud/`. Tasks 40–43 delete `cloudApi.ts` and the cloud
+  specs first, so Tasks 36–37 `git rm` and trim, and Tasks 35, 38 and 39 grep
+  without exclusions. Task 40's guard spec loads the app through the local mock
+  only (not `drivePage`), so its "blocked" holds before Task 43.
+- **R22 (`CLOUD_ONLY`).** Tasks 41–42 remove the skip and its import from each
+  spec they port (including `localOnly.spec.ts`, now ported in Task 42); Task 43
+  deletes the export; Task 49 greps that `CLOUD_ONLY` returns nothing.
+- **R23 (session and auth, PR 3).** Task 31 drops the session's empty token
+  fields; Task 33 deletes `isAuthDisabled` (keeping the `true` branch at every
+  reader) and makes `session` non-null; Task 37 trims `makeLocalUser` to
+  `{ userId, name, email }` and updates `auth.test.ts` and `UserBar.test.ts`.
+- **R24 (right panel and shortcuts, PR 3).** Task 30 deletes the Description
+  (`description`, with `DescriptionEditor.vue`) and Properties (`settings`)
+  tabs, `isCloudDirectoryView` and `enabledInCloudOnly`, and the drive's and the
+  Versions tab's `isCloudCategory` uses. Task 33 deletes `SettingsTabType`'s
+  cloud members, their `goTo…Settings` bindings and handlers, and the cloud-only
+  actions.
+- **R25 (decision 9).** Task 37 drops the `HYBRID_PROJECT_DIRECTORY_MASK`
+  listing filter in `ProjectManager.ts` (and `INVALID_NAME_MASKS`), with a test
+  that a `cloud-project-*` folder lists as an ordinary folder.
+- **R26 (texts, PR 4).** Task 46 Step 3b prunes `english.json` with a script
+  that lists the keys no source names; Task 24 deletes `datalinkFilePathBrowse`
+  with `FilePathInput.vue`.
+- **R27 (smaller fixes).** Task 11's test destructures `mountWithProviders`;
+  Task 12 drops the false `isAuthDisabled` note; Task 22's `getDatalink`/
+  `deleteDatalink` take the abstract's optional title; Task 25 re-adds the New
+  Datalink button and menu entry Task 12 deleted; Task 31 also deletes
+  `registerMocks.ts`'s dead flags; Task 33/37 lose the steps for files Task 11
+  deleted (`FileBrowserWidget`); Task 46 edits the `RemoteConfig` interface
+  (Task 1 deleted the schema) and `CreateCredentialModal.test.ts`; Tasks 44/45
+  carry the verified counts.
 
 ---
 
@@ -1137,8 +1184,9 @@ is one local user, so "per user" is "per browser profile", as for those.
 - Consumes: Tasks 1–7 (no config fetch, offline session, local categories, no
   cloud entries).
 - Produces: `CLOUD_ONLY: string` in `integration-test/base.ts`, the reason every
-  skipped cloud test carries, which PR 4 greps for
-  (`git grep -n CLOUD_ONLY app/gui/integration-test`).
+  skipped cloud test carries. Tasks 41–42 remove the skip (and the import) from
+  each spec they port, Task 43 deletes the export with the cloud-only specs, and
+  Task 49 checks that `git grep -n CLOUD_ONLY -- app` prints nothing.
 
 - [ ] **Step 1: Write the failing spec**
       `integration-test/dashboard/localOnly.spec.ts`:
@@ -1421,7 +1469,10 @@ task's touched files.
   `app/gui/src/secrets/serviceCredentials/`;
   `app/gui/src/project-view/components/UpsertSecretPanel.vue` →
   `app/gui/src/secrets/UpsertSecretPanel.vue`.
-- Modify: `app/gui/src/App.vue`, `app/gui/src/entrypoint.ts` (PR 1's Versions
+- Delete: `app/gui/src/versions/rightPanel.ts` (after the move; it holds
+  `registerVersionsTabs`, which only `cloud/index.ts` called, so it is uncalled
+  since PR 1).
+- Modify: `app/gui/src/App.vue`, `app/gui/src/registerCore.ts` (PR 1's Versions
   registration import), `app/gui/src/dashboard/layouts/AssetContextMenu.vue`,
   `app/gui/src/dashboard/layouts/Drive/driveActions.ts`,
   `app/gui/src/dashboard/layouts/Drive/globalContextMenuEntries.ts`,
@@ -1432,20 +1483,21 @@ task's touched files.
   (`src/versions/CLAUDE.md`, `src/secrets/CLAUDE.md`,
   `src/datalinks/CLAUDE.md`), `eslint.config.mjs` (drop `'datalinks'` and
   `'versions'` from `CLOUD_AREAS`), `app/gui/src/cloud/CLAUDE.md` (delete the
-  moved areas' bullets).
+  moved areas' bullets), `app/gui/src/cloud/index.ts` (drop the
+  `registerVersionsTabs` import and call).
 
 **Interfaces**
 
-- Consumes: PR 1's core registration of the Versions tab: `entrypoint.ts` calls
-  `registerVersionsTabs()` (today in `src/cloud/versions/rightPanel.ts`,
-  contributing `versions` and `executionsCalendar` through
-  `contributeRightPanelTab`).
-- Produces: `$/versions/rightPanel` (`registerVersionsTabs`),
-  `$/versions/schedule` (`usePreferredTimeZone`),
-  `$/versionChecker/versionChecker` (`useVersionCheckerEnabled`,
-  `isNewerRelease`, `getVersionNumber`), `$/versionChecker/VersionChecker.vue`;
-  `$/secrets/UpsertSecretForm.vue`, `$/secrets/UpsertSecretModal.vue`,
-  `$/secrets/CreateCredentialModal.vue`, `$/secrets/credentialInfos`,
+- Consumes: `registerCore()` (`src/registerCore.ts`, PR 1), which contributes
+  only `versions` through `contributeRightPanelTab`; the Step 2 sed rewrites its
+  `$/cloud/versions/AssetVersions.vue` import.
+- Produces: `$/versions/AssetVersions.vue` (registered by `registerCore`; the
+  old `rightPanel.ts`/`registerVersionsTabs` is deleted), `$/versions/schedule`
+  (`usePreferredTimeZone`), `$/versionChecker/versionChecker`
+  (`useVersionCheckerEnabled`, `isNewerRelease`, `getVersionNumber`),
+  `$/versionChecker/VersionChecker.vue`; `$/secrets/UpsertSecretForm.vue`,
+  `$/secrets/UpsertSecretModal.vue`, `$/secrets/CreateCredentialModal.vue`,
+  `$/secrets/credentialInfos`,
   `$/secrets/serviceCredentials/{logic,types,google,ms365,salesforce,snowflake,strava,utilities}`,
   `$/secrets/UpsertSecretPanel.vue`; `$/datalinks/UpsertDatalinkModal.vue`,
   `$/datalinks/DatalinkFormInput.vue`, `$/datalinks/JSONSchemaInput.vue`,
@@ -1466,6 +1518,16 @@ task's touched files.
   git mv cloud/serviceCredentials secrets/serviceCredentials
   git mv project-view/components/UpsertSecretPanel.vue secrets/UpsertSecretPanel.vue
   ```
+- [ ] **Step 1b: Delete the uncalled registration.**
+      `git rm app/gui/src/versions/rightPanel.ts` — `registerVersionsTabs` was
+      called only from `cloud/index.ts`, which PR 1 stopped calling;
+      `registerCore()` registers the Versions tab. Check first that nothing else
+      imports it (must print nothing):
+      `grep -rn "versions/rightPanel\|registerVersionsTabs" app/gui/src | grep -v "^app/gui/src/versions/rightPanel.ts\|^app/gui/src/cloud/index.ts"`.
+      `cloud/index.ts` imports it relatively (`./versions/rightPanel`, which the
+      move breaks anyway): delete that import line and the
+      `registerVersionsTabs()` call there so the commit typechecks (the rest of
+      `src/cloud/` goes in Task 13).
 - [ ] **Step 2: Rewrite the imports.**
   ```bash
   cd app/gui
@@ -1485,9 +1547,10 @@ task's touched files.
   panel, over `$/secrets/UpsertSecretForm.vue`. Dormant: secrets are cloud-only
   until local secrets exist, decision 5 of
   `docs/superpowers/specs/2026-10-17-local-only-ide-design.md`."), and the three
-  moved `CLAUDE.md` files' first paragraphs (new path; `secrets/` and
-  `datalinks/` say "dormant: no UI entry point opens them; their unit tests are
-  the guard against rot"). The check, which must print nothing:
+  moved `CLAUDE.md` files' first paragraphs (new path; `versions/CLAUDE.md` says
+  the Versions tab is registered by `src/registerCore.ts`, not `rightPanel.ts`;
+  `secrets/` and `datalinks/` say "dormant: no UI entry point opens them; their
+  unit tests are the guard against rot"). The check, which must print nothing:
   ```bash
   grep -rn "cloud/\(versions\|versionChecker\|datalinks\|credentials\|serviceCredentials\)\|components/UpsertSecretPanel" app/gui/src app/gui/integration-test eslint.config.mjs
   ```
@@ -1572,7 +1635,7 @@ a working local picker.
       value: { fileBrowser: { openFileBrowser } },
       configurable: true,
     });
-    const wrapper = await mountWithProviders(FilePathInput, {
+    const { wrapper } = await mountWithProviders(FilePathInput, {
       props: { value: "/old.csv" },
     });
     await wrapper
@@ -1584,7 +1647,7 @@ a working local picker.
   });
 
   test("without the desktop app, there is no Browse… button", async () => {
-    const wrapper = await mountWithProviders(FilePathInput, {
+    const { wrapper } = await mountWithProviders(FilePathInput, {
       props: { value: "" },
     });
     expect(
@@ -1592,8 +1655,9 @@ a working local picker.
     ).toBe(false);
   });
   ```
-  (If `mountWithProviders` returns the mounted wrapper under another name,
-  follow its signature at `src/utils/testing/mountWithProviders.ts:107`.)
+  (`mountWithProviders` resolves to
+  `{ wrapper, setProps, unmount, router, queryClient }`,
+  `src/utils/testing/mountWithProviders.ts` l.168.)
 - [ ] **Step 2: Run them.**
       `corepack pnpm --dir app/gui exec vitest run src/datalinks/__tests__/FilePathInput.test.ts`
       — expect both to fail (no such button). The Playwright spec fails too, on
@@ -1688,7 +1752,7 @@ gone, and the closing grep is the check.
   `$/cloud/permissionsClasses`. `transferBetweenCategories` from a local
   category to a cloud one does nothing. `SETTINGS_DATA` lists Account, Local,
   Appearance and Keyboard shortcuts only. `SettingsTabType`'s cloud members and
-  their `goTo…Settings` bindings stay until PR 3 trims the organization types
+  their `goTo…Settings` bindings stay until Task 33 (PR 3) deletes them
   (removing them here would cascade into `inputBindings.ts` and
   `DashboardPage.vue` for no visible change).
 
@@ -1708,11 +1772,10 @@ gone, and the closing grep is the check.
   });
   ```
   (use the file's existing `auth`, `USER`, `mountBar`/mount helper and `screen`
-  names; the case sets `isAuthDisabled: false` on purpose, proving the bar no
-  longer depends on it). In `SettingsPage.test.ts` replace "lists the
-  organization's tabs once the cloud fills them" (line 187), "lists Billing &
-  Plans only for an admin…" (line 300) and "the search finds Billing & Plans by
-  its aliases" (line 377) with:
+  names). In `SettingsPage.test.ts` replace "lists the organization's tabs once
+  the cloud fills them" (line 187), "lists Billing & Plans only for an admin…"
+  (line 300) and "the search finds Billing & Plans by its aliases" (line 377)
+  with:
   ```ts
   test("lists only the local tabs, whatever is contributed", async () => {
     contributeSettingsSections(
@@ -1827,8 +1890,8 @@ gone, and the closing grep is the check.
 
 - Consumes: Task 12 (no core importer left).
 - Produces: no `$/cloud` path anywhere; the registries stay, with no contributor
-  but the Versions tab: `$/providers/rightPanelContributions` (`versions`,
-  `executionsCalendar`), `$/providers/settingsContributions` and
+  but the Versions tab: `$/providers/rightPanelContributions` (`versions`, via
+  `registerCore`), `$/providers/settingsContributions` and
   `$/providers/layoutContributions` (empty). Their docs move to
   `app/gui/CLAUDE.md`.
 
@@ -1845,15 +1908,13 @@ gone, and the closing grep is the check.
       (lines ~106–122) with bullets for the new homes and a "Contribution
       registries" paragraph carried over from the deleted `src/cloud/CLAUDE.md`
       "Rules" section: what each registry does (`contributeRightPanelTab` in
-      `$/providers/rightPanelContributions`, which the Versions and Schedule
-      tabs use; `contributeSettingsSections` in
-      `$/providers/settingsContributions`; `contributeAppContainerModals` in
-      `$/providers/layoutContributions`), that a contribution is a loader so it
-      stays out of the initial chunk, and that a tab or modal nothing
-      contributes is hidden. New bullets:
-  - `src/versions/` — the right panel's Versions tab over local git versions
-    (and, until PR 3, the cloud's versions and the Schedule tab);
-    `registerVersionsTabs`, called by `entrypoint.ts`.
+      `$/providers/rightPanelContributions`, which the Versions tab uses;
+      `contributeSettingsSections` in `$/providers/settingsContributions`;
+      `contributeAppContainerModals` in `$/providers/layoutContributions`), that
+      a contribution is a loader so it stays out of the initial chunk, and that
+      a tab or modal nothing contributes is hidden. New bullets:
+  - `src/versions/` — the Versions tab, registered by `src/registerCore.ts`
+    (local git versions; until PR 3 also the cloud's version branches).
   - `src/versionChecker/` — the "new version available" dialog (GitHub
     releases), mounted by `App.vue`.
   - `src/secrets/` — dormant: the secret and per-service credential forms and
@@ -2017,7 +2078,7 @@ gone, and the closing grep is the check.
 
   The token fields stay, always empty, only because
   `providers/openedProjects/projectStates.ts:205` (the hybrid open, deleted in
-  PR 3) reads them; PR 3 drops them. (`$/providers/auth`):
+  PR 3) reads them; Task 31 (PR 3) drops them. (`$/providers/auth`):
 
   ```ts
   export interface UserSession extends session.UserSession {
@@ -2042,13 +2103,13 @@ gone, and the closing grep is the check.
   `session` is typed nullable and the flags `boolean`, though they are constant
   (`session` set, both flags `true`): narrowing them now would make the 52
   existing `?.`/`isCloudDataUnavailable` checks fail
-  `@typescript-eslint/no-unnecessary-condition`; PR 3 narrows them as it removes
-  `isCloudDataUnavailable`. Gone: `useInitAuthService`, `useAuthDisabled`,
-  `createUsersMeQuery`, `isUsersMeQueryKey`, `makeSyntheticUser` (renamed
-  `makeLocalUser`), `makeOfflineSession` (renamed `makeLocalSession`),
-  sign-in/out, MFA, password, username and user deletion/restoration,
-  `refetchSession`, `setUser`, 401 recovery and backoff, Sentry `setUser`, the
-  `onAuthenticated` injection,
+  `@typescript-eslint/no-unnecessary-condition`; Task 33 (PR 3) removes
+  `isCloudDataUnavailable` and `isAuthDisabled` and makes `session` non-null.
+  Gone: `useInitAuthService`, `useAuthDisabled`, `createUsersMeQuery`,
+  `isUsersMeQueryKey`, `makeSyntheticUser` (renamed `makeLocalUser`),
+  `makeOfflineSession` (renamed `makeLocalSession`), sign-in/out, MFA, password,
+  username and user deletion/restoration, `refetchSession`, `setUser`, 401
+  recovery and backoff, Sentry `setUser`, the `onAuthenticated` injection,
   `SettingsContext.changePassword`/`accessToken`/`updateUser`/`updateOrganization`,
   `RouteMeta.access`, `LOGIN_PATH` and the other auth page paths, the agreements
   gate and devtools contributions in `layoutContributions.ts`.
@@ -2381,25 +2442,47 @@ links still open through `TRUSTED_EXTERNAL_PROTOCOLS`.
       `handleItemOpening`, `processArguments` (and the `ParsedArguments` type)
       and `run`; the `isWin`/`ensoLinkInArgs` block in the `second-instance`
       handler (keep the focus/restore part); `initAuthentication(...)` and its
-      comment in `main`; and in `run` the
-      `projectToOpen.startsWith(\`${DEEP_LINK_SCHEME}:\`)`branch, so headless opens`runLocalProjectByPath`only and the usage message reads`'Usage:
-      \`--headless --startup.project <project path>\`'`.
+      comment in `main`; and in `run` replace the
+      ``projectToOpen.startsWith(`${DEEP_LINK_SCHEME}:`)`` branch (which called
+      `createRemoteBackend`/`runHybridProjectByUrl`) with a literal check that
+      refuses a cloud link:
+  ```ts
+  if (projectToOpen.startsWith("enso:")) {
+    console.error(
+      "Cloud projects are not supported; pass a local project path.",
+    );
+    return this.exit(1);
+  }
+  ```
+  so headless opens with `runLocalProjectByPath` only, and the usage message
+  reads ``'Usage: `--headless --startup.project <project path>`'``. (R7: this is
+  the final form; PR 3's Electron task does not touch it again.)
+- [ ] **Step 3b: Confirm what `TRUSTED_HOSTS` gates (R8).**
+      `grep -n "TRUSTED_HOSTS" app/electron-client/src/*.ts` must show only its
+      declaration and its use in `security.ts`'s `will-navigate` /
+      `setWindowOpenHandler` handlers (develop: l.13 and l.153). Read those
+      handlers: they decide only whether the window may navigate or open a
+      window, not whether the main process or the renderer may `fetch`. If
+      anything else reads it, keep exactly the hosts the update checker
+      (`api.github.com`), Mapbox and Sentry need instead of emptying it, and say
+      so in the PR body.
 - [ ] **Step 4: The rest.** `preload.ts`: delete the deep-link handler (lines
       ~86–96), the `authentication` object (lines ~98–141), its `accessToken`
       import and `authentication,` in `api`. `ipc.ts`: delete the three
-      channels. `security.ts`: `const TRUSTED_HOSTS: string[] = []` with the
-      comment "Hosts the main window may navigate to, beyond its own origin:
-      none." `configParser.ts`: delete the two `authentication.*` entries.
-      `common/src/options.ts`: delete `authentication` from `OptionsSchema` and
-      the two `PASS_TO_WEB` keys. `paths.ts`: delete `CREDENTIALS_PATH` (and
-      `homedir`/`PRODUCT_NAME` imports if unused). `electron-builder-config.ts`:
-      delete the `protocols` array and its doc comment (lines ~200–218).
-      `common/src/constants.ts`: delete `DEEP_LINK_SCHEME` and its comment.
-      `gui/src/electronApi.ts`: delete `AuthenticationApi`, `authentication` in
-      `ElectronApi` and the `accessToken` import. `registerMocks.ts`: delete the
-      `authentication: {…}` stub (lines 87–91). `electron-client/CLAUDE.md`:
-      delete or rewrite the paragraphs on `authentication.ts`, deep links and
-      `~/.enso/credentials` (find them with
+      channels. `security.ts` (after Step 3b's check):
+      `const TRUSTED_HOSTS: string[] = []` with the comment "Hosts the main
+      window may navigate to, beyond its own origin: none." `configParser.ts`:
+      delete the two `authentication.*` entries. `common/src/options.ts`: delete
+      `authentication` from `OptionsSchema` and the two `PASS_TO_WEB` keys.
+      `paths.ts`: delete `CREDENTIALS_PATH` (and `homedir`/`PRODUCT_NAME`
+      imports if unused). `electron-builder-config.ts`: delete the `protocols`
+      array and its doc comment (lines ~200–218). `common/src/constants.ts`:
+      delete `DEEP_LINK_SCHEME` and its comment. `gui/src/electronApi.ts`:
+      delete `AuthenticationApi`, `authentication` in `ElectronApi` and the
+      `accessToken` import. `registerMocks.ts`: delete the `authentication: {…}`
+      stub (lines 87–91). `electron-client/CLAUDE.md`: delete or rewrite the
+      paragraphs on `authentication.ts`, deep links and `~/.enso/credentials`
+      (find them with
       `grep -n "authentication\|deep link\|credentials" app/electron-client/CLAUDE.md`;
       the test-user notes stay for PR 4).
 - [ ] **Step 5: Verify.** Must print nothing:
@@ -2514,10 +2597,9 @@ State consumed from PR 2: the editor lives in `app/gui/src/datalinks/`
 `$/datalinks/…`; `src/cloud/` (with `properties/`, the Properties tab and its
 `DatalinkConfiguration`) is gone; the graph editor's cloud browser
 (`WidgetFileBrowser/cloudBrowser.ts`) is gone, so the file widget offers only
-`useLocalBrowser`'s "Choose file…"; the drive's toolbar and global context menu
-still gate "New Datalink" on `isCloud` (always false since PR 1). Where PR 2
-removed a gated entry outright instead of leaving it disabled, the task below
-re-adds it with the code shown.
+`useLocalBrowser`'s "Choose file…"; the drive's toolbar button and global
+context-menu entry for "New Datalink" were deleted outright in Task 12, with
+their `openedModals` plumbing, so Task 25 re-adds them with the code shown.
 
 ### Task 20: Shim datalink file module
 
@@ -3074,10 +3156,11 @@ GUI's.
   `body.datalinkId` is `null` and **rewrites the existing file in place when it
   is set** (the cloud's "new version" semantics, so no new abstract
   `updateDatalink` is needed while `RemoteBackend` still exists);
-  `getDatalink(id)` → the file's JSON; `deleteDatalink(id)` and
-  `deleteAsset(<datalink id>)` delete it. A datalink asset's `title` is the file
-  name without `.datalink` (as cloud datalinks were titled;
-  `FileBrowserWidget.chooseEntry` and the drive append the extension back).
+  `getDatalink(id, _title?)` → the file's JSON; `deleteDatalink(id, _title?)`
+  (the optional title matches the abstract `(datalinkId, title: string | null)`
+  signature and is unused locally) and `deleteAsset(<datalink id>)` delete it. A
+  datalink asset's `title` is the file name without `.datalink` (as cloud
+  datalinks were titled; the drive appends the extension back).
 
 - [ ] **Step 1: Write the failing tests.** `LocalBackend.datalinks.test.ts`:
 
@@ -3397,13 +3480,19 @@ Replace the three stubs:
   }
 
   /** The datalink file's JSON. */
-  override async getDatalink(datalinkId: backend.DatalinkId): Promise<backend.Datalink> {
+  override async getDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<backend.Datalink> {
     // A `Datalink` is opaque JSON; the editor validates it.
     return (await this.projectManager.readDatalink(backend.extractTypeAndPath(datalinkId).path)) as backend.Datalink
   }
 
   /** Delete the datalink file. */
-  override async deleteDatalink(datalinkId: backend.DatalinkId): Promise<void> {
+  override async deleteDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<void> {
     await this.projectManager.deleteDatalink(backend.extractTypeAndPath(datalinkId).path)
   }
 ```
@@ -3510,7 +3599,8 @@ disk directly and maps every file to a file asset.)
   branches ~l.237–273; `Dropdown` ~l.360)
 - Modify `app/gui/src/datalinks/DatalinkInput.vue`
 - Modify `app/gui/src/datalinks/UpsertDatalinkModal.vue`
-- Delete `app/gui/src/datalinks/FilePathInput.vue`
+- Delete `app/gui/src/datalinks/FilePathInput.vue` and its test
+  `app/gui/src/datalinks/__tests__/FilePathInput.test.ts` (Task 11)
 - Modify `app/gui/src/datalinks/__tests__/DatalinkInput.test.ts`
 - Modify `app/gui/src/datalinks/__tests__/UpsertDatalinkModal.test.ts`
 - Modify `app/gui/src/datalinks/CLAUDE.md`
@@ -3542,18 +3632,17 @@ cloud) keeps it: the member stays listed while it is the chosen one, its path
 shows read-only with the note, and saving writes it back unchanged; choosing
 "Text" replaces it. The `Enso File` datalink type is left out the same way (no
 note): its `path` must match `^enso://(?:Users|Teams)/`, an Enso Cloud path.
-**Ruling needed:** hiding `Enso File` and deleting `FilePathInput.vue` (its only
-user, and the last mount of `FileBrowserWidget` outside the project view) —
-recommended, since no local path can satisfy that schema; an existing
-`Enso_File` file still opens, its path as plain text.
+Hiding `Enso File` and deleting `FilePathInput.vue` (its only user) is R12: no
+local path can satisfy that schema; an existing `Enso_File` file still opens,
+its path as plain text.
 
 - [ ] **Step 1: Write the failing tests.** In `DatalinkInput.test.ts`: delete
       the `listSecrets` hoist, both
-      `vi.mock('$/providers/backends'…)`/`vi.mock('$/providers/auth'…)`, the
-      `FileBrowserWidget` mock and `listSecrets.mockReset()…`; drop
-      `'Enso File'` from the first test's expected type list; replace the tests
-      "a secret is chosen…", "an invalid secret shows…" and "a file path opens
-      the file browser…" with:
+      `vi.mock('$/providers/backends'…)`/`vi.mock('$/providers/auth'…)` and
+      `listSecrets.mockReset()…` (Task 11 already removed the
+      `FileBrowserWidget` mock and the file-browser test); drop `'Enso File'`
+      from the first test's expected type list; replace the tests "a secret is
+      chosen…" and "an invalid secret shows…" with:
 
 ```ts
 test("a secure value offers Text only, and says secrets are not available", async () => {
@@ -3626,8 +3715,8 @@ test("an existing Enso File datalink opens, its path as plain text", async () =>
 (The list index of the password's `SecureValue` follows the rendering order —
 type, username, password; confirm it with a `console.log` of the listboxes'
 option texts while writing the test, then remove the log.) In
-`UpsertDatalinkModal.test.ts`: remove the backends/auth/FileBrowserWidget mocks;
-let `mountModal(props = {})` spread extra props; add:
+`UpsertDatalinkModal.test.ts`: remove the backends/auth mocks; let
+`mountModal(props = {})` spread extra props; add:
 
 ```ts
 test('edit mode: "Edit Datalink", the name read-only, the value loaded, and Save', async () => {
@@ -3732,18 +3821,20 @@ Validator paths keep the schema's own indices
 and delete the `enso-file` branch (it falls to the plain `SchemaTextInput`);
 `partCount`'s string arm becomes `count += 1`; update the file comment
 (`enso-secret`: shown read-only, no local secrets; `enso-file`: plain text).
-`git rm app/gui/src/datalinks/FilePathInput.vue`;
-`git grep -n "FilePathInput" app/gui/src` must come back empty.
-`UpsertDatalinkModal.vue`: add the `existing` prop;
+`git rm app/gui/src/datalinks/FilePathInput.vue app/gui/src/datalinks/__tests__/FilePathInput.test.ts`;
+in `english.json` delete `"datalinkFilePathBrowse"` (Task 11's "Browse…",
+orphaned with `FilePathInput.vue`);
+`git grep -n "FilePathInput\|datalinkFilePathBrowse" app/gui/src app/common/src`
+must come back empty. `UpsertDatalinkModal.vue`: add the `existing` prop;
 `:title="existing ? getText('editDatalink') : getText('createDatalink')"`;
 `:defaultValues="{ name: existing?.name ?? '', value: existing?.value ?? INITIAL_DATALINK_VALUE }"`;
 the name `Input` gets `:readOnly="existing != null"` and
 `:autoFocus="existing == null"`; the submit text is
 `existing ? getText('save') : getText('create')`; the file comment says the edit
-mode keeps the name (renaming is the name cell's). **Ruling needed:** name
-read-only when editing — recommended, because a rename is a file move the drive
-already does (with uniqueness checking by `titleSchema`), and a save that also
-moves the file could half-fail. `CLAUDE.md`: drop `FilePathInput`, describe
+mode keeps the name (renaming is the name cell's). The name is read-only when
+editing (R18): a rename goes through the drive's name cell, which keeps
+`.datalink` (R13) and checks uniqueness with `titleSchema`, and a save that also
+moved the file could half-fail. `CLAUDE.md`: drop `FilePathInput`, describe
 `UNAVAILABLE_SCHEMAS` and the edit mode, and that the Properties tab is gone
 (the dialog is the only editor).
 
@@ -3764,10 +3855,10 @@ moves the file could half-fail. `CLAUDE.md`: drop `FilePathInput`, describe
 - Create `app/gui/src/dashboard/layouts/Drive/__tests__/datalinkActions.test.ts`
 - Modify
   `app/gui/src/dashboard/pages/dashboard/Drive/DriveBar/DriveBarToolbar.vue`
-  (`newDatalink` ~l.95, `openNewDatalink` ~l.129, the `connector_add` button
-  ~l.264–272)
+  (re-add the New Datalink button Task 12 deleted; develop 4a504bf4d9 had it at
+  ~l.104–109, 129–138 and 264–272)
 - Modify `app/gui/src/dashboard/layouts/Drive/globalContextMenuEntries.ts`
-  (`newDatalink` ~l.48, entry ~l.98–108)
+  (re-add the `newDatalink` entry Task 12 deleted; develop ~l.98–108)
 - Modify `app/gui/src/dashboard/layouts/AssetContextMenu.vue` (the `edit` entry
   ~l.388–405)
 - Modify `app/gui/src/dashboard/layouts/AssetsTable.vue` (Enter/Space on a
@@ -3965,18 +4056,51 @@ export function useEditDatalink(backend: MaybeRefOrGetter<Backend>) {
 }
 ```
 
-Wiring (each replaces the old code at the cited lines):
+Wiring. Task 12 deleted the New Datalink button and menu entry with their
+plumbing, so the first two are re-added, not edited:
 
-- `DriveBarToolbar.vue`: drop the `UpsertDatalinkModal` import and
-  `newDatalink`; add `const newDatalink = useNewDatalink(backend)`;
-  `openNewDatalink` becomes
-  `const { key } = newDatalink(currentDirectoryId.value); openedModals.value = { ...openedModals.value, datalink: key }`;
-  the `connector_add` button loses `:isDisabled="!isCloud"` and gets
-  `:aria-label="getText('newDatalink')"`.
-- `globalContextMenuEntries.ts`: drop the import and the `newDatalink` mutation;
-  add `const newDatalink = useNewDatalink(options.backend)`; the entry is
+- `DriveBarToolbar.vue`: import
+  `import { useNewDatalink } from '#/layouts/Drive/datalinkActions'`, then in
+  the script (next to the other actions):
+
+  ```ts
+  const newDatalink = useNewDatalink(backend);
+  /** Key of the datalink dialog this button opened on the modal stack, for its `aria-expanded`. */
+  const openedDatalinkModal = shallowRef<number>();
+  const isDatalinkModalOpen = computed(() => {
+    const key = openedDatalinkModal.value;
+    return key != null && modals.stack.value.some((entry) => entry.key === key);
+  });
+  function openNewDatalink() {
+    openedDatalinkModal.value = newDatalink(currentDirectoryId.value).key;
+  }
+  ```
+
+  (`useModals`, `shallowRef` and `computed` are still imported there; re-add any
+  Task 12 dropped as unused) and, after the `folder_add` button in the same
+  group:
+
+  ```vue
+  <Button
+    variant="icon"
+    size="medium"
+    icon="connector_add"
+    :aria-expanded="isDatalinkModalOpen"
+    :aria-label="getText('newDatalink')"
+    @press="openNewDatalink"
+  />
+  ```
+
+  This is develop's button minus `:isDisabled="!isCloud"` and the cloud-only
+  label. Update the `@file` comment (it opens the datalink dialog on the modal
+  stack).
+
+- `globalContextMenuEntries.ts`: import `useNewDatalink` from
+  `./datalinkActions`; add `const newDatalink = useNewDatalink(options.backend)`
+  next to `newFolder`; re-add, after the `newFolder` entry,
   `{ action: 'newDatalink', doAction: () => { modals.closeAll(); newDatalink(target()) } }`
-  with no `isCloud &&`; update the file comment.
+  (no `isCloud &&`; `modals` is still declared there, re-add `useModals` if Task
+  12 dropped it); the file comment lists "datalink" again.
 - `AssetContextMenu.vue`: split the `edit` entry: a datalink gets
   `asset.type === backendModule.AssetType.datalink && canEditThisAsset.value && { action: 'edit', doAction: () => void editDatalink(asset) }`
   with `const editDatalink = useEditDatalink(() => driveView.location.backend)`
@@ -4549,17 +4673,13 @@ Tasks 30–33 empty the GUI of `remoteBackend`; 34–35 do the same for Electron
 the shim; 36 deletes the remote modules; 37 trims `Backend.ts`; 38 removes
 `BackendType.remote`.
 
-**Ruling needed (the integration-test mock):** `app/gui/integration-test/` is
-typechecked by `tsconfig.node.json`, and `integration-test/mock/cloudApi.ts`
-(1585 lines, deleted in PR 4) imports `RemoteBackend/ids`, `remoteBackendPaths`
-and about 60 `Backend` symbols, roughly half of which this PR deletes.
-Recommended default: freeze them for the mock. Tasks 36 and 37 move the deleted
-code into `app/gui/integration-test/mock/cloud/` (`git mv` for whole files; cut
-and paste for the deleted `Backend.ts` declarations into
-`mock/cloud/cloudTypes.ts`), behind a barrel `mock/cloud/backend.ts` that
-`cloudApi.ts` and the specs import instead of `enso-common`. PR 4 deletes the
-folder with `cloudApi.ts`. The alternative is to move PR 4's spec porting ahead
-of this PR; that would make PR 3 bigger still and change the spec's order.
+**The integration-test mock.** `app/gui/integration-test/` is typechecked by
+`tsconfig.node.json`, and `integration-test/mock/cloudApi.ts` imports
+`RemoteBackend/ids`, `remoteBackendPaths` and about 60 `Backend` symbols.
+Superseded by the order: Tasks 40–43 run first in this PR and delete
+`cloudApi.ts`, the cloud-only specs and the login fixtures, so nothing in the
+integration tests imports the code Tasks 36–37 delete. Nothing is frozen under
+`integration-test/mock/cloud/`; Tasks 36–37 simply `git rm` and trim.
 
 **Ruling needed (`BackendType.remote`): remove it.** The count on develop
 (outside `src/cloud/`, which PR 2 deletes), with `ydoc-shared`'s unrelated
@@ -4611,8 +4731,8 @@ decision 3 asks, and is only a query-key and `backend.type` tag from then on.
   - files, upload and export: `uploadFileStart`, `uploadFileChunk`,
     `uploadFileEnd`, `updateFile`, `getFileDetails`, `download`,
     `exportArchive`;
-  - datalinks: `createDatalink`, `getDatalink`, `deleteDatalink`, and whatever
-    update method PR 2b added;
+  - datalinks: `createDatalink`, `getDatalink`, `deleteDatalink` (no separate
+    update method, R10);
   - secrets: `createSecret`, `createCredential`, `getSecret`, `updateSecret`,
     `listSecrets`;
   - labels: `supportsLabels`, `createTag`, `listTags`, `associateTag`,
@@ -4650,7 +4770,9 @@ decision 3 asks, and is only a query-key and `backend.type` tag from then on.
     cloud-only fields (if any), `S3ObjectVersion.tags`, `UploadedImages`,
     `UploadPictureRequestParams`;
   - hybrid projects: `OpenHybridProjectParameters`,
-    `HYBRID_PROJECT_DIRECTORY_MASK`,
+    `HYBRID_PROJECT_DIRECTORY_MASK` (with its uses: `ProjectManager.ts`'s
+    listing filter and `Backend.ts`'s `INVALID_NAME_MASKS`, so `cloud-project-*`
+    folders list as ordinary folders, decision 9),
     `ProjectState.hybridOpenInProgress`/`hybridOpened`, and from
     `OpenProjectRequestBody` the `cognitoCredentials` and
     `openHybridProjectParameters` fields;
@@ -4693,7 +4815,11 @@ own user type, delete `Backend.User` instead and point its remaining users at PR
   `app/gui/src/dashboard/layouts/AssetContextMenu.vue`,
   `app/gui/src/dashboard/layouts/AssetsTableContextMenu.vue`,
   `app/gui/src/dashboard/layouts/DriveView.vue`,
-  `app/gui/src/providers/rightPanel.ts`,
+  `app/gui/src/providers/rightPanel.ts`, `app/gui/src/providers/drive.ts` (Task
+  4's `isCloudCategory(stored)` check), `app/gui/src/versions/AssetVersions.vue`
+  (its `isCloudCategory` branch, ~l.143),
+  `app/gui/src/components/AppContainer/RightPanel.vue`,
+  `app/gui/src/dashboard/layouts/AssetsTable.vue`,
   `app/gui/src/configurations/inputBindings.ts`,
   `app/gui/src/dashboard/pages/dashboard/UserBar/NotificationTray/notifications.ts`,
   `app/gui/src/project-view/composables/upload.ts`,
@@ -4703,6 +4829,8 @@ own user type, delete `Backend.User` instead and point its remaining users at PR
 - Create: `app/gui/src/composables/moveAssets.ts`,
   `app/gui/src/composables/__tests__/moveAssets.test.ts`
 - Delete: `app/gui/src/utils/transferBetweenCategories.ts`,
+  `app/gui/src/project-view/components/DescriptionEditor.vue` (the "Exclusive to
+  Cloud" Description tab, R3),
   `app/gui/src/composables/transferBetweenCategories.ts`,
   `app/gui/src/composables/__tests__/transferBetweenCategories.test.ts`,
   `app/gui/src/providers/__tests__/upload.test.ts`
@@ -4723,6 +4851,10 @@ own user type, delete `Backend.User` instead and point its remaining users at PR
   - `UploadFilesContext` without `uploadToCloud`; no `useUploadsToCloudStore`,
     `createUploadsStore`, `UploadKind` or `OngoingUpload`.
   - `isCloudCategory` is gone.
+  - The right panel has no `description` (Description) or `settings`
+    (Properties) tab: `RightPanelTabId` (the map's keys) loses both, and nothing
+    calls `setTemporaryTab('settings')`. `executionsCalendar` stays, hidden and
+    disabled, until Task 32 deletes it.
 
 - [ ] **Step 1: Write the failing tests.** In
       `providers/__tests__/category.test.ts`, replace the cloud cases with:
@@ -4864,11 +4996,28 @@ export function useMoveAssets() {
   - `project-view/composables/upload.ts`'s `useUpload` returns
     `useUploadLocally(backend)`.
   - `notifications.ts` drops its uploads entries.
-  - Delete the `uploadToCloud` menu entries in `AssetContextMenu.vue` and
-    `AssetsTableContextMenu.vue` (if PR 1 left them), the `uploadToCloud`
-    binding in `inputBindings.ts`, and the `isCloudCategory` branches in
-    `DriveView.vue`, `rightPanel.ts` and the Versions tab (Task 32 rewrites the
-    rest of that tab).
+  - Delete the `uploadToCloud` binding in `inputBindings.ts` (the menu entries
+    went in Task 5) and the `isCloudCategory` branches in `DriveView.vue`.
+  - `providers/drive.ts`: `currentCategory.get` becomes
+    `get: () => categoryFromKey(storedDriveDisplay.value?.currentCategory) ?? defaultCategory`
+    (`categoryFromKey` now returns `null` for every cloud key), and drop the
+    `isCloudCategory` import.
+  - `versions/AssetVersions.vue`: delete the `isCloudCategory(category)` branch
+    (~l.143) and its import (Task 32 rewrites the rest of that tab).
+  - `providers/rightPanel.ts`: delete the `description` and `settings` map
+    entries, `isCloudDirectoryView` (and its term in `enabledInDriveOrProject`),
+    `enabledInCloudOnly`, `AssetPropertiesSpotlight` and the context's
+    `spotlightOn`; the `executionsCalendar` entry's `enabled` becomes
+    `Err('Exclusive to Cloud')` (it is hidden; Task 32 deletes it).
+    `RightPanel.vue`: delete `case 'description'`, `case 'settings'` and the
+    `DescriptionEditor` import; then
+    `git rm app/gui/src/project-view/components/DescriptionEditor.vue`.
+  - The last `setTemporaryTab('settings')` callers open a tab that no longer
+    exists: delete `AssetContextMenu.vue`'s secret `edit` arm (Task 25 left it;
+    the datalink arm calls `editDatalink`; decision 5: nothing opens the secrets
+    screens) and any `AssetType.secret` `setTemporaryTab('settings')` in
+    `AssetsTable.vue`. Check (must print nothing):
+    `git grep -nE "setTemporaryTab\('settings'\)|spotlightOn|isCloudDirectoryView|enabledInCloudOnly|DescriptionEditor" -- app/gui/src`.
   - `git grep -nE "isCloudCategory|useUploadsToCloudStore|uploadToCloud|transferBetweenCategories|TeamDirectory|'team'|'trash'" -- app/gui/src`
     must come back empty, apart from unrelated text ids in `english.json`.
 - [ ] **Step 6: Run the tests.**
@@ -4895,8 +5044,13 @@ export function useMoveAssets() {
     `app/gui/src/project-view/providers/asyncResources/upload.ts`,
     `app/gui/src/project-view/providers/asyncResources/AsyncResource.ts`,
     `app/gui/src/components/ProjectLog/projectLogData.ts`;
+  - session: `app/gui/src/providers/session.ts` (the empty token fields),
+    `app/gui/src/providers/__tests__/session.test.ts`;
   - tests: `app/gui/src/router/__tests__/dashboardGuards.test.ts`,
-    `app/gui/src/providers/openedProjects/__tests__/closeProject.test.ts`.
+    `app/gui/src/providers/openedProjects/__tests__/closeProject.test.ts`,
+    `app/gui/integration-test/mock/registerMocks.ts` (`enableCloudExecution` and
+    `enableAdvancedProjectExecutionOptions`, ~l.59–60: excess properties once
+    the flags are deleted, which break the integration-test typecheck).
 - Create: `app/gui/src/providers/openedProjects/__tests__/projectInfo.test.ts`
 
 **Interfaces:**
@@ -4910,6 +5064,9 @@ export function useMoveAssets() {
     `HybridLocallyClosed` or `HybridUploaded`;
   - `welcomeProjectPath(cliStartupProject: string | undefined, backends: { localBackend: BackendAPI<LocalBackend> | null }): Promise<string | undefined>`;
   - `useResourceUpload(openedProjects, queryClient)` has no cloud branch.
+  - `session.UserSession` is `{ readonly email: string }`: no `accessToken`,
+    `refreshToken`, `refreshUrl`, `expireAt` or `clientId` (spec PR 2: "no
+    tokens"; their only reader was the hybrid open).
 
 - [ ] **Step 1: Write the failing tests.** Create `projectInfo.test.ts`:
 
@@ -5000,7 +5157,10 @@ test("a project named on the command line opens from the local root", async () =
       with `natively` the same.
     - Delete the `enableCloudExecution`/`Plan` check, and the `'hybrid-closed'`
       case at line 307.
-    - Delete `enableCloudExecution` from `featureFlags.ts`.
+    - Delete `enableCloudExecution` and `enableAdvancedProjectExecutionOptions`
+      from `featureFlags.ts` (the latter's only readers were the devtools,
+      deleted in PR 2), and their two lines from
+      `integration-test/mock/registerMocks.ts`'s default flags (~l.59–60).
     - Persisted `openedTabs` with a cloud or hybrid `runningProject` now fail
       the schema, and the app starts with no restored tabs. That is accepted: PR
       1 already stops creating such entries, and the next close rewrites the
@@ -5021,14 +5181,32 @@ test("a project named on the command line opens from the local root", async () =
     `remoteUploadFinished`.
   - **`projectLogData.ts`:** use `backends.localBackend` instead of
     `backendForType(projectSessionBackendType(…))`.
-  - `git grep -nE "hybrid|Hybrid|mode === 'cloud'|enableCloudExecution|remoteUploadFinished" -- app/gui/src`
-    must come back empty.
+  - **`session.ts`:** with the hybrid open gone (`projectStates.ts` ~l.207 was
+    the only token reader), delete `accessToken`, `refreshToken`, `refreshUrl`,
+    `expireAt` and `clientId` from `UserSession` and from `makeLocalSession`
+    (with `LOCAL_SESSION_LIFETIME_MS`, the `now` parameter and the
+    `Rfc3339DateTime` import); fix the interface's doc comment ("The local
+    session: only the local user's email."). Replace `session.test.ts`'s test
+    with:
+
+```ts
+test("the local session is the local user's email, with no tokens", () => {
+  expect(makeLocalSession()).toEqual({ email: LOCAL_SESSION_EMAIL });
+});
+```
+
+- `git grep -nE "hybrid|Hybrid|mode === 'cloud'|enableCloudExecution|enableAdvancedProjectExecutionOptions|remoteUploadFinished" -- app/gui/src app/gui/integration-test`
+  must come back empty, and so must
+  `git grep -nE "session\??\.(accessToken|refreshToken|refreshUrl|expireAt|clientId)|accessToken: ''" -- app/gui/src`
+  (other `clientId` names, such as the language-server client id in
+  `openedProjects/project/project.ts`, are unrelated and stay).
 - [ ] **Step 4: Run the tests.**
       `corepack pnpm --dir app/gui exec vitest run src/providers src/router src/project-view/providers src/components`,
-      then `corepack pnpm --dir app/gui run typecheck`. Expected: pass, with 0
+      then `corepack pnpm --dir app/gui run typecheck` (it covers
+      `integration-test/` through `tsconfig.node.json`). Expected: pass, with 0
       errors.
 - [ ] **Step 5: Commit.** Run
-      `git add -A app/gui/src && git commit -m "Open projects only locally: drop hybrid and cloud project states"`.
+      `git add -A app/gui/src app/gui/integration-test/mock/registerMocks.ts && git commit -m "Open projects only locally: drop hybrid and cloud project states"`.
 
 ### Task 32: Versions tab without its cloud branches; Schedule tab removed
 
@@ -5037,27 +5215,28 @@ test("a project named on the command line opens from the local root", async () =
 - Modify:
   - in `app/gui/src/versions/` (PR 2's location): `AssetVersions.vue`,
     `AssetVersion.vue`, `AssetVersionList.vue`, `queries.ts`, `version.ts`,
-    `rightPanel.ts`, `CLAUDE.md`, `__tests__/AssetVersions.test.ts`;
+    `CLAUDE.md`, `__tests__/AssetVersions.test.ts`;
   - elsewhere: `app/gui/src/providers/rightPanel.ts`,
     `app/gui/src/providers/rightPanelContributions.ts`,
     `app/gui/src/providers/__tests__/rightPanelContributions.test.ts`,
-    `app/gui/src/components/AppContainer/RightPanel.vue`.
+    `app/gui/src/components/AppContainer/RightPanel.vue`,
+    `app/gui/src/__tests__/registerCore.test.ts` (Task 3: its
+    `"settings"`/`"executionsCalendar"` assertions stop typechecking once the
+    union is `'versions'`).
 - Delete:
   - in `app/gui/src/versions/`: `AddVersionTag.vue`,
     `NewProjectExecutionForm.vue`, `ProjectExecution.vue`,
     `ProjectExecutionsCalendar.vue`, `ProjectExecutionsCalendarContent.vue`,
-    `schedule.ts`, `__tests__/ProjectExecutionsCalendar.test.ts`;
-  - `app/gui/src/dashboard/layouts/Settings/__tests__/cloudTabs.test.ts`, if PR
-    2 left it.
+    `schedule.ts`, `__tests__/ProjectExecutionsCalendar.test.ts`.
 
 **Interfaces:**
 
-- Consumes: PR 2's `app/gui/src/versions/` and its core registration (here
-  called `registerVersionsTabs`; use PR 2's name); Task 30's categories (local
-  only).
+- Consumes: PR 2's `app/gui/src/versions/` and `registerCore()`
+  (`src/registerCore.ts`, PR 1), which already contributes only `versions`; Task
+  30's categories (local only) and right panel (no `settings` or `description`
+  tab, `executionsCalendar` left hidden).
 - Produces:
-  - `ContributedRightPanelTab = 'settings' | 'versions'`, and
-    `registerVersionsTab()` contributes only `versions`;
+  - `ContributedRightPanelTab = 'versions'`; `registerCore()` is unchanged;
   - `AssetVersions.vue` reads versions from `useBackends().localBackend` only;
   - `queries.ts` has no `versionTagsQueryOptions`, `useAddVersionTag` or
     `useRemoveVersionTag`.
@@ -5066,12 +5245,16 @@ test("a project named on the command line opens from the local root", async () =
       replace the `executionsCalendar` case with:
 
 ```ts
-test("only Settings and Versions can be contributed", () => {
-  expectTypeOf<ContributedRightPanelTab>().toEqualTypeOf<
-    "settings" | "versions"
-  >();
+test("only Versions can be contributed", () => {
+  expectTypeOf<ContributedRightPanelTab>().toEqualTypeOf<"versions">();
 });
 ```
+
+and delete the first test's `rightPanelTabContribution('settings')` line
+(~l.19). In `src/__tests__/registerCore.test.ts`, rename the test to
+"contributes the Versions tab" and delete its two lines
+`expect(rightPanelTabContribution("settings")).toBeUndefined()` and
+`expect(rightPanelTabContribution("executionsCalendar")).toBeUndefined()`.
 
 In `AssetVersions.test.ts`:
 
@@ -5095,22 +5278,22 @@ test("the opened project’s versions come from the local backend, without asset
       `corepack pnpm --dir app/gui exec vitest run src/providers/__tests__/rightPanelContributions.test.ts src/versions`
       and `corepack pnpm --dir app/gui run typecheck` (vue-tsc checks the
       `expectTypeOf` assertion; vitest alone does not). Expected: the type
-      assertion fails (`'executionsCalendar'` is still in the union), and the
-      fixture change fails while `AssetVersions.vue` still reads
+      assertion fails (`'settings'` and `'executionsCalendar'` are still in the
+      union), and the fixture change fails while `AssetVersions.vue` still reads
       `remoteBackend`.
 - [ ] **Step 3: Implement.**
   - Run
     `git rm app/gui/src/versions/AddVersionTag.vue app/gui/src/versions/NewProjectExecutionForm.vue app/gui/src/versions/ProjectExecution.vue app/gui/src/versions/ProjectExecutionsCalendar.vue app/gui/src/versions/ProjectExecutionsCalendarContent.vue app/gui/src/versions/schedule.ts app/gui/src/versions/__tests__/ProjectExecutionsCalendar.test.ts`.
-  - `rightPanel.ts` (versions) drops the `executionsCalendar` contribution.
   - `providers/rightPanel.ts` drops the `executionsCalendar` tab definition
-    (around line 136) and its plan check.
-  - `RightPanel.vue` drops the `'executionsCalendar'` case, and
-    `rightPanelContributions.ts` drops it from the union.
+    (around line 136, with the placeholder `enabled` Task 30 gave it).
+  - `RightPanel.vue` drops the `'executionsCalendar'` case (leaving
+    `case 'versions': return contributedTab(data.displayedTab)`), and
+    `rightPanelContributions.ts` becomes
+    `export type ContributedRightPanelTab = 'versions'` (fix its doc comment).
   - **`AssetVersions.vue`:**
     - `openedProject` resolves to `{ id, backend: localBackend ?? null }`.
-    - Delete the `isCloudCategory(category)` branch (around line 143), the
-      cloud/hybrid `getAssetDetails` fetch and the "outside the cloud"
-      placeholder.
+    - Delete the cloud/hybrid `getAssetDetails` fetch and the "outside the
+      cloud" placeholder (Task 30 already deleted the `isCloudCategory` branch).
     - Every route goes through `localProjectState`.
   - **`AssetVersion.vue`:** delete `hasTags`, `tagsQuery`, `removeVersionTag`,
     `<AddVersionTag>` and the `onDelete` of tags. `VersionTag.vue` stays for
@@ -5140,19 +5323,27 @@ test("the opened project’s versions come from the local backend, without asset
 - Modify:
   - providers: `app/gui/src/providers/backends.ts`,
     `app/gui/src/providers/auth.ts`, `app/gui/src/providers/session.ts`,
-    `app/gui/src/providers/drive.ts`, `app/gui/src/providers/mapboxToken.ts`;
+    `app/gui/src/providers/drive.ts`;
   - app shell and settings: `app/gui/src/components/AppContainerLayout.vue`,
     `app/gui/src/components/AppContainer/LeftPanel.vue`,
     `app/gui/src/components/DashboardPage.vue`,
     `app/gui/src/configurations/settings.ts`,
+    `app/gui/src/configurations/settingsTabs.ts` (`SettingsTabType`'s cloud
+    members), `app/gui/src/configurations/inputBindings.ts` (the cloud-only
+    actions and `goTo…Settings` bindings),
+    `app/gui/src/configurations/__tests__/keyboardShortcuts.test.ts`,
     `app/gui/src/dashboard/layouts/Settings/SettingsPage.vue`,
     `app/gui/src/dashboard/layouts/Settings/tabs.ts`;
+  - `isAuthDisabled` and nullable-`session` readers: every file
+    `git grep -ln "isAuthDisabled" -- app/gui/src` lists (32 non-test uses on
+    develop), and the tests that set it, including
+    `app/gui/src/providers/__tests__/auth.test.ts`;
   - drive: `app/gui/src/dashboard/layouts/DriveView.vue`,
     `app/gui/src/dashboard/layouts/AssetContextMenu.vue`
     (`TEAMS_DIRECTORY_ID`/`USERS_DIRECTORY_ID`),
     `app/gui/src/dashboard/layouts/AssetsTable.vue` (`RemoteBackend/ids`);
-  - project view: `app/gui/src/project-view/composables/backend.ts`,
-    `app/gui/src/project-view/components/widgets/FileBrowserWidget.vue`;
+  - project view: `app/gui/src/project-view/composables/backend.ts` and its
+    callers (`git grep -n "useBackend('remote')" -- app/gui/src`);
   - test utilities: `app/gui/src/utils/testing/mountWithProviders.ts`,
     `app/gui/src/utils/testing/__tests__/mountWithProviders.test.ts`, and every
     test that passes `remoteBackend` to `mockBackends`/`mountWithProviders`
@@ -5169,7 +5360,12 @@ test("the opened project’s versions come from the local backend, without asset
     argument and the local backend;
   - `mockBackends({ localBackend? })`;
   - `UserSession`/`SettingsBaseContext` have no `isCloudDataUnavailable`,
-    `organization` or `backend: RemoteBackend`.
+    `organization` or `backend: RemoteBackend`;
+  - `useSession()` is `{ readonly session: UserSession }` and `useAuth()`'s
+    `session` is non-null; neither has `isAuthDisabled`;
+  - `SettingsTabType` is `account | local | appearance | keyboardShortcuts`, and
+    no cloud-only action or `goTo…Settings` binding is left in
+    `inputBindings.ts`.
 
 - [ ] **Step 1: Write the failing test.** In
       `utils/testing/__tests__/mountWithProviders.test.ts`, replace the remote
@@ -5211,22 +5407,52 @@ test("the backends store holds only the local backend", () => {
       and `SettingsPage.vue`, and every `isCloudDataUnavailable:` key in the
       Settings tests.
   - **`SettingsPage.vue`:** delete `organizationQuery`, `updateUserMutation`,
-    `updateOrganizationMutation` and the `backend`/`organization`/`updateUser`/
-    `updateOrganization`/`changePassword` context fields that PR 2 left,
-    together with their declarations in `configurations/settings.ts`. Delete
-    those tabs' tests (`accountTab.test.ts`, `organizationTabs.test.ts`,
-    `billingTab.test.ts`) if PR 2 left them.
-  - **`auth.ts`/`session.ts`:** delete any `remoteBackend`, `usersMe`,
-    `createUser`, `updateUser`, `deleteUser` or `restoreUser` use that PR 2
-    left.
-  - **`mapboxToken.ts`:** delete `createMapboxTokenStore` if PR 1 left it.
+    `updateOrganizationMutation` and the `backend`/`organization` context
+    fields, together with their declarations in `configurations/settings.ts`
+    (Task 15 already deleted `updateUser`/`updateOrganization`/`changePassword`,
+    and Task 12 the cloud tabs' tests).
+  - **`isAuthDisabled` and the nullable `session`:** delete `isAuthDisabled`
+    from `useSession` (`session.ts`) and from `auth.ts`'s `UserSession`,
+    `makeLocalUserSession` and `createAuthStore`. In every reader keep the
+    `true` branch (e.g. `if (auth.isAuthDisabled) A else B` becomes `A`;
+    `!auth.isAuthDisabled && X` disappears). Type `session` as non-null:
+    `useSession`'s `const session: UserSession = makeLocalSession()`, and
+    `createAuthStore`'s
+    `computed((): UserSession => makeLocalUserSession(session, getText('offlineUserName')))`;
+    then fix each `@typescript-eslint/no-unnecessary-condition` report on a
+    `session?.`/`session != null` that
+    `corepack pnpm --dir app/gui exec eslint src --max-warnings=0` gives. In
+    `auth.test.ts` delete the `isAuthDisabled` assertion; delete
+    `isAuthDisabled:` keys from test fixtures, the field from
+    `configurations/settings.ts`'s context, and the mention in
+    `dashboard/layouts/Settings/CLAUDE.md`
+    (`git grep -n "isAuthDisabled" -- app/gui` lists them all).
+  - **Cloud settings tabs and shortcuts (R3, Task 12):** in
+    `configurations/settingsTabs.ts` delete `organization`, `billingAndPlans`,
+    `members`, `userGroups`, `activityLog`, `apiKeys` and `usage` (and their
+    `SETTINGS_TAB_ICONS` entries). In `inputBindings.ts` delete
+    `goToOrganizationSettings`, `goToBillingAndPlansSettings`,
+    `goToMembersSettings`, `goToUserGroupsSettings`, `goToActivityLogSettings`,
+    and the cloud-only actions `switchOrganization`, `run`, `runAsTask`,
+    `downloadToLocal`, `undelete`, `share`, `newSecret`, `newCredential`,
+    `signOut`, `upgradePlan` and `toggleEnsoDevtools` (`uploadToCloud` went in
+    Task 30). Before deleting each action run
+    `git grep -nE "'<action>'|<action>:" -- app/gui/src ':!app/gui/src/configurations/inputBindings.ts'`:
+    delete its now-dead users (menu entries gated on a cloud category, handlers
+    for deleted UI), and keep the action, with a note in the PR body, if a live
+    local use remains. In `DashboardPage.vue` delete the five cloud
+    `goTo…Settings` handlers (l.81–95) and their gating conditions. Update the
+    `keyboardShortcuts.test.ts` equality test's expected action list to match
+    (delete the same names), and `KeyboardShortcutsSettingsSection.test.ts` if
+    it names any.
   - **`project-view/composables/backend.ts`:** `useBackend()` uses
-    `localBackend`. Update `FileBrowserWidget.vue` (`useBackend('remote')`
-    becomes `useBackend()`).
+    `localBackend`; every `useBackend('remote')` caller from
+    `git grep -n "useBackend('remote')" -- app/gui/src` becomes `useBackend()`.
   - **`AssetContextMenu.vue`/`AssetsTable.vue`:** delete the Users/Teams
     virtual-directory branches and the `RemoteBackend/ids` import.
-  - `git grep -nwE "RemoteBackend|remoteBackend|isCloudDataUnavailable" -- app/gui/src`
-    must come back empty.
+  - `git grep -nwE "RemoteBackend|remoteBackend|isCloudDataUnavailable|isAuthDisabled" -- app/gui/src`
+    must come back empty, and so must
+    `git grep -nE "SettingsTabType\.(organization|billingAndPlans|members|userGroups|activityLog|apiKeys|usage)|goTo(Organization|BillingAndPlans|Members|UserGroups|ActivityLog)Settings|switchOrganization|runAsTask" -- app/gui/src`.
 - [ ] **Step 4: Run the tests.** Run
       `corepack pnpm --dir app/gui exec vitest run`, then
       `corepack pnpm --dir app/gui run typecheck`, then
@@ -5239,24 +5465,20 @@ test("the backends store holds only the local backend", () => {
 
 **Files:**
 
-- Modify: `app/electron-client/src/index.ts`,
-  `app/electron-client/src/server.ts`,
+- Modify: `app/electron-client/src/server.ts`,
   `app/gui/project-manager-shim-middleware/index.ts`,
   `app/common/src/services/LocalBackend.ts`
-- Delete: `app/electron-client/src/backend.ts`,
-  `app/electron-client/src/assetManagement.ts`,
+- Delete: `app/electron-client/src/assetManagement.ts`,
   `app/electron-client/tests/headless/writeFile.test.ts` (`test.skip`'d,
   cloud-only, imports `RemoteBackend`)
 
 **Interfaces:**
 
-- Consumes: PR 2's Electron changes. PR 2 deletes `src/authentication.ts`, which
-  `backend.ts` imports (`getUpToDateAccessToken`), so PR 2 may already have
-  removed or stubbed `createRemoteBackend`. Delete whatever is left.
+- Consumes: Task 16 (R7), which already deleted `backend.ts`
+  (`createRemoteBackend`), `DEEP_LINK_SCHEME` and the `runHybridProjectByUrl`
+  import, and made headless `enso:` URLs exit 1 with "Cloud projects are not
+  supported; pass a local project path."; `index.ts` needs nothing more here.
 - Produces:
-  - `--headless --startup.project <path>` runs only local projects. An `enso:`
-    URL exits 1 with "Cloud projects are not supported; pass a local project
-    path.";
   - `LocalBackend` has no `startWatchingHybridProject`,
     `stopWatchingHybridProject` or `getStateOfWatchedHybridProject`;
   - neither server routes `/api/watcher/*`, `/api/cloud/download-project` or
@@ -5266,25 +5488,25 @@ test("the backends store holds only the local backend", () => {
       import time (`await app.run()`), so no unit test can reach it. The check
       is the grep that ends Step 3. Before the change, run
       `git grep -nE "createRemoteBackend|runHybridProjectByUrl|handleWatcherRequest|isWatcherRequest|downloadCloudProject|httpCloud|/cloud/|WatchingHybridProject" -- app/electron-client/src app/gui/project-manager-shim-middleware app/common/src`.
-      Expected: hits in `index.ts`, `backend.ts`, `server.ts`,
-      `assetManagement.ts`, the middleware and `LocalBackend.ts`.
-- [ ] **Step 2: Implement `index.ts`.** Replace the `enso:` branch (around lines
-      541–556) with:
-
-```ts
-      if (projectToOpen.startsWith(`${DEEP_LINK_SCHEME}:`)) {
-        console.error('Cloud projects are not supported; pass a local project path.')
-        return this.exit(1)
-      } else if (projectToOpen) {
-```
-
-Drop `runHybridProjectByUrl`, `createRemoteBackend` and `EnsoPath` from the
-imports (if PR 2 deleted `DEEP_LINK_SCHEME`, test
-`projectToOpen.startsWith('enso:')` inline instead).
+      Expected: hits in `server.ts`, `assetManagement.ts`, the middleware and
+      `LocalBackend.ts` (none in `index.ts` or for `createRemoteBackend`: Task
+      16 removed them).
+- [ ] **Step 2: Confirm nothing local uses the watcher (R15).** Before deleting
+      any watcher route, run
+      `git grep -n "api/watcher" -- app ':!**/node_modules/**'`. Expected: the
+      shim's `handler/watcher.ts` (the routes; `server.ts` and the middleware
+      reach it through `isWatcherRequest`), and as callers only `LocalBackend`'s
+      three `*HybridProject` methods (develop l.1081–1117:
+      `startWatchingHybridProject`, `stopWatchingHybridProject`,
+      `getStateOfWatchedHybridProject`), which Task 31 left without callers and
+      Step 3 deletes. Confirm with
+      `git grep -nE "WatchingHybridProject|WatchedHybridProject" -- app/gui/src`
+      (must print nothing). If any other caller shows up, stop and report it
+      instead of deleting the watcher.
 
 - [ ] **Step 3: Implement the servers and `LocalBackend`.**
   - Run
-    `git rm app/electron-client/src/backend.ts app/electron-client/src/assetManagement.ts app/electron-client/tests/headless/writeFile.test.ts`.
+    `git rm app/electron-client/src/assetManagement.ts app/electron-client/tests/headless/writeFile.test.ts`.
   - **`server.ts`:** delete the `watchers` field (line 188), the
     `isWatcherRequest` branch (around line 292), the `/cloud/download-project`
     and `/cloud/get-project-archive` cases (299–306), `httpCloudDownloadProject`
@@ -5296,8 +5518,7 @@ imports (if PR 2 deleted `DEEP_LINK_SCHEME`, test
     imports.
   - **`LocalBackend.ts`:** delete the three
     `*WatchedHybridProject`/`*WatchingHybridProject` methods (lines 1066–1126).
-  - Re-run the Step 1 grep. Expected: empty, apart from a line that rejects
-    `enso:` in `index.ts`.
+  - Re-run the Step 1 grep. Expected: empty.
 - [ ] **Step 4: Run the checks.** Run
       `corepack pnpm --dir app/electron-client run typecheck`,
       `corepack pnpm --dir app/common run typecheck`,
@@ -5305,7 +5526,7 @@ imports (if PR 2 deleted `DEEP_LINK_SCHEME`, test
       `corepack pnpm --dir app/electron-client exec vitest run`. Expected: 0
       errors, and the remaining headless tests pass.
 - [ ] **Step 5: Commit.** Run
-      `git add -A app/electron-client app/gui/project-manager-shim-middleware app/common/src/services/LocalBackend.ts && git commit -m "Electron: headless runs local projects only; drop cloud routes and the project watcher"`.
+      `git add -A app/electron-client app/gui/project-manager-shim-middleware app/common/src/services/LocalBackend.ts && git commit -m "Electron and the dev middleware: drop the cloud routes and the project watcher"`.
 
 ### Task 35: Shim: no hybrid open, cloud environment, watcher or cloud upload
 
@@ -5333,7 +5554,8 @@ imports (if PR 2 deleted `DEEP_LINK_SCHEME`, test
 **Interfaces:**
 
 - Consumes: Task 34, which leaves no importers of `handleWatcherRequest`,
-  `project-manager-shim/fs` or `runHybridProjectByUrl`.
+  `project-manager-shim/fs` or `runHybridProjectByUrl`, and whose Step 2
+  confirmed (R15) that nothing local uses the watcher.
 - Produces:
   - `ProjectService.runProject(projectId, projectsDirectory)` and
     `ProjectService.openProject(projectId, projectsDirectory)`, with no `cloud`
@@ -5381,6 +5603,11 @@ it("records every successful open", async () => {
       `LocalBackend` case passes already; it keeps the behaviour pinned once the
       hybrid branch is gone.
 - [ ] **Step 3: Implement.**
+  - R15 check, before deleting the watcher:
+    `git grep -n "api/watcher" -- app ':!**/node_modules/**'` must show only the
+    shim's `handler/watcher.ts` (Task 34 deleted the server routes and
+    `LocalBackend`'s `*HybridProject` methods, its only callers). Anything else
+    is a local user: stop and report it.
   - Run
     `git rm app/project-manager-shim/src/handler/watcher.ts app/project-manager-shim/src/upload.ts app/project-manager-shim/src/fs.ts app/project-manager-shim/src/__tests__/fs.test.ts`.
   - Remove `export * from './watcher.js'` from `handler/index.ts`.
@@ -5414,7 +5641,7 @@ it("records every successful open", async () => {
   `corepack pnpm install` and stage `pnpm-lock.yaml`.
 - **Docs:** in `project-manager-shim/CLAUDE.md` and `common/CLAUDE.md`, drop the
   "cloud projects" and "hybrid project" sentences.
-- `git grep -nE "CloudParams|ENSO_CLOUD_|setHybridOpen|runHybridProjectByUrl|downloadCloudProject|uploadFile\(|chokidar|handleWatcherRequest" -- app ':!**/node_modules/**' ':!app/gui/integration-test/mock/cloud*'`
+- `git grep -nE "CloudParams|ENSO_CLOUD_|setHybridOpen|runHybridProjectByUrl|downloadCloudProject|uploadFile\(|chokidar|handleWatcherRequest" -- app ':!**/node_modules/**'`
   must come back empty.
 - [ ] **Step 4: Run the tests.** Run
       `corepack pnpm --dir app/project-manager-shim run compile`,
@@ -5430,78 +5657,49 @@ it("records every successful open", async () => {
 **Files:**
 
 - Delete: `app/common/src/services/RemoteBackend.ts`,
+  `app/common/src/services/RemoteBackend/ids.ts`,
+  `app/common/src/services/Backend/remoteBackendPaths.ts`,
   `app/common/src/services/Backend/projectExecution.ts`,
   `app/common/src/services/Backend/__test__/projectExecution.test.ts`
-- Move (`git mv`, frozen for the cloud mock until PR 4):
-  `app/common/src/services/RemoteBackend/ids.ts` goes to
-  `app/gui/integration-test/mock/cloud/ids.ts`, and
-  `app/common/src/services/Backend/remoteBackendPaths.ts` goes to
-  `app/gui/integration-test/mock/cloud/remoteBackendPaths.ts`
-- Create: `app/common/src/services/Backend/localBackendPaths.ts`,
-  `app/gui/integration-test/mock/cloud/backend.ts`
+- Create: `app/common/src/services/Backend/localBackendPaths.ts`
 - Modify: `app/common/src/services/Backend.ts` (import),
   `app/common/src/services/LocalBackend.ts`,
   `app/electron-client/src/server.ts`,
   `app/gui/project-manager-shim-middleware/index.ts`,
-  `app/gui/src/providers/config.ts` (`CONFIGURATION_PATH`, if PR 1 left it),
-  `app/gui/src/secrets/serviceCredentials/utilities.ts` (PR 2's location),
-  `app/gui/integration-test/mock/cloudApi.ts`,
-  `app/gui/integration-test/dashboard/copyInstead.spec.ts`, plus any other
-  `integration-test` file the typecheck flags
+  `app/gui/src/secrets/serviceCredentials/utilities.ts` (PR 2's location)
 
 **Interfaces:**
 
-- Consumes: Tasks 33–35, after which no `src` code imports `RemoteBackend`.
+- Consumes: Tasks 40–43 (no integration-test importer) and Tasks 33–35, after
+  which no `src` code imports `RemoteBackend`.
 - Produces:
   - `localBackendPaths.ts` exports `downloadProjectPath`,
     `DOWNLOAD_PROJECT_REGEX`, `getFileDetailsPath`, `GET_FILE_DETAILS_REGEX`,
-    `downloadFilePath` and `EXPORT_ARCHIVE_PATH` (plus any datalink route
-    constant PR 2b put in `remoteBackendPaths.ts`);
+    `downloadFilePath` and `EXPORT_ARCHIVE_PATH` (PR 2b added no path constants:
+    it uses the shim's `datalink/*` routes);
   - `getOauthCallbackPath(service: CredentialInput['type']): HttpsUrl` lives in
     `src/secrets/serviceCredentials/utilities.ts`;
-  - `integration-test/mock/cloud/backend.ts` re-exports
-    `enso-common/src/services/Backend` and `./cloudTypes` (Task 37).
+  - nothing in `app/gui/integration-test/` imports the deleted modules (Tasks
+    40–43 deleted `cloudApi.ts` and the specs that did).
 
 - [ ] **Step 1: Write the failing check.** Run
       `corepack pnpm --dir app/common exec vitest run src/services/Backend/__test__/projectExecution.test.ts`.
       Expected: PASS before the change. It is deleted with its subject: project
       executions are a cloud scheduler feature, and nothing local uses them.
 - [ ] **Step 2: Implement.**
-  - Run
-    `git rm app/common/src/services/RemoteBackend.ts app/common/src/services/Backend/projectExecution.ts app/common/src/services/Backend/__test__/projectExecution.test.ts`.
-  - Run
-    `git mv app/common/src/services/RemoteBackend/ids.ts app/gui/integration-test/mock/cloud/ids.ts`.
-  - Run
-    `git mv app/common/src/services/Backend/remoteBackendPaths.ts app/gui/integration-test/mock/cloud/remoteBackendPaths.ts`.
-  - Rewrite the two moved files' imports to `enso-common/src/services/Backend`,
-    and give each a file comment: "Frozen for `cloudApi.ts`; deleted with it in
-    PR 4."
-  - Create `localBackendPaths.ts` with the six exports above, copied verbatim
-    (with their doc comments, re-worded "…of the local backend's servers
-    (Electron and the dev middleware)").
+  - Create `localBackendPaths.ts` first (its source is about to be deleted) with
+    the six exports above, copied verbatim (with their doc comments, re-worded
+    "…of the local backend's servers (Electron and the dev middleware)").
   - Rewrite the imports in `Backend.ts:14`, `LocalBackend.ts:25`,
     `server.ts:59–64` and the middleware's `index.ts:34–37` to
     `./Backend/localBackendPaths.js` or
     `enso-common/src/services/Backend/localBackendPaths`.
   - Move `getOauthCallbackPath` into
-    `src/secrets/serviceCredentials/utilities.ts` as a local function.
-  - Create `mock/cloud/backend.ts`:
-
-```ts
-/**
- * @file The cloud mock's `Backend`: the shared module, plus the cloud-only declarations PR 3
- * removed from it (`./cloudTypes`). Deleted with `cloudApi.ts` in PR 4.
- */
-export * from "enso-common/src/services/Backend";
-export * from "./cloudTypes";
-```
-
-- Start `mock/cloud/cloudTypes.ts` as `export {}`. Task 37 fills it.
-- Repoint `cloudApi.ts` (`import * as backend from './cloud/backend'`,
-  `./cloud/remoteBackendPaths`, `./cloud/ids`), `copyInstead.spec.ts`, and every
-  other integration-test import the typecheck flags.
-- `git grep -nE "RemoteBackend(/ids)?'|remoteBackendPaths|Backend/projectExecution" -- app ':!app/gui/integration-test/mock/cloud*'`
-  must come back empty.
+    `src/secrets/serviceCredentials/utilities.ts` as a local function (R9).
+  - Then run
+    `git rm app/common/src/services/RemoteBackend.ts app/common/src/services/RemoteBackend/ids.ts app/common/src/services/Backend/remoteBackendPaths.ts app/common/src/services/Backend/projectExecution.ts app/common/src/services/Backend/__test__/projectExecution.test.ts`.
+  - `git grep -nE "RemoteBackend(/ids)?'|remoteBackendPaths|Backend/projectExecution" -- app`
+    must come back empty (including `app/gui/integration-test`).
 - [ ] **Step 3: Run the checks.** Run
       `corepack pnpm -r --if-present run compile`,
       `corepack pnpm --dir app/gui run typecheck`,
@@ -5529,15 +5727,20 @@ export * from "./cloudTypes";
     `column/ProjectNameColumn.vue`, `columnHeading/ColumnHeading.vue`,
     `components/AssetRow.vue`), `providers/auth.ts`, `providers/session.ts`,
     `providers/category.ts`, `configurations/settings.ts`;
+  - `app/common/src/services/ProjectManager/ProjectManager.ts` (the
+    `HYBRID_PROJECT_DIRECTORY_MASK` listing filter, ~l.258) and
+    `app/common/src/services/ProjectManager/__tests__/ProjectManager.test.ts`
+    (decision 9);
   - shim, Electron and the middleware: `app/electron-client/src/server.ts` and
     `app/gui/project-manager-shim-middleware/index.ts` (asset literals'
     `permissions`);
   - test data:
-    `app/gui/src/project-view/components/widgets/FileBrowserWidget/__tests__/mockData.ts`,
-    `app/gui/src/components/Drive/__tests__/DuplicateAssetsModal.test.ts`, and
-    every other file the typecheck flags;
-  - mock: `app/gui/integration-test/mock/cloud/cloudTypes.ts`,
-    `mock/cloud/backend.ts`, `integration-test/dashboard/rightPanel.spec.ts`.
+    `app/gui/src/components/Drive/__tests__/DuplicateAssetsModal.test.ts`,
+    `app/gui/src/providers/__tests__/auth.test.ts` (Task 15's `makeLocalUser`
+    assertions),
+    `app/gui/src/dashboard/pages/dashboard/UserBar/__tests__/UserBar.test.ts`
+    (Task 12's case sets `plan`/`isOrganizationAdmin`), and every other file the
+    typecheck flags.
 - Delete: `app/common/src/utilities/permissions.ts`, if only cloud permissions
   remain in it (its remaining GUI users are the permission columns PR 1 hid).
   Otherwise trim it.
@@ -5550,8 +5753,11 @@ export * from "./cloudTypes";
     `rootDirectoryId(): DirectoryId | null`;
   - `OpenProjectRequestBody = { readonly executeAsync: boolean }`;
   - `Asset` without `permissions`/`createdBy`;
-  - the minimal `User` (see the ruling);
-  - `LocalBackend` without the overrides of the deleted methods.
+  - the minimal `User` (R14): `{ userId, name, email }`, which
+    `providers/auth.ts`'s `makeLocalUser` returns;
+  - `LocalBackend` without the overrides of the deleted methods;
+  - a `cloud-project-<id>` directory under the root lists as an ordinary folder
+    (decision 9): no `HYBRID_PROJECT_DIRECTORY_MASK`.
 
 - [ ] **Step 1: Write the failing test.** Add to
       `app/common/src/services/__test__/Backend.test.ts`:
@@ -5593,33 +5799,56 @@ test("the local backend has no cloud-only methods", () => {
 });
 ```
 
+Add to the `ProjectManager` describe in
+`app/common/src/services/ProjectManager/__tests__/ProjectManager.test.ts`
+(decision 9; the filter lives in `ProjectManager.listDirectory`, so the test
+stubs the shim command beneath it, as `LocalBackend.windowsPaths.test.ts` does):
+
+```ts
+it("lists a cloud-project-* folder as an ordinary folder", async () => {
+  const projectManager = new ProjectManager(ROOT);
+  const attributes = projectEntry(Path("/root/x")).attributes;
+  vi.spyOn(
+    projectManager as never,
+    "runStandaloneCommandJson",
+  ).mockResolvedValue({
+    entries: [
+      { type: "DirectoryEntry", path: "/root/cloud-project-abc", attributes },
+      { type: "DirectoryEntry", path: "/root/Data", attributes },
+    ],
+  } as never);
+  const entries = await projectManager.listDirectory(ROOT);
+  expect(entries.map((entry) => entry.path)).toEqual([
+    "/root/cloud-project-abc",
+    "/root/Data",
+  ]);
+});
+```
+
 - [ ] **Step 2: Run it.** Run
-      `corepack pnpm --dir app/common exec vitest run src/services/__test__/Backend.test.ts`.
-      Expected: FAIL on `usersMe`.
+      `corepack pnpm --dir app/common exec vitest run src/services/__test__/Backend.test.ts src/services/ProjectManager/__tests__/ProjectManager.test.ts`.
+      Expected: FAIL on `usersMe`, and the listing lacks
+      `/root/cloud-project-abc`.
 - [ ] **Step 3: Implement.**
   - **`Backend.ts`:** delete exactly the abstract methods and types listed at
-    the top. Before deleting each declaration, cut it into
-    `integration-test/mock/cloud/cloudTypes.ts`, but only for those
-    `cloudApi.ts` or a spec uses. Run
-    `corepack pnpm --dir app/gui run typecheck` after each group: users, orgs,
-    plans, permissions, executions, API keys, audit log.
-    - For kept-but-trimmed names the mock still builds in full (`Asset`, `User`,
-      `Project`), put the pre-trim declaration in `cloudTypes.ts` under the same
-      name, and add an explicit
-      `export type { Asset, User, … } from './cloudTypes'` to
-      `mock/cloud/backend.ts` (an explicit re-export shadows the star export).
-      `cloudApi.ts` then compiles with no change beyond its imports.
+    the top (no copy is kept anywhere: Tasks 40–43 already deleted the cloud
+    mock). Run `corepack pnpm --dir app/gui run typecheck` after each group:
+    users, orgs, plans, permissions, executions, API keys, audit log.
     - `rootPath(user)` becomes `rootPath(): string`, and
       `rootDirectoryId(user, organization)` becomes
-      `rootDirectoryId(): DirectoryId | null`. Update `LocalBackend` and
-      `project-view/components/widgets/FileBrowserWidget/userFiles.ts`'s
-      `UserFilesBackend`.
+      `rootDirectoryId(): DirectoryId | null`. Update `LocalBackend` and every
+      caller the typecheck flags.
+    - Delete `HYBRID_PROJECT_DIRECTORY_MASK` and its entry in
+      `INVALID_NAME_MASKS` (~l.1697), and in `ProjectManager.ts` the filter that
+      drops `cloud-project-*` folders from listings (~l.258), so they list as
+      ordinary folders (decision 9). The `cloud-<id>` writers in `server.ts`,
+      the middleware and `assetManagement.ts` went in Task 34.
     - Delete `ProjectState.hybridOpenInProgress`/`hybridOpened` from the enum
       and from `IS_OPENING`/`IS_OPENING_OR_OPENED`.
   - **`types.ts`:** delete `OrganizationId`, `isOrganizationId`, `UserGroupId`,
     `isUserGroupId`, `ProjectExecutionId`, `SubscriptionId`, `ApiKeyId`, `Ami`
     and `UserPermissionIdentifier`. The compiler shows which still have users;
-    anything only `cloudApi.ts` uses moves to `cloudTypes.ts`.
+    keep only those a kept declaration needs.
   - **`LocalBackend.ts`:** delete the overrides of every deleted method (lines
     700–780, 913–918, 1186–1218, 1285–1290, 1311–1407 for the deleted subset),
     the `organizationId:` fields in its project literals (lines 341, 482, 501,
@@ -5635,15 +5864,35 @@ test("the local backend has no cloud-only methods", () => {
       `AssetColumnCell.vue`, `ProjectNameColumn.vue`, `ColumnHeading.vue` and
       `AssetRow.vue`;
     - `Plan` in `AppContainerLayout.vue`, `appTitle.ts`, `UserBar.vue`,
-      `AssetContextMenu.vue`, `AssetsTableContextMenu.vue` and `auth.ts`'s
-      `makeSyntheticUser`, if PR 2 left them;
-    - `organizationId` in `auth.ts` and `session.ts`.
-  - **`openProject` callers:** pass `{ executeAsync: false }`
-    (`projectStates.ts` and its tests).
-  - Delete `MAPBOX_TOKEN_SCHEMA`/`MapboxToken`. PR 1's settings-based token has
-    its own type.
-  - `git grep -nwE "usersMe|listUsers|getOrganization|OrganizationInfo|Plan|AssetPermission|UserGroupInfo|listUserGroups|undoDeleteAsset|uploadImage|listAssetVersionTags|getLogEvents|logEvent|ApiKey|getMapboxToken|OpenHybridProjectParameters|cognitoCredentials|hybridOpened|hybridOpenInProgress|CheckoutSession|PaymentsConfig" -- app/common/src app/gui/src app/electron-client/src app/project-manager-shim/src app/gui/project-manager-shim-middleware ':!app/common/src/text*'`
-    must come back empty.
+      `AssetContextMenu.vue` and `AssetsTableContextMenu.vue`;
+    - `providers/auth.ts`'s `makeLocalUser` (Task 15) returns
+      `{ userId: backendModule.UserId('user-local'), name, email: backendModule.EmailAddress(LOCAL_SESSION_EMAIL) }`:
+      no `organizationId`, `rootDirectoryId`, `plan`, `isOrganizationAdmin`,
+      `isEnabled`, `userGroups`, `groups` or `isEnsoTeamMember`. Rewrite the
+      first test of `providers/__tests__/auth.test.ts` to the one below (import
+      `LOCAL_SESSION_EMAIL` from `$/providers/session`; drop the `Plan` import);
+    - in `UserBar.test.ts`, the case Task 12 added drops `plan: Plan.free` and
+      `isOrganizationAdmin: true` from its user (and the `Plan` import), and is
+      renamed `'no trial, "Invite" or "Upgrade"'`; fix any other `USER` fixture
+      the typecheck flags the same way;
+    - `organizationId` in `session.ts`, if any is left.
+
+```ts
+test("the local user is named, with the local email", () => {
+  expect(makeLocalUser("Working locally")).toEqual({
+    userId: "user-local",
+    name: "Working locally",
+    email: LOCAL_SESSION_EMAIL,
+  });
+});
+```
+
+- **`openProject` callers:** pass `{ executeAsync: false }` (`projectStates.ts`
+  and its tests).
+- Delete `MAPBOX_TOKEN_SCHEMA`/`MapboxToken`. PR 1's settings-based token has
+  its own type.
+- `git grep -nwE "usersMe|listUsers|getOrganization|OrganizationInfo|Plan|AssetPermission|UserGroupInfo|listUserGroups|undoDeleteAsset|uploadImage|listAssetVersionTags|getLogEvents|logEvent|ApiKey|getMapboxToken|OpenHybridProjectParameters|cognitoCredentials|hybridOpened|hybridOpenInProgress|CheckoutSession|PaymentsConfig" -- app/common/src app/gui/src app/electron-client/src app/project-manager-shim/src app/gui/project-manager-shim-middleware ':!app/common/src/text*'`
+  must come back empty.
 - [ ] **Step 4: Run the checks.** Run
       `corepack pnpm --dir app/common run test:unit`,
       `corepack pnpm -r --if-present run compile`,
@@ -5708,9 +5957,8 @@ test("the local backend is the only backend type", () => {
   - in the tests, `BackendType.remote` fixtures become local, or the case is
     deleted when it tested a cloud-only path.
 
-  Then run
-  `git grep -nE "BackendType\.remote|type: 'remote'" -- app ':!app/gui/integration-test/mock/cloud*' ':!app/gui/integration-test/mock/cloudApi.ts'`.
-  Expected: empty.
+  Then run `git grep -nE "BackendType\.remote|type: 'remote'" -- app`. Expected:
+  empty.
 
 - [ ] **Step 4: Run the checks.** Run
       `corepack pnpm --dir app/common run test:unit`,
@@ -5729,8 +5977,8 @@ test("the local backend is the only backend type", () => {
 - [ ] **Step 1: Run the final greps.** Each must come back empty:
 
 ```bash
-git grep -nwE "RemoteBackend|remoteBackend|createRemoteBackend|runHybridProjectByUrl" -- app ':!app/gui/integration-test/mock/cloud*' ':!app/gui/integration-test/mock/cloudApi.ts'
-git grep -nE "BackendType\.remote|isCloudCategory|isCloudDataUnavailable|HybridOpened|HybridDownloaded|hybrid-opened|openHybridProjectParameters|CloudParams|ENSO_CLOUD_|setHybridOpen|downloadCloudProject|useUploadsToCloudStore|transferBetweenCategories|remoteBackendPaths|RemoteBackend/ids|Backend/projectExecution|listAssetVersionTags|getMapboxToken|cloud/download-project|get-project-archive|api/watcher|projectSessionBackendType|isRemoteAssetPath|executionsCalendar" -- app ':!app/gui/integration-test/mock/cloud*' ':!app/gui/integration-test/mock/cloudApi.ts' ':!app/common/src/text*'
+git grep -nwE "RemoteBackend|remoteBackend|createRemoteBackend|runHybridProjectByUrl" -- app
+git grep -nE "BackendType\.remote|isCloudCategory|isCloudDataUnavailable|HybridOpened|HybridDownloaded|hybrid-opened|openHybridProjectParameters|CloudParams|ENSO_CLOUD_|setHybridOpen|downloadCloudProject|useUploadsToCloudStore|transferBetweenCategories|remoteBackendPaths|RemoteBackend/ids|Backend/projectExecution|listAssetVersionTags|getMapboxToken|cloud/download-project|get-project-archive|api/watcher|projectSessionBackendType|isRemoteAssetPath|executionsCalendar|isAuthDisabled|HYBRID_PROJECT_DIRECTORY_MASK" -- app ':!app/common/src/text*'
 git grep -n "ENSO_LOCAL_PROJECT_ID" -- app/project-manager-shim/src   # must NOT be empty: kept
 ```
 
@@ -5774,19 +6022,21 @@ configuration.
     spec checks: no login screen, starts on Local, projects open/save/version,
     Settings has no cloud sections, and no cloud request or error when offline.
     Also run `Enso.exe --headless --startup.project <a local project>`: it
-    exits 0. With `enso://…` it exits 1 with the message from Task 34.
+    exits 0. With `enso://…` it exits 1 with the message from Task 16.
 - [ ] **Step 4: Push and open the PR.** Run
       `git push -u origin feature/local-only-remove-remote-backend`, then
       `gh pr create --base develop --label "CI: No changelog needed" --title "Local-only IDE, PR 3: remove the remote backend"`.
       The body covers:
   - **Summary:** what is deleted from each package, with the method and type
     lists from this section.
-  - **Rulings:** the integration-test mock frozen under
-    `integration-test/mock/cloud/` until PR 4; `BackendType.remote` removed (the
-    counts); the minimal `User`; restored tabs from a cloud/hybrid project are
-    dropped once.
-  - **Behaviour:** none visible beyond PR 1, plus headless `enso:` URLs now
-    refused.
+  - **Rulings:** Tasks 40–43 (PR 4's spec ports, the cloud mock's deletion and
+    the suite-wide cloud-request guard) ran first in this PR, so nothing is
+    frozen for a cloud mock; `BackendType.remote` removed (the counts); the
+    minimal `User`; `cloud-project-*` folders list as ordinary folders; restored
+    tabs from a cloud/hybrid project are dropped once.
+  - **Behaviour:** none visible beyond PR 1, apart from `cloud-project-*`
+    folders now listing in the drive (decision 9). (Headless `enso:` URLs have
+    been refused since PR 2.)
   - **Not verified here:** `ProjectService.test.ts` needs a built engine (it
     runs in CI); the `Package New IDE` jobs on Linux and Windows are CI's.
   - **Screenshots:** before/after of the drive sidebar, a context menu and the
@@ -5818,15 +6068,14 @@ test by the user before merge. Add the `CI: Build IDE` label so that
 `Package New IDE` runs on Linux and Windows even if the changed-files filters
 would skip it.
 
-**Ordering hazard (Ruling needed):** PR 3 deletes
+**Ordering (settled; see "Execution order" at the top):** PR 3 deletes
 `services/Backend/remoteBackendPaths.ts` and `services/RemoteBackend/ids.ts` and
 trims `Backend.ts`. `mock/cloudApi.ts` imports all three (lines 2–8), and
 `tsconfig.node.json` type-checks it, so PR 3's `typecheck` cannot pass while
-that file exists. **Recommended default:** run Tasks 40–43 at the start of PR 3.
-They touch nothing PR 3 changes except the local mock's
-`/api/cloud/download-project` route, which they delete too. The rest of PR 4
-then follows as written. Every `git rm` below uses `--ignore-unmatch`, so the
-tasks are still correct if PR 3 has already deleted some of these files.
+that file exists. So Tasks 40–43 run at the start of PR 3, before Task 30. They
+touch nothing PR 3 changes except the local mock's `/api/cloud/download-project`
+route, which they delete too. PR 4 is then Tasks 44–49. Every `git rm` below
+uses `--ignore-unmatch`, so the tasks hold wherever they land.
 
 ### Task 40: Local mock helpers and a suite-wide cloud-request guard
 
@@ -5842,7 +6091,8 @@ tasks are still correct if PR 3 has already deleted some of these files.
 - Consumes:
   - from PR 1, the app starts on the local drive with no login, and its startup
     spec makes no cloud request;
-  - from PR 3, nothing calls `/api/cloud/download-project` any more.
+  - no reachable code calls `/api/cloud/download-project` (no cloud category
+    since PR 1; Task 33 deletes the caller later in PR 3).
 - Produces:
   - `MockLocalApi.addRootDirectory(title: string, options?: { parent?: Path; attributes?: Partial<Attributes> }): Path`
   - `MockLocalApi.addRootFile(title: string, options?: { parent?: Path; content?: string; attributes?: Partial<Attributes> }): Path`
@@ -5864,13 +6114,21 @@ tasks are still correct if PR 3 has already deleted some of these files.
 ```ts
 /** @file Every spec fails if the app asks Enso Cloud for anything (`cloudRequests`, `base.ts`). */
 import { expect, test } from "integration-test/base";
+import { registerMocks } from "integration-test/mock/registerMocks";
 
+// Not `drivePage`: until Task 43 that fixture goes through `loginPage` and the cloud mock
+// (`cloudApi`), whose `https://mock` routes are registered after this auto fixture and so would
+// answer first. Only the local mock is registered here, as in `localOnly.spec.ts`.
 test("a request to Enso Cloud is blocked and recorded", async ({
-  drivePage,
   page,
+  localApi,
+  appConfig,
   cloudRequests,
 }) => {
-  await drivePage;
+  const _ = { localApi };
+  await registerMocks(page, {}, { appConfig });
+  await page.goto("/");
+  await expect(page.getByTestId("drive-view")).toBeVisible();
   const outcome = await page.evaluate(() =>
     fetch("https://mock/users/me").then(
       () => "answered",
@@ -6001,11 +6259,11 @@ Also add a `project/duplicate` route next to `project/create`. It reads
 `{ projectId, projectName, projectNormalizedName, projectPath }`. Add all four
 helpers to `api`.
 
-- [ ] **Step 5: Remove what the electron and cloud mocks no longer need from
-      `registerMocks.ts`.** Delete `authentication` from `mockElectronApi`,
-      because PR 2 removed the preload API. Delete the
-      `ensoanalytics.com/eula.json` and `privacy.json` routes and their bodies,
-      because PR 2 removed the agreements.
+- [ ] **Step 5: Remove what the cloud mocks no longer need from
+      `registerMocks.ts`.** Delete the `ensoanalytics.com/eula.json` and
+      `privacy.json` routes and their bodies, because PR 2 removed the
+      agreements. (`mockElectronApi`'s `authentication` stub already went in
+      Task 16.)
 - [ ] **Step 6: Run the tests.** Rerun Step 2's spec; it passes. Then run the
       whole suite once to see whether a non-cloud spec trips the guard:
       `corepack pnpm --dir app/gui exec playwright test --project="Integration Tests" --workers=2`.
@@ -6038,8 +6296,11 @@ helpers to `api`.
 - Produces: no spec under `dashboard/` that uses `cloudApi` or
   `goToCategory.cloud()/recent()/trash()`, except those deleted in Task 43.
 
-The ports follow these rules. Each `goToCategory.cloud()` becomes `.local()`.
-Each `cloudApi.addX({ title })` becomes `localApi.addRootX(title)`, in
+The ports follow these rules. Remove every `test.skip(true, CLOUD_ONLY)` line
+Task 8 added to a ported spec (file-level and per-test), and the spec's
+`CLOUD_ONLY` import; otherwise the ported tests stay skipped and a "pass" is
+only a skip. Each `goToCategory.cloud()` becomes `.local()`. Each
+`cloudApi.addX({ title })` becomes `localApi.addRootX(title)`, in
 `setupApi.local` or in the test body with the `localApi` fixture. A spec whose
 row counts assumed an empty drive sets
 `test.use({ setupApi: { addDefaultProject: false } })`. A cloud secret becomes a
@@ -6049,7 +6310,7 @@ file. The table says what happens to each test.
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | contextMenu         | `drive view` (no default project; drop the label setup)                                                                                   | none                                                                                                                                                    |
 | copy                | `move`, `move (drag)`, `move (keyboard)`, `cut (keyboard)`, `duplicate`, `duplicate (keyboard)` (projects)                                | `copy` and `copy (keyboard)`: local `copyAsset` copies only projects, within their folder (`LocalBackend.ts` ~L657). `move to trash`: there is no Trash |
-| createAsset         | the three `(local)` tests; `create folder (local)` drops its leading `.cloud()`                                                           | the four `(remote)` tests, including the secret                                                                                                         |
+| createAsset         | the three `(local)` tests (Task 8 already dropped `create folder (local)`'s leading `.cloud()`)                                           | the four `(remote)` tests, including the secret                                                                                                         |
 | delete              | `delete (local)`, `cannot delete opened project (local)`                                                                                  | every `(remote)` and trash test (6)                                                                                                                     |
 | driveView           | `drive view`, with `contextMenu.delete()` in place of `moveToTrash()` and no default project                                              | none                                                                                                                                                    |
 | editAssetName       | all 11 tests, with `calls.updateAsset` → `localApi.trackCalls().moveFile`                                                                 | none                                                                                                                                                    |
@@ -6084,8 +6345,10 @@ test("move (drag)", async ({ drivePage, localApi }) => {
       Before Task 40 it would fail on the missing `addRootDirectory`; with Task
       40 in place it passes. If it fails on the row order, fix the order, not
       the app. The drive groups folders before projects.
-- [ ] **Step 3: Port the rest by the table.** The rename assertions in
-      `editAssetName.spec.ts` change like this:
+- [ ] **Step 3: Port the rest by the table.** In each of the 11 specs first
+      remove its `test.skip(true, CLOUD_ONLY)` lines and the `CLOUD_ONLY` import
+      (see the rules above). The rename assertions in `editAssetName.spec.ts`
+      change like this:
 
 ```ts
 const calls = localApi.trackCalls();
@@ -6128,11 +6391,14 @@ comment saying so, and leave the sorted expectations alone.
       `git rm --ignore-unmatch app/gui/integration-test/dashboard/copyInstead.spec.ts app/gui/integration-test/dashboard/exportAsset.spec.ts`.
 - [ ] **Step 5: Check that nothing is left behind, and run the tests.** This
       must print nothing:
-      `git grep -n "cloudApi\|goToCategory\s*\.\s*\(cloud\|recent\|trash\)()\|\.cloud()" -- app/gui/integration-test/dashboard/{contextMenu,copy,createAsset,delete,driveView,editAssetName,sort,assetSearchBar,assetsTableFeatures,labelsPopover,pageSwitcher}.spec.ts`.
+      `git grep -n "CLOUD_ONLY\|cloudApi\|goToCategory\s*\.\s*\(cloud\|recent\|trash\)()\|\.cloud()" -- app/gui/integration-test/dashboard/{contextMenu,copy,createAsset,delete,driveView,editAssetName,sort,assetSearchBar,assetsTableFeatures,labelsPopover,pageSwitcher}.spec.ts`.
       Then, in WSL, run these 11 specs three times each with
-      `--workers=2 --repeat-each=3`. All must pass. Run the same specs once on
-      Windows. Finish with `corepack pnpm --dir app/gui run typecheck` and
-      ESLint on the touched files.
+      `--workers=2 --repeat-each=3`. All must pass, and the reporter must show
+      no skipped test in them apart from the
+      `labels (…not supported in     search)` skip that predates PR 1. Run the
+      same specs once on Windows. Finish with
+      `corepack pnpm --dir app/gui run typecheck` and ESLint on the touched
+      files.
 - [ ] **Step 6: Commit.** `git add app/gui/integration-test/dashboard`, then
       `git commit -m "Integration tests: run the drive specs against the local mock"`.
 
@@ -6142,8 +6408,8 @@ comment saying so, and leave the sorted expectations alone.
 
 - Modify (under `app/gui/integration-test/`): `dashboard/rightPanel.spec.ts`,
   `dashboard/accessibility.spec.ts`, `dashboard/userMenu.spec.ts`,
-  `dashboard/localModeSettings.spec.ts`, `dashboard/localVersions.spec.ts` and
-  `project-view/editorPanels.spec.ts`
+  `dashboard/localModeSettings.spec.ts`, `dashboard/localVersions.spec.ts`,
+  `dashboard/localOnly.spec.ts` (Task 8) and `project-view/editorPanels.spec.ts`
 - Modify: `accessibility-baseline/drive.json`,
   `accessibility-baseline/settings.json` and
   `accessibility-baseline/asset-panel.json` (regenerated)
@@ -6157,7 +6423,8 @@ comment saying so, and leave the sorted expectations alone.
 - Produces: no spec, except those deleted in Task 43, that names `cloudApi`,
   `loginPage`, `storageState` or `https://mock`.
 
-- [ ] **Step 1: Port `rightPanel.spec.ts`.** Keep
+- [ ] **Step 1: Port `rightPanel.spec.ts`.** Remove its file-level
+      `test.skip(true, CLOUD_ONLY)` and the `CLOUD_ONLY` import. Keep
       `Asset Panel documentation view` and `Assets Panel docs images`, each
       starting from
       `localApi.addProjectSources(posix.join(localApi.rootPath, 'Mock_Project'))`
@@ -6173,6 +6440,8 @@ comment saying so, and leave the sorted expectations alone.
       It fails until the docs route serves the sources, so fix `mimeTypeFor` or
       the path until both tests pass.
 - [ ] **Step 3: Port `accessibility.spec.ts`.**
+  - Remove every `test.skip(true, CLOUD_ONLY)` Task 8 added (R4) and the
+    `CLOUD_ONLY` import.
   - Delete the `logged out` describe block and run
     `git rm --ignore-unmatch app/gui/integration-test/accessibility-baseline/login.json`.
   - The three drive tests use `localApi.addRootDirectory('Folder')`,
@@ -6210,7 +6479,21 @@ await expect(sidebar).toMatchAriaSnapshot(`
       because it now scans the Docs tab. Then run the spec
       `--repeat-each=10 --workers=2` (integration-test/CLAUDE.md) and check that
       it is stable.
-- [ ] **Step 5: Port the remaining four specs.**
+- [ ] **Step 5: Port the remaining five specs.** In each, first remove the
+      `test.skip(true, CLOUD_ONLY)` lines Task 8 added and the `CLOUD_ONLY`
+      import (the skipped tests below are then deleted or ported).
+  - `localOnly.spec.ts` (Task 8): delete `test.use({ storageState: … })`,
+    `CLOUD_URL`, `failCloudRequests` and the final
+    `expect(cloudRequests).toEqual([])` (the auto `cloudRequests` fixture now
+    fails the test on any cloud request); start the test with
+    `async ({ drivePage, page })` and `await drivePage` in place of the
+    `registerMocks`/`page.goto` lines; delete the
+    `getByPlaceholder(TEXT.emailPlaceholder)` assertion (Task 43 deletes the
+    login page objects that kept `emailPlaceholder` meaningful; the
+    `agreements-modal` check stays); and check the absent toolbar buttons by
+    literal name, `page.getByRole('button', { name: 'New Secret' })` and
+    `{ name: 'New Credential' }`, so that no spec names `TEXT.newSecret` or
+    `TEXT.newCredential` (Task 43's grep, and PR 4's text pruning).
   - `userMenu.spec.ts`: keep `user menu`. Port `local mode` →
     `no "Upgrade Plan" or "Logout"` to `async ({ drivePage, page })`, with no
     config route, no `storageState` and no reload. Delete `download app` (the
@@ -6229,9 +6512,11 @@ await expect(sidebar).toMatchAriaSnapshot(`
     only Markdown, and other tests count the `a` elements in the docs.
 - [ ] **Step 6: Check and run.** This must print nothing:
       `git grep -n "cloudApi\|loginPage\|storageState\|https://mock" -- app/gui/integration-test ':!app/gui/integration-test/mock/cloudApi.ts' ':!app/gui/integration-test/dashboard/{activityLogSettings,authPreserveEmail,billing,dataLinkEditor,degradedAuth,loginLogout,loginScreen,organizationSettings,signUp,userGroupsSettings,userSettings,welcomeProject}.spec.ts' ':!app/gui/integration-test/setup.ts' ':!app/gui/integration-test/base.ts' ':!app/gui/integration-test/dashboard/cloudRequestGuard.spec.ts' ':!app/gui/integration-test/mock/registerMocks.ts'`.
-      Then run the six specs in WSL with `--workers=2 --repeat-each=3` and once
-      on Windows, and finish with the typecheck.
-- [ ] **Step 7: Commit.** `git add app/gui/integration-test`, then
+      So must
+      `git grep -n "CLOUD_ONLY" -- app/gui/integration-test/dashboard/{rightPanel,accessibility,userMenu,localVersions,localOnly}.spec.ts app/gui/integration-test/project-view/editorPanels.spec.ts`.
+      Then run the seven specs in WSL with `--workers=2 --repeat-each=3` and
+      once on Windows, and finish with the typecheck.
+- [ ] **Step 7: Commit.** `git add -A app/gui/integration-test`, then
       `git commit -m "Integration tests: port the panel, settings and menu specs to local; refresh the accessibility baselines"`.
 
 ### Task 43: Delete the cloud mock, the cloud-only specs and the login helpers
@@ -6298,11 +6583,11 @@ export async function waitForAppLoaded(page: Page) {
 ```
 
 `before-auth-layout`/`after-auth-layout` are no longer awaited, because PR 2
-reduced `ProtectedLayout`. In `registerMocks.ts`, drop `enableCloudExecution`
-and `enableAdvancedProjectExecutionOptions` from the default flags if
-`git grep -n "enableCloudExecution\|enableAdvancedProjectExecutionOptions" app/gui/src`
-is empty after PR 3. Otherwise leave them, and note in the PR body that the dead
-flags remain.
+reduced `ProtectedLayout`. Also delete `export const CLOUD_ONLY` from `base.ts`
+(Tasks 41–42 removed every use; the specs Step 1 deletes took the rest). Leave
+`registerMocks.ts`'s default feature flags alone: Task 31 deletes
+`enableCloudExecution` and `enableAdvancedProjectExecutionOptions` together with
+the flags themselves, later in PR 3.
 
 - [ ] **Step 3: Prune the page objects.**
   - `DrivePageActions`: remove the `cloud`, `recent` and `trash` categories,
@@ -6330,6 +6615,7 @@ flags remain.
 - [ ] **Step 5: Verify.** Each of these must print nothing:
   - `git grep -n "mock/cloudApi\|MockCloudApi\|LoginPageActions\|loginIfNeeded\|playwright/.auth\|project=Setup" -- app/gui`
   - `git grep -n "VALID_PASSWORD\|VALID_EMAIL\|newSecret\|moveToTrash\|exportToCloud" -- app/gui/integration-test`
+  - `git grep -n "CLOUD_ONLY" -- app/gui/integration-test`
 
   Then:
   - run `corepack pnpm --dir app/gui run typecheck`. If it fails with TS6307,
@@ -6385,10 +6671,11 @@ export async function waitForDashboard(page: Page) {
 Delete `TEXT` and the `TEXTS` import if ESLint reports them unused.
 
 - [ ] **Step 3: Rewrite the call sites.** `loginAsTestUser` becomes
-      `waitForDashboard` in the 4 specs (9 call sites:
-      `git grep -n loginAsTestUser -- app/electron-client`). In `globals.d.ts`,
-      delete `readonly ENSO_TEST_USER?: string` (L59). In `tests/README.md`,
-      delete the "Test account" section.
+      `waitForDashboard` in the 4 specs (10 call sites: `aiChallenges` 4,
+      `aiNode` 2, `gettingStarted` 2, `localWorkflow` 2;
+      `git grep -n loginAsTestUser -- app/electron-client` lists them). In
+      `globals.d.ts`, delete `readonly ENSO_TEST_USER?: string` (L59). In
+      `tests/README.md`, delete the "Test account" section.
 - [ ] **Step 4: Verify.** This must print nothing:
       `git grep -n "loginAsTestUser\|ENSO_TEST_USER\|ENSO_TEST_CLOUD\|passwordOverride\|playwright/.auth" -- app/electron-client`.
       Then run `corepack pnpm --dir app/electron-client run typecheck`,
@@ -6419,8 +6706,10 @@ Delete `TEXT` and the `TEXTS` import if ESLint reports them unused.
 
 - [ ] **Step 1: Check that nothing imports them any more:**
       `git grep -n "aws-amplify\|amazon-cognito-identity-js" -- app ':!**/CLAUDE.md'`
-      must print only `app/gui/package.json` (L84–85). If source still imports
-      them, PR 2 is incomplete. Stop and report it.
+      must print only `app/gui/package.json` (L84–85) and
+      `app/gui/vite.config.ts:99` (a comment on the `define` block, removed in
+      Step 2). If source still imports them, PR 2 is incomplete. Stop and report
+      it.
 - [ ] **Step 2: Remove them.** Run
       `corepack pnpm --dir app/gui remove aws-amplify amazon-cognito-identity-js`.
       In `pnpm-workspace.yaml`, delete the `"@aws-amplify/auth"` entries under
@@ -6463,6 +6752,10 @@ Delete `TEXT` and the `TEXTS` import if ESLint reports them unused.
   - `app/gui/.env`, `app/gui/.env.testing`, `app/gui/src/config.ts`,
     `app/gui/src/entrypoint.ts`, `app/gui/src/providers/config.ts` and
     `app/gui/package.json`;
+  - `app/gui/src/secrets/__tests__/CreateCredentialModal.test.ts` (its
+    `ENSO_IDE_API_URL` config stub, ~l.25) and the
+    `app/gui/src/secrets/*CredentialsForm.vue` forms;
+  - `app/common/src/text/english.json` (Step 3b: keys only deleted code used);
   - `app/electron-client/src/guiConfig.ts`.
 - Unchanged (verified by grep): `app/electron-client/src/configParser.ts` (PR 2
   removed `--authentication.*`); `buildInfo.ts`, `esbuildConfig.ts` and
@@ -6477,10 +6770,13 @@ Delete `TEXT` and the `TEXTS` import if ESLint reports them unused.
 
 - Consumes:
   - from PR 1, `providers/config.ts` makes no fetch;
-  - from PR 3, `backends.ts` no longer reads `remoteConfig?.ENSO_IDE_API_URL`,
-    and `electron-client/src/backend.ts` no longer reads `API_URL`.
+  - from PR 3, `backends.ts` no longer reads `remoteConfig?.ENSO_IDE_API_URL`;
+    `electron-client/src/backend.ts`, the other `API_URL` reader, was deleted in
+    Task 16.
 - Produces: `$Config` without `API_URL` or `CLOUD_BUILD`; `GUI_CONFIG_KEYS`
-  without them; the npm script `build-cloud` is gone.
+  without them; the npm script `build-cloud` is gone; `RemoteConfig` keeps only
+  the four `*_OAUTH_CLIENT_ID` keys; `english.json` has no key that nothing
+  references.
 
 - [ ] **Step 1: Write the failing test**
       `app/gui/src/__tests__/localOnlyConfig.test.ts`:
@@ -6540,23 +6836,69 @@ describe("no cloud configuration", () => {
   - `src/config.ts`: delete `API_URL` and `CLOUD_BUILD` from `DEFAULT_CONFIG`.
   - `entrypoint.ts` `getRootDirPath` (~L121): use
     `const supportsLocalBackend = window.overrideFeatureFlags?.enableLocalBackend ?? true`.
-  - `providers/config.ts`:
-    - delete any remaining `$config.API_URL` use (L36 before PR 1);
-    - delete `ENSO_IDE_API_URL`, `ENSO_IDE_AUTH_ENDPOINT`, `ENSO_IDE_STRIPE_KEY`
-      and the four `ENSO_IDE_COGNITO_*` keys from `REMOTE_CONFIG_SCHEMA`, if PR
-      1 kept the schema;
-    - delete the Sentry `tracePropagationTargets` watch on `ENSO_IDE_API_URL`
-      (~L85–108);
-    - keep the four `*_OAUTH_CLIENT_ID` keys (decision 5, "for later").
+  - `providers/config.ts`: in the `RemoteConfig` interface (Task 1 kept it as an
+    interface and already deleted `REMOTE_CONFIG_SCHEMA`, the fetch and the
+    Sentry `tracePropagationTargets` watch), delete `ENSO_IDE_ENVIRONMENT`,
+    `ENSO_IDE_API_URL`, `ENSO_IDE_AUTH_ENDPOINT`, `ENSO_IDE_STRIPE_KEY` and the
+    four `ENSO_IDE_COGNITO_*` keys; keep the four `*_OAUTH_CLIENT_ID` keys
+    (decision 5, "for later").
   - `src/secrets/*CredentialsForm.vue` (moved there by PR 2): each
-    `config.remoteConfig?.ENSO_IDE_API_URL` argument becomes `undefined`.
-    **Ruling needed** below.
+    `config.remoteConfig?.ENSO_IDE_API_URL` argument becomes `undefined` (R17).
+  - `src/secrets/__tests__/CreateCredentialModal.test.ts`: drop the
+    `ENSO_IDE_API_URL: 'https://api.example.com'` entry from its config stub
+    (and the stub's `remoteConfig` object if it is then empty); its tests pass
+    unchanged, since the forms now pass `undefined`.
   - `app/gui/package.json`: delete the `build-cloud` script (L37).
   - `electron-client/src/guiConfig.ts`: delete `'API_URL'` and `'CLOUD_BUILD'`
     from `GUI_CONFIG_KEYS`. The `_AssertAllGuiConfigKeysCovered` check enforces
     this at compile time.
   - Keep `ENSO_IDE_HOST` / `$config.HOST`. The spec does not list it, and
     `appUtils.ts` (L51) builds the contact URL from it.
+- [ ] **Step 3b: Prune the text keys only deleted code used (R16).** List the
+      keys in `english.json` that no remaining source names, by quoting
+      (`'key'`, `"key"`, `` `key` ``) or as `TEXT.key` (the Playwright specs'
+      text map). Run from the repo root:
+
+```bash
+node --input-type=module - <<'EOF'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+const keys = Object.keys(JSON.parse(readFileSync('app/common/src/text/english.json', 'utf8')))
+const files = execFileSync('git', ['ls-files', '--', 'app/gui/src', 'app/gui/integration-test',
+  'app/common/src', 'app/electron-client/src', ':!app/common/src/text/english.json'])
+  .toString().split('\n').filter((f) => /\.(ts|vue|mts|js)$/.test(f))
+const source = files.map((f) => readFileSync(f, 'utf8')).join('\n')
+const quoted = new Set([...source.matchAll(/['"`]([A-Za-z0-9_.]+)['"`]/g)].map((m) => m[1]))
+const viaText = new Set([...source.matchAll(/\bTEXT\.([A-Za-z0-9_]+)/g)].map((m) => m[1]))
+// Ids built at run time: `<action>Shortcut` (inputBindings.ts, graphInputBindings.ts),
+// `<category>BindingCategory`, `<column>ColumnName`, `<category>Category`, and the dormant
+// MS365 form's `ms365Credential…` (src/secrets/).
+const DYNAMIC = /(Shortcut|BindingCategory|ColumnName|Category)$|^ms365Credential/
+for (const key of keys) {
+  if (!quoted.has(key) && !viaText.has(key) && !DYNAMIC.test(key)) console.log(key)
+}
+EOF
+```
+
+      Delete every key it prints from `english.json`. The list includes keys
+      that were already unreferenced before this work (the script printed 297
+      on develop 4a504bf4d9, such as `createFolderError` and
+      `projectTabBarErrorTitle`); nothing names them either, so they go too,
+      and the PR body says so with the count. Then go through the
+      dynamic families by hand: delete `<action>Shortcut` for each action Task
+      30/33 removed from `inputBindings.ts` (e.g. `uploadToCloudShortcut`,
+      `shareShortcut`, `runAsTaskShortcut`, `switchOrganizationShortcut`), and
+      `<column>ColumnName`/`<category>Category` for each deleted column
+      (`sharedWith`) and category (`cloud`, `recent`, `trash`, `team`); check
+      each with `git grep -n "<the key's stem>" -- app/gui/src` first. Expect
+      among the deletions `newSecret.cloudOnly`, `newCredential.cloudOnly`, the
+      billing, plan, organization, schedule and sign-in texts, and the
+      `*BackendError` ids of the methods Task 37 deleted. Keys the dormant
+      `src/secrets/` uses stay, because the script scans it. Then
+      `corepack pnpm --filter enso-common run compile` and
+      `corepack pnpm --dir app/gui run typecheck` (a deleted key that is still
+      used fails as `TextId`), and rerun the script: it prints nothing.
+
 - [ ] **Step 4: Run the tests and checks.**
   - Step 2's test passes.
   - This must print nothing:
@@ -6570,9 +6912,9 @@ describe("no cloud configuration", () => {
   - Rerun the Playwright suite once in WSL. `appConfig` comes from
     `.env.testing`, so the injected config shrinks too.
 - [ ] **Step 5: Commit.**
-      `git add app/gui/.env app/gui/.env.testing app/gui/src app/gui/package.json app/electron-client/src/guiConfig.ts`,
+      `git add app/gui/.env app/gui/.env.testing app/gui/src app/gui/package.json app/electron-client/src/guiConfig.ts app/common/src/text/english.json`,
       then
-      `git commit -m "Remove the Enso Cloud build-time variables from the GUI and Electron"`.
+      `git commit -m "Remove the Enso Cloud build-time variables and unused cloud texts from the GUI and Electron"`.
 
 ### Task 47: Build tools and CI: drop the cloud variables and the e2e test account
 
@@ -6764,8 +7106,8 @@ mod tests {
 
 **Interfaces**
 
-- Consumes: Tasks 40–48 (or 44–48 if Tasks 40–43 went into PR 3, per the
-  ordering ruling).
+- Consumes: Tasks 44–48 (Tasks 40–43 ran at the start of PR 3, per the execution
+  order).
 - Produces: a PR to `develop` with the `CI: No changelog needed` and
   `CI: Build IDE` labels.
 
@@ -6789,6 +7131,11 @@ mod tests {
   - Run the `git grep` for each removed variable and each old name from Tasks
     41–47 again, over the whole repo. Each must print nothing outside the
     standard library, the engine, `CHANGELOG.md`, `docs/cloud/` and the specs.
+  - No test is still skipped as cloud-only (Task 8's marker; Tasks 41–43 removed
+    every use and the export). This must print nothing:
+    `git grep -n "CLOUD_ONLY" -- app`.
+  - Step 3b of Task 46 left no unreferenced text key: rerun its script; it
+    prints nothing.
 - [ ] **Step 2: Push and open the PR.** Run
       `git push -u origin feature/local-only-prune`, then
       `gh pr create --base develop --title "Local-only IDE, PR 4: prune cloud tests, dependencies and build configuration" --label "CI: No changelog needed" --label "CI: Build IDE"`.
@@ -6801,6 +7148,8 @@ mod tests {
   - **Accessibility**: the baseline diff, per screen, with every added entry
     explained; `login.json` deleted; and the three ARIA snapshot changes (user
     menu, settings sidebar, the asset panel now on Docs).
+  - **Texts**: the keys Task 46 pruned from `english.json`, with the count of
+    those that were already unreferenced on `develop`.
   - **CI**: the regenerated workflow diff. The `ENSO_MAPBOX_API_TOKEN`
     repository variable and the `ENSO_CLOUD_TEST_ACCOUNT_*` secrets can be
     removed from the repository settings once the standard library cloud jobs
