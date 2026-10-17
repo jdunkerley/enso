@@ -4,13 +4,13 @@ import { createContextStore } from '@/providers'
 import { isDirectoryId, type DirectoryId } from 'enso-common/src/services/Backend'
 import { computed, ref, watch } from 'vue'
 import * as z from 'zod'
-import { useAuth } from './auth'
 import { useBackends } from './backends'
 import {
   CATEGORY_BACKEND,
   categoryEq,
   categoryFromKey,
   categoryKey,
+  isCloudCategory,
   useCategories,
   type Category,
 } from './category'
@@ -41,7 +41,6 @@ export type DriveLocationStore = ReturnType<typeof useDriveLocation>
 export const [provideDriveLocation, useDriveLocation] = createContextStore('drive', () => {
   const backends = useBackends()
   const categories = useCategories()
-  const auth = useAuth()
   const localStorage = LocalStorage.getInstance()
   const storedDriveDisplay = computed(() => localStorage.get('driveDisplay'))
   /**
@@ -51,18 +50,15 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore('driv
    */
   const isNavigating = ref(false)
 
-  // In degraded-auth mode the user must land on cloud so the "Enso Cloud is unavailable"
-  // stub (rendered by the cloud-category view) is visible after sign-in. Otherwise the
-  // existing local-first default would silently hide the failure. When auth is disabled
-  // entirely there is no cloud to fail, so the local-first default applies.
-  const defaultCategory = computed<Category>(() => {
-    if (auth.session?.isCloudDataUnavailable && !auth.session.isAuthDisabled)
-      return { type: 'cloud' }
-    return backends.localBackend != null ? { type: 'local' } : { type: 'cloud' }
-  })
+  // The IDE is local-only: the drive starts on Local, and a cloud category saved by an earlier
+  // version (or a team's) is not shown, since nothing lists it.
+  const defaultCategory: Category = { type: 'local' }
 
   const currentCategory = computed({
-    get: () => categoryFromKey(storedDriveDisplay.value?.currentCategory) ?? defaultCategory.value,
+    get: () => {
+      const stored = categoryFromKey(storedDriveDisplay.value?.currentCategory)
+      return stored != null && !isCloudCategory(stored) ? stored : defaultCategory
+    },
     set: (category) =>
       localStorage.set('driveDisplay', {
         currentCategory: categoryKey(category),
@@ -88,7 +84,7 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore('driv
   }
 
   watch(
-    () => [...categories.localCategoriesList, ...categories.cloudCategoriesList],
+    () => categories.localCategoriesList,
     (newList) => {
       if (!newList.find((category) => categoryEq(category, currentCategory.value))) {
         setDefaultCategory()
