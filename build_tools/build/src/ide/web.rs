@@ -4,9 +4,7 @@ use crate::prelude::*;
 
 use crate::paths::generated;
 use crate::project::IsArtifact;
-use crate::version::ENSO_VERSION;
 
-use ide_ci::env::known::electron_builder::WindowsSigningCredentials;
 use ide_ci::program::command::FallibleManipulator;
 use ide_ci::program::command::Manipulator;
 use ide_ci::programs::Pnpm;
@@ -211,7 +209,6 @@ impl IdeDesktop {
         sign: bool,
     ) -> Result {
         let output_path = output_path.as_ref();
-        let electron_config = output_path.join("electron-builder.json");
         if TARGET_OS == OS::MacOS && env::CSC_KEY_PASSWORD.is_set() {
             // This means that we will be doing code signing on MacOS. This requires JDK environment
             // to be set up.
@@ -248,41 +245,12 @@ impl IdeDesktop {
             .set_env(env::ENSO_BUILD_IDE, output_path)?
             .set_env(env::ENSO_BUILD_SIGN, sign_artifacts)?
             .set_env(env::ENSO_BUILD_BACKEND, backend.as_ref())?
-            .set_env(enso_install_config::ENSO_BUILD_ELECTRON_BUILDER_CONFIG, &electron_config)?
             .run("dist:ide")
             .arg("--")
             .arg(target_os_flag(target_os)?)
             .args(target_args)
             .run_ok()
             .await?;
-
-        // On Windows we build our own installer by invoking `enso_install_config::bundler::bundle`.
-        if TARGET_OS == OS::Windows {
-            let code_signing_certificate = WindowsSigningCredentials::new_from_env()
-                .await
-                .inspect_err(|e| {
-                    warn!("Failed to create code signing certificate from the environment: {e:?}");
-                })
-                .ok();
-
-            let ide_artifacts = crate::project::ide::Artifact::new(
-                target_os,
-                TARGET_ARCH,
-                &ENSO_VERSION.get()?,
-                output_path,
-            );
-
-            let config = enso_install_config::bundler::Config {
-                electron_builder_config: electron_config,
-                unpacked_electron_bundle: unpacked_dir(output_path, target_os, TARGET_ARCH),
-                repo_root: self.repo_root.to_path_buf(),
-                output_file: ide_artifacts.image.clone(),
-                intermediate_dir: output_path.to_path_buf(),
-                certificate: code_signing_certificate,
-            };
-            enso_install_config::bundler::bundle(config).await?;
-            store_sha256_checksum(&ide_artifacts.image, &ide_artifacts.image_checksum)?;
-        }
         Ok(())
     }
 }

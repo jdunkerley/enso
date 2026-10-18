@@ -144,26 +144,3 @@ impl CodeSigningCertificate {
         Self::new(csc_link).await
     }
 }
-
-/// Data needed to sign the binaries on Windows.
-#[derive(Debug)]
-pub struct WindowsSigningCredentials {
-    /// Code signing certificate file.
-    pub certificate: CodeSigningCertificate,
-    /// Password to the certificate.
-    pub password: String,
-}
-
-impl WindowsSigningCredentials {
-    /// Create a new certificate file from the environment variable.
-    pub async fn new_from_env() -> Result<Self> {
-        let certificate = CodeSigningCertificate::new_from_env().await?;
-        let password = WIN_CSC_KEY_PASSWORD.get().or_else(|_| CSC_KEY_PASSWORD.get())?;
-        Ok(Self { certificate, password })
-    }
-
-    /// Sign the given binary.
-    pub async fn sign(&self, exe: impl AsRef<Path>) -> Result {
-        crate::programs::signtool::sign(exe, self.certificate.as_ref(), &self.password).await
-    }
-}
