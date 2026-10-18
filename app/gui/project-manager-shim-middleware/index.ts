@@ -5,7 +5,6 @@
 import * as fsSync from 'node:fs'
 import * as fs from 'node:fs/promises'
 import * as http from 'node:http'
-import * as https from 'node:https'
 import * as path from 'node:path'
 
 import {
@@ -43,13 +42,10 @@ import { finished } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
-import type { Watcher } from 'project-manager-shim/fs'
 import {
   handleFilesystemCommand,
   handleProjectServiceRequest,
-  handleWatcherRequest,
   isProjectServiceRequest,
-  isWatcherRequest,
 } from 'project-manager-shim/handler'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
@@ -59,8 +55,6 @@ import { tarFsPack, unzipEntries, zipWriteStream } from './archive'
 // =================
 // === Constants ===
 // =================
-
-const FS_MAX_RETRIES = 3
 
 const HTTP_STATUS_OK = 200
 const HTTP_STATUS_BAD_REQUEST = 400
@@ -97,7 +91,6 @@ export class ProjectManagerShimMiddleware {
   private readonly localVersioning = new LocalVersioning({
     consent: new VersioningConsent({ userDataDirectory: DEV_USER_DATA_DIRECTORY }),
   })
-  private watchers: Map<AssetId, Watcher> = new Map()
 
   /** Create the new middleware. */
   constructor(private readonly setup: () => Promise<void>) {}
@@ -122,88 +115,7 @@ export class ProjectManagerShimMiddleware {
     if (!requestUrl.startsWith('/api/')) return next()
     const url = new URL(requestUrl, 'https://apishim.local')
     const requestPath = url.pathname
-    if (requestUrl != null && requestUrl.startsWith('/api/cloud/')) {
-      switch (requestPath) {
-        case '/api/cloud/download-project': {
-          const downloadUrl = url.searchParams.get('downloadUrl')
-          const projectId = url.searchParams.get('projectId')
-
-          if (downloadUrl == null) {
-            response
-              .writeHead(HTTP_STATUS_BAD_REQUEST, COMMON_HEADERS)
-              .end('Request is missing search parameter `downloadUrl`.')
-            break
-          }
-
-          if (projectId == null) {
-            response
-              .writeHead(HTTP_STATUS_BAD_REQUEST, COMMON_HEADERS)
-              .end('Request is missing search parameter `projectId`.')
-            break
-          }
-
-          https.get(downloadUrl, (actualResponse) => {
-            const projectsDirectory = projectManagement.getProjectsDirectory()
-            const parentDirectory = path.join(projectsDirectory, `cloud-${projectId}`)
-            const projectRootDirectory = path.join(parentDirectory, 'project_root')
-
-            fs.rm(parentDirectory, { recursive: true, force: true, maxRetries: FS_MAX_RETRIES })
-              .then(() => fs.mkdir(projectRootDirectory, { recursive: true }))
-              .then(() => projectManagement.unpackBundle(actualResponse, projectRootDirectory))
-              .then(() => {
-                response
-                  .writeHead(HTTP_STATUS_OK, COMMON_HEADERS)
-                  .end(JSON.stringify({ parentDirectory, projectRootDirectory }))
-              })
-              .catch((e) => {
-                console.error(e)
-                try {
-                  if (fsSync.existsSync(parentDirectory)) {
-                    fsSync.rmdirSync(parentDirectory, { maxRetries: 3, recursive: true })
-                  }
-                } catch (e) {
-                  console.error(`Failed to cleanup directory ${parentDirectory}.`, e)
-                }
-                response.writeHead(HTTP_STATUS_INTERNAL_SERVER_ERROR, COMMON_HEADERS).end()
-              })
-          })
-
-          break
-        }
-        case '/api/cloud/get-project-archive': {
-          const parentDir = url.searchParams.get('directory')
-
-          if (parentDir == null) {
-            response
-              .writeHead(HTTP_STATUS_BAD_REQUEST, COMMON_HEADERS)
-              .end('Request is missing search parameter `directory`.')
-            break
-          }
-          const projectDir = path.join(parentDir, 'project_root')
-
-          projectManagement
-            .createBundle(projectDir)
-            .then((projectBundle) => {
-              response
-                .writeHead(HTTP_STATUS_OK, {
-                  ...COMMON_HEADERS,
-                  'Content-Length': String(projectBundle.byteLength),
-                })
-                .end(projectBundle)
-            })
-            .catch((err) => {
-              console.error(err)
-              response.writeHead(HTTP_STATUS_INTERNAL_SERVER_ERROR, COMMON_HEADERS).end()
-            })
-
-          break
-        }
-        default: {
-          console.error(`Unknown Cloud middleware request:`, requestPath)
-          break
-        }
-      }
-    } else if (isProjectServiceRequest(requestPath)) {
+    if (isProjectServiceRequest(requestPath)) {
       handleProjectServiceRequest(
         request,
         response,
@@ -213,8 +125,6 @@ export class ProjectManagerShimMiddleware {
         this.localMetadata,
         this.localVersioning,
       )
-    } else if (isWatcherRequest(requestPath)) {
-      handleWatcherRequest(request, response, COMMON_HEADERS, this.watchers)
     } else if (requestPath.startsWith('/api/')) {
       switch (`${request.method} ${requestPath}`) {
         case `POST /api/${EXPORT_ARCHIVE_PATH}`: {
