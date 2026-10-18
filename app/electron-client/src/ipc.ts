@@ -57,4 +57,14 @@ export enum Channel {
    * renderer, since availability is process-wide rather than per-request.
    */
   aiAvailabilityChanged = 'ai-availability-changed',
+  /** Renderer → main: query the update mode (`auto` or `manual`). */
+  updaterMode = 'updater-mode',
+  /** Renderer → main: check for an update; resolves with the resulting `UpdateStatus`. */
+  updaterCheck = 'updater-check',
+  /** Renderer → main: download the update found by the last check. */
+  updaterDownload = 'updater-download',
+  /** Renderer → main: quit and install the downloaded update. */
+  updaterQuitAndInstall = 'updater-quit-and-install',
+  /** Main → renderer: broadcast whenever the `UpdateStatus` changes. */
+  updaterStatus = 'updater-status',
 }

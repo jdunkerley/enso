@@ -9,6 +9,7 @@ import type {
 } from 'enso-common/src/ai'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import type { Path } from 'enso-common/src/services/Backend'
+import type { UpdateMode, UpdateStatus } from 'enso-common/src/updater'
 import type { FileFilter } from './project-view/util/fileFilter'
 import type { MenuItem, MenuItemHandler } from './project-view/util/menuItems'
 
@@ -90,6 +91,16 @@ export interface AiApi {
   readonly cancel: (requestId: string) => void
 }
 
+/** Automatic updates; see `app/electron-client/src/updater.ts`. */
+export interface UpdaterApi {
+  readonly mode: () => Promise<UpdateMode>
+  readonly check: (allowPrerelease: boolean) => Promise<UpdateStatus>
+  readonly download: () => Promise<void>
+  readonly quitAndInstall: () => Promise<void>
+  /** Subscribe to status changes. Returns a disposer. */
+  readonly onStatus: (handler: (status: UpdateStatus) => void) => () => void
+}
+
 export interface ElectronApi {
   readonly navigation: NavigationApi
   readonly menu: MenuApi
@@ -99,5 +110,6 @@ export interface ElectronApi {
   readonly versionInfo: VersionInfo
   readonly log: LogApi
   readonly ai: AiApi
+  readonly updater: UpdaterApi
 }
 export type { FileFilter, MenuItem, MenuItemHandler }

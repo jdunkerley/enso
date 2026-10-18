@@ -256,3 +256,36 @@ describe('Updater guards', () => {
     expect(updater.status()).toEqual({ state: 'idle' })
   })
 })
+
+const { handleMock, sendMock } = vi.hoisted(() => ({
+  handleMock: vi.fn(),
+  sendMock: vi.fn(),
+}))
+vi.mock('electron', () => ({
+  app: { isPackaged: true },
+  ipcMain: { handle: handleMock },
+  webContents: {
+    getAllWebContents: () => [{ isDestroyed: () => false, send: sendMock }],
+  },
+}))
+
+describe('initUpdaterIpc', () => {
+  test('registers the four handlers and broadcasts status changes', async () => {
+    const { initUpdaterIpc } = await import('../../src/updaterIpc')
+    const { Channel } = await import('../../src/ipc')
+    const autoUpdater = new FakeAutoUpdater()
+    initUpdaterIpc('auto', autoUpdater as unknown as UpdaterDeps['autoUpdater'])
+    const channels = handleMock.mock.calls.map(([channel]) => channel)
+    expect(channels).toEqual([
+      Channel.updaterMode,
+      Channel.updaterCheck,
+      Channel.updaterDownload,
+      Channel.updaterQuitAndInstall,
+    ])
+    autoUpdater.emit('update-downloaded', { version: '2026.2.0' })
+    expect(sendMock).toHaveBeenCalledWith(Channel.updaterStatus, {
+      state: 'ready',
+      version: '2026.2.0',
+    })
+  })
+})

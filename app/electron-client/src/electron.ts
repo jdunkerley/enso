@@ -1,8 +1,10 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import * as paths from '@/paths'
+import { initUpdaterIpc } from '@/updaterIpc'
 import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { download } from 'electron-dl'
+import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import { unlinkSync } from 'node:fs'
 import { basename, dirname, extname } from 'node:path'
@@ -58,6 +60,8 @@ export function initIpc(
   electron: Electron | undefined,
   electronIsDev: boolean,
 ) {
+  // TODO(Task 13): replace `'manual'` with `BUILD_INFO.updates`.
+  initUpdaterIpc('manual', electronUpdater.autoUpdater)
   ipcMain.on(Channel.error, (_event, data) => {
     console.error(...data)
   })
