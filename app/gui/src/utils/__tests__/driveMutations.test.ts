@@ -9,7 +9,6 @@ import {
   deleteAssetsMutationOptions,
   downloadAssetsMutationOptions,
   moveAssetsMutationOptions,
-  restoreAssetsMutationOptions,
 } from '$/utils/driveMutations'
 import { newFolderTitle, newProjectName, renameAssetVariables } from '$/utils/driveQueries'
 import { QueryClient } from '@tanstack/query-core'
@@ -47,10 +46,6 @@ describe('the batched mutations', () => {
       awaitInvalidates: true,
       refetchType: 'all',
     })
-    expect(restoreAssetsMutationOptions(backend).mutationKey).toEqual([
-      BackendType.remote,
-      'restoreAssets',
-    ])
     expect(copyAssetsMutationOptions(backend).mutationKey).toEqual([
       BackendType.remote,
       'copyAssets',

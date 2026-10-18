@@ -6,28 +6,12 @@ export { EnsoPath, EnsoPathValue } from './ensoPath.js'
 export type KSUID = Newtype<string, 'KSUID'>
 export const KSUID = newtypeConstructor<KSUID>()
 
-/** Unique identifier for an organization. */
-export type OrganizationId = Newtype<`organization-${string}`, 'OrganizationId'>
-export const OrganizationId = newtypeConstructor<OrganizationId>()
-/** Whether a given {@link string} is an {@link OrganizationId}. */
-export function isOrganizationId(id: string): id is OrganizationId {
-  return id.startsWith('organization-')
-}
-
 /** Unique identifier for a user in an organization. */
 export type UserId = Newtype<string, 'UserId'>
 export const UserId = newtypeConstructor<UserId>()
 /** Whether a given {@link string} is an {@link UserId}. */
 export function isUserId(id: string): id is UserId {
   return id.startsWith('user-')
-}
-
-/** Unique identifier for a user group. */
-export type UserGroupId = Newtype<`usergroup-${string}`, 'UserGroupId'>
-export const UserGroupId = newtypeConstructor<UserGroupId>()
-/** Whether a given {@link string} is an {@link UserGroupId}. */
-export function isUserGroupId(id: string): id is UserGroupId {
-  return id.startsWith('usergroup-')
 }
 
 /** Unique identifier for a directory. */
@@ -83,10 +67,6 @@ export const SecretId = newtypeConstructor<SecretId>()
 export type ProjectSessionId = Newtype<string, 'ProjectSessionId'>
 export const ProjectSessionId = newtypeConstructor<ProjectSessionId>()
 
-/** Unique identifier for a project execution. */
-export type ProjectExecutionId = Newtype<string, 'ProjectExecutionId'>
-export const ProjectExecutionId = newtypeConstructor<ProjectExecutionId>()
-
 /** Unique identifier for a Datalink. */
 export type DatalinkId = Newtype<string, 'DatalinkId'>
 export const DatalinkId = newtypeConstructor<DatalinkId>()
@@ -103,10 +83,6 @@ export const AssetId = newtypeConstructor<AssetId>()
 export type MetadataId = Newtype<`metadata-${KSUID}`, 'MetadataId'>
 export const MetadataId = newtypeConstructor<MetadataId>()
 
-/** Unique identifier for a subscription. */
-export type SubscriptionId = Newtype<string, 'SubscriptionId'>
-export const SubscriptionId = newtypeConstructor<SubscriptionId>()
-
 /** Unique identifier for a task to archive some assets to a `.zip`. */
 export type ZipAssetsJobId = Newtype<string, 'ZipAssetsJobId'>
 export const ZipAssetsJobId = newtypeConstructor<ZipAssetsJobId>()
@@ -114,10 +90,6 @@ export const ZipAssetsJobId = newtypeConstructor<ZipAssetsJobId>()
 /** Unique identifier for a task to archive some assets to a `.zip`. */
 export type UnzipAssetsJobId = Newtype<string, 'UnzipAssetsJobId'>
 export const UnzipAssetsJobId = newtypeConstructor<UnzipAssetsJobId>()
-
-/** Unique identifier for an API key. */
-export type ApiKeyId = Newtype<string, 'ApiKeyId'>
-export const ApiKeyId = newtypeConstructor<ApiKeyId>()
 
 /** The name of an asset label. */
 export type LabelName = Newtype<string, 'LabelName'>
@@ -142,13 +114,6 @@ export const EmailAddress = newtypeConstructor<EmailAddress>()
 /** An AWS S3 file path. */
 export type S3FilePath = Newtype<string, 'S3FilePath'>
 export const S3FilePath = newtypeConstructor<S3FilePath>()
-
-/** An AWS machine configuration. */
-export type Ami = Newtype<string, 'Ami'>
-export const Ami = newtypeConstructor<Ami>()
-
-/** An identifier for an entity with an {@link AssetPermission} for an {@link Asset}. */
-export type UserPermissionIdentifier = UserGroupId | UserId
 
 /** An filesystem path. Only present on the local backend. */
 export type Path = Newtype<string, 'Path'>

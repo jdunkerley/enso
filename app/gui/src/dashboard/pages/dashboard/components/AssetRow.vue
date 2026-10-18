@@ -13,15 +13,12 @@
  * faded.
  */
 import { ASSET_ROWS } from '#/layouts/Drive/drag'
-import { useAssetItems } from '#/layouts/Drive/assetItems'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useTabStopContents } from '#/layouts/Drive/rovingTabStop'
 import AssetColumnCell from '#/pages/dashboard/components/column/AssetColumnCell.vue'
 import { COLUMN_CSS_CLASS, type Column } from '#/pages/dashboard/components/column/columnUtils'
 import { directoryNavigationSource } from '#/pages/dashboard/components/column/nameColumn'
 import { useDragDelayAction } from '$/composables/dragDelay'
-import { isLocalCategory } from '$/providers/category'
-import { useAuth } from '$/providers/auth'
 import { useDriveLocation } from '$/providers/drive'
 import { useDriveStore } from '$/providers/driveStore'
 import { useModals } from '$/providers/modals'
@@ -35,11 +32,6 @@ import {
   type AnyAsset,
   type Label,
 } from 'enso-common/src/services/Backend'
-import {
-  canPermissionModifyDirectoryContents,
-  isTeamPath,
-  tryFindSelfPermission,
-} from 'enso-common/src/utilities/permissions'
 import { computed, onMounted, onUpdated, ref, watch } from 'vue'
 
 const props = defineProps<{
@@ -55,8 +47,6 @@ const props = defineProps<{
   onRowFocus: (item: AnyAsset) => void
   /** Whether a deletion of this asset is in flight. */
   isDeleting: boolean
-  /** Whether a restoration of this asset from the trash is in flight. */
-  isRestoring: boolean
   /** Whether a rename or move of this asset is in flight. */
   isUpdating: boolean
   grabKeyboardFocus: (item: AnyAsset) => void
@@ -71,12 +61,8 @@ const props = defineProps<{
 const driveStore = useDriveStore()
 const driveView = useDriveView()
 const drive = useDriveLocation()
-const assetItems = useAssetItems()
-const auth = useAuth()
 const modals = useModals()
 const openedProjects = useOpenedProjects()
-
-const category = computed(() => driveView.location.category)
 
 const selection = computed(() => driveStore.visuallySelectedKeys ?? driveStore.selectedIds)
 const isSelected = computed(() => selection.value.has(props.item.id))
@@ -95,9 +81,7 @@ const insertionVisibility = computed(() =>
   : Visibility.visible,
 )
 const visibility = computed(() =>
-  props.isDeleting || props.isRestoring || props.isUpdating ?
-    'opacity-50'
-  : insertionVisibility.value,
+  props.isDeleting || props.isUpdating ? 'opacity-50' : insertionVisibility.value,
 )
 
 const root = ref<HTMLTableRowElement>()
@@ -128,7 +112,7 @@ function setSelected(newSelected: boolean) {
 
 // An asset being deleted or restored leaves the selection.
 watch(
-  () => isSelected.value && (props.isDeleting || props.isRestoring),
+  () => isSelected.value && props.isDeleting,
   (shouldDeselect) => {
     if (shouldDeselect) setSelected(false)
   },
@@ -174,22 +158,7 @@ function onDragOverRow(event: DragEvent) {
   const payload = ASSET_ROWS.lookup(event)
   const isPayloadMatch =
     payload != null && payload.items.every((innerItem) => innerItem.key !== directoryId)
-  const canPaste = (() => {
-    if (!isPayloadMatch) return false
-    if (isLocalCategory(category.value)) return true
-    return payload.items.every(({ asset }) => {
-      const payloadParentId = assetItems.getAsset(asset.id)?.parentId
-      const parent = payloadParentId == null ? null : assetItems.getAsset(payloadParentId)
-      // Assume the parent is the root directory.
-      if (!parent) return true
-      if (isTeamPath(parent.ensoPath)) return true
-      // Assume a user path; check the permissions.
-      const permission = tryFindSelfPermission(auth.session.user, item.permissions)
-      return permission != null && canPermissionModifyDirectoryContents(permission.permission)
-    })
-  })()
-
-  if ((isPayloadMatch && canPaste) || event.dataTransfer?.types.includes('Files') === true) {
+  if (isPayloadMatch || event.dataTransfer?.types.includes('Files') === true) {
     event.preventDefault()
     if (item.type === AssetType.directory) {
       isDraggedOver.value = true

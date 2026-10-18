@@ -6,6 +6,7 @@ import {
   doesTitleContainInvalidCharacters,
   type AnyAsset,
 } from '../Backend'
+import { LocalBackend } from '../LocalBackend'
 
 describe('Backend', () => {
   it('sorts assets by creation date descending', () => {
@@ -756,4 +757,36 @@ test.each([
   expect(!doesTitleContainInvalidCharacters(name), `'${name}' is a valid directory name`).toBe(
     valid,
   )
+})
+
+test('the local backend has no cloud-only methods', () => {
+  const removed = [
+    'usersMe',
+    'listUsers',
+    'getOrganization',
+    'listUserGroups',
+    'createPermission',
+    'inviteUser',
+    'undoDeleteAsset',
+    'listProjectExecutions',
+    'uploadImage',
+    'listAssetVersionTags',
+    'createCheckoutSession',
+    'getLogEvents',
+    'logEvent',
+    'listApiKeys',
+    'getMapboxToken',
+  ]
+  for (const name of removed) expect(name in LocalBackend.prototype, name).toBe(false)
+  for (const name of [
+    'createSecret',
+    'getSecret',
+    'updateSecret',
+    'listSecrets',
+    'createDatalink',
+    'getDatalink',
+    'deleteDatalink',
+  ]) {
+    expect(name in LocalBackend.prototype, name).toBe(true)
+  }
 })

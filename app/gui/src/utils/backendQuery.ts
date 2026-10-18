@@ -25,79 +25,39 @@ type DefineBackendMethods<T extends BackendMethods> = T
 
 /** Names of methods corresponding to mutations. */
 export type BackendMutationMethod = DefineBackendMethods<
-  | 'acceptInvitation'
   | 'associateTag'
-  | 'changeUserGroup'
   | 'closeProject'
   | 'copyAsset'
-  | 'cancelSubscription'
-  | 'createCheckoutSession'
   | 'createCredential'
   | 'createDatalink'
   | 'createDirectory'
-  | 'createPermission'
-  | 'createApiKey'
   | 'createProject'
-  | 'createProjectExecution'
   | 'createSecret'
   | 'createTag'
-  | 'createUser'
-  | 'createUserGroup'
-  | 'declineInvitation'
   | 'deleteAsset'
   | 'deleteDatalink'
-  | 'deleteInvitation'
-  | 'deleteApiKey'
-  | 'deleteProjectExecution'
   | 'deleteTag'
-  | 'deleteUser'
-  | 'deleteUserGroup'
   | 'duplicateProject'
   | 'exportArchive'
-  | 'inviteUser'
-  | 'logEvent'
   | 'openProject'
-  | 'removeUser'
-  | 'resendInvitation'
-  | 'restoreUser'
-  | 'syncProjectExecution'
-  | 'undoDeleteAsset'
   | 'updateAsset'
   | 'updateDirectory'
   | 'updateFile'
-  | 'updateOrganization'
   | 'updateProject'
-  | 'updateProjectExecution'
   | 'updateSecret'
-  | 'updateUser'
   | 'uploadFileChunk'
   | 'uploadFileEnd'
   | 'uploadFileStart'
-  | 'uploadImage'
-  | 'uploadOrganizationPicture'
-  | 'uploadUserPicture'
 >
 
 /** Names of methods corresponding to queries. */
 export type BackendQueryMethod = Exclude<BackendMethods, BackendMutationMethod>
 
 /**
- * How long the organization and the signed-in user stay fresh: long enough that the screens
- * reading them do not refetch on every mount, short enough that a subscription or profile changed
- * elsewhere (another device, the billing page) shows within minutes (the maintainer's choice on
- * #201).
- */
-export const ACCOUNT_STALE_TIME_MS = 5 * 60 * 1000
-
-/**
  * The stale time of the methods whose data does not go stale as soon as it arrives (the default
  * is 0). A caller's own `staleTime` takes precedence.
  */
-export const STALE_TIME_MAP: Partial<Record<BackendQueryMethod, number>> = {
-  getOrganization: ACCOUNT_STALE_TIME_MS,
-  usersMe: ACCOUNT_STALE_TIME_MS,
-  listUsers: Infinity,
-}
+export const STALE_TIME_MAP: Partial<Record<BackendQueryMethod, number>> = {}
 
 /**
  * The methods whose results are never persisted (the default is to persist). This takes
@@ -116,38 +76,9 @@ export const INVALIDATE_ALL_QUERIES = Symbol('invalidate all queries')
 export const INVALIDATION_MAP: Partial<
   Record<BackendMutationMethod, readonly (BackendQueryMethod | typeof INVALIDATE_ALL_QUERIES)[]>
 > = {
-  createUser: ['usersMe'],
-  updateUser: [INVALIDATE_ALL_QUERIES],
-  deleteUser: [
-    'usersMe',
-    'listUsers',
-    'listUserGroups',
-    'listDirectory',
-    'searchDirectory',
-    'getAssetDetails',
-  ],
-  removeUser: [
-    'usersMe',
-    'listUsers',
-    'listUserGroups',
-    'listDirectory',
-    'searchDirectory',
-    'getAssetDetails',
-  ],
-  restoreUser: ['usersMe'],
-  inviteUser: ['listInvitations'],
-  deleteInvitation: ['listInvitations'],
-  uploadUserPicture: ['usersMe'],
-  updateOrganization: ['getOrganization'],
-  uploadOrganizationPicture: ['getOrganization'],
-  createUserGroup: [INVALIDATE_ALL_QUERIES],
-  deleteUserGroup: [INVALIDATE_ALL_QUERIES],
-  changeUserGroup: [INVALIDATE_ALL_QUERIES],
   createTag: ['listTags'],
   deleteTag: ['listTags'],
   associateTag: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
-  acceptInvitation: [INVALIDATE_ALL_QUERIES],
-  declineInvitation: ['usersMe'],
   createProject: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
   duplicateProject: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
   createDirectory: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
@@ -160,17 +91,9 @@ export const INVALIDATION_MAP: Partial<
   uploadFileEnd: ['listDirectory', 'searchDirectory', 'listAssetVersions', 'getAssetDetails'],
   copyAsset: ['listDirectory', 'searchDirectory', 'listAssetVersions', 'getAssetDetails'],
   deleteAsset: ['listDirectory', 'searchDirectory', 'listAssetVersions', 'getAssetDetails'],
-  undoDeleteAsset: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
   updateAsset: ['listDirectory', 'searchDirectory', 'listAssetVersions', 'getAssetDetails'],
   openProject: ['listDirectory', 'searchDirectory', 'getAssetDetails'],
   closeProject: ['listDirectory', 'searchDirectory', 'listAssetVersions', 'getAssetDetails'],
-  createProjectExecution: ['listProjectExecutions', 'listExecutionsSummary'],
-  updateProjectExecution: ['listProjectExecutions', 'listExecutionsSummary'],
-  syncProjectExecution: ['listProjectExecutions', 'listExecutionsSummary'],
-  deleteProjectExecution: ['listProjectExecutions', 'listExecutionsSummary'],
-  createApiKey: ['listApiKeys'],
-  deleteApiKey: ['listApiKeys'],
-  uploadImage: ['listDirectory', 'searchDirectory'],
 }
 
 /** For each backend method, an optional function defining how to create a query key from its arguments. */

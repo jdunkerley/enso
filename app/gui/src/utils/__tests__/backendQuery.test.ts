@@ -4,13 +4,11 @@
  * options merge with them.
  */
 import {
-  ACCOUNT_STALE_TIME_MS,
   backendMutationOptions,
   backendQueryDefaults,
   backendQueryOptions,
   executeMutation,
   INVALIDATION_MAP,
-  STALE_TIME_MAP,
   type BackendQueryMethod,
 } from '$/utils/backendQuery'
 import { listDirectoryQueryOptions } from '$/utils/driveQueries'
@@ -28,16 +26,12 @@ const local = { type: BackendType.local } as Backend
 
 /**
  * The keys whose options were set differently in two places before #192, and the options they get
- * now, per the ruling on #192, except the organization and the signed-in user, which stay fresh for
- * five minutes (the maintainer's choice on #201).
+ * now, per the ruling on #192.
  */
 const RULED: Record<string, { staleTime: number; persist: boolean }> = {
   getFileDetails: { staleTime: 0, persist: true },
   searchDirectory: { staleTime: 0, persist: false },
   listTags: { staleTime: 0, persist: false },
-  getOrganization: { staleTime: 5 * 60 * 1000, persist: true },
-  usersMe: { staleTime: 5 * 60 * 1000, persist: true },
-  listUsers: { staleTime: Infinity, persist: true },
 }
 
 describe('backendQueryOptions', () => {
@@ -55,12 +49,6 @@ describe('backendQueryOptions', () => {
       expect(toValue(vue.queryKey)).toEqual(direct.queryKey)
     },
   )
-
-  test('the organization and the signed-in user stay fresh for exactly five minutes', () => {
-    expect(ACCOUNT_STALE_TIME_MS).toBe(300_000)
-    expect(STALE_TIME_MAP.getOrganization).toBe(300_000)
-    expect(STALE_TIME_MAP.usersMe).toBe(300_000)
-  })
 
   test('the other keys keep the defaults: fresh for no time, persisted', () => {
     expect(backendQueryDefaults(remote, 'listSecrets')).toEqual({
@@ -113,7 +101,7 @@ describe('backendQueryOptions', () => {
   })
 
   test("a caller's stale time wins; a method that is never persisted stays unpersisted", () => {
-    const options = backendQueryOptions(remote, 'getOrganization', [], {
+    const options = backendQueryOptions(remote, 'listSecrets', [], {
       staleTime: 5,
       meta: { persist: false },
       enabled: false,

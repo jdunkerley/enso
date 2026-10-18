@@ -8,24 +8,20 @@ export enum Column {
   name = 'name',
   modified = 'modified',
   createdAt = 'createdAt',
-  sharedWith = 'sharedWith',
   labels = 'labels',
   path = 'path',
   accessedByProjects = 'accessedByProjects',
   accessedData = 'accessedData',
   size = 'size',
-  createdBy = 'createdBy',
 }
 
 export const DEFAULT_ENABLED_COLUMNS: ReadonlySet<Column> = new Set([
   Column.name,
   Column.modified,
   Column.createdAt,
-  Column.sharedWith,
   Column.labels,
   Column.path,
   Column.size,
-  Column.createdBy,
 ])
 
 export const COLUMN_ICONS: Readonly<Record<Column, Icon>> = {
@@ -34,13 +30,11 @@ export const COLUMN_ICONS: Readonly<Record<Column, Icon>> = {
   [Column.name]: 'ghost',
   [Column.modified]: 'time',
   [Column.createdAt]: 'time',
-  [Column.sharedWith]: 'people',
   [Column.labels]: 'tag',
   [Column.accessedByProjects]: 'accessed_by_projects',
   [Column.accessedData]: 'accessed_data',
   [Column.path]: 'folder',
   [Column.size]: 'metadata',
-  [Column.createdBy]: 'people',
 }
 
 const COLUMN_CSS_CLASSES =
@@ -52,22 +46,18 @@ export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
   [Column.name]: `z-10 sticky left-1 bg-dashboard rounded-rows-skip-level min-w-80 max-w-80 h-full p-0 border-l-0 after:absolute after:right-0 after:top-0 after:bottom-0 after:border-r-[1.5px] after:border-primary/5 ${COLUMN_CSS_CLASSES}`,
   [Column.modified]: `min-w-drive-modified-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.createdAt]: `min-w-drive-created-at-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.sharedWith]: `min-w-drive-shared-with-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.labels]: `min-w-drive-labels-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.accessedByProjects]: `min-w-drive-accessed-by-projects-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.accessedData]: `min-w-drive-accessed-data-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.path]: `min-w-drive-path-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
   [Column.size]: `min-w-drive-size-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
-  [Column.createdBy]: `min-w-drive-created-by-column rounded-rows-have-level ${NORMAL_COLUMN_CSS_CLASSES}`,
 }
 
 /**
  * Return the full list of columns given the relevant current state. `supportsLabels` is whether the
- * backend can label assets of any type (`supportsAnyLabels`). The plan no longer matters: it decided
- * only the "Shared with" column, which is gone; the parameter can go with the cloud code.
+ * backend can label assets of any type (`supportsAnyLabels`).
  */
 export function getColumnList(
-  _userPlan: backend.Plan,
   backendType: backend.BackendType,
   category: CategoryType,
   isSearching: boolean,

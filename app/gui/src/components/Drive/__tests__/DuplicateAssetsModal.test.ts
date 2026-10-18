@@ -27,7 +27,6 @@ function file(id: string, title: string, modifiedAt = '2026-10-01T10:00:00Z'): A
     modifiedAt,
     createdAt: modifiedAt,
     parentId: TARGET_ID,
-    permissions: null,
     projectState: null,
     extension: 'csv',
     parentsPath: '',

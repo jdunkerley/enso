@@ -5,12 +5,7 @@
  */
 import * as dateTime from '../../utilities/data/dateTime.js'
 import { omit } from '../../utilities/data/object.js'
-import {
-  getDirectoryAndName,
-  getFileName,
-  getFolderPath,
-  normalizeSlashes,
-} from '../../utilities/file.js'
+import { getDirectoryAndName, getFolderPath, normalizeSlashes } from '../../utilities/file.js'
 import { normalizeName } from '../../utilities/nameValidation.js'
 import * as backend from '../Backend.js'
 import { makeProjectCacheKey, makeProjectTelemetryKey } from './projectIdentity.js'
@@ -250,20 +245,10 @@ export class ProjectManager {
       recursive ? 'filesystem-list-recursive' : 'filesystem-list',
       parentPath,
     )
-    const result = response.entries
-      .filter((entry) => {
-        // Ignore hybrid project directories.
-        if (entry.type === 'DirectoryEntry') {
-          const directoryName = getFileName(entry.path)
-          return !backend.HYBRID_PROJECT_DIRECTORY_MASK.test(directoryName)
-        }
-
-        return true
-      })
-      .map((entry) => ({
-        ...entry,
-        path: normalizeSlashes(entry.path),
-      }))
+    const result = response.entries.map((entry) => ({
+      ...entry,
+      path: normalizeSlashes(entry.path),
+    }))
 
     for (const entry of result) {
       if (entry.type === 'ProjectEntry') {

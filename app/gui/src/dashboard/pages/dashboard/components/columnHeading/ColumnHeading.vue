@@ -68,8 +68,6 @@ const PLAIN: Partial<Record<Column, { readonly icon: string; readonly name: Text
   [Column.labels]: { icon: 'tag', name: 'labelsColumnName' },
   [Column.size]: { icon: 'metadata', name: 'sizeColumnName' },
   [Column.path]: { icon: 'folder', name: 'pathColumnName' },
-  [Column.sharedWith]: { icon: 'people', name: 'sharedWithColumnName' },
-  [Column.createdBy]: { icon: 'people', name: 'createdByColumnName' },
 }
 
 const sortable = computed(() => SORTABLE[column])
@@ -175,12 +173,6 @@ function cycleSortDirection() {
       v-bind="STOP_PRESS_PROPAGATION"
       @press="hideColumn(column)"
     />
-    <div
-      v-if="column === Column.sharedWith || column === Column.createdBy"
-      class="flex items-center gap-1"
-    >
-      <Text weight="bold" truncate="1" color="custom">{{ getText(plain.name) }}</Text>
-    </div>
-    <Text v-else weight="bold" truncate="1" color="custom">{{ getText(plain.name) }}</Text>
+    <Text weight="bold" truncate="1" color="custom">{{ getText(plain.name) }}</Text>
   </div>
 </template>

@@ -11,20 +11,12 @@ export interface UserSession extends LocalSession {
   readonly user: backendModule.User
 }
 
-/** The local user: a user without a licence or an organization. */
+/** The local user. */
 export function makeLocalUser(name: string): backendModule.User {
   return {
     userId: backendModule.UserId('user-local'),
-    organizationId: backendModule.OrganizationId('organization-00000000000000000000000000'),
-    rootDirectoryId: backendModule.DirectoryId('directory-local'),
     name,
     email: backendModule.EmailAddress(LOCAL_SESSION_EMAIL),
-    isEnabled: false,
-    isOrganizationAdmin: false,
-    userGroups: null,
-    plan: backendModule.Plan.free,
-    groups: [],
-    isEnsoTeamMember: false,
   }
 }
 

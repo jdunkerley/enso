@@ -179,11 +179,7 @@ describe('LocalBackend: the local Recent list', () => {
       vi.spyOn(projectManager, 'openProject').mockResolvedValue(
         {} as Awaited<ReturnType<ProjectManager['openProject']>>,
       )
-      await makeBackend().openProject(
-        PROJECT_ID,
-        { executeAsync: false, cognitoCredentials: null, openHybridProjectParameters: null },
-        'P1',
-      )
+      await makeBackend().openProject(PROJECT_ID, { executeAsync: false }, 'P1')
       expect(projectManager.recordRecentProject).toHaveBeenCalledOnce()
     })
 

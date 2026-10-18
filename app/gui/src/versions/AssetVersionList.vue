@@ -61,7 +61,7 @@ const versions = computed<Version[]>(() => {
       ...version,
       number,
       title: getText('versionX', number),
-      tags: [...(version.isLatest ? [getText('latestIndicator')] : []), ...(version.tags ?? [])],
+      tags: version.isLatest ? [getText('latestIndicator')] : [],
     }
   })
 })

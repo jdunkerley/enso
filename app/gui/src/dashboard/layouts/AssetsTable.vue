@@ -26,8 +26,16 @@ declare module '$/utils/LocalStorage' {
   }
 }
 
+const COLUMNS: readonly string[] = Object.values(Column)
+
 LocalStorage.registerKey('enabledColumns', {
-  schema: z.nativeEnum(Column).array().readonly(),
+  // A column that no longer exists (such as "Shared with") is dropped, not a reason to forget the
+  // user's other choices. The schema reads any strings, which its declared type cannot express.
+  schema: z
+    .string()
+    .array()
+    .transform((columns) => columns.filter((column): column is Column => COLUMNS.includes(column)))
+    .readonly() as z.ZodType<readonly Column[]>,
 })
 
 /** The height of each row in the table body. It MUST be the one Tailwind's `h-table-row` sets. */
@@ -76,8 +84,6 @@ import Scroller from '$/components/Scroller/Scroller.vue'
 import SelectionBrush, { type OnDragParams } from '$/components/SelectionBrush/SelectionBrush.vue'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import Text from '$/components/Text/Text.vue'
-import UserWithPopover from '$/components/UserWithPopover/UserWithPopover.vue'
-import { useAuth } from '$/providers/auth'
 import { categoryKey, isRecentCategory, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
@@ -95,9 +101,7 @@ import { withPresence } from '$/utils/data/set'
 import {
   deleteAssetsMutationKey,
   moveAssetsMutationKey,
-  restoreAssetsMutationKey,
   type DeleteAssetsVariables,
-  type RestoreAssetsVariables,
   type TransferAssetsVariables,
 } from '$/utils/driveMutations'
 import { listDirectoryQueryOptions, searchDirectoryQueryOptions } from '$/utils/driveQueries'
@@ -136,7 +140,6 @@ import {
 const { query } = defineProps<{ query: AssetQuery }>()
 
 const { getText } = useText()
-const auth = useAuth()
 const categories = useCategories()
 const container = useContainerData()
 const rightPanel = useRightPanelData()
@@ -155,17 +158,12 @@ const backend = computed(() => location.value.backend)
 const editDatalink = useEditDatalink(backend)
 const category = computed(() => location.value.category)
 const currentDirectoryId = computed(() => location.value.currentDirectoryId)
-const user = computed(() => auth.session.user)
 
 const supportsLabels = computed(() => supportsAnyLabels(backend.value))
 const labelsQuery = useQuery(
   computed(() =>
     backendQueryOptions(backend.value, 'listTags', [], { enabled: supportsLabels.value }),
   ),
-)
-const usersQuery = useQuery(computed(() => backendQueryOptions(backend.value, 'listUsers', [])))
-const userGroupsQuery = useQuery(
-  computed(() => backendQueryOptions(backend.value, 'listUserGroups', [])),
 )
 const labels = computed(() => labelsQuery.data.value ?? [])
 
@@ -178,13 +176,7 @@ watch(enabledColumns, (columns) => localStorage.set('enabledColumns', [...column
   immediate: true,
 })
 const allowedColumns = computed(() =>
-  getColumnList(
-    user.value.plan,
-    backend.value.type,
-    category.value.type,
-    query.query !== '',
-    supportsLabels.value,
-  ),
+  getColumnList(backend.value.type, category.value.type, query.query !== '', supportsLabels.value),
 )
 const columns = computed(() =>
   allowedColumns.value.filter((column) => enabledColumns.value.has(column)),
@@ -400,7 +392,7 @@ function suggestion(
 }
 
 watch(
-  [() => query, labels, assets, () => usersQuery.data.value, () => userGroupsQuery.data.value],
+  [() => query, labels, assets],
   () => {
     const allVisible = () =>
       assets.value.map((node) => suggestion(node.id, () => node.title, 'names', node.title))
@@ -493,27 +485,6 @@ watch(
         )
         break
       }
-      case 'owner': {
-        setSuggestions([
-          ...(usersQuery.data.value ?? []).map((otherUser) =>
-            suggestion(
-              otherUser.userId,
-              () => h(UserWithPopover, { user: otherUser }),
-              'owners',
-              otherUser.name,
-            ),
-          ),
-          ...(userGroupsQuery.data.value ?? []).map((userGroup) =>
-            suggestion(
-              userGroup.id,
-              () => AssetQuery.termToString({ tag: 'owner', values: [userGroup.groupName] }),
-              'owners',
-              userGroup.groupName,
-            ),
-          ),
-        ])
-        break
-      }
       default: {
         setSuggestions(shouldOmitNames ? [] : allVisible())
         break
@@ -598,10 +569,6 @@ const deletingSingle = usePendingMutations(
   () => backendMutationOptions(backend.value, 'deleteAsset').mutationKey ?? [],
 )
 const deletingMultiple = usePendingMutations(() => deleteAssetsMutationKey(backend.value.type))
-const restoringSingle = usePendingMutations(
-  () => backendMutationOptions(backend.value, 'undoDeleteAsset').mutationKey ?? [],
-)
-const restoringMultiple = usePendingMutations(() => restoreAssetsMutationKey(backend.value.type))
 const updatingSingle = usePendingMutations(
   () => backendMutationOptions(backend.value, 'updateAsset').mutationKey ?? [],
 )
@@ -620,15 +587,6 @@ const deletingIds = computed(
       ...firstArguments(deletingSingle.value),
       ...deletingMultiple.value.flatMap(
         (mutation) => (mutation.state.variables as DeleteAssetsVariables | undefined)?.[0] ?? [],
-      ),
-    ]),
-)
-const restoringIds = computed(
-  () =>
-    new Set<unknown>([
-      ...firstArguments(restoringSingle.value),
-      ...restoringMultiple.value.flatMap(
-        (mutation) => (mutation.state.variables as RestoreAssetsVariables | undefined)?.ids ?? [],
       ),
     ]),
 )
@@ -1249,7 +1207,6 @@ const isLoadingRow = computed(
                         :rowIndex="index + 2"
                         :onRowFocus="onRowFocus"
                         :isDeleting="deletingIds.has(item.id)"
-                        :isRestoring="restoringIds.has(item.id)"
                         :isUpdating="updatingIds.has(item.id)"
                         :grabKeyboardFocus="grabRowKeyboardFocus"
                         :onRowClick="onRowClick"

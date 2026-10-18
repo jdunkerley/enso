@@ -113,7 +113,6 @@ beforeEach(() => {
   versions = [
     version(3, {
       isLatest: true,
-      tags: ['release'],
       user: { name: 'Ada', email: EmailAddress('ada@example.com') },
     }),
     version(2, { comment: 'Fixed the join' }),
@@ -540,12 +539,11 @@ describe('in a project tab', () => {
 })
 
 describe('the list', () => {
-  test('shows each version, newest first, with its tags, comment and author', async () => {
+  test('shows each version, newest first, with the latest tag, comment and author', async () => {
     const { wrapper } = await renderTab()
     expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
     expect(wrapper.text()).toMatch(/Version 3.*Version 2.*Version 1/)
     expect(wrapper.text()).toContain('Latest')
-    expect(wrapper.text()).toContain('release')
     expect(wrapper.text()).toContain('Fixed the join')
     expect(wrapper.text()).toContain('Ada')
   })
@@ -659,16 +657,5 @@ describe('comments', () => {
     expect(document.querySelector('textarea')).toBeNull()
     expect(localBackend.updateAsset).not.toHaveBeenCalled()
     expect(text()).toContain('Fixed the join')
-  })
-})
-
-describe('tags', () => {
-  test('tags that do not fit beside the title collapse into one', async () => {
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
-      new DOMRect(0, 0, 40, 20),
-    )
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('2 tags')
-    expect(buttonsWithIcon('close')).toHaveLength(0)
   })
 })

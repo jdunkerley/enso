@@ -13,10 +13,6 @@ import { isDoubleClick } from '$/utils/event'
 import { twMerge } from '$/utils/style/tailwindMerge'
 import { BackendType, type ProjectAsset } from 'enso-common/src/services/Backend'
 import { isOnMacOS } from 'enso-common/src/utilities/detect'
-import {
-  PERMISSION_ACTION_CAN_EXECUTE,
-  tryFindSelfPermission,
-} from 'enso-common/src/utilities/permissions'
 import { computed } from 'vue'
 import { useNameCell } from './nameColumn'
 
@@ -35,16 +31,9 @@ const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
 )
 
 const user = computed(() => auth.session.user)
-const ownPermission = computed(() => tryFindSelfPermission(user.value, item.permissions))
 // A workaround for a temporary bad state in the backend, in which `projectState` is absent.
 const projectState = computed(() => item.projectState ?? CLOSED_PROJECT_STATE)
-const canExecute = computed(
-  () =>
-    isEditable &&
-    (backend.value.type === BackendType.local ||
-      (ownPermission.value != null &&
-        PERMISSION_ACTION_CAN_EXECUTE[ownPermission.value.permission])),
-)
+const canExecute = computed(() => isEditable)
 const isOtherUserUsingProject = computed(
   () =>
     backend.value.type === BackendType.remote &&

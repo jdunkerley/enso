@@ -102,11 +102,9 @@ const REMOTE_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
   [ProjectState.new]: 'loading-slow',
   [ProjectState.placeholder]: 'loading-slow',
   [ProjectState.openInProgress]: 'loading-slow',
-  [ProjectState.hybridOpenInProgress]: 'loading-slow',
   [ProjectState.provisioned]: 'loading-slow',
   [ProjectState.scheduled]: 'loading-slow',
   [ProjectState.opened]: 'done',
-  [ProjectState.hybridOpened]: 'done',
 }
 /** The spinner's phase for each project state, on the local backend. */
 const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
@@ -115,11 +113,9 @@ const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
   [ProjectState.new]: 'loading-slow',
   [ProjectState.placeholder]: 'loading-medium',
   [ProjectState.openInProgress]: 'loading-slow',
-  [ProjectState.hybridOpenInProgress]: 'loading-slow',
   [ProjectState.provisioned]: 'loading-medium',
   [ProjectState.scheduled]: 'loading-medium',
   [ProjectState.opened]: 'done',
-  [ProjectState.hybridOpened]: 'done',
 }
 </script>
 

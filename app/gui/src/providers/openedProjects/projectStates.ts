@@ -136,15 +136,7 @@ export function useProjectStates() {
   async function openProject(project: NotOpened): Promise<Result<Opened>> {
     if (!backends.localBackend) return Err('Cannot open local project: Local Backend missing.')
     const result = await catchNetworkError(
-      openLocalProject.mutateAsync([
-        project.info.id,
-        {
-          executeAsync: false,
-          cognitoCredentials: null,
-          openHybridProjectParameters: null,
-        },
-        project.info.title,
-      ]),
+      openLocalProject.mutateAsync([project.info.id, { executeAsync: false }, project.info.title]),
     )
     if (!result.ok) return result
     return Ok({

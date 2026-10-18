@@ -297,12 +297,6 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
               page.getByLabel(TEXT.modifiedColumnName).click(),
             )
           },
-          /** Toggle visibility for the "shared with" column. */
-          sharedWith() {
-            return self.step('Toggle "shared with" column', (page) =>
-              page.getByLabel(TEXT.sharedWithColumnName).click(),
-            )
-          },
           /** Toggle visibility for the "labels" column. */
           labels() {
             return self.step('Toggle "labels" column', (page) =>

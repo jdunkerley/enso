@@ -10,14 +10,7 @@ import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { onlineManager } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import {
-  EmailAddress,
-  OrganizationId,
-  Plan,
-  PLANS,
-  UserId,
-  type User,
-} from 'enso-common/src/services/Backend'
+import { EmailAddress, UserId, type User } from 'enso-common/src/services/Backend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import UserBar from '../UserBar.vue'
@@ -63,17 +56,10 @@ const textOf = (element: Element | null | undefined) => element?.textContent.tri
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     userId: UserId('user-1'),
-    organizationId: OrganizationId('organization-1'),
     name: 'Ada Lovelace',
     email: EmailAddress('ada@example.com'),
-    isEnabled: true,
-    isOrganizationAdmin: false,
-    userGroups: null,
-    plan: Plan.solo,
-    groups: [],
-    isEnsoTeamMember: false,
     ...overrides,
-  } as User
+  }
 }
 
 async function mountUserBar() {
@@ -132,7 +118,7 @@ describe('UserBar', () => {
 
   test('"Download app" without a local backend', async () => {
     localBackend.value = null
-    auth.session = { user: makeUser({ plan: Plan.team }) }
+    auth.session = { user: makeUser() }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
@@ -144,13 +130,13 @@ describe('UserBar', () => {
   })
 
   test('local mode: "Working locally", no "Upgrade Plan" or "Logout", in menu or actions', async () => {
-    // The offline stand-in session: a synthetic user on the free plan, with authentication off.
-    auth.session = { user: makeUser({ plan: Plan.free }) }
+    // The local session: the one local user, with no sign-in.
+    auth.session = { user: makeUser() }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
-    expect(must(userMenu()).textContent).not.toContain(getText(Plan.free))
+    expect(must(userMenu()).textContent).not.toContain(getText('free'))
     expect(must(userMenu()).textContent).toContain('Working locally')
     const names = useActionsStore()
       .findActions('')
@@ -159,26 +145,16 @@ describe('UserBar', () => {
     expect(names).not.toContain(getText('signOutShortcut'))
   })
 
-  test('local mode: no "Upgrade" for an organization admin on the free plan', async () => {
-    auth.session = { user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }) }
+  test('no trial, "Invite" or "Upgrade"', async () => {
+    auth.session = { user: makeUser() }
     await mountUserBar()
-    expect([...document.querySelectorAll('a')].map(textOf)).not.toContain(getText('upgrade'))
-  })
-
-  test('no "Invite", "Upgrade" or "Upgrade Plan", whatever the plan', async () => {
-    const user = userEvent.setup()
-    for (const plan of PLANS) {
-      auth.session = { user: makeUser({ plan, isOrganizationAdmin: true }) }
-      const { unmount } = await mountUserBar()
-      const controls = [...document.querySelectorAll('a, button')].map(textOf)
-      expect(controls).not.toContain(getText('upgrade'))
-      expect(controls).not.toContain(getText('invite'))
-      await user.click(userMenuButton())
-      await flushPromises()
-      expect(entryNames()).not.toContain(getText('upgradePlanShortcut'))
-      unmount()
-      await flushPromises()
-    }
+    const controls = [...document.querySelectorAll('a, button')].map(textOf)
+    expect(controls).not.toContain(getText('upgrade'))
+    expect(controls).not.toContain(getText('invite'))
+    expect(document.body.textContent).not.toContain(getText('trialProgressLabel'))
+    await userEvent.setup().click(userMenuButton())
+    await flushPromises()
+    expect(entryNames()).not.toContain(getText('upgradePlanShortcut'))
   })
 
   test('Settings and About close the menu and act; there is no Logout', async () => {

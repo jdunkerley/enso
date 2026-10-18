@@ -143,10 +143,7 @@ export class LocalBackend extends backend.Backend {
   }
 
   /** Return the ID of the root directory. */
-  override rootDirectoryId(
-    _user: backend.User,
-    _organization: backend.OrganizationInfo | null,
-  ): backend.DirectoryId {
+  override rootDirectoryId(): backend.DirectoryId {
     return newDirectoryId(this.rootPath())
   }
 
@@ -192,7 +189,6 @@ export class LocalBackend extends backend.Backend {
           const ensoPathRaw = normalizePath(entry.path)
           const ensoPath = backend.EnsoPath(ensoPathRaw)
           const shared = {
-            permissions: [],
             projectState: null,
             extension: null,
             parentsPath: backend.ParentsPath(parentsPath),
@@ -372,7 +368,6 @@ export class LocalBackend extends backend.Backend {
     })
     return {
       name: project.projectName,
-      organizationId: backend.OrganizationId('organization-'),
       projectId: newProjectId(project.projectPath),
       packageName: project.projectName,
       state: { type: backend.ProjectState.closed, volumeId: '' },
@@ -513,7 +508,6 @@ export class LocalBackend extends backend.Backend {
           name: project.name,
           jsonAddress: null,
           ydocAddress: null,
-          organizationId: backend.OrganizationId('organization-'),
           packageName: project.name,
           projectId,
           state: { type: backend.ProjectState.closed, volumeId: '' },
@@ -532,7 +526,6 @@ export class LocalBackend extends backend.Backend {
           cachedProject.languageServerYdocAddress ?
             ipWithSocketToAddress(cachedProject.languageServerYdocAddress)
           : backend.Address('ws://localhost:5976'),
-        organizationId: backend.OrganizationId('organization-'),
         packageName: cachedProject.projectNormalizedName,
         projectId,
         state: {
@@ -602,7 +595,6 @@ export class LocalBackend extends backend.Backend {
     } else {
       return {
         name: project.name,
-        organizationId: backend.OrganizationId('organization-'),
         projectId,
         packageName: project.name,
         state: { type: backend.ProjectState.closed },
@@ -628,7 +620,6 @@ export class LocalBackend extends backend.Backend {
         projectId: newProjectId(project.projectPath),
         name: project.projectName,
         packageName: project.projectNormalizedName,
-        organizationId: backend.OrganizationId('organization-'),
         state: { type: backend.ProjectState.closed, volumeId: '' },
         ensoPath: backend.EnsoPath(normalizePath(project.projectPath)),
       }
@@ -638,7 +629,6 @@ export class LocalBackend extends backend.Backend {
       projectId: newProjectId(project.projectPath),
       name: project.projectName,
       packageName: project.projectNormalizedName,
-      organizationId: backend.OrganizationId('organization-'),
       state: { type: backend.ProjectState.closed, volumeId: '' },
       ensoPath: backend.EnsoPath(`${path}/${project.projectNormalizedName}`),
     }
@@ -717,8 +707,6 @@ export class LocalBackend extends backend.Backend {
     }
   }
 
-  // === Endpoints that intentionally do not work on the Local Backend ===
-
   /**
    * Called for any function that does not make sense in the Local Backend.
    * @throws {Error} An error stating that the operation is intentionally unavailable on the local
@@ -726,89 +714,6 @@ export class LocalBackend extends backend.Backend {
    */
   invalidOperation(): never {
     throw new Error('Cannot manage users, folders, files, tags, and secrets on the local backend.')
-  }
-
-  /** Invalid operation. */
-  override undoDeleteAsset(): Promise<void> {
-    return this.invalidOperation()
-  }
-
-  /** Return an empty array. */
-  override listUsers() {
-    return Promise.resolve([])
-  }
-
-  /** Invalid operation. */
-  override createUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override updateUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override restoreUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override removeUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override uploadUserPicture() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override changeUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /**
-   * Get the current organization. Returns `null` because organizations do not exist on the
-   * Local Backend. This is required for `rootDiretoryId` to work.
-   */
-  override async getOrganization(): Promise<backend.OrganizationInfo | null> {
-    return Promise.resolve(null)
-  }
-
-  /** Invalid operation. */
-  override updateOrganization() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override uploadOrganizationPicture() {
-    return this.invalidOperation()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override inviteUser() {
-    return Promise.resolve()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override createPermission() {
-    return Promise.resolve()
-  }
-
-  /** Return `null`. This function should never need to be called. */
-  override usersMe() {
-    return this.invalidOperation()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override getPaymentsConfig() {
-    return this.invalidOperation()
   }
 
   /** Create a directory. */
@@ -841,7 +746,6 @@ export class LocalBackend extends backend.Backend {
   ): Promise<void> {
     if (body.versionId != null) {
       const { type, path } = backend.extractTypeAndPath(assetId)
-      if (body.tag != null) throw new Error('Local versions have no tags.')
       if (type !== backend.AssetType.project) {
         throw new Error('Only projects have versions on the Local Backend.')
       }
@@ -939,17 +843,6 @@ export class LocalBackend extends backend.Backend {
       throw new Error('Uploaded file not found')
     }
     return Promise.resolve(file)
-  }
-
-  /**
-   * Upload set of Images, resolving any possible conflicts. The sum of file sizes may not
-   * exceed cloud message limit.
-   */
-  override uploadImage(
-    _parentDirectoryId: backend.DirectoryId,
-    _files: { data: Blob; name: string }[],
-  ): Promise<backend.UploadedImages> {
-    this.invalidOperation()
   }
 
   /** Change the name of a file. */
@@ -1169,41 +1062,6 @@ export class LocalBackend extends backend.Backend {
     )
   }
 
-  /** Invalid operation. */
-  override createProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override getProjectExecutionDetails() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override updateProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override listProjectExecutions() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override listExecutionsSummary() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override syncProjectExecution() {
-    return this.invalidOperation()
-  }
-
   /**
    * Create `<parent>/<name>.datalink`, or, with `body.datalinkId`, replace that datalink's content
    * (the cloud's "new version"; a local datalink has no versions).
@@ -1294,14 +1152,6 @@ export class LocalBackend extends backend.Backend {
   }
 
   /**
-   * Return an empty array. This function is required to be implemented as it is unconditionally
-   * called, but its result should never need to be used.
-   */
-  override listAssetVersionTags(): Promise<readonly string[]> {
-    return Promise.resolve([])
-  }
-
-  /**
    * Set the full list of labels of a local project.
    * @throws {Error} When the asset is not a project.
    */
@@ -1322,71 +1172,6 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.deleteLabel({ id: tagId })
   }
 
-  /** Invalid operation. */
-  override createUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createCheckoutSession() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override cancelSubscription() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /** Return an empty array. */
-  override listUserGroups() {
-    return Promise.resolve([])
-  }
-
-  /** Invalid operation. */
-  override listInvitations() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override resendInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override acceptInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override declineInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override getLogEvents() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override logEvent() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createCustomerPortalSession() {
-    return this.invalidOperation()
-  }
-
   /** Download all logs for a local project session as a file. */
   override async downloadProjectSessionLogs(
     projectSessionId: backend.ProjectSessionId,
@@ -1400,26 +1185,6 @@ export class LocalBackend extends backend.Backend {
     } finally {
       URL.revokeObjectURL(url)
     }
-  }
-
-  /** Invalid operation. */
-  override listApiKeys() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createApiKey() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteApiKey() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation */
-  override getMapboxToken() {
-    return this.invalidOperation()
   }
 }
 

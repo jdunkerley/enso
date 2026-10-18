@@ -10,7 +10,6 @@
  * asked for. Everything below the drive reads `shown`. A control that navigates passes itself as
  * the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom} is true for it.
  */
-import { useAuth } from '$/providers/auth'
 import { categoryKey, isLocalCategory, useCategories, type Category } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useLocalPaths } from '$/providers/localDirectories'
@@ -19,11 +18,11 @@ import { useQuery } from '@tanstack/vue-query'
 import {
   AssetDoesNotExistError,
   BackendType,
+  DirectoryId,
   NetworkError as OtherNetworkError,
   isUnauthorizedError,
   type AnyAsset,
   type Backend,
-  type DirectoryId,
   type Path,
 } from 'enso-common/src/services/Backend'
 import { NetworkError } from 'enso-common/src/utilities/errors'
@@ -107,23 +106,24 @@ export function selectDirectoryDetails(data: AnyAsset | null): DirectoryDetails 
   }
 }
 
+/** Stands in for the local root directory until its path is known. */
+const UNKNOWN_ROOT_DIRECTORY_ID = DirectoryId('directory-local')
+
 /** See the file comment. */
 export const [provideDriveView, useDriveView] = createContextStore('driveView', () => {
   const drive = useDriveLocation()
   const categories = useCategories()
-  const auth = useAuth()
   const localPaths = useLocalPaths()
 
   /** The location asked for. */
   const target = computed((): DriveViewLocation => {
-    const user = auth.session.user
     const category = drive.currentCategory
     const categoryHomeDir = categories.categoryDirectoryId(category)
     // A category with no home directory (a Recent) is rooted at its backend's root.
     const rootDirectoryId =
       categoryHomeDir ??
       (isLocalCategory(category) ? categories.categoryDirectoryId({ type: 'local' }) : null) ??
-      user.rootDirectoryId
+      UNKNOWN_ROOT_DIRECTORY_ID
     const directoryId = drive.currentDirectory
     const queryDirectoryId = directoryId ?? categoryHomeDir
     return {

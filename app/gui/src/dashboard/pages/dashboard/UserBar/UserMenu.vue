@@ -66,14 +66,14 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
     <template #trigger>
       <Button size="custom" variant="icon" class="ml-2" :aria-label="getText('userMenuLabel')">
         <template #icon>
-          <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+          <ProfilePicture :picture="null" :name="user.name" />
         </template>
       </Button>
     </template>
     <div
       class="mb-2 flex select-none items-center gap-icons overflow-hidden px-menu-entry transition-all duration-user-menu"
     >
-      <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+      <ProfilePicture :picture="null" :name="user.name" />
       <div class="flex min-w-0 flex-col">
         <Text disableLineHeightCompensation variant="body" truncate="1" weight="semibold">
           {{ user.name }}

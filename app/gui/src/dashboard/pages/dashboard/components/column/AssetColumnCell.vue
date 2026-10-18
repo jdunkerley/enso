@@ -59,7 +59,6 @@ const { column, item, labels, isEditable } = defineProps<{
     {{ toReadableIsoString(new Date(item.createdAt)) }}
   </Text>
   <Text v-else-if="column === Column.size" nowrap>{{ formatBytes(item.size) }}</Text>
-  <Text v-else-if="column === Column.createdBy" nowrap>{{ item.createdBy?.name }}</Text>
   <LabelsColumn v-else-if="column === Column.labels" :item="item" :labels="labels" />
   <PathColumn v-else-if="column === Column.path" :item="item" />
 </template>

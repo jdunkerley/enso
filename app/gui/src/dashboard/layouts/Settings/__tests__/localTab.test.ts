@@ -11,14 +11,18 @@ import LocalStorage from '$/utils/LocalStorage'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import { Path, Plan, type User } from 'enso-common/src/services/Backend'
+import { EmailAddress, Path, UserId, type User } from 'enso-common/src/services/Backend'
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { z } from 'zod'
 import SettingsPage from '../SettingsPage.vue'
 import { required } from './dom'
 
-const USER = { name: 'user name', email: 'user@example.com', plan: Plan.solo } as User
+const USER: User = {
+  userId: UserId('user-1'),
+  name: 'user name',
+  email: EmailAddress('user@example.com'),
+}
 const DEFAULT_ROOT = Path('/projects')
 const DEFAULT_DOWNLOADS = Path('/downloads')
 

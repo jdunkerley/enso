@@ -11,7 +11,6 @@ import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
 import Icon from '$/components/Icon/Icon.vue'
 import Text from '$/components/Text/Text.vue'
-import { useAuth } from '$/providers/auth'
 import { useCategories } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { parseDirectoriesPath, type PathItem } from '$/utils/parseDirectoriesPath'
@@ -21,17 +20,15 @@ import { computed } from 'vue'
 
 const { item } = defineProps<{ item: AnyAsset }>()
 
-const auth = useAuth()
 const categories = useCategories()
 const drive = useDriveLocation()
 const driveView = useDriveView()
 
 const finalPath = computed(() => {
-  const user = auth.session.user
   return parseDirectoriesPath({
     parentsPath: item.parentsPath,
     virtualParentsPath: item.virtualParentsPath,
-    rootDirectoryId: user.rootDirectoryId,
+    rootDirectoryId: driveView.location.rootDirectoryId,
     getCategoryByDirectoryId: categories.getCategoryByDirectoryId,
     categoryLabel: categories.categoryLabel,
   }).finalPath
