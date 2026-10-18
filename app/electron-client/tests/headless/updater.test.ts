@@ -257,6 +257,118 @@ describe('Updater guards', () => {
   })
 })
 
+describe('Updater stable fallback', () => {
+  /** Answers each check by the `allowPrerelease` it sees: a prerelease check finds nothing. */
+  function answerChecks(
+    autoUpdater: FakeAutoUpdater,
+    stable: () => Promise<null>,
+    seen: boolean[] = [],
+  ) {
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      seen.push(autoUpdater.allowPrerelease)
+      if (autoUpdater.allowPrerelease) {
+        autoUpdater.emit('update-not-available', { version: '2026.1.1-rc.1' })
+        return null
+      }
+      return stable()
+    })
+    return seen
+  }
+
+  test('an rc install that finds no prerelease is offered the stable release', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    const seen = answerChecks(autoUpdater, async () => {
+      autoUpdater.emit('update-available', { version: '2026.1.1', releaseDate: '2026-11-01' })
+      return null
+    })
+    expect(await updater.check(true)).toEqual({
+      state: 'available',
+      version: '2026.1.1',
+      releaseDate: '2026-11-01',
+    })
+    expect(seen).toEqual([true, false])
+    expect(autoUpdater.allowPrerelease).toBe(true)
+    // The first, empty check is not reported: the status goes straight from checking.
+    expect(statuses.map((s) => s.state)).toEqual(['checking', 'available'])
+  })
+
+  test('no stable release either is none', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    answerChecks(autoUpdater, async () => {
+      autoUpdater.emit('update-not-available', { version: '2026.1.0' })
+      return null
+    })
+    expect(await updater.check(true)).toEqual({ state: 'none' })
+    expect(autoUpdater.allowPrerelease).toBe(true)
+    expect(statuses.map((s) => s.state)).toEqual(['checking', 'none'])
+  })
+
+  test('a failed stable check (no stable release yet) is none, not an error', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    answerChecks(autoUpdater, async () => {
+      const error = new Error('HttpError: 404 Not Found')
+      autoUpdater.emit('error', error)
+      throw error
+    })
+    expect(await updater.check(true)).toEqual({ state: 'none' })
+    expect(autoUpdater.allowPrerelease).toBe(true)
+    expect(statuses.some((s) => s.state === 'error')).toBe(false)
+  })
+
+  test('a stable check that fires no event settles to none', async () => {
+    const { autoUpdater, updater } = setup()
+    answerChecks(autoUpdater, async () => null)
+    expect(await updater.check(true)).toEqual({ state: 'none' })
+  })
+
+  test('a prerelease that is found needs no second check', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      autoUpdater.emit('update-available', { version: '2026.2.0-rc.1', releaseDate: '' })
+      return null
+    })
+    await updater.check(true)
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  test('a failed prerelease check is an error, with no second check', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      const error = new Error('offline')
+      autoUpdater.emit('error', error)
+      throw error
+    })
+    expect(await updater.check(true)).toEqual({ state: 'error', message: 'offline', version: null })
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+    expect(statuses.filter((s) => s.state === 'error')).toHaveLength(1)
+  })
+
+  test('without prereleases there is only one check', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      autoUpdater.emit('update-not-available', { version: '2026.1.1' })
+      return null
+    })
+    expect(await updater.check(false)).toEqual({ state: 'none' })
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+  })
+
+  test('check() during the stable check changes nothing', async () => {
+    const { autoUpdater, updater } = setup()
+    let finishStable: () => void = () => {}
+    answerChecks(
+      autoUpdater,
+      () => new Promise<null>((resolve) => (finishStable = () => resolve(null))),
+    )
+    const first = updater.check(true)
+    await vi.waitFor(() => expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2))
+    expect(await updater.check(true)).toEqual({ state: 'checking' })
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    finishStable()
+    expect(await first).toEqual({ state: 'none' })
+  })
+})
+
 const { handleMock, sendMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   sendMock: vi.fn(),

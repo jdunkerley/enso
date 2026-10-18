@@ -44,6 +44,8 @@ export function resolveUpdateMode(
 export class Updater {
   readonly mode: UpdateMode
   private current: UpdateStatus = { state: 'idle' }
+  /** Which pass of {@link check} is running; see {@link checkWithStableFallback}. */
+  private pass: 'single' | 'prerelease' | 'stable' = 'single'
 
   /** Configures `autoUpdater` and subscribes to its events. */
   constructor(private readonly deps: UpdaterDeps) {
@@ -60,6 +62,8 @@ export class Updater {
       })
     })
     updater.on('update-not-available', () => {
+      // A prerelease pass that finds nothing is followed by the stable pass, which decides.
+      if (this.pass === 'prerelease') return
       this.set({ state: 'none' })
     })
     updater.on('download-progress', (progress) => {
@@ -75,6 +79,8 @@ export class Updater {
     updater.on('error', (error) => {
       // A downloaded update installs on quit whatever happens afterwards.
       if (this.current.state === 'ready') return
+      // A failed stable fallback is `none`, not an error.
+      if (this.pass === 'stable') return
       this.set({
         state: 'error',
         message: error.message,
@@ -97,16 +103,50 @@ export class Updater {
       this.current.state === 'ready'
     )
       return this.current
-    this.deps.autoUpdater.allowPrerelease = allowPrerelease
     this.set({ state: 'checking' })
     try {
-      await this.deps.autoUpdater.checkForUpdates()
+      if (allowPrerelease) await this.checkWithStableFallback()
+      else {
+        this.deps.autoUpdater.allowPrerelease = false
+        await this.deps.autoUpdater.checkForUpdates()
+      }
       // No event fires when the updater is inactive.
       if (this.status().state === 'checking') this.set({ state: 'none' })
     } catch (error) {
       this.fail(error, null)
     }
     return this.current
+  }
+
+  /**
+   * Checks including prereleases, then, if that finds nothing, for stable releases only.
+   *
+   * `electron-updater`'s GitHub provider takes the channel from the current version, so an
+   * `rc` install with `allowPrerelease` matches only `rc` tags and is never offered a stable
+   * release. Without `allowPrerelease` it asks GitHub for `/releases/latest`, which is the newest
+   * stable release. Setting `channel` instead would also enable `allowDowngrade`.
+   */
+  private async checkWithStableFallback() {
+    const autoUpdater = this.deps.autoUpdater
+    autoUpdater.allowPrerelease = true
+    this.pass = 'prerelease'
+    try {
+      await autoUpdater.checkForUpdates()
+    } finally {
+      this.pass = 'single'
+    }
+    if (this.current.state !== 'checking') return
+    autoUpdater.allowPrerelease = false
+    this.pass = 'stable'
+    try {
+      await autoUpdater.checkForUpdates()
+    } catch (error) {
+      // A fork with no stable release yet answers 404; there is simply nothing newer.
+      console.info('[Updater] The stable-release check failed:', messageOf(error))
+    } finally {
+      this.pass = 'single'
+      autoUpdater.allowPrerelease = true
+    }
   }
 
   /** Downloads the available update; the outcome arrives as a status. Never throws. */
