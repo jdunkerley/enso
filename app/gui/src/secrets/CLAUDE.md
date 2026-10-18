@@ -34,8 +34,8 @@ Three things are missing, and each would fail only at run time:
 - **A submit path that is tested.** `CreateCredentialModal.test.ts` stubs
   `getOauthRedirectUri`, so the forms' submit path is never exercised against
   the real function.
-- **A `catch` on the Google and Strava forms.** Their `submit()` functions
-  (`GoogleCredentialsForm.vue`, `StravaCredentialsForm.vue`) do not catch a
-  rejection from the recipe, so the invariant above would surface as an
-  unhandled error rather than a toast. Add one (see `toastAndLog.ts`) before
-  enabling them.
+- **A `catch` on the Google form.** `submit()` in `GoogleCredentialsForm.vue`
+  does not catch a rejection from the recipe, so the invariant above would
+  surface as an unhandled error rather than a toast. Add one, as the Strava,
+  MS365, Salesforce and Snowflake forms have (`toastAndLogError`, see
+  `toastAndLog.ts`), before enabling it.

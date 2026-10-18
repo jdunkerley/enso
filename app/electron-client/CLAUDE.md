@@ -23,6 +23,11 @@ desktop binary (AppImage/DMG/exe + installer).
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).
+- Implements the in-app `enso://` protocol (`handleProjectProtocol`,
+  `projectService.ts`, registered with `protocol.handle` in `index.ts`), which
+  serves project assets to the window and refuses paths outside a project. The
+  OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
+  are no deep links.
 - Handles auto-update (electron-updater via electron-builder), custom window
   chrome.
 
