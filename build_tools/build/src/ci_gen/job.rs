@@ -1026,6 +1026,18 @@ rm dist/backend/backend.tar"
                 prepare_packaging_steps(target.0, step, PackagingTarget::Development);
             steps.append(&mut packaging_steps);
 
+            // Install, start and uninstall the real NSIS installer, so an installer that
+            // exits on launch (#251) fails packaging instead of reaching a release.
+            if target.0 == OS::Windows {
+                steps.push(
+                    shell(
+                        "./tools/ci/windows-installer-smoke.ps1 -Installer (Get-Item dist/ide/enso-win-x64-*.exe).FullName",
+                    )
+                    .with_name("Smoke-test the installer")
+                    .with_shell(Shell::Pwsh),
+                );
+            }
+
             let upload_ide = step::upload_artifact("Upload ide")
                 .with_custom_argument("name", format!("ide-{}", target.0))
                 .with_custom_argument(
@@ -1139,6 +1151,16 @@ mod tests {
                 assert!(!yaml.contains(forbidden), "`{}` still mentions {forbidden}", job.name);
             }
         }
+        Ok(())
+    }
+
+    /// Windows packaging installs, starts and uninstalls the NSIS installer (#251).
+    #[test]
+    fn windows_packaging_smoke_tests_the_installer() -> Result {
+        let windows = serde_yaml::to_string(&PackageIde.job((OS::Windows, Arch::X86_64)))?;
+        assert!(windows.contains("tools/ci/windows-installer-smoke.ps1"), "{windows}");
+        let linux = serde_yaml::to_string(&PackageIde.job((OS::Linux, Arch::X86_64)))?;
+        assert!(!linux.contains("windows-installer-smoke"), "{linux}");
         Ok(())
     }
 }
