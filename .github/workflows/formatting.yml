@@ -4,6 +4,10 @@ on:
   push:
     branches: [develop, "release/*"]
   pull_request:
+    # Specs and plans alone start no checks; keep in step with `PR_IGNORED_PATHS` in
+    # `build_tools/build/src/ci_gen.rs`.
+    paths-ignore:
+      - "docs/superpowers/**"
     branches: ["*"]
 
 env:

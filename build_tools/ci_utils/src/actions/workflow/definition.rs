@@ -372,9 +372,17 @@ pub struct PullRequest {
     pub inner_branches: Branches,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub types: Vec<PullRequestActivityType>,
+    /// The workflow does not run when every changed file matches one of these patterns.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub paths_ignore: Vec<String>,
 }
 
 impl PullRequest {
+    pub fn with_paths_ignore(mut self, paths: impl IntoIterator<Item: Into<String>>) -> Self {
+        self.paths_ignore.extend(paths.into_iter().map(Into::into));
+        self
+    }
+
     pub fn with_types(
         mut self,
         types: impl IntoIterator<Item: Into<PullRequestActivityType>>,
