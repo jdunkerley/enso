@@ -39,11 +39,8 @@ pub mod env {
 
     // GUI-specific environment variables
     define_env_var! {
-        /// The host URL for the Enso Cloud.
+        /// The Enso web host, for the contact page link.
         ENSO_IDE_HOST, String;
-
-        /// The root path for all API endpoints, without a trailing slash.
-        ENSO_IDE_API_URL, String;
 
         /// The Sentry DSN for error reporting in this environment.
         ENSO_IDE_SENTRY_DSN, String;
@@ -67,9 +64,6 @@ pub mod env {
         /// does so silently, so nothing else would catch it. See `requireAgGridLicense` in
         /// `app/gui/vite.config.ts`.
         ENSO_IDE_REQUIRE_AG_GRID_LICENSE, bool;
-
-        /// The Mapbox API token for the GeoMap visualization.
-        ENSO_IDE_MAPBOX_API_TOKEN, String;
 
         ENSO_IDE_COMMIT_HASH, String;
         ENSO_IDE_VERSION, String;

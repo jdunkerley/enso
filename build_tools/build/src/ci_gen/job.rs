@@ -140,10 +140,6 @@ pub fn expose_gui_vars(step: Step) -> Step {
             variables::ENSO_AG_GRID_LICENSE_KEY,
             ide::web::env::ENSO_IDE_AG_GRID_LICENSE_KEY,
         )
-        .with_variable_exposed_as(
-            variables::ENSO_MAPBOX_API_TOKEN,
-            ide::web::env::ENSO_IDE_MAPBOX_API_TOKEN,
-        )
 }
 
 /// Expose variables for debugging purposes.
@@ -970,7 +966,7 @@ pub enum PackagingTarget {
 ///
 /// This involves:
 /// * exposing secrets necessary for code signing and notarization;
-/// * exposing variables defining cloud environment for dashboard;
+/// * exposing the GUI's build variables (host, Sentry, Analytics, AG Grid);
 /// * for releases, requiring an AG Grid Enterprise license.
 pub fn prepare_packaging_steps(os: OS, step: Step, packaging_target: PackagingTarget) -> Vec<Step> {
     let step = expose_gui_vars(step);
@@ -994,112 +990,81 @@ impl JobArchetype for PackageIde {
         RunStepsBuilder::new(
             "ide build --backend-source local --gui-source local --gui-upload-artifact false",
         )
-            .fetch_depth(2)
-            .customize(move |step| {
-                let mut steps = vec![];
+        .fetch_depth(2)
+        .customize(move |step| {
+            let mut steps = vec![];
 
-                let download_backend = step::download_artifact("Download backend")
-                    .with_custom_argument("name", format!("backend-{}", target.0))
-                    .with_custom_argument("path", "dist/backend");
-                steps.push(download_backend);
+            let download_backend = step::download_artifact("Download backend")
+                .with_custom_argument("name", format!("backend-{}", target.0))
+                .with_custom_argument("path", "dist/backend");
+            steps.push(download_backend);
 
-                let unpack_backend = Step {
-                    run: Some(
-                        "tar -xvf dist/backend/backend.tar -C dist/backend
+            let unpack_backend = Step {
+                run: Some(
+                    "tar -xvf dist/backend/backend.tar -C dist/backend
 rm dist/backend/backend.tar"
-                            .into(),
-                    ),
-                    ..Default::default()
-                };
-                steps.push(unpack_backend);
+                        .into(),
+                ),
+                ..Default::default()
+            };
+            steps.push(unpack_backend);
 
-                // The GUI is platform-independent web assets built once by the `GuiBuild` job;
-                // download that artifact instead of recompiling it here (`--gui-source local`
-                // above; the default `--gui-path` is `dist/gui`).
-                let download_gui = step::download_artifact("Download GUI")
-                    .with_custom_argument("name", "gui")
-                    .with_custom_argument("path", "dist/gui");
-                steps.push(download_gui);
+            // The GUI is platform-independent web assets built once by the `GuiBuild` job;
+            // download that artifact instead of recompiling it here (`--gui-source local`
+            // above; the default `--gui-path` is `dist/gui`).
+            let download_gui = step::download_artifact("Download GUI")
+                .with_custom_argument("name", "gui")
+                .with_custom_argument("path", "dist/gui");
+            steps.push(download_gui);
 
-                // `./run ide build` runs `pnpm install`, whose lifecycle scripts would otherwise
-                // recompile the Rust parser to WASM. Drop the prebuilt bindings from the
-                // `GuiBuild` job into place so the input-hash guard skips that Cargo build.
-                steps.push(step::download_wasm_artifacts());
+            // `./run ide build` runs `pnpm install`, whose lifecycle scripts would otherwise
+            // recompile the Rust parser to WASM. Drop the prebuilt bindings from the
+            // `GuiBuild` job into place so the input-hash guard skips that Cargo build.
+            steps.push(step::download_wasm_artifacts());
 
-                let mut packaging_steps =
-                    prepare_packaging_steps(target.0, step, PackagingTarget::Development);
-                steps.append(&mut packaging_steps);
+            let mut packaging_steps =
+                prepare_packaging_steps(target.0, step, PackagingTarget::Development);
+            steps.append(&mut packaging_steps);
 
-                let upload_ide = step::upload_artifact("Upload ide")
-                    .with_custom_argument("name", format!("ide-{}", target.0))
-                    .with_custom_argument(
-                        "path",
-                        format!("dist/ide/enso-*.{}", target.0.package_extension()),
-                    );
-                steps.push(upload_ide);
+            let upload_ide = step::upload_artifact("Upload ide")
+                .with_custom_argument("name", format!("ide-{}", target.0))
+                .with_custom_argument(
+                    "path",
+                    format!("dist/ide/enso-*.{}", target.0.package_extension()),
+                );
+            steps.push(upload_ide);
 
-                let test_prepare_step = shell("\
-                    mkdir -p app/electron-client/playwright/.auth && \
-                    touch app/electron-client/playwright/.auth/user.json && \
-                    chmod 600 app/electron-client/playwright/.auth/user.json && \
-                    echo \"{\\\"user\\\": \\\"$ENSO_TEST_USER\\\",\\\"password\\\":\\\"$ENSO_TEST_USER_PASSWORD\\\"}\" > app/electron-client/playwright/.auth/user.json\
-                    ").with_shell(Shell::Bash).with_secret_exposed_as(
-                        secret::ENSO_CLOUD_TEST_ACCOUNT_USERNAME,
-                        "ENSO_TEST_USER",
-                    )
-                    .with_secret_exposed_as(
-                        secret::ENSO_CLOUD_TEST_ACCOUNT_PASSWORD,
-                        "ENSO_TEST_USER_PASSWORD",
-                    ).with_name(
-                        "Prepare Package Tests"
-                    );
-                steps.push(test_prepare_step);
+            const TEST_COMMAND: &str = "corepack pnpm -r --filter enso ide-integration-test";
+            let test_step = match target.0 {
+                OS::Linux => shell(format!("xvfb-run {TEST_COMMAND}")),
+                OS::MacOS =>
+                // MacOS CI runners are very slow
+                {
+                    shell(format!("{TEST_COMMAND} --timeout 300000"))
+                }
+                _ => shell(TEST_COMMAND),
+            };
+            let test_step =
+                test_step.with_env("DEBUG", "pw:browser log:").with_name("Run Package Tests");
 
-                const TEST_COMMAND: &str = "corepack pnpm -r --filter enso ide-integration-test";
-                let test_step = match target.0 {
-                    OS::Linux => shell(format!("xvfb-run {TEST_COMMAND}")),
-                    OS::MacOS =>
-                    // MacOS CI runners are very slow
-                        shell(format!("{TEST_COMMAND} --timeout 300000")),
-                    _ => shell(TEST_COMMAND),
-                };
-                let test_step = test_step
-                    .with_env("DEBUG", "pw:browser log:")
-                    .with_name("Run Package Tests");
+            steps.push(test_step);
 
-                steps.push(test_step);
+            let upload_test_traces_step = Step {
+                r#if: Some("failure()".into()),
+                name: Some("Upload Test Traces".into()),
+                uses: Some("actions/upload-artifact@v5".into()),
+                with: Some(Argument::Other(BTreeMap::from_iter([
+                    ("name".into(), format!("test-traces-{}-{}", target.0, target.1).into()),
+                    ("path".into(), "app/electron-client/test-traces".into()),
+                    ("compression-level".into(), 0.into()), // The traces are in zip already.
+                ]))),
+                ..Default::default()
+            };
+            steps.push(upload_test_traces_step);
 
-                let upload_test_traces_step = Step {
-                    r#if: Some("failure()".into()),
-                    name: Some("Upload Test Traces".into()),
-                    uses: Some("actions/upload-artifact@v5".into()),
-                    with: Some(Argument::Other(BTreeMap::from_iter([
-                        ("name".into(), format!("test-traces-{}-{}", target.0, target.1).into()),
-                        ("path".into(), "app/electron-client/test-traces".into()),
-                        ("compression-level".into(), 0.into()), // The traces are in zip already.
-                    ]))),
-                    ..Default::default()
-                };
-                steps.push(upload_test_traces_step);
-
-                // After the E2E tests run, they create a credentials file in user home directory.
-                // If that file is not cleaned up, future runs of our tests may randomly get
-                // authenticated into Enso Cloud. We want to run tests as an authenticated
-                // user only when we explicitly set that up, not randomly. So we clean the
-                // credentials file.
-                let cloud_credentials_path = "$HOME/.enso/credentials";
-                let cleanup_credentials_step = Step {
-                    r#if: Some("always()".into()),
-                    name: Some("Remove Credentials File".into()),
-                    shell: Some(Shell::Bash),
-                    ..shell(format!("rm -f {cloud_credentials_path}"))
-                };
-
-                steps.push(cleanup_credentials_step);
-
-                steps
-            })
-            .build_job("Package New IDE", target)
+            steps
+        })
+        .build_job("Package New IDE", target)
     }
 }
 
@@ -1150,5 +1115,30 @@ impl JobArchetype for BuildEngineDistribution {
             self.id_key_base(),
             self.graal_edition.to_string().to_kebab_case()
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The IDE is local-only: packaging and its e2e tests need no Enso Cloud account or token.
+    #[test]
+    fn ide_jobs_need_no_cloud_account() -> Result {
+        for job in
+            [PackageIde.job((OS::Linux, Arch::X86_64)), GuiBuild.job((OS::Linux, Arch::X86_64))]
+        {
+            let yaml = serde_yaml::to_string(&job)?;
+            for forbidden in [
+                "ENSO_TEST_USER",
+                "ENSO_CLOUD_TEST_ACCOUNT",
+                ".enso/credentials",
+                "playwright/.auth",
+                "MAPBOX",
+            ] {
+                assert!(!yaml.contains(forbidden), "`{}` still mentions {forbidden}", job.name);
+            }
+        }
+        Ok(())
     }
 }

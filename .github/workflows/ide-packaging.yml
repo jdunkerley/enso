@@ -292,7 +292,6 @@ jobs:
           ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MODE: production
@@ -386,7 +385,6 @@ jobs:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload ide
@@ -394,13 +392,6 @@ jobs:
         with:
           name: ide-linux
           path: dist/ide/enso-*.AppImage
-      - name: Prepare Package Tests
-        run: 'mkdir -p app/electron-client/playwright/.auth && touch app/electron-client/playwright/.auth/user.json && chmod 600 app/electron-client/playwright/.auth/user.json && echo "{\"user\": \"$ENSO_TEST_USER\",\"password\":\"$ENSO_TEST_USER_PASSWORD\"}" > app/electron-client/playwright/.auth/user.json'
-        shell: bash
-        env:
-          ENSO_TEST_USER: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_USERNAME }}
-          ENSO_TEST_USER_PASSWORD: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_PASS }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Package Tests
         run: xvfb-run corepack pnpm -r --filter enso ide-integration-test
         env:
@@ -413,12 +404,6 @@ jobs:
           compression-level: 0
           name: test-traces-linux-amd64
           path: app/electron-client/test-traces
-      - if: always()
-        name: Remove Credentials File
-        run: rm -f $HOME/.enso/credentials
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
         run: corepack pnpm run git-clean --verbose
@@ -495,7 +480,6 @@ jobs:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
           ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_MAPBOX_API_TOKEN: ${{ vars.ENSO_MAPBOX_API_TOKEN }}
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT_PASSWORD }}
@@ -505,13 +489,6 @@ jobs:
         with:
           name: ide-windows
           path: dist/ide/enso-*.exe
-      - name: Prepare Package Tests
-        run: 'mkdir -p app/electron-client/playwright/.auth && touch app/electron-client/playwright/.auth/user.json && chmod 600 app/electron-client/playwright/.auth/user.json && echo "{\"user\": \"$ENSO_TEST_USER\",\"password\":\"$ENSO_TEST_USER_PASSWORD\"}" > app/electron-client/playwright/.auth/user.json'
-        shell: bash
-        env:
-          ENSO_TEST_USER: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_USERNAME }}
-          ENSO_TEST_USER_PASSWORD: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_PASS }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Package Tests
         run: corepack pnpm -r --filter enso ide-integration-test
         env:
@@ -524,12 +501,6 @@ jobs:
           compression-level: 0
           name: test-traces-windows-amd64
           path: app/electron-client/test-traces
-      - if: always()
-        name: Remove Credentials File
-        run: rm -f $HOME/.enso/credentials
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
         run: corepack pnpm run git-clean --verbose
