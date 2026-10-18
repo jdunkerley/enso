@@ -1107,6 +1107,27 @@ mod tests {
         }
     }
 
+    /// Every `setup-node` step disables the automatic package-manager cache: it needs `pnpm`,
+    /// which is installed only by the corepack step that follows.
+    #[test]
+    fn setup_node_steps_disable_package_manager_cache() {
+        let mut checked = 0;
+        for (name, workflow) in [
+            ("nightly", nightly().unwrap()),
+            ("engine-checks", engine_checks().unwrap()),
+            ("ide-packaging", ide_packaging().unwrap()),
+            ("release", release().unwrap()),
+            ("promote", promote().unwrap()),
+        ] {
+            let yaml = serde_yaml::to_string(&workflow).unwrap();
+            let setup_node_steps = yaml.matches("uses: actions/setup-node@").count();
+            let cache_disabled = yaml.matches("package-manager-cache: false").count();
+            assert_eq!(setup_node_steps, cache_disabled, "{name}:\n{yaml}");
+            checked += setup_node_steps;
+        }
+        assert!(checked > 0, "no setup-node steps were checked");
+    }
+
     /// The release workflow publishes IDE-only GitHub releases and needs nothing but the
     /// workflow token.
     #[test]
