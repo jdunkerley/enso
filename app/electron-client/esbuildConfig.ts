@@ -36,6 +36,7 @@ export function bundlerOptions(outdir: string, devMode = false): esbuild.BuildOp
     define: {
       'process.env.ELECTRON_DEV_MODE': JSON.stringify(String(devMode)),
       'process.env.ENSO_IDE_VERSION': JSON.stringify(process.env.ENSO_IDE_VERSION),
+      'process.env.ENSO_IDE_UPDATES': JSON.stringify(process.env.ENSO_IDE_UPDATES),
       'process.env.ENSO_IDE_COMMIT_HASH': JSON.stringify(process.env.ENSO_IDE_COMMIT_HASH),
     },
     sourcemap: 'linked',

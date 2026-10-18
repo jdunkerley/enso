@@ -66,6 +66,9 @@ pub mod env {
         ENSO_IDE_COMMIT_HASH, String;
         ENSO_IDE_VERSION, String;
 
+        /// `auto` or `manual`: whether the packaged app may update itself.
+        ENSO_IDE_UPDATES, String;
+
         /// Vite mode.
         MODE, String;
     }
@@ -221,9 +224,12 @@ impl IdeDesktop {
         crate::web::install(&self.repo_root).await?;
         let backend_bundle = BackendInfo::new(backend)?;
         let sign_artifacts = &sign;
+        let mac_signed = std::env::var("CSC_LINK").is_ok_and(|link| !link.is_empty()) && sign;
+        let updates = update_mode(version, target_os, mac_signed);
         self.pnpm()?
             .set_env(env::ENSO_IDE_COMMIT_HASH, &commit_hash)?
             .set_env(env::ENSO_IDE_VERSION, &version_string)?
+            .set_env(env::ENSO_IDE_UPDATES, &updates)?
             .set_env(env::ENSO_BUILD_GUI, gui.as_ref())?
             .set_env(env::ENSO_BUILD_IDE, output_path)?
             .set_env(env::ENSO_BUILD_SIGN, sign_artifacts)?
@@ -241,6 +247,7 @@ impl IdeDesktop {
             .apply(&RemoveEmptyCscEnvVars)
             .set_env(env::ENSO_IDE_COMMIT_HASH, &commit_hash)?
             .set_env(env::ENSO_IDE_VERSION, &version_string)?
+            .set_env(env::ENSO_IDE_UPDATES, &updates)?
             .set_env(env::ENSO_BUILD_GUI, gui.as_ref())?
             .set_env(env::ENSO_BUILD_IDE, output_path)?
             .set_env(env::ENSO_BUILD_SIGN, sign_artifacts)?
@@ -252,6 +259,30 @@ impl IdeDesktop {
             .run_ok()
             .await?;
         Ok(())
+    }
+}
+
+/// Whether the packaged app may update itself: not for dev builds, and on macOS only when signed
+/// (an unsigned app cannot replace itself there).
+pub fn update_mode(version: &Version, target_os: OS, mac_signed: bool) -> &'static str {
+    let is_dev = version.pre.as_str().contains("dev");
+    if is_dev || (target_os == OS::MacOS && !mac_signed) { "manual" } else { "auto" }
+}
+
+#[cfg(test)]
+mod update_mode_tests {
+    use super::*;
+
+    #[test]
+    fn dev_builds_and_unsigned_macos_are_manual() {
+        let release = Version::parse("2026.2.0").unwrap();
+        let rc = Version::parse("2026.2.0-rc.1").unwrap();
+        let dev = Version::parse("2026.10.18-dev").unwrap();
+        assert_eq!(update_mode(&release, OS::Windows, false), "auto");
+        assert_eq!(update_mode(&rc, OS::Linux, false), "auto");
+        assert_eq!(update_mode(&dev, OS::Windows, false), "manual");
+        assert_eq!(update_mode(&release, OS::MacOS, false), "manual");
+        assert_eq!(update_mode(&release, OS::MacOS, true), "auto");
     }
 }
 

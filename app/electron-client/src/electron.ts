@@ -9,6 +9,7 @@ import type { DownloadUrlOptions } from 'enso-common/src/download'
 import { unlinkSync } from 'node:fs'
 import { basename, dirname, extname } from 'node:path'
 import { importProjectFromPath, isProjectBundle, isProjectRoot } from 'project-manager-shim'
+import BUILD_INFO from '../buildInfo'
 import { toElectronFileFilter, type FileFilter } from './fileBrowser'
 
 export type Electron = typeof import('electron')
@@ -60,8 +61,7 @@ export function initIpc(
   electron: Electron | undefined,
   electronIsDev: boolean,
 ) {
-  // TODO(Task 13): replace `'manual'` with `BUILD_INFO.updates`.
-  initUpdaterIpc('manual', electronUpdater.autoUpdater)
+  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater)
   ipcMain.on(Channel.error, (_event, data) => {
     console.error(...data)
   })

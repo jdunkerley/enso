@@ -90,6 +90,8 @@ once `./run ide build` has produced the engine bundle.
 - `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — which engine to bundle.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
+- `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
+  `update_mode` in `build_tools/build/src/ide/web.rs`.
 
 ## Local Claude agent
 
