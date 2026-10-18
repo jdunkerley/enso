@@ -79,18 +79,12 @@ overrides:
   "reka-ui>@vueuse/core": ^15.0.0
   "reka-ui>@vueuse/shared": ^15.0.0
 packageExtensions:
-  "@aws-amplify/auth":
-    dependencies:
-      "@aws-crypto/sha256-js": "*"
   ag-grid-enterprise:
     dependencies:
       ag-grid-community: "*"
   "@open-rpc/client-js":
     dependencies:
       events: ^3.3.0
-  "@aws-crypto/sha256-browser":
-    dependencies:
-      "@aws-sdk/util-utf8-browser": "*"
   "@vue/compiler-core":
     dependencies:
       "@babel/types": "*"
@@ -106,7 +100,6 @@ packageExtensions:
     peerDependencies:
       "@types/ws": "*"
 patchedDependencies:
-  "@aws-amplify/auth": patches/@aws-amplify__auth.patch
   app-builder-lib@26.8.1: patches/app-builder-lib@26.8.1.patch
 # pnpm 12 will not skip a dependency's build scripts silently: every package that has one must
 # be decided here, or the install fails with ERR_PNPM_IGNORED_BUILDS. Under pnpm 10 anything
