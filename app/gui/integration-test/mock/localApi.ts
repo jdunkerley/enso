@@ -10,6 +10,7 @@ import {
   type CreateProjectParams,
   type DatalinkEntry,
   type DirectoryEntry,
+  type DuplicatedProject,
   type FileEntry,
   type FileSystemEntry,
   type JSONRPCResponse,
@@ -23,10 +24,11 @@ import {
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { unsafeMutable } from 'enso-common/src/utilities/data/object'
 import { getDirectoryAndName } from 'enso-common/src/utilities/file'
-import { uniqueString } from 'enso-common/src/utilities/uniqueString'
 import { test } from 'integration-test/base'
 import { uuidv4 } from 'lib0/random.js'
+import { readFileSync } from 'node:fs'
 import { posix } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Page, WebSocketRoute } from 'playwright'
 import { YjsChannel } from 'ydoc-channel'
 import { WSSharedDoc, YjsConnection, type YjsSocket } from 'ydoc-server'
@@ -50,11 +52,18 @@ function array<T>(): Readonly<T>[] {
   return []
 }
 
+/** The content type `filesystem-read-path` answers with for the file at `path`. */
+function mimeTypeFor(path: string) {
+  return path.endsWith('.png') ? 'image/png' : 'text/plain'
+}
+
 // The mocked filesystem is POSIX-style whatever the host is: join its paths with `posix.join`, not
 // the host's `join`, which would write backslashes into them on Windows.
 const ROOT_PARENT_PATH = Path('/home/user/enso')
 const ROOT_PATH = Path('/home/user/enso/enso-projects')
 const DOWNLOAD_PATH = Path('/home/user/enso/Downloads')
+/** The sources `addProjectSources` copies into a mocked project. */
+const MOCK_PROJECT_DIR = fileURLToPath(new URL('./project', import.meta.url))
 /** The shim's cap on the Recent list (`RECENT_LIMIT` in `localMetadata`). */
 const RECENT_LIMIT = 20
 
@@ -64,13 +73,15 @@ const languageServerYdocAddress = { host: '127.0.0.1', port: 1233 }
 const INITIAL_CALLS_OBJECT = {
   getRootDirectory: array<object>(),
   getDownloadDirectory: array<object>(),
-  downloadCloudProject: array<object>(),
   downloadProject: array<{ projectId: backend.ProjectId }>(),
   getFileContent: array<{ path: string }>(),
   listProjectSessions: array<{ localProjectKey: string }>(),
   createProject: array<CreateProjectParams>(),
   openProject: array<OpenProjectParams>(),
   closeProject: array<CloseProjectParams>(),
+  duplicateProject: array<{ projectId: string }>(),
+  moveFile: array<{ from: string; to: string }>(),
+  deletePath: array<{ path: string }>(),
 }
 
 const READONLY_INITIAL_CALLS_OBJECT: TrackedCallsInternal = INITIAL_CALLS_OBJECT
@@ -98,7 +109,7 @@ type ProjectEntryWithData = {
   }
 }
 
-type FileEntryWithData = { type: 'FileEntry'; entry: FileEntry; content: string }
+type FileEntryWithData = { type: 'FileEntry'; entry: FileEntry; content: string | Buffer }
 
 type DatalinkEntryWithData = { type: 'DatalinkEntry'; entry: DatalinkEntry; content: string }
 
@@ -224,12 +235,15 @@ export async function mockLocalApi(page: Page) {
     attributes?: Partial<Attributes>
   }
 
-  const createProject = (options: ProjectEntryOptions): ProjectEntryWithData => {
-    const normalizedName = options.metadata.name
+  const normalizeProjectName = (name: string) =>
+    name
       .split(' ')
       .filter((n) => n.length)
       .map((part) => capitalizeFirst(part))
       .join('_')
+
+  const createProject = (options: ProjectEntryOptions): ProjectEntryWithData => {
+    const normalizedName = normalizeProjectName(options.metadata.name)
     return {
       type: 'ProjectEntry',
       entry: {
@@ -263,7 +277,7 @@ export async function mockLocalApi(page: Page) {
   type FileEntryOptions = {
     path: Path
     attributes?: Partial<Attributes>
-    content?: string
+    content?: string | Buffer
   }
 
   const createFileEntry = ({ path, attributes }: FileEntryOptions): FileEntry => ({
@@ -300,6 +314,69 @@ export async function mockLocalApi(page: Page) {
 
   const addFile = (options: FileEntryOptions) => {
     addEntry(options.path, createFile(options))
+  }
+
+  /** Add a folder (under the root unless `parent` is given), by title. */
+  const addRootDirectory = (
+    title: string,
+    options: { parent?: Path; attributes?: Partial<Attributes> } = {},
+  ) => {
+    const path = Path(posix.join(options.parent ?? ROOT_PATH, title))
+    addDirectory({ path, ...(options.attributes ? { attributes: options.attributes } : {}) })
+    return path
+  }
+
+  /** Add a file (under the root unless `parent` is given), by title. */
+  const addRootFile = (
+    title: string,
+    options: { parent?: Path; content?: string; attributes?: Partial<Attributes> } = {},
+  ) => {
+    const path = Path(posix.join(options.parent ?? ROOT_PATH, title))
+    addFile({
+      path,
+      content: options.content ?? '',
+      ...(options.attributes ? { attributes: options.attributes } : {}),
+    })
+    return path
+  }
+
+  /**
+   * Whether a project in the projects directory `parentPath` already has the name (the shim's
+   * `ProjectRepository.exists`, which lists that directory only).
+   */
+  const projectNameTaken = (name: string, parentPath: Path = ROOT_PATH) => {
+    const parent = fileSystem.get(parentPath)
+    return (
+      parent?.type === 'DirectoryEntry' &&
+      parent.children.some(
+        (entry) => entry.type === 'ProjectEntry' && entry.entry.metadata.name === name,
+      )
+    )
+  }
+
+  /** Add a project under the root, by title; returns its directory. */
+  const addRootProject = (
+    title: string,
+    options: { attributes?: Partial<Attributes>; created?: ReturnType<typeof toRfc3339> } = {},
+  ) =>
+    addProject({
+      metadata: {
+        id: UUID(uuidv4()),
+        name: title,
+        namespace: 'local',
+        created: options.created ?? toRfc3339(new Date()),
+      },
+      ...(options.attributes ? { attributes: options.attributes } : {}),
+    }).entry.path
+
+  /** Give `projectPath` the sources in `mock/project/` (docs with "Project Goal", and an image). */
+  const addProjectSources = (projectPath: Path) => {
+    for (const relative of ['src/Main.enso', 'src/ea.png']) {
+      addFile({
+        path: Path(posix.join(projectPath, relative)),
+        content: readFileSync(posix.join(MOCK_PROJECT_DIR, relative)),
+      })
+    }
   }
 
   addDirectory({ path: ROOT_PARENT_PATH })
@@ -359,6 +436,63 @@ export async function mockLocalApi(page: Page) {
           created: toRfc3339(new Date()),
         },
       })
+      return route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify(toJSONRPCResult(result)),
+      })
+    })
+
+    await page.route('/api/project-service/project/duplicate', async (route, request) => {
+      if (request.method() !== 'POST') {
+        return route.fulfill({ status: 400 })
+      }
+      const params: { projectId: UUID; projectsDirectory?: Path } = JSON.parse(
+        request.postData() ?? '{}',
+      )
+      called('duplicateProject', { projectId: params.projectId })
+      const parentPath = params.projectsDirectory ?? ROOT_PATH
+      const parentDirectory = fileSystem.get(parentPath)
+      const original =
+        parentDirectory?.type === 'DirectoryEntry' ?
+          parentDirectory.children.find(
+            (entry) =>
+              entry.type === 'ProjectEntry' && entry.entry.metadata.id === params.projectId,
+          )
+        : undefined
+      if (original?.type !== 'ProjectEntry') {
+        return route.fulfill({
+          contentType: 'application/json',
+          body: JSON.stringify(toJSONRPCError('Project not found')),
+        })
+      }
+      // The shim's naming (`getNameForDuplicatedProject`), made unique as `getNameForNewProject`
+      // does: a clash gets `_1`, `_2`, ... after it.
+      const suggestedName = `${original.entry.metadata.name} (copy)`
+      let suffix = 0
+      while (
+        projectNameTaken(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`, parentPath)
+      ) {
+        suffix += 1
+      }
+      const name = ProjectName(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`)
+      // The directory is named after the normalized name, and made unique like the shim's
+      // `findTargetPath`.
+      const normalizedName = normalizeProjectName(name)
+      let path = Path(`${parentPath}/${normalizedName}`)
+      for (let dirSuffix = 1; fileSystem.has(path); dirSuffix += 1) {
+        path = Path(`${parentPath}/${normalizedName}_${dirSuffix}`)
+      }
+      const id = UUID(uuidv4())
+      addProject({
+        path,
+        metadata: { id, name, namespace: 'local', created: toRfc3339(new Date()) },
+      })
+      const result: DuplicatedProject = {
+        projectId: id,
+        projectName: name,
+        projectNormalizedName: normalizedName,
+        projectPath: path,
+      }
       return route.fulfill({
         contentType: 'application/json',
         body: JSON.stringify(toJSONRPCResult(result)),
@@ -434,6 +568,64 @@ export async function mockLocalApi(page: Page) {
         })
       })
 
+    /** The project with `projectId` (the shim looks it up by ID too). */
+    const findProject = (params: Record<string, unknown>) => {
+      for (const entry of fileSystem.values()) {
+        if (entry.type === 'ProjectEntry' && entry.entry.metadata.id === params.projectId) {
+          return entry
+        }
+      }
+      return undefined
+    }
+    await projectServiceRoute('project/delete', (params) => {
+      const project = findProject(params)
+      if (project == null) {
+        return toJSONRPCError('Project not found')
+      }
+      called('deletePath', { path: project.entry.path })
+      removeEntry(project.entry.path)
+      recentPathDeleted(project.entry.path)
+      return toJSONRPCResult(null)
+    })
+    // Like the shim's `renameProject`: the name must not be empty or taken; the project's directory
+    // is renamed after it, unless the project is running (the shim defers that until it stops, and
+    // the mock leaves it where it is).
+    await projectServiceRoute('project/rename', (params) => {
+      const project = findProject(params)
+      if (project == null) {
+        return toJSONRPCError('Project not found')
+      }
+      const name = String(params.name)
+      if (name.trim().length === 0) {
+        return toJSONRPCError('Project name cannot be empty.')
+      }
+      if (projectNameTaken(name, getDirectoryAndName(project.entry.path).directoryPath)) {
+        return toJSONRPCError(`Project with name '${name}' already exists.`)
+      }
+      const oldPath = project.entry.path
+      unsafeMutable(project.entry.metadata).name = ProjectName(name)
+      unsafeMutable(project.metadata).projectName = ProjectName(name)
+      if (!openProjects.has(project.entry.metadata.id)) {
+        const normalizedName = normalizeProjectName(name)
+        unsafeMutable(project.metadata).projectNormalizedName = normalizedName
+        const parent = getDirectoryAndName(oldPath).directoryPath
+        let newPath = Path(`${parent}/${normalizedName}`)
+        for (let suffix = 1; fileSystem.has(newPath); suffix += 1) {
+          newPath = Path(`${parent}/${normalizedName}_${suffix}`)
+        }
+        // The project's sources are entries of their own, which follow it.
+        const descendants = [...fileSystem.keys()]
+          .filter((path) => path.startsWith(`${oldPath}/`))
+          .map(Path)
+          .sort((a, b) => a.length - b.length)
+        moveEntry(oldPath, newPath)
+        for (const path of descendants) {
+          moveEntry(path, Path(`${newPath}${path.slice(oldPath.length)}`))
+        }
+        recentPathMoved(oldPath, newPath)
+      }
+      return toJSONRPCResult(null)
+    })
     await projectServiceRoute('labels/list', () => toJSONRPCResult(labels))
     await projectServiceRoute('labels/create', (params) => {
       const value = String(params.value)
@@ -725,36 +917,6 @@ export async function mockLocalApi(page: Page) {
       })
     })
 
-    await page.route('/api/cloud/download-project?*', async (route, request) => {
-      called('downloadCloudProject', {})
-      if (request.method() !== 'GET') {
-        return route.fulfill({ status: 400 })
-      }
-      const projectId = uniqueString()
-      const parentDirectory = posix.join(ROOT_PATH, `cloud-project-${projectId}`)
-      const targetDirectory = posix.join(parentDirectory, 'project_root')
-      addDirectory({ path: Path(parentDirectory) })
-      addProject({
-        path: Path(targetDirectory),
-        metadata: {
-          name: '',
-          namespace: '',
-          created: toRfc3339(new Date()),
-          id: UUID(uuidv4()),
-        },
-      })
-
-      await route.fulfill({
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          targetDirectory,
-          parentDirectory,
-        }),
-      })
-    })
-
     await page.route('/api/upload-file?*', async (route, request) => {
       const params = new URL(request.url()).searchParams
       const fileName = params.get('file_name')
@@ -851,7 +1013,9 @@ export async function mockLocalApi(page: Page) {
           if (file.type !== 'FileEntry') {
             return fail(`Filesystem entry at '${filePath}' is '${file?.type}', not file`)
           }
-          return succeed(file.content, 'text/plain')
+          // Raw, not a JSON-RPC result: the shim streams the file (`--filesystem-read-path`), and
+          // `Backend.getMainFileContent` reads the body as text.
+          return route.fulfill({ contentType: mimeTypeFor(file.entry.path), body: file.content })
         }
         case 'filesystem-create-directory': {
           const folderPath = cliArguments[0]
@@ -887,6 +1051,7 @@ export async function mockLocalApi(page: Page) {
           if (destinationPath == null) {
             return fail('No destination path provided')
           }
+          called('moveFile', { from: sourcePath, to: destinationPath })
           moveEntry(Path(sourcePath), Path(destinationPath))
           recentPathMoved(sourcePath, destinationPath)
           return succeed({})
@@ -908,6 +1073,7 @@ export async function mockLocalApi(page: Page) {
           if (!entry) {
             return fail(`Item does not exist at '${path}'`)
           }
+          called('deletePath', { path })
           removeEntry(Path(path))
           recentPathDeleted(path)
           return succeed({})
@@ -961,6 +1127,10 @@ export async function mockLocalApi(page: Page) {
     addDirectory,
     addProject,
     addFile,
+    addRootDirectory,
+    addRootFile,
+    addRootProject,
+    addProjectSources,
     addDatalink,
     datalinkValue,
     removeEntry,

@@ -1199,8 +1199,6 @@
   "ensoDevtoolsFeatureFlags.fileChunkUploadPoolSizeDescription": "The maximum number of file chunks to upload at once",
   "ensoDevtoolsFeatureFlags.listDirectoryPageSize": "List Directory Page Size",
   "ensoDevtoolsFeatureFlags.listDirectoryPageSizeDescription": "The number of entries to fetch per page when listing a directory",
-  "ensoDevtoolsFeatureFlags.getLogEventsPageSize": "Get Log Events Page Size",
-  "ensoDevtoolsFeatureFlags.getLogEventsPageSizeDescription": "The number of entries to fetch per page when listing log events",
   "setupEnso": "Set up Enso",
   "termsAndConditions": "Terms and Conditions",
   "back": "Back",

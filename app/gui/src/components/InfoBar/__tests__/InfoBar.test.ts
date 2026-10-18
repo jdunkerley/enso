@@ -8,7 +8,12 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive } from 'vue'
 
-const auth = reactive<{ session: object | null }>({ session: null })
+// The local session: the only one there is.
+const LOCAL_SESSION = {
+  email: 'local@enso.localhost',
+  user: { userId: 'user-local', name: 'Offline', email: 'local@enso.localhost' },
+}
+const auth = reactive<{ session: object }>({ session: LOCAL_SESSION })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
 const { getText } = useText()
@@ -18,7 +23,7 @@ beforeEach(() => {
   portalRoot = document.createElement('div')
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
-  auth.session = null
+  auth.session = LOCAL_SESSION
 })
 afterEach(() => {
   portalRoot.remove()
@@ -56,7 +61,6 @@ describe('InfoBar', () => {
   })
 
   test('the info menu has no Logout', async () => {
-    auth.session = {}
     await mountWithProviders(InfoBar)
     const user = userEvent.setup()
     await user.click(logoButton())

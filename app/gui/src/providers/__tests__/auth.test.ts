@@ -1,23 +1,17 @@
 import { makeLocalUser, makeLocalUserSession } from '$/providers/auth'
-import { makeLocalSession } from '$/providers/session'
-import { Plan } from 'enso-common/src/services/Backend'
+import { LOCAL_SESSION_EMAIL, makeLocalSession } from '$/providers/session'
 import { expect, test } from 'vitest'
 
-test('the local user is named, unlicensed and on no organization', () => {
-  const user = makeLocalUser('Working locally')
-  expect(user).toMatchObject({
+test('the local user is named, with the local email', () => {
+  expect(makeLocalUser('Working locally')).toEqual({
+    userId: 'user-local',
     name: 'Working locally',
-    isEnabled: false,
-    isOrganizationAdmin: false,
-    plan: Plan.free,
-    isEnsoTeamMember: false,
+    email: LOCAL_SESSION_EMAIL,
   })
-  expect(user.userId).toBe('user-local')
 })
 
-test('the local user session is never cloud-backed', () => {
+test('the local user session is the local session with the local user', () => {
   const session = makeLocalUserSession(makeLocalSession(), 'Working locally')
-  expect(session.isAuthDisabled).toBe(true)
-  expect(session.isCloudDataUnavailable).toBe(true)
+  expect(session).toEqual({ ...makeLocalSession(), user: makeLocalUser('Working locally') })
   expect(session.user.name).toBe('Working locally')
 })

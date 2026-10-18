@@ -1,12 +1,9 @@
 import { PRODUCT_NAME } from 'enso-common/src/constants'
-import { AssetType, extractTypeAndPath, type ProjectAsset } from 'enso-common/src/services/Backend'
-import { EnsoPath } from 'enso-common/src/services/Backend/types'
-import { Path, type ProjectEntry, type UUID } from 'enso-common/src/services/ProjectManager/types'
-import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
+import { Path, type UUID } from 'enso-common/src/services/ProjectManager/types'
 import { dirname, resolve } from 'node:path'
 import { getFileSystemEntry } from './handler/index.js'
 import { EnsoRunner, findEnsoExecutable } from './projectService/ensoRunner.js'
-import { ProjectService, type CloudParams } from './projectService/index.js'
+import { ProjectService } from './projectService/index.js'
 
 function getWorkDir() {
   if (process.env.NODE_ENV === 'development') {
@@ -25,63 +22,14 @@ function createProjectService(): ProjectService {
   return new ProjectService(runner, [])
 }
 
-/** Run a hybrid project by URL. */
-export async function runHybridProjectByUrl(
-  path: EnsoPath,
-  remoteBackend: RemoteBackend,
-): Promise<number> {
-  let project: ProjectEntry | undefined
-  let asset: ProjectAsset | undefined
-  try {
-    const unknownAsset = await remoteBackend.resolveEnsoPath(EnsoPath(decodeURIComponent(path)))
-    if (unknownAsset.type !== AssetType.project) {
-      throw new Error(`The path '${path}' does not point to a project.`)
-    }
-    asset = unknownAsset
-    const cloudProjectSessionId = await remoteBackend.setHybridOpenInProgress(asset.id, asset.title)
-    const localProject = await remoteBackend.downloadProject(asset.id)
-    let parentPath: Path | undefined
-    for (const projectId of [localProject.parentId, localProject.projectRootId]) {
-      const projectPath = extractTypeAndPath(projectId).path
-      parentPath = Path(dirname(projectPath))
-      const entry = await getFileSystemEntry(projectPath)
-      if (entry.type === 'ProjectEntry') {
-        project = entry as ProjectEntry
-        break
-      }
-    }
-
-    if (!project || !parentPath) {
-      throw new Error('Downloaded cloud project does not exist in Local Backend.')
-    }
-    const cloudProjectDirectoryPath = Path(asset.ensoPath.slice(0, asset.ensoPath.lastIndexOf('/')))
-    await remoteBackend.setHybridOpened(asset.id, asset.title)
-    const exitCode = await runLocalProjectByUuid(project.metadata.id, parentPath, {
-      cloudProjectDirectoryPath,
-      cloudProjectId: asset.id,
-      cloudProjectSessionId,
-      cloudApiUrl: remoteBackend.baseUrl.toString(),
-    })
-    return exitCode
-  } catch (error) {
-    console.error(`Error starting hybrid project '${asset?.title ?? '(unknown)'}':`, error)
-    return 1
-  } finally {
-    if (asset) {
-      await remoteBackend.closeProject(asset.id, asset.title)
-    }
-  }
-}
-
 /** Run a local project by UUID. */
 export async function runLocalProjectByUuid(
   projectId: UUID,
   projectsDirectory: Path,
-  cloudParams?: CloudParams,
 ): Promise<number> {
   const projectService = createProjectService()
   try {
-    const exitCode = await projectService.runProject(projectId, projectsDirectory, cloudParams)
+    const exitCode = await projectService.runProject(projectId, projectsDirectory)
     return exitCode
   } catch (error) {
     console.error(`Error starting local project '${projectId}':`, error)

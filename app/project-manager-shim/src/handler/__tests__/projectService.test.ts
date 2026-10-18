@@ -376,3 +376,15 @@ describe('datalink routes with forward-slash paths', () => {
     expect((await call('datalink/read', { path: file })).result).toEqual({ type: 'HTTP' })
   })
 })
+
+describe('project/open', () => {
+  test('a stray `cloud` parameter is ignored', async () => {
+    const open = vi.spyOn(projectService, 'openProject').mockResolvedValue({} as never)
+    await call('project/open', {
+      projectId: 'id-1',
+      projectsDirectory: root,
+      cloud: { cloudProjectId: 'x', cloudApiUrl: 'https://example.com' },
+    })
+    expect(open).toHaveBeenCalledExactlyOnceWith('id-1', root)
+  })
+})

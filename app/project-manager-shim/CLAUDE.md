@@ -19,7 +19,6 @@ Consumers import by subpath (see `package.json#exports`):
 
 - `project-manager-shim` — public helpers (`downloadEnsoEngine`,
   `findEnsoExecutable`, …).
-- `project-manager-shim/fs` — filesystem glue.
 - `project-manager-shim/handler` — JSON-RPC request handler.
 - `project-manager-shim/localMetadata` — local labels and Recent store (see
   below).
@@ -34,10 +33,9 @@ under `~/.cache/enso` (or platform equivalent).
 
 ## Scope
 
-Historically some advanced features (cloud projects, multi-engine, upgrade)
-deferred to the old Scala PM. Those paths now need to live here or be served by
-the language server / cloud directly — don't add Scala-PM back-references when
-extending this package.
+Historically some advanced features (multi-engine, upgrade) deferred to the old
+Scala PM. Those paths now need to live here or be served by the language server
+directly — don't add Scala-PM back-references when extending this package.
 
 ## Local metadata (`src/localMetadata/`)
 

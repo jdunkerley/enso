@@ -24,11 +24,10 @@ const context = ref<RightPanelContext>()
 
 // `useBackends` and `useContainerData` are global stores (see `mountWithProviders`), so they are
 // replaced by module mocks; the right panel's store is a context store, given to the mount.
-const backends = { remote: fakeBackend(BackendType.remote), local: fakeBackend(BackendType.local) }
+const backends = { local: fakeBackend(BackendType.local) }
 vi.mock('$/providers/backends', () => ({
   useBackends: () => ({
-    backendForType: (type: BackendType) =>
-      (type === BackendType.local ? backends.local : backends.remote) as unknown as Backend,
+    backendForType: (_type: BackendType) => backends.local as unknown as Backend,
   }),
 }))
 const openProjectLogTab = vi.fn()
@@ -41,7 +40,7 @@ const focusedAsset = computed(() => {
 })
 const rightPanel = reactive({ sessionsProject, focusedAsset })
 
-const CLOUD_ID = ProjectId('project-cloud')
+const DRIVE_ID = ProjectId('project-drive')
 const LOCAL_ID = ProjectId('project-local')
 const PARENT_ID = DirectoryId('directory-parent')
 
@@ -63,7 +62,6 @@ function fakeBackend(type: BackendType) {
 }
 
 beforeEach(() => {
-  backends.remote = fakeBackend(BackendType.remote)
   backends.local = fakeBackend(BackendType.local)
   openProjectLogTab.mockReset()
   context.value = undefined
@@ -77,29 +75,6 @@ async function renderTab() {
 }
 
 describe('in a project tab', () => {
-  test('a cloud project lists its sessions from the cloud', async () => {
-    context.value = {
-      item: CLOUD_ID,
-      openedProject: { id: CLOUD_ID, title: 'Cloud Project', mode: 'cloud' },
-    }
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Session 2')
-    expect(wrapper.text()).toContain('Session 1')
-    expect(backends.remote.listProjectSessions).toHaveBeenCalledWith(CLOUD_ID, 'Cloud Project')
-    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
-  })
-
-  test("a hybrid project lists the cloud project's sessions", async () => {
-    context.value = {
-      item: CLOUD_ID,
-      openedProject: { id: CLOUD_ID, title: 'Hybrid Project', mode: 'hybrid' },
-    }
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Session 2')
-    expect(backends.remote.listProjectSessions).toHaveBeenCalledWith(CLOUD_ID, 'Hybrid Project')
-    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
-  })
-
   test('a local project lists its sessions from the local backend', async () => {
     context.value = {
       item: LOCAL_ID,
@@ -108,49 +83,48 @@ describe('in a project tab', () => {
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Session 2')
     expect(backends.local.listProjectSessions).toHaveBeenCalledWith(LOCAL_ID, 'Local Project')
-    expect(backends.remote.listProjectSessions).not.toHaveBeenCalled()
   })
 })
 
 describe('in the drive', () => {
   const project = {
     type: AssetType.project,
-    id: CLOUD_ID,
+    id: DRIVE_ID,
     title: 'Drive Project',
     parentId: PARENT_ID,
   } as unknown as AnyAsset
 
   test("the selected project's sessions come from the category's backend", async () => {
-    context.value = { category: { type: 'cloud' }, item: project }
+    context.value = { category: { type: 'local' }, item: project }
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Session 2')
-    expect(backends.remote.listProjectSessions).toHaveBeenCalledWith(CLOUD_ID, 'Drive Project')
+    expect(backends.local.listProjectSessions).toHaveBeenCalledWith(DRIVE_ID, 'Drive Project')
   })
 
   test('with nothing selected, it asks for a project', async () => {
-    context.value = { category: { type: 'cloud' } }
+    context.value = { category: { type: 'local' } }
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Select a single project to view its sessions.')
-    expect(backends.remote.listProjectSessions).not.toHaveBeenCalled()
+    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
   })
 
   test('with another asset selected, it asks for a project', async () => {
     const file = { type: AssetType.file, id: 'file-1', title: 'File' } as unknown as AnyAsset
-    context.value = { category: { type: 'cloud' }, item: file }
+    context.value = { category: { type: 'local' }, item: file }
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Select a single project to view its sessions.')
-    expect(backends.remote.listProjectSessions).not.toHaveBeenCalled()
+    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
   })
 
   test('selecting another project lists its sessions instead', async () => {
-    context.value = { category: { type: 'cloud' }, item: project }
+    context.value = { category: { type: 'local' }, item: project }
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Session 2')
     const other = { ...project, id: ProjectId('project-other'), title: 'Other' } as AnyAsset
-    context.value = { category: { type: 'cloud' }, item: other }
+    context.value = { category: { type: 'local' }, item: other }
     await flushPromises()
     await flushPromises()
-    expect(backends.remote.listProjectSessions).toHaveBeenLastCalledWith(
+    expect(backends.local.listProjectSessions).toHaveBeenLastCalledWith(
       ProjectId('project-other'),
       'Other',
     )
@@ -160,8 +134,8 @@ describe('in the drive', () => {
 
 test('the newest session comes first, and its button opens its logs', async () => {
   context.value = {
-    item: CLOUD_ID,
-    openedProject: { id: CLOUD_ID, title: 'Cloud Project', mode: 'cloud' },
+    item: LOCAL_ID,
+    openedProject: { id: LOCAL_ID, title: 'Local Project', mode: 'local' },
   }
   const { wrapper } = await renderTab()
   expect(wrapper.text()).toMatch(/Session 2.*Session 1/)
@@ -170,10 +144,10 @@ test('the newest session comes first, and its button opens its logs', async () =
   await userEvent.click(buttons[0]!.element)
   expect(openProjectLogTab).toHaveBeenCalledWith(
     ProjectSessionId('projectsession-2'),
-    'Cloud Project',
+    'Local Project',
   )
 })
 
 test('a project id alone, without the opened project, is not enough', () => {
-  expect(sessionsProjectFromContext({ item: CLOUD_ID })).toBeUndefined()
+  expect(sessionsProjectFromContext({ item: DRIVE_ID })).toBeUndefined()
 })

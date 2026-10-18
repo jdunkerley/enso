@@ -1,4 +1,4 @@
-/** @file The drive's categories: the local Recent category beside the cloud's, and added folders. */
+/** @file The drive's categories: the local ones, the local Recent category, and added folders. */
 import {
   CATEGORY_BACKEND,
   categoryFromKey,
@@ -14,7 +14,6 @@ import { newDirectoryId } from 'enso-common/src/services/LocalBackend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive } from 'vue'
 
-vi.mock('$/providers/auth', () => ({ useAuth: () => reactive({ session: null }) }))
 vi.mock('$/providers/backends', () => ({ useBackends: () => ({ localBackend: null }) }))
 vi.mock('$/providers/localDirectories', () => ({
   useLocalPaths: () => reactive({ localRootDirectory: '/root' }),
@@ -31,41 +30,41 @@ describe('the local Recent category', () => {
     ])
   })
 
-  test('`isRecentCategory` is true for both Recents only', () => {
-    expect(isRecentCategory({ type: 'recent' })).toBe(true)
+  test('`isRecentCategory` is true for the local Recent only', () => {
     expect(isRecentCategory({ type: 'localRecent' })).toBe(true)
     expect(isRecentCategory('localRecent')).toBe(true)
-    expect(isRecentCategory('recent')).toBe(true)
     const others: Category[] = [
-      { type: 'cloud' },
-      { type: 'trash' },
       { type: 'local' },
       { type: 'localDirectory', path: Path('/somewhere') },
     ]
     for (const category of others) expect(isRecentCategory(category)).toBe(false)
   })
 
-  test('it uses the local backend, has the Recent icon, and round-trips its key', () => {
-    expect(CATEGORY_BACKEND.localRecent).toBe(BackendType.local)
-    expect(CATEGORY_BACKEND.recent).toBe(BackendType.remote)
-    expect(categoryIcon('localRecent')).toBe(categoryIcon('recent'))
+  test('it has the Recent icon, and round-trips its key', () => {
+    expect(categoryIcon('localRecent')).toBe('history')
     expect(categoryFromKey(categoryKey({ type: 'localRecent' }))).toEqual({ type: 'localRecent' })
   })
 
-  test('nothing can be dropped into or out of either Recent', () => {
-    expect(dropOperationBetweenCategories({ type: 'local' }, { type: 'localRecent' })).toBe(
-      'cancel',
-    )
+  test('every category is local, and the removed cloud keys parse to nothing', () => {
+    expect(Object.keys(CATEGORY_BACKEND).sort()).toEqual(['local', 'localDirectory', 'localRecent'])
+    for (const value of Object.values(CATEGORY_BACKEND)) expect(value).toBe(BackendType.local)
+    for (const key of ['cloud', 'recent', 'trash', 'team-usergroup-a']) {
+      expect(categoryFromKey(key)).toBeNull()
+    }
+  })
+
+  test('dropping moves between local folders, and cancels into the same folder or Recent', () => {
+    const dir: Category = { type: 'localDirectory', path: Path('/a') }
+    expect(dropOperationBetweenCategories({ type: 'local' }, dir)).toBe('move')
+    expect(dropOperationBetweenCategories(dir, dir)).toBe('cancel')
+    expect(dropOperationBetweenCategories(dir, dir, newDirectoryId(Path('/a/b')))).toBe('move')
+    expect(dropOperationBetweenCategories(dir, { type: 'localRecent' })).toBe('cancel')
     expect(dropOperationBetweenCategories({ type: 'localRecent' }, { type: 'local' })).toBe(
       'cancel',
     )
-    expect(dropOperationBetweenCategories({ type: 'localRecent' }, { type: 'cloud' })).toBe(
-      'cancel',
-    )
-    expect(dropOperationBetweenCategories({ type: 'cloud' }, { type: 'recent' })).toBe('cancel')
   })
 
-  test('the local list is Local, then Recent, labelled as the cloud Recent, with no home directory', () => {
+  test('the local list is Local, then Recent, with no home directory', () => {
     const categories = useCategories()
     expect(categories.localCategoriesList.slice(0, 2)).toEqual([
       { type: 'local' },

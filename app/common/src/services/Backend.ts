@@ -10,10 +10,8 @@ import {
 } from '../text.js'
 import * as dateTime from '../utilities/data/dateTime.js'
 import * as newtype from '../utilities/data/newtype.js'
-import * as permissions from '../utilities/permissions.js'
-import { getFileDetailsPath } from './Backend/remoteBackendPaths.js'
+import { getFileDetailsPath } from './Backend/localBackendPaths.js'
 import {
-  ApiKeyId,
   DatalinkId,
   DirectoryId,
   EnsoPath,
@@ -32,17 +30,12 @@ import {
   type EmailAddress,
   type HttpsUrl,
   type LabelName,
-  type OrganizationId,
-  type ProjectExecutionId,
   type ProjectSessionId,
   type S3FilePath,
   type S3ObjectVersionId,
-  type SubscriptionId,
   type TagId,
   type UnzipAssetsJobId,
-  type UserGroupId,
   type UserId,
-  type UserPermissionIdentifier,
 } from './Backend/types.js'
 import { HttpClient, type HttpClientPostOptions, type ResponseWithTypedJson } from './HttpClient.js'
 export { prettifyError } from 'zod/v4'
@@ -109,85 +102,14 @@ export interface Logger {
 /** The {@link Backend} variant. If a new variant is created, it should be added to this enum. */
 export enum BackendType {
   local = 'local',
-  remote = 'remote',
 }
 
-/** Determine backend type from session ID. */
-export function projectSessionBackendType(id: ProjectSessionId): BackendType {
-  return id.startsWith('projectsession-') ? BackendType.remote : BackendType.local
-}
-
-/** Check if this path points to an asset in cloud drive. */
-export function isRemoteAssetPath(ensoPath: EnsoPath): ensoPath is EnsoPath & `enso://${string}` {
-  return ensoPath.startsWith('enso://')
-}
-
-/** Metadata uniquely identifying a user inside an organization. */
-export interface UserInfo {
-  /**
-   * The ID of the parent organization. If this is a sole user, they are implicitly in an
-   * organization consisting of only themselves. For `User`s with `maintainerAccount` set to true this
-   * represents currently active (selected) `Organization`.
-   */
-  readonly organizationId: OrganizationId
-  /** The name of the parent organization. */
-  readonly organizationName?: string
-  /**
-   * The ID of this user.
-   *
-   * The user ID is globally unique. Thus, the user ID is always sufficient to uniquely identify a
-   * user. The user ID is guaranteed to never change, once assigned. For these reasons, the user ID
-   * should be the preferred way to uniquely refer to a user. That is, when referring to a user,
-   * prefer this field over `name`, `email`, `subject`, or any other mechanism, where possible.
-   */
+/** The local user. */
+export interface User {
   readonly userId: UserId
   readonly name: string
   readonly email: EmailAddress
-  readonly newOrganizationName?: string
-  readonly newOrganizationInvite?: 'error' | 'pending'
-  /**
-   * Marks account with enabled feature to be able to switch currently active organization.
-   */
-  readonly maintainerAccount?: boolean
-  /** Array containing all `OrganizationInfo` that `User` belongs to. */
-  readonly organizations?: readonly OrganizationInfo[]
 }
-
-/** A user in the application. These are the primary owners of a project. */
-export interface User extends UserInfo {
-  /**
-   * If `false`, this account is awaiting acceptance from an administrator, and endpoints other than
-   * `usersMe` will not work.
-   */
-  readonly isEnabled: boolean
-  readonly isOrganizationAdmin: boolean
-  readonly rootDirectoryId: DirectoryId
-  readonly profilePicture?: HttpsUrl
-  /**
-   * Contains the IDs of the user groups that the user is a member of.
-   * @deprecated Use `groups` instead.
-   */
-  readonly userGroups: readonly UserGroupId[] | null
-  readonly removeAt?: dateTime.Rfc3339DateTime | null
-  readonly plan: Plan
-  /**
-   * Contains the user groups that the user is a member of.
-   * Has enriched metadata, like the name of the group and the home directory ID.
-   */
-  readonly groups?: readonly UserGroup[]
-  /** Whether the user is a member of the Enso team. */
-  readonly isEnsoTeamMember: boolean
-  /** Information about any pending invitation to a different organization / team. */
-  readonly invitation?: Invitation
-}
-
-/** A user group related to the current user. */
-export interface UserGroup {
-  readonly id: UserGroupId
-  readonly name: string
-  readonly homeDirectoryId: DirectoryId
-}
-
 /** A `Directory` returned by `createDirectory`. */
 export interface CreatedDirectory {
   readonly id: DirectoryId
@@ -203,8 +125,6 @@ export enum ProjectState {
   openInProgress = 'OpenInProgress',
   provisioned = 'Provisioned',
   opened = 'Opened',
-  hybridOpenInProgress = 'HybridOpenInProgress',
-  hybridOpened = 'HybridOpened',
   closed = 'Closed',
   /**
    * A frontend-specific state, representing a project that should be displayed as
@@ -234,8 +154,6 @@ export const IS_OPENING: Readonly<Record<ProjectState, boolean>> = {
   [ProjectState.openInProgress]: true,
   [ProjectState.provisioned]: true,
   [ProjectState.opened]: false,
-  [ProjectState.hybridOpenInProgress]: true,
-  [ProjectState.hybridOpened]: false,
   [ProjectState.closed]: false,
   [ProjectState.placeholder]: true,
 }
@@ -246,16 +164,13 @@ export const IS_OPENING_OR_OPENED: Readonly<Record<ProjectState, boolean>> = {
   [ProjectState.scheduled]: true,
   [ProjectState.openInProgress]: true,
   [ProjectState.provisioned]: true,
-  [ProjectState.hybridOpenInProgress]: true,
   [ProjectState.opened]: true,
-  [ProjectState.hybridOpened]: true,
   [ProjectState.closed]: false,
   [ProjectState.placeholder]: true,
 }
 
 /** Common `Project` fields returned by all `Project`-related endpoints. */
 export interface BaseProject {
-  readonly organizationId: OrganizationId
   readonly projectId: ProjectId
   readonly name: string
 }
@@ -269,7 +184,6 @@ export interface CreatedProject extends BaseProject {
 
 /** A `Project` returned by `updateProject`. */
 export interface UpdatedProject {
-  readonly organizationId: OrganizationId
   readonly projectId: ProjectId
   readonly name: string
   readonly state: ProjectStateType
@@ -319,129 +233,6 @@ export interface ProjectSession {
 export interface ProjectSessionLogs {
   readonly scrollId: string
   readonly hits: readonly string[]
-}
-
-export const PROJECT_PARALLEL_MODES = ['ignore', 'restart', 'parallel'] as const
-
-export const PARALLEL_MODE_TO_TEXT_ID = {
-  ignore: 'ignoreParallelMode',
-  restart: 'restartParallelMode',
-  parallel: 'parallelParallelMode',
-} satisfies {
-  [K in ProjectParallelMode]: TextId & `${K}ParallelMode`
-}
-
-export const PARALLEL_MODE_TO_DESCRIPTION_ID = {
-  ignore: 'ignoreParallelModeDescription',
-  restart: 'restartParallelModeDescription',
-  parallel: 'parallelParallelModeDescription',
-} satisfies {
-  [K in ProjectParallelMode]: TextId & `${K}ParallelModeDescription`
-}
-
-/**
- * The behavior when manually starting a new execution when the previous one is not yet complete.
- * One of the following:
- * - `ignore` - do not start the new execution.
- * - `restart` - stop the old execution and start the new execution.
- * - `parallel` - keep the old execution running but also run the new execution.
- */
-export type ProjectParallelMode = (typeof PROJECT_PARALLEL_MODES)[number]
-
-export const PROJECT_EXECUTION_REPEAT_TYPES = [
-  'none',
-  'daily',
-  'weekly',
-  'monthlyDate',
-  'monthlyWeekday',
-  'monthlyLastWeekday',
-] as const
-
-export const PROJECT_EXECUTION_REPEAT_TYPE_TO_TEXT_ID = {
-  none: 'noneProjectExecutionRepeatType',
-  daily: 'dailyProjectExecutionRepeatType',
-  weekly: 'weeklyProjectExecutionRepeatType',
-  monthlyDate: 'monthlyProjectExecutionRepeatType',
-  monthlyWeekday: 'monthlyProjectExecutionRepeatType',
-  monthlyLastWeekday: 'monthlyProjectExecutionRepeatType',
-} satisfies {
-  readonly [K in ProjectExecutionRepeatType]: TextId & `${string}ProjectExecutionRepeatType`
-}
-
-/** The interval at which a project schedule repeats. */
-export type ProjectExecutionRepeatType = ProjectExecutionRepeatInfo['type']
-
-/** Details for a project execution that repeats hourly. */
-export interface ProjectExecutionNoneRepeatInfo {
-  readonly type: 'none'
-}
-
-/** Details for a project execution that repeats daily. */
-export interface ProjectExecutionDailyRepeatInfo {
-  readonly type: 'daily'
-}
-
-/** Details for a project execution that repeats weekly on one or more days. */
-export interface ProjectExecutionWeeklyRepeatInfo {
-  readonly type: 'weekly'
-  readonly daysOfWeek: readonly number[]
-}
-
-/** Details for a project execution that repeats monthly on a specific date. */
-export interface ProjectExecutionMonthlyDateRepeatInfo {
-  readonly type: 'monthlyDate'
-  readonly date: number
-  readonly months: readonly number[]
-}
-
-/**
- * Details for a project execution that repeats monthly on a specific weekday of a specific week
- * of a specific month.
- */
-export interface ProjectExecutionMonthlyWeekdayRepeatInfo {
-  readonly type: 'monthlyWeekday'
-  readonly weekNumber: number
-  readonly dayOfWeek: number
-  readonly months: readonly number[]
-}
-
-/**
- * Details for a project execution that repeats monthly on a specific weekday of the last week
- * of a specific month.
- */
-export interface ProjectExecutionMonthlyLastWeekdayRepeatInfo {
-  readonly type: 'monthlyLastWeekday'
-  readonly dayOfWeek: number
-  readonly months: readonly number[]
-}
-
-export type ProjectExecutionRepeatInfo =
-  | ProjectExecutionDailyRepeatInfo
-  | ProjectExecutionWeeklyRepeatInfo
-  | ProjectExecutionMonthlyDateRepeatInfo
-  | ProjectExecutionMonthlyWeekdayRepeatInfo
-  | ProjectExecutionMonthlyLastWeekdayRepeatInfo
-  | ProjectExecutionNoneRepeatInfo
-
-/** Metadata for a {@link ProjectExecution}. */
-export interface ProjectExecutionInfo {
-  readonly projectId: ProjectId
-  readonly repeat: ProjectExecutionRepeatInfo
-  readonly startDate: dateTime.Rfc3339DateTime
-  readonly endDate: dateTime.Rfc3339DateTime | null
-  readonly timeZone: dateTime.IanaTimeZone
-  readonly maxDurationMinutes: number
-  readonly parallelMode: ProjectParallelMode
-  readonly tag: string | undefined
-}
-
-/** A specific execution schedule of a project. */
-export interface ProjectExecution extends ProjectExecutionInfo {
-  readonly executionId: ProjectExecutionId
-  readonly organizationId: OrganizationId
-  readonly versionId: S3ObjectVersionId
-  readonly nextExecution: dateTime.Rfc3339DateTime
-  readonly projectSessions?: readonly ProjectSession[]
 }
 
 /** Metadata describing the location of an uploaded file. */
@@ -522,111 +313,6 @@ export interface VersionNumber {
   readonly lifecycle: VersionLifecycle
 }
 
-/** Credentials that need to be passed to libraries to give them access to the Cloud API. */
-export interface CognitoCredentials {
-  readonly accessToken: string
-  readonly refreshToken: string
-  readonly refreshUrl: string
-  readonly clientId: string
-  readonly expireAt: dateTime.Rfc3339DateTime
-}
-
-/** Subscription plans. */
-export enum Plan {
-  free = 'free',
-  solo = 'solo',
-  team = 'team',
-  enterprise = 'enterprise',
-}
-
-export const PLANS: readonly Plan[] = Object.values(Plan)
-
-/** Whether a given value is a {@link Plan}. */
-export function isPlan(value: unknown): value is Plan {
-  const plans: readonly unknown[] = PLANS
-  return plans.includes(value)
-}
-
-/** Metadata for a payment checkout session. */
-export interface CheckoutSession {
-  readonly url: HttpsUrl
-}
-
-/** Metadata for a single payment card. */
-export interface Card {
-  readonly plan: Plan
-  readonly period: PlanBillingPeriod
-  readonly title: string
-  readonly subtitle: string
-  readonly pricing: string
-  readonly features: readonly string[]
-}
-
-/** Metadata for a payment pricing page configuration. */
-export interface PaymentsConfig {
-  readonly cards: readonly Card[]
-}
-
-/** Metadata for a subscription. */
-export interface Subscription {
-  readonly id?: SubscriptionId
-  readonly plan?: Plan
-  readonly trialStart?: dateTime.Rfc3339DateTime | null
-  readonly trialEnd?: dateTime.Rfc3339DateTime | null
-  readonly isPaused?: boolean | null
-}
-
-/** Metadata for an organization. */
-export interface OrganizationInfo {
-  readonly id: OrganizationId
-  readonly name: string | null
-  readonly email: EmailAddress | null
-  readonly website: HttpsUrl | null
-  readonly address: string | null
-  readonly picture: HttpsUrl | null
-  readonly subscription: Subscription | null
-}
-
-/** A user group and its associated metadata. */
-export interface UserGroupInfo {
-  readonly organizationId: OrganizationId
-  readonly id: UserGroupId
-  readonly groupName: string
-}
-
-/** User permission for a specific user. */
-export interface UserPermission {
-  readonly user: UserInfo
-  readonly permission: permissions.PermissionAction
-}
-
-/** User permission for a specific user group. */
-export interface UserGroupPermission {
-  readonly userGroup: UserGroupInfo
-  readonly permission: permissions.PermissionAction
-}
-
-/** User permission for a specific user or user group. */
-export type AssetPermission = UserGroupPermission | UserPermission
-
-/** The format of all errors returned by the backend. */
-export interface RemoteBackendError {
-  readonly type: string
-  readonly code: string
-  readonly message: string
-  readonly param: string
-}
-
-/** HTTP response body for the "list api keys" endpoint. */
-export interface ListApiKeysResponse {
-  readonly credentials: readonly ApiKey[]
-}
-
-/** HTTP response body for the "list users" endpoint. */
-export interface ListUsersResponseBody {
-  readonly users: readonly User[]
-}
-
 /** HTTP response body for the "list directory" endpoint. */
 export interface ListDirectoryResponseBody {
   readonly assets: readonly AnyAsset[]
@@ -644,20 +330,6 @@ export interface ListSecretsResponseBody {
   readonly secrets: readonly SecretInfo[]
 }
 
-/** HTTP response body for the "list tag" endpoint. */
-export interface ListTagsResponseBody {
-  readonly tags: readonly Label[]
-  readonly assetVersionTags: readonly string[]
-}
-
-/**
- * Response from the "create customer portal session" endpoint.
- * Returns a URL that the user can use to access the customer portal and manage their subscription.
- */
-export interface CreateCustomerPortalSessionResponse {
-  readonly url: string | null
-}
-
 /** Whether a type is `any`. */
 type IsAny<T> = 0 extends 1 & T ? true : false
 
@@ -669,55 +341,6 @@ export type AssetDetailsResponse<Id extends AssetId> =
   IsAny<Id> extends true ? AssetDetailsResponse<AssetId>
   : | (Id extends Id ? AnyAsset<AssetTypeFromId<Id>> & { readonly metadataId: MetadataId } : never)
     | null
-
-/** Whether the user is on a plan with multiple seats (i.e. a plan that supports multiple users). */
-export function isUserOnPlanWithMultipleSeats(user: User) {
-  switch (user.plan) {
-    case undefined:
-    case Plan.free:
-    case Plan.solo: {
-      return false
-    }
-    case Plan.team:
-    case Plan.enterprise: {
-      return true
-    }
-  }
-}
-
-/** Whether an {@link AssetPermission} is a {@link UserPermission}. */
-export function isUserPermission(permission: AssetPermission): permission is UserPermission {
-  return 'user' in permission
-}
-
-/** Whether an {@link AssetPermission} is a {@link UserPermission} with an additional predicate. */
-export function isUserPermissionAnd(predicate: (permission: UserPermission) => boolean) {
-  return (permission: AssetPermission): permission is UserPermission =>
-    isUserPermission(permission) && predicate(permission)
-}
-
-/** Whether an {@link AssetPermission} is a {@link UserGroupPermission}. */
-export function isUserGroupPermission(
-  permission: AssetPermission,
-): permission is UserGroupPermission {
-  return 'userGroup' in permission
-}
-
-/** Whether an {@link AssetPermission} is a {@link UserGroupPermission} with an additional predicate. */
-export function isUserGroupPermissionAnd(predicate: (permission: UserGroupPermission) => boolean) {
-  return (permission: AssetPermission): permission is UserGroupPermission =>
-    isUserGroupPermission(permission) && predicate(permission)
-}
-
-/** Get the property representing the name on an arbitrary variant of {@link UserPermission}. */
-export function getAssetPermissionName(permission: AssetPermission) {
-  return isUserPermission(permission) ? permission.user.name : permission.userGroup.groupName
-}
-
-/** Get the property representing the id on an arbitrary variant of {@link UserPermission}. */
-export function getAssetPermissionId(permission: AssetPermission): UserPermissionIdentifier {
-  return isUserPermission(permission) ? permission.user.userId : permission.userGroup.id
-}
 
 /** The type returned from the "update directory" endpoint. */
 export interface UpdatedDirectory {
@@ -742,79 +365,6 @@ export enum FilterBy {
   trashed = 'Trashed',
 }
 
-/** An event in an audit log. */
-export interface AuditLogEvent {
-  readonly organizationId: OrganizationId
-  readonly userEmail: EmailAddress
-  readonly timestamp: dateTime.Rfc3339DateTime | null
-  /** The type is called `EventType` in the backend. */
-  readonly metadata: EventMetadata | null
-  readonly message: string | null
-  readonly projectId: ProjectId | null
-  readonly url: string | null
-  readonly method: string | null
-  readonly lambdaKind: string | null
-}
-
-/** Possible types of event in an audit log. */
-export enum EventType {
-  GetSecret = 'getSecret',
-  DeleteAssets = 'deleteAssets',
-  ListSecrets = 'listSecrets',
-  OpenProject = 'openProject',
-  UploadFile = 'uploadFile',
-  Lib = 'lib',
-  Telemetry = 'telemetry',
-}
-
-export const EVENT_TYPES = Object.freeze(Object.values(EventType))
-
-/** An event indicating that a secret was accessed. */
-interface GetSecretEventMetadata {
-  readonly type: EventType.GetSecret
-  readonly secretId: SecretId
-}
-
-/** An event indicating that one or more assets were deleted. */
-interface DeleteAssetsEventMetadata {
-  readonly type: EventType.DeleteAssets
-}
-
-/** An event indicating that all secrets were listed. */
-interface ListSecretsEventMetadata {
-  readonly type: EventType.ListSecrets
-}
-
-/** An event indicating that a project was opened. */
-interface OpenProjectEventMetadata {
-  readonly type: EventType.OpenProject
-}
-
-/** An event indicating that a file was uploaded. */
-interface UploadFileEventMetadata {
-  readonly type: EventType.UploadFile
-}
-
-/** An event indicating that an action was performed by the Standard libraries. */
-interface LibEventMetadata {
-  readonly type: EventType.Lib
-}
-
-/** An event indicating telemetry data sent from the IDE. */
-interface TelemetryEventMetadata {
-  readonly type: EventType.Telemetry
-}
-
-/** All possible types of metadata for an event in the audit log. */
-export type EventMetadata =
-  | DeleteAssetsEventMetadata
-  | GetSecretEventMetadata
-  | ListSecretsEventMetadata
-  | OpenProjectEventMetadata
-  | UploadFileEventMetadata
-  | LibEventMetadata
-  | TelemetryEventMetadata
-
 /** A color in the LCh colorspace. */
 export interface LChColor {
   readonly lightness: number
@@ -822,36 +372,6 @@ export interface LChColor {
   readonly hue: number
   readonly alpha?: number | undefined
 }
-
-/** Type used when creating api key credential. */
-export interface CreateApiKeyRequestBody {
-  readonly name: string
-  readonly description: string
-  readonly expiresIn: ApiKeyExpiresIn
-}
-
-/** Api key credential. */
-export interface ApiKey {
-  readonly id: ApiKeyId
-  // Field populated only once after creation.
-  readonly secretId: string | null
-  readonly name: string
-  readonly description: string
-  readonly createdAt: dateTime.Rfc3339DateTime
-  readonly lastUsedAt: dateTime.Rfc3339DateTime | null
-  readonly expiresAt: dateTime.Rfc3339DateTime | null
-  readonly expiresIn: ApiKeyExpiresIn
-}
-
-/** Possible types of lifetime span for api key credentials. */
-export enum ApiKeyExpiresIn {
-  Week = 'Week',
-  Month = 'Month',
-  Year = 'Year',
-  Indefinetly = 'Indefinetly',
-}
-
-export const API_KEY_EXPIRES_IN_VALUES: readonly ApiKeyExpiresIn[] = Object.values(ApiKeyExpiresIn)
 
 /** A pre-selected list of colors to be used in color pickers. */
 export const COLORS = [
@@ -992,7 +512,6 @@ export interface Asset<Type extends AssetType = AssetType> {
    * (and currently safe) to assume it is always a {@link DirectoryId}.
    */
   readonly parentId: DirectoryId
-  readonly permissions: readonly AssetPermission[] | null
   readonly labels?: readonly LabelName[] | undefined
   readonly description?: string | undefined
   /** Asset data for a project */
@@ -1005,8 +524,6 @@ export interface Asset<Type extends AssetType = AssetType> {
   readonly virtualParentsPath: VirtualParentsPath
   /** The display path. */
   readonly ensoPath: EnsoPath
-  /** The user that created asset. */
-  readonly createdBy?: User
   /** Optional size valid only for projects and files. */
   readonly size?: number
 }
@@ -1088,7 +605,6 @@ export interface S3ObjectVersion {
   /** An archive containing the all the project files object in the S3 bucket. */
   readonly key: string
   readonly user?: OtherUser
-  readonly tags?: string[] | undefined
   readonly comment?: string | undefined
 }
 
@@ -1102,88 +618,6 @@ export interface OtherUser {
 /** A list of asset versions. */
 export interface AssetVersions {
   readonly versions: S3ObjectVersion[]
-}
-
-/**
- * Return a positive number when `a > b`, a negative number when `a < b`, and `0`
- * when `a === b`.
- */
-export function compareAssetPermissions(a: AssetPermission, b: AssetPermission) {
-  const relativePermissionPrecedence =
-    permissions.PERMISSION_ACTION_PRECEDENCE[a.permission] -
-    permissions.PERMISSION_ACTION_PRECEDENCE[b.permission]
-  if (relativePermissionPrecedence !== 0) {
-    return relativePermissionPrecedence
-  } else {
-    // NOTE [NP]: Although `userId` is unique, and therefore sufficient to sort permissions, sort
-    // name first, so that it's easier to find a permission in a long list (i.e., for readability).
-    const aName = getAssetPermissionName(a)
-    const bName = getAssetPermissionName(b)
-    const aUserId = getAssetPermissionId(a)
-    const bUserId = getAssetPermissionId(b)
-    return (
-      aName < bName ? -1
-      : aName > bName ? 1
-      : aUserId < bUserId ? -1
-      : aUserId > bUserId ? 1
-      : 0
-    )
-  }
-}
-
-/** HTTP request body for the "set username" endpoint. */
-export interface CreateUserRequestBody {
-  readonly userName: string
-  readonly userEmail: EmailAddress
-  readonly organizationId: OrganizationId | null
-}
-
-/** HTTP request body for the "update user" endpoint. */
-export interface UpdateUserRequestBody {
-  readonly username?: string
-  readonly organizationId?: OrganizationId
-  readonly switchOrganization?: boolean
-}
-
-/** HTTP request body for the "change user group" endpoint. */
-export interface ChangeUserGroupRequestBody {
-  readonly userGroups: UserGroupId[]
-}
-
-/** HTTP request body for the "update organization" endpoint. */
-export interface UpdateOrganizationRequestBody {
-  readonly name?: string
-  readonly email?: EmailAddress
-  readonly website?: HttpsUrl
-  readonly address?: string
-}
-
-/** HTTP request body for the "invite user" endpoint. */
-export interface InviteUserRequestBody {
-  readonly userEmail: EmailAddress
-  readonly resend?: boolean
-}
-
-/** HTTP response body for the "list invitations" endpoint. */
-export interface ListInvitationsResponseBody {
-  readonly invitations: readonly Invitation[]
-  readonly availableLicenses: number
-  readonly maxLicenses: number
-}
-
-/** Invitation to join an organization. */
-export interface Invitation {
-  readonly organizationId: OrganizationId
-  readonly organizationName: string
-  readonly userEmail: EmailAddress
-  readonly expireAt: dateTime.Rfc3339DateTime
-}
-
-/** HTTP request body for the "create permission" endpoint. */
-export interface CreatePermissionRequestBody {
-  readonly actorsIds: readonly UserPermissionIdentifier[]
-  readonly resourceId: AssetId
-  readonly action: permissions.PermissionAction | null
 }
 
 /** HTTP request body for the "create directory" endpoint. */
@@ -1210,20 +644,13 @@ export interface UpdateAsset {
   readonly metadataId?: MetadataId | null
 }
 
-/** HTTP request body for the "update asset version tag" action. */
-export interface UpdateAssetVersionTag {
-  readonly versionId?: S3ObjectVersionId
-  readonly tag?: string
-  readonly remove?: boolean
-}
-
 /** HTTP request body for the "update asset version comment" action. */
 export interface UpdateAssetVersionComment {
   readonly versionId?: S3ObjectVersionId
   readonly comment?: string | null
 }
 
-export type UpdateAssetRequestBody = UpdateAsset & UpdateAssetVersionTag & UpdateAssetVersionComment
+export type UpdateAssetRequestBody = UpdateAsset & UpdateAssetVersionComment
 
 /** HTTP request body for the "delete asset" endpoint. */
 export interface DeleteAssetRequestBody {
@@ -1245,32 +672,9 @@ export interface UpdateProjectRequestBody {
   readonly projectName: string | null
 }
 
-/** Extra parameters required when opening the project in hybrid mode. */
-export interface OpenHybridProjectParameters {
-  /** Cloud project directory path. */
-  readonly cloudProjectDirectoryPath: EnsoPath
-  /** Cloud project id. */
-  readonly cloudProjectId: ProjectId
-  /** Cloud project session id. */
-  readonly cloudProjectSessionId: ProjectSessionId
-  readonly cloudApiUrl: string
-}
-
 /** HTTP request body for the "open project" endpoint. */
 export interface OpenProjectRequestBody {
   readonly executeAsync: boolean
-  /** MUST be present on Remote backend; NOT REQUIRED on Local backend. */
-  readonly cognitoCredentials: CognitoCredentials | null
-  /** Extra parameters required when running in hybrid mode. */
-  readonly openHybridProjectParameters: OpenHybridProjectParameters | null
-}
-
-/** HTTP request body for the "create project execution" endpoint. */
-export interface CreateProjectExecutionRequestBody extends ProjectExecutionInfo {}
-
-/** HTTP request body for the "update project execution" endpoint. */
-export interface UpdateProjectExecutionRequestBody {
-  readonly enabled?: boolean | undefined
 }
 
 /** HTTP request body for the "create secret or credential" endpoint. */
@@ -1315,60 +719,6 @@ export interface CreateDatalinkRequestBody {
 export interface CreateTagRequestBody {
   readonly value: string
   readonly color: LChColor
-}
-
-/** HTTP request body for the "create user group" endpoint. */
-export interface CreateUserGroupRequestBody {
-  readonly name: string
-}
-
-/** Valid plan intervals. */
-export type PlanBillingPeriod = 1 | 12
-
-/** HTTP request body for the "create checkout session" endpoint. */
-export interface CreateCheckoutSessionRequestBody {
-  readonly price: Plan
-  readonly quantity: number
-  readonly interval: PlanBillingPeriod
-}
-
-/** URL query string parameters for the "get log events" endpoint. */
-export interface GetLogEventsRequestParams {
-  readonly userEmail?: EmailAddress | null | undefined
-  readonly lambdaKind?: string | null | undefined
-  readonly startDate?: dateTime.Rfc3339DateTime | null | undefined
-  readonly endDate?: dateTime.Rfc3339DateTime | null | undefined
-  /** Pagination offset */
-  readonly from?: number | null | undefined
-  readonly pageSize?: number | null | undefined
-}
-
-/** URL query string parameters for the "list all executions" endpoint. */
-export interface ListExecutionsRequestParams {
-  readonly lastExecutionId?: ProjectExecutionId | null
-}
-
-/** URL query string parameters for the "list execution usage summary" endpoint. */
-export interface ListExecutionsSummaryRequestParams {
-  readonly month?: string | null | undefined
-}
-
-export interface ExecutionUsageSummaryProject {
-  readonly projectId: ProjectId
-  readonly name: string | null
-}
-
-export interface ExecutionUsageSummaryUser {
-  readonly name: string | null
-  readonly email: EmailAddress | null
-}
-
-export interface ExecutionUsageSummary {
-  readonly project: ExecutionUsageSummaryProject
-  readonly user: ExecutionUsageSummaryUser
-  readonly totalSessions: number
-  readonly totalUptimeSeconds: number
-  readonly averageUptimeSeconds: number
 }
 
 export type AssetSortExpression =
@@ -1477,15 +827,6 @@ export interface UploadedProject {
 
 /** A large asset (file or project) that has finished uploading. */
 export type UploadedAsset = UploadedFile | UploadedArchive | UploadedProject
-
-export interface UploadedImages {
-  files: { assetId: AssetId; title: string }[]
-}
-
-/** URL query string parameters for the "upload profile picture" endpoint. */
-export interface UploadPictureRequestParams {
-  readonly fileName: string | null
-}
 
 export interface ExportArchiveParams {
   readonly assetIds: readonly AssetId[]
@@ -1609,21 +950,6 @@ export function getAssetId<Type extends AssetType>(asset: Asset<Type>) {
   return asset.id
 }
 
-/** Whether a user's root directory has the "Users" and "Teams" subdirectories. */
-export function userHasUserAndTeamSpaces(user: User | null) {
-  switch (user?.plan ?? null) {
-    case null:
-    case Plan.free:
-    case Plan.solo: {
-      return false
-    }
-    case Plan.team:
-    case Plan.enterprise: {
-      return true
-    }
-  }
-}
-
 /** A subset of properties of the JS {@link File} type. */
 interface JSFile {
   readonly name: string
@@ -1702,17 +1028,6 @@ export function doesTitleContainInvalidCharacters(name: string) {
   )
 }
 
-/** A regex for matching hybrid project directories. */
-export const HYBRID_PROJECT_DIRECTORY_MASK = /^cloud-project-\w+$/
-
-/** A list of regexes for matching invalid names. */
-const INVALID_NAME_MASKS = [HYBRID_PROJECT_DIRECTORY_MASK]
-
-/** Check if the title contains invalid names. */
-export function doesContainInvalidNames(title: string) {
-  return INVALID_NAME_MASKS.some((mask) => mask.test(title))
-}
-
 /** A Zod schema for validating a title. */
 export function titleSchema(options: TitleSchemaOptions) {
   const { id, siblings, extension } = options
@@ -1724,9 +1039,6 @@ export function titleSchema(options: TitleSchemaOptions) {
     .trim()
     .min(1)
     .max(512)
-    .refine((value) => !doesContainInvalidNames(value), {
-      message: getText(dictionary, 'nameShouldNotContainInvalidCharacters'),
-    })
     .refine((value) => !doesTitleContainInvalidCharacters(value), {
       message: getText(dictionary, 'nameShouldNotContainInvalidCharacters'),
     })
@@ -1752,15 +1064,6 @@ export function isNewTitleUnique(
       sibling.title.trim().toLowerCase() !== newTitle.trim().toLowerCase(),
   )
 }
-
-export const MAPBOX_TOKEN_SCHEMA = z.object({
-  token: z.string(),
-  expires: z
-    .string()
-    .datetime({ offset: true })
-    .transform((str) => new Date(str)),
-})
-export type MapboxToken = z.infer<typeof MAPBOX_TOKEN_SCHEMA>
 
 /** Network error class. */
 export class NetworkError extends Error {
@@ -1848,54 +1151,9 @@ export abstract class Backend {
   }
 
   /** The path to the root directory of this {@link Backend}. */
-  abstract rootPath(user: User): string
+  abstract rootPath(): string
   /** Return the ID of the root directory, if known. */
-  abstract rootDirectoryId(user: User, organization: OrganizationInfo | null): DirectoryId | null
-  /** Return a list of all users in the same organization. */
-  abstract listUsers(): Promise<readonly Omit<User, 'groups'>[]>
-  /** Set the username of the current user. */
-  abstract createUser(body: CreateUserRequestBody): Promise<User>
-  /** Change the username of the current user. */
-  abstract updateUser(body: UpdateUserRequestBody): Promise<void>
-  /** Restore the current user. */
-  abstract restoreUser(): Promise<void>
-  /** Delete the current user. */
-  abstract deleteUser(): Promise<void>
-  /** Delete a user. */
-  abstract removeUser(userId: UserId): Promise<void>
-  /** Upload a new profile picture for the current user. */
-  abstract uploadUserPicture(params: UploadPictureRequestParams, file: Blob): Promise<User>
-  /** Set the list of groups a user is in. */
-  abstract changeUserGroup(
-    userId: UserId,
-    userGroups: ChangeUserGroupRequestBody,
-    name: string | null,
-  ): Promise<User>
-  /** Invite a new user to the organization by email. */
-  abstract inviteUser(body: InviteUserRequestBody): Promise<void>
-  /** Return a list of invitations to the organization. */
-  abstract listInvitations(): Promise<ListInvitationsResponseBody>
-  /** Delete an outgoing invitation. */
-  abstract deleteInvitation(userEmail: EmailAddress): Promise<void>
-  /** Resend an outgoing invitation. */
-  abstract resendInvitation(userEmail: EmailAddress): Promise<void>
-  /** Accept an incoming invitation to a new organization. */
-  abstract acceptInvitation(): Promise<void>
-  /** Decline an incoming invitation to a new organization. */
-  abstract declineInvitation(userEmail: string): Promise<void>
-  /** Get the details of the current organization. */
-  abstract getOrganization(): Promise<OrganizationInfo | null>
-  /** Change the details of the current organization. */
-  abstract updateOrganization(body: UpdateOrganizationRequestBody): Promise<OrganizationInfo | null>
-  /** Upload a new profile picture for the current organization. */
-  abstract uploadOrganizationPicture(
-    params: UploadPictureRequestParams,
-    file: Blob,
-  ): Promise<OrganizationInfo>
-  /** Adds a permission for a specific user on a specific asset. */
-  abstract createPermission(body: CreatePermissionRequestBody): Promise<void>
-  /** Return user details for the current user. */
-  abstract usersMe(): Promise<User | null>
+  abstract rootDirectoryId(): DirectoryId | null
   /** Return a list of assets in a directory. */
   abstract listDirectory(
     query: ListDirectoryRequestParams,
@@ -1920,8 +1178,6 @@ export abstract class Backend {
   abstract updateAsset(assetId: AssetId, body: UpdateAssetRequestBody, title: string): Promise<void>
   /** Delete an arbitrary asset. */
   abstract deleteAsset(assetId: AssetId, body: DeleteAssetRequestBody, title: string): Promise<void>
-  /** Restore an arbitrary asset from the trash. */
-  abstract undoDeleteAsset(assetId: AssetId, parentDirectoryId: DirectoryId | null): Promise<void>
   /** Copy an arbitrary asset to another directory. */
   abstract copyAsset(
     assetId: AssetId,
@@ -1937,40 +1193,6 @@ export abstract class Backend {
     projectId: ProjectId,
     title: string,
   ): Promise<readonly ProjectSession[]>
-  /** Create a project execution. */
-  abstract createProjectExecution(
-    body: CreateProjectExecutionRequestBody,
-    title: string,
-  ): Promise<ProjectExecution>
-  abstract getProjectExecutionDetails(
-    executionId: ProjectExecutionId,
-    title: string,
-  ): Promise<ProjectExecution>
-  abstract updateProjectExecution(
-    executionId: ProjectExecutionId,
-    body: UpdateProjectExecutionRequestBody,
-    projectTitle: string,
-  ): Promise<ProjectExecution>
-  /** Delete a project execution. */
-  abstract deleteProjectExecution(
-    executionId: ProjectExecutionId,
-    projectTitle: string,
-  ): Promise<void>
-  /** Return a list of executions for a project. */
-  abstract listProjectExecutions(
-    projectId: ProjectId,
-    title: string,
-    year: number,
-    month: number,
-  ): Promise<readonly ProjectExecution[]>
-  /** Return usage summary rows for an organization (if admin) or a user. */
-  abstract listExecutionsSummary(
-    params: ListExecutionsSummaryRequestParams,
-  ): Promise<readonly ExecutionUsageSummary[]>
-  abstract syncProjectExecution(
-    executionId: ProjectExecutionId,
-    projectTitle: string,
-  ): Promise<ProjectExecution>
   /** Restore a project from a different version. */
   abstract restoreAsset(assetId: AssetId, versionId: S3ObjectVersionId): Promise<void>
   /** Duplicate a specific version of an asset. */
@@ -2040,14 +1262,6 @@ export abstract class Backend {
     body: UploadFileEndRequestBody,
     abort?: AbortSignal,
   ): Promise<UploadedAsset>
-  /**
-   * Upload set of Images, resolving any possible conflicts. The sum of file sizes may not
-   * exceed cloud message limit.
-   */
-  abstract uploadImage(
-    parentDirectoryId: DirectoryId,
-    files: { data: Blob; name: string }[],
-  ): Promise<UploadedImages>
   /** Change the name of a file. */
   abstract updateFile(fileId: FileId, body: UpdateFileRequestBody, title: string): Promise<void>
 
@@ -2098,8 +1312,6 @@ export abstract class Backend {
   abstract createTag(body: CreateTagRequestBody): Promise<Label>
   /** Return all labels accessible by the user. */
   abstract listTags(): Promise<readonly Label[]>
-  /** Return all tags attached to asset versions in the organization. */
-  abstract listAssetVersionTags(): Promise<readonly string[]>
   /** Set the full list of labels for a specific asset. */
   abstract associateTag(
     assetId: AssetId,
@@ -2108,24 +1320,6 @@ export abstract class Backend {
   ): Promise<void>
   /** Delete a label. */
   abstract deleteTag(tagId: TagId, value: LabelName): Promise<void>
-  /** Create a user group. */
-  abstract createUserGroup(body: CreateUserGroupRequestBody): Promise<UserGroupInfo>
-  /** Delete a user group. */
-  abstract deleteUserGroup(userGroupId: UserGroupId, name: string): Promise<void>
-  /** Return all user groups in the organization. */
-  abstract listUserGroups(): Promise<readonly UserGroupInfo[]>
-  /** Create a payment checkout session. */
-  abstract createCheckoutSession(body: CreateCheckoutSessionRequestBody): Promise<CheckoutSession>
-  /** Cancel subscription. */
-  abstract cancelSubscription(subscriptionId: SubscriptionId): Promise<void>
-  /** List events in the organization's audit log. */
-  abstract getLogEvents(options: GetLogEventsRequestParams): Promise<readonly AuditLogEvent[]>
-  /** Log an event that will be visible in the organization audit log. */
-  abstract logEvent(
-    message: string,
-    projectId?: string | null,
-    metadata?: object | null,
-  ): Promise<void>
   /** Download an asset. */
   abstract download(
     assetId: AssetId,
@@ -2137,23 +1331,6 @@ export abstract class Backend {
   abstract downloadProjectSessionLogs(projectSessionId: ProjectSessionId): Promise<void>
   /** Export multiple files and pack into an archive. */
   abstract exportArchive(params: ExportArchiveParams): Promise<ExportedArchive>
-  /**
-   * Get the URL for the customer portal.
-   * @see https://stripe.com/docs/billing/subscriptions/integrating-customer-portal
-   * @param returnUrl - The URL to redirect to after the customer visits the portal.
-   */
-  abstract createCustomerPortalSession(returnUrl: string): Promise<string | null>
-  /** Fetches pricing page configuration. */
-  abstract getPaymentsConfig(): Promise<PaymentsConfig>
-
-  /** List all API keys for the current user. */
-  abstract listApiKeys(): Promise<readonly ApiKey[]>
-  /** Create a new API key for the current user. */
-  abstract createApiKey(body: CreateApiKeyRequestBody): Promise<ApiKey>
-  /** Delete a API key for the current user. */
-  abstract deleteApiKey(apiKeyId: ApiKeyId): Promise<void>
-  /** Retrieve Mapbox token for the current user. */
-  abstract getMapboxToken(): Promise<MapboxToken>
 
   /** Throw a {@link backend.NotAuthorizedError} if the response is a 401 Not Authorized status code. */
   private async checkForAuthenticationError<T>(

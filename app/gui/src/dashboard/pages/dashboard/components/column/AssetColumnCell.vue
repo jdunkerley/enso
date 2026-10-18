@@ -16,41 +16,20 @@ import PathColumn from './PathColumn.vue'
 import ProjectNameColumn from './ProjectNameColumn.vue'
 import SecretNameColumn from './SecretNameColumn.vue'
 
-const { column, item, labels, isEditable } = defineProps<{
+const { column, item, labels } = defineProps<{
   column: Column
   item: AnyAsset
   labels: readonly Label[]
-  isEditable: boolean
 }>()
 </script>
 
 <template>
   <template v-if="column === Column.name">
-    <DirectoryNameColumn
-      v-if="item.type === AssetType.directory"
-      :item="item"
-      :isEditable="isEditable"
-    />
-    <ProjectNameColumn
-      v-else-if="item.type === AssetType.project"
-      :item="item"
-      :isEditable="isEditable"
-    />
-    <FileNameColumn
-      v-else-if="item.type === AssetType.file"
-      :item="item"
-      :isEditable="isEditable"
-    />
-    <DatalinkNameColumn
-      v-else-if="item.type === AssetType.datalink"
-      :item="item"
-      :isEditable="isEditable"
-    />
-    <SecretNameColumn
-      v-else-if="item.type === AssetType.secret"
-      :item="item"
-      :isEditable="isEditable"
-    />
+    <DirectoryNameColumn v-if="item.type === AssetType.directory" :item="item" />
+    <ProjectNameColumn v-else-if="item.type === AssetType.project" :item="item" />
+    <FileNameColumn v-else-if="item.type === AssetType.file" :item="item" />
+    <DatalinkNameColumn v-else-if="item.type === AssetType.datalink" :item="item" />
+    <SecretNameColumn v-else-if="item.type === AssetType.secret" :item="item" />
   </template>
   <Text v-else-if="column === Column.modified" nowrap>
     {{ toReadableIsoString(new Date(item.modifiedAt)) }}
@@ -59,7 +38,6 @@ const { column, item, labels, isEditable } = defineProps<{
     {{ toReadableIsoString(new Date(item.createdAt)) }}
   </Text>
   <Text v-else-if="column === Column.size" nowrap>{{ formatBytes(item.size) }}</Text>
-  <Text v-else-if="column === Column.createdBy" nowrap>{{ item.createdBy?.name }}</Text>
   <LabelsColumn v-else-if="column === Column.labels" :item="item" :labels="labels" />
   <PathColumn v-else-if="column === Column.path" :item="item" />
 </template>

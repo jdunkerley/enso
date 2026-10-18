@@ -13,20 +13,16 @@ import type * as vite from 'vite'
 
 import { COOP_COEP_CORP_HEADERS } from 'enso-common/src/constants'
 import * as projectManagement from 'project-manager-shim'
-import type { Watcher } from 'project-manager-shim/fs'
 import {
   handleFilesystemCommand,
   handleProjectServiceRequest,
-  handleWatcherRequest,
   isProjectServiceRequest,
-  isWatcherRequest,
 } from 'project-manager-shim/handler'
 import type { LocalMetadata } from 'project-manager-shim/localMetadata'
 import type { LocalVersioning } from 'project-manager-shim/localVersioning'
 import * as ydocServer from 'ydoc-server'
 
 import { tarFsPack, unzipEntries, zipWriteStream } from '@/archive'
-import { downloadCloudProject } from '@/assetManagement'
 import { BUNDLED_PROJECT_SUFFIX } from '@/fileAssociations'
 import * as paths from '@/paths'
 import { resolveServedFile } from '@/servedFile'
@@ -62,9 +58,9 @@ import {
   downloadFilePath,
   EXPORT_ARCHIVE_PATH,
   GET_FILE_DETAILS_REGEX,
-} from 'enso-common/src/services/Backend/remoteBackendPaths'
+} from 'enso-common/src/services/Backend/localBackendPaths'
 import { createReadStream, createWriteStream, statSync } from 'node:fs'
-import { access, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { finished } from 'node:stream/promises'
 import { pathToFileURL } from 'node:url'
@@ -84,7 +80,6 @@ ydocServer.configureAllDebugLogs(
 const HTTP_STATUS_OK = 200
 const HTTP_STATUS_BAD_REQUEST = 400
 const HTTP_STATUS_NOT_FOUND = 404
-const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500
 
 // ==================
 // === fileExists ===
@@ -188,7 +183,6 @@ export class Server {
   private projectService: ProjectService
   private localMetadata: LocalMetadata
   private localVersioning: LocalVersioning
-  private watchers: Map<AssetId, Watcher> = new Map()
 
   /**
    * Create a simple HTTP server.
@@ -292,21 +286,10 @@ export class Server {
         this.localMetadata,
         this.localVersioning,
       )
-    } else if (isWatcherRequest(requestUrl)) {
-      const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
-      handleWatcherRequest(request, response, headers, this.watchers)
     } else if (request.url?.startsWith('/api/')) {
       const route = new URL(`https://example.com${requestUrl.replace('/api/', '/')}`)
       const params = route.searchParams
       switch (`${request.method} ${route.pathname}`) {
-        case 'GET /cloud/download-project': {
-          await this.httpCloudDownloadProject(request, response, params)
-          break
-        }
-        case 'GET /cloud/get-project-archive': {
-          await this.httpCloudGetProjectArchive(request, response, params)
-          break
-        }
         case 'GET /root-directory-path': {
           await this.httpGetRootDirectoryPath(request, response, params)
           break
@@ -467,38 +450,6 @@ export class Server {
     this.httpOkText(response, this.apiGetDownloadDirectoryPath())
   }
 
-  /** Response handler for "download project from cloud" endpoint. */
-  async httpCloudDownloadProject(
-    _request: http.IncomingMessage,
-    response: http.ServerResponse,
-    params: URLSearchParams,
-  ) {
-    const downloadUrl = this.expectParameter(response, params, 'downloadUrl')
-    const projectId = this.expectParameter(response, params, 'projectId')
-    if (downloadUrl == null || projectId == null) {
-      return
-    }
-
-    try {
-      this.httpOkJson<{
-        readonly projectRootDirectory: string
-        readonly parentDirectory: string
-      }>(response, await downloadCloudProject(downloadUrl, ProjectId(projectId)))
-    } catch (error) {
-      console.error(error)
-      const projectsDirectory = projectManagement.getProjectsDirectory()
-      const parentDirectory = path.join(projectsDirectory, `cloud-${projectId}`)
-      await access(parentDirectory)
-        .then(() => {
-          rm(parentDirectory, { maxRetries: 3, recursive: true, force: true })
-        })
-        .catch((e) => {
-          console.error(`Failed to cleanup directory ${parentDirectory}.`, e)
-        })
-      response.writeHead(HTTP_STATUS_INTERNAL_SERVER_ERROR, COOP_COEP_CORP_HEADERS).end()
-    }
-  }
-
   /** Return a parameter if it exists, return an error if it does not. */
   expectParameter(response: http.ServerResponse, params: URLSearchParams, parameter: string) {
     const value = params.get(parameter)
@@ -508,36 +459,6 @@ export class Server {
         .end(`Request is missing search parameter '${parameter}'.`)
     }
     return value
-  }
-
-  /** Response handler for "get project archive for cloud" endpoint. */
-  async httpCloudGetProjectArchive(
-    _request: http.IncomingMessage,
-    response: http.ServerResponse,
-    params: URLSearchParams,
-  ) {
-    const parentDir = this.expectParameter(response, params, 'directory')
-    if (parentDir == null) {
-      response
-        .writeHead(HTTP_STATUS_BAD_REQUEST, COOP_COEP_CORP_HEADERS)
-        .end('Request is missing search parameter `directory`.')
-      return
-    }
-    const projectDir = path.join(parentDir, 'project_root')
-
-    try {
-      const projectBundle = await projectManagement.createBundle(projectDir)
-      response
-        .writeHead(HTTP_STATUS_OK, [
-          ['Content-Length', String(projectBundle.byteLength)],
-          ['Content-Type', 'application/octet-stream'],
-          ...COOP_COEP_CORP_HEADERS,
-        ])
-        .end(projectBundle)
-    } catch (error) {
-      console.error(error)
-      response.writeHead(HTTP_STATUS_INTERNAL_SERVER_ERROR, COOP_COEP_CORP_HEADERS).end()
-    }
   }
 
   /** Response handler for "get file details" endpoint. */
@@ -688,7 +609,6 @@ export class Server {
         createdAt: new Date().toISOString() as DirectoryAsset['createdAt'],
         parentId: DirectoryId(`directory-${path.dirname(destinationPath)}` as const),
         extension: null,
-        permissions: [],
         projectState: null,
         parentsPath: ParentsPath(''),
         virtualParentsPath: VirtualParentsPath(''),
@@ -921,7 +841,6 @@ export class Server {
         createdAt: new Date().toISOString() as DirectoryAsset['createdAt'],
         parentId: DirectoryId(`directory-${path.dirname(assetPath)}` as const),
         extension: null,
-        permissions: [],
         projectState: null,
         parentsPath: ParentsPath(''),
         virtualParentsPath: VirtualParentsPath(''),

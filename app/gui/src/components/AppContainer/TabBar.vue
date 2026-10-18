@@ -42,17 +42,12 @@ const tabsViewInfos = computed(() =>
             ...tab,
             dataTestId: 'project-view-tab-button',
             icon: projectIcon(project),
-            changed: project.state.info.mode === 'local' && isChanged(tab.id),
+            changed: isChanged(tab.id),
             label:
               project.state.status === 'initialized' ?
                 project.state.name.value
               : project.state.info.title,
-            loadingPhase:
-              showSpinner ?
-                project.state.info.mode === 'cloud' ?
-                  'loading-slow'
-                : 'loading-fast'
-              : undefined,
+            loadingPhase: showSpinner ? 'loading-fast' : undefined,
           },
         ]
       }
@@ -81,9 +76,6 @@ const tabsViewInfos = computed(() =>
 function projectIcon(project: Project): Icon | undefined {
   if (project.error != null) {
     return 'error'
-  }
-  if (project.state.status === 'closed-by-backend') {
-    return 'warning'
   }
   if (project.nextTask?.process === 'opening' || project.nextTask?.process === 'restoring') {
     return undefined

@@ -14,7 +14,6 @@ import { optPx } from '$/utils/dom'
 import type { ToValue } from '$/utils/reactivity'
 import AssetContentsEditor from '@/components/AssetContentsEditor.vue'
 import ComponentHelpPanel from '@/components/ComponentHelpPanel.vue'
-import DescriptionEditor from '@/components/DescriptionEditor.vue'
 import DocumentationEditor from '@/components/DocumentationEditor'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
@@ -65,13 +64,9 @@ function contributedTab(tab: ContributedRightPanelTab) {
 // Not a part of RightPanelTabInfo, because it would create cyclic imports.
 const component = computed(() => {
   switch (data.displayedTab) {
-    case 'description':
-      return DescriptionEditor
     case 'contents':
       return AssetContentsEditor
-    case 'settings':
     case 'versions':
-    case 'executionsCalendar':
       return contributedTab(data.displayedTab)
     case 'sessions':
       return ProjectSessions

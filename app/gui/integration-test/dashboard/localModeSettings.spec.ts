@@ -1,51 +1,20 @@
 /**
- * @file The settings page in the local-only IDE: authentication is disabled and the app runs as the
- * offline stand-in user. The page opens, the Account tab shows the offline user, and nothing asks
- * Enso Cloud for anything, not even a configuration.
+ * @file The settings page in the IDE, which is always local-only: the app runs as the offline
+ * stand-in user, and there is no remote configuration. The page opens and the Account tab shows the
+ * offline user. The suite-wide `cloudRequests` fixture fails any test that asks Enso Cloud for
+ * anything.
  */
 import { expect, test, type Page } from 'integration-test/base'
-import { registerMocks } from 'integration-test/mock/registerMocks'
 import { TEXT } from '../actions'
 import BaseActions from '../actions/BaseActions'
-
-/** The mocked Enso Cloud API (`mock/cloudApi.ts`). */
-const CLOUD_API_URL = 'https://mock/'
-
-// Local-only mode has no session to restore: start from nothing, as a fresh install would.
-test.use({ storageState: { cookies: [], origins: [] } })
-
-/** Open the app. Returns every request made to Enso Cloud or Cognito, as it is made. */
-async function openLocalOnly(page: Page, appConfig: Record<string, string | undefined>) {
-  await registerMocks(page, {}, { appConfig })
-  const cloudRequests: string[] = []
-  page.on('request', (request) => {
-    const url = request.url()
-    const { hostname } = new URL(url)
-    const isCloud =
-      url.startsWith(CLOUD_API_URL) || /cognito|amazonaws/.test(hostname) || hostname === 'mock'
-    if (isCloud) {
-      cloudRequests.push(`${request.method()} ${url}`)
-    }
-  })
-  await page.goto('/')
-  await expect(page.getByTestId('drive-view')).toBeVisible()
-  return cloudRequests
-}
 
 const settingsPanel = (page: Page) => page.getByTestId('settings-panel')
 const sidebarTab = (page: Page, name: string) =>
   settingsPanel(page).locator('aside').getByRole('button', { name, exact: true })
 const sectionHeadings = (page: Page) => settingsPanel(page).locator('main h2')
 
-test('settings open on the offline user, and ask nothing of the cloud', async ({
-  page,
-  cloudApi,
-  localApi,
-  appConfig,
-}) => {
-  // Only make sure that the API mocks are registered, so that any cloud request is answered.
-  const _ = { cloudApi, localApi }
-  const cloudRequests = await openLocalOnly(page, appConfig)
+test('settings open on the offline user', async ({ drivePage, page }) => {
+  await drivePage
 
   await BaseActions.press(page, 'Mod+,')
   await expect(settingsPanel(page).locator('h1').first()).toContainText(TEXT.offlineUserName)
@@ -85,24 +54,17 @@ test('settings open on the offline user, and ask nothing of the cloud', async ({
   await expect(sectionHeadings(page)).toHaveText([TEXT.keyboardShortcutsSettingsSection])
   await sidebarTab(page, TEXT.accountSettingsTab).click()
   await expect(page.getByTestId('offline-user-settings')).toBeVisible()
-
-  expect(cloudRequests).toEqual([])
 })
 
 test('the user menu shows the offline user, and opens the same settings', async ({
+  drivePage,
   page,
-  cloudApi,
-  localApi,
-  appConfig,
 }) => {
-  const _ = { cloudApi, localApi }
-  const cloudRequests = await openLocalOnly(page, appConfig)
+  await drivePage
 
   await page.getByRole('button', { name: TEXT.userMenuLabel }).click()
   const menu = page.getByTestId('user-menu')
   await expect(menu).toContainText(TEXT.offlineUserName)
   await menu.getByRole('button', { name: TEXT.settingsShortcut }).click()
   await expect(page.getByTestId('offline-user-settings')).toBeVisible()
-
-  expect(cloudRequests).toEqual([])
 })

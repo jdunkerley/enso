@@ -4,7 +4,7 @@
  * are mocked (`mock/localVersioning.ts`, `mock/versioning/historyRoutes.ts`).
  */
 import { Path, type VersionEntry } from 'enso-common/src/services/ProjectManager/types'
-import { CLOUD_ONLY, expect, test, type Page } from 'integration-test/base'
+import { expect, test, type Page } from 'integration-test/base'
 import * as locate from 'integration-test/project-view/locate'
 import { posix } from 'node:path'
 
@@ -288,19 +288,4 @@ test.describe('placeholders', () => {
     const panel = await openVersions(page)
     await expect(panel).toContainText('Install git to keep versions of local projects.')
   })
-})
-
-test('the cloud Versions tab still works: a directory has no versions', async ({
-  page,
-  drivePage,
-  cloudApi,
-}) => {
-  test.skip(true, CLOUD_ONLY)
-  cloudApi.addDirectory({ title: 'Cloud folder' })
-  await drivePage.goToCategory.cloud().driveTable.clickRow('Cloud folder')
-  const panel = await openVersions(page)
-  await expect(panel).not.toContainText('In the local drive')
-  await expect(panel).toContainText(
-    'Versions are available for projects, files and datalinks only.',
-  )
 })

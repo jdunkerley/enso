@@ -41,14 +41,7 @@ const ACCOUNT_TAB: SettingsTabData = {
   sections: [
     {
       nameId: 'offlineUserSettingsSection',
-      entries: [
-        {
-          // No aliases: a search for them would list the tab with nothing in it for a signed-in user.
-          type: 'custom',
-          getVisible: ({ isAuthDisabled }) => isAuthDisabled,
-          component: OfflineUserSettingsSection,
-        },
-      ],
+      entries: [{ type: 'custom', component: OfflineUserSettingsSection }],
     },
   ],
 }

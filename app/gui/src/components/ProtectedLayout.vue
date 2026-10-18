@@ -18,8 +18,7 @@ useAppTitle(computed(() => auth.session))
 </script>
 
 <template>
-  <!-- Markers the integration tests' login helpers wait for (until PR 4 removes them). -->
-  <div v-if="auth.session == null" data-testid="before-auth-layout" aria-hidden></div>
-  <div v-else data-testid="after-auth-layout" aria-hidden></div>
+  <!-- A marker the integration tests' login helpers wait for (until PR 4 removes it). -->
+  <div data-testid="after-auth-layout" aria-hidden></div>
   <RouterView />
 </template>

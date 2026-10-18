@@ -1,8 +1,7 @@
 /**
  * @file The right panel's tabs whose content other parts of the app contribute, without the core
  * importing them (decision 6b of `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`).
- * Only the Versions tab is contributed now (`src/registerCore.ts`); the Properties and Schedule
- * tabs were the cloud's, and nothing contributes them since it was removed.
+ * Only the Versions tab is contributed (`src/registerCore.ts`).
  *
  * The tabs themselves (icon, title, when they are enabled) stay in `$/providers/rightPanel`, in
  * their place among the others; a contributable tab that nothing contributed is hidden. A
@@ -12,8 +11,8 @@
  */
 import { shallowReactive, type Component } from 'vue'
 
-/** A right-panel tab whose content can be contributed: Properties, Versions and Schedule. */
-export type ContributedRightPanelTab = 'settings' | 'versions' | 'executionsCalendar'
+/** A right-panel tab whose content can be contributed: Versions. */
+export type ContributedRightPanelTab = 'versions'
 
 /** Loads a tab's component. */
 export type RightPanelTabLoader = () => Promise<Component | { default: Component }>

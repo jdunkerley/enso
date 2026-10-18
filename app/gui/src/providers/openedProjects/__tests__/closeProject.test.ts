@@ -25,12 +25,9 @@ vi.mock('$/utils/backendQuery', () => ({
 }))
 vi.mock('@/stores/aiAvailability', () => ({ useAiAvailability: () => ({}) }))
 vi.mock('../../backends', () => ({
-  useBackends: () => ({ localBackend, remoteBackend: {} }),
+  useBackends: () => ({ localBackend }),
 }))
-vi.mock('../../session', () => ({ useSession: () => ({}) }))
 vi.mock('../../text', () => ({ useText: () => ({}) }))
-vi.mock('../../httpClient', () => ({ useHttpClient: () => ({}) }))
-vi.mock('../../upload', () => ({ useUploadsToCloudStore: () => ({}) }))
 vi.mock('../../localVersioning', () => ({
   useLocalVersioning: () => ({
     offerRepository: mocks.offerRepository,

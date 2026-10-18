@@ -2,7 +2,6 @@ import { useBackends } from '$/providers/backends'
 import type { OpenedProjectsStore } from '$/providers/openedProjects'
 import type { ToValue } from '$/utils/reactivity'
 import { createContextStore } from '@/providers'
-import { useQueryClient } from '@tanstack/vue-query'
 import { andThen, mapOk, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { computed, onScopeDispose, toValue, type ComputedRef } from 'vue'
 import {
@@ -39,10 +38,9 @@ export const [provideAsyncResources, useAsyncResources] = createContextStore(
   'asyncResourceStore',
   (openedProjects: OpenedProjectsStore) => {
     const backends = useBackends()
-    const queryClient = useQueryClient()
     const { retainResource, releaseResource } = useResourceCache()
     const resolveResourceInContext = useAsyncResourceResolver(backends, openedProjects)
-    const uploadResource = useResourceUpload(openedProjects, backends.remoteBackend, queryClient)
+    const uploadResource = useResourceUpload(openedProjects)
 
     function finishResourceUpload(
       progress: UploadProgress,

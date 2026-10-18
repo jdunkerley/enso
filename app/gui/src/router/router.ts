@@ -5,7 +5,6 @@ import {
   openTab,
   redirectFromPath,
 } from '$/router/dashboardGuards'
-import { withDataLoader } from '$/router/dataLoader'
 import { APP_CONTAINER_LAYOUT_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
@@ -20,7 +19,7 @@ const routes = [
       {
         name: APP_CONTAINER_LAYOUT_ROUTE,
         path: UNAVAILABLE_PATH,
-        component: withDataLoader(() => import('$/components/AppContainerLayout.vue')),
+        component: () => import('$/components/AppContainerLayout.vue'),
         children: [
           {
             name: 'dashboard',

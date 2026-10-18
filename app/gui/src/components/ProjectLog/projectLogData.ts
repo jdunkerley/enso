@@ -1,7 +1,7 @@
 import { useBackends } from '$/providers/backends'
 import type { ToValue } from '$/utils/reactivity'
 import * as vueQuery from '@tanstack/vue-query'
-import { projectSessionBackendType, type ProjectSessionId } from 'enso-common/src/services/Backend'
+import type { ProjectSessionId } from 'enso-common/src/services/Backend'
 import { computed, toRef } from 'vue'
 
 export interface LogEntry {
@@ -22,12 +22,16 @@ export interface LogDataOptions {
 
 /** Composable support obtaining project session log data from the backend. */
 export function useLogData(options: LogDataOptions) {
-  const { backendForType } = useBackends()
+  const backends = useBackends()
   const sessionId = toRef(options.sessionId)
   const projectTitle = toRef(options.projectTitle)
 
-  const backendType = computed(() => projectSessionBackendType(sessionId.value))
-  const backend = computed(() => backendForType(backendType.value))
+  /** Project sessions are local: their logs come from the local backend. */
+  function localBackend() {
+    const backend = backends.localBackend
+    if (backend == null) throw new Error('Cannot read the project logs: no local backend.')
+    return backend
+  }
 
   const logs = vueQuery.useInfiniteQuery({
     queryKey: [
@@ -35,11 +39,7 @@ export function useLogData(options: LogDataOptions) {
       { projectSessionId: sessionId.value, projectTitle: projectTitle.value, infinite: true },
     ],
     queryFn: ({ pageParam }) =>
-      backend.value.getProjectSessionLogs(
-        sessionId.value,
-        { scrollId: pageParam },
-        projectTitle.value,
-      ),
+      localBackend().getProjectSessionLogs(sessionId.value, { scrollId: pageParam }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => (page.hits.length === 0 ? null : page.scrollId),
   })
@@ -55,7 +55,7 @@ export function useLogData(options: LogDataOptions) {
       enabled: () => logs.hasNextPage.value && !logs.isFetchingNextPage.value,
     },
     download: {
-      action: () => backend.value.downloadProjectSessionLogs(sessionId.value),
+      action: () => localBackend().downloadProjectSessionLogs(sessionId.value),
     },
   }
   return {

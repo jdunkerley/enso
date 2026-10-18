@@ -1,8 +1,6 @@
 /**
- * @file Uploading files: the store of the uploads to the cloud in progress
- * ({@link useUploadsToCloudStore}), and {@link uploadFiles}, which uploads files the user picked
- * or dropped into a drive directory, on either backend. `uploadFiles` is framework-free (#192): its
- * caller gives it the drive's stores.
+ * @file {@link uploadFiles}, which uploads files the user picked or dropped into a drive
+ * directory. It is framework-free (#192): its caller gives it the drive's stores.
  */
 import type { ResolvedDuplication } from '$/components/Drive/duplicateAssets'
 import type { CategoryType } from '$/providers/category'
@@ -11,16 +9,11 @@ import {
   backendMutationOptions as backendMutationOptionsFor,
   executeMutation,
 } from '$/utils/backendQuery'
-import { ConditionVariable } from '$/utils/ConditionVariable'
 import type { DuplicationResolver } from '$/utils/driveMutations'
 import { ensureListDirectory } from '$/utils/driveQueries'
-import { backendMutationOptions } from '@/composables/backend'
 import type { QueryClient } from '@tanstack/query-core'
-import * as vueQuery from '@tanstack/vue-query'
-import { createGlobalState } from '@vueuse/core'
 import {
   AssetType,
-  BackendType,
   escapeSpecialCharacters,
   extractProjectExtension,
   fileIsProject,
@@ -29,116 +22,9 @@ import {
   type Backend,
   type DirectoryId,
   type FileId,
-  type HttpsUrl,
   type ProjectId,
-  type UploadedAsset,
   type UploadFileRequestParams,
 } from 'enso-common/src/services/Backend'
-import { reactive } from 'vue'
-import { useBackends } from './backends'
-import { useFeatureFlag } from './featureFlags'
-
-/** The delay, in milliseconds, before query data for a file being uploaded is cleared. */
-const CLEAR_PROGRESS_DELAY_MS = 5_000
-const RETRIES = 3
-
-export type UploadKind = 'requestedByUser' | 'hybridSync'
-
-export interface OngoingUpload {
-  kind?: UploadKind | undefined
-  sentBytes: number
-  totalBytes: number
-  finished: boolean
-  abortController: AbortController
-}
-
-export type UploadsToCloudStore = ReturnType<typeof createUploadsStore>
-
-/** Constructor of UploadsToCloudStore. see {@link useUploadsToCloudStore}  docs. */
-export function createUploadsStore(backend: Backend) {
-  const uploads = reactive(new Map<string, OngoingUpload>())
-  const chunkUploadPoolSize = useFeatureFlag('fileChunkUploadPoolSize')
-  let chunksBeingUploaded = 0
-  const chunkUploadCondVar = new ConditionVariable()
-
-  const uploadFileStart = vueQuery.useMutation(backendMutationOptions('uploadFileStart', backend))
-  const uploadFileChunk = vueQuery.useMutation(
-    backendMutationOptions('uploadFileChunk', backend, { retry: RETRIES }),
-  )
-  const uploadFileEnd = vueQuery.useMutation(
-    backendMutationOptions('uploadFileEnd', backend, { retry: RETRIES }),
-  )
-
-  async function uploadChunk(url: HttpsUrl, file: File, index: number, abort: AbortSignal) {
-    while (chunkUploadPoolSize.value > 0 && chunksBeingUploaded >= chunkUploadPoolSize.value) {
-      await chunkUploadCondVar.wait()
-      abort.throwIfAborted()
-    }
-    chunksBeingUploaded += 1
-    return uploadFileChunk.mutateAsync([url, file, index, abort]).finally(() => {
-      chunksBeingUploaded -= 1
-      chunkUploadCondVar.notifyOne()
-    })
-  }
-
-  async function uploadFile(file: File, params: UploadFileRequestParams, kind?: UploadKind) {
-    const abortController = new AbortController()
-    const { sourcePath, uploadId, presignedUrls } = await uploadFileStart.mutateAsync([
-      params,
-      file,
-      abortController.signal,
-    ])
-
-    const data: OngoingUpload = reactive({
-      kind,
-      sentBytes: 0,
-      totalBytes: file.size,
-      finished: false,
-      abortController,
-    })
-    uploads.set(uploadId, data)
-
-    const parts = await Promise.all(
-      presignedUrls.map((url, i) =>
-        uploadChunk(url, file, i, abortController.signal).then(({ part, size }) => {
-          data.sentBytes += size
-          return part
-        }),
-      ),
-    )
-    const result = await uploadFileEnd.mutateAsync([
-      {
-        parentDirectoryId: params.parentDirectoryId,
-        parts,
-        sourcePath: sourcePath,
-        uploadId: uploadId,
-        assetId: params.fileId,
-        fileName: params.fileName,
-      },
-      abortController.signal,
-    ])
-    data.finished = true
-    setTimeout(() => {
-      uploads.delete(uploadId)
-    }, CLEAR_PROGRESS_DELAY_MS)
-    return result
-  }
-
-  return { uploads, uploadFile }
-}
-
-/**
- * Uploads to Cloud Store.
- *
- * This store handles and keeps track of multipart file upload to Remote Backend.
- * The number of chunks uploaded at once is throttled by 'fileChunkUploadPoolSize'
- * feature flag. `uploads` map contains all uploads with their progress, including
- * the uploads finished no longer than {@link CLEAR_PROGRESS_DELAY_MS} ago.
- */
-export const useUploadsToCloudStore = createGlobalState(() => {
-  const { remoteBackend } = useBackends()
-  return createUploadsStore(remoteBackend)
-})
 
 /** What {@link uploadFiles} needs from the app. */
 export interface UploadFilesContext {
@@ -146,12 +32,6 @@ export interface UploadFilesContext {
   readonly backend: Backend
   /** The category of the target directory, whose listing gives the names already taken. */
   readonly category: CategoryType
-  /** The uploads store's `uploadFile`, used for the cloud. */
-  readonly uploadToCloud: (
-    file: File,
-    params: UploadFileRequestParams,
-    kind?: UploadKind,
-  ) => Promise<UploadedAsset>
   readonly resolveDuplications: DuplicationResolver
   /** Called with all the assets uploaded so far, after each upload: the drive selects them. */
   readonly onUploaded: (uploaded: readonly SelectedAssetInfo[]) => void
@@ -185,9 +65,7 @@ export async function uploadFiles(
 ) {
   const { queryClient, backend, category } = context
   const uploadFile = (file: File, params: UploadFileRequestParams) =>
-    backend.type === BackendType.local ?
-      uploadLocally(queryClient, backend, file, params)
-    : context.uploadToCloud(file, params, 'requestedByUser')
+    uploadLocally(queryClient, backend, file, params)
 
   const reversedFiles = Array.from(filesToUpload).reverse()
   const siblings = await ensureListDirectory(queryClient, backend, category, parentId)

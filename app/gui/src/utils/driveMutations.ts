@@ -84,41 +84,6 @@ export function deleteAssetsMutationOptions(backend: Backend | null) {
   })
 }
 
-export const RESTORE_ASSETS_MUTATION_METHOD = 'restoreAssets'
-
-/** A key for {@link restoreAssetsMutationOptions}. */
-export function restoreAssetsMutationKey(backendType: BackendType) {
-  return [backendType, RESTORE_ASSETS_MUTATION_METHOD]
-}
-
-/** The variables of {@link restoreAssetsMutationOptions}. */
-export interface RestoreAssetsVariables {
-  readonly ids: readonly AssetId[]
-  readonly parentId: DirectoryId | null
-}
-
-/** Call "restore" mutations for a list of assets. */
-export function restoreAssetsMutationOptions(backend: Backend) {
-  return defineMutationOptions({
-    mutationKey: restoreAssetsMutationKey(backend.type),
-    mutationFn: async ({ ids, parentId = null }: RestoreAssetsVariables) => {
-      const results = await Promise.allSettled(
-        ids.map((id) => backend.undoDeleteAsset(id, parentId)),
-      )
-      throwIfAnyFailed(results, ids.length)
-      return null
-    },
-    meta: {
-      invalidates: [
-        [backend.type, 'listDirectory'],
-        [backend.type, 'getAssetDetails'],
-      ],
-      awaitInvalidates: true,
-      refetchType: 'all',
-    },
-  })
-}
-
 export const COPY_ASSETS_MUTATION_METHOD = 'copyAssets'
 
 /** A key for {@link copyAssetsMutationOptions}. */
@@ -265,10 +230,7 @@ export function downloadAssetsMutationOptions(backend: Backend) {
       return null
     },
     meta: {
-      invalidates: [
-        [BackendType.remote, 'listDirectory'],
-        [BackendType.local, 'listDirectory'],
-      ],
+      invalidates: [[BackendType.local, 'listDirectory']],
       awaitInvalidates: true,
     },
   })
