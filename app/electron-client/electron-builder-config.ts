@@ -121,6 +121,13 @@ function isMacSigned(passedArgs: Arguments) {
   return passedArgs.sign && process.env.CSC_LINK != null && process.env.CSC_LINK !== ''
 }
 
+/** Whether a Windows signing certificate is configured (`WIN_CSC_LINK`, or `CSC_LINK` for all). */
+function hasWindowsCertificate() {
+  return [process.env.WIN_CSC_LINK, process.env.CSC_LINK].some(
+    (link) => link != null && link !== '',
+  )
+}
+
 /** Based on the given arguments, creates a configuration for the Electron Builder. */
 export function createElectronBuilderConfig(passedArgs: Arguments): electronBuilder.Configuration {
   // Electron Builder validates the *whole* configuration object, not just the platform it is
@@ -171,8 +178,10 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       // almost zero.
       target: targetFor('win', 'nsis'),
       icon: `./assets/icons/icon.ico`,
-      // With a signing certificate, `electron-updater` refuses an update signed by anyone else.
-      ...(process.env.ENSO_BUILD_WIN_PUBLISHER_NAME ?
+      // electron-builder writes `publisherName` into `app-update.yml`, and `electron-updater` then
+      // refuses any update not signed by that publisher. An unsigned build would therefore reject
+      // every update, so the name is set only when a Windows certificate is configured.
+      ...(process.env.ENSO_BUILD_WIN_PUBLISHER_NAME && hasWindowsCertificate() ?
         { signtoolOptions: { publisherName: process.env.ENSO_BUILD_WIN_PUBLISHER_NAME } }
       : {}),
     },
