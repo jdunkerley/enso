@@ -43,6 +43,9 @@ function ipWithSocketToAddress(ipWithSocket: IpWithSocket) {
 export const DIRECTORY_ID_PREFIX = `${backend.AssetType.directory}-`
 export const PROJECT_ID_PREFIX = `${backend.AssetType.project}-`
 export const FILE_ID_PREFIX = `${backend.AssetType.file}-`
+export const DATALINK_ID_PREFIX = `${backend.AssetType.datalink}-`
+/** The extension of a local datalink file (compared case-sensitively, as the standard library does). */
+export const DATALINK_EXTENSION = '.datalink'
 
 /** Create a {@link backend.DirectoryId} from a path. */
 export function newDirectoryId(path: Path) {
@@ -71,6 +74,26 @@ export function isLocalProjectId(projectId: backend.ProjectId): boolean {
 /** Create a {@link backend.FileId} from a path. */
 export function newFileId(path: Path) {
   return backend.FileId(`${FILE_ID_PREFIX}${encodeURIComponent(path)}`)
+}
+
+/** Create a {@link backend.DatalinkId} from the path of a `.datalink` file. */
+export function newDatalinkId(path: Path) {
+  return backend.DatalinkId(`${DATALINK_ID_PREFIX}${encodeURIComponent(path)}`)
+}
+
+/**
+ * A datalink's file name: the title and `.datalink`, once (a title that already ends in the
+ * extension is not given it twice).
+ * @throws {Error} when the title contains a path separator.
+ */
+function datalinkFileName(title: string) {
+  if (/[/\\]/.test(title)) throw new Error("A datalink's name cannot contain '/' or '\\'.")
+  return title.endsWith(DATALINK_EXTENSION) ? title : `${title}${DATALINK_EXTENSION}`
+}
+
+/** A datalink's title: its file name without `.datalink`, as the cloud titled datalinks. */
+function datalinkTitle(path: Path) {
+  return getFileName(path).slice(0, -DATALINK_EXTENSION.length)
 }
 
 /**
@@ -219,6 +242,17 @@ export class LocalBackend extends backend.Backend {
                 parentId,
                 extension: fileExtension(entry.path),
               } satisfies backend.FileAsset
+            }
+            case 'DatalinkEntry': {
+              return {
+                ...shared,
+                type: backend.AssetType.datalink,
+                id: newDatalinkId(entry.path),
+                title: datalinkTitle(entry.path),
+                modifiedAt: entry.attributes.lastModifiedTime,
+                createdAt: entry.attributes.creationTime,
+                parentId,
+              } satisfies backend.DatalinkAsset
             }
           }
         }),
@@ -632,6 +666,10 @@ export class LocalBackend extends backend.Backend {
         await this.projectManager.deleteFile(path)
         return
       }
+      case backend.AssetType.datalink: {
+        await this.projectManager.deleteDatalink(path)
+        return
+      }
       case backend.AssetType.project: {
         try {
           await this.projectManager.deleteProject({ projectPath: path })
@@ -824,7 +862,10 @@ export class LocalBackend extends backend.Backend {
     const currentParentDirectoryPath = path
 
     const newParentDirectoryPath = (() => {
-      const fileName = title == null ? getFileName(currentParentDirectoryPath) : title
+      const fileName =
+        title == null ? getFileName(currentParentDirectoryPath)
+        : type === backend.AssetType.datalink ? datalinkFileName(title)
+        : title
 
       if (parentDirectoryId == null) {
         return joinPath(
@@ -1028,7 +1069,20 @@ export class LocalBackend extends backend.Backend {
         })
         break
       }
-      case backend.AssetType.datalink:
+      case backend.AssetType.datalink: {
+        // A local datalink is a file: download the file itself, byte for byte.
+        const { path } = backend.extractTypeAndPath(asset.id)
+        const details = await this.getFileDetails(newFileId(path), title, true)
+        if (details.url == null) {
+          throw new Error('The download URL of the datalink must be present.')
+        }
+        await this.downloader({
+          url: details.url,
+          name: details.file.fileName ?? `${title}${DATALINK_EXTENSION}`,
+          electronOptions: { path: targetPath, showFileDialog: true },
+        })
+        break
+      }
       case backend.AssetType.secret:
       case backend.AssetType.directory: {
         throw new Error(`'${asset.type}' assets cannot be downloaded.`)
@@ -1217,19 +1271,47 @@ export class LocalBackend extends backend.Backend {
     return this.invalidOperation()
   }
 
-  /** Invalid operation. */
-  override createDatalink() {
-    return this.invalidOperation()
+  /**
+   * Create `<parent>/<name>.datalink`, or, with `body.datalinkId`, replace that datalink's content
+   * (the cloud's "new version"; a local datalink has no versions).
+   * @throws {Error} when the name contains a path separator, or the shim refuses the write.
+   */
+  override async createDatalink(
+    body: backend.CreateDatalinkRequestBody,
+  ): Promise<backend.DatalinkInfo> {
+    if (body.datalinkId != null) {
+      await this.projectManager.updateDatalink(
+        backend.extractTypeAndPath(body.datalinkId).path,
+        body.value,
+      )
+      return { id: body.datalinkId }
+    }
+    const parentPath =
+      body.parentDirectoryId == null ?
+        this.projectManager.rootDirectory
+      : backend.extractTypeAndPath(body.parentDirectoryId).path
+    const path = joinPath(parentPath, datalinkFileName(body.name))
+    await this.projectManager.createDatalink(path, body.value)
+    return { id: newDatalinkId(path) }
   }
 
-  /** Invalid operation. */
-  override getDatalink() {
-    return this.invalidOperation()
+  /** The datalink file's JSON. */
+  override async getDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<backend.Datalink> {
+    // A `Datalink` is opaque JSON; the editor validates it.
+    return (await this.projectManager.readDatalink(
+      backend.extractTypeAndPath(datalinkId).path,
+    )) as backend.Datalink
   }
 
-  /** Invalid operation. */
-  override deleteDatalink() {
-    return this.invalidOperation()
+  /** Delete the datalink file. */
+  override async deleteDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<void> {
+    await this.projectManager.deleteDatalink(backend.extractTypeAndPath(datalinkId).path)
   }
 
   /** Invalid operation. */

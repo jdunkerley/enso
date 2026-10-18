@@ -10,6 +10,7 @@ import * as path from 'node:path'
 
 import {
   AssetType,
+  DatalinkId,
   DirectoryId,
   EnsoPath,
   extractTypeAndPath,
@@ -472,7 +473,7 @@ function apiArchiveStream(assets: readonly AssetId[]) {
     await archive.addFile(tarFsPack(assetPath).pipe(createGzip()), { name: pathInArchive })
   }
 
-  const addFile = async (id: FileId, rootPath?: string) => {
+  const addFile = async (id: FileId | DatalinkId, rootPath?: string) => {
     const assetPath = extractTypeAndPath(id).path
     rootPath ??= path.dirname(assetPath)
     const pathInArchive = path.relative(rootPath, assetPath)
@@ -520,11 +521,16 @@ function apiArchiveStream(assets: readonly AssetId[]) {
         }
         break
       }
-      // These asset types are not present on the Local Backend,
-      // however include them to force any newly added asset types to be handled
-      // (by causing a non-exhaustiveness error).
-      case AssetType.secret:
+      // A local datalink is a `.datalink` file.
       case AssetType.datalink: {
+        const error = await addFile(typeAndId.id, rootPath)
+        if (error) {
+          return error
+        }
+        break
+      }
+      // Secrets are not present on the Local Backend; listed to keep the switch exhaustive.
+      case AssetType.secret: {
         return
       }
     }

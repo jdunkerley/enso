@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * @file The drive's toolbar: the buttons creating assets (a project, a folder), uploading and
- * downloading, the count of cut or copied assets, and the search bar. In the trash, a button
- * emptying it; in Recent, only the count and the search bar.
+ * @file The drive's toolbar: the buttons creating assets (a project, a folder, a datalink, which
+ * opens the datalink dialog on the modal stack), uploading and downloading, the count of cut or
+ * copied assets, and the search bar. In the trash, a button emptying it; in Recent, only the count
+ * and the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
+import { useNewDatalink } from '#/layouts/Drive/datalinkActions'
 import {
   useExportArchive,
   useMutationCallback,
@@ -30,7 +32,7 @@ import { getAllTrashedItems, listDirectoryQueryOptions } from '$/utils/driveQuer
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { BackendType, isDirectoryId, isProjectId } from 'enso-common/src/services/Backend'
 import { readUserSelectedFile } from 'enso-common/src/utilities/file'
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import PasteStatus from './PasteStatus.vue'
 
 const { query, setQuery } = defineProps<{
@@ -78,6 +80,16 @@ const newFolder = useNewFolder(backend, () => category.value.type, driveStore)
 const uploadFiles = useUploadFiles(backend, () => category.value.type, driveStore)
 const newProjectRaw = useNewProject(backend, () => category.value.type)
 const exportArchive = useExportArchive(backend, driveStore)
+const newDatalink = useNewDatalink(backend, () => category.value.type, driveStore)
+/** Key of the datalink dialog this button opened on the modal stack, for its `aria-expanded`. */
+const openedDatalinkModal = shallowRef<number>()
+const isDatalinkModalOpen = computed(() => {
+  const key = openedDatalinkModal.value
+  return key != null && modals.stack.value.some((entry) => entry.key === key)
+})
+function openNewDatalink() {
+  openedDatalinkModal.value = newDatalink(currentDirectoryId.value).key
+}
 const newProject = useMutationCallback({
   mutationKey: ['newProject'],
   mutationFn: async () => await newProjectRaw({}, currentDirectoryId.value),
@@ -188,6 +200,14 @@ function openClearTrash() {
           icon="folder_add"
           :aria-label="getText('newFolder')"
           @press="() => newFolder(currentDirectoryId)"
+        />
+        <Button
+          variant="icon"
+          size="medium"
+          icon="connector_add"
+          :aria-expanded="isDatalinkModalOpen"
+          :aria-label="getText('newDatalink')"
+          @press="openNewDatalink"
         />
       </div>
       <div

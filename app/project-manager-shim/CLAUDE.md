@@ -300,3 +300,26 @@ stays staged).
   `Saved before restore` commit) still has everything. Any restore that fails
   after that commit says so:
   `Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (<git's message>)`.
+
+## Local datalinks (`src/datalinks.ts`)
+
+A datalink is a `<name>.datalink` file holding the datalink's JSON, the format
+the standard library reads with `Data.read`. The extension is exact and
+case-sensitive, as the standard library's `data_link_extension`. A directory
+listing reports such a file as a `DatalinkEntry` without parsing it, so a file
+that is not valid JSON is still listed; reading it reports the problem.
+
+- Routes (POST to `/api/project-service/datalink/*`, served by
+  `handler/projectService.ts`): `read` `{ path }` returns the JSON; `create`
+  `{ path, value }`, `update` `{ path, value }` and `delete` `{ path }` return
+  `null`. Failures are JSON-RPC errors `datalink/<op> failed: <message>`.
+- Paths must be absolute, already normalised (no `.`/`..` segments) and name a
+  `.datalink` file; anything else is refused. Datalinks live in any folder, so
+  there is no root to confine them to.
+- Writes are `writeJsonAtomic` under `serialised`. `create` is exclusive
+  (`writeJsonExclusive`: the temporary file is hard-linked into place, which
+  fails on an existing file or a dangling symlink; on a file system without hard
+  links it falls back to a `wx` write) and refuses a missing folder; `update`
+  refuses a missing file, `delete` anything but a file; `read` of a missing file
+  says `Datalink not found`. Values must be JSON objects. Schema validation is
+  the GUI's.

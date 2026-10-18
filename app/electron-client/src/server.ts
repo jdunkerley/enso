@@ -36,6 +36,7 @@ import {
   type AnyAsset,
   AssetId,
   AssetType,
+  DatalinkId,
   type DirectoryAsset,
   DirectoryId,
   EnsoPath,
@@ -113,6 +114,7 @@ interface AssetTypeAndIdRaw<Type extends AssetType> {
 type AssetTypeAndId<Id extends AssetId = AssetId> =
   | (DirectoryId extends Id ? AssetTypeAndIdRaw<AssetType.directory> : never)
   | (FileId extends Id ? AssetTypeAndIdRaw<AssetType.file> : never)
+  | (DatalinkId extends Id ? AssetTypeAndIdRaw<AssetType.datalink> : never)
   | (ProjectId extends Id ? AssetTypeAndIdRaw<AssetType.project> : never)
 
 export function extractTypeAndPath<Id extends AssetId>(id: Id): AssetTypeAndId<Id>
@@ -126,6 +128,7 @@ export function extractTypeAndPath<Id extends AssetId>(id: Id): AssetTypeAndId {
   switch (typeRaw) {
     case AssetType.directory:
     case AssetType.project:
+    case AssetType.datalink:
     case AssetType.file: {
       return {
         type: typeRaw,
@@ -749,7 +752,7 @@ export class Server {
       await archive.addFile(tarFsPack(assetPath).pipe(createGzip()), { name: pathInArchive })
     }
 
-    const addFile = async (id: FileId, rootPath?: string) => {
+    const addFile = async (id: FileId | DatalinkId, rootPath?: string) => {
       const assetPath = extractTypeAndPath(id).path
       rootPath ??= path.dirname(assetPath)
       const pathInArchive = path.relative(rootPath, assetPath)
@@ -797,11 +800,16 @@ export class Server {
           }
           break
         }
-        // These asset types are not present on the Local Backend,
-        // however include them to force any newly added asset types to be handled
-        // (by causing a non-exhaustiveness error).
-        case AssetType.secret:
+        // A local datalink is a `.datalink` file.
         case AssetType.datalink: {
+          const error = await addFile(typeAndId.id, rootPath)
+          if (error) {
+            return error
+          }
+          break
+        }
+        // Secrets are not present on the Local Backend; listed to keep the switch exhaustive.
+        case AssetType.secret: {
           return
         }
       }

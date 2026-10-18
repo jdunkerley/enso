@@ -175,6 +175,10 @@
   straight into the local drive, with no cloud categories, sign-in, or sign-out.
   Map visualizations now use your own Mapbox access token, which you set in
   Settings → Local → Maps.
+- [Datalinks are now a local feature][246]. You can create and edit `.datalink`
+  files in your own folders (the same files `Data.read` opens) from the drive's
+  New Datalink button and context menu, and pick them in the graph editor's file
+  widget.
 
 #### Enso Language & Runtime
 
@@ -317,6 +321,7 @@
 [234]: https://github.com/jdunkerley/enso/pull/234
 [235]: https://github.com/jdunkerley/enso/pull/235
 [243]: https://github.com/jdunkerley/enso/pull/243
+[246]: https://github.com/jdunkerley/enso/pull/246
 [66]: https://github.com/jdunkerley/enso/pull/66
 [65]: https://github.com/jdunkerley/enso/pull/65
 [64]: https://github.com/jdunkerley/enso/pull/64

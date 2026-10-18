@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * @file The name cell of a datalink: its icon, and its name, which turns into a form while it is
- * renamed. A double click opens the asset panel's Properties tab. Its name, unlike the other
+ * renamed. A double click opens it in the datalink dialog. Its name, unlike the other
  * cells', has no `asset-row-name` test id (kept as it was).
  */
+import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
+import { useDriveView } from '#/layouts/Drive/driveView'
 import Icon from '$/components/Icon/Icon.vue'
 import EditableSpan from '$/components/EditableSpan/EditableSpan.vue'
-import { useRightPanelData } from '$/providers/rightPanel'
 import { isDoubleClick } from '$/utils/event'
 import type { DatalinkAsset } from 'enso-common/src/services/Backend'
 import { useNameCell } from './nameColumn'
@@ -16,7 +17,8 @@ const { item, isEditable } = defineProps<{
   isEditable: boolean
 }>()
 
-const rightPanel = useRightPanelData()
+const driveView = useDriveView()
+const editDatalink = useEditDatalink(() => driveView.location.backend)
 const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
   () => item,
   () => isEditable,
@@ -29,7 +31,7 @@ function onKeyDown(event: KeyboardEvent) {
 function onClick(event: MouseEvent) {
   if (isDoubleClick(event)) {
     event.stopPropagation()
-    rightPanel.setTemporaryTab('settings')
+    void editDatalink(item)
   }
 }
 </script>
