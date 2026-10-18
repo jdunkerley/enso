@@ -19,14 +19,15 @@ if ($process.ExitCode -ne 0) { throw "The installer exited with $($process.ExitC
 
 $entry = Get-EnsoUninstallEntry
 if ($null -eq $entry) { throw 'The installer wrote no uninstall entry.' }
-$exe = Join-Path $entry.InstallLocation 'Enso.exe'
+# NSIS writes no InstallLocation to the uninstall key; DisplayIcon is `<dir>\Enso.exe,0`.
+$exe = $entry.DisplayIcon -replace ',\d+$', ''
 if (-not (Test-Path $exe)) { throw "Enso.exe is missing: $exe" }
 
 Write-Host "Starting $exe"
 $app = Start-Process $exe -PassThru
 Start-Sleep -Seconds 20
 if ($app.HasExited) { throw "Enso exited during start-up with $($app.ExitCode)." }
-Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "$($entry.InstallLocation)*" } |
+Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -like "$(Split-Path $exe)*" } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 Write-Host "Uninstalling: $($entry.QuietUninstallString)"
