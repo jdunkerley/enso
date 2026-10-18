@@ -219,6 +219,7 @@ test.describe(() => {
   test('edit name (empty name)', async ({ drivePage, page }) => {
     await drivePage.goToCategory.local().driveTable.withRows(async (rows) => {
       const row = rows.nth(0)
+      const originalName = (await locateAssetRowName(row).innerText()).trim()
       await locateAssetRowName(row).click()
 
       const nameEl = locateAssetRowName(row)
@@ -246,8 +247,14 @@ test.describe(() => {
       await locateEditingTick(row).click()
 
       // The rename changes the row's place in the list (all the rows have the same date), so find
-      // it by name.
+      // it by name: the edited row is the renamed one when its old name is gone, and the new one
+      // is there exactly once.
       await expect(rows.filter({ hasText: /^Another Project/ })).toHaveCount(1)
+      await expect(
+        rows.filter({
+          has: page.getByTestId('asset-row-name').getByText(originalName, { exact: true }),
+        }),
+      ).toHaveCount(0)
       await expect(errorOutline).not.toBeAttached()
       await expect(errorContainer).not.toBeAttached()
     })

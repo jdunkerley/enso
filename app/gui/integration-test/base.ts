@@ -1,22 +1,22 @@
 import type { FeatureFlags } from '$/providers/featureFlags'
 import { UUID } from 'enso-common/src/services/Backend'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
-import { test as base, expect as baseExpect, type Locator } from 'playwright/test'
-import type DrivePageActions from './actions/DrivePageActions'
+import { test as base, expect as baseExpect, type Locator, type Page } from 'playwright/test'
+import DrivePageActions from './actions/DrivePageActions'
 import type EditorPageActions from './actions/EditorPageActions'
-import LoginPageActions from './actions/LoginPageActions'
-import { mockCloudApi, type MockCloudApi } from './mock/cloudApi'
 import { mockLocalApi, type MockLocalApi } from './mock/localApi'
 import { recordCloudRequests, registerMocks } from './mock/registerMocks'
 
 export type * from 'playwright/test'
 
-/**
- * The reason every skipped cloud-only test gives (`test.skip(true, CLOUD_ONLY)`). Each skip goes when
- * its test is ported to the local mock or deleted, and this with the last of them.
- */
-export const CLOUD_ONLY =
-  'Cloud-only: the IDE is local-only since PR 1 of docs/superpowers/specs/2026-10-17-local-only-ide-design.md; PR 4 deletes or ports this test.'
+/** Wait for the app to load: no loading screen, and the drive (or a project) on screen. */
+export async function waitForAppLoaded(page: Page) {
+  await page.waitForLoadState()
+  await baseExpect(page.getByTestId('loading-screen')).toHaveCount(0, { timeout: 30_000 })
+  await baseExpect(
+    page.getByTestId('drive-view').or(page.locator('.ProjectView')).first(),
+  ).toBeVisible({ timeout: 30_000 })
+}
 
 /**
  * The `$config` the page should boot with, injected before any app script runs. Supplied by
@@ -43,7 +43,6 @@ export const test = base.extend<{
   aiAvailable: boolean
   appConfig: AppConfig
   setupApi: {
-    cloud?: (api: MockCloudApi) => void
     local?: (api: MockLocalApi) => void
     addDefaultProject?: boolean
   }
@@ -52,9 +51,7 @@ export const test = base.extend<{
    * each is aborted unless a later route answers it, and a test that leaves one recorded fails.
    */
   cloudRequests: string[]
-  cloudApi: MockCloudApi
   localApi: MockLocalApi
-  loginPage: LoginPageActions
   drivePage: DrivePageActions
   editorPage: EditorPageActions
 }>({
@@ -70,11 +67,6 @@ export const test = base.extend<{
     },
     { auto: true },
   ],
-  cloudApi: async ({ page, setupApi }, use) => {
-    const api = await mockCloudApi(page)
-    setupApi.cloud?.(api)
-    return use(api)
-  },
   localApi: async ({ page, setupApi }, use) => {
     const api = await mockLocalApi(page)
     if (setupApi?.addDefaultProject ?? true) {
@@ -91,18 +83,14 @@ export const test = base.extend<{
     setupApi.local?.(api)
     return use(api)
   },
-  loginPage: async ({ page, cloudApi, localApi, featureFlags, aiAvailable, appConfig }, use) => {
-    // Only make sure that API mocks are registered, do not actually use the values
-    const _ = { cloudApi, localApi }
+  drivePage: async ({ page, localApi, featureFlags, aiAvailable, appConfig }, use) => {
+    // Only make sure that the local API mock is registered; the spec uses it through `localApi`.
+    const _ = { localApi }
     await registerMocks(page, featureFlags, { aiAvailable, appConfig })
-
-    const loginPage = new LoginPageActions(page, {}).do(async () => {
-      await page.goto('/')
-    })
-    await use(await loginPage)
-    return
+    await page.goto('/')
+    await waitForAppLoaded(page)
+    await use(new DrivePageActions(page, {}))
   },
-  drivePage: async ({ loginPage }, use) => await use(await loginPage.loginIfNeeded()),
 
   editorPage: async ({ drivePage }, use) => {
     const editorPage = drivePage.driveTable

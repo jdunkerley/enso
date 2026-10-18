@@ -17,7 +17,7 @@ test('"Label" in the context menu opens the popover under the row', async ({
     .do(async (page) => {
       const popover = page.getByRole('dialog').filter({ hasText: LABEL_NAME })
       await expect(popover).toBeVisible()
-      const row = page.getByTestId('asset-row').first()
+      const row = page.getByTestId('asset-row').filter({ hasText: 'Mock Project' })
       const rowBox = (await row.boundingBox())!
       // Once its entry animation has settled.
       await expect
@@ -31,6 +31,6 @@ test('"Label" in the context menu opens the popover under the row', async ({
     .press('Escape')
     .do(async (page) => {
       await expect(page.getByRole('dialog')).toHaveCount(0)
-      await expect(page.getByTestId('asset-row').first()).toBeFocused()
+      await expect(page.getByTestId('asset-row').filter({ hasText: 'Mock Project' })).toBeFocused()
     })
 })

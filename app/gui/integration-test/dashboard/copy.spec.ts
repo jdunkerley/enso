@@ -23,7 +23,7 @@ test('move', async ({ drivePage }) => {
     })
 })
 
-test.describe('move (drag)', () => {
+test.describe(() => {
   // Added before the app loads: a change made once it has loaded is not listed.
   test.use({
     setupApi: {

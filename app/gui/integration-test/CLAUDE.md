@@ -14,11 +14,10 @@ file; add it to `tsconfig.node.json`'s `include` list (see the gotcha in
 - `project-view/` — ProjectView feature flows (create nodes, connect edges, open
   visualization).
 - `actions/` — Reusable test actions (page-object-style helpers).
-- `mock/` — Mocks for the backend, Cognito, feature flags. Dashboard tests run
-  against these by default.
-- `base.ts` — Playwright base test fixture (provides auth'd page, mocked env,
-  debug logging).
-- `setup.ts` — Global setup (port finders, temp dirs).
+- `mock/` — Mocks for the local project manager, versioning, feature flags.
+  Dashboard tests run against these by default.
+- `base.ts` — Playwright base test fixture (provides the loaded drive page,
+  mocked env, debug logging).
 
 ## Run
 
@@ -29,9 +28,8 @@ pnpm test-dev:integration      # UI mode
 ```
 
 Single projects:
-`corepack pnpm exec cross-env NODE_ENV=production playwright test --project=Setup`
-(or `--project="Integration Tests"`). `PROD=true` builds and previews instead of
-running the dev server.
+`corepack pnpm exec cross-env NODE_ENV=production playwright test --project="Integration Tests"`.
+`PROD=true` builds and previews instead of running the dev server.
 
 ### On native Windows
 
@@ -117,13 +115,9 @@ in both modes. Anything else runs once, unlicensed.
 - **The app under test also imports the workspace packages' `dist/`**, so a
   reused worktree or clone keeps running the old shared code after a merge or
   checkout. A missing export then stops the app on "Loading Enso..." and every
-  spec times out waiting for `before-auth-layout`/`after-auth-layout`; the
-  trace's console shows `does not provide an export named …`. Run
+  spec times out waiting for the drive; the trace's console shows
+  `does not provide an export named …`. Run
   `corepack pnpm -r --if-present run compile` before trusting a local run.
-- **The mocked Cognito can ask for a one-time code.** With `mock_totp_code` set
-  in `localStorage`, a password sign-in stops at the code step, and that value
-  is the right code; any other fails as Amplify 6 fails it
-  (`CodeMismatchException`, by `name`). See `loginScreen.spec.ts`.
 - CI runs with a matrix of {dashboard, project-view} × {chromium}. Don't add
   cross-suite test IDs — they must stay independent.
 

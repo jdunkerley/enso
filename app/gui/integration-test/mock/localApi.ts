@@ -235,12 +235,15 @@ export async function mockLocalApi(page: Page) {
     attributes?: Partial<Attributes>
   }
 
-  const createProject = (options: ProjectEntryOptions): ProjectEntryWithData => {
-    const normalizedName = options.metadata.name
+  const normalizeProjectName = (name: string) =>
+    name
       .split(' ')
       .filter((n) => n.length)
       .map((part) => capitalizeFirst(part))
       .join('_')
+
+  const createProject = (options: ProjectEntryOptions): ProjectEntryWithData => {
+    const normalizedName = normalizeProjectName(options.metadata.name)
     return {
       type: 'ProjectEntry',
       entry: {
@@ -336,6 +339,12 @@ export async function mockLocalApi(page: Page) {
     })
     return path
   }
+
+  /** Whether some project already has the name (the shim's `ProjectRepository.exists`). */
+  const projectNameTaken = (name: string) =>
+    [...fileSystem.values()].some(
+      (entry) => entry.type === 'ProjectEntry' && entry.entry.metadata.name === name,
+    )
 
   /** Add a project under the root, by title; returns its directory. */
   const addRootProject = (
@@ -448,8 +457,14 @@ export async function mockLocalApi(page: Page) {
           body: JSON.stringify(toJSONRPCError('Project not found')),
         })
       }
-      // The shim's naming (`getNameForDuplicatedProject`).
-      const name = ProjectName(`${original.entry.metadata.name} (copy)`)
+      // The shim's naming (`getNameForDuplicatedProject`), made unique as `getNameForNewProject`
+      // does: a clash gets `_1`, `_2`, ... after it.
+      const suggestedName = `${original.entry.metadata.name} (copy)`
+      let suffix = 0
+      while (projectNameTaken(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`)) {
+        suffix += 1
+      }
+      const name = ProjectName(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`)
       const path = Path(`${parentPath}/${name}`)
       const id = UUID(uuidv4())
       addProject({
@@ -556,13 +571,43 @@ export async function mockLocalApi(page: Page) {
       recentPathDeleted(project.entry.path)
       return toJSONRPCResult(null)
     })
-    // Like the shim, this changes the name only: the project stays in its directory.
+    // Like the shim's `renameProject`: the name must not be empty or taken; the project's directory
+    // is renamed after it, unless the project is running (the shim defers that until it stops, and
+    // the mock leaves it where it is).
     await projectServiceRoute('project/rename', (params) => {
       const project = findProject(params)
       if (project == null) {
         return toJSONRPCError('Project not found')
       }
-      unsafeMutable(project.entry.metadata).name = ProjectName(String(params.name))
+      const name = String(params.name)
+      if (name.trim().length === 0) {
+        return toJSONRPCError('Project name cannot be empty.')
+      }
+      if (projectNameTaken(name)) {
+        return toJSONRPCError(`Project with name '${name}' already exists.`)
+      }
+      const oldPath = project.entry.path
+      unsafeMutable(project.entry.metadata).name = ProjectName(name)
+      unsafeMutable(project.metadata).projectName = ProjectName(name)
+      if (!openProjects.has(project.entry.metadata.id)) {
+        const normalizedName = normalizeProjectName(name)
+        unsafeMutable(project.metadata).projectNormalizedName = normalizedName
+        const parent = getDirectoryAndName(oldPath).directoryPath
+        let newPath = Path(`${parent}/${normalizedName}`)
+        for (let suffix = 1; fileSystem.has(newPath); suffix += 1) {
+          newPath = Path(`${parent}/${normalizedName}_${suffix}`)
+        }
+        // The project's sources are entries of their own, which follow it.
+        const descendants = [...fileSystem.keys()]
+          .filter((path) => path.startsWith(`${oldPath}/`))
+          .map(Path)
+          .sort((a, b) => a.length - b.length)
+        moveEntry(oldPath, newPath)
+        for (const path of descendants) {
+          moveEntry(path, Path(`${newPath}${path.slice(oldPath.length)}`))
+        }
+        recentPathMoved(oldPath, newPath)
+      }
       return toJSONRPCResult(null)
     })
     await projectServiceRoute('labels/list', () => toJSONRPCResult(labels))

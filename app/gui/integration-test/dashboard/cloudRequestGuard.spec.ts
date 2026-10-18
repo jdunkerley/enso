@@ -2,9 +2,8 @@
 import { expect, test } from 'integration-test/base'
 import { registerMocks } from 'integration-test/mock/registerMocks'
 
-// Not `drivePage`: until Task 43 that fixture goes through `loginPage` and the cloud mock
-// (`cloudApi`), whose `https://mock` routes are registered after this auto fixture and so would
-// answer first. Only the local mock is registered here, as in `localOnly.spec.ts`.
+// Not `drivePage`: it would load the app, and this spec registers the mocks by hand to make its
+// own request. Only the local mock is registered here, as in `localOnly.spec.ts`.
 test('a request to Enso Cloud is blocked and recorded', async ({
   page,
   localApi,

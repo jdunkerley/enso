@@ -65,10 +65,8 @@ decisions are under "Rulings from #89" and "Rulings from #183" in
 - `__tests__/ProjectExecutionsCalendar.test.ts` covers the Schedule tab. It
   registers the `preferredTimeZone` local-storage key, which `App.vue` registers
   in the app.
-- The mocked cloud API (`integration-test/mock/cloudApi.ts`) has no versions or
-  executions endpoints, so the cloud's tabs have no Playwright spec. The local
-  Versions tab is covered by `integration-test/dashboard/localVersions.spec.ts`,
-  against the mocked `versioning/*` routes
-  (`integration-test/mock/versioning/historyRoutes.ts`).
+- The local Versions tab is covered by
+  `integration-test/dashboard/localVersions.spec.ts`, against the mocked
+  `versioning/*` routes (`integration-test/mock/versioning/historyRoutes.ts`).
 - Follow-up (PR 6): the tab now serves the core (the local drive) too, so it
   should move out of `cloud/`.
