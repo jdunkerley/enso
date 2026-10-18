@@ -29,6 +29,10 @@ vi.mock('$/utils/github', () => ({
   getDownloadUrl: () => getDownloadUrl(),
   RELEASES_REPOSITORY: 'jdunkerley/enso',
 }))
+const openInNewBrowserTab = vi.fn()
+vi.mock('$/utils/window', () => ({
+  openInNewBrowserTab: (url: unknown) => openInNewBrowserTab(url),
+}))
 const download = vi.fn(async () => {})
 vi.mock('$/utils/download', () => ({ download: (options: unknown) => download(options) }))
 
@@ -150,6 +154,85 @@ describe('automatic updates', () => {
     })
     await vi.waitFor(() => expect(button(getText('retry'))).not.toBeUndefined())
     expect(button(getText('downloadManually'))).not.toBeUndefined()
+  })
+})
+
+describe('automatic updates, in more detail', () => {
+  afterEach(() => Reflect.deleteProperty(window, 'api'))
+  const available = (version: string): UpdateStatus => ({
+    state: 'available',
+    version,
+    releaseDate: '2026-11-01',
+  })
+
+  test('nothing downloads before the Update click', async () => {
+    const updater = fakeUpdater(available('2026.2.0'))
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(updater.download).not.toHaveBeenCalled()
+  })
+
+  test('Later hides the dialog; a newer version shows it again', async () => {
+    const updater = fakeUpdater(available('2026.2.0'))
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    await userEvent.setup().click(button(getText('remindMeLater'))!)
+    await vi.waitFor(() => expect(dialog()).toBeNull())
+    const emit = updater.onStatus.mock.calls[0]![0]
+    emit(available('2026.2.0'))
+    await flushPromises()
+    expect(dialog()).toBeNull()
+    emit(available('2026.3.0'))
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(dialog()!.textContent).toContain('2026.3.0')
+  })
+
+  test('closing during the download reopens when it is ready', async () => {
+    const updater = fakeUpdater({ state: 'downloading', version: '2026.2.0', percent: 10 })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    await userEvent
+      .setup()
+      .click(dialog()!.querySelector<HTMLElement>('button[aria-label="Close"]')!)
+    await vi.waitFor(() => expect(dialog()).toBeNull())
+    updater.onStatus.mock.calls[0]![0]({ state: 'downloading', version: '2026.2.0', percent: 60 })
+    await flushPromises()
+    expect(dialog()).toBeNull()
+    updater.onStatus.mock.calls[0]![0]({ state: 'ready', version: '2026.2.0' })
+    await vi.waitFor(() => expect(button(getText('restartToUpdate'))).not.toBeUndefined())
+  })
+
+  test('Download manually opens the release page of the failed version', async () => {
+    fakeUpdater({ state: 'error', message: 'offline', version: '2026.2.0' })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    await userEvent.setup().click(button(getText('downloadManually'))!)
+    expect(openInNewBrowserTab).toHaveBeenCalledWith(
+      'https://github.com/jdunkerley/enso/releases/tag/2026.2.0',
+    )
+    expect(getLatestRelease).not.toHaveBeenCalled()
+    expect(getDownloadUrl).not.toHaveBeenCalled()
+  })
+
+  test('an empty release date shows no parentheses', async () => {
+    fakeUpdater({ state: 'available', version: '2026.2.0', releaseDate: '' })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(dialog()!.textContent).toContain('2026.2.0')
+    expect(dialog()!.textContent).not.toContain('()')
+  })
+
+  test('manual mode with an updater present uses the download link', async () => {
+    const updater = fakeUpdater(available('2026.2.0'))
+    updater.mode.mockImplementation(async () => 'manual' as never)
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(updater.check).not.toHaveBeenCalled()
+    expect(dialog()!.textContent).toContain('2099.1.1')
+    await userEvent.setup().click(button(getText('download'))!)
+    await vi.waitFor(() =>
+      expect(download).toHaveBeenCalledWith({ url: 'https://example.com/enso.exe' }),
+    )
   })
 })
 

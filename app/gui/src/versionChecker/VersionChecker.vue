@@ -27,8 +27,10 @@ import TextGroup from '$/components/Text/TextGroup.vue'
 import { useDevtoolsStore } from '$/providers/devTools'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
+import { useIncludePrereleases } from '$/providers/updateSettings'
 import { download } from '$/utils/download'
 import { getDownloadUrl, getLatestRelease, RELEASES_REPOSITORY } from '$/utils/github'
+import { openInNewBrowserTab } from '$/utils/window'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onScopeDispose, ref, watch, watchEffect } from 'vue'
 import { useAutoUpdate } from './appUpdate'
@@ -54,17 +56,30 @@ const queryClient = useQueryClient()
 
 const autoUpdate = useAutoUpdate()
 
+function checkAuto() {
+  autoUpdate.check().catch((error) => console.error('Checking for an update failed:', error))
+}
+function downloadAuto() {
+  autoUpdate.download().catch((error) => console.error('Downloading the update failed:', error))
+}
+
 let autoCheckTimer: ReturnType<typeof setInterval> | undefined
 watch(
   autoUpdate.mode,
   (mode) => {
     if (mode !== 'auto' || autoCheckTimer != null) return
-    void autoUpdate.check()
-    autoCheckTimer = setInterval(() => void autoUpdate.check(), AUTO_CHECK_INTERVAL)
+    checkAuto()
+    autoCheckTimer = setInterval(checkAuto, AUTO_CHECK_INTERVAL)
   },
   { immediate: true },
 )
 onScopeDispose(() => clearInterval(autoCheckTimer))
+
+// Switching prereleases on looks for one at once, not at the next daily check.
+const includePrereleases = useIncludePrereleases()
+watch(includePrereleases, (include) => {
+  if (include && autoUpdate.mode.value === 'auto') checkAuto()
+})
 
 const shouldOverride = computed(() => devtools.showVersionChecker ?? false)
 
@@ -117,21 +132,55 @@ const autoRelease = computed(() => {
       s
     : null
 })
-/** The version the user asked to be reminded about later; the dialog stays closed for it. */
-const postponedAutoVersion = ref<string | null>(null)
+/** The version the user asked to be reminded about later (in the `available` state only). */
+let postponedAutoVersion: string | null = null
 
 const autoReleaseUrl = computed(() => {
   const version = autoRelease.value?.version
-  return version == null ? null : (
-      `https://github.com/${RELEASES_REPOSITORY}/releases/tag/${version}`
-    )
+  return version == null ?
+      `https://github.com/${RELEASES_REPOSITORY}/releases`
+    : `https://github.com/${RELEASES_REPOSITORY}/releases/tag/${version}`
 })
 
-watchEffect(() => {
-  const version = autoRelease.value?.version
-  if (version != null && version !== postponedAutoVersion.value && !isOpen.value)
-    isOpen.value = true
+const autoReleaseDate = computed(() => {
+  const r = autoRelease.value
+  if (r?.state !== 'available') return null
+  const date = new Date(r.releaseDate)
+  return r.releaseDate === '' || Number.isNaN(date.getTime()) ?
+      null
+    : date.toLocaleString(text.locale, { dateStyle: 'long' })
 })
+
+const autoTitle = computed(() => {
+  switch (autoRelease.value?.state) {
+    case 'downloading':
+      return getText('updateDownloadingTitle')
+    case 'ready':
+      return getText('updateReadyTitle')
+    case 'error':
+      return getText('updateFailedTitle')
+    default:
+      return getText('versionOutdatedTitle')
+  }
+})
+
+// Open the dialog whenever the update moves on (or on first sight, as in a reloaded window), unless
+// the user postponed this very version while it was only available. Closing it while downloading
+// leaves it closed until the download is `ready` or fails.
+watch(
+  () => {
+    const r = autoRelease.value
+    return r == null ? null : `${r.state}/${r.version}`
+  },
+  (key) => {
+    const r = autoRelease.value
+    if (key == null || r == null) return
+    if (r.state !== 'available') postponedAutoVersion = null
+    else if (postponedAutoVersion === r.version) return
+    isOpen.value = true
+  },
+  { immediate: true },
+)
 
 watchEffect(() => {
   if (release.value != null && !isOpen.value && !isLastStep.value) isOpen.value = true
@@ -159,8 +208,14 @@ async function onDownload() {
 }
 
 function remindLaterAuto() {
-  postponedAutoVersion.value = autoRelease.value?.version ?? null
+  const r = autoRelease.value
+  if (r?.state === 'available') postponedAutoVersion = r.version
   isOpen.value = false
+}
+
+/** Open the release page of the version that failed to download. */
+function onDownloadManually() {
+  openInNewBrowserTab(autoReleaseUrl.value)
 }
 
 /** The automatic-update dialog closed itself (its close button, Escape, an outside click). */
@@ -182,7 +237,7 @@ function onOpenChange(open: boolean) {
   <Dialog
     v-if="autoRelease"
     :open="isOpen"
-    :title="getText('versionOutdatedTitle')"
+    :title="autoTitle"
     size="large"
     @update:open="onAutoOpenChange"
   >
@@ -192,11 +247,15 @@ function onOpenChange(open: boolean) {
         <div class="mb-4 mt-3 flex flex-col items-center">
           <TextGroup>
             <Text variant="h1">
-              {{ getText('latestVersion', autoRelease.version, autoRelease.releaseDate) }}
+              {{
+                autoReleaseDate == null ?
+                  autoRelease.version
+                : getText('latestVersion', autoRelease.version, autoReleaseDate)
+              }}
             </Text>
             <Button
               variant="link"
-              :href="autoReleaseUrl ?? undefined"
+              :href="autoReleaseUrl"
               target="_blank"
               icon="open"
               iconPosition="end"
@@ -226,7 +285,7 @@ function onOpenChange(open: boolean) {
             variant="primary"
             icon="data_download"
             iconPosition="end"
-            @press="autoUpdate.download()"
+            @press="downloadAuto"
           >
             {{ getText('updateNow') }}
           </Button>
@@ -266,10 +325,10 @@ function onOpenChange(open: boolean) {
           {{ getText('updateFailed', autoRelease.message) }}
         </Text>
         <ButtonGroup class="justify-center">
-          <Button size="medium" variant="outline" fullWidth @press="onDownload">
+          <Button size="medium" variant="outline" fullWidth @press="onDownloadManually">
             {{ getText('downloadManually') }}
           </Button>
-          <Button size="medium" fullWidth variant="primary" @press="autoUpdate.download()">
+          <Button size="medium" fullWidth variant="primary" @press="downloadAuto">
             {{ getText('retry') }}
           </Button>
         </ButtonGroup>
