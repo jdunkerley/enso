@@ -13,7 +13,6 @@ import MenuItem from '$/components/Menu/MenuItem.vue'
 import Text from '$/components/Text/Text.vue'
 import VisualTooltip from '$/components/Tooltip/VisualTooltip.vue'
 import { useContainerData } from '$/providers/container'
-import { useFeatureFlag } from '$/providers/featureFlags'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { tv } from '$/utils/style/tailwindVariants'
@@ -66,9 +65,8 @@ const getOrdinal = useGetOrdinal()
 const container = useContainerData()
 const modals = useModals()
 const timeZone = usePreferredTimeZone()
-const enableAdvancedProjectExecutionOptions = useFeatureFlag(
-  'enableAdvancedProjectExecutionOptions',
-)
+// Always hidden: their feature flag is gone, and Task 32 deletes this file with the Schedule tab.
+const showAdvancedOptions = false
 
 /** `hh:mm` with "am" or "pm", in the user's language. */
 function timeOfDay(dateTime: ZonedDateTime) {
@@ -169,7 +167,7 @@ function askToDelete() {
         <div>{{ repeatString }}</div>
         <template #tooltip>
           <div>
-            <Text v-if="enableAdvancedProjectExecutionOptions" color="inherit">
+            <Text v-if="showAdvancedOptions" color="inherit">
               {{ maxDuration }}
             </Text>
             <Text color="inherit">{{ repeatInterval }}</Text>

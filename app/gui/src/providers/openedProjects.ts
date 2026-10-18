@@ -8,15 +8,9 @@ import {
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
 import { Err, Ok, type Result, type ResultError } from 'enso-common/src/utilities/data/result'
-import { isOnElectron } from 'enso-common/src/utilities/detect'
-import { ref, shallowReactive } from 'vue'
+import { shallowReactive } from 'vue'
 import type { ProjectInfo, RunningProjectInfo } from './openedProjects/projectInfo'
-import {
-  useProjectStates,
-  type HybridLocallyClosed,
-  type Initialized,
-  type ProjectState,
-} from './openedProjects/projectStates'
+import { useProjectStates, type ProjectState } from './openedProjects/projectStates'
 
 /** A reason given to AbortController when opening, restoring or closing process is being aborted. */
 const PROCESS_ABORTED = 'aborted'
@@ -52,8 +46,6 @@ export function createOpenedProjectsStore() {
   const projects = shallowReactive(new Map<ProjectId, Project>())
 
   const projectStates = useProjectStates()
-  /** Whether the unsynced hybrid projects are being uploaded as the app exits. */
-  const closingOnAppExit = ref(false)
   const projectReadyCallbacks: ((project: Project) => void)[] = []
 
   /** Open project. */
@@ -80,8 +72,6 @@ export function createOpenedProjectsStore() {
    * Restore a project which was running on app close.
    *
    * The project may be opened or put in "closed by backend" state.
-   *
-   * In case of hybrid projects, the local version is assumed to be already downloaded.
    */
   function restoreProject(info: RunningProjectInfo) {
     const existing = projects.get(info.id)
@@ -115,7 +105,7 @@ export function createOpenedProjectsStore() {
       if (backendProject == null) {
         console.warn('Cannot close project: project not opened')
       } else {
-        projectStates.closeProjectInBackend(backendProject.asset, backendProject.backendType)
+        projectStates.closeProjectInBackend(backendProject.asset)
       }
 
       return
@@ -192,21 +182,14 @@ export function createOpenedProjectsStore() {
       abort: AbortSignal,
     ) => Promise<Result<ProjectState>> | undefined
   } = {
-    opening: (state: ProjectState, abort: AbortSignal) => {
+    opening: (state: ProjectState) => {
       switch (state.status) {
         case 'not-opened':
           return projectStates.openProject(state)
-        case 'hybrid-opened':
-          return projectStates.downloadHybridProject(state)
-        case 'hybrid-downloaded':
-          return projectStates.openLocalVersionOfHybridProject(state, abort)
         case 'opened':
           return projectStates.initializeProject(state)
         case 'initialized':
           break
-        case 'hybrid-closed':
-        case 'hybrid-uploaded':
-          return projectStates.reopenLocalVersionOfHybridProject(state)
         case 'to-restore':
           return projectStates.restoreProject(state)
         case 'closed-by-backend':
@@ -217,19 +200,11 @@ export function createOpenedProjectsStore() {
       switch (state.status) {
         case 'not-opened':
           break
-        case 'hybrid-opened':
-          return projectStates.closeHybridProject(state)
-        case 'hybrid-downloaded':
-          return projectStates.closeHybridProject(state)
         case 'opened':
         case 'initialized':
           return projectStates.closeProject(state, {
             offer: !closingWithoutOffer.has(state.info.id),
           })
-        case 'hybrid-closed':
-          return projectStates.uploadHybridProjectOnClose(state)
-        case 'hybrid-uploaded':
-          return projectStates.closeHybridProject(state)
         case 'to-restore':
         case 'closed-by-backend':
           return projectStates.discardProject(state)
@@ -287,45 +262,12 @@ export function createOpenedProjectsStore() {
     return projects.get(id)?.nextTask?.process === 'closing'
   }
 
-  // A handler for uploading hybrid projects before app close.
-  //
-  // They are not removed from local backend, but synchronized with remote in case someone else
-  // would open it in the meantime.
-  window.addEventListener('beforeunload', async (event) => {
-    const hybridsToUpload = [...projects.values()].filter(
-      (proj): proj is Project & { state: Initialized | HybridLocallyClosed } =>
-        (proj.state.status === 'initialized' || proj.state.status === 'hybrid-closed') &&
-        proj.state.info.mode === 'hybrid' &&
-        !proj.state.info.synced,
-    )
-    if (hybridsToUpload.length > 0) {
-      // Do not prevent default in browsers.
-      // In "real" browsers users will be unable to run hybrid projects anyway, but in dev
-      // servers the "data loss" messages are annoying.
-      if (!isOnElectron()) return
-      event.preventDefault()
-      closingOnAppExit.value = true
-      const errors = (
-        await Promise.all(
-          hybridsToUpload.map(async (project) => {
-            assert(project.state.info.mode === 'hybrid')
-            await projectStates.uploadHybridProject(project.state.info)
-            return project
-          }),
-        )
-      ).filter((proj) => proj.error != null)
-      closingOnAppExit.value = false
-      if (errors.length == 0) {
-        window.close()
-      }
-    } else {
-      // Do the project cleanup, but do not close projects entirely.
-      // Local projects's PM process will be killed anyway, and
-      // Cloud projects should be kept opened.
-      for (const project of projects.values()) {
-        if (project.state.status === 'initialized') {
-          project.state.scope.stop()
-        }
+  // Before the app unloads, the projects' stores are cleaned up, but the projects are not closed:
+  // the project manager's processes are killed anyway.
+  window.addEventListener('beforeunload', () => {
+    for (const project of projects.values()) {
+      if (project.state.status === 'initialized') {
+        project.state.scope.stop()
       }
     }
   })
@@ -342,7 +284,6 @@ export function createOpenedProjectsStore() {
     isProjectOpened,
     isProjectClosing,
     waitForProcess,
-    closingOnAppExit,
   }
 }
 

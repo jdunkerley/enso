@@ -70,8 +70,6 @@ async function mockFeatureFlags(page: Page, featureFlags: Partial<FeatureFlags>)
   const flags = Object.assign(
     {
       enableLocalBackend: true,
-      enableCloudExecution: true,
-      enableAdvancedProjectExecutionOptions: true,
       enableAssetsTableBackgroundRefresh: false,
     },
     featureFlags,

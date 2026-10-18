@@ -5,19 +5,12 @@ import { useAiAvailability } from '@/stores/aiAvailability'
 import { assert, assertDefined } from '@/util/assert'
 import * as vueQuery from '@tanstack/vue-query'
 import {
-  AssetType,
   Backend,
   ProjectState as BackendProjectState,
-  BackendType,
-  EnsoPath,
   IS_OPENING,
-  IS_OPENING_OR_OPENED,
   NetworkError,
-  type DirectoryId,
-  type ProjectAsset,
   type Project as ProjectDetails,
   type ProjectId,
-  type ProjectSessionId,
 } from 'enso-common/src/services/Backend'
 import { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { Err, Ok, rejectionToResult, type Result } from 'enso-common/src/utilities/data/result'
@@ -31,9 +24,7 @@ import {
   type Ref,
 } from 'vue'
 import { useBackends } from '../backends'
-import { useHttpClient } from '../httpClient'
 import { useLocalVersioning } from '../localVersioning'
-import { useSession } from '../session'
 import { useText } from '../text'
 import { createGraphStore, type GraphStore } from './graph'
 import { createModuleStore, type ModuleStore } from './module'
@@ -50,28 +41,7 @@ export interface NotOpened {
 }
 
 /**
- * Project which has set the HybridOpening state in the backend, but is not yet downloaded to
- * local.
- */
-export interface HybridOpened {
-  status: 'hybrid-opened'
-  info: ProjectInfo & { mode: 'hybrid'; hybridSessionId: ProjectSessionId }
-}
-
-/** Hybrid project downloaded but not yet opened in local backend. */
-export interface HybridDownloaded {
-  status: 'hybrid-downloaded'
-  localProjectRootId: DirectoryId
-  localProjectParentId: DirectoryId
-  info: ProjectInfo & { mode: 'hybrid'; hybridSessionId: ProjectSessionId }
-  scope: EffectScope
-  details?: Ref<ProjectDetails>
-}
-
-/**
  * A project with opened state in the backend.
- *
- * In case of hybrid project, it is downloaded and opened locally.
  */
 export interface Opened {
   status: 'opened'
@@ -98,18 +68,6 @@ export interface Initialized {
   module: ModuleStore
   graph: GraphStore
   widgetRegistry: WidgetRegistry
-}
-
-/** A hybrid project closed in the local backend, not yet uploaded. */
-export interface HybridLocallyClosed {
-  status: 'hybrid-closed'
-  info: RunningProjectInfo & { mode: 'hybrid' }
-}
-
-/** A hybrid project successfully uploaded to remote backend, but still marked as opened there. */
-export interface HybridUploaded {
-  status: 'hybrid-uploaded'
-  info: RunningProjectInfo & { mode: 'hybrid' }
 }
 
 /**
@@ -139,16 +97,7 @@ export interface ClosedByBackend {
  * The states covers entire possible lifespan of a project, may be discerned by `status` field.
  * The main, working state of opened project is {@link Initialized}; it contains all project stores.
  */
-export type ProjectState =
-  | NotOpened
-  | HybridOpened
-  | HybridDownloaded
-  | Opened
-  | Initialized
-  | HybridLocallyClosed
-  | HybridUploaded
-  | ToRestore
-  | ClosedByBackend
+export type ProjectState = NotOpened | Opened | Initialized | ToRestore | ClosedByBackend
 
 /**
  * A composable with project state transiting operations.
@@ -157,18 +106,13 @@ export type ProjectState =
  */
 export function useProjectStates() {
   const backends = useBackends()
-  const session = useSession()
   const text = useText()
   const queryClient = vueQuery.useQueryClient()
   const localVersioning = useLocalVersioning()
-  const httpClient = useHttpClient()
   const aiAvailability = useAiAvailability()
 
   const openLocalProject = vueQuery.useMutation(
     backendMutationOptions('openProject', backends.localBackend),
-  )
-  const openRemoteProject = vueQuery.useMutation(
-    backendMutationOptions('openProject', backends.remoteBackend),
   )
   // The plain options (`$/utils/backendQuery`), not the Vue wrapper's `computed`: their key,
   // network mode and invalidations are kept, while the call returns the close commit's warning.
@@ -184,202 +128,30 @@ export function useProjectStates() {
       return localBackend.closeProjectReportingVersioning(id, title)
     },
   })
-  const closeRemoteProject = vueQuery.useMutation(
-    backendMutationOptions('closeProject', backends.remoteBackend),
-  )
   const renameProjectMut = renameProjectMutation(queryClient)
 
   const catchNetworkError = rejectionToResult(NetworkError)
 
-  async function openProject(
-    project: NotOpened & { info: ProjectInfo & { mode: 'hybrid' } },
-  ): Promise<Result<HybridOpened>>
-  async function openProject(
-    project: NotOpened & { info: ProjectInfo & { mode: 'local' | 'cloud' } },
-  ): Promise<Result<Opened>>
-  async function openProject(project: NotOpened): Promise<Result<HybridOpened | Opened>>
-  /** Open a project in given mode. */
-  async function openProject(project: NotOpened): Promise<Result<HybridOpened | Opened>> {
-    if (session.session == null) return Err('No user session')
-    const cognitoCredentials = {
-      accessToken: session.session.accessToken,
-      refreshToken: session.session.refreshToken,
-      clientId: session.session.clientId,
-      expireAt: session.session.expireAt,
-      refreshUrl: session.session.refreshUrl,
-    }
-    switch (project.info.mode) {
-      case 'local': {
-        if (!backends.localBackend) return Err('Cannot open local project: Local Backend missing.')
-        const result = await catchNetworkError(
-          openLocalProject.mutateAsync([
-            project.info.id,
-            {
-              executeAsync: false,
-              cognitoCredentials: null,
-              openHybridProjectParameters: null,
-            },
-            project.info.title,
-          ]),
-        )
-        if (!result.ok) return result
-        return Ok({
-          status: 'opened',
-          info: { ...project.info, mode: project.info.mode },
-          runningId: project.info.id,
-          scope: effectScope(),
-        })
-      }
-      case 'cloud': {
-        const result = await catchNetworkError(
-          openRemoteProject.mutateAsync([
-            project.info.id,
-            {
-              executeAsync: false,
-              cognitoCredentials,
-              openHybridProjectParameters: null,
-            },
-            project.info.title,
-          ]),
-        )
-        if (!result.ok) return result
-        return Ok({
-          status: 'opened',
-          info: { ...project.info, mode: project.info.mode },
-          runningId: project.info.id,
-          scope: effectScope(),
-        })
-      }
-      case 'hybrid': {
-        if (!backends.localBackend) return Err('Cannot open hybrid project: Local Backend missing.')
-        const hybridSessionId = await catchNetworkError(
-          backends.remoteBackend.setHybridOpenInProgress(project.info.id, project.info.title),
-        )
-        if (!hybridSessionId.ok) return hybridSessionId
-        // This strange spread is needed for TS for some reason
-        return Ok({
-          status: 'hybrid-opened',
-          info: {
-            ...project.info,
-            mode: project.info.mode,
-            hybridSessionId: hybridSessionId.value,
-          },
-        })
-      }
-    }
-  }
-
-  /** Download opened Hybrid Project to local. */
-  async function downloadHybridProject(project: HybridOpened): Promise<Result<HybridDownloaded>> {
-    if (!backends.localBackend) return Err('Cannot open hybrid project: Local Backend missing.')
-    const localProject = await catchNetworkError(
-      backends.remoteBackend.downloadProject(project.info.id),
-    )
-    if (!localProject.ok) return localProject
-    return Ok({
-      status: 'hybrid-downloaded',
-      localProjectParentId: localProject.value.parentId,
-      localProjectRootId: localProject.value.projectRootId,
-      info: project.info,
-      scope: effectScope(),
-    })
-  }
-
-  /** Open the downloaded hybrid project. */
-  async function openLocalVersionOfHybridProject(
-    project: HybridDownloaded,
-    abort: AbortSignal,
-  ): Promise<Result<Opened>> {
+  /** Open a project locally. */
+  async function openProject(project: NotOpened): Promise<Result<Opened>> {
     if (!backends.localBackend) return Err('Cannot open local project: Local Backend missing.')
-    let localProjectAsset: ProjectAsset | undefined
-    // TODO[ao]: Apparently, the only way to get local project id is to list directory, because
-    // "downloadProject" does not return it. To discuss.
-    for (const parentId of [project.localProjectParentId, project.localProjectRootId]) {
-      const listing = await catchNetworkError(
-        backends.localBackend.listDirectory({
-          parentId: parentId,
-          filterBy: null,
-          labels: null,
-          sortExpression: null,
-          sortDirection: null,
-          from: null,
-          pageSize: null,
-          recentProjects: false,
-        }),
-      )
-      if (!listing.ok) continue
-      abort.throwIfAborted()
-      localProjectAsset = listing.value.assets
-        .filter((item) => item.type === AssetType.project)
-        .at(0)
-      if (localProjectAsset) {
-        break
-      }
-    }
-    if (!localProjectAsset) return Err('Cannot find downloaded local project.')
-    return openLocalVersionOfHybridProjectByRunningInfo({
-      ...project.info,
-      runningId: localProjectAsset.id,
-      localParentId: localProjectAsset.parentId,
-    })
-  }
-
-  async function reopenLocalVersionOfHybridProject(project: HybridLocallyClosed | HybridUploaded) {
-    return openLocalVersionOfHybridProjectByRunningInfo(project.info)
-  }
-
-  async function openLocalVersionOfHybridProjectByRunningInfo(
-    info: RunningProjectInfo & { mode: 'hybrid' },
-    scope: EffectScope = effectScope(),
-    details?: Ref<ProjectDetails>,
-  ) {
-    if (!backends.localBackend) return Err('Cannot open local project: Local Backend missing.')
-    await backends.localBackend
-      .startWatchingHybridProject(
-        info.id,
-        info.runningId,
-        info.parentId,
-        httpClient.defaultHeaders,
-        backends.remoteBackend.baseUrl.toString(),
-      )
-      .catch((err) => {
-        console.error(`Failed to start watching hybrid project ${info.id}`, err)
-      })
-    scope.run(() =>
-      onScopeDispose(async () => {
-        await backends.localBackend?.stopWatchingHybridProject(info.id).catch((err) => {
-          console.error(`Failed to stop watching hybrid project ${info.id}`, err)
-        })
-      }),
-    )
-    const cloudParentPath = EnsoPath(info.ensoPath.slice(0, info.ensoPath.lastIndexOf('/')))
     const result = await catchNetworkError(
-      backends.localBackend.openProject(
-        info.runningId,
+      openLocalProject.mutateAsync([
+        project.info.id,
         {
           executeAsync: false,
           cognitoCredentials: null,
-          openHybridProjectParameters: {
-            cloudProjectDirectoryPath: cloudParentPath,
-            cloudProjectId: info.id,
-            cloudProjectSessionId: info.hybridSessionId,
-            cloudApiUrl: backends.remoteBackend.baseUrl.toString(),
-          },
+          openHybridProjectParameters: null,
         },
-        info.title,
-      ),
+        project.info.title,
+      ]),
     )
     if (!result.ok) return result
-    const hybridOpenedSet = await catchNetworkError(
-      backends.remoteBackend.setHybridOpened(info.id, info.title),
-    )
-    if (!hybridOpenedSet.ok) return hybridOpenedSet
     return Ok({
       status: 'opened',
-      info,
-      runningId: info.runningId,
-      scope,
-      ...(details != null ? { details } : {}),
+      info: project.info,
+      runningId: project.info.id,
+      scope: effectScope(),
     })
   }
 
@@ -390,10 +162,8 @@ export function useProjectStates() {
       project.details ? Ok(project.details) : await getProjectDetails(project.info, scope)
     if (!detailsResult.ok) return detailsResult
     const details = detailsResult.value
-
-    const runDetailsResult = await getRunningProjectDetails(project.info, scope, details)
-    if (!runDetailsResult.ok) return runDetailsResult
-    const runDetails = runDetailsResult.value
+    // A local project runs as itself: its running details are its details.
+    const runDetails = details
 
     // Wait for project to be ready.
     await new Promise((resolve) => {
@@ -411,10 +181,10 @@ export function useProjectStates() {
       })
     })
 
-    const runningId = project.info.mode === 'hybrid' ? project.info.runningId : project.info.id
+    const runningId = project.info.id
     const projectNames = scope.run(() =>
       createProjectNameStore({
-        projectNamespace: 'local', // Even in cloud, the namespace seems to be always "local".
+        projectNamespace: 'local',
         projectDisplayedName: () => details.value.name,
         projectInitialName: runDetails.value.packageName,
       }),
@@ -450,16 +220,14 @@ export function useProjectStates() {
     return scope.run(() => {
       const graph = createGraphStore(store, suggestionDb, projectNames, module.value)
       const widgetRegistry = new WidgetRegistry(graph.db)
-      const logger = eventLogger(project, runDetails.value)
+      const logger = eventLogger(runDetails.value)
 
       logger.send('ide_project_opened')
       onScopeDispose(() => logger.send('ide_project_closed'))
 
-      if (project.info.mode === 'local') {
-        const projectId = project.info.id
-        localVersioning.watchProject(projectId, () => store.flushModules())
-        onScopeDispose(() => localVersioning.unwatchProject(projectId))
-      }
+      const projectId = project.info.id
+      localVersioning.watchProject(projectId, () => store.flushModules())
+      onScopeDispose(() => localVersioning.unwatchProject(projectId))
 
       return Ok(
         markRaw({
@@ -483,57 +251,16 @@ export function useProjectStates() {
 
   /** Get details of opened project from the backend. */
   async function getProjectDetails(info: RunningProjectInfo, scope: EffectScope) {
-    switch (info.mode) {
-      case 'local': {
-        if (backends.localBackend == null)
-          return Err('Cannot get details of local project: no local backend.')
-        return Ok(
-          await getProjectDetailsFromBackend(backends.localBackend, info.id, scope, queryClient),
-        )
-      }
-      case 'cloud':
-      case 'hybrid': {
-        return Ok(
-          await getProjectDetailsFromBackend(backends.remoteBackend, info.id, scope, queryClient),
-        )
-      }
-    }
-  }
-
-  /**
-   * Get details of running version of the project.
-   *
-   * Hybrid projects will get details about local version.
-   * @param details details of the original project from {@link getProjectDetails}.
-   */
-  async function getRunningProjectDetails(
-    info: RunningProjectInfo,
-    scope: EffectScope,
-    details: Ref<ProjectDetails>,
-  ) {
-    switch (info.mode) {
-      case 'local':
-      case 'cloud':
-        return Ok(details)
-      case 'hybrid': {
-        if (backends.localBackend == null)
-          return Err('Cannot get details of hybrid project: no local backend.')
-        return Ok(
-          await getProjectDetailsFromBackend(
-            backends.localBackend,
-            info.runningId,
-            scope,
-            queryClient,
-          ),
-        )
-      }
-    }
+    if (backends.localBackend == null)
+      return Err('Cannot get details of local project: no local backend.')
+    return Ok(
+      await getProjectDetailsFromBackend(backends.localBackend, info.id, scope, queryClient),
+    )
   }
 
   /** Create an event logger for given project. */
-  function eventLogger(project: Opened, runDetails: ProjectDetails) {
-    const logProjectId =
-      project.info.mode === 'local' ? runDetails.localProjectKey : project.info.id
+  function eventLogger(runDetails: ProjectDetails) {
+    const logProjectId = runDetails.localProjectKey
     assertDefined(logProjectId)
     return {
       async send(message: string) {
@@ -550,103 +277,40 @@ export function useProjectStates() {
   async function closeProject(
     project: Opened | Initialized,
     { offer = true }: { offer?: boolean } = {},
-  ): Promise<Result<NotOpened | HybridLocallyClosed>> {
-    switch (project.info.mode) {
-      case 'local': {
-        if (backends.localBackend == null) {
-          project.scope.stop()
-          return Err('Cannot close local project: no local backend')
-        }
-        // The question needs the project to be watched, and stopping the scope unwatches it.
-        if (offer) {
-          try {
-            await localVersioning.offerRepository(project.info.id, 'close')
-          } catch (error) {
-            console.error('Could not offer a repository before closing the project:', error)
-          }
-        }
-        project.scope.stop()
-        const { versioningWarning } = await closeLocalProject.mutateAsync([
-          project.info.id,
-          project.info.title,
-        ])
-        if (versioningWarning != null) {
-          try {
-            localVersioning.showCloseWarning(project.info.title, versioningWarning)
-          } catch (error) {
-            console.error('Could not show the close commit warning:', error)
-          }
-        }
-        return Ok({
-          status: 'not-opened',
-          info: project.info,
-        })
-      }
-      case 'cloud':
-        project.scope.stop()
-        await closeRemoteProject.mutateAsync([project.info.id, project.info.title])
-        return Ok({
-          status: 'not-opened',
-          info: project.info,
-        })
-      case 'hybrid':
-        project.scope.stop()
-        if (backends.localBackend == null)
-          return Err('Cannot close hybrid project: no local backend')
-        await backends.localBackend.closeProject(project.runningId, project.info.title)
-        return Ok({
-          status: 'hybrid-closed',
-          info: { ...project.info, mode: project.info.mode },
-        })
+  ): Promise<Result<NotOpened>> {
+    if (backends.localBackend == null) {
+      project.scope.stop()
+      return Err('Cannot close local project: no local backend')
     }
-  }
-
-  // The cloud upload is gone, and hybrid projects with it; Task 31 deletes the rest of this.
-  function uploadHybridProject(_info: RunningProjectInfo & { mode: 'hybrid' }) {
-    return Promise.resolve(Err('Hybrid projects cannot be uploaded: there is no cloud.'))
-  }
-
-  async function uploadHybridProjectOnClose(project: HybridLocallyClosed) {
-    const result = await uploadHybridProject(project.info)
-    if (!result.ok) return result
+    // The question needs the project to be watched, and stopping the scope unwatches it.
+    if (offer) {
+      try {
+        await localVersioning.offerRepository(project.info.id, 'close')
+      } catch (error) {
+        console.error('Could not offer a repository before closing the project:', error)
+      }
+    }
+    project.scope.stop()
+    const { versioningWarning } = await closeLocalProject.mutateAsync([
+      project.info.id,
+      project.info.title,
+    ])
+    if (versioningWarning != null) {
+      try {
+        localVersioning.showCloseWarning(project.info.title, versioningWarning)
+      } catch (error) {
+        console.error('Could not show the close commit warning:', error)
+      }
+    }
     return Ok({
-      status: 'hybrid-uploaded',
+      status: 'not-opened',
       info: project.info,
     })
   }
 
-  async function deleteLocalVersionOfHybridProject(localParentId: DirectoryId) {
-    if (backends.localBackend == null) {
-      console.error('Cannot delete Hybrid Project without local backend')
-    } else {
-      return backends.localBackend
-        .deleteAsset(localParentId, { force: true }, null)
-        .catch((err) => console.error('Failed to delete local version of hybrid project', err))
-    }
-  }
-
-  /** Mark hybrid project as closed on remote backend. */
-  async function closeHybridProject(
-    project: HybridUploaded | HybridOpened | HybridDownloaded,
-  ): Promise<Result<NotOpened>> {
-    if (project.status === 'hybrid-uploaded') {
-      await deleteLocalVersionOfHybridProject(project.info.localParentId)
-    }
-    if (project.status === 'hybrid-downloaded') {
-      project.scope.stop()
-      await deleteLocalVersionOfHybridProject(project.localProjectParentId)
-    }
-    await closeRemoteProject.mutateAsync([project.info.id, project.info.title])
-    return Ok({ status: 'not-opened', info: project.info })
-  }
-
   /** Close project which has "opened" state in backend */
-  function closeProjectInBackend(project: { id: ProjectId; title: string }, backend: BackendType) {
-    if (backend === BackendType.local) {
-      closeLocalProject.mutate([project.id, project.title])
-    } else {
-      closeRemoteProject.mutate([project.id, project.title])
-    }
+  function closeProjectInBackend(project: { id: ProjectId; title: string }) {
+    closeLocalProject.mutate([project.id, project.title])
   }
 
   /** Rename project. It updates proper structures with a new name. */
@@ -654,7 +318,7 @@ export function useProjectStates() {
     project: Initialized,
     newName: string,
   ): Promise<Result<Initialized>> {
-    const backend = project.info.mode === 'local' ? backends.localBackend : backends.remoteBackend
+    const backend = backends.localBackend
     if (backend == null) {
       return Err('Failed to rename project: no Backend available')
     }
@@ -662,93 +326,29 @@ export function useProjectStates() {
       renameProjectMut.mutateAsync({ project: project.info, newName, backend }),
     )
     if (!result.ok) return result
-    if (project.info.mode === 'local') void localVersioning.refresh(project.info.id)
+    void localVersioning.refresh(project.info.id)
     return Ok(markRaw({ ...project, info: { ...project.info, title: newName } }))
   }
 
-  /**
-   * Restore project after app restart.
-   *
-   * The local project is opened outright, while in case of cloud and hybrid projects we first
-   * check if the projects are still opened in the backend. If not, we do not reopen them
-   * automatically.
-   */
+  /** Restore project after app restart: a local project is opened outright. */
   async function restoreProject(project: ToRestore): Promise<Result<Opened | ClosedByBackend>> {
-    if (project.info.mode === 'local') {
-      return openProject({ status: 'not-opened', info: project.info })
-    }
-    const scope = effectScope()
-    const details = await getProjectDetails(project.info, scope)
-    if (!details.ok) return details
-    if (project.info.mode === 'hybrid' && IS_OPENING_OR_OPENED[details.value.value.state.type]) {
-      return openLocalVersionOfHybridProjectByRunningInfo(project.info, scope, details.value)
-    }
-    if (
-      project.info.mode === 'cloud' &&
-      details.value.value.state.type === BackendProjectState.opened
-    ) {
-      return Ok({
-        status: 'opened',
-        info: project.info,
-        runningId: project.info.id,
-        scope,
-        details: details.value,
-      })
-    }
-    return Ok({
-      status: 'closed-by-backend',
-      info: project.info,
-      scope,
-      details: details.value,
-    })
+    return openProject({ status: 'not-opened', info: project.info })
   }
 
-  /** Confirm a restored cloud/hybrid project reopening. */
-  async function reopenProject(project: ClosedByBackend): Promise<Result<Opened | HybridOpened>> {
-    const opened = await openProject({ status: 'not-opened', info: project.info })
-    if (!opened.ok) return opened
-    // If the local version is not synced, we prefer to open it instead downloading from remote,
-    // so the user won't lose their changes.
-    // TODO[ao]: We should ask user about this.
-    const hybridNotSynced = project.info.mode === 'hybrid' ? !project.info.synced : false
-    if (opened.value.status === 'hybrid-opened' && hybridNotSynced) {
-      assert(project.info.mode === 'hybrid')
-      return openLocalVersionOfHybridProjectByRunningInfo(
-        project.info,
-        project.scope,
-        project.details,
-      )
-    } else {
-      if (project.info.mode === 'hybrid') {
-        deleteLocalVersionOfHybridProject(project.info.localParentId)
-      }
-      return Ok(opened.value)
-    }
+  /** Confirm a restored project reopening. */
+  async function reopenProject(project: ClosedByBackend): Promise<Result<Opened>> {
+    return openProject({ status: 'not-opened', info: project.info })
   }
 
   /** Discard the restored project. */
   async function discardProject(project: ToRestore | ClosedByBackend): Promise<Result<NotOpened>> {
-    if (project.info.mode === 'hybrid') {
-      await deleteLocalVersionOfHybridProject(project.info.localParentId)
-      return closeHybridProject({ status: 'hybrid-opened', info: project.info })
-    } else {
-      return Ok({
-        status: 'not-opened',
-        info: project.info,
-      })
-    }
+    return Ok({ status: 'not-opened', info: project.info })
   }
 
   return {
     openProject,
-    downloadHybridProject,
-    openLocalVersionOfHybridProject,
-    reopenLocalVersionOfHybridProject,
     initializeProject,
     closeProject,
-    uploadHybridProject,
-    uploadHybridProjectOnClose,
-    closeHybridProject,
     closeProjectInBackend,
     renameProject,
     restoreProject,
@@ -760,13 +360,7 @@ export function useProjectStates() {
 /** Default interval for refetching project status when the project is opened. */
 const OPENED_INTERVAL_MS = 30_000
 /**
- * Interval when we open a cloud project.
- * Since opening a cloud project is a long operation, we want to check the status less often.
- */
-const CLOUD_OPENING_INTERVAL_MS = 2_500
-/**
- * Interval when we open a local project or when we want to sync the project status as soon as
- * possible.
+ * Interval when we open a project or when we want to sync the project status as soon as possible.
  */
 const LOCAL_OPENING_INTERVAL_MS = 100
 
@@ -781,8 +375,6 @@ async function getProjectDetailsFromBackend(
   scope: EffectScope,
   queryClient: vueQuery.QueryClient,
 ) {
-  const isLocal = backend.type === BackendType.local
-
   const detailsQuery = scope.run(() =>
     vueQuery.useQuery(
       {
@@ -791,20 +383,20 @@ async function getProjectDetailsFromBackend(
         refetchIntervalInBackground: true,
         refetchOnWindowFocus: true,
         refetchOnMount: true,
-        networkMode: backend.type === BackendType.remote ? 'online' : 'always',
+        networkMode: 'always',
         meta: { persist: false },
         refetchInterval: ({ state }): number | false => {
           if (state.status === 'error' || !state.data) {
             return false
           }
           if (CREATED_PROJECT_STATES.has(state.data.state.type)) {
-            return isLocal ? LOCAL_OPENING_INTERVAL_MS : CLOUD_OPENING_INTERVAL_MS
+            return LOCAL_OPENING_INTERVAL_MS
           }
           if (STATIC_PROJECT_STATES.has(state.data.state.type)) {
             return OPENED_INTERVAL_MS
           }
           if (IS_OPENING[state.data.state.type]) {
-            return isLocal ? LOCAL_OPENING_INTERVAL_MS : CLOUD_OPENING_INTERVAL_MS
+            return LOCAL_OPENING_INTERVAL_MS
           }
           return DEFAULT_INTERVAL_MS
         },

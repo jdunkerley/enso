@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
  * @file The dashboard route: the app container, with the dashboard's global shortcuts (Electron's
- * back and forward, and going to each settings tab), and the dialog shown while the projects sync
- * as the app exits.
+ * back and forward, and going to each settings tab).
  *
  * The shortcuts are attached to `document.body` once the container has mounted, so that the
  * container's own shortcuts on the body see a key first, and are in the command palette.
  */
 import { SEARCH_PARAMS_PREFIX } from '$/appUtils'
 import AppContainer from '$/components/AppContainer'
-import SyncingProjectsModal from '$/components/SyncingProjectsModal.vue'
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useActionsStore, type Action } from '$/providers/actions'
@@ -17,7 +15,6 @@ import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useModals } from '$/providers/modals'
-import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { backendQueryOptions } from '@/composables/backend'
 import { useQuery } from '@tanstack/vue-query'
@@ -34,7 +31,6 @@ const router = useRouter()
 const auth = useAuth()
 const backends = useBackends()
 const modals = useModals()
-const openedProjects = useOpenedProjects()
 const inputBindings = useDashboardInputBindings()
 const { bindGlobalActions } = useActionsStore()
 const { getText } = useText()
@@ -133,24 +129,6 @@ onUnmounted(() => {
   unbind?.()
   detach?.()
 })
-
-// While the opened projects sync as the app exits, a dialog says so, and nothing else is open.
-// Mounting does not close the modals already open.
-let syncingDialog: { close: () => void } | undefined
-watch(
-  () => openedProjects.closingOnAppExit.value,
-  (closing) => {
-    if (closing) {
-      modals.closeAll()
-      syncingDialog = modals.open(SyncingProjectsModal, {})
-    } else if (syncingDialog != null) {
-      modals.closeAll()
-      syncingDialog = undefined
-    }
-  },
-  { immediate: true },
-)
-onUnmounted(() => syncingDialog?.close())
 
 function onContextMenu(event: MouseEvent) {
   event.preventDefault()

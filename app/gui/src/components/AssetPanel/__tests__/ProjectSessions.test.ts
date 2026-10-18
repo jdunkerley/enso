@@ -77,29 +77,6 @@ async function renderTab() {
 }
 
 describe('in a project tab', () => {
-  test('a cloud project lists its sessions from the cloud', async () => {
-    context.value = {
-      item: CLOUD_ID,
-      openedProject: { id: CLOUD_ID, title: 'Cloud Project', mode: 'cloud' },
-    }
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Session 2')
-    expect(wrapper.text()).toContain('Session 1')
-    expect(backends.remote.listProjectSessions).toHaveBeenCalledWith(CLOUD_ID, 'Cloud Project')
-    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
-  })
-
-  test("a hybrid project lists the cloud project's sessions", async () => {
-    context.value = {
-      item: CLOUD_ID,
-      openedProject: { id: CLOUD_ID, title: 'Hybrid Project', mode: 'hybrid' },
-    }
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Session 2')
-    expect(backends.remote.listProjectSessions).toHaveBeenCalledWith(CLOUD_ID, 'Hybrid Project')
-    expect(backends.local.listProjectSessions).not.toHaveBeenCalled()
-  })
-
   test('a local project lists its sessions from the local backend', async () => {
     context.value = {
       item: LOCAL_ID,
@@ -160,8 +137,8 @@ describe('in the drive', () => {
 
 test('the newest session comes first, and its button opens its logs', async () => {
   context.value = {
-    item: CLOUD_ID,
-    openedProject: { id: CLOUD_ID, title: 'Cloud Project', mode: 'cloud' },
+    item: LOCAL_ID,
+    openedProject: { id: LOCAL_ID, title: 'Local Project', mode: 'local' },
   }
   const { wrapper } = await renderTab()
   expect(wrapper.text()).toMatch(/Session 2.*Session 1/)
@@ -170,7 +147,7 @@ test('the newest session comes first, and its button opens its logs', async () =
   await userEvent.click(buttons[0]!.element)
   expect(openProjectLogTab).toHaveBeenCalledWith(
     ProjectSessionId('projectsession-2'),
-    'Cloud Project',
+    'Local Project',
   )
 })
 

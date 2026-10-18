@@ -138,8 +138,7 @@ export interface SessionsProject {
  * The project whose sessions the Activity tab lists.
  *
  * In the drive, it is the focused project asset, held by the current category's backend. In a
- * project tab, it is the opened project: a local project's sessions are the local backend's, while
- * a cloud or hybrid project's are the cloud project's (its `id`, not a hybrid's `runningId`).
+ * project tab, it is the opened project, whose sessions are the local backend's.
  */
 export function sessionsProjectFromContext(
   ctx: RightPanelContext | undefined,

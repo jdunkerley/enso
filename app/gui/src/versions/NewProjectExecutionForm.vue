@@ -18,7 +18,6 @@ import Input from '$/components/Inputs/Input.vue'
 import MultiSelector from '$/components/Inputs/MultiSelector.vue'
 import Selector from '$/components/Inputs/Selector.vue'
 import Text from '$/components/Text/Text.vue'
-import { useFeatureFlag } from '$/providers/featureFlags'
 import { useText } from '$/providers/text'
 import { backendMutationOptions } from '@/composables/backend'
 import { endOfMonth, now, toZoned, type ZonedDateTime } from '@internationalized/date'
@@ -78,9 +77,8 @@ const getOrdinal = useGetOrdinal()
 const preferredTimeZone = usePreferredTimeZone()
 const timeZone = IanaTimeZone(preferredTimeZone.value)
 const timeZoneDescription = getDescriptionForTimeZone(timeZone)
-const enableAdvancedProjectExecutionOptions = useFeatureFlag(
-  'enableAdvancedProjectExecutionOptions',
-)
+// Always hidden: their feature flag is gone, and Task 32 deletes this file with the Schedule tab.
+const showAdvancedOptions = false
 
 // The start of today, when the form opens.
 const minFirstOccurrence = now(timeZone).set({ hour: 0, minute: 0, second: 0, millisecond: 0 })
@@ -240,7 +238,7 @@ function timeZoneOption(description: string) {
       </Text>
       <Text>{{ getText('ellipsis') }}</Text>
     </div>
-    <details v-if="enableAdvancedProjectExecutionOptions" class="w-full">
+    <details v-if="showAdvancedOptions" class="w-full">
       <summary class="cursor-pointer">{{ getText('advancedOptions') }}</summary>
       <div class="flex w-full flex-col">
         <Selector

@@ -71,7 +71,6 @@ beforeEach(async () => {
   auth.session = {
     user: USER,
     email: USER.email,
-    accessToken: '',
     isCloudDataUnavailable: true,
     isAuthDisabled: true,
   }
@@ -140,7 +139,6 @@ describe('SettingsPage', () => {
     auth.session = {
       user: offlineUser,
       email: 'local@enso.localhost',
-      accessToken: '',
       isCloudDataUnavailable: true,
       isAuthDisabled: true,
     }
@@ -168,7 +166,6 @@ describe('SettingsPage', () => {
     auth.session = {
       user: admin,
       email: admin.email,
-      accessToken: '',
       isCloudDataUnavailable: false,
       isAuthDisabled: false,
     }
