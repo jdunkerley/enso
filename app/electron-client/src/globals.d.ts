@@ -47,8 +47,6 @@ declare global {
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly APPLETEAMID?: string
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
-      readonly ENSO_BUILD_ELECTRON_BUILDER_CONFIG?: string
-      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly npm_package_name?: string
 
       // === Integration test variables ===

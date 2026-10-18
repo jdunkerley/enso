@@ -21,7 +21,6 @@ futures = { workspace = true }
 glob = "0.3.0"
 handlebars = "4.3.5"
 enso-build-base = { path = "../base" }
-enso-install-config = { path = "../install/config" }
 ide-ci = { path = "../ci_utils" }
 mime = { workspace = true }
 new_mime_guess = { workspace = true }

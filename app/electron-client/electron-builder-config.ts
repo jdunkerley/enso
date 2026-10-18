@@ -44,25 +44,6 @@ export interface Arguments {
   readonly sign: boolean
 }
 
-/** File association configuration, extended with information needed by the `enso-installer`. */
-interface ExtendedFileAssociation extends electronBuilder.FileAssociation {
-  /**
-   * The Windows registry key under which the file association is registered.
-   *
-   * Should follow the pattern `Enso.CamelCaseName`.
-   */
-  readonly progId: string
-}
-
-/** Additional configuration for the installer. */
-interface InstallerAdditionalConfig {
-  /** The company name to be used in the installer. */
-  readonly publisher: string
-
-  /** File association configuration. */
-  readonly fileAssociations: ExtendedFileAssociation[]
-}
-
 //======================================
 // === Argument parser configuration ===
 //======================================
@@ -115,64 +96,39 @@ export const args: Arguments = await yargs(process.argv.slice(2))
 // ======================================
 
 /** File associations for the IDE. */
-export const EXTENDED_FILE_ASSOCIATIONS = [
+export const FILE_ASSOCIATIONS: electronBuilder.FileAssociation[] = [
   {
     ext: fileAssociations.SOURCE_FILE_SUFFIX,
     name: `${common.PRODUCT_NAME} Source File`,
     role: 'Editor',
-    // Note that MIME type is used on Windows by the enso-installer to register the file association.
-    // This behavior is unlike what electron-builder does.
     mimeType: 'text/plain',
-    progId: 'Enso.Source',
   },
   {
     ext: fileAssociations.BUNDLED_PROJECT_SUFFIX,
     name: `${common.PRODUCT_NAME} Project Bundle`,
     role: 'Editor',
     mimeType: 'application/gzip',
-    progId: 'Enso.ProjectBundle',
   },
 ]
 
-/**
- * Returns non-extended file associations, as required by the `electron-builder`.
- *
- * Note that we need to actually remove any additional fields that we added to the file associations,
- * as the `electron-builder` will error out if it encounters unknown fields.
- */
+/** Returns the file associations, as required by the `electron-builder`. */
 function getFileAssociations(): electronBuilder.FileAssociation[] {
-  return EXTENDED_FILE_ASSOCIATIONS.map((assoc) => {
-    const { ext, name, role, mimeType } = assoc
-    return { ext, name, role, mimeType }
-  })
+  return FILE_ASSOCIATIONS
 }
 
-/** Returns additional configuration for the `enso-installer`. */
-function getInstallerAdditionalConfig(): InstallerAdditionalConfig {
-  return {
-    publisher: common.COMPANY_NAME,
-    fileAssociations: EXTENDED_FILE_ASSOCIATIONS,
-  }
+/** macOS updates need a signed app: build the update zip only when signing. */
+function isMacSigned(passedArgs: Arguments) {
+  return passedArgs.sign && process.env.CSC_LINK != null && process.env.CSC_LINK !== ''
 }
 
 /** Based on the given arguments, creates a configuration for the Electron Builder. */
 export function createElectronBuilderConfig(passedArgs: Arguments): electronBuilder.Configuration {
-  let version = BUILD_INFO.version
-  if (passedArgs.target === 'msi') {
-    // MSI installer imposes some restrictions on the version number. Namely, product version must have a major
-    // version less than 256, a minor version less than 256, and a build version less than 65536.
-    //
-    // As a workaround (we use year, like 2023, as a major version), we drop two leading digits from the major
-    // version number.
-    version = version.substring(2)
-  }
-
   // Electron Builder validates the *whole* configuration object, not just the platform it is
   // packaging. Writing the `--target` override into every platform block therefore fails the
   // build whenever the requested target is not also valid elsewhere — e.g. `--target nsis` on
   // Windows is rejected because `nsis` is not a legal macOS target. Apply it only to the
   // platform actually being built.
-  const targetFor = (buildConfigurationKey: string, platformDefault: string) =>
+  const targetFor = (buildConfigurationKey: string, platformDefault: string | string[]) =>
     passedArgs.platform.buildConfigurationKey === buildConfigurationKey ?
       (passedArgs.target ?? platformDefault)
     : platformDefault
@@ -180,15 +136,9 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
   return {
     appId: 'org.enso',
     productName: common.PRODUCT_NAME,
-    extraMetadata: {
-      version,
-      // This provides extra data for the installer.
-      installer: getInstallerAdditionalConfig(),
-    },
+    extraMetadata: { version: BUILD_INFO.version },
     copyright: `Copyright © ${new Date().getFullYear()} ${common.COMPANY_NAME}`,
 
-    // Note that the `artifactName` uses the "canonical" version of the product, not one that might have been
-    // simplified for the MSI installer to cope.
     artifactName: 'enso-${os}-${arch}-' + BUILD_INFO.version + '.${ext}',
 
     mac: {
@@ -196,7 +146,7 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       // almost zero.
       // This type assertion is UNSAFE, and any users MUST verify that
       // they are passing a valid value to `target`.
-      target: targetFor('mac', 'dmg') as any,
+      target: targetFor('mac', isMacSigned(passedArgs) ? ['dmg', 'zip'] : 'dmg') as any,
       icon: `./assets/icons/icon.icns`,
       category: 'public.app-category.developer-tools',
       darkModeSupport: true,
@@ -219,8 +169,12 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     win: {
       // Compression is not used as the build time is huge and file size saving
       // almost zero.
-      target: targetFor('win', 'dir'),
+      target: targetFor('win', 'nsis'),
       icon: `./assets/icons/icon.ico`,
+      // With a signing certificate, `electron-updater` refuses an update signed by anyone else.
+      ...(process.env.ENSO_BUILD_WIN_PUBLISHER_NAME ?
+        { signtoolOptions: { publisherName: process.env.ENSO_BUILD_WIN_PUBLISHER_NAME } }
+      : {}),
     },
     linux: {
       // Compression is not used as the build time is huge and file size saving
@@ -245,28 +199,20 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     directories: {
       output: `${passedArgs.ideDist}`,
     },
-    msi: {
-      runAfterFinish: false,
-    },
     nsis: {
-      // Disables "block map" generation during electron building. Block maps
-      // can be used for incremental package update on client-side. However,
-      // their generation can take long time (even 30 mins), so we removed it
-      // for now. Moreover, we may probably never need them, as our updates
-      // are handled by us. More info:
-      // https://github.com/electron-userland/electron-builder/issues/2851
-      // https://github.com/electron-userland/electron-builder/issues/2900
-      differentialPackage: false,
-      runAfterFinish: false,
+      // Per-user, so no admin rights; installs to `%LOCALAPPDATA%\Programs\enso`, the folder the
+      // former Rust installer used.
+      oneClick: true,
+      perMachine: false,
+      runAfterFinish: true,
+      // Migrates an install made by the Rust installer (see the file).
+      include: 'build/installer.nsh',
+      // Blockmaps let `electron-updater` download only the changed blocks. They are needed only
+      // for releases, and cost build time, so PR builds skip them.
+      differentialPackage: process.env.ENSO_BUILD_UPDATE_INFO === 'true',
     },
     dmg: {
-      // Disables "block map" generation during electron building. Block maps
-      // can be used for incremental package update on client-side. However,
-      // their generation can take long time (even 30 mins), so we removed it
-      // for now. Moreover, we may probably never need them, as our updates
-      // are handled by us. More info:
-      // https://github.com/electron-userland/electron-builder/issues/2851
-      // https://github.com/electron-userland/electron-builder/issues/2900
+      // macOS updates come from the zip, not the dmg, so the dmg needs no update info.
       writeUpdateInfo: false,
       // Disable code signing of the final dmg as this triggers an issue
       // with Apple’s Gatekeeper. Since the DMG contains a signed and
@@ -402,16 +348,16 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       }
     },
 
-    publish: null,
+    // The update feed baked into the app (`app-update.yml`) and written as `latest*.yml`.
+    // electron-builder never uploads: the build CLI does (see `buildPackage`).
+    publish: { provider: 'github', owner: 'jdunkerley', repo: 'enso' },
   }
 }
 
 /**
  * Write the configuration to a JSON file.
  *
- * On Windows it is necessary to provide configuration to our installer. On other platforms, this may be useful for debugging.
- *
- * The configuration will be extended with additional information needed by the `enso-installer`.
+ * This is for debugging only: nothing reads the file.
  */
 async function dumpConfiguration(configPath: string, config: electronBuilder.Configuration) {
   const jsonConfig = JSON.stringify(config)
@@ -471,15 +417,11 @@ export async function buildPackage(passedArgs: Arguments) {
   const cliOpts: electronBuilder.CliOptions = {
     config,
     targets: passedArgs.platform.createTarget(),
+    publish: 'never',
   }
 
-  // If `ENSO_BUILD_ELECTRON_BUILDER_CONFIG` is set, we will write the configuration to the
-  // specified path. Otherwise, we will write it to the default path.
-  // This is used on Windows to provide the configuration to the installer build. On other
-  // platforms, this may be useful for debugging.
-  const configPath =
-    process.env['ENSO_BUILD_ELECTRON_BUILDER_CONFIG'] ??
-    `${passedArgs.ideDist}/electron-builder-config.yaml`
+  // Kept for debugging: the configuration the build actually used.
+  const configPath = `${passedArgs.ideDist}/electron-builder-config.yaml`
   console.log(`Writing configuration to ${configPath}`)
   await dumpConfiguration(configPath, config)
 

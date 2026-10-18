@@ -489,6 +489,11 @@ jobs:
         with:
           name: ide-windows
           path: dist/ide/enso-*.exe
+      - name: Smoke-test the installer
+        run: ./tools/ci/windows-installer-smoke.ps1 -Installer (Get-Item dist/ide/enso-win-x64-*.exe).FullName
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Package Tests
         run: corepack pnpm -r --filter enso ide-integration-test
         env:

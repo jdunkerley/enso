@@ -19,7 +19,6 @@ pub mod robocopy;
 pub mod rsync;
 pub mod sbt;
 pub mod seven_zip;
-pub mod signtool;
 pub mod strip;
 pub mod tar;
 pub mod vs;
