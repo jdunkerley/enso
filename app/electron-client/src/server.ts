@@ -58,7 +58,7 @@ import {
   downloadFilePath,
   EXPORT_ARCHIVE_PATH,
   GET_FILE_DETAILS_REGEX,
-} from 'enso-common/src/services/Backend/remoteBackendPaths'
+} from 'enso-common/src/services/Backend/localBackendPaths'
 import { createReadStream, createWriteStream, statSync } from 'node:fs'
 import { mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'

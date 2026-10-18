@@ -11,7 +11,7 @@ import {
 import * as dateTime from '../utilities/data/dateTime.js'
 import * as newtype from '../utilities/data/newtype.js'
 import * as permissions from '../utilities/permissions.js'
-import { getFileDetailsPath } from './Backend/remoteBackendPaths.js'
+import { getFileDetailsPath } from './Backend/localBackendPaths.js'
 import {
   ApiKeyId,
   DatalinkId,

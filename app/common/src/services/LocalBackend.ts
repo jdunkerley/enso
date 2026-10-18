@@ -22,7 +22,7 @@ import {
 } from '../utilities/file.js'
 import { uniqueString } from '../utilities/uniqueString.js'
 import * as backend from './Backend.js'
-import { downloadProjectPath, EXPORT_ARCHIVE_PATH } from './Backend/remoteBackendPaths.js'
+import { downloadProjectPath, EXPORT_ARCHIVE_PATH } from './Backend/localBackendPaths.js'
 import { HttpClient } from './HttpClient.js'
 import type { ProjectManager } from './ProjectManager/ProjectManager.js'
 import {

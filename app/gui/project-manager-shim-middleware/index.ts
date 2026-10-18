@@ -34,7 +34,7 @@ import {
 import {
   DOWNLOAD_PROJECT_REGEX,
   EXPORT_ARCHIVE_PATH,
-} from 'enso-common/src/services/Backend/remoteBackendPaths'
+} from 'enso-common/src/services/Backend/localBackendPaths'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import { tmpdir } from 'node:os'
 import type { Readable } from 'node:stream'
