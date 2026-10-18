@@ -192,7 +192,7 @@ function onDragOverRow(event: DragEvent) {
 
   if ((isPayloadMatch && canPaste) || event.dataTransfer?.types.includes('Files') === true) {
     event.preventDefault()
-    if (item.type === AssetType.directory && category.value.type !== 'trash') {
+    if (item.type === AssetType.directory) {
       isDraggedOver.value = true
     }
   }
@@ -245,9 +245,6 @@ function onDragEnter(event: DragEvent) {
 }
 
 function onDragOver(event: DragEvent) {
-  if (category.value.type === 'trash' && event.dataTransfer != null) {
-    event.dataTransfer.dropEffect = 'none'
-  }
   onDragOverRow(event)
 }
 
@@ -307,12 +304,7 @@ function onDrop(event: DragEvent) {
     @drop="onDrop"
   >
     <td v-for="column in columns" :key="column" :class="COLUMN_CSS_CLASS[column]">
-      <AssetColumnCell
-        :column="column"
-        :item="item"
-        :labels="labels"
-        :isEditable="category.type !== 'trash'"
-      />
+      <AssetColumnCell :column="column" :item="item" :labels="labels" :isEditable="true" />
     </td>
   </tr>
 </template>

@@ -17,10 +17,9 @@ import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'
 import Result from '$/components/Result/Result.vue'
 import Loader from '$/components/Spinner/Loader.vue'
 import { useBackends } from '$/providers/backends'
-import { isCloudCategory, isLocalCategory } from '$/providers/category'
+import { isLocalCategory } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
-import { includes } from '$/utils/data/array'
 import { backendQueryOptions } from '$/utils/backendQuery'
 import { localVersioningStatusQueryOptions } from '$/utils/localVersioningQuery'
 import { useQuery } from '@tanstack/vue-query'
@@ -28,7 +27,6 @@ import {
   AssetType,
   extractTypeAndPath,
   ProjectId,
-  type AnyAsset,
   type Backend,
   type DatalinkAsset,
   type FileAsset,
@@ -46,11 +44,6 @@ defineProps<{
 const rightPanel = useRightPanelData()
 const { remoteBackend, localBackend } = useBackends()
 const { getText } = useText()
-
-/** Whether the asset can have versions. */
-function hasVersions(asset: AnyAsset): asset is DatalinkAsset | FileAsset | ProjectAsset {
-  return includes([AssetType.project, AssetType.datalink, AssetType.file], asset.type)
-}
 
 /**
  * The project opened in this project tab, and the backend which holds it: the local backend for a
@@ -139,11 +132,6 @@ const state = computed((): State => {
   const asset = rightPanel.focusedAsset
   if (category == null || asset == null) {
     return { placeholder: getText('assetVersions.notSelected') }
-  }
-  if (isCloudCategory(category)) {
-    return hasVersions(asset) ?
-        { asset, backend: remoteBackend }
-      : { placeholder: getText('assetVersions.invalidAssetType') }
   }
   if (localBackend == null) return { placeholder: getText('assetVersions.localUnavailable') }
   if (asset.type !== AssetType.project) {

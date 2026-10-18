@@ -18,18 +18,16 @@ vi.mock('$/providers/category', async (importOriginal) => ({
     categoryLabel: (category: Category) =>
       category.type === 'localDirectory' ?
         'Projects'
-      : useText().getText(`${category.type}Category` as 'cloudCategory'),
+      : useText().getText(`${category.type}Category` as 'localCategory'),
     removeLocalDirectory,
   }),
 }))
 const containerData = reactive({ leftPanelShown: true, leftPanelToggledOn: false })
 vi.mock('$/providers/container', () => ({ useContainerData: () => containerData }))
 
-// The transfer itself is tested with its composable (`$/composables/__tests__`).
-const transferBetweenCategories = vi.fn()
-vi.mock('$/composables/transferBetweenCategories', () => ({
-  useTransferBetweenCategories: () => transferBetweenCategories,
-}))
+// The move itself is tested with its composable (`$/composables/__tests__`).
+const moveAssets = vi.fn()
+vi.mock('$/composables/moveAssets', () => ({ useMoveAssets: () => moveAssets }))
 
 function mountCategoryButton(category: Category, props: { extended?: boolean } = {}) {
   const drive = reactive({ currentCategory: { type: 'local' } as Category, isNavigating: false })
@@ -54,19 +52,19 @@ describe('CategoryButton', () => {
   })
 
   test('is labelled with the category name, from the text store', async () => {
-    const { wrapper } = await mountCategoryButton({ type: 'cloud' })
-    expect(wrapper.find('button').attributes('aria-label')).toBe('Cloud')
+    const { wrapper } = await mountCategoryButton({ type: 'local' })
+    expect(wrapper.find('button').attributes('aria-label')).toBe('Local')
   })
 
   test('switches the drive to its category when pressed', async () => {
-    const { wrapper, drive } = await mountCategoryButton({ type: 'trash' })
+    const { wrapper, drive } = await mountCategoryButton({ type: 'localRecent' })
     await press(wrapper)
-    expect(drive.currentCategory).toEqual({ type: 'trash' })
+    expect(drive.currentCategory).toEqual({ type: 'localRecent' })
   })
 
   test('opens the left panel when it is collapsed', async () => {
     containerData.leftPanelShown = false
-    const { wrapper } = await mountCategoryButton({ type: 'cloud' })
+    const { wrapper } = await mountCategoryButton({ type: 'local' })
     await press(wrapper)
     expect(containerData.leftPanelToggledOn).toBe(true)
   })
@@ -93,7 +91,7 @@ describe('CategoryButton', () => {
   test("another category's button shows no spinner while the drive navigates", async () => {
     vi.useFakeTimers()
     try {
-      const { wrapper, drive } = await mountCategoryButton({ type: 'cloud' })
+      const { wrapper, drive } = await mountCategoryButton({ type: 'localRecent' })
       drive.isNavigating = true
       await vi.advanceTimersByTimeAsync(150)
       expect(wrapper.findComponent({ name: 'LoadingSpinner' }).exists()).toBe(false)
@@ -131,8 +129,11 @@ describe('CategoryButton', () => {
   })
 
   test('moves the assets dropped on it into its category', async () => {
-    transferBetweenCategories.mockClear()
-    const { wrapper } = await mountCategoryButton({ type: 'cloud' })
+    moveAssets.mockClear()
+    const { wrapper } = await mountCategoryButton({
+      type: 'localDirectory',
+      path: '/home/projects',
+    } as Category)
     const item = {
       id: 'directory-1',
       title: 'Data',
@@ -153,9 +154,11 @@ describe('CategoryButton', () => {
         ],
       },
     })
-    await vi.waitFor(() => expect(transferBetweenCategories).toHaveBeenCalledOnce())
-    expect(transferBetweenCategories).toHaveBeenCalledWith({ type: 'local' }, { type: 'cloud' }, [
-      item,
-    ])
+    await vi.waitFor(() => expect(moveAssets).toHaveBeenCalledOnce())
+    expect(moveAssets).toHaveBeenCalledWith(
+      { type: 'local' },
+      { type: 'localDirectory', path: '/home/projects' },
+      [item],
+    )
   })
 })

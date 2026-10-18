@@ -1,12 +1,12 @@
 /**
  * @file The drive's actions, for its Vue components: thin wrappers over the framework-free queries
  * and mutations (`$/utils/backendQuery`, `$/utils/driveQueries`, `$/utils/driveMutations`), the
- * uploads (`$/providers/upload`) and the transfer between categories, giving them the drive's
+ * uploads (`$/providers/upload`) and moving between categories, giving them the drive's
  * stores (#192, ruling 12). Call them in a component's `setup`; the functions they return may be
  * called at any time.
  */
 import { resolveDuplications } from '$/components/Drive/duplicateAssets'
-import { useTransferBetweenCategories } from '$/composables/transferBetweenCategories'
+import { useMoveAssets } from '$/composables/moveAssets'
 import {
   dropOperationBetweenCategories,
   type Category,
@@ -19,7 +19,7 @@ import { useLocalPaths } from '$/providers/localDirectories'
 import type { ProjectInfo } from '$/providers/openedProjects/projectInfo'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
-import { uploadFiles, useUploadsToCloudStore } from '$/providers/upload'
+import { uploadFiles } from '$/providers/upload'
 import { backendMutationOptions, executeMutation } from '$/utils/backendQuery'
 import {
   ensureListDirectory,
@@ -34,7 +34,6 @@ import { PRODUCT_NAME } from 'enso-common/src/constants'
 import {
   AssetType,
   Path,
-  type AnyAsset,
   type AssetId,
   type Backend,
   type DirectoryId,
@@ -175,28 +174,18 @@ export function useUploadFiles(
   driveStore: DriveStore,
 ) {
   const queryClient = useQueryClient()
-  const uploads = useUploadsToCloudStore()
   return (filesToUpload: readonly File[], parentId: DirectoryId) =>
     uploadFiles(
       {
         queryClient,
         backend: toValue(backend),
         category: toValue(category),
-        uploadToCloud: (file, params, kind) => uploads.uploadFile(file, params, kind),
         resolveDuplications,
         onUploaded: (uploaded) => driveStore.setSelectedAssets(uploaded),
       },
       filesToUpload,
       parentId,
     )
-}
-
-/** A function copying cloud assets to the local drive. */
-export function useUploadFileToLocal(category: MaybeRefOrGetter<Category>) {
-  const transferBetweenCategories = useTransferBetweenCategories()
-  return async (assets: readonly AnyAsset[]) => {
-    await transferBetweenCategories(toValue(category), { type: 'local' }, assets)
-  }
 }
 
 /** Options for the function {@link usePaste} returns. */
@@ -208,23 +197,14 @@ export interface PasteOptions {
   readonly method: 'copy' | 'move'
 }
 
-/**
- * A function copying or moving assets as appropriate. Assets are moved, except when cut and pasted
- * between the Team Space and the User Space, where they are copied.
- */
+/** A function copying or moving the pasted assets into a folder. */
 export function usePaste() {
-  const transferBetweenCategories = useTransferBetweenCategories()
+  const moveAssets = useMoveAssets()
   return (options: PasteOptions) => {
     const { newParentId, pasteData, fromCategory, toCategory, method } = options
     const dropOperation = dropOperationBetweenCategories(fromCategory, toCategory, newParentId)
     if (dropOperation === 'cancel') return
-    return transferBetweenCategories(
-      fromCategory,
-      toCategory,
-      pasteData.assets,
-      newParentId,
-      method,
-    )
+    return moveAssets(fromCategory, toCategory, pasteData.assets, newParentId, method)
   }
 }
 

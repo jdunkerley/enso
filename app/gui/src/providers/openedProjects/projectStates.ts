@@ -35,7 +35,6 @@ import { useHttpClient } from '../httpClient'
 import { useLocalVersioning } from '../localVersioning'
 import { useSession } from '../session'
 import { useText } from '../text'
-import { useUploadsToCloudStore } from '../upload'
 import { createGraphStore, type GraphStore } from './graph'
 import { createModuleStore, type ModuleStore } from './module'
 import { createProjectStore, type ProjectStore } from './project'
@@ -160,7 +159,6 @@ export function useProjectStates() {
   const backends = useBackends()
   const session = useSession()
   const text = useText()
-  const uploads = useUploadsToCloudStore()
   const queryClient = vueQuery.useQueryClient()
   const localVersioning = useLocalVersioning()
   const httpClient = useHttpClient()
@@ -603,24 +601,9 @@ export function useProjectStates() {
     }
   }
 
-  async function uploadHybridProject(info: RunningProjectInfo & { mode: 'hybrid' }) {
-    const fileName = 'project_root.enso-project'
-    const file = await backends.remoteBackend.getProjectArchive(info.localParentId, fileName)
-    const result = await catchNetworkError(
-      uploads.uploadFile(
-        file,
-        {
-          fileId: info.id,
-          fileName,
-          parentDirectoryId: info.parentId,
-        },
-        'hybridSync',
-      ),
-    )
-    if (result.ok) {
-      info.synced = true
-    }
-    return result
+  // The cloud upload is gone, and hybrid projects with it; Task 31 deletes the rest of this.
+  function uploadHybridProject(_info: RunningProjectInfo & { mode: 'hybrid' }) {
+    return Promise.resolve(Err('Hybrid projects cannot be uploaded: there is no cloud.'))
   }
 
   async function uploadHybridProjectOnClose(project: HybridLocallyClosed) {

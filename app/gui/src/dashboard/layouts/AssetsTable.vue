@@ -1046,7 +1046,7 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
 }
 
 function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
-  if (category.value.type === 'trash' || isRecentCategory(category.value)) {
+  if (isRecentCategory(category.value)) {
     dragAnnouncements.rejected()
     return
   }
@@ -1168,10 +1168,7 @@ const specialEmptyText = computed(() =>
 )
 
 const emptyText = computed(() =>
-  category.value.type === 'trash' ? (specialEmptyText.value ?? getText('yourTrashIsEmpty'))
-  : category.value.type === 'recent' ?
-    (specialEmptyText.value ?? getText('youHaveNoRecentProjects'))
-  : category.value.type === 'localRecent' ?
+  category.value.type === 'localRecent' ?
     (specialEmptyText.value ?? getText('noRecentLocalProjects'))
   : (specialEmptyText.value ?? getText('youHaveNoFiles')),
 )
@@ -1307,7 +1304,7 @@ const isLoadingRow = computed(
                     :class="
                       twMerge(
                         'sticky left-1 grid max-w-[calc(100cqw_-_0.5rem)] grow place-items-center pb-40 pt-20',
-                        (isRecentCategory(category) || category.type === 'trash') && 'hidden',
+                        isRecentCategory(category) && 'hidden',
                       )
                     "
                     @dragenter="onDropzoneDragOver"

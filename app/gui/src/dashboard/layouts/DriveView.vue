@@ -6,25 +6,17 @@
  *
  * It provides the drive's state (`provideDriveStore`, #90), the location it shows
  * (`provideDriveView`: the old directory stays on screen while a new one loads), the listed assets
- * and the search suggestions. In place of the drive it shows why the cloud is unavailable (the
- * cloud cannot be reached, or the user is not enabled), or that the cloud is unavailable offline.
+ * and the search suggestions.
  */
 import AssetsTable from '#/layouts/AssetsTable.vue'
 import { provideAssetItems } from '#/layouts/Drive/assetItems'
-import { useToastAndLog } from '#/layouts/Drive/driveActions'
 import { provideDriveView } from '#/layouts/Drive/driveView'
 import { provideSuggestions } from '#/layouts/Drive/suggestions'
 import DriveBar from '#/pages/dashboard/Drive/DriveBar/DriveBar.vue'
-import { SUBSCRIBE_PATH } from '$/appUtils'
-import Button from '$/components/Button/Button.vue'
-import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import ErrorDisplay from '$/components/ErrorBoundary/ErrorDisplay.vue'
-import Result from '$/components/Result/Result.vue'
 import Loader from '$/components/Spinner/Loader.vue'
-import { useAuth } from '$/providers/auth'
-import { useBackends } from '$/providers/backends'
-import { categoryKey, isCloudCategory } from '$/providers/category'
+import { categoryKey } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
 import { provideDriveStore } from '$/providers/driveStore'
@@ -32,8 +24,6 @@ import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import AssetQuery from '$/utils/AssetQuery'
-import { download } from '$/utils/download'
-import { getDownloadUrl } from '$/utils/github'
 import { BackendType, DirectoryDoesNotExistError } from 'enso-common/src/services/Backend'
 import { OfflineError } from 'enso-common/src/utilities/errors'
 import { computed, shallowRef, watch } from 'vue'
@@ -50,35 +40,10 @@ provideSuggestions()
 const driveView = provideDriveView()
 
 const { getText } = useText()
-const auth = useAuth()
 const drive = useDriveLocation()
 const container = useContainerData()
 const isOnline = useIsOnline()
 const toasts = useToasts()
-const toastAndLog = useToastAndLog()
-const { localBackend } = useBackends()
-
-const session = computed(() => auth.session)
-const isCloud = computed(() => isCloudCategory(drive.currentCategory))
-const supportLocalBackend = localBackend != null
-
-const status = computed(() => {
-  return (
-    isCloud.value && !isOnline.value ? 'offline'
-    : isCloud.value && session.value?.user.isEnabled !== true ? 'not-enabled'
-    : 'ok'
-  )
-})
-
-function switchToLocal() {
-  drive.currentCategory = { type: 'local' }
-}
-
-async function downloadFreeEdition() {
-  const downloadUrl = await getDownloadUrl()
-  if (downloadUrl == null) toastAndLog('noAppDownloadError')
-  else void download({ url: downloadUrl })
-}
 
 // A directory that no longer exists sends the drive back to its default category, with a toast.
 watch(
@@ -116,48 +81,21 @@ function onFocusIn() {
 
 <template>
   <ErrorBoundary>
-    <Result
-      v-if="status === 'not-enabled'"
-      status="error"
-      :title="getText('notEnabledTitle')"
-      testId="not-enabled-stub"
-      :subtitle="`${getText('notEnabledSubtitle')}${localBackend == null ? ' ' + getText('downloadFreeEditionMessage') : ''}`"
+    <OfflineMessage v-if="errorToShow instanceof OfflineError" :onPress="driveView.retry" />
+    <ErrorDisplay v-else-if="errorToShow != null" :error="errorToShow" @reset="driveView.retry" />
+    <Loader v-else-if="shown == null" minHeight="h24" size="medium" />
+    <div
+      v-else
+      class="relative flex w-full grow flex-col overflow-hidden"
+      data-testid="drive-view"
+      :data-category="categoryKey(shown.category)"
+      @focusin="onFocusIn"
     >
-      <ButtonGroup align="center">
-        <Button variant="primary" size="medium" :href="SUBSCRIBE_PATH">
-          {{ getText('upgrade') }}
-        </Button>
-        <Button v-if="supportLocalBackend" size="medium" variant="primary" @press="switchToLocal">
-          {{ getText('switchToLocal') }}
-        </Button>
-        <Button
-          v-else
-          data-testid="download-free-edition"
-          size="medium"
-          variant="accent"
-          @press="downloadFreeEdition"
-        >
-          {{ getText('downloadFreeEdition') }}
-        </Button>
-      </ButtonGroup>
-    </Result>
-    <template v-else>
-      <OfflineMessage v-if="errorToShow instanceof OfflineError" :onPress="driveView.retry" />
-      <ErrorDisplay v-else-if="errorToShow != null" :error="errorToShow" @reset="driveView.retry" />
-      <Loader v-else-if="shown == null" minHeight="h24" size="medium" />
-      <div
-        v-else
-        class="relative flex w-full grow flex-col overflow-hidden"
-        data-testid="drive-view"
-        :data-category="categoryKey(shown.category)"
-        @focusin="onFocusIn"
-      >
-        <DriveBar :query="query" :setQuery="setQuery" :toolbar="toolbar" />
-        <OfflineMessage v-if="isInaccessible" />
-        <ErrorBoundary v-else>
-          <AssetsTable :query="query" />
-        </ErrorBoundary>
-      </div>
-    </template>
+      <DriveBar :query="query" :setQuery="setQuery" :toolbar="toolbar" />
+      <OfflineMessage v-if="isInaccessible" />
+      <ErrorBoundary v-else>
+        <AssetsTable :query="query" />
+      </ErrorBoundary>
+    </div>
   </ErrorBoundary>
 </template>

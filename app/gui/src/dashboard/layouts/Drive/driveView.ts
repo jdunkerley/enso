@@ -3,8 +3,7 @@
  *
  * The drive location (`$/providers/drive`) changes the moment a category button, a breadcrumb or a
  * row asks it to. The drive shows the change only once it has loaded: the old directory (its bar,
- * its rows, its `data-category`) stays on screen until the new directory's details (and, for the
- * trash, its listing) have loaded, while `isNavigating` shows the category button's spinner and the
+ * its rows, its `data-category`) stays on screen until the new directory's details have loaded, while `isNavigating` shows the category button's spinner and the
  * button that asked shows its own (#90, ruling 5). The specs rely on that through `data-category`.
  *
  * {@link provideDriveView} does this: `shown` is the location whose data is there, `target` the one
@@ -15,7 +14,6 @@ import { useAuth } from '$/providers/auth'
 import { categoryKey, isLocalCategory, useCategories, type Category } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useLocalPaths } from '$/providers/localDirectories'
-import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { createContextStore } from '@/providers'
 import { useQuery } from '@tanstack/vue-query'
 import {
@@ -157,30 +155,8 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     }),
   )
 
-  const trashListing = useQuery(
-    computed(() => {
-      const category = { type: 'trash' } as const
-      return {
-        ...listDirectoryQueryOptions({
-          backend: target.value.backend,
-          category,
-          parentId: categories.categoryDirectoryId(category),
-          refetchInterval: null,
-          labels: null,
-          sortDirection: null,
-          sortExpression: null,
-        }),
-        enabled: target.value.category.type === 'trash',
-      }
-    }),
-  )
-
   /** Whether the data the target needs is there, so that it can be shown. */
-  const isTargetReady = computed(
-    () =>
-      details.data.value !== undefined &&
-      (target.value.category.type !== 'trash' || trashListing.data.value !== undefined),
-  )
+  const isTargetReady = computed(() => details.data.value !== undefined)
 
   /** The location shown: the last one whose data was there. `null` until the first is. */
   const shown = shallowRef<DriveViewLocation | null>(null)
@@ -195,7 +171,7 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
   })
 
   /** The error the target's data failed with, if it did. */
-  const error = computed(() => details.error.value ?? trashListing.error.value ?? null)
+  const error = computed(() => details.error.value ?? null)
 
   const isNavigating = computed(
     () => shown.value != null && !sameLocation(shown.value, target.value),
@@ -243,7 +219,6 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     /** Refetch the target's data, after an error. */
     retry: () => {
       void details.refetch()
-      if (target.value.category.type === 'trash') void trashListing.refetch()
     },
     shownDetails,
   }

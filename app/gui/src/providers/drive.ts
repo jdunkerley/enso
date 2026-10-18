@@ -10,7 +10,6 @@ import {
   categoryEq,
   categoryFromKey,
   categoryKey,
-  isCloudCategory,
   useCategories,
   type Category,
 } from './category'
@@ -55,10 +54,7 @@ export const [provideDriveLocation, useDriveLocation] = createContextStore('driv
   const defaultCategory: Category = { type: 'local' }
 
   /** The saved category, unless it is missing, unreadable or a cloud one: then there is none. */
-  const storedCategory = computed(() => {
-    const stored = categoryFromKey(storedDriveDisplay.value?.currentCategory)
-    return stored != null && !isCloudCategory(stored) ? stored : null
-  })
+  const storedCategory = computed(() => categoryFromKey(storedDriveDisplay.value?.currentCategory))
 
   const currentCategory = computed({
     get: () => storedCategory.value ?? defaultCategory,

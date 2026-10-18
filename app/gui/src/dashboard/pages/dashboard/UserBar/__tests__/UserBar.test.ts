@@ -43,9 +43,6 @@ vi.mock('$/providers/backends', async () => {
   }
 })
 
-const uploads = reactive(new Map<string, object>())
-vi.mock('$/providers/upload', () => ({ useUploadsToCloudStore: () => ({ uploads }) }))
-
 const { getText } = useText()
 
 // The overlays teleport into the portal root that `index.html` provides.
@@ -115,7 +112,6 @@ beforeEach(() => {
 afterEach(() => {
   useAboutModal().isOpen.value = false
   onlineManager.setOnline(true)
-  uploads.clear()
   useToasts().dismiss()
 })
 
@@ -266,32 +262,5 @@ describe('NotificationTray', () => {
     expect(tray().getAttribute('aria-label')).toBe(getText('notifications'))
     expect(textOf(tray().querySelector('h3'))).toBe(getText('notifications'))
     expect(tray().textContent).toContain(getText('youAreAllCaughtUp'))
-  })
-
-  test('an upload: a notification with a toast, and a badge until the tray is opened', async () => {
-    await mountUserBar()
-    const badge = () => must(trayButton().querySelector('[class*="after:bg-danger"]'))
-    uploads.set('upload-1', {
-      kind: 'requestedByUser',
-      sentBytes: 500_000,
-      totalBytes: 2_000_000,
-    })
-    await flushPromises()
-    const message = getText('uploadingXFilesWithProgressNotification', 0, 1, '0.50', '2')
-    const toast = must(useToasts().toasts.value.find((t) => t.id === 'upload-1'))
-    expect(toast.isLoading).toBe(true)
-    expect(toast.position).toBe('bottom-right')
-    expect(toast.progress).toBe(0.25)
-    expect(badge().classList).not.toContain('invisible')
-
-    await userEvent.setup().click(trayButton())
-    await flushPromises()
-    const items = [...tray().querySelectorAll('[role="listitem"]')]
-    expect(items).toHaveLength(1)
-    const [item] = items
-    expect(item?.textContent).toContain(message)
-    expect(item?.querySelector('[role="progressbar"]')).not.toBeNull()
-    // Seen: the badge goes.
-    expect(badge().classList).toContain('invisible')
   })
 })

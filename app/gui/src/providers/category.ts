@@ -1,32 +1,18 @@
 import { createPersistedStore } from '$/utils/persistedStore'
-import { proxyRefs, type ToValue } from '$/utils/reactivity'
+import { proxyRefs } from '$/utils/reactivity'
 import type { Opt } from '@/util/data/opt'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import { createGlobalState } from '@vueuse/core'
-import {
-  BackendType,
-  isUserGroupId,
-  Path,
-  UserGroupId,
-  type DirectoryId,
-  type User,
-} from 'enso-common/src/services/Backend'
+import { BackendType, Path, type DirectoryId } from 'enso-common/src/services/Backend'
 import { newDirectoryId } from 'enso-common/src/services/LocalBackend'
-import { organizationIdToDirectoryId } from 'enso-common/src/services/RemoteBackend/ids'
 import { getFileName, normalizeSlashes } from 'enso-common/src/utilities/file'
-import { computed, toValue } from 'vue'
-import { useAuth } from './auth'
+import { computed } from 'vue'
 import { useBackends } from './backends'
 import { useLocalPaths } from './localDirectories'
 import { useText } from './text'
 
 export interface PredefinedCategory {
-  type: 'cloud' | 'recent' | 'trash' | 'local' | 'localRecent'
-}
-
-export interface TeamDirectory {
-  type: 'team'
-  groupId: UserGroupId
+  type: 'local' | 'localRecent'
 }
 
 export interface LocalDirectory {
@@ -34,32 +20,22 @@ export interface LocalDirectory {
   path: Path
 }
 
-export type Category = PredefinedCategory | TeamDirectory | LocalDirectory
+export type Category = PredefinedCategory | LocalDirectory
 export type CategoryType = Category['type']
 
 export const CATEGORY_BACKEND: Record<CategoryType, BackendType> = {
-  cloud: BackendType.remote,
-  recent: BackendType.remote,
-  trash: BackendType.remote,
-  team: BackendType.remote,
   local: BackendType.local,
   localRecent: BackendType.local,
   localDirectory: BackendType.local,
 }
-const TEAM_CATEGORY_KEY_PREFIX = 'team-'
 const LOCAL_DIRECTORY_KEY_PREFIX = 'local-'
 
 /** A key string of panel. May be used as Set element or Map key. */
 export function categoryKey(category: Category) {
   switch (category.type) {
-    case 'cloud':
-    case 'recent':
-    case 'trash':
     case 'local':
     case 'localRecent':
       return category.type
-    case 'team':
-      return `${TEAM_CATEGORY_KEY_PREFIX}${category.groupId}`
     case 'localDirectory':
       return `${LOCAL_DIRECTORY_KEY_PREFIX}${category.path}`
   }
@@ -68,22 +44,12 @@ export function categoryKey(category: Category) {
 /** Parse key string created by {@link categoryKey}. */
 export function categoryFromKey(key: Opt<string>): Category | null {
   switch (key) {
-    case 'cloud':
-    case 'recent':
-    case 'trash':
     case 'local':
     case 'localRecent':
       return { type: key }
     default:
       if (key == null) return null
-      else if (key.startsWith(TEAM_CATEGORY_KEY_PREFIX)) {
-        const groupId = key.substring(TEAM_CATEGORY_KEY_PREFIX.length)
-        if (!isUserGroupId(groupId)) return null
-        return {
-          type: 'team',
-          groupId: groupId,
-        }
-      } else if (key.startsWith(LOCAL_DIRECTORY_KEY_PREFIX)) {
+      else if (key.startsWith(LOCAL_DIRECTORY_KEY_PREFIX)) {
         return {
           type: 'localDirectory',
           path: Path(key.substring(LOCAL_DIRECTORY_KEY_PREFIX.length)),
@@ -97,35 +63,24 @@ export function categoryEq(a: Opt<Category>, b: Opt<Category>) {
   return (a ? categoryKey(a) : '') === (b ? categoryKey(b) : '')
 }
 
-/** Check if category uses remote backend. */
-export function isCloudCategory(category: Category) {
-  return CATEGORY_BACKEND[category.type] === BackendType.remote
-}
-
 /** Check if category uses local backend. */
 export function isLocalCategory(category: Category) {
   return CATEGORY_BACKEND[category.type] === BackendType.local
 }
 
-/** Whether the category is a Recent list: the cloud's, or the local one. */
+/** Whether the category is the Recent list. */
 export function isRecentCategory(category: Category | CategoryType) {
   const type = typeof category === 'string' ? category : category.type
-  return type === 'recent' || type === 'localRecent'
+  return type === 'localRecent'
 }
 
 /** Get icon representing given category type. */
 export function categoryIcon(category: CategoryType): Icon {
   switch (category) {
-    case 'cloud':
-    case 'trash':
-      return category
-    case 'recent':
     case 'localRecent':
       return 'history'
     case 'local':
       return 'system'
-    case 'team':
-      return 'people'
     case 'localDirectory':
       return 'folder_small'
   }
@@ -147,14 +102,11 @@ const localDirectoryStore = createPersistedStore<LocalRootDirectoryStoreState>(
  */
 export type CategoriesStore = ReturnType<typeof createCategoriesStore>
 
-function createCategoriesStore(userData: ToValue<Opt<User>>) {
+function createCategoriesStore() {
   const { getText } = useText()
   const backends = useBackends()
   const localPaths = useLocalPaths()
 
-  const groupById = computed(
-    () => new Map(toValue(userData)?.groups?.map((group) => [group.id, group])),
-  )
   const rootPath = computed(
     () => localPaths.localRootDirectory ?? backends.localBackend?.rootPath(),
   )
@@ -179,37 +131,22 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
 
   function categoryLabel(category: Category) {
     switch (category.type) {
-      case 'cloud':
-        return getText('cloudCategory')
-      case 'recent':
       case 'localRecent':
         return getText('recentCategory')
-      case 'trash':
-        return getText('trashCategory')
       case 'local':
         return getText('localCategory')
-      case 'team':
-        return getText('teamCategory', groupById.value.get(category.groupId)?.name ?? 'UNKNOWN')
       case 'localDirectory':
         return getFileName(category.path)
     }
   }
 
   function categoryDirectoryId(category: Category): DirectoryId | null {
-    const user = toValue(userData)
     switch (category.type) {
-      case 'cloud':
-        return user?.rootDirectoryId ?? null
-      case 'recent':
       case 'localRecent':
         return null
-      case 'trash':
-        return user != null ? organizationIdToDirectoryId(user?.organizationId) : null
       case 'local': {
         return rootPath.value != null ? newDirectoryId(rootPath.value) : null
       }
-      case 'team':
-        return groupById.value.get(category.groupId)?.homeDirectoryId ?? null
       case 'localDirectory':
         return newDirectoryId(category.path)
     }
@@ -221,10 +158,6 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
 
   function categoryRootPath(category: Category): Path | null {
     switch (category.type) {
-      case 'team': {
-        const group = groupById.value.get(category.groupId)
-        return group != null ? Path(`enso://Teams/${group.name}`) : null
-      }
       case 'local':
         return rootPath.value ?? null
       case 'localDirectory':
@@ -270,10 +203,7 @@ function createCategoriesStore(userData: ToValue<Opt<User>>) {
   })
 }
 
-export const useCategories = createGlobalState(() => {
-  const auth = useAuth()
-  return createCategoriesStore(() => auth.session?.user)
-})
+export const useCategories = createGlobalState(() => createCategoriesStore())
 
 /**
  * The drop operation to use when transferring assets between categories.
@@ -285,37 +215,11 @@ export function dropOperationBetweenCategories(
   from: Category,
   to: Category,
   parentId: DirectoryId | null = null,
-): 'cancel' | 'copy' | 'move' | undefined {
+): 'cancel' | 'move' {
   // Moving into the same category without a parentId is not allowed.
-  if (categoryEq(from, to) && parentId == null) {
-    return 'cancel'
-  }
-
-  if (isRecentCategory(to) || isRecentCategory(from)) {
-    return 'cancel'
-  }
-
-  if (isLocalCategory(from)) {
-    if (to.type === 'trash') {
-      return 'cancel'
-    }
-  }
-
-  if (isCloudCategory(from) !== isCloudCategory(to)) {
-    return 'copy'
-  }
-
-  switch (from.type) {
-    case 'cloud':
-      return 'move'
-    case 'team':
-      return to.type === 'trash' ? 'move' : 'copy'
-    case 'trash':
-      return 'move'
-    case 'local':
-    case 'localDirectory':
-      return 'move' // "Copy from cloud" scenario covered above.
-  }
+  if (categoryEq(from, to) && parentId == null) return 'cancel'
+  if (isRecentCategory(to) || isRecentCategory(from)) return 'cancel'
+  return 'move'
 }
 
 /** Whether an asset can be transferred between categories. */
@@ -324,7 +228,5 @@ export function canTransferBetweenCategories(
   to: Category,
   parentId: DirectoryId | null = null,
 ) {
-  const operation = dropOperationBetweenCategories(from, to, parentId)
-
-  return operation !== 'cancel'
+  return dropOperationBetweenCategories(from, to, parentId) !== 'cancel'
 }

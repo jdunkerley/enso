@@ -74,18 +74,15 @@ export function getColumnList(
   supportsLabels: boolean,
 ): readonly Column[] {
   const isCloud = backendType === backend.BackendType.remote
-  const isTrash = category === 'trash'
   const isRecent = isRecentCategory(category)
-  const isTeam = category === 'team'
 
   const columns = [
     Column.name,
     Column.modified,
     Column.createdAt,
-    (isTrash || isRecent || isSearching) && Column.path,
+    (isRecent || isSearching) && Column.path,
     supportsLabels && Column.labels,
     isCloud && Column.size,
-    isCloud && isTeam && Column.createdBy,
     // FIXME[sb]: https://github.com/enso-org/cloud-v2/issues/1525
     // Bring back these columns when they are ready for use again.
     // isCloud && Column.accessedByProjects,
