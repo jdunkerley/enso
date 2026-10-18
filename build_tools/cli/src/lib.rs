@@ -575,8 +575,13 @@ impl Processor {
                 .upload_asset_file_with_custom_name(&artifacts.image, add_prefix.clone())
                 .await?;
             release
-                .upload_asset_file_with_custom_name(&artifacts.image_checksum, add_prefix)
+                .upload_asset_file_with_custom_name(&artifacts.image_checksum, add_prefix.clone())
                 .await?;
+            // Update files keep their own names: `latest*.yml` names the files it points at,
+            // so a prefix would break the feed.
+            for file in artifacts.update_files() {
+                release.upload_asset_file(&file).await?;
+            }
             Ok(())
         }
         .boxed()

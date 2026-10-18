@@ -14,6 +14,10 @@ pub struct Artifact {
     pub image: PathBuf,
     /// File with the checksum of the image.
     pub image_checksum: PathBuf,
+    /// Directory the build writes its outputs to.
+    pub dist_dir: PathBuf,
+    /// OS the image was built for.
+    pub target_os: OS,
 }
 
 impl Artifact {
@@ -38,7 +42,34 @@ impl Artifact {
             image,
             unpacked,
             unpacked_executable,
+            dist_dir: dist_dir.as_ref().to_path_buf(),
+            target_os,
         }
+    }
+
+    /// What `electron-updater` needs next to the image: the feed and the blockmaps (and on macOS,
+    /// the zip it updates from). Only release builds write them (`ENSO_BUILD_UPDATE_INFO`), so
+    /// missing files are skipped.
+    pub fn update_files(&self) -> Vec<PathBuf> {
+        let with_suffix = |path: &Path, suffix: &str| {
+            let mut name = path.as_os_str().to_owned();
+            name.push(suffix);
+            PathBuf::from(name)
+        };
+        let candidates = match self.target_os {
+            OS::Windows => {
+                vec![with_suffix(&self.image, ".blockmap"), self.dist_dir.join("latest.yml")]
+            }
+            OS::Linux => {
+                vec![with_suffix(&self.image, ".blockmap"), self.dist_dir.join("latest-linux.yml")]
+            }
+            OS::MacOS => {
+                let zip = self.image.with_extension("zip");
+                let zip_blockmap = with_suffix(&zip, ".blockmap");
+                vec![self.dist_dir.join("latest-mac.yml"), zip, zip_blockmap]
+            }
+        };
+        candidates.into_iter().filter(|path| path.exists()).collect()
     }
 
     pub fn start_unpacked(
@@ -138,5 +169,41 @@ pub fn electron_image_filename(target_os: OS, target_arch: Arch, version: &Versi
         OS::Linux => format!("enso-linux-{arch_string}-{version}.AppImage"),
         OS::MacOS => format!("enso-mac-{arch_string}-{version}.dmg"),
         OS::Windows => format!("enso-win-{arch_string}-{version}.exe"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_files_are_the_existing_feed_and_blockmaps() -> Result {
+        let dist = tempfile::tempdir()?;
+        let version = Version::parse("2026.2.0")?;
+        let artifact = Artifact::new(OS::Windows, Arch::X86_64, &version, dist.path());
+        assert!(artifact.update_files().is_empty());
+
+        let blockmap = dist.path().join("enso-win-x64-2026.2.0.exe.blockmap");
+        let feed = dist.path().join("latest.yml");
+        ide_ci::fs::write(&blockmap, "")?;
+        ide_ci::fs::write(&feed, "")?;
+        ide_ci::fs::write(dist.path().join("latest-linux.yml"), "")?;
+        assert_eq!(artifact.update_files(), vec![blockmap, feed]);
+        Ok(())
+    }
+
+    #[test]
+    fn macos_update_files_include_the_zip() -> Result {
+        let dist = tempfile::tempdir()?;
+        let version = Version::parse("2026.2.0")?;
+        let artifact = Artifact::new(OS::MacOS, Arch::AArch64, &version, dist.path());
+        let zip = dist.path().join("enso-mac-arm64-2026.2.0.zip");
+        let zip_blockmap = dist.path().join("enso-mac-arm64-2026.2.0.zip.blockmap");
+        let feed = dist.path().join("latest-mac.yml");
+        for path in [&zip, &zip_blockmap, &feed] {
+            ide_ci::fs::write(path, "")?;
+        }
+        assert_eq!(artifact.update_files(), vec![feed, zip, zip_blockmap]);
+        Ok(())
     }
 }
