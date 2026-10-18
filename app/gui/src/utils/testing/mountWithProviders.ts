@@ -24,7 +24,7 @@
  * vi.mock('$/providers/backends', async () => {
  *   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
  *   const listDirectory = vi.fn<Backend['listDirectory']>()
- *   return { useBackends: () => mockBackends({ remoteBackend: { listDirectory } }) }
+ *   return { useBackends: () => mockBackends({ localBackend: { listDirectory } }) }
  * })
  * ```
  */
@@ -42,7 +42,7 @@ import {
   type ComponentMountingOptions,
   type VueWrapper,
 } from '@vue/test-utils'
-import { BackendType, type Backend } from 'enso-common/src/services/Backend'
+import { BackendType } from 'enso-common/src/services/Backend'
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import type { Language } from 'enso-common/src/text'
 import { afterEach } from 'vitest'
@@ -170,26 +170,22 @@ export async function mountWithProviders<C extends Component>(
 
 /**
  * A stand-in for the backends store (`useBackends`), for use in a `vi.mock` factory. Only the
- * methods a test passes exist on each backend; calling any other one is a test error.
+ * methods a test passes exist on the local backend; calling any other one is a test error.
  */
 export function mockBackends(
-  backends: {
-    readonly remoteBackend?: Partial<Backend>
-    readonly localBackend?: Partial<LocalBackend> | null
-  } = {},
+  backends: { readonly localBackend?: Partial<LocalBackend> | null } = {},
 ): BackendsStore {
-  const remoteBackend = { type: BackendType.remote, ...backends.remoteBackend } as Backend
   const localBackend =
     backends.localBackend === undefined || backends.localBackend === null ?
       null
     : ({ type: BackendType.local, ...backends.localBackend } as LocalBackend)
-  return reactive({
-    remoteBackend,
+  const store = reactive({
     localBackend,
-    backendForType: (type: BackendType) => {
-      if (type === BackendType.remote) return remoteBackend
-      if (localBackend == null) throw new Error('mockBackends: no local backend was given.')
-      return localBackend
+    // The store's own `localBackend`, as in the real store.
+    backendForType: (_type: BackendType) => {
+      if (store.localBackend == null) throw new Error('mockBackends: no local backend was given.')
+      return store.localBackend
     },
-  }) as unknown as BackendsStore
+  })
+  return store as unknown as BackendsStore
 }

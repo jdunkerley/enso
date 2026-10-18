@@ -220,11 +220,6 @@ export function useProjectStates() {
     return scope.run(() => {
       const graph = createGraphStore(store, suggestionDb, projectNames, module.value)
       const widgetRegistry = new WidgetRegistry(graph.db)
-      const logger = eventLogger(runDetails.value)
-
-      logger.send('ide_project_opened')
-      onScopeDispose(() => logger.send('ide_project_closed'))
-
       const projectId = project.info.id
       localVersioning.watchProject(projectId, () => store.flushModules())
       onScopeDispose(() => localVersioning.unwatchProject(projectId))
@@ -256,17 +251,6 @@ export function useProjectStates() {
     return Ok(
       await getProjectDetailsFromBackend(backends.localBackend, info.id, scope, queryClient),
     )
-  }
-
-  /** Create an event logger for given project. */
-  function eventLogger(runDetails: ProjectDetails) {
-    const logProjectId = runDetails.localProjectKey
-    assertDefined(logProjectId)
-    return {
-      async send(message: string) {
-        backends.remoteBackend.logEvent(message, logProjectId)
-      },
-    }
   }
 
   /**

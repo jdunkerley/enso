@@ -1,4 +1,3 @@
-import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { useConfig } from '$/providers/config'
 import { routeFromTab, useContainerData, type Tab } from '$/providers/container'
@@ -76,10 +75,6 @@ export async function maybeRedirectToProject(to: RouteLocation): Promise<Navigat
   if (to.name !== 'dashboard' || to.redirectedFrom != null) return
   const backends = useBackends()
   const config = useConfig()
-  const auth = useAuth()
-
-  // Always set: the local session. PR 3 makes it non-null.
-  if (auth.session == null) return
 
   const pathFromOptions =
     config.params.startup.project && backends.localBackend ?

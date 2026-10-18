@@ -8,35 +8,22 @@ import type SettingsTabType from '$/configurations/settingsTabs'
 import type { GetText } from '$/providers/text'
 import { regexEscape } from '$/utils/data/string'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import type { OrganizationInfo, Path, User } from 'enso-common/src/services/Backend'
+import type { Path, User } from 'enso-common/src/services/Backend'
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
-import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import type { TextId } from 'enso-common/src/text'
 import type { Component } from 'vue'
 import type { z } from 'zod'
 
 /** What the visibility predicates of every tab are given. */
 export interface SettingsBaseContext {
+  /** The local user: there is no sign-in. */
   readonly user: User
-  readonly organization: OrganizationInfo | null
   readonly localBackend: LocalBackend | null
-  /**
-   * `true` in degraded-auth mode: `user` and `organization` are placeholders, because the Enso
-   * Cloud `users/me` call failed. Entries that depend on the real cloud profile hide themselves.
-   */
-  readonly isCloudDataUnavailable: boolean
-  /**
-   * `true` in local-only mode: authentication is disabled (no Enso Cloud is configured), so `user`
-   * is the local user. Implies `isCloudDataUnavailable`. Nothing
-   * that needs Enso Cloud or Cognito can work here, and there is no way to sign in.
-   */
-  readonly isAuthDisabled: boolean
   readonly getText: GetText
 }
 
 /** What the entries of the Vue tabs are given. */
 export interface SettingsContext extends SettingsBaseContext {
-  readonly backend: RemoteBackend
   readonly preferredTimeZone: string | undefined
   readonly setPreferredTimeZone: (preferredTimeZone: string | undefined) => void
   readonly localRootDirectory: Path | null
@@ -68,8 +55,6 @@ export interface SettingsSearchableTab<Section> {
   readonly settingsTab: SettingsTabType
   readonly icon: Icon
   readonly visible?: ((context: SettingsBaseContext) => boolean) | undefined
-  /** The page's title names the organization rather than the user. */
-  readonly organizationOnly?: true
   readonly sections: readonly Section[]
 }
 

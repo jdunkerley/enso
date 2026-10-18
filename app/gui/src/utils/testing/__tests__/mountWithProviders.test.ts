@@ -2,7 +2,7 @@
 import { useBackends } from '$/providers/backends'
 import { useText } from '$/providers/text'
 import { useQuery } from '@tanstack/vue-query'
-import { BackendType, type Backend } from 'enso-common/src/services/Backend'
+import { BackendType, Path, type Backend } from 'enso-common/src/services/Backend'
 import { expect, test, vi } from 'vitest'
 import { defineComponent, h, inject } from 'vue'
 import { useRoute } from 'vue-router'
@@ -13,7 +13,7 @@ vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('../mountWithProviders')
   return {
     useBackends: () =>
-      mockBackends({ remoteBackend: { listDirectory: vi.fn<Backend['listDirectory']>() } }),
+      mockBackends({ localBackend: { listDirectory: vi.fn<Backend['listDirectory']>() } }),
   }
 })
 
@@ -29,7 +29,7 @@ const Probe = defineComponent({
         h('p', { id: 'text' }, getText('cloudCategory')),
         h('p', { id: 'route' }, route.path),
         h('p', { id: 'store' }, store?.value),
-        h('p', { id: 'backend' }, backends.backendForType(BackendType.remote).type),
+        h('p', { id: 'backend' }, backends.backendForType(BackendType.local).type),
         h('p', { id: 'query' }, query.data.value),
       ])
   },
@@ -46,16 +46,23 @@ test('provides text, router, context stores, mocked backends and a query client'
   expect(wrapper.find('#route').text()).toBe('/drive')
   expect(router.currentRoute.value.path).toBe('/drive')
   expect(wrapper.find('#store').text()).toBe('provided')
-  expect(wrapper.find('#backend').text()).toBe(BackendType.remote)
+  expect(wrapper.find('#backend').text()).toBe(BackendType.local)
   expect(wrapper.find('#query').text()).toBe('loaded')
   expect(queryClient.getQueryData(['probe'])).toBe('loaded')
 })
 
 test('a backend method the test did not supply does not exist', async () => {
   const { mockBackends } = await import('../mountWithProviders')
-  const backends = mockBackends()
-  expect(() => backends.backendForType(BackendType.local)).toThrow(/no local backend/)
-  expect('listDirectory' in backends.remoteBackend).toBe(false)
+  expect(() => mockBackends().backendForType(BackendType.local)).toThrow(/no local backend/)
+  const backends = mockBackends({ localBackend: {} })
+  expect('listDirectory' in backends.backendForType(BackendType.local)).toBe(false)
+})
+
+test('the backends store holds only the local backend', async () => {
+  const { mockBackends } = await import('../mountWithProviders')
+  const backends = mockBackends({ localBackend: { rootPath: () => Path('/r') } })
+  expect(Object.keys(backends)).not.toContain('remoteBackend')
+  expect(backends.backendForType(BackendType.local)).toBe(backends.localBackend)
 })
 
 test('forwards props, attributes and slots, and updates props', async () => {

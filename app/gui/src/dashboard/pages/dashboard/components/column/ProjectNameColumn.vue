@@ -34,10 +34,8 @@ const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
   () => isEditable,
 )
 
-const user = computed(() => auth.session?.user)
-const ownPermission = computed(() =>
-  user.value != null ? tryFindSelfPermission(user.value, item.permissions) : null,
-)
+const user = computed(() => auth.session.user)
+const ownPermission = computed(() => tryFindSelfPermission(user.value, item.permissions))
 // A workaround for a temporary bad state in the backend, in which `projectState` is absent.
 const projectState = computed(() => item.projectState ?? CLOSED_PROJECT_STATE)
 const canExecute = computed(
@@ -51,7 +49,7 @@ const isOtherUserUsingProject = computed(
   () =>
     backend.value.type === BackendType.remote &&
     projectState.value.openedBy != null &&
-    projectState.value.openedBy !== user.value?.email,
+    projectState.value.openedBy !== user.value.email,
 )
 
 function onKeyDown(event: KeyboardEvent) {

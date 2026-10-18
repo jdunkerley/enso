@@ -22,26 +22,18 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import UserBar from '../UserBar.vue'
 
-const auth = reactive<{ session: { user: User; isAuthDisabled?: boolean } | null }>({
-  session: null,
-})
+const auth = reactive<{ session: { user: User } }>({ session: { user: makeUser() } })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
 const localBackend = shallowRef<object | null>({})
-vi.mock('$/providers/backends', async () => {
-  const { mockBackends: mock } = await import('$/utils/testing/mountWithProviders')
-  return {
-    useBackends: () => {
-      const backends = mock({ remoteBackend: {} })
-      return reactive({
-        get localBackend() {
-          return localBackend.value
-        },
-        remoteBackend: backends.remoteBackend,
-      })
-    },
-  }
-})
+vi.mock('$/providers/backends', () => ({
+  useBackends: () =>
+    reactive({
+      get localBackend() {
+        return localBackend.value
+      },
+    }),
+}))
 
 const { getText } = useText()
 
@@ -116,12 +108,6 @@ afterEach(() => {
 })
 
 describe('UserBar', () => {
-  test('nothing without a user', async () => {
-    auth.session = null
-    const { wrapper } = await mountUserBar()
-    expect(wrapper.html()).toBe('<!--v-if-->')
-  })
-
   test('the user menu: a "User Settings" dialog of buttons, focused as it opens', async () => {
     await mountUserBar()
     const user = userEvent.setup()
@@ -134,7 +120,7 @@ describe('UserBar', () => {
     // The dialog itself takes the focus, then Tab goes to the entries.
     expect(document.activeElement).toBe(menu)
     expect(menu.textContent).toContain('Ada Lovelace')
-    expect(menu.textContent).toContain(getText(Plan.solo))
+    expect(menu.textContent).toContain(getText('userMenuWorkingLocally'))
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
     await user.tab()
     expect(document.activeElement).toBe(entry(getText('settingsShortcut')))
@@ -159,7 +145,7 @@ describe('UserBar', () => {
 
   test('local mode: "Working locally", no "Upgrade Plan" or "Logout", in menu or actions', async () => {
     // The offline stand-in session: a synthetic user on the free plan, with authentication off.
-    auth.session = { user: makeUser({ plan: Plan.free }), isAuthDisabled: true }
+    auth.session = { user: makeUser({ plan: Plan.free }) }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
@@ -174,10 +160,7 @@ describe('UserBar', () => {
   })
 
   test('local mode: no "Upgrade" for an organization admin on the free plan', async () => {
-    auth.session = {
-      user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }),
-      isAuthDisabled: true,
-    }
+    auth.session = { user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }) }
     await mountUserBar()
     expect([...document.querySelectorAll('a')].map(textOf)).not.toContain(getText('upgrade'))
   })

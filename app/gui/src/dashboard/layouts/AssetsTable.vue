@@ -120,12 +120,7 @@ import {
   type DirectoryId,
   type PaginationToken,
 } from 'enso-common/src/services/Backend'
-import {
-  userGroupIdToDirectoryId,
-  userIdToDirectoryId,
-} from 'enso-common/src/services/RemoteBackend/ids'
 import { fileExtension } from 'enso-common/src/utilities/file'
-import invariant from 'tiny-invariant'
 import {
   computed,
   h,
@@ -160,11 +155,7 @@ const backend = computed(() => location.value.backend)
 const editDatalink = useEditDatalink(backend)
 const category = computed(() => location.value.category)
 const currentDirectoryId = computed(() => location.value.currentDirectoryId)
-const user = computed(() => {
-  const value = auth.session?.user
-  invariant(value != null, 'The drive is only shown to a signed-in user.')
-  return value
-})
+const user = computed(() => auth.session.user)
 
 const supportsLabels = computed(() => supportsAnyLabels(backend.value))
 const labelsQuery = useQuery(
@@ -220,21 +211,8 @@ function setSortInfo(value: SortInfo<AssetSortExpression> | null) {
 
 // === The listing ===
 
-/** The directory to list: an `owner:` term in the query lists that user's or group's home. */
-const queryDirectoryId = computed((): DirectoryId | null => {
-  const raw = location.value.queryDirectoryId
-  const ownerLower = query.owners[0]?.toLowerCase()
-  if (ownerLower == null) return raw
-  const userId = usersQuery.data.value?.find((otherUser) =>
-    otherUser.name.toLowerCase().includes(ownerLower),
-  )?.userId
-  if (userId != null) return userIdToDirectoryId(userId)
-  const userGroupId = userGroupsQuery.data.value?.find((userGroup) =>
-    userGroup.groupName.toLowerCase().includes(ownerLower),
-  )?.id
-  if (userGroupId != null) return userGroupIdToDirectoryId(userGroupId)
-  return raw
-})
+/** The directory to list. */
+const queryDirectoryId = computed((): DirectoryId | null => location.value.queryDirectoryId)
 const listDirectoryRefetchInterval = useListDirectoryRefetchInterval()
 const debouncedQueryDelayMs = useFeatureFlag('dataCatalogQueryDebounceDelay')
 const pageSize = useFeatureFlag('listDirectoryPageSize')

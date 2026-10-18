@@ -14,19 +14,18 @@ tab.
 
 - **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance and
   Keyboard shortcuts. The cloud's tabs (Organization, Billing & Plans, Members,
-  User groups, Activity log, API keys, Usage) were deleted with the cloud UI;
-  their `SettingsTabType` values remain for now. `SettingsTab.vue` lays out a
-  tab's sections; a form entry is `SettingsFormEntry.vue`, a component entry
-  reads the page's context with `useSettingsContext`
-  (`$/providers/settingsContext`). A tab with no sections is not listed.
+  User groups, Activity log, API keys, Usage) were deleted with the cloud UI,
+  and so were their `SettingsTabType` values. `SettingsTab.vue` lays out a tab's
+  sections; a form entry is `SettingsFormEntry.vue`, a component entry reads the
+  page's context with `useSettingsContext` (`$/providers/settingsContext`). A
+  tab with no sections is not listed.
 - **The Account tab has one section of its own: the local user.** There is no
-  sign-in (`isAuthDisabled` in the context is always `true`), so it shows the
-  local user and why there are no account settings
-  (`OfflineUserSettingsSection.vue`). Other sections could come through
-  `$/providers/settingsContributions` (see "Contribution registries" in
-  `app/gui/CLAUDE.md`), which nothing uses now; the settings route waits for
-  them to load. Nothing may reach for Enso Cloud: the session's tokens are
-  empty.
+  sign-in (the context's `user` is always the local user), so it shows the local
+  user and why there are no account settings (`OfflineUserSettingsSection.vue`).
+  Other sections could come through `$/providers/settingsContributions` (see
+  "Contribution registries" in `app/gui/CLAUDE.md`), which nothing uses now; the
+  settings route waits for them to load. Nothing may reach for Enso Cloud: the
+  session has no tokens.
 
 ## Local directories
 

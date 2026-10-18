@@ -8,31 +8,15 @@ import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { flushPromises } from '@vue/test-utils'
-import { Plan, type Backend } from 'enso-common/src/services/Backend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-
-const { getOrganization } = await vi.hoisted(async () => {
-  const { vi } = await import('vitest')
-  return {
-    getOrganization: vi.fn<Backend['getOrganization']>(),
-  }
-})
 
 vi.mock('$/components/AppContainer', async () => {
   const { h } = await import('vue')
   return { default: { render: () => h('div', { 'data-testid': 'app-container' }) } }
 })
-vi.mock('$/providers/auth', () => ({
-  useAuth: () => ({
-    session: {
-      user: { plan: Plan.team, isOrganizationAdmin: true },
-      isCloudDataUnavailable: false,
-    },
-  }),
-}))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
-  const backends = mockBackends({ remoteBackend: { getOrganization }, localBackend: null })
+  const backends = mockBackends({ localBackend: null })
   return { useBackends: () => backends }
 })
 vi.mock('enso-common/src/utilities/detect', async (importOriginal) => ({
@@ -46,7 +30,6 @@ const { getText } = useText()
 const Blank = { render: () => null }
 
 beforeEach(() => {
-  getOrganization.mockReset().mockResolvedValue({ subscription: {} } as never)
   useModals().closeAll()
 })
 afterEach(() => {
@@ -69,16 +52,14 @@ describe('DashboardPage', () => {
   test('puts the settings shortcuts in the command palette, and each goes to its tab', async () => {
     const { router } = await mountWithProviders(DashboardPage)
     await flushPromises()
-    const [members] = paletteActions(getText('goToMembersSettingsShortcut'))
-    expect(members).toBeDefined()
-    // The user is the organization's admin, and it has a subscription.
-    expect(paletteActions(getText('goToBillingAndPlansSettingsShortcut'))).toHaveLength(1)
+    const [keyboardShortcuts] = paletteActions(getText('goToKeyboardShortcutsSettingsShortcut'))
+    expect(keyboardShortcuts).toBeDefined()
     // There is no local backend.
     expect(paletteActions(getText('goToLocalSettingsShortcut'))).toHaveLength(0)
-    members!.doAction()
+    keyboardShortcuts!.doAction()
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/settings')
-    expect(router.currentRoute.value.query['cloud-ide_SettingsTab']).toBe('"members"')
+    expect(router.currentRoute.value.query['cloud-ide_SettingsTab']).toBe('"keyboard-shortcuts"')
   })
 
   test('leaves the palette once unmounted', async () => {

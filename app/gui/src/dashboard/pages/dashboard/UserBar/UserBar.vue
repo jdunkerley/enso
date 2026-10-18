@@ -20,12 +20,11 @@ const auth = useAuth()
 const { getText } = useText()
 const isOnline = useIsOnline()
 
-const user = computed(() => auth.session?.user)
-const isAuthDisabled = computed(() => auth.session?.isAuthDisabled === true)
+const user = computed(() => auth.session.user)
 </script>
 
 <template>
-  <div v-if="user" class="flex-shrink-0 pt-0.5">
+  <div class="flex-shrink-0 pt-0.5">
     <div class="flex h-full shrink-0 cursor-default items-center gap-user-bar pl-icons-x">
       <div v-if="!isOnline" class="mr-2 flex items-center gap-2">
         <Icon icon="cloud_offline" />
@@ -34,11 +33,7 @@ const isAuthDisabled = computed(() => auth.session?.isAuthDisabled === true)
         </Text>
       </div>
       <NotificationTray />
-      <UserMenu
-        :user="user"
-        :isAuthDisabled="isAuthDisabled"
-        :goToSettingsPage="goToSettingsPage"
-      />
+      <UserMenu :user="user" :goToSettingsPage="goToSettingsPage" />
     </div>
   </div>
 </template>

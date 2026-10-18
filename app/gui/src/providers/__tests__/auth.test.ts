@@ -15,9 +15,8 @@ test('the local user is named, unlicensed and on no organization', () => {
   expect(user.userId).toBe('user-local')
 })
 
-test('the local user session is never cloud-backed', () => {
+test('the local user session is the local session with the local user', () => {
   const session = makeLocalUserSession(makeLocalSession(), 'Working locally')
-  expect(session.isAuthDisabled).toBe(true)
-  expect(session.isCloudDataUnavailable).toBe(true)
+  expect(session).toEqual({ ...makeLocalSession(), user: makeLocalUser('Working locally') })
   expect(session.user.name).toBe('Working locally')
 })

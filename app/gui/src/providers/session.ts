@@ -18,7 +18,7 @@ export function makeLocalSession(): UserSession {
 }
 
 /** The current session: always the local one. */
-export const useSession = createGlobalState(() => {
-  const session: UserSession | null = makeLocalSession()
-  return { session, isAuthDisabled: true as boolean }
+export const useSession = createGlobalState((): { readonly session: UserSession } => {
+  const session: UserSession = makeLocalSession()
+  return { session }
 })

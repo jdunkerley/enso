@@ -39,10 +39,7 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
   ],
   {
     settings: { bindings: ['Mod+,'], icon: 'settings', category: 'navigation' },
-    switchOrganization: { bindings: [], category: 'other' },
     open: { bindings: ['Enter'], icon: 'open', category: 'other' },
-    run: { bindings: ['Shift+Enter'], icon: 'workflow_play', category: 'other' },
-    runAsTask: { bindings: ['Mod+Shift+Enter'], icon: 'workflow_play', category: 'fileManagement' },
     close: { bindings: [], icon: 'close', category: 'other' },
     exportArchive: { bindings: [], icon: 'data_download', category: 'fileManagement' },
     rename: { bindings: ['Mod+R'], icon: 'edit', category: 'editing' },
@@ -53,8 +50,6 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       color: 'rgb(243 24 10 / 0.87)',
       category: 'fileManagement',
     },
-    undelete: { bindings: ['Mod+R'], icon: 'untrash', category: 'fileManagement' },
-    share: { bindings: ['Mod+Enter'], icon: 'people', category: 'collaboration' },
     label: { bindings: ['Mod+L'], icon: 'tag', category: 'collaboration' },
     duplicate: { bindings: ['Mod+D'], icon: 'duplicate', category: 'fileManagement' },
     copy: { bindings: ['Mod+C'], icon: 'copy', category: 'fileManagement' },
@@ -66,12 +61,6 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
     newProject: { bindings: ['Mod+N'], icon: 'graph_add', category: 'fileManagement' },
     newFolder: { bindings: ['Mod+Shift+N'], icon: 'folder_add', category: 'fileManagement' },
     // FIXME [sb]: Platform detection should be handled directly in `shortcuts.ts`.
-    newSecret: {
-      bindings: !detect.isOnMacOS() ? ['Mod+Alt+N'] : ['Mod+Alt+N', 'Mod+Alt+~'],
-      icon: 'key_add',
-      category: 'fileManagement',
-    },
-    newCredential: { bindings: [], icon: 'credential_add', category: 'fileManagement' },
     newDatalink: {
       bindings: !detect.isOnMacOS() ? ['Mod+Alt+Shift+N'] : ['Mod+Alt+Shift+N', 'Mod+Alt+Shift+~'],
       icon: 'connector_add',
@@ -89,7 +78,6 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'history',
       category: 'fileManagement',
     },
-    signOut: { bindings: [], icon: 'logout', color: 'rgb(243 24 10 / 0.87)', category: 'other' },
     // These should not appear in any menus.
     closeModal: { bindings: ['Escape'], rebindable: false, category: 'other' },
     cancelEditName: { bindings: ['Escape'], rebindable: false, category: 'editing' },
@@ -117,22 +105,10 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'arrow_right',
       category: 'navigation',
     },
-    upgradePlan: { bindings: [], icon: 'data_upload', category: 'other' },
     aboutThisApp: { bindings: ['Mod+/'], icon: 'enso_logo', category: 'help' },
-    toggleEnsoDevtools: {
-      bindings: [],
-      rebindable: false,
-      icon: 'enso_logo',
-      category: 'developer',
-    },
     goToAccountSettings: {
       bindings: [],
       icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
-      category: 'settings',
-    },
-    goToOrganizationSettings: {
-      bindings: [],
-      icon: SETTINGS_TAB_ICONS[SettingsTabType.organization],
       category: 'settings',
     },
     goToLocalSettings: {
@@ -140,29 +116,9 @@ const BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: SETTINGS_TAB_ICONS[SettingsTabType.local],
       category: 'settings',
     },
-    goToBillingAndPlansSettings: {
-      bindings: [],
-      icon: SETTINGS_TAB_ICONS[SettingsTabType.billingAndPlans],
-      category: 'settings',
-    },
-    goToMembersSettings: {
-      bindings: [],
-      icon: SETTINGS_TAB_ICONS[SettingsTabType.members],
-      category: 'settings',
-    },
-    goToUserGroupsSettings: {
-      bindings: [],
-      icon: SETTINGS_TAB_ICONS[SettingsTabType.userGroups],
-      category: 'settings',
-    },
     goToKeyboardShortcutsSettings: {
       bindings: [],
       icon: SETTINGS_TAB_ICONS[SettingsTabType.keyboardShortcuts],
-      category: 'settings',
-    },
-    goToActivityLogSettings: {
-      bindings: [],
-      icon: SETTINGS_TAB_ICONS[SettingsTabType.activityLog],
       category: 'settings',
     },
     copyId: {

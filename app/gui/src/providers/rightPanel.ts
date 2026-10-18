@@ -136,8 +136,8 @@ export function sessionsProjectFromContext(
 ): SessionsProject | undefined {
   if (ctx == null) return undefined
   if (ctx.openedProject != null) {
-    const { id, title, mode } = ctx.openedProject
-    return { backendType: mode === 'local' ? BackendType.local : BackendType.remote, id, title }
+    const { id, title } = ctx.openedProject
+    return { backendType: BackendType.local, id, title }
   }
   const asset = ctx.item ?? ctx.defaultItem
   if (ctx.category == null || typeof asset !== 'object' || asset.type !== AssetType.project) {

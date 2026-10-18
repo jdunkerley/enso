@@ -3,7 +3,6 @@ import { createGlobalState } from '@vueuse/core'
 import {
   IS_OPENING as BACKEND_IS_OPENING,
   IS_OPENING_OR_OPENED as BACKEND_IS_OPENING_OR_OPENED,
-  BackendType,
   ProjectId,
   type ProjectAsset,
 } from 'enso-common/src/services/Backend'
@@ -92,20 +91,20 @@ export function createOpenedProjectsStore() {
   }
 
   /**
-   * Close given project. If `backendProject` is provided, the project will be closed even if not
+   * Close given project. If its `asset` is provided, the project will be closed even if not
    * running by current app instance.
    */
   function closeProject(
     id: ProjectId,
-    backendProject?: { asset: ProjectAsset; backendType: BackendType },
+    asset?: ProjectAsset,
     { offer = true }: { offer?: boolean } = {},
   ) {
     const project = projects.get(id)
     if (project == null) {
-      if (backendProject == null) {
+      if (asset == null) {
         console.warn('Cannot close project: project not opened')
       } else {
-        projectStates.closeProjectInBackend(backendProject.asset)
+        projectStates.closeProjectInBackend(asset)
       }
 
       return

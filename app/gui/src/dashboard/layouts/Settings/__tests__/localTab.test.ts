@@ -41,12 +41,7 @@ const versioning = vi.hoisted(() => ({
 
 vi.mock('$/providers/auth', () => ({
   useAuth: () => ({
-    session: {
-      user: USER,
-      email: USER.email,
-      isCloudDataUnavailable: true,
-      isAuthDisabled: true,
-    },
+    session: { user: USER, email: USER.email },
   }),
 }))
 // The global store keeps the first router it sees; each test has its own.
@@ -59,7 +54,6 @@ vi.mock('$/providers/backends', async () => {
   return {
     useBackends: () =>
       mockBackends({
-        remoteBackend: { getOrganization: vi.fn(() => Promise.resolve(null)) },
         localBackend: {
           rootPath: () => Path('/projects'),
           versioningStatus: (path: Path) => versioning.versioningStatus(path),

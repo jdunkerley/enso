@@ -9,15 +9,8 @@ import {
   resetLayoutContributions,
 } from '$/providers/layoutContributions'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test } from 'vitest'
 import { defineComponent, h } from 'vue'
-
-const logEvent = vi.hoisted(() => vi.fn())
-
-vi.mock('$/providers/backends', async () => {
-  const { mockBackends } = await import('$/utils/testing/mountWithProviders')
-  return { useBackends: () => mockBackends({ remoteBackend: { logEvent } }) }
-})
 
 /** A stand-in modal that shows its name and props. */
 const stub = (name: string) =>
@@ -47,7 +40,6 @@ const shown = (id: string) => document.querySelector(`[data-testid="${id}"]`)?.t
 
 beforeEach(() => {
   resetLayoutContributions()
-  logEvent.mockReset()
 })
 
 describe('AppContainerLayout', () => {
@@ -73,12 +65,5 @@ describe('AppContainerLayout', () => {
       props: { ...NONE, shouldSetupOrganization: true },
     })
     expect(shown('setup')).toBeNull()
-  })
-
-  test('logs opening and closing the app, as before', async () => {
-    const { unmount } = await mountWithProviders(AppContainerLayout, { props: NONE })
-    expect(logEvent).toHaveBeenCalledWith('open_app')
-    unmount()
-    expect(logEvent).toHaveBeenCalledWith('close_app')
   })
 })

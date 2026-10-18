@@ -33,10 +33,7 @@ const auth = vi.hoisted(() => {
   const value: { session: unknown } = { session: null }
   return value
 })
-const backends = vi.hoisted(() => ({
-  hasLocalBackend: true,
-  organization: null as { readonly subscription?: object } | null,
-}))
+const backends = vi.hoisted(() => ({ hasLocalBackend: true }))
 
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 // The global store keeps the first router it sees; each test has its own.
@@ -49,7 +46,6 @@ vi.mock('$/providers/backends', async () => {
   return {
     useBackends: () =>
       mockBackends({
-        remoteBackend: { getOrganization: vi.fn(() => Promise.resolve(backends.organization)) },
         localBackend: backends.hasLocalBackend ? { rootPath: () => Path('/projects') } : null,
       }),
   }
@@ -67,15 +63,9 @@ beforeAll(() => {
 })
 
 beforeEach(async () => {
-  // The reachable state: the local session, whose flags are always `true`.
-  auth.session = {
-    user: USER,
-    email: USER.email,
-    isCloudDataUnavailable: true,
-    isAuthDisabled: true,
-  }
+  // The local session: the only one there is.
+  auth.session = { user: USER, email: USER.email }
   backends.hasLocalBackend = true
-  backends.organization = null
   contributeSettingsSections(SettingsTabType.account, () =>
     Promise.resolve([
       {
@@ -136,12 +126,7 @@ describe('SettingsPage', () => {
 
   test('in local-only mode, the Account tab shows the offline user', async () => {
     const offlineUser = { ...USER, name: getText('offlineUserName'), plan: Plan.free }
-    auth.session = {
-      user: offlineUser,
-      email: 'local@enso.localhost',
-      isCloudDataUnavailable: true,
-      isAuthDisabled: true,
-    }
+    auth.session = { user: offlineUser, email: 'local@enso.localhost' }
     await mountWithProviders(SettingsPage)
     expect(document.querySelector('h1.flex')?.textContent).toContain(getText('offlineUserName'))
     expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
@@ -157,53 +142,6 @@ describe('SettingsPage', () => {
     // The default picture: there is no account to have one.
     expect(offline.querySelector('img')).toBeNull()
     expect(offline.querySelector('svg')).not.toBeNull()
-  })
-
-  test('lists only the local tabs, whatever is contributed', async () => {
-    // An admin of an organization with a subscription, with both flags `false` (unreachable now):
-    // the cloud's tabs would all have been listed.
-    const admin = { ...USER, plan: Plan.team, isOrganizationAdmin: true }
-    auth.session = {
-      user: admin,
-      email: admin.email,
-      isCloudDataUnavailable: false,
-      isAuthDisabled: false,
-    }
-    backends.organization = { subscription: {} }
-    const section =
-      (
-        nameId:
-          | 'activityLogSettingsSection'
-          | 'apiKeysSettingsSection'
-          | 'billingAndPlansSettingsSection'
-          | 'membersSettingsSection'
-          | 'organizationSettingsSection'
-          | 'usageSettingsSection'
-          | 'userGroupsSettingsSection',
-      ) =>
-      () =>
-        Promise.resolve([
-          { nameId, entries: [{ type: 'custom' as const, component: ContributedEntry }] },
-        ])
-    contributeSettingsSections(SettingsTabType.organization, section('organizationSettingsSection'))
-    contributeSettingsSections(
-      SettingsTabType.billingAndPlans,
-      section('billingAndPlansSettingsSection'),
-    )
-    contributeSettingsSections(SettingsTabType.members, section('membersSettingsSection'))
-    contributeSettingsSections(SettingsTabType.userGroups, section('userGroupsSettingsSection'))
-    contributeSettingsSections(SettingsTabType.activityLog, section('activityLogSettingsSection'))
-    contributeSettingsSections(SettingsTabType.apiKeys, section('apiKeysSettingsSection'))
-    contributeSettingsSections(SettingsTabType.usage, section('usageSettingsSection'))
-    await loadSettingsContributions()
-    await mountWithProviders(SettingsPage)
-    await flushPromises()
-    expect(sidebarTabs()).toEqual([
-      getText('accountSettingsTab'),
-      getText('localSettingsTab'),
-      getText('appearanceSettingsTab'),
-      getText('keyboardShortcutsSettingsTab'),
-    ])
   })
 
   test('hides the Local tab without a local backend', async () => {

@@ -27,8 +27,7 @@ const drive = useDriveLocation()
 const driveView = useDriveView()
 
 const finalPath = computed(() => {
-  const user = auth.session?.user
-  if (user == null) return []
+  const user = auth.session.user
   return parseDirectoriesPath({
     parentsPath: item.parentsPath,
     virtualParentsPath: item.virtualParentsPath,

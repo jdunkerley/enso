@@ -44,7 +44,7 @@ const projectState = computed(() => item.projectState ?? CLOSED_PROJECT_STATE)
 const isRunningInBackground = computed(() => projectState.value.executeAsync ?? false)
 const isOtherUserUsingProject = computed(
   () =>
-    projectState.value.openedBy != null && projectState.value.openedBy !== auth.session?.user.email,
+    projectState.value.openedBy != null && projectState.value.openedBy !== auth.session.user.email,
 )
 
 const isProjectOpening = computed(() => openedProjects.isProjectOpening(item))
@@ -88,7 +88,7 @@ function doOpenProject() {
 function doCloseProject() {
   const tab: Tab = { type: 'project', id: item.id }
   if (container.isTabOpened(tab)) container.closeTab(tab)
-  else openedProjects.closeProject(item.id, { asset: item, backendType: backend.type })
+  else openedProjects.closeProject(item.id, item)
 }
 </script>
 

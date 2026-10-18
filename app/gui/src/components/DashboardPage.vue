@@ -11,14 +11,10 @@ import AppContainer from '$/components/AppContainer'
 import { actionToTextId, type DashboardBindingKey } from '$/configurations/inputBindings'
 import SettingsTabType from '$/configurations/settingsTabs'
 import { useActionsStore, type Action } from '$/providers/actions'
-import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
-import { backendQueryOptions } from '@/composables/backend'
-import { useQuery } from '@tanstack/vue-query'
-import { isUserOnPlanWithMultipleSeats } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { isOnElectron } from 'enso-common/src/utilities/detect'
 import { computed, onMounted, onUnmounted, watch } from 'vue'
@@ -28,21 +24,11 @@ import { useRouter } from 'vue-router'
 type Handler = () => boolean | void
 
 const router = useRouter()
-const auth = useAuth()
 const backends = useBackends()
 const modals = useModals()
 const inputBindings = useDashboardInputBindings()
 const { bindGlobalActions } = useActionsStore()
 const { getText } = useText()
-
-const user = computed(() => auth.session?.user)
-
-const { data: organization } = useQuery({
-  ...backendQueryOptions('getOrganization', [], backends.remoteBackend),
-  // In degraded-auth mode the remote `getOrganization` would error; keep the query idle, and
-  // leave out the shortcuts that need the organization.
-  enabled: computed(() => !(auth.session?.isCloudDataUnavailable ?? false)),
-})
 
 /** Navigate to a specific settings tab. */
 function goToSettingsTab(tab: SettingsTabType) {
@@ -57,43 +43,23 @@ function closeModal() {
   if (!modals.closeAll()) return false
 }
 
-const handlers = computed((): Partial<Record<DashboardBindingKey, Handler>> => {
-  const currentUser = user.value
-  const hasOrganization = currentUser != null && isUserOnPlanWithMultipleSeats(currentUser)
-  const isBillingAdmin =
-    currentUser?.isOrganizationAdmin === true && organization.value?.subscription != null
-
-  return {
-    // We want to handle the back and forward buttons in electron the same way as in the browser.
-    ...(isOnElectron() && {
-      goBack: () => {
-        window.api?.navigation.goBack()
-      },
-      goForward: () => {
-        window.api?.navigation.goForward()
-      },
-      goToAccountSettings: () => goToSettingsTab(SettingsTabType.account),
-      ...(hasOrganization && {
-        goToOrganizationSettings: () => goToSettingsTab(SettingsTabType.organization),
-      }),
-      ...(backends.localBackend != null && {
-        goToLocalSettings: () => goToSettingsTab(SettingsTabType.local),
-      }),
-      ...(isBillingAdmin && {
-        goToBillingAndPlansSettings: () => goToSettingsTab(SettingsTabType.billingAndPlans),
-      }),
-      ...(hasOrganization && {
-        goToMembersSettings: () => goToSettingsTab(SettingsTabType.members),
-        goToUserGroupsSettings: () => goToSettingsTab(SettingsTabType.userGroups),
-      }),
-      goToKeyboardShortcutsSettings: () => goToSettingsTab(SettingsTabType.keyboardShortcuts),
-      ...(hasOrganization && {
-        goToActivityLogSettings: () => goToSettingsTab(SettingsTabType.activityLog),
-      }),
+const handlers = computed((): Partial<Record<DashboardBindingKey, Handler>> => ({
+  // We want to handle the back and forward buttons in electron the same way as in the browser.
+  ...(isOnElectron() && {
+    goBack: () => {
+      window.api?.navigation.goBack()
+    },
+    goForward: () => {
+      window.api?.navigation.goForward()
+    },
+    goToAccountSettings: () => goToSettingsTab(SettingsTabType.account),
+    ...(backends.localBackend != null && {
+      goToLocalSettings: () => goToSettingsTab(SettingsTabType.local),
     }),
-    closeModal,
-  }
-})
+    goToKeyboardShortcutsSettings: () => goToSettingsTab(SettingsTabType.keyboardShortcuts),
+  }),
+  closeModal,
+}))
 
 // The shortcuts, in the command palette under their names from the keyboard shortcuts settings.
 const actions = computed((): Action[] =>

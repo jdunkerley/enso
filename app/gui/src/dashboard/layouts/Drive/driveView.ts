@@ -116,8 +116,7 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
 
   /** The location asked for. */
   const target = computed((): DriveViewLocation => {
-    const user = auth.session?.user
-    invariant(user != null, 'The drive is only shown to a signed-in user.')
+    const user = auth.session.user
     const category = drive.currentCategory
     const categoryHomeDir = categories.categoryDirectoryId(category)
     // A category with no home directory (a Recent) is rooted at its backend's root.

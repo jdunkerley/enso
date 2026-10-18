@@ -102,15 +102,10 @@ export function backendMutationOptions<
   }) as any
 }
 
-/**
- * Composable providing access to the backend API.
- * @param which - Whether to use the remote backend, or the current project's backend (which may be the remote backend,
- * or a local backend).
- */
-export function useBackend(which: 'remote' | 'project') {
+/** Composable providing access to the backend API: the local backend, the only one. */
+export function useBackend() {
   const queryClient = useQueryClient()
-  const { localBackend: project, remoteBackend: remote } = useBackends()
-  const backend: Backend | null = which === 'project' ? project : remote
+  const backend: Backend | null = useBackends().localBackend
 
   /** Perform the specified query, and keep the result up-to-date if the provided arguments change. */
   function query<Method extends BackendQueryMethod>(

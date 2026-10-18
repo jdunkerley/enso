@@ -148,7 +148,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
           const tab: Tab = { type: 'project', id: asset.id }
           if (container.isTabOpened(tab)) container.closeTab(tab)
           // With no tab open, close it on the backend.
-          else openedProjects.closeProject(asset.id, { asset, backendType: backend.value.type })
+          else openedProjects.closeProject(asset.id, asset)
         },
       },
     backend.value.supportsLabels(asset.type) && {

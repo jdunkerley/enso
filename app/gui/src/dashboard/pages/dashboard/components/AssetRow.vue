@@ -184,8 +184,7 @@ function onDragOverRow(event: DragEvent) {
       if (!parent) return true
       if (isTeamPath(parent.ensoPath)) return true
       // Assume a user path; check the permissions.
-      const user = auth.session?.user
-      const permission = user != null ? tryFindSelfPermission(user, item.permissions) : null
+      const permission = tryFindSelfPermission(auth.session.user, item.permissions)
       return permission != null && canPermissionModifyDirectoryContents(permission.permission)
     })
   })()
