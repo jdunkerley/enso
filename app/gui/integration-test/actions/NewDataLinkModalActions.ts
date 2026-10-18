@@ -6,7 +6,9 @@ import { TEXT } from './utilities'
 
 /** Locate the "new data link" modal. */
 function locateNewDataLinkModal(page: Page) {
-  return page.getByRole('dialog').filter({ has: page.getByText('Create Datalink') })
+  return page.getByRole('dialog').filter({
+    has: page.getByText(TEXT.createDatalink).or(page.getByText(TEXT.editDatalink)),
+  })
 }
 
 /** Actions for a "new Data Link" modal. */

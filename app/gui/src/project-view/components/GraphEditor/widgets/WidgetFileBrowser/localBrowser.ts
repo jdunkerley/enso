@@ -15,6 +15,12 @@ const LABELS = new Map<BrowserItem, string>([
   ['file', 'Choose file…'],
 ])
 
+/** Lets a read dialog pick a datalink, which the standard library reads as its target. */
+export const DATALINK_FILE_FILTER: FileFilter = {
+  name: 'Datalink',
+  extensions: ['datalink'],
+}
+
 function fileTypesToFileFilters(fileTypes: FileType[]): FileFilter[] {
   return fileTypes.flatMap((fileType) => {
     const name = fileType.label
@@ -27,6 +33,23 @@ function fileTypesToFileFilters(fileTypes: FileType[]): FileFilter[] {
     }
     return []
   })
+}
+
+/**
+ * The native dialog's filters for the widget's file types. Without file types it lists every
+ * file. A dialog reading a file also offers datalinks, unless a filter already admits them.
+ */
+export function dialogFileFilters(
+  fileTypes: FileType[] | undefined,
+  write: boolean,
+): FileFilter[] | undefined {
+  if (fileTypes == null) return undefined
+  const filters = fileTypesToFileFilters(fileTypes)
+  if (write || filters.length === 0) return filters
+  const admitsDatalinks = filters.some(
+    ({ extensions }) => extensions.includes('*') || extensions.includes('datalink'),
+  )
+  return admitsDatalinks ? filters : [...filters, DATALINK_FILE_FILTER]
 }
 
 /** @returns Dropdown items for opening a local file browser. */
@@ -52,8 +75,8 @@ export function useLocalBrowser({
     const rawKind = toValue(dialogKind)
     assert(rawKind !== 'secret')
     const kind = rawKind === 'file' && toValue(write) ? 'filePath' : rawKind
-    const fileTypes_ = toValue(fileTypes)
-    const filters = fileTypes_ != null ? fileTypesToFileFilters(fileTypes_) : undefined
+    const filters =
+      rawKind === 'file' ? dialogFileFilters(toValue(fileTypes), toValue(write)) : undefined
     const selected = await window.api.fileBrowser.openFileBrowser(
       kind,
       toValue(currentPath),

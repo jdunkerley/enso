@@ -79,17 +79,6 @@ const finalPath = computed((): readonly PathItem[] => {
       ...finalPathRaw.slice(1),
     ]
   }
-  if (category.value.type === 'trash') {
-    return [
-      {
-        id: categories.categoryDirectoryId(category.value) ?? location.value.rootDirectoryId,
-        category: category.value,
-        label: getText('trashCategory'),
-        icon: 'trash',
-      },
-      ...finalPathRaw.slice(Math.max(1, finalPathRaw.length - 1)),
-    ]
-  }
   return finalPathRaw
 })
 
@@ -194,12 +183,9 @@ function onMenuSelect(item: PathItem) {
 
 <template>
   <div
-    :class="[
-      'flex w-full flex-none items-center',
-      category.type === 'trash' || isRecentCategory(category) ? 'py-2' : undefined,
-    ]"
+    :class="['flex w-full flex-none items-center', isRecentCategory(category) ? 'py-2' : undefined]"
   >
-    <template v-if="category.type === 'trash' || isRecentCategory(category)">
+    <template v-if="isRecentCategory(category)">
       <Button
         variant="icon"
         icon="navigate_up"

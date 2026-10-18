@@ -8,7 +8,6 @@ import type { CredentialRecipe } from '$/secrets/serviceCredentials/types'
 import Button from '$/components/Button/Button.vue'
 import Form from '$/components/Form/Form.vue'
 import Input from '$/components/Inputs/Input.vue'
-import { useConfig } from '$/providers/config'
 import { useText } from '$/providers/text'
 import CredentialsFormFooter from './CredentialsFormFooter.vue'
 import { toastAndLogError } from './toastAndLog'
@@ -18,11 +17,10 @@ const { createCredentials } = defineProps<{
 }>()
 
 const { getText } = useText()
-const config = useConfig()
 
 async function submit(values: Parameters<typeof snowflake.submitForm>[2]) {
   try {
-    await snowflake.submitForm(config.remoteConfig?.ENSO_IDE_API_URL, createCredentials, values)
+    await snowflake.submitForm(undefined, createCredentials, values)
   } catch (error) {
     toastAndLogError(error)
   }

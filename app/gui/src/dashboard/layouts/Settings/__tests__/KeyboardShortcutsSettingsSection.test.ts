@@ -86,7 +86,7 @@ describe('KeyboardShortcutsSettingsSection', () => {
     await mountWithProviders(Page)
     const rebindable = defaultShortcuts().filter((shortcut) => shortcut.rebindable)
     expect(document.querySelectorAll('tbody tr[data-shortcut-id]')).toHaveLength(rebindable.length)
-    expect(findRow('toggleEnsoDevtools')).toBeUndefined()
+    expect(findRow('closeModal')).toBeUndefined()
     expect(shortcutsOf('rename')).toHaveLength(BINDINGS.rename.bindings.length)
   })
 

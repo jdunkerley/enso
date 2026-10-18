@@ -10,7 +10,7 @@ import type { Backend } from 'enso-common/src/services/Backend'
 /** Options for a query of the backend's labels. */
 export function labelsQueryOptions(backend: Backend) {
   return queryOptions({
-    ...backendBaseOptions(backend),
+    ...backendBaseOptions(),
     queryKey: backendQueryKey(backend, 'listTags', []),
     queryFn: () => backend.listTags(),
     // As `backendQueryOptions` sets them for this method (`PERSISTENCE_MAP`).

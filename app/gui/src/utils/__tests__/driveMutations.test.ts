@@ -9,7 +9,6 @@ import {
   deleteAssetsMutationOptions,
   downloadAssetsMutationOptions,
   moveAssetsMutationOptions,
-  restoreAssetsMutationOptions,
 } from '$/utils/driveMutations'
 import { newFolderTitle, newProjectName, renameAssetVariables } from '$/utils/driveQueries'
 import { QueryClient } from '@tanstack/query-core'
@@ -28,39 +27,34 @@ const TARGET = DirectoryId('directory-target')
 const ids = ['file-1', 'file-2', 'file-3'] as AssetId[]
 
 function backendWith(methods: Partial<Backend>) {
-  return { type: BackendType.remote, ...methods } as Backend
+  return { type: BackendType.local, ...methods } as Backend
 }
 
 describe('the batched mutations', () => {
   test('keep their keys and invalidations', () => {
     const backend = backendWith({})
     expect(deleteAssetsMutationOptions(backend).mutationKey).toEqual([
-      BackendType.remote,
+      BackendType.local,
       'deleteAssets',
     ])
     expect(deleteAssetsMutationOptions(backend).meta).toEqual({
       invalidates: [
-        [BackendType.remote, 'listDirectory'],
-        [BackendType.remote, 'getAssetDetails'],
-        [BackendType.remote, 'listAssetVersions'],
+        [BackendType.local, 'listDirectory'],
+        [BackendType.local, 'getAssetDetails'],
+        [BackendType.local, 'listAssetVersions'],
       ],
       awaitInvalidates: true,
       refetchType: 'all',
     })
-    expect(restoreAssetsMutationOptions(backend).mutationKey).toEqual([
-      BackendType.remote,
-      'restoreAssets',
-    ])
     expect(copyAssetsMutationOptions(backend).mutationKey).toEqual([
-      BackendType.remote,
+      BackendType.local,
       'copyAssets',
     ])
     expect(moveAssetsMutationOptions(backend, vi.fn()).mutationKey).toEqual([
-      BackendType.remote,
+      BackendType.local,
       'moveAssets',
     ])
     expect(downloadAssetsMutationOptions(backend).meta?.invalidates).toEqual([
-      [BackendType.remote, 'listDirectory'],
       [BackendType.local, 'listDirectory'],
     ])
   })

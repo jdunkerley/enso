@@ -10,41 +10,23 @@ import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { onlineManager } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import {
-  EmailAddress,
-  OrganizationId,
-  Plan,
-  PLANS,
-  UserId,
-  type User,
-} from 'enso-common/src/services/Backend'
+import { EmailAddress, UserId, type User } from 'enso-common/src/services/Backend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import UserBar from '../UserBar.vue'
 
-const auth = reactive<{ session: { user: User; isAuthDisabled?: boolean } | null }>({
-  session: null,
-})
+const auth = reactive<{ session: { user: User } }>({ session: { user: makeUser() } })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
 const localBackend = shallowRef<object | null>({})
-vi.mock('$/providers/backends', async () => {
-  const { mockBackends: mock } = await import('$/utils/testing/mountWithProviders')
-  return {
-    useBackends: () => {
-      const backends = mock({ remoteBackend: {} })
-      return reactive({
-        get localBackend() {
-          return localBackend.value
-        },
-        remoteBackend: backends.remoteBackend,
-      })
-    },
-  }
-})
-
-const uploads = reactive(new Map<string, object>())
-vi.mock('$/providers/upload', () => ({ useUploadsToCloudStore: () => ({ uploads }) }))
+vi.mock('$/providers/backends', () => ({
+  useBackends: () =>
+    reactive({
+      get localBackend() {
+        return localBackend.value
+      },
+    }),
+}))
 
 const { getText } = useText()
 
@@ -74,17 +56,10 @@ const textOf = (element: Element | null | undefined) => element?.textContent.tri
 function makeUser(overrides: Partial<User> = {}): User {
   return {
     userId: UserId('user-1'),
-    organizationId: OrganizationId('organization-1'),
     name: 'Ada Lovelace',
     email: EmailAddress('ada@example.com'),
-    isEnabled: true,
-    isOrganizationAdmin: false,
-    userGroups: null,
-    plan: Plan.solo,
-    groups: [],
-    isEnsoTeamMember: false,
     ...overrides,
-  } as User
+  }
 }
 
 async function mountUserBar() {
@@ -115,17 +90,10 @@ beforeEach(() => {
 afterEach(() => {
   useAboutModal().isOpen.value = false
   onlineManager.setOnline(true)
-  uploads.clear()
   useToasts().dismiss()
 })
 
 describe('UserBar', () => {
-  test('nothing without a user', async () => {
-    auth.session = null
-    const { wrapper } = await mountUserBar()
-    expect(wrapper.html()).toBe('<!--v-if-->')
-  })
-
   test('the user menu: a "User Settings" dialog of buttons, focused as it opens', async () => {
     await mountUserBar()
     const user = userEvent.setup()
@@ -138,7 +106,7 @@ describe('UserBar', () => {
     // The dialog itself takes the focus, then Tab goes to the entries.
     expect(document.activeElement).toBe(menu)
     expect(menu.textContent).toContain('Ada Lovelace')
-    expect(menu.textContent).toContain(getText(Plan.solo))
+    expect(menu.textContent).toContain(getText('userMenuWorkingLocally'))
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
     await user.tab()
     expect(document.activeElement).toBe(entry(getText('settingsShortcut')))
@@ -150,7 +118,7 @@ describe('UserBar', () => {
 
   test('"Download app" without a local backend', async () => {
     localBackend.value = null
-    auth.session = { user: makeUser({ plan: Plan.team }) }
+    auth.session = { user: makeUser() }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
@@ -162,13 +130,13 @@ describe('UserBar', () => {
   })
 
   test('local mode: "Working locally", no "Upgrade Plan" or "Logout", in menu or actions', async () => {
-    // The offline stand-in session: a synthetic user on the free plan, with authentication off.
-    auth.session = { user: makeUser({ plan: Plan.free }), isAuthDisabled: true }
+    // The local session: the one local user, with no sign-in.
+    auth.session = { user: makeUser() }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
-    expect(must(userMenu()).textContent).not.toContain(getText(Plan.free))
+    expect(must(userMenu()).textContent).not.toContain(getText('free'))
     expect(must(userMenu()).textContent).toContain('Working locally')
     const names = useActionsStore()
       .findActions('')
@@ -177,29 +145,16 @@ describe('UserBar', () => {
     expect(names).not.toContain(getText('signOutShortcut'))
   })
 
-  test('local mode: no "Upgrade" for an organization admin on the free plan', async () => {
-    auth.session = {
-      user: makeUser({ isOrganizationAdmin: true, plan: Plan.free }),
-      isAuthDisabled: true,
-    }
+  test('no trial, "Invite" or "Upgrade"', async () => {
+    auth.session = { user: makeUser() }
     await mountUserBar()
-    expect([...document.querySelectorAll('a')].map(textOf)).not.toContain(getText('upgrade'))
-  })
-
-  test('no "Invite", "Upgrade" or "Upgrade Plan", whatever the plan', async () => {
-    const user = userEvent.setup()
-    for (const plan of PLANS) {
-      auth.session = { user: makeUser({ plan, isOrganizationAdmin: true }) }
-      const { unmount } = await mountUserBar()
-      const controls = [...document.querySelectorAll('a, button')].map(textOf)
-      expect(controls).not.toContain(getText('upgrade'))
-      expect(controls).not.toContain(getText('invite'))
-      await user.click(userMenuButton())
-      await flushPromises()
-      expect(entryNames()).not.toContain(getText('upgradePlanShortcut'))
-      unmount()
-      await flushPromises()
-    }
+    const controls = [...document.querySelectorAll('a, button')].map(textOf)
+    expect(controls).not.toContain(getText('upgrade'))
+    expect(controls).not.toContain(getText('invite'))
+    expect(document.body.textContent).not.toContain(getText('trialProgressLabel'))
+    await userEvent.setup().click(userMenuButton())
+    await flushPromises()
+    expect(entryNames()).not.toContain(getText('upgradePlanShortcut'))
   })
 
   test('Settings and About close the menu and act; there is no Logout', async () => {
@@ -266,32 +221,5 @@ describe('NotificationTray', () => {
     expect(tray().getAttribute('aria-label')).toBe(getText('notifications'))
     expect(textOf(tray().querySelector('h3'))).toBe(getText('notifications'))
     expect(tray().textContent).toContain(getText('youAreAllCaughtUp'))
-  })
-
-  test('an upload: a notification with a toast, and a badge until the tray is opened', async () => {
-    await mountUserBar()
-    const badge = () => must(trayButton().querySelector('[class*="after:bg-danger"]'))
-    uploads.set('upload-1', {
-      kind: 'requestedByUser',
-      sentBytes: 500_000,
-      totalBytes: 2_000_000,
-    })
-    await flushPromises()
-    const message = getText('uploadingXFilesWithProgressNotification', 0, 1, '0.50', '2')
-    const toast = must(useToasts().toasts.value.find((t) => t.id === 'upload-1'))
-    expect(toast.isLoading).toBe(true)
-    expect(toast.position).toBe('bottom-right')
-    expect(toast.progress).toBe(0.25)
-    expect(badge().classList).not.toContain('invisible')
-
-    await userEvent.setup().click(trayButton())
-    await flushPromises()
-    const items = [...tray().querySelectorAll('[role="listitem"]')]
-    expect(items).toHaveLength(1)
-    const [item] = items
-    expect(item?.textContent).toContain(message)
-    expect(item?.querySelector('[role="progressbar"]')).not.toBeNull()
-    // Seen: the badge goes.
-    expect(badge().classList).toContain('invisible')
   })
 })

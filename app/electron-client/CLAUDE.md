@@ -23,9 +23,11 @@ desktop binary (AppImage/DMG/exe + installer).
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).
-- Implements the in-app `enso://` protocol (`handleProjectProtocol`), which
-  serves project assets to the window. It is not registered with the OS: there
-  are no deep links, no sign-in, and the IDE writes no `~/.enso/credentials`.
+- Implements the in-app `enso://` protocol (`handleProjectProtocol`,
+  `projectService.ts`, registered with `protocol.handle` in `index.ts`), which
+  serves project assets to the window and refuses paths outside a project. The
+  OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
+  are no deep links.
 - Handles auto-update (electron-updater via electron-builder), custom window
   chrome.
 
@@ -56,16 +58,10 @@ the retry recovers. A healthy session shows that warning exactly once and no
 `Request timeout` lines at all. Repeated 15 s timeouts are the real failure.
 
 **Always run `git submodule update --init --recursive` before building.** In
-particular, `app/gui/.dev-env/` (a private submodule) holds `.env.staging` /
-`.env.production` with the Cognito client ids and the staging cloud API URL. A
-fresh worktree starts with that submodule empty. The build does **not**
-hard-fail when it's missing — the symlink `app/gui/.env.staging` becomes broken,
-vite silently falls back to defaults, and the resulting Electron app points the
-dashboard at the production cloud regardless of `--mode staging`. The end-to-end
-tests then fail at the login screen (`Loading Enso…` →
-`Error while fetching configuration [Error: Failed to fetch]`) because the
-in-renderer fetch hits a URL the auth flow can't handshake. Init the submodules
-before any IDE build (and before running the e2e suite that loads that build).
+particular, `app/gui/.dev-env/` is a private submodule which a fresh worktree
+must initialise for the `.env.staging` / `.env.production` symlinks. Init the
+submodules before any IDE build (and before running the e2e suite that loads
+that build).
 
 For testing, always build with `--mode staging`, to not pollute production
 backend and telemetry with test runs.
@@ -77,8 +73,7 @@ once `./run ide build` has produced the engine bundle.
 
 - `ENSO_BUILD_IDE`, `ENSO_BUILD_BACKEND` — output locations.
 - `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — which engine to bundle.
-- `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server when running
-  against a cloud backend.
+- `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 
 ## Local Claude agent
@@ -606,11 +601,11 @@ rule in `playwright.config.ts`:
   Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
-  perspective (login → dashboard → project → graph editor). `electronTest.ts`
-  extends Playwright's `test` fixture to spawn Electron and exposes helpers like
-  `loginAsTestUser`, `createNewProject`, `openComponentBrowser`. See
-  `tests/README.md` for prerequisites (a built `dist/ide/`, credentials at
-  `playwright/.auth/user.json`). If on a worktree, Run with
+  perspective (dashboard → project → graph editor). `electronTest.ts` extends
+  Playwright's `test` fixture to spawn Electron and exposes helpers like
+  `waitForDashboard`, `createNewProject`, `openComponentBrowser`. See
+  `tests/README.md` for prerequisites (a built `dist/ide/`; no cloud account is
+  needed). If on a worktree, Run with
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 

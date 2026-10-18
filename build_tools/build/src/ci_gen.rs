@@ -151,26 +151,13 @@ pub mod secret {
 
 pub mod variables {
     pub const ENSO_HOST: &str = "ENSO_HOST";
-    pub const ENSO_CLOUD_ENVIRONMENT: &str = "ENSO_CLOUD_ENVIRONMENT";
-    pub const ENSO_CLOUD_API_URL: &str = "ENSO_CLOUD_API_URL";
-    pub const ENSO_CLOUD_CHAT_URL: &str = "ENSO_CLOUD_CHAT_URL";
     pub const ENSO_CLOUD_SENTRY_DSN: &str = "ENSO_CLOUD_SENTRY_DSN";
-    pub const ENSO_CLOUD_STRIPE_KEY: &str = "ENSO_CLOUD_STRIPE_KEY";
-    pub const ENSO_CLOUD_AUTH_ENDPOINT: &str = "ENSO_CLOUD_AUTH_ENDPOINT";
-    pub const ENSO_CLOUD_COGNITO_USER_POOL_ID: &str = "ENSO_CLOUD_COGNITO_USER_POOL_ID";
-    pub const ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: &str =
-        "ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID";
-    pub const ENSO_CLOUD_COGNITO_DOMAIN: &str = "ENSO_CLOUD_COGNITO_DOMAIN";
-    pub const ENSO_CLOUD_COGNITO_REGION: &str = "ENSO_CLOUD_COGNITO_REGION";
     pub const ENSO_CLOUD_GOOGLE_ANALYTICS_TAG: &str = "ENSO_CLOUD_GOOGLE_ANALYTICS_TAG";
     pub const ENSO_CLOUD_SENTRY_ORGANIZATION: &str = "ENSO_CLOUD_SENTRY_ORGANIZATION";
     pub const ENSO_CLOUD_SENTRY_PROJECT: &str = "ENSO_CLOUD_SENTRY_PROJECT";
 
     /// License key for the AG Grid library.
     pub const ENSO_AG_GRID_LICENSE_KEY: &str = "ENSO_AG_GRID_LICENSE_KEY";
-
-    /// The Mapbox API token for the GeoMap visualization.
-    pub const ENSO_MAPBOX_API_TOKEN: &str = "ENSO_MAPBOX_API_TOKEN";
 }
 
 /// Return an expression piece that evaluates to `true` if the current branch is not the default.
@@ -629,11 +616,22 @@ fn concurrency(group: impl AsRef<str>) -> Concurrency {
     }
 }
 
+/// Paths whose changes alone start no pull-request workflow: design specs and implementation
+/// plans, which nothing builds or tests. The hand-written `*-pull-request.yml` and
+/// `formatting.yml` carry the same list; keep them in step.
+pub const PR_IGNORED_PATHS: [&str; 1] = ["docs/superpowers/**"];
+
+/// The `pull_request` trigger of the PR workflows: everything but changes to
+/// [`PR_IGNORED_PATHS`] alone.
+fn pull_request_trigger() -> PullRequest {
+    PullRequest::default().with_paths_ignore(PR_IGNORED_PATHS)
+}
+
 /// Generate a workflow that checks if the changelog has been updated (if needed).
 pub fn changelog() -> Result<Workflow> {
     use PullRequestActivityType::*;
     let mut workflow = Workflow::new("Changelog");
-    workflow.on.pull_request(PullRequest::default().with_types([
+    workflow.on.pull_request(pull_request_trigger().with_types([
         Labeled,
         Unlabeled,
         Synchronize,
@@ -982,7 +980,7 @@ fn stdlib_api_change_labels_workflow() -> Result<Workflow> {
     ];
     let on = Event {
         push: Some(Push { inner_branches: Branches::new(["develop"]), ..default() }),
-        pull_request: Some(PullRequest::default()),
+        pull_request: Some(pull_request_trigger()),
         workflow_dispatch: Some(WorkflowDispatch::default()),
         workflow_call: Some(WorkflowCall::default()),
         schedule: vec![],
@@ -1116,4 +1114,25 @@ pub fn generate(
         })
         .collect();
     Ok(workflows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A PR that changes only specs and plans starts none of the PR workflows.
+    #[test]
+    fn pull_request_workflows_ignore_spec_and_plan_changes() {
+        for (name, workflow) in [
+            ("changelog", changelog().unwrap()),
+            ("std-libs-labels", stdlib_api_change_labels_workflow().unwrap()),
+        ] {
+            let yaml = serde_yaml::to_string(&workflow).unwrap();
+            assert!(yaml.contains("paths-ignore:"), "{name} lacks paths-ignore:\n{yaml}");
+            assert!(
+                yaml.contains("docs/superpowers/**"),
+                "{name} does not ignore specs and plans:\n{yaml}"
+            );
+        }
+    }
 }

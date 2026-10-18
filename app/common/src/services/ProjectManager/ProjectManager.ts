@@ -5,12 +5,7 @@
  */
 import * as dateTime from '../../utilities/data/dateTime.js'
 import { omit } from '../../utilities/data/object.js'
-import {
-  getDirectoryAndName,
-  getFileName,
-  getFolderPath,
-  normalizeSlashes,
-} from '../../utilities/file.js'
+import { getDirectoryAndName, getFolderPath, normalizeSlashes } from '../../utilities/file.js'
 import { normalizeName } from '../../utilities/nameValidation.js'
 import * as backend from '../Backend.js'
 import { makeProjectCacheKey, makeProjectTelemetryKey } from './projectIdentity.js'
@@ -250,20 +245,10 @@ export class ProjectManager {
       recursive ? 'filesystem-list-recursive' : 'filesystem-list',
       parentPath,
     )
-    const result = response.entries
-      .filter((entry) => {
-        // Ignore hybrid project directories.
-        if (entry.type === 'DirectoryEntry') {
-          const directoryName = getFileName(entry.path)
-          return !backend.HYBRID_PROJECT_DIRECTORY_MASK.test(directoryName)
-        }
-
-        return true
-      })
-      .map((entry) => ({
-        ...entry,
-        path: normalizeSlashes(entry.path),
-      }))
+    const result = response.entries.map((entry) => ({
+      ...entry,
+      path: normalizeSlashes(entry.path),
+    }))
 
     for (const entry of result) {
       if (entry.type === 'ProjectEntry') {
@@ -353,6 +338,7 @@ export class ProjectManager {
               this.projectIds.delete(child.path)
               break
             }
+            case 'DatalinkEntry':
             case 'FileEntry': {
               // No special extra metadata is stored for files.
               break
@@ -465,6 +451,29 @@ export class ProjectManager {
   /** Remove the local project at `projectPath` from the recently opened projects. */
   async forgetRecentProject(projectPath: Path): Promise<void> {
     await this.runProjectServiceCommand('recent/forget', { path: projectPath })
+  }
+
+  /**
+   * The JSON of the datalink file at `path`.
+   * @throws {Error} when it is missing or is not valid JSON.
+   */
+  async readDatalink(path: Path): Promise<unknown> {
+    return this.runProjectServiceCommand('datalink/read', { path })
+  }
+
+  /** Create the datalink file `path`; its folder must exist and the file must not. */
+  async createDatalink(path: Path, value: unknown): Promise<void> {
+    await this.runProjectServiceCommand('datalink/create', { path, value })
+  }
+
+  /** Replace the content of the existing datalink file `path`. */
+  async updateDatalink(path: Path, value: unknown): Promise<void> {
+    await this.runProjectServiceCommand('datalink/update', { path, value })
+  }
+
+  /** Delete the datalink file `path`. */
+  async deleteDatalink(path: Path): Promise<void> {
+    await this.runProjectServiceCommand('datalink/delete', { path })
   }
 
   /** Whether the project at `path` is versioned, has unsaved changes, and its last version. */

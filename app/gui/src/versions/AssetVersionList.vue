@@ -61,7 +61,7 @@ const versions = computed<Version[]>(() => {
       ...version,
       number,
       title: getText('versionX', number),
-      tags: [...(version.isLatest ? [getText('latestIndicator')] : []), ...(version.tags ?? [])],
+      tags: version.isLatest ? [getText('latestIndicator')] : [],
     }
   })
 })
@@ -80,7 +80,7 @@ const latestVersion = computed(() => versions.value.find((version) => version.is
  * restore fails, the project is still opened again, unchanged.
  */
 async function restoreVersion(versionId: S3ObjectVersionId) {
-  if (backend.type !== BackendType.local || item.type !== AssetType.project) {
+  if (item.type !== AssetType.project) {
     await backend.restoreAsset(item.id, versionId)
     return
   }
@@ -106,13 +106,10 @@ const restoreMutation = useMutation({
     restoreVersion(variables.versionId),
   onError: (error: unknown) => toastAndLog('restoreProjectError', error),
   meta: {
-    invalidates:
-      backend.type === BackendType.local ?
-        [
-          versionsQueryOptions.queryKey,
-          localVersioningStatusQueryOptions(null, extractTypeAndPath(item.id).path).queryKey,
-        ]
-      : [versionsQueryOptions.queryKey],
+    invalidates: [
+      versionsQueryOptions.queryKey,
+      localVersioningStatusQueryOptions(null, extractTypeAndPath(item.id).path).queryKey,
+    ],
     awaitInvalidates: true,
   },
 })

@@ -31,8 +31,6 @@ import { useText } from '$/providers/text'
 import { includesPredicate } from '$/utils/data/array'
 import LocalStorage from '$/utils/LocalStorage'
 import { safeJsonParse } from '$/utils/safeJsonParse'
-import { backendQueryOptions } from '@/composables/backend'
-import { useQuery } from '@tanstack/vue-query'
 import type { Path } from 'enso-common/src/services/Backend'
 import { computed, inject, onScopeDispose, ref, watch } from 'vue'
 import SettingsSearchBar from './SettingsSearchBar.vue'
@@ -73,22 +71,6 @@ function setTab(newTab: SettingsTabType) {
 
 // === The context of the entries ===
 
-const session = computed(() => {
-  const value = auth.session
-  if (value == null) throw new Error('The settings page needs a signed-in user.')
-  return value
-})
-const isCloudDataUnavailable = computed(() => session.value.isCloudDataUnavailable)
-
-const organizationQuery = useQuery(
-  backendQueryOptions(
-    'getOrganization',
-    () => (isCloudDataUnavailable.value ? undefined : []),
-    backends.remoteBackend,
-  ),
-)
-const organization = computed(() => organizationQuery.data.value ?? null)
-
 const localStorage = LocalStorage.getInstance()
 const preferredTimeZone = ref(localStorage.get('preferredTimeZone'))
 onScopeDispose(
@@ -105,12 +87,8 @@ const storedDownloadDirectory = computed(() => localPathsStore.state.value.downl
 const defaultDownloadDirectory = inject<Path | null>('defaultDownloadPath', null)
 
 const context = computed<SettingsContext>(() => ({
-  user: session.value.user,
-  backend: backends.remoteBackend,
+  user: auth.session.user,
   localBackend: backends.localBackend,
-  organization: organization.value,
-  isCloudDataUnavailable: isCloudDataUnavailable.value,
-  isAuthDisabled: session.value.isAuthDisabled,
   getText,
   preferredTimeZone: preferredTimeZone.value,
   setPreferredTimeZone,
@@ -168,11 +146,7 @@ const sections = computed((): readonly SettingsSectionData[] => {
   return filterSettingsSections(data, isMatch.value, getText, SETTINGS_NO_RESULTS_SECTION_DATA)
 })
 
-const title = computed(() =>
-  tabData.value.organizationOnly === true ?
-    (organization.value?.name ?? 'your organization')
-  : session.value.user.name,
-)
+const title = computed(() => auth.session.user.name)
 </script>
 
 <template>

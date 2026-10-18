@@ -3,14 +3,12 @@ import * as analytics from '$/utils/analytics'
 import { proxyRefs } from '$/utils/reactivity'
 import type { Opt } from '@/util/data/opt'
 import { createGlobalState } from '@vueuse/core'
-import { BackendType, Plan, type ProjectSessionId } from 'enso-common/src/services/Backend'
+import { BackendType, type ProjectSessionId } from 'enso-common/src/services/Backend'
 import { Err } from 'enso-common/src/utilities/data/result'
 import { computed, onScopeDispose, reactive, readonly, ref, watchEffect } from 'vue'
 import { useRoute, useRouter, type RouteLocation, type RouteLocationRaw } from 'vue-router'
 import * as z from 'zod'
-import { useAuth } from './auth'
 import { useBackends } from './backends'
-import { useFeatureFlag } from './featureFlags'
 import { useOpenedProjects } from './openedProjects'
 import {
   PROJECT_ID_SCHEMA,
@@ -304,9 +302,7 @@ function createContainerStore() {
           switch (project?.state.status) {
             case 'opened':
             case 'initialized':
-            case 'hybrid-closed':
             case 'to-restore':
-            case 'closed-by-backend':
               runningProject = project.state.info
               break
           }
@@ -350,28 +346,14 @@ function createContainerStore() {
  * available to the user.
  */
 function useModesForBackend() {
-  const auth = useAuth()
-  const enableCloudExecution = useFeatureFlag('enableCloudExecution')
   const backends = useBackends()
-  return computed(() => ({
-    locally: {
-      [BackendType.local]: backends.localBackend != null ? ('local' as const) : null,
-      [BackendType.remote]: backends.localBackend != null ? ('hybrid' as const) : null,
-    },
-    // Local projects can be run natively; only Team plans and above have access to Cloud execution.
-    // Local projects: Open normally
-    // Cloud projects: Open in Cloud VM
-    natively: {
-      [BackendType.local]: backends.localBackend != null ? ('local' as const) : null,
-      [BackendType.remote]:
-        (
-          enableCloudExecution.value &&
-          (auth.session?.user.plan === Plan.team || auth.session?.user.plan === Plan.enterprise)
-        ) ?
-          ('cloud' as const)
-        : null,
-    },
-  }))
+  return computed(() => {
+    // Projects run only locally, and only when there is a local backend.
+    const modes: Record<BackendType, 'local' | null> = {
+      [BackendType.local]: backends.localBackend != null ? 'local' : null,
+    }
+    return { locally: modes, natively: modes }
+  })
 }
 
 export const useContainerData = createGlobalState(createContainerStore)

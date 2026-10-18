@@ -55,23 +55,10 @@ export class ErrorWithDisplayMessage extends Error {
 
 /**
  * Checks if the given error is a network error.
- * Wraps the `is-network-error` library to add additional network errors to the check.
+ * Wraps the `is-network-error` library.
  */
 export function isNetworkError(error: unknown): error is TypeError {
-  const customNetworkErrors = new Set([
-    // aws amplify network error
-    'Network error',
-  ])
-
-  if (error instanceof Error) {
-    if (customNetworkErrors.has(error.message)) {
-      return true
-    } else {
-      return originalIsNetworkError(error)
-    }
-  } else {
-    return false
-  }
+  return error instanceof Error && originalIsNetworkError(error)
 }
 
 /** Evaluates the given type only if it the exact same type as `Expected`. */

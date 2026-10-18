@@ -7,6 +7,10 @@ on:
     branches:
       - develop
   pull_request:
+    # Specs and plans alone start no checks; keep in step with `PR_IGNORED_PATHS` in
+    # `build_tools/build/src/ci_gen.rs`.
+    paths-ignore:
+      - "docs/superpowers/**"
     # `labeled`/`unlabeled` so that adding or removing `CI: Build IDE` re-evaluates the checks.
     types: [opened, synchronize, reopened, labeled, unlabeled]
 

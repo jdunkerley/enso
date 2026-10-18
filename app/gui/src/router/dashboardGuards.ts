@@ -1,49 +1,38 @@
-import { useAuth } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
 import { useConfig } from '$/providers/config'
 import { routeFromTab, useContainerData, type Tab } from '$/providers/container'
 import { backendQueryOptions } from '@/composables/backend'
-import { onlineManager, useQueryClient } from '@tanstack/vue-query'
+import { useQueryClient } from '@tanstack/vue-query'
 import {
   AssetType,
   Backend,
   EnsoPath,
   extractTypeFromId,
   isProjectId,
-  isRemoteAssetPath,
   Path,
-  Plan,
   ProjectId,
   type AssetDetailsResponse,
-  type User,
 } from 'enso-common/src/services/Backend'
-import {
-  isLocalProjectId,
-  newDirectoryId,
-  type LocalBackend,
-} from 'enso-common/src/services/LocalBackend'
-import type { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
+import { newDirectoryId, type LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { platform, Platform } from 'enso-common/src/utilities/detect'
 import { getFileName } from 'enso-common/src/utilities/file'
 import type { NavigationGuardReturn, RouteLocation } from 'vue-router'
 
 export const SAMPLES_DIRECTORY = 'Samples'
 export const LOCAL_WELCOME_PROJECT_RELATIVE_PATH = `${SAMPLES_DIRECTORY}/Getting_Started`
-export const CLOUD_WELCOME_PROJECT_RELATIVE_PATH = `${SAMPLES_DIRECTORY}/Getting Started.project`
 
 type BackendAPI<B extends Backend> = Pick<B, 'rootPath' | 'listDirectory'>
 
 /** Redirect from "ensoPath" route to proper asset's tab for this route. */
 export async function redirectFromPath(to: RouteLocation) {
   if (to.params.path == null) return false
-  const { localBackend, remoteBackend } = useBackends()
+  const { localBackend } = useBackends()
 
   const path = EnsoPath(to.params.path instanceof Array ? to.params.path.join('/') : to.params.path)
   if (!path) return false
 
-  const backend = isRemoteAssetPath(path) ? remoteBackend : localBackend
-  if (backend == null) return false
-  const resolvedPath = await backend.resolveEnsoPath(path).catch(() => null)
+  if (localBackend == null) return false
+  const resolvedPath = await localBackend.resolveEnsoPath(path).catch(() => null)
   const typedAsset = resolvedPath && extractTypeFromId(resolvedPath.id)
   switch (typedAsset?.type) {
     case AssetType.project:
@@ -64,34 +53,15 @@ export async function maybeRedirectToTab(to: RouteLocation) {
 /** Get path of the project to auto-open on application launch. */
 export async function welcomeProjectPath(
   cliStartupProject: string | undefined,
-  user: User,
-  {
-    localBackend,
-    remoteBackend,
-  }: {
-    localBackend: BackendAPI<LocalBackend> | null
-    remoteBackend: BackendAPI<RemoteBackend>
-  },
-) {
-  let path: string | undefined
-
+  { localBackend }: { localBackend: BackendAPI<LocalBackend> | null },
+): Promise<string | undefined> {
   if (cliStartupProject?.startsWith('file:')) return undefined
   // If not file url, we expect this parameter to be a project name
-  if (cliStartupProject) {
-    path = `${localBackend?.rootPath()}/${cliStartupProject}`
-  } else {
-    if (
-      await shouldOpenWelcomeProject(localBackend, user.plan === Plan.free ? null : remoteBackend)
-    ) {
-      if (user.plan === Plan.free) {
-        path = `${localBackend?.rootPath()}/${LOCAL_WELCOME_PROJECT_RELATIVE_PATH}`
-      } else {
-        path = `enso://Users/${user.name}/${CLOUD_WELCOME_PROJECT_RELATIVE_PATH}`
-      }
-    }
+  if (cliStartupProject) return `${localBackend?.rootPath()}/${cliStartupProject}`
+  if (await shouldOpenWelcomeProject(localBackend)) {
+    return `${localBackend?.rootPath()}/${LOCAL_WELCOME_PROJECT_RELATIVE_PATH}`
   }
-
-  return path
+  return undefined
 }
 
 /**
@@ -105,10 +75,6 @@ export async function maybeRedirectToProject(to: RouteLocation): Promise<Navigat
   if (to.name !== 'dashboard' || to.redirectedFrom != null) return
   const backends = useBackends()
   const config = useConfig()
-  const auth = useAuth()
-
-  // Always set: the local session. PR 3 makes it non-null.
-  if (auth.session == null) return
 
   const pathFromOptions =
     config.params.startup.project && backends.localBackend ?
@@ -116,16 +82,12 @@ export async function maybeRedirectToProject(to: RouteLocation): Promise<Navigat
     : undefined
 
   const initialPath =
-    pathFromOptions ??
-    (await welcomeProjectPath(config.params.startup.project, auth.session.user, backends))
+    pathFromOptions ?? (await welcomeProjectPath(config.params.startup.project, backends))
 
   return initialPath ? { name: 'ensoPath', params: { path: initialPath.split('/') } } : true
 }
 
-async function shouldOpenWelcomeProject(
-  localBackend: Pick<LocalBackend, 'listDirectory'> | null,
-  remoteBackend: Pick<RemoteBackend, 'listDirectory'> | null,
-) {
+async function shouldOpenWelcomeProject(localBackend: Pick<LocalBackend, 'listDirectory'> | null) {
   const navigatedInDrive =
     window.localStorage.getItem('enso-category-id') ||
     window.localStorage.getItem('enso-current-directory-id')
@@ -145,15 +107,12 @@ async function shouldOpenWelcomeProject(
     console.error('Cannot read user home directory; will skip launching Welcome Project', err)
     return null
   }
-  const homeContent = await Promise.all([
-    localBackend?.listDirectory(homeDirQuery),
-    onlineManager.isOnline() && remoteBackend != null ?
-      remoteBackend.listDirectory(homeDirQuery, 'User Home')
-    : null,
-  ]).catch(onError)
-  if (homeContent == null) return false
-  const [localHome, cloudHome] = homeContent
-  return ![...(localHome?.assets ?? []), ...(cloudHome?.assets ?? [])].some((asset) => {
+  const localHome =
+    localBackend == null ?
+      { assets: [] }
+    : await localBackend.listDirectory(homeDirQuery).catch(onError)
+  if (localHome == null) return false
+  return !localHome.assets.some((asset) => {
     return asset.type != AssetType.directory || asset.title != SAMPLES_DIRECTORY
   })
 }
@@ -214,10 +173,9 @@ export async function openTab(to: RouteLocation) {
       if (container.isTabOpened(tab)) {
         break
       }
-      const { localBackend, remoteBackend } = useBackends()
+      const { localBackend: backend } = useBackends()
       const queryClient = useQueryClient()
 
-      const backend = isLocalProjectId(id) ? localBackend : remoteBackend
       if (backend == null) return false
 
       const options = backendQueryOptions('getAssetDetails', [id, undefined], backend)

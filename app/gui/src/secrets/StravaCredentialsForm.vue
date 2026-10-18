@@ -24,7 +24,7 @@ const config = useConfig()
 async function submit(values: Parameters<typeof strava.submitForm>[3]) {
   try {
     await strava.submitForm(
-      config.remoteConfig?.ENSO_IDE_API_URL,
+      undefined,
       config.remoteConfig?.ENSO_IDE_STRAVA_OAUTH_CLIENT_ID,
       createCredentials,
       values,

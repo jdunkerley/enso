@@ -24,7 +24,7 @@ const config = useConfig()
 async function submit(values: Parameters<typeof salesforce.submitForm>[3]) {
   try {
     await salesforce.submitForm(
-      config.remoteConfig?.ENSO_IDE_API_URL,
+      undefined,
       config.remoteConfig?.ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID,
       createCredentials,
       values,

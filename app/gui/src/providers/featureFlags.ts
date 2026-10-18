@@ -1,7 +1,6 @@
 /** @file Provider for feature flags, used to enable or disable certain features in the application. */
 import { createPersistedStore } from '$/utils/persistedStore'
 import { unsafeWriteValue } from '$/utils/write'
-import { Plan } from 'enso-common/src/services/Backend'
 import { unsafeEntries } from 'enso-common/src/utilities/data/object'
 import { IS_DEV_MODE, isOnElectron, isOnLinux } from 'enso-common/src/utilities/detect'
 import { computed } from 'vue'
@@ -9,7 +8,6 @@ import { z } from 'zod'
 
 const MIN_ASSETS_TABLE_REFRESH_INTERVAL_MS = 100
 export const DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS = 3_000
-export const DEFAULT_GET_LOG_EVENTS_PAGE_SIZE = 100
 export const DEFAULT_LIST_DIRECTORY_PAGE_SIZE = 100
 export const DEFAULT_FILE_CHUNK_UPLOAD_POOL_SIZE = 5
 export const DEFAULT_DATA_CATALOG_QUERY_DEBOUNCE_DELAY_MS = 500
@@ -20,16 +18,11 @@ export const FEATURE_FLAGS_SCHEMA = z.object({
   enableMultitabs: z.boolean(),
   enableAssetsTableBackgroundRefresh: z.boolean(),
   assetsTableBackgroundRefreshInterval: z.number().int().min(MIN_ASSETS_TABLE_REFRESH_INTERVAL_MS),
-  enableCloudExecution: z.boolean(),
-  enableAdvancedProjectExecutionOptions: z.boolean(),
   showDeveloperIds: z.boolean(),
-  developerPlanOverride: z.nativeEnum(Plan).optional(),
   fileChunkUploadPoolSize: z.number().int().min(1),
-  getLogEventsPageSize: z.number().int().min(1),
   listDirectoryPageSize: z.number().int().min(1),
   dataCatalogQueryDebounceDelay: z.number().int().min(0),
   unsafeDarkTheme: z.boolean(),
-  apiKeyLimit: z.number().int().min(0),
   debugHoverAreas: z.boolean(),
 })
 
@@ -101,16 +94,11 @@ export const flagsStore = createPersistedStore<FeatureFlagsState>(
       enableMultitabs: false,
       enableAssetsTableBackgroundRefresh: true,
       assetsTableBackgroundRefreshInterval: DEFAULT_ASSETS_TABLE_REFRESH_INTERVAL_MS,
-      enableCloudExecution: IS_DEV_MODE || isOnElectron(),
-      enableAdvancedProjectExecutionOptions: false,
       showDeveloperIds: false,
-      developerPlanOverride: undefined,
       fileChunkUploadPoolSize: DEFAULT_FILE_CHUNK_UPLOAD_POOL_SIZE,
-      getLogEventsPageSize: DEFAULT_GET_LOG_EVENTS_PAGE_SIZE,
       listDirectoryPageSize: DEFAULT_LIST_DIRECTORY_PAGE_SIZE,
       dataCatalogQueryDebounceDelay: DEFAULT_DATA_CATALOG_QUERY_DEBOUNCE_DELAY_MS,
       unsafeDarkTheme: false,
-      apiKeyLimit: 5,
       debugHoverAreas: false,
     },
   }),

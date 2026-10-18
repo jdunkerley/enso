@@ -27,7 +27,6 @@ function file(id: string, title: string, modifiedAt = '2026-10-01T10:00:00Z'): A
     modifiedAt,
     createdAt: modifiedAt,
     parentId: TARGET_ID,
-    permissions: null,
     projectState: null,
     extension: 'csv',
     parentsPath: '',
@@ -45,7 +44,7 @@ const EXISTING_NOTES = file('file-notes', 'notes.csv')
 
 let siblings: AnyAsset[]
 const listDirectory = vi.fn<Backend['listDirectory']>()
-const backend = { type: BackendType.remote, listDirectory } as unknown as Backend
+const backend = { type: BackendType.local, listDirectory } as unknown as Backend
 
 let portalRoot: HTMLElement
 beforeEach(() => {
@@ -87,7 +86,7 @@ describe('the duplicate-name dialog', () => {
     const { createTestQueryClient } = await import('$/utils/testing/mountWithProviders')
     const queryClient = createTestQueryClient()
     // An infinite listing, as the drive table's.
-    queryClient.setQueryData(['remote', 'listDirectory', 'source'], {
+    queryClient.setQueryData(['local', 'listDirectory', 'source'], {
       pages: [{ assets: [NEW_DATA, NEW_NOTES] }],
     })
     const onSubmit = vi.fn()
@@ -331,7 +330,7 @@ describe('the duplicate-name dialog', () => {
     siblings = [EXISTING_NOTES]
     const { createTestQueryClient } = await import('$/utils/testing/mountWithProviders')
     const queryClient = createTestQueryClient()
-    queryClient.setQueryData(['remote', 'listDirectory', 'source'], {
+    queryClient.setQueryData(['local', 'listDirectory', 'source'], {
       pages: [{ assets: [NEW_DATA] }],
     })
     const onSubmit = vi.fn()

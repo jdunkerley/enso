@@ -1,8 +1,9 @@
 import { LabelName, Path, UUID, type LChColor } from 'enso-common/src/services/Backend'
 import type * as http from 'node:http'
+import * as datalinkFiles from '../datalinks.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import type { LocalVersioning } from '../localVersioning/index.js'
-import { ProjectService, type CloudParams } from '../projectService/index.js'
+import { ProjectService } from '../projectService/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
 
@@ -110,6 +111,28 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value != null && !Array.isArray(value)
 }
 
+/** The `datalink/` routes. Their "store" is the module itself, which needs no host state. */
+const DATALINK_ROUTES: Readonly<Record<string, RouteHandler<typeof datalinkFiles>>> = {
+  'datalink/read': (files, body) => files.readDatalink(requireString(body, 'path')),
+  'datalink/create': async (files, body) => {
+    await files.createDatalink(requireString(body, 'path'), requireValue(body, 'value'))
+    return null
+  },
+  'datalink/update': async (files, body) => {
+    await files.updateDatalink(requireString(body, 'path'), requireValue(body, 'value'))
+    return null
+  },
+  'datalink/delete': async (files, body) => {
+    await files.deleteDatalink(requireString(body, 'path'))
+    return null
+  },
+}
+
+function requireValue(body: Record<string, unknown>, key: string): unknown {
+  if (!Object.hasOwn(body, key)) throw new Error(`'${key}' is required.`)
+  return body[key]
+}
+
 function requireString(body: Record<string, unknown>, key: string): string {
   const value = body[key]
   if (typeof value !== 'string') throw new Error(`'${key}' must be a string.`)
@@ -175,8 +198,8 @@ async function handleStoreRequest<Store>(
 /**
  * Handle project service requests.
  *
- * The label and Recent routes are served by `localMetadata`, and the `versioning/` routes by
- * `localVersioning`; without their store they answer with an error.
+ * The label and Recent routes are served by `localMetadata`, the `versioning/` routes by
+ * `localVersioning`, and the `datalink/` routes by `datalinks.ts`; without their store they answer with an error.
  */
 export async function handleProjectServiceRequest(
   request: http.IncomingMessage,
@@ -212,6 +235,17 @@ export async function handleProjectServiceRequest(
         headers,
       )
     }
+    if (Object.hasOwn(DATALINK_ROUTES, routeName)) {
+      return handleStoreRequest(
+        request,
+        response,
+        routeName,
+        DATALINK_ROUTES[routeName]!,
+        datalinkFiles,
+        'Datalinks are not available in this host.',
+        headers,
+      )
+    }
   }
   switch (`${request.method} ${requestPath}`) {
     case 'POST /api/project-service/project/create': {
@@ -239,12 +273,11 @@ export async function handleProjectServiceRequest(
       interface Body {
         readonly projectId: UUID
         readonly projectsDirectory: Path
-        readonly cloud?: CloudParams
       }
       bodyJson<Body>(request)
         .then(async (body) => {
           const projectService = await getProjectService()
-          return projectService.openProject(body.projectId, body.projectsDirectory, body.cloud)
+          return projectService.openProject(body.projectId, body.projectsDirectory)
         })
         .then((result) => {
           response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))

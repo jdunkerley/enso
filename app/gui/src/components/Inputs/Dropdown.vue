@@ -191,7 +191,7 @@ function onFocusOut(event: FocusEvent) {
         </div>
       </div>
     </div>
-    <div :class="styles.input()">
+    <div :class="styles.input()" data-testid="dropdown-trigger">
       <Icon icon="chevron_right" :class="styles.dropdownArrow()" />
       <div :class="styles.inputDisplay()">
         <template v-if="isMouseFocused && !multiple">&nbsp;</template>

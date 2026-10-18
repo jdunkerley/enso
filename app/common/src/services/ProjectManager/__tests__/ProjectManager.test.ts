@@ -188,4 +188,17 @@ describe('ProjectManager', () => {
     expect(secondKey).toMatch(/^local-[0-9a-f]{64}$/)
     expect(firstKey).not.toBe(secondKey)
   })
+
+  it('lists a cloud-project-* folder as an ordinary folder', async () => {
+    const projectManager = new ProjectManager(ROOT)
+    const attributes = projectEntry(Path('/root/x')).attributes
+    vi.spyOn(projectManager as never, 'runStandaloneCommandJson').mockResolvedValue({
+      entries: [
+        { type: 'DirectoryEntry', path: '/root/cloud-project-abc', attributes },
+        { type: 'DirectoryEntry', path: '/root/Data', attributes },
+      ],
+    } as never)
+    const entries = await projectManager.listDirectory(ROOT)
+    expect(entries.map((entry) => entry.path)).toEqual(['/root/cloud-project-abc', '/root/Data'])
+  })
 })

@@ -117,17 +117,6 @@ describe('LocalBackend versions', () => {
     expect(move).not.toHaveBeenCalled()
   })
 
-  it('local versions have no tags', async () => {
-    const { localBackend } = makeLocalBackend()
-    await expect(
-      localBackend.updateAsset(
-        newProjectId(PROJECT),
-        { versionId: S3ObjectVersionId(ID), tag: 'release' },
-        'P',
-      ),
-    ).rejects.toThrow('Local versions have no tags.')
-  })
-
   it('maps a non-latest entry with isLatest false', async () => {
     const { projectManager, localBackend } = makeLocalBackend()
     vi.spyOn(projectManager, 'listVersions').mockResolvedValue({

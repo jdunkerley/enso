@@ -12,7 +12,15 @@ import { defineComponent, reactive } from 'vue'
 vi.mock('$/providers/backends', () => ({
   useBackends: () => ({ localBackend: {}, backendForType: () => ({}) }),
 }))
-vi.mock('$/providers/auth', () => ({ useAuth: () => reactive({ session: null }) }))
+vi.mock('$/providers/auth', () => ({
+  useAuth: () =>
+    reactive({
+      session: {
+        email: 'local@enso.localhost',
+        user: { userId: 'user-local', name: 'Offline', email: 'local@enso.localhost' },
+      },
+    }),
+}))
 vi.mock('$/providers/category', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$/providers/category')>()),
   useCategories: () =>

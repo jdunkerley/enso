@@ -9,12 +9,7 @@ import { TEXT } from './utilities'
 export interface ContextMenuActions<T extends BaseActions<Context>, Context> {
   readonly open: () => T
   readonly rename: () => T
-  readonly exportToCloud: () => T
-  readonly exportToLocal: () => T
   readonly delete: () => T
-  readonly moveToTrash: () => T
-  readonly restoreFromTrash: () => T
-  readonly share: () => T
   readonly label: () => T
   readonly duplicate: () => T
   readonly duplicateProject: () => EditorPageActions<Context>
@@ -25,7 +20,6 @@ export interface ContextMenuActions<T extends BaseActions<Context>, Context> {
   readonly download: () => T
   readonly uploadFiles: () => T
   readonly newFolder: () => T
-  readonly newSecret: () => T
   readonly newDataLink: () => T
 }
 
@@ -45,20 +39,6 @@ export function contextMenuActions<T extends BaseActions<Context>, Context>(
           .getByText(TEXT.renameShortcut)
           .click(),
       ),
-    exportToCloud: () =>
-      step('Export to cloud (context menu)', (page) =>
-        page
-          .getByRole('button', { name: TEXT.uploadToCloudShortcut })
-          .getByText(TEXT.uploadToCloudShortcut)
-          .click(),
-      ),
-    exportToLocal: () =>
-      step('Export to local (context menu)', (page) =>
-        page
-          .getByRole('button', { name: TEXT.downloadToLocalShortcut })
-          .getByText(TEXT.downloadToLocalShortcut)
-          .click(),
-      ),
     delete: () =>
       step('Delete (context menu)', async (page) => {
         await page
@@ -76,35 +56,6 @@ export function contextMenuActions<T extends BaseActions<Context>, Context>(
         // (rather than for a fixed duration) holds whatever the transition is.
         await expect(dialog).toBeHidden()
       }),
-    moveToTrash: () =>
-      step('Move to trash (context menu)', async (page) => {
-        await page
-          .getByRole('button', { name: TEXT.moveToTrashShortcut })
-          .getByText(TEXT.moveToTrashShortcut)
-          .click()
-
-        // Confirm the deletion in the dialog
-        const dialog = page.getByTestId('modal-dialog')
-        await dialog.getByRole('button', { name: TEXT.delete }).getByText(TEXT.delete).click()
-        // Wait until the dialog is gone. A closing modal can stay in the page for its exit
-        // transition, covering the page and intercepting the next click; waiting for the state
-        // (rather than for a fixed duration) holds whatever the transition is.
-        await expect(dialog).toBeHidden()
-      }),
-    restoreFromTrash: () =>
-      step('Restore from trash (context menu)', (page) =>
-        page
-          .getByRole('button', { name: TEXT.restoreFromTrashShortcut })
-          .getByText(TEXT.restoreFromTrashShortcut)
-          .click(),
-      ),
-    share: () =>
-      step('Share (context menu)', (page) =>
-        page
-          .getByRole('button', { name: TEXT.shareShortcut })
-          .getByText(TEXT.shareShortcut)
-          .click(),
-      ),
     label: () =>
       step('Label (context menu)', (page) =>
         page
@@ -171,13 +122,6 @@ export function contextMenuActions<T extends BaseActions<Context>, Context>(
         page
           .getByRole('button', { name: TEXT.newFolderShortcut })
           .getByText(TEXT.newFolderShortcut)
-          .click(),
-      ),
-    newSecret: () =>
-      step('New secret (context menu)', (page) =>
-        page
-          .getByRole('button', { name: TEXT.newSecretShortcut })
-          .getByText(TEXT.newSecretShortcut)
           .click(),
       ),
     newDataLink: () =>

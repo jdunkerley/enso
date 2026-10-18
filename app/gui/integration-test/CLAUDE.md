@@ -10,15 +10,15 @@ here imports a type or helper from `src/` that isn't already reachable,
 file; add it to `tsconfig.node.json`'s `include` list (see the gotcha in
 `app/gui/CLAUDE.md` — do not widen it to a `src/**` glob).
 
-- `dashboard/` — Dashboard feature flows (sign-in, project list, settings).
+- `dashboard/` — Dashboard feature flows (project list, settings).
 - `project-view/` — ProjectView feature flows (create nodes, connect edges, open
   visualization).
 - `actions/` — Reusable test actions (page-object-style helpers).
-- `mock/` — Mocks for the backend, Cognito, feature flags. Dashboard tests run
-  against these by default.
-- `base.ts` — Playwright base test fixture (provides auth'd page, mocked env,
-  debug logging).
-- `setup.ts` — Global setup (port finders, temp dirs).
+- `mock/` — Mocks for the local backend (`localApi.ts`), the Language Server,
+  feature flags and the Electron API. Dashboard tests run against these by
+  default.
+- `base.ts` — Playwright base test fixture (provides the loaded drive page,
+  mocked env, debug logging).
 
 ## Run
 
@@ -29,9 +29,8 @@ pnpm test-dev:integration      # UI mode
 ```
 
 Single projects:
-`corepack pnpm exec cross-env NODE_ENV=production playwright test --project=Setup`
-(or `--project="Integration Tests"`). `PROD=true` builds and previews instead of
-running the dev server.
+`corepack pnpm exec cross-env NODE_ENV=production playwright test --project="Integration Tests"`.
+`PROD=true` builds and previews instead of running the dev server.
 
 ### On native Windows
 
@@ -117,13 +116,9 @@ in both modes. Anything else runs once, unlicensed.
 - **The app under test also imports the workspace packages' `dist/`**, so a
   reused worktree or clone keeps running the old shared code after a merge or
   checkout. A missing export then stops the app on "Loading Enso..." and every
-  spec times out waiting for `before-auth-layout`/`after-auth-layout`; the
-  trace's console shows `does not provide an export named …`. Run
+  spec times out waiting for the drive; the trace's console shows
+  `does not provide an export named …`. Run
   `corepack pnpm -r --if-present run compile` before trusting a local run.
-- **The mocked Cognito can ask for a one-time code.** With `mock_totp_code` set
-  in `localStorage`, a password sign-in stops at the code step, and that value
-  is the right code; any other fails as Amplify 6 fails it
-  (`CodeMismatchException`, by `name`). See `loginScreen.spec.ts`.
 - CI runs with a matrix of {dashboard, project-view} × {chromium}. Don't add
   cross-suite test IDs — they must stay independent.
 
@@ -132,13 +127,13 @@ in both modes. Anything else runs once, unlicensed.
 `dashboard/accessibility.spec.ts` is the dashboard's accessibility safety net
 (#81). It runs in every CI build, as part of the ordinary suite.
 
-- **axe-core** (`@axe-core/playwright`, WCAG 2.0–2.2 A/AA rules) scans four
-  screens — login, drive, settings, and the asset panel — through
-  `expectNoNewAxeViolations` in `accessibility.ts`. Each screen has a baseline,
-  `accessibility-baseline/<screen>.json`: the violations the dashboard had when
-  the check came in, keyed by rule id and (normalized) target selector. A
-  violation not in the baseline fails the test; a baseline entry that no longer
-  occurs is only annotated, so a fix never breaks the build.
+- **axe-core** (`@axe-core/playwright`, WCAG 2.0–2.2 A/AA rules) scans three
+  screens — drive, settings, and the asset panel (scanned on its Documentation
+  tab) — through `expectNoNewAxeViolations` in `accessibility.ts`. Each screen
+  has a baseline, `accessibility-baseline/<screen>.json`: the violations the
+  dashboard had when the check came in, keyed by rule id and (normalized) target
+  selector. A violation not in the baseline fails the test; a baseline entry
+  that no longer occurs is only annotated, so a fix never breaks the build.
 - **axe runs only once the page's animations have settled**
   (`waitForAnimationsToSettle`). Layout rules such as `target-size` otherwise
   measure a panel mid-slide: the asset panel's Fullscreen button failed
@@ -153,11 +148,11 @@ in both modes. Anything else runs once, unlicensed.
   the same PR.
 - **Accessibility-tree snapshots** (`toMatchAriaSnapshot`) pin the roles, names
   and states of the drive table header, the drive table's `grid` (its name, row
-  groups and selected row, #208), the user menu and the settings sidebar. They
-  are partial on purpose — no unnamed icons or other incidental nodes — so they
-  hold the dashboard to the contract, not to its DOM. When a change alters a
-  tree deliberately (e.g. the user menu becoming a `menu` of `menuitem`s),
-  update the snapshot in the same PR
+  groups and selected row, #208), the user menu (local items only) and the
+  settings sidebar. They are partial on purpose — no unnamed icons or other
+  incidental nodes — so they hold the dashboard to the contract, not to its DOM.
+  When a change alters a tree deliberately (e.g. the user menu becoming a `menu`
+  of `menuitem`s), update the snapshot in the same PR
   (`--update-snapshots --update-source-method=overwrite`) and say why.
 
 ## Framework-neutral locators
@@ -170,16 +165,14 @@ use:
   use the ARIA state instead (e.g. `getByRole('row', { selected: true })`: drive
   rows carry `aria-selected`; the drive table itself is `getByRole('grid')`);
 - toast library classes — toasts are inside `getByTestId('toast-host')`;
-- generated or framework ids — `#agreements-modal` became
-  `getByTestId('agreements-modal')`;
+- generated or framework ids — use a `data-testid` and `getByTestId` instead;
 - waits for an animation's duration — wait for the resulting state
   (`toBeHidden()`, `toHaveCount(0)`) instead.
 
 A `data-testid` is a contract: keep it on the equivalent element. The ones the
 page objects rely on include `drive-view`, `asset-row`, `asset-row-name`,
-`dummy-row`, `context-menu`, `modal-dialog`, `agreements-modal`, `user-menu`,
-`right-panel`, `asset-search-bar`, `upsert-secret-modal`,
-`directory-row-navigate-button` and `toast-host`.
+`dummy-row`, `context-menu`, `modal-dialog`, `user-menu`, `right-panel`,
+`asset-search-bar`, `directory-row-navigate-button` and `toast-host`.
 
 ## Port parity checklist
 
@@ -205,25 +198,23 @@ description and ticks it off. The flake baseline it compares against is
       visible, and returns to the trigger when a menu or dialog closes.
 - [ ] Electron e2e (`app/electron-client/tests/`), **only** when the port
       touches a flow an Electron spec drives; then run the specs that drive it.
-      They need a packaged build, and the cloud specs a test account. The flows:
-  - login form: the `email`/`password` textboxes and the Login button
-    (`electronTest.ts`, `loginAsTestUser`);
-  - terms-and-privacy dialog: the checkbox groups named by their labels, and
-    Accept;
-  - drive: `drive-view`, `asset-row-name`, the Cloud category button, the New
-    Project button, a project row's context menu → Duplicate
-    (`localWorkflow.spec.ts`, `cloudWorkflow.spec.ts`);
+      They need a packaged build. The flows:
+  - dashboard: `waitForDashboard` (`electronTest.ts`);
+  - drive: `drive-view`, `asset-row-name`, the New Project button, a project
+    row's context menu → Duplicate (`localWorkflow.spec.ts`);
   - project tabs: the welcome project's `tab` and its close button
     (`closeWelcome`);
-  - user menu → Settings → Members tab and its members table, with Remove
-    (`cloudWorkflow.spec.ts`);
   - project rename from the editor, checked back in the drive's row names
     (`localWorkflow.spec.ts`).
 
 ## Writing tests
 
 - Use page-object-style helpers from `actions/`, not raw selectors.
-- Mock at the boundary (HTTP / Amplify / LS), not inside components.
+- Mock at the boundary (HTTP / LS), not inside components.
+- **No cloud requests.** The auto fixture `cloudRequests` (`base.ts`) aborts
+  every request matching `CLOUD_URL` (`mock/registerMocks.ts`) and fails the
+  test that made it. Local data comes from `localApi` (`addRootDirectory`,
+  `addRootFile`, `addRootProject`, `addProjectSources`).
 - Local versioning is mocked in `mock/localVersioning.ts` (state,
   `versioning/status`), with each feature's routes in `mock/versioning/`. Git is
   absent by default; a spec opts in through `setupApi.local`.

@@ -20,24 +20,11 @@ export const PROJECT_INFO_SCHEMA = z.object({
   parentId: DIRECTORY_ID_SCHEMA,
   title: z.string(),
   ensoPath: ENSO_PATH_SCHEMA,
-  mode: z.enum(['local', 'cloud', 'hybrid']),
+  mode: z.literal('local'),
 })
 
-const RUNNING_NATIVE_PROJECT_INFO_SCHEMA = PROJECT_INFO_SCHEMA.extend({
-  mode: z.enum(['local', 'cloud']),
-})
-
-const RUNNING_HYBRID_PROJECT_INFO_SCHEMA = PROJECT_INFO_SCHEMA.extend({
-  mode: z.literal('hybrid'),
-  runningId: PROJECT_ID_SCHEMA,
-  hybridSessionId: PROJECT_SESSION_ID_SCHEMA,
-  localParentId: DIRECTORY_ID_SCHEMA,
-  synced: z.boolean().optional(),
-})
-export const RUNNING_PROJECT_INFO_SCHEMA = z.discriminatedUnion('mode', [
-  RUNNING_NATIVE_PROJECT_INFO_SCHEMA,
-  RUNNING_HYBRID_PROJECT_INFO_SCHEMA,
-])
+/** A running project's info: projects run only locally, so it is a project's info. */
+export const RUNNING_PROJECT_INFO_SCHEMA = PROJECT_INFO_SCHEMA
 
 export type ProjectInfo = z.infer<typeof PROJECT_INFO_SCHEMA>
 export type RunningProjectInfo = z.infer<typeof RUNNING_PROJECT_INFO_SCHEMA>

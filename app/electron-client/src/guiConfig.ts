@@ -15,12 +15,10 @@ const GUI_CONFIG_KEYS = [
   'HOST',
   'ENVIRONMENT',
   'SENTRY_DSN',
-  'API_URL',
   'VERSION',
   'COMMIT_HASH',
   'GOOGLE_ANALYTICS_TAG',
   'YDOC_SERVER_URL',
-  'CLOUD_BUILD',
   'AG_GRID_LICENSE_KEY',
 ] as const satisfies readonly (keyof $Config)[]
 

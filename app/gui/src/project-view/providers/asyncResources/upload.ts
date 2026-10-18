@@ -1,13 +1,9 @@
 import type { OpenedProjectsStore } from '$/providers/openedProjects'
 import type { Initialized as InitializedProject } from '$/providers/openedProjects/projectStates'
-import { backendMutationOptions, backendQueryOptions } from '@/composables/backend'
 import { useProjectFiles } from '@/stores/projectFiles'
-import { QueryClient, useMutation } from '@tanstack/vue-query'
-import { type Asset, AssetType, DirectoryId } from 'enso-common/src/services/Backend'
-import { RemoteBackend } from 'enso-common/src/services/RemoteBackend'
 import { unsafeKeys } from 'enso-common/src/utilities/data/object'
 import { Err, mapOk, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { getFolderPath, readUserSelectedFile } from 'enso-common/src/utilities/file'
+import { readUserSelectedFile } from 'enso-common/src/utilities/file'
 import type { FetchPartialProgress } from './AsyncResource'
 import type { ResourceContextSnapshot } from './context'
 
@@ -91,17 +87,7 @@ const supportedResourceTypes = {
  * Part of 'asyncResources' store.
  * @internal
  */
-export function useResourceUpload(
-  openedProjects: OpenedProjectsStore,
-  backend: RemoteBackend,
-  query: QueryClient,
-) {
-  const createImgDirMutation = useMutation(
-    backendMutationOptions('createDirectory', backend),
-    query,
-  )
-  const uploadImageMutation = useMutation(backendMutationOptions('uploadImage', backend), query)
-
+export function useResourceUpload(openedProjects: OpenedProjectsStore) {
   async function uploadResourceToProject(
     project: InitializedProject,
     upload: UploadDefinition,
@@ -126,43 +112,6 @@ export function useResourceUpload(
     })
   }
 
-  async function uploadResourceToCloud(
-    data: UploadDefinition,
-    asset: Asset,
-  ): Promise<Result<UploadProgress>> {
-    const directory = getFolderPath(asset.ensoPath)
-    try {
-      const parentContents = await query.fetchQuery(
-        backendQueryOptions('listDirectory', [{ parentId: asset.parentId }, ''], backend),
-      )
-      let imagesDir = parentContents.assets.find(
-        (asset) => asset.type === AssetType.directory && asset.title === 'images',
-      )?.id as DirectoryId | undefined
-      if (imagesDir == null) {
-        imagesDir = (
-          await createImgDirMutation.mutateAsync([
-            { title: 'images', parentId: asset.parentId },
-            false,
-          ])
-        ).id
-      }
-
-      const contents = await data.data
-      const uploadResult = await uploadImageMutation.mutateAsync([
-        imagesDir,
-        [{ data: contents, name: data.filename }],
-      ])
-
-      return Ok({
-        uploadData: data.data,
-        resourceUrl: encodeURI(`${directory}images/${uploadResult.files[0]?.title}`),
-        upload: Promise.resolve(Ok()),
-      })
-    } catch (err) {
-      return Err(err)
-    }
-  }
-
   async function uploadResource(
     data: UploadDefinition,
     context: ResourceContextSnapshot,
@@ -175,10 +124,8 @@ export function useResourceUpload(
       openedProject?.state.status === 'initialized' ? openedProject.state : undefined
     if (initialized) {
       return uploadResourceToProject(initialized, data)
-    } else if (context.asset) {
-      return uploadResourceToCloud(data, context.asset)
     } else {
-      return Err('Cannot upload resource: no Project nor asset in the context.')
+      return Err('Cannot upload resource: no opened project in the context.')
     }
   }
 

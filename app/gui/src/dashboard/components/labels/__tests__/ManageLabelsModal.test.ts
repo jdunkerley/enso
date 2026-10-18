@@ -37,7 +37,7 @@ const createTag = vi.fn<Backend['createTag']>()
 const associateTag = vi.fn<Backend['associateTag']>()
 const deleteTag = vi.fn<Backend['deleteTag']>()
 const backend = {
-  type: BackendType.remote,
+  type: BackendType.local,
   listTags,
   createTag,
   associateTag,

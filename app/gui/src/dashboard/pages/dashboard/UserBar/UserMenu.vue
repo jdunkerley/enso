@@ -25,16 +25,9 @@ import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { download } from '$/utils/download'
 import { getDownloadUrl } from '$/utils/github'
-import { computed } from 'vue'
 
-const {
-  user,
-  isAuthDisabled = false,
-  goToSettingsPage,
-} = defineProps<{
+const { user, goToSettingsPage } = defineProps<{
   user: UserSession['user']
-  /** Local mode: authentication is disabled, so there is no cloud account. */
-  isAuthDisabled?: boolean | undefined
   goToSettingsPage: () => void
 }>()
 
@@ -66,11 +59,6 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
   { action: 'settings', doAction: goToSettingsPage },
   { action: 'aboutThisApp', doAction: openAboutModal },
 ])
-
-// Local mode has no plan: the synthetic user's ("Community") would mislead.
-const planText = computed(() =>
-  isAuthDisabled ? getText('userMenuWorkingLocally') : getText(user.plan),
-)
 </script>
 
 <template>
@@ -78,19 +66,20 @@ const planText = computed(() =>
     <template #trigger>
       <Button size="custom" variant="icon" class="ml-2" :aria-label="getText('userMenuLabel')">
         <template #icon>
-          <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+          <ProfilePicture :picture="null" :name="user.name" />
         </template>
       </Button>
     </template>
     <div
       class="mb-2 flex select-none items-center gap-icons overflow-hidden px-menu-entry transition-all duration-user-menu"
     >
-      <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+      <ProfilePicture :picture="null" :name="user.name" />
       <div class="flex min-w-0 flex-col">
         <Text disableLineHeightCompensation variant="body" truncate="1" weight="semibold">
           {{ user.name }}
         </Text>
-        <Text disableLineHeightCompensation>{{ planText }}</Text>
+        <!-- There is no plan: the local user's synthetic one ("Community") would mislead. -->
+        <Text disableLineHeightCompensation>{{ getText('userMenuWorkingLocally') }}</Text>
       </div>
     </div>
 

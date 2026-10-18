@@ -22,7 +22,7 @@ import {
 } from '../utilities/file.js'
 import { uniqueString } from '../utilities/uniqueString.js'
 import * as backend from './Backend.js'
-import { downloadProjectPath, EXPORT_ARCHIVE_PATH } from './Backend/remoteBackendPaths.js'
+import { downloadProjectPath, EXPORT_ARCHIVE_PATH } from './Backend/localBackendPaths.js'
 import { HttpClient } from './HttpClient.js'
 import type { ProjectManager } from './ProjectManager/ProjectManager.js'
 import {
@@ -43,6 +43,9 @@ function ipWithSocketToAddress(ipWithSocket: IpWithSocket) {
 export const DIRECTORY_ID_PREFIX = `${backend.AssetType.directory}-`
 export const PROJECT_ID_PREFIX = `${backend.AssetType.project}-`
 export const FILE_ID_PREFIX = `${backend.AssetType.file}-`
+export const DATALINK_ID_PREFIX = `${backend.AssetType.datalink}-`
+/** The extension of a local datalink file (compared case-sensitively, as the standard library does). */
+export const DATALINK_EXTENSION = '.datalink'
 
 /** Create a {@link backend.DirectoryId} from a path. */
 export function newDirectoryId(path: Path) {
@@ -71,6 +74,26 @@ export function isLocalProjectId(projectId: backend.ProjectId): boolean {
 /** Create a {@link backend.FileId} from a path. */
 export function newFileId(path: Path) {
   return backend.FileId(`${FILE_ID_PREFIX}${encodeURIComponent(path)}`)
+}
+
+/** Create a {@link backend.DatalinkId} from the path of a `.datalink` file. */
+export function newDatalinkId(path: Path) {
+  return backend.DatalinkId(`${DATALINK_ID_PREFIX}${encodeURIComponent(path)}`)
+}
+
+/**
+ * A datalink's file name: the title and `.datalink`, once (a title that already ends in the
+ * extension is not given it twice).
+ * @throws {Error} when the title contains a path separator.
+ */
+function datalinkFileName(title: string) {
+  if (/[/\\]/.test(title)) throw new Error("A datalink's name cannot contain '/' or '\\'.")
+  return title.endsWith(DATALINK_EXTENSION) ? title : `${title}${DATALINK_EXTENSION}`
+}
+
+/** A datalink's title: its file name without `.datalink`, as the cloud titled datalinks. */
+function datalinkTitle(path: Path) {
+  return getFileName(path).slice(0, -DATALINK_EXTENSION.length)
 }
 
 /**
@@ -120,10 +143,7 @@ export class LocalBackend extends backend.Backend {
   }
 
   /** Return the ID of the root directory. */
-  override rootDirectoryId(
-    _user: backend.User,
-    _organization: backend.OrganizationInfo | null,
-  ): backend.DirectoryId {
+  override rootDirectoryId(): backend.DirectoryId {
     return newDirectoryId(this.rootPath())
   }
 
@@ -169,7 +189,6 @@ export class LocalBackend extends backend.Backend {
           const ensoPathRaw = normalizePath(entry.path)
           const ensoPath = backend.EnsoPath(ensoPathRaw)
           const shared = {
-            permissions: [],
             projectState: null,
             extension: null,
             parentsPath: backend.ParentsPath(parentsPath),
@@ -219,6 +238,17 @@ export class LocalBackend extends backend.Backend {
                 parentId,
                 extension: fileExtension(entry.path),
               } satisfies backend.FileAsset
+            }
+            case 'DatalinkEntry': {
+              return {
+                ...shared,
+                type: backend.AssetType.datalink,
+                id: newDatalinkId(entry.path),
+                title: datalinkTitle(entry.path),
+                modifiedAt: entry.attributes.lastModifiedTime,
+                createdAt: entry.attributes.creationTime,
+                parentId,
+              } satisfies backend.DatalinkAsset
             }
           }
         }),
@@ -338,7 +368,6 @@ export class LocalBackend extends backend.Backend {
     })
     return {
       name: project.projectName,
-      organizationId: backend.OrganizationId('organization-'),
       projectId: newProjectId(project.projectPath),
       packageName: project.projectName,
       state: { type: backend.ProjectState.closed, volumeId: '' },
@@ -479,7 +508,6 @@ export class LocalBackend extends backend.Backend {
           name: project.name,
           jsonAddress: null,
           ydocAddress: null,
-          organizationId: backend.OrganizationId('organization-'),
           packageName: project.name,
           projectId,
           state: { type: backend.ProjectState.closed, volumeId: '' },
@@ -498,7 +526,6 @@ export class LocalBackend extends backend.Backend {
           cachedProject.languageServerYdocAddress ?
             ipWithSocketToAddress(cachedProject.languageServerYdocAddress)
           : backend.Address('ws://localhost:5976'),
-        organizationId: backend.OrganizationId('organization-'),
         packageName: cachedProject.projectNormalizedName,
         projectId,
         state: {
@@ -527,9 +554,6 @@ export class LocalBackend extends backend.Backend {
       await this.projectManager.openProject({
         projectPath: path,
         missingComponentAction: MissingComponentAction.install,
-        ...(body?.openHybridProjectParameters != null ?
-          { cloud: body.openHybridProjectParameters }
-        : {}),
       })
     } catch (error) {
       throw new Error(
@@ -539,12 +563,9 @@ export class LocalBackend extends backend.Backend {
         { cause: error },
       )
     }
-    // A hybrid project is a cloud project's local copy, and cloud projects are not recorded.
-    if (body?.openHybridProjectParameters == null) {
-      await this.projectManager.recordRecentProject(path).catch((error: unknown) => {
-        console.warn(`Could not add the project at '${path}' to the recent projects:`, error)
-      })
-    }
+    await this.projectManager.recordRecentProject(path).catch((error: unknown) => {
+      console.warn(`Could not add the project at '${path}' to the recent projects:`, error)
+    })
   }
 
   /**
@@ -574,7 +595,6 @@ export class LocalBackend extends backend.Backend {
     } else {
       return {
         name: project.name,
-        organizationId: backend.OrganizationId('organization-'),
         projectId,
         packageName: project.name,
         state: { type: backend.ProjectState.closed },
@@ -600,7 +620,6 @@ export class LocalBackend extends backend.Backend {
         projectId: newProjectId(project.projectPath),
         name: project.projectName,
         packageName: project.projectNormalizedName,
-        organizationId: backend.OrganizationId('organization-'),
         state: { type: backend.ProjectState.closed, volumeId: '' },
         ensoPath: backend.EnsoPath(normalizePath(project.projectPath)),
       }
@@ -610,7 +629,6 @@ export class LocalBackend extends backend.Backend {
       projectId: newProjectId(project.projectPath),
       name: project.projectName,
       packageName: project.projectNormalizedName,
-      organizationId: backend.OrganizationId('organization-'),
       state: { type: backend.ProjectState.closed, volumeId: '' },
       ensoPath: backend.EnsoPath(`${path}/${project.projectNormalizedName}`),
     }
@@ -630,6 +648,10 @@ export class LocalBackend extends backend.Backend {
       case backend.AssetType.directory:
       case backend.AssetType.file: {
         await this.projectManager.deleteFile(path)
+        return
+      }
+      case backend.AssetType.datalink: {
+        await this.projectManager.deleteDatalink(path)
         return
       }
       case backend.AssetType.project: {
@@ -685,8 +707,6 @@ export class LocalBackend extends backend.Backend {
     }
   }
 
-  // === Endpoints that intentionally do not work on the Local Backend ===
-
   /**
    * Called for any function that does not make sense in the Local Backend.
    * @throws {Error} An error stating that the operation is intentionally unavailable on the local
@@ -694,89 +714,6 @@ export class LocalBackend extends backend.Backend {
    */
   invalidOperation(): never {
     throw new Error('Cannot manage users, folders, files, tags, and secrets on the local backend.')
-  }
-
-  /** Invalid operation. */
-  override undoDeleteAsset(): Promise<void> {
-    return this.invalidOperation()
-  }
-
-  /** Return an empty array. */
-  override listUsers() {
-    return Promise.resolve([])
-  }
-
-  /** Invalid operation. */
-  override createUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override updateUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override restoreUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override removeUser() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override uploadUserPicture() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override changeUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /**
-   * Get the current organization. Returns `null` because organizations do not exist on the
-   * Local Backend. This is required for `rootDiretoryId` to work.
-   */
-  override async getOrganization(): Promise<backend.OrganizationInfo | null> {
-    return Promise.resolve(null)
-  }
-
-  /** Invalid operation. */
-  override updateOrganization() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override uploadOrganizationPicture() {
-    return this.invalidOperation()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override inviteUser() {
-    return Promise.resolve()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override createPermission() {
-    return Promise.resolve()
-  }
-
-  /** Return `null`. This function should never need to be called. */
-  override usersMe() {
-    return this.invalidOperation()
-  }
-
-  /** Do nothing. This function should never need to be called. */
-  override getPaymentsConfig() {
-    return this.invalidOperation()
   }
 
   /** Create a directory. */
@@ -809,7 +746,6 @@ export class LocalBackend extends backend.Backend {
   ): Promise<void> {
     if (body.versionId != null) {
       const { type, path } = backend.extractTypeAndPath(assetId)
-      if (body.tag != null) throw new Error('Local versions have no tags.')
       if (type !== backend.AssetType.project) {
         throw new Error('Only projects have versions on the Local Backend.')
       }
@@ -824,7 +760,10 @@ export class LocalBackend extends backend.Backend {
     const currentParentDirectoryPath = path
 
     const newParentDirectoryPath = (() => {
-      const fileName = title == null ? getFileName(currentParentDirectoryPath) : title
+      const fileName =
+        title == null ? getFileName(currentParentDirectoryPath)
+        : type === backend.AssetType.datalink ? datalinkFileName(title)
+        : title
 
       if (parentDirectoryId == null) {
         return joinPath(
@@ -904,17 +843,6 @@ export class LocalBackend extends backend.Backend {
       throw new Error('Uploaded file not found')
     }
     return Promise.resolve(file)
-  }
-
-  /**
-   * Upload set of Images, resolving any possible conflicts. The sum of file sizes may not
-   * exceed cloud message limit.
-   */
-  override uploadImage(
-    _parentDirectoryId: backend.DirectoryId,
-    _files: { data: Blob; name: string }[],
-  ): Promise<backend.UploadedImages> {
-    this.invalidOperation()
   }
 
   /** Change the name of a file. */
@@ -1028,7 +956,20 @@ export class LocalBackend extends backend.Backend {
         })
         break
       }
-      case backend.AssetType.datalink:
+      case backend.AssetType.datalink: {
+        // A local datalink is a file: download the file itself, byte for byte.
+        const { path } = backend.extractTypeAndPath(asset.id)
+        const details = await this.getFileDetails(newFileId(path), title, true)
+        if (details.url == null) {
+          throw new Error('The download URL of the datalink must be present.')
+        }
+        await this.downloader({
+          url: details.url,
+          name: details.file.fileName ?? `${title}${DATALINK_EXTENSION}`,
+          electronOptions: { path: targetPath, showFileDialog: true },
+        })
+        break
+      }
       case backend.AssetType.secret:
       case backend.AssetType.directory: {
         throw new Error(`'${asset.type}' assets cannot be downloaded.`)
@@ -1060,67 +1001,6 @@ export class LocalBackend extends backend.Backend {
       })
       return { filePath: null }
     }
-  }
-
-  /** Start watching project directory. */
-  async startWatchingHybridProject(
-    assetId: backend.AssetId,
-    localProjectId: backend.ProjectId,
-    parentDirectoryId: backend.DirectoryId,
-    defaultHeaders: Record<string, string>,
-    apiUrl: string,
-  ): Promise<void> {
-    const localProjectDirectory = backend.extractTypeAndPath(localProjectId).path
-    const queryString = new URLSearchParams({
-      assetId,
-      parentDirectoryId,
-      directory: localProjectDirectory,
-      apiUrl,
-    }).toString()
-    const response = await this.post(
-      new URL(`/api/watcher/start?${queryString}`, location.href).toString(),
-      defaultHeaders,
-    )
-    if (!response.ok) {
-      return await this.throw(response, 'resolveProjectAssetPathBackendError')
-    }
-  }
-
-  /**
-   * Stop watching project directory.
-   * @returns true if the project directory has unsaved changes.
-   */
-  async stopWatchingHybridProject(assetId: backend.AssetId): Promise<boolean> {
-    const queryString = new URLSearchParams({
-      assetId,
-    }).toString()
-    const response = await this.post(
-      new URL(`/api/watcher/stop?${queryString}`, location.href).toString(),
-      null,
-    )
-    if (!response.ok) {
-      return await this.throw(response, 'resolveProjectAssetPathBackendError')
-    }
-    const httpStatusIsDirty = 201
-    return response.status === httpStatusIsDirty
-  }
-
-  /**
-   * Get the state of the watched project directory.
-   * @returns true if the project directory has unsaved changes.
-   */
-  async getStateOfWatchedHybridProject(assetId: backend.AssetId): Promise<boolean> {
-    const queryString = new URLSearchParams({
-      assetId,
-    }).toString()
-    const response = await this.get(
-      new URL(`/api/watcher/state?${queryString}`, location.href).toString(),
-    )
-    if (!response.ok) {
-      return await this.throw(response, 'resolveProjectAssetPathBackendError')
-    }
-    const httpStatusIsDirty = 201
-    return response.status === httpStatusIsDirty
   }
 
   // === Versions tab (local project versions are git commits) ===
@@ -1182,54 +1062,47 @@ export class LocalBackend extends backend.Backend {
     )
   }
 
-  /** Invalid operation. */
-  override createProjectExecution() {
-    return this.invalidOperation()
+  /**
+   * Create `<parent>/<name>.datalink`, or, with `body.datalinkId`, replace that datalink's content
+   * (the cloud's "new version"; a local datalink has no versions).
+   * @throws {Error} when the name contains a path separator, or the shim refuses the write.
+   */
+  override async createDatalink(
+    body: backend.CreateDatalinkRequestBody,
+  ): Promise<backend.DatalinkInfo> {
+    if (body.datalinkId != null) {
+      await this.projectManager.updateDatalink(
+        backend.extractTypeAndPath(body.datalinkId).path,
+        body.value,
+      )
+      return { id: body.datalinkId }
+    }
+    const parentPath =
+      body.parentDirectoryId == null ?
+        this.projectManager.rootDirectory
+      : backend.extractTypeAndPath(body.parentDirectoryId).path
+    const path = joinPath(parentPath, datalinkFileName(body.name))
+    await this.projectManager.createDatalink(path, body.value)
+    return { id: newDatalinkId(path) }
   }
 
-  /** Invalid operation. */
-  override getProjectExecutionDetails() {
-    return this.invalidOperation()
+  /** The datalink file's JSON. */
+  override async getDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<backend.Datalink> {
+    // A `Datalink` is opaque JSON; the editor validates it.
+    return (await this.projectManager.readDatalink(
+      backend.extractTypeAndPath(datalinkId).path,
+    )) as backend.Datalink
   }
 
-  /** Invalid operation. */
-  override updateProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override listProjectExecutions() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override listExecutionsSummary() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override syncProjectExecution() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createDatalink() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override getDatalink() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteDatalink() {
-    return this.invalidOperation()
+  /** Delete the datalink file. */
+  override async deleteDatalink(
+    datalinkId: backend.DatalinkId,
+    _title?: string | null,
+  ): Promise<void> {
+    await this.projectManager.deleteDatalink(backend.extractTypeAndPath(datalinkId).path)
   }
 
   /** Invalid operation. */
@@ -1279,14 +1152,6 @@ export class LocalBackend extends backend.Backend {
   }
 
   /**
-   * Return an empty array. This function is required to be implemented as it is unconditionally
-   * called, but its result should never need to be used.
-   */
-  override listAssetVersionTags(): Promise<readonly string[]> {
-    return Promise.resolve([])
-  }
-
-  /**
    * Set the full list of labels of a local project.
    * @throws {Error} When the asset is not a project.
    */
@@ -1307,71 +1172,6 @@ export class LocalBackend extends backend.Backend {
     return this.projectManager.deleteLabel({ id: tagId })
   }
 
-  /** Invalid operation. */
-  override createUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createCheckoutSession() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override cancelSubscription() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteUserGroup() {
-    return this.invalidOperation()
-  }
-
-  /** Return an empty array. */
-  override listUserGroups() {
-    return Promise.resolve([])
-  }
-
-  /** Invalid operation. */
-  override listInvitations() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override resendInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override acceptInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override declineInvitation() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override getLogEvents() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override logEvent() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createCustomerPortalSession() {
-    return this.invalidOperation()
-  }
-
   /** Download all logs for a local project session as a file. */
   override async downloadProjectSessionLogs(
     projectSessionId: backend.ProjectSessionId,
@@ -1385,26 +1185,6 @@ export class LocalBackend extends backend.Backend {
     } finally {
       URL.revokeObjectURL(url)
     }
-  }
-
-  /** Invalid operation. */
-  override listApiKeys() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override createApiKey() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation. */
-  override deleteApiKey() {
-    return this.invalidOperation()
-  }
-
-  /** Invalid operation */
-  override getMapboxToken() {
-    return this.invalidOperation()
   }
 }
 

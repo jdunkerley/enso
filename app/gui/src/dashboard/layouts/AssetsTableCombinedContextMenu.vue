@@ -79,7 +79,6 @@ defineExpose({
     :position="position"
     :currentDirectoryId="currentDirectoryId"
     :bindingTarget="bindingTarget"
-    :doCopy="doCopy"
     :doCut="doCut"
     :doPaste="doPaste"
   />

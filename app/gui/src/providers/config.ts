@@ -6,18 +6,10 @@ import { computed } from 'vue'
 /**
  * The keys the Enso Cloud's remote configuration used to carry. The IDE is local-only
  * (`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`): nothing is fetched, and the
- * configuration is always empty. The type stays while the dormant secrets forms read it (decision
- * 5); PR 4 removes it with the cloud variables.
+ * configuration is always empty. The type is kept for the four `*_OAUTH_CLIENT_ID` keys that the
+ * dormant secrets screens still read (decision 5).
  */
 export interface RemoteConfig {
-  readonly ENSO_IDE_ENVIRONMENT?: string
-  readonly ENSO_IDE_API_URL?: string
-  readonly ENSO_IDE_AUTH_ENDPOINT?: string
-  readonly ENSO_IDE_STRIPE_KEY?: string
-  readonly ENSO_IDE_COGNITO_USER_POOL_ID?: string
-  readonly ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID?: string
-  readonly ENSO_IDE_COGNITO_DOMAIN?: string
-  readonly ENSO_IDE_COGNITO_REGION?: string
   readonly ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID?: string
   readonly ENSO_IDE_STRAVA_OAUTH_CLIENT_ID?: string
   readonly ENSO_IDE_MS365_OAUTH_CLIENT_ID?: string

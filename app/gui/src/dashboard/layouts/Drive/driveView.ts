@@ -3,29 +3,26 @@
  *
  * The drive location (`$/providers/drive`) changes the moment a category button, a breadcrumb or a
  * row asks it to. The drive shows the change only once it has loaded: the old directory (its bar,
- * its rows, its `data-category`) stays on screen until the new directory's details (and, for the
- * trash, its listing) have loaded, while `isNavigating` shows the category button's spinner and the
- * button that asked shows its own (#90, ruling 5). The specs rely on that through `data-category`.
+ * its rows, its `data-category`) stays on screen until the new directory's details have loaded,
+ * while `isNavigating` shows the category button's spinner and the button that asked shows its
+ * own (#90, ruling 5). The specs rely on that through `data-category`.
  *
  * {@link provideDriveView} does this: `shown` is the location whose data is there, `target` the one
  * asked for. Everything below the drive reads `shown`. A control that navigates passes itself as
  * the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom} is true for it.
  */
-import { useAuth } from '$/providers/auth'
-import { categoryKey, isLocalCategory, useCategories, type Category } from '$/providers/category'
+import { categoryKey, useCategories, type Category } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useLocalPaths } from '$/providers/localDirectories'
-import { listDirectoryQueryOptions } from '$/utils/driveQueries'
 import { createContextStore } from '@/providers'
 import { useQuery } from '@tanstack/vue-query'
 import {
   AssetDoesNotExistError,
-  BackendType,
+  DirectoryId,
   NetworkError as OtherNetworkError,
   isUnauthorizedError,
   type AnyAsset,
   type Backend,
-  type DirectoryId,
   type Path,
 } from 'enso-common/src/services/Backend'
 import { NetworkError } from 'enso-common/src/utilities/errors'
@@ -74,11 +71,7 @@ export function directoryDetailsQueryOptions(
   const { backend, currentDirectoryId } = location
   return {
     queryKey: [backend.type, 'getAssetDetails', { id: currentDirectoryId }],
-    queryFn: () =>
-      backend.getAssetDetails(
-        currentDirectoryId,
-        backend.type === BackendType.local ? (rootPath ?? undefined) : undefined,
-      ),
+    queryFn: () => backend.getAssetDetails(currentDirectoryId, rootPath ?? undefined),
     meta: { persist: false },
     retry: (count: number, error: Error) => {
       if (isUnauthorizedError(error)) return false
@@ -109,24 +102,24 @@ export function selectDirectoryDetails(data: AnyAsset | null): DirectoryDetails 
   }
 }
 
+/** Stands in for the local root directory until its path is known. */
+const UNKNOWN_ROOT_DIRECTORY_ID = DirectoryId('directory-local')
+
 /** See the file comment. */
 export const [provideDriveView, useDriveView] = createContextStore('driveView', () => {
   const drive = useDriveLocation()
   const categories = useCategories()
-  const auth = useAuth()
   const localPaths = useLocalPaths()
 
   /** The location asked for. */
   const target = computed((): DriveViewLocation => {
-    const user = auth.session?.user
-    invariant(user != null, 'The drive is only shown to a signed-in user.')
     const category = drive.currentCategory
     const categoryHomeDir = categories.categoryDirectoryId(category)
     // A category with no home directory (a Recent) is rooted at its backend's root.
     const rootDirectoryId =
       categoryHomeDir ??
-      (isLocalCategory(category) ? categories.categoryDirectoryId({ type: 'local' }) : null) ??
-      user.rootDirectoryId
+      categories.categoryDirectoryId({ type: 'local' }) ??
+      UNKNOWN_ROOT_DIRECTORY_ID
     const directoryId = drive.currentDirectory
     const queryDirectoryId = directoryId ?? categoryHomeDir
     return {
@@ -157,30 +150,8 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     }),
   )
 
-  const trashListing = useQuery(
-    computed(() => {
-      const category = { type: 'trash' } as const
-      return {
-        ...listDirectoryQueryOptions({
-          backend: target.value.backend,
-          category,
-          parentId: categories.categoryDirectoryId(category),
-          refetchInterval: null,
-          labels: null,
-          sortDirection: null,
-          sortExpression: null,
-        }),
-        enabled: target.value.category.type === 'trash',
-      }
-    }),
-  )
-
   /** Whether the data the target needs is there, so that it can be shown. */
-  const isTargetReady = computed(
-    () =>
-      details.data.value !== undefined &&
-      (target.value.category.type !== 'trash' || trashListing.data.value !== undefined),
-  )
+  const isTargetReady = computed(() => details.data.value !== undefined)
 
   /** The location shown: the last one whose data was there. `null` until the first is. */
   const shown = shallowRef<DriveViewLocation | null>(null)
@@ -195,7 +166,7 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
   })
 
   /** The error the target's data failed with, if it did. */
-  const error = computed(() => details.error.value ?? trashListing.error.value ?? null)
+  const error = computed(() => details.error.value ?? null)
 
   const isNavigating = computed(
     () => shown.value != null && !sameLocation(shown.value, target.value),
@@ -243,7 +214,6 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     /** Refetch the target's data, after an error. */
     retry: () => {
       void details.refetch()
-      if (target.value.category.type === 'trash') void trashListing.refetch()
     },
     shownDetails,
   }

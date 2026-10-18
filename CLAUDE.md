@@ -8,8 +8,10 @@ monorepo**:
   interpreter (Truffle/GraalVM), language server, and the Enso standard library.
   Written in Scala, Java, and Rust.
 - **Enso IDE** — a desktop application (Electron) with a visual graph editor and
-  a dashboard for project/cloud management. Written in TypeScript; the UI is Vue
-  throughout (the Dashboard feature was React until #75 ported it).
+  a dashboard for local projects (the IDE has no Enso Cloud since the local-only
+  work: no login, no cloud drive; the engine and standard library still support
+  it). Written in TypeScript; the UI is Vue throughout (the Dashboard feature
+  was React until #75 ported it).
 
 The two products are glued together by several generated/shared artifacts: the
 Rust parser is compiled to **both** WASM (for the GUI) and a JNI `cdylib` (for
@@ -138,7 +140,12 @@ has silently produced a wrong result here:
   skip both, except under `distribution/`: that whole tree ships in the IDE
   bundle, so any change there, docs included, still packages. Changes only to
   GUI tests or their configuration run the GUI checks but skip packaging. Add
-  the `CI: Build IDE` label to force both.
+  the `CI: Build IDE` label to force both. A PR that changes only
+  `docs/superpowers/**` (specs and plans) starts no PR workflow at all, not even
+  Changelog: `paths-ignore` lists it in each `pull_request` trigger, generated
+  from `PR_IGNORED_PATHS` in `build_tools/build/src/ci_gen.rs` and copied by
+  hand into the hand-written workflows. No check is required by the ruleset, so
+  nothing is left waiting.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules

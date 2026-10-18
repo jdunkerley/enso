@@ -33,13 +33,6 @@ export interface RunningLanguageServerInfo {
   readonly projectNamespace: string
 }
 
-export interface CloudParams {
-  readonly cloudProjectDirectoryPath: Path
-  readonly cloudProjectId: string
-  readonly cloudProjectSessionId: string
-  readonly cloudApiUrl: string
-}
-
 /** Parameters for the "create project" endpoint. */
 export interface CreateProjectParams {
   readonly name: string
@@ -201,42 +194,29 @@ export class ProjectService {
   private async projectEnvVars(
     projectId: UUID,
     projectsDirectory: Path,
-    cloud?: CloudParams,
   ): Promise<readonly (readonly [string, string])[]> {
-    if (!cloud) {
-      const localSessionId = `localprojectsession-${KSUID.randomSync().string}`
-      const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
-      return [
-        ['ENSO_LOCAL_PROJECT_ID', localProjectKey],
-        ['ENSO_LOCAL_PROJECT_SESSION_ID', localSessionId],
-      ]
-    }
+    const localSessionId = `localprojectsession-${KSUID.randomSync().string}`
+    const localProjectKey = await makeProjectTelemetryKey(projectsDirectory, projectId)
     return [
-      ['ENSO_CLOUD_PROJECT_DIRECTORY_PATH', cloud.cloudProjectDirectoryPath],
-      ['ENSO_CLOUD_PROJECT_ID', cloud.cloudProjectId],
-      ['ENSO_CLOUD_PROJECT_SESSION_ID', cloud.cloudProjectSessionId],
-      ['ENSO_CLOUD_API_URL', cloud.cloudApiUrl],
+      ['ENSO_LOCAL_PROJECT_ID', localProjectKey],
+      ['ENSO_LOCAL_PROJECT_SESSION_ID', localSessionId],
     ]
   }
 
   /** Run an existing Enso project at the specified path. */
-  async runProject(projectId: UUID, projectsDirectory: Path, cloud?: CloudParams): Promise<number> {
+  async runProject(projectId: UUID, projectsDirectory: Path): Promise<number> {
     const project = await this.getProject(projectId, projectsDirectory, true)
     this.logger.debug(`Running project '${project.path}'`)
     const exitCode = await this.runner.runProject(
       project.path,
-      await this.projectEnvVars(projectId, projectsDirectory, cloud),
+      await this.projectEnvVars(projectId, projectsDirectory),
     )
     this.logger.debug(`Project '${project.path}' finished running`)
     return exitCode
   }
 
   /** Open a project and starts its language server. */
-  async openProject(
-    projectId: UUID,
-    projectsDirectory: Path,
-    cloud?: CloudParams,
-  ): Promise<OpenProject> {
+  async openProject(projectId: UUID, projectsDirectory: Path): Promise<OpenProject> {
     this.logger.debug('Opening project', projectId)
 
     const project = await this.getProject(projectId, projectsDirectory, true)
@@ -251,7 +231,7 @@ export class ProjectService {
       project.path,
       projectId,
       this.extraArgs.length > 0 ? this.extraArgs : undefined,
-      await this.projectEnvVars(projectId, projectsDirectory, cloud),
+      await this.projectEnvVars(projectId, projectsDirectory),
     )
 
     // Registered before any rename hook, so a project is saved before its directory moves.
