@@ -1,11 +1,6 @@
 //! Environment variables used by the Electron Builder.
 
-use crate::prelude::*;
-
 use crate::define_env_var;
-
-use base64::Engine;
-use std::io::Write;
 
 define_env_var! {
     /// The HTTPS link (or base64-encoded data, or file:// link, or local path) to certificate
@@ -56,91 +51,3 @@ pub const CI_CSC_SECRETS: &[&str] = &[
     APPLEIDPASS.name,
     APPLETEAMID.name,
 ];
-
-/// CSC (Code Signing Certificate) link.
-///
-/// This models the way Electron Builder uses to recieve the certificate file.
-#[derive(Clone, Debug)]
-pub enum CscLink {
-    /// Local path to the certificate file.
-    FilePath(PathBuf),
-    /// HTTPS link to the certificate file.
-    Url(Url),
-    /// The certificate file contents.
-    Data(Vec<u8>),
-}
-
-impl FromStr for CscLink {
-    type Err = anyhow::Error;
-
-    #[context("Failed to parse CSC link from '{csc_link}'.")]
-    fn from_str(csc_link: &str) -> Result<Self> {
-        let csc_link = csc_link.trim();
-        if let Some(file_path) = csc_link.strip_prefix("file://") {
-            Ok(Self::FilePath(file_path.into()))
-        } else if let Some(url) = csc_link.strip_prefix("https://") {
-            Ok(Self::Url(url.parse()?))
-        } else if csc_link.len() > 2048 {
-            let contents = base64::engine::general_purpose::STANDARD
-                .decode(csc_link)
-                .context("Failed to decode base64-encoded CSC link.")?;
-            Ok(Self::Data(contents))
-        } else {
-            Ok(Self::FilePath(csc_link.into()))
-        }
-    }
-}
-
-impl CscLink {
-    /// Create a new certificate file from the environment variable.
-    pub fn new_from_env() -> Result<Self> {
-        let csc_link = WIN_CSC_LINK.get().or_else(|_| CSC_LINK.get())?;
-        // When secret is not available, we might get a variable with an empty value.
-        ensure!(!csc_link.is_empty(), "CSC link is empty.");
-        Self::from_str(&csc_link)
-    }
-}
-
-/// CSC certificate file to be used for signing the Windows build.
-#[derive(Debug)]
-pub enum CodeSigningCertificate {
-    /// Local certificate file.
-    FilePath(PathBuf),
-    /// Temporarily created certificate file.
-    TempFile(tempfile::TempPath),
-}
-
-impl AsRef<Path> for CodeSigningCertificate {
-    fn as_ref(&self) -> &Path {
-        match self {
-            Self::FilePath(path) => path.as_ref(),
-            Self::TempFile(path) => path.as_ref(),
-        }
-    }
-}
-
-impl CodeSigningCertificate {
-    /// Create a new certificate file from the given link.
-    pub async fn new(link: CscLink) -> Result<Self> {
-        let ret = match link {
-            CscLink::FilePath(path) => Self::FilePath(path),
-            CscLink::Url(url) => {
-                let temp_file = tempfile::NamedTempFile::new()?.into_temp_path();
-                crate::io::web::download_file(url, &temp_file).await?;
-                Self::TempFile(temp_file)
-            }
-            CscLink::Data(contents) => {
-                let temp_file = tempfile::NamedTempFile::new()?;
-                temp_file.as_file().write_all(&contents)?;
-                Self::TempFile(temp_file.into_temp_path())
-            }
-        };
-        Ok(ret)
-    }
-
-    /// Create a new certificate file from the environment variable.
-    pub async fn new_from_env() -> Result<Self> {
-        let csc_link = CscLink::new_from_env()?;
-        Self::new(csc_link).await
-    }
-}
