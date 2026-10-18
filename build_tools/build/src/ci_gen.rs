@@ -81,18 +81,10 @@ pub const RELEASE_WORKFLOW_PATH: &str = "./.github/workflows/release.yml";
 ///
 /// To manage, see: https://github.com/organizations/enso-org/settings/secrets/actions
 pub mod secret {
-    // === AWS S3 deploy (release list) ===
-    pub const ARTEFACT_S3_ACCESS_KEY_ID: &str = "ARTEFACT_S3_ACCESS_KEY_ID";
-    pub const ARTEFACT_S3_SECRET_ACCESS_KEY: &str = "ARTEFACT_S3_SECRET_ACCESS_KEY";
-
     // === AWS S3 Standard Library Tests ===
     pub const ENSO_LIB_S3_AWS_ACCESS_KEY_ID: &str = "ENSO_LIB_S3_AWS_ACCESS_KEY_ID";
     pub const ENSO_LIB_S3_AWS_REGION: &str = "ENSO_LIB_S3_AWS_REGION";
     pub const ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: &str = "ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY";
-
-    // === AWS ECR deployment (runtime release to cloud) ===
-    pub const ECR_PUSH_RUNTIME_SECRET_ACCESS_KEY: &str = "ECR_PUSH_RUNTIME_SECRET_ACCESS_KEY";
-    pub const ECR_PUSH_RUNTIME_ACCESS_KEY_ID: &str = "ECR_PUSH_RUNTIME_ACCESS_KEY_ID";
 
     // === Enso Cloud deployment ===
     /// Static token for admin requests on our Lambdas.
@@ -129,10 +121,6 @@ pub mod secret {
     /// Name of the GitHub Actions secret that stores password to the Windows code signing
     /// certificate.
     pub const WINDOWS_CERT_PASSWORD: &str = "MICROSOFT_CODE_SIGNING_CERT_PASSWORD";
-
-    // === Github Token ===
-    /// A token created for the `enso-ci` user.
-    pub const CI_PRIVATE_TOKEN: &str = "CI_PRIVATE_TOKEN";
 
     // === Sentry ===
     /// The authentication token for pushing source maps to Sentry.
@@ -468,28 +456,7 @@ pub struct PublishRelease;
 
 impl JobArchetype for PublishRelease {
     fn job(&self, target: Target) -> Job {
-        let mut job = RunStepsBuilder::new("release publish")
-            .customize(move |step| {
-                let mut steps = vec![];
-
-                let download_edition_file = step::download_artifact("Download Edition File")
-                    .with_custom_argument("name", crate::paths::EDITION_FILE_ARTIFACT_NAME)
-                    .with_custom_argument("path", "distribution/editions");
-                steps.push(download_edition_file);
-
-                steps.push(step);
-
-                steps
-            })
-            .build_job("Publish release", target);
-
-        job.expose_secret_as(secret::ARTEFACT_S3_ACCESS_KEY_ID, crate::aws::env::AWS_ACCESS_KEY_ID);
-        job.expose_secret_as(
-            secret::ARTEFACT_S3_SECRET_ACCESS_KEY,
-            crate::aws::env::AWS_SECRET_ACCESS_KEY,
-        );
-        job.env(crate::aws::env::AWS_REGION, "us-west-1");
-        job
+        RunStepsBuilder::new("release publish").build_job("Publish release", target)
     }
 }
 
@@ -548,30 +515,54 @@ impl JobArchetype for UpdateLatestReleaseVersion {
     }
 }
 
-/// Build new IDE and upload it as a release asset.
+/// Build new IDE and upload it, with its update feed, as a release asset.
+///
+/// The backend is the one built by the preceding [`job::BuildBackend`] job of the same platform.
+/// Release builds are the only ones that write the update feed (`ENSO_BUILD_UPDATE_INFO`).
 #[derive(Clone, Copy, Debug)]
 pub struct UploadIde;
 
 impl JobArchetype for UploadIde {
     fn job(&self, target: Target) -> Job {
-        RunStepsBuilder::new(
-            "ide upload --backend-source release --backend-release ${{env.ENSO_RELEASE_ID}} --sign-artifacts",
-        )
-        .cleaning(RELEASE_CLEANING_POLICY)
-        .customize(move |step| {
-            let mut steps = prepare_packaging_steps(target.0, step, job::PackagingTarget::Release);
+        let mut job = RunStepsBuilder::new("ide upload --backend-source local --sign-artifacts")
+            .cleaning(RELEASE_CLEANING_POLICY)
+            .customize(move |step| {
+                let mut steps = vec![];
 
-            let upload_ide = step::upload_artifact("Upload ide")
-                .with_custom_argument("name", format!("ide-{}-{}", target.0, target.1))
-                .with_custom_argument(
-                "path",
-                format!("dist/ide/enso-*.{}", target.0.package_extension()),
-                );
-            steps.push(upload_ide);
+                let download_backend = step::download_artifact("Download backend")
+                    .with_custom_argument("name", format!("backend-{}", target.0))
+                    .with_custom_argument("path", "dist/backend");
+                steps.push(download_backend);
 
-            steps
-        })
-        .build_job("Build IDE", target)
+                let unpack_backend = Step {
+                    run: Some(
+                        "tar -xvf dist/backend/backend.tar -C dist/backend
+rm dist/backend/backend.tar"
+                            .into(),
+                    ),
+                    ..Default::default()
+                };
+                steps.push(unpack_backend);
+
+                steps.extend(prepare_packaging_steps(
+                    target.0,
+                    step,
+                    job::PackagingTarget::Release,
+                ));
+
+                let upload_ide = step::upload_artifact("Upload ide")
+                    .with_custom_argument("name", format!("ide-{}-{}", target.0, target.1))
+                    .with_custom_argument(
+                        "path",
+                        format!("dist/ide/enso-*.{}", target.0.package_extension()),
+                    );
+                steps.push(upload_ide);
+
+                steps
+            })
+            .build_job("Build IDE", target);
+        job.env("ENSO_BUILD_UPDATE_INFO", "true");
+        job
     }
 }
 
@@ -659,35 +650,19 @@ pub fn nightly() -> Result<Workflow> {
 
 fn add_release_steps(workflow: &mut Workflow) -> Result {
     let prepare_job_id = workflow.add(PRIMARY_TARGET, DraftRelease);
-    // The license-package check gates publishing (see `publish_deps` below).
+    // The license-package check gates publishing.
     let license_check_job_id = workflow.add(PRIMARY_TARGET, job::VerifyLicensePackages);
-    let mut packaging_job_ids = vec![];
+    let mut publish_deps = vec![prepare_job_id.clone(), license_check_job_id];
 
-    // Assumed, because Linux is necessary to deploy ECR runtime image.
-    assert!(RELEASE_TARGETS.into_iter().any(|(os, _)| os == OS::Linux));
+    // Each platform builds its own engine and IDE, and uploads the installer and the update feed
+    // to the draft. The release is published only when all of them succeed.
+    let engine_launcher = engine::EngineLauncher::Native;
     for target in RELEASE_TARGETS {
-        let backend_job_id = workflow.add_dependent(target, job::UploadBackend, [&prepare_job_id]);
-
+        let backend_job_id = workflow.add(target, job::BuildBackend { engine_launcher });
         let build_ide_job_id =
             workflow.add_dependent(target, UploadIde, [&prepare_job_id, &backend_job_id]);
-        packaging_job_ids.push(build_ide_job_id.clone());
-
-        // The backend image is deployed to ECR only on Linux.
-        if target.0 == OS::Linux {
-            let runtime_requirements = [&prepare_job_id, &backend_job_id];
-            let upload_runtime_job_id =
-                workflow.add_dependent(target, job::DeployRuntime, runtime_requirements);
-            let dispatch_build_image_job_id =
-                workflow.add_dependent(target, job::DispatchBuildImage, [&upload_runtime_job_id]);
-            packaging_job_ids.push(dispatch_build_image_job_id);
-        }
+        publish_deps.push(build_ide_job_id);
     }
-
-    let publish_deps = {
-        packaging_job_ids.push(prepare_job_id.clone());
-        packaging_job_ids.push(license_check_job_id);
-        packaging_job_ids
-    };
 
     let publish_job_id = workflow.add_dependent(PRIMARY_TARGET, PublishRelease, publish_deps);
     // Depends on the draft-release job as well, since that is what exposes `ENSO_VERSION`.
@@ -1134,5 +1109,39 @@ mod tests {
                 "{name} does not ignore specs and plans:\n{yaml}"
             );
         }
+    }
+
+    /// The release workflow publishes IDE-only GitHub releases and needs nothing but the
+    /// workflow token.
+    #[test]
+    fn release_is_ide_only_and_needs_no_cloud_secrets() {
+        let workflow = release().unwrap();
+        let yaml = serde_yaml::to_string(&workflow).unwrap();
+        for gone in [
+            "deploy-runtime",
+            "dispatch-build-image",
+            "upload-backend",
+            "ARTEFACT_S3",
+            "ECR_PUSH",
+            "CI_PRIVATE_TOKEN",
+            "Download Edition File",
+            "--backend-source release",
+        ] {
+            assert!(
+                !yaml.contains(gone),
+                "release.yml still contains {gone}:
+{yaml}"
+            );
+        }
+        for kept in
+            ["release create-draft", "release publish", "update-latest-version", "ide upload"]
+        {
+            assert!(
+                yaml.contains(kept),
+                "release.yml lacks {kept}:
+{yaml}"
+            );
+        }
+        assert!(yaml.contains("ENSO_BUILD_UPDATE_INFO"), "{yaml}");
     }
 }
