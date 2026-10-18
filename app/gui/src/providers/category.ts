@@ -63,11 +63,6 @@ export function categoryEq(a: Opt<Category>, b: Opt<Category>) {
   return (a ? categoryKey(a) : '') === (b ? categoryKey(b) : '')
 }
 
-/** Check if category uses local backend. */
-export function isLocalCategory(category: Category) {
-  return CATEGORY_BACKEND[category.type] === BackendType.local
-}
-
 /** Whether the category is the Recent list. */
 export function isRecentCategory(category: Category | CategoryType) {
   const type = typeof category === 'string' ? category : category.type

@@ -102,7 +102,6 @@ export interface Logger {
 /** The {@link Backend} variant. If a new variant is created, it should be added to this enum. */
 export enum BackendType {
   local = 'local',
-  remote = 'remote',
 }
 
 /** The local user. */

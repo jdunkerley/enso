@@ -1,7 +1,6 @@
 /** @file Types and constants related to `Column`s. */
 import { isRecentCategory, type CategoryType } from '$/providers/category'
 import type { Icon } from '@/util/iconMetadata/iconName'
-import * as backend from 'enso-common/src/services/Backend'
 
 /** Column type. */
 export enum Column {
@@ -58,12 +57,10 @@ export const COLUMN_CSS_CLASS: Readonly<Record<Column, string>> = {
  * backend can label assets of any type (`supportsAnyLabels`).
  */
 export function getColumnList(
-  backendType: backend.BackendType,
   category: CategoryType,
   isSearching: boolean,
   supportsLabels: boolean,
 ): readonly Column[] {
-  const isCloud = backendType === backend.BackendType.remote
   const isRecent = isRecentCategory(category)
 
   const columns = [
@@ -72,11 +69,6 @@ export function getColumnList(
     Column.createdAt,
     (isRecent || isSearching) && Column.path,
     supportsLabels && Column.labels,
-    isCloud && Column.size,
-    // FIXME[sb]: https://github.com/enso-org/cloud-v2/issues/1525
-    // Bring back these columns when they are ready for use again.
-    // isCloud && Column.accessedByProjects,
-    // isCloud && Column.accessedData,
   ] as const
 
   return columns.flatMap((column) => (column !== false ? [column] : []))

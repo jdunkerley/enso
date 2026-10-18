@@ -2,6 +2,7 @@ import { describe, expect, it, test } from 'vitest'
 import { Rfc3339DateTime } from '../../utilities/data/dateTime'
 import {
   AssetType,
+  BackendType,
   compareAssets,
   doesTitleContainInvalidCharacters,
   type AnyAsset,
@@ -789,4 +790,8 @@ test('the local backend has no cloud-only methods', () => {
   ]) {
     expect(name in LocalBackend.prototype, name).toBe(true)
   }
+})
+
+test('the local backend is the only backend type', () => {
+  expect(Object.values(BackendType)).toEqual(['local'])
 })

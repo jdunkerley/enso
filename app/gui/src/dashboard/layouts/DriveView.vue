@@ -20,11 +20,10 @@ import { categoryKey } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
 import { provideDriveStore } from '$/providers/driveStore'
-import { useIsOnline } from '$/providers/online'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import AssetQuery from '$/utils/AssetQuery'
-import { BackendType, DirectoryDoesNotExistError } from 'enso-common/src/services/Backend'
+import { DirectoryDoesNotExistError } from 'enso-common/src/services/Backend'
 import { OfflineError } from 'enso-common/src/utilities/errors'
 import { computed, shallowRef, watch } from 'vue'
 import OfflineMessage from './Drive/OfflineMessage.vue'
@@ -42,7 +41,6 @@ const driveView = provideDriveView()
 const { getText } = useText()
 const drive = useDriveLocation()
 const container = useContainerData()
-const isOnline = useIsOnline()
 const toasts = useToasts()
 
 // A directory that no longer exists sends the drive back to its default category, with a toast.
@@ -70,9 +68,6 @@ function setQuery(newQuery: AssetQuery) {
 }
 
 const shown = computed(() => driveView.shown.value)
-const isInaccessible = computed(
-  () => shown.value?.backend.type === BackendType.remote && !isOnline.value,
-)
 
 function onFocusIn() {
   container.setFocusedPanel({ type: 'drive' })
@@ -92,8 +87,7 @@ function onFocusIn() {
       @focusin="onFocusIn"
     >
       <DriveBar :query="query" :setQuery="setQuery" :toolbar="toolbar" />
-      <OfflineMessage v-if="isInaccessible" />
-      <ErrorBoundary v-else>
+      <ErrorBoundary>
         <AssetsTable :query="query" />
       </ErrorBoundary>
     </div>

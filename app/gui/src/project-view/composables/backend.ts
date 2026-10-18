@@ -38,7 +38,7 @@ export function backendQueryOptions<Method extends BackendQueryMethod, B extends
   backend: B,
 ) {
   return {
-    ...backendQueryDefaults(backend, method),
+    ...backendQueryDefaults(method),
     queryKey: computed(() => {
       const argsValue = toValue(args)
       return argsValue ? backendQueryKey(backend, method, argsValue) : []

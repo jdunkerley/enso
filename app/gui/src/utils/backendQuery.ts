@@ -14,7 +14,6 @@ import type {
   QueryMeta,
 } from '@tanstack/query-core'
 import type { Backend } from 'enso-common/src/services/Backend'
-import * as backendModule from 'enso-common/src/services/Backend'
 import { omit, type ExtractKeys, type MethodOf } from 'enso-common/src/utilities/data/object'
 
 /** The properties of the Backend type that are methods. */
@@ -150,9 +149,9 @@ export interface BackendQueryOptions<TData> extends Omit<BackendQueryExtraOption
  * The options every query of the given method gets, whichever framework runs it: its network
  * mode, stale time and persistence.
  */
-export function backendQueryDefaults(backend: Backend | null, method: BackendQueryMethod) {
+export function backendQueryDefaults(method: BackendQueryMethod) {
   return {
-    ...backendBaseOptions(backend),
+    ...backendBaseOptions(),
     staleTime: STALE_TIME_MAP[method] ?? 0,
     meta: { persist: PERSISTENCE_MAP[method] ?? true },
   }
@@ -180,7 +179,7 @@ export function backendQueryOptions<Method extends BackendQueryMethod>(
   args: Readonly<Parameters<Backend[Method]>>,
   options?: BackendQueryExtraOptions,
 ): BackendQueryOptions<BackendMethodResult<Method> | undefined> {
-  const defaults = backendQueryDefaults(backend, method)
+  const defaults = backendQueryDefaults(method)
   const queryKey: QueryKey = backendQueryKey(backend, method, args, options?.queryKey)
   return {
     ...options,
@@ -258,7 +257,7 @@ export function backendMutationOptions<Method extends BackendMutationMethod>(
     ...rest,
     mutationKey: [backend?.type, method, ...(rest.mutationKey ?? [])],
     mutationFn: (args) => callBackendMethod(backend, method, args),
-    networkMode: backendBaseOptions(backend).networkMode,
+    networkMode: backendBaseOptions().networkMode,
     meta: {
       ...rest.meta,
       invalidates,
@@ -295,11 +294,10 @@ export function backendQueryKey<
   return [backend?.type, method, ...normalizeMethodQuery(method, args), ...(keyExtra ?? [])]
 }
 
-/** Returns options applicable to any method of the given backend. */
-export function backendBaseOptions(backend: Backend | null): {
+/** Returns options applicable to any method of a backend. */
+export function backendBaseOptions(): {
   networkMode: NetworkMode
 } {
-  return {
-    networkMode: backend?.type === backendModule.BackendType.local ? 'always' : 'online',
-  }
+  // The backend is local: it needs no network.
+  return { networkMode: 'always' }
 }

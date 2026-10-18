@@ -21,7 +21,6 @@ import { BackendType, DirectoryId, FilterBy, type Backend } from 'enso-common/sr
 import { describe, expect, test, vi } from 'vitest'
 import { toValue } from 'vue'
 
-const remote = { type: BackendType.remote } as Backend
 const local = { type: BackendType.local } as Backend
 
 /**
@@ -39,25 +38,25 @@ describe('backendQueryOptions', () => {
     '%s: one set of options, directly and through the Vue wrapper',
     (method, expected) => {
       const queryMethod = method as BackendQueryMethod
-      const direct = backendQueryOptions(remote, queryMethod, [] as never)
-      const vue = vueBackendQueryOptions(queryMethod, [] as never, remote)
+      const direct = backendQueryOptions(local, queryMethod, [] as never)
+      const vue = vueBackendQueryOptions(queryMethod, [] as never, local)
       for (const options of [direct, vue]) {
         expect(options.staleTime).toBe(expected.staleTime)
         expect(options.meta.persist).toBe(expected.persist)
-        expect(options.networkMode).toBe('online')
+        expect(options.networkMode).toBe('always')
       }
       expect(toValue(vue.queryKey)).toEqual(direct.queryKey)
     },
   )
 
   test('the other keys keep the defaults: fresh for no time, persisted', () => {
-    expect(backendQueryDefaults(remote, 'listSecrets')).toEqual({
-      networkMode: 'online',
+    expect(backendQueryDefaults('listSecrets')).toEqual({
+      networkMode: 'always',
       staleTime: 0,
       meta: { persist: true },
     })
-    expect(backendQueryDefaults(remote, 'listDirectory').meta.persist).toBe(false)
-    expect(backendQueryDefaults(remote, 'getAssetDetails').meta.persist).toBe(false)
+    expect(backendQueryDefaults('listDirectory').meta.persist).toBe(false)
+    expect(backendQueryDefaults('getAssetDetails').meta.persist).toBe(false)
   })
 
   test('a local backend always runs its queries, even offline', () => {
@@ -66,9 +65,9 @@ describe('backendQueryOptions', () => {
   })
 
   test("the key is the backend type, the method and its arguments, then the caller's extra key", () => {
-    expect(
-      backendQueryOptions(remote, 'listSecrets', [], { queryKey: ['extra'] }).queryKey,
-    ).toEqual([BackendType.remote, 'listSecrets', 'extra'])
+    expect(backendQueryOptions(local, 'listSecrets', [], { queryKey: ['extra'] }).queryKey).toEqual(
+      [BackendType.local, 'listSecrets', 'extra'],
+    )
     const parentId = DirectoryId('directory-1')
     const listDirectoryArgs = [
       {
@@ -84,8 +83,8 @@ describe('backendQueryOptions', () => {
       'title',
     ] as const
     // `listDirectory` puts its parent first, so that a directory's listings share a key prefix.
-    expect(backendQueryOptions(remote, 'listDirectory', listDirectoryArgs).queryKey).toEqual([
-      BackendType.remote,
+    expect(backendQueryOptions(local, 'listDirectory', listDirectoryArgs).queryKey).toEqual([
+      BackendType.local,
       'listDirectory',
       parentId,
       {
@@ -101,7 +100,7 @@ describe('backendQueryOptions', () => {
   })
 
   test("a caller's stale time wins; a method that is never persisted stays unpersisted", () => {
-    const options = backendQueryOptions(remote, 'listSecrets', [], {
+    const options = backendQueryOptions(local, 'listSecrets', [], {
       staleTime: 5,
       meta: { persist: false },
       enabled: false,
@@ -110,7 +109,7 @@ describe('backendQueryOptions', () => {
     expect(options.meta.persist).toBe(false)
     expect(options.enabled).toBe(false)
     expect(
-      backendQueryOptions(remote, 'listTags', [], { meta: { persist: true } }).meta.persist,
+      backendQueryOptions(local, 'listTags', [], { meta: { persist: true } }).meta.persist,
     ).toBe(false)
   })
 
@@ -119,7 +118,7 @@ describe('backendQueryOptions', () => {
       expect(this).toBe(backend)
       return Promise.resolve([])
     })
-    const backend = { type: BackendType.remote, listSecrets } as unknown as Backend
+    const backend = { type: BackendType.local, listSecrets } as unknown as Backend
     await expect(backendQueryOptions(backend, 'listSecrets', []).queryFn()).resolves.toEqual([])
     expect(listSecrets).toHaveBeenCalledOnce()
   })
@@ -127,12 +126,12 @@ describe('backendQueryOptions', () => {
 
 describe('backendMutationOptions', () => {
   test("invalidates the caller's keys, then the method's, and awaits them", () => {
-    const options = backendMutationOptions(remote, 'createTag', {
+    const options = backendMutationOptions(local, 'createTag', {
       meta: { invalidates: [['custom']] },
     })
-    expect(options.mutationKey).toEqual([BackendType.remote, 'createTag'])
+    expect(options.mutationKey).toEqual([BackendType.local, 'createTag'])
     expect(options.meta).toEqual({
-      invalidates: [['custom'], [BackendType.remote, 'listTags']],
+      invalidates: [['custom'], [BackendType.local, 'listTags']],
       awaitInvalidates: true,
       refetchType: 'active',
     })
@@ -157,12 +156,12 @@ describe('backendMutationOptions', () => {
   })
 
   test('refetches every listing, not only the active ones, after a change to the drive', () => {
-    expect(backendMutationOptions(remote, 'createDirectory').meta?.refetchType).toBe('all')
+    expect(backendMutationOptions(local, 'createDirectory').meta?.refetchType).toBe('all')
   })
 
   test('`invalidate: false` turns the invalidations off', () => {
     expect(
-      backendMutationOptions(remote, 'createDirectory', { invalidate: false }).meta?.invalidates,
+      backendMutationOptions(local, 'createDirectory', { invalidate: false }).meta?.invalidates,
     ).toEqual([])
   })
 
@@ -185,9 +184,9 @@ describe('backendMutationOptions', () => {
 
   test('Vue gets the same options, its mutation key appended', () => {
     const vue = toValue(
-      vueBackendMutationOptions('updateAsset', remote, { mutationKey: ['editDescription'] }),
+      vueBackendMutationOptions('updateAsset', local, { mutationKey: ['editDescription'] }),
     )
-    const direct = backendMutationOptions(remote, 'updateAsset', {
+    const direct = backendMutationOptions(local, 'updateAsset', {
       mutationKey: ['editDescription'],
     })
     expect(vue.mutationKey).toEqual(direct.mutationKey)
@@ -197,7 +196,7 @@ describe('backendMutationOptions', () => {
 
   test('executeMutation runs it through the mutation cache, outside any component', async () => {
     const createTag = vi.fn(() => Promise.resolve({ id: 'tag-1' }))
-    const backend = { type: BackendType.remote, createTag } as unknown as Backend
+    const backend = { type: BackendType.local, createTag } as unknown as Backend
     const queryClient = new QueryClient()
     const options = backendMutationOptions(backend, 'createTag')
     await expect(executeMutation(queryClient, options, [{} as never])).resolves.toEqual({

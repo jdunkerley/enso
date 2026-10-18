@@ -14,12 +14,7 @@ import { useContainerData, type Tab } from '$/providers/container'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { twJoin, twMerge } from '$/utils/style/tailwindMerge'
-import {
-  BackendType,
-  ProjectState,
-  type Backend,
-  type ProjectAsset,
-} from 'enso-common/src/services/Backend'
+import { ProjectState, type Backend, type ProjectAsset } from 'enso-common/src/services/Backend'
 import { computed } from 'vue'
 
 const {
@@ -66,9 +61,7 @@ const isDisabled = computed(
 
 const spinnerState = computed((): SpinnerPhase => {
   const status = projectState.value.type
-  return backend.type === BackendType.remote ?
-      REMOTE_SPINNER_STATE[status]
-    : LOCAL_SPINNER_STATE[status]
+  return LOCAL_SPINNER_STATE[status]
 })
 
 function tooltip(defaultTooltip: string) {
@@ -95,18 +88,7 @@ function doCloseProject() {
 <script lang="ts">
 export const CLOSED_PROJECT_STATE = { type: ProjectState.closed } as const
 
-/** The spinner's phase for each project state, on the cloud. */
-const REMOTE_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
-  [ProjectState.closed]: 'loading-slow',
-  [ProjectState.created]: 'loading-slow',
-  [ProjectState.new]: 'loading-slow',
-  [ProjectState.placeholder]: 'loading-slow',
-  [ProjectState.openInProgress]: 'loading-slow',
-  [ProjectState.provisioned]: 'loading-slow',
-  [ProjectState.scheduled]: 'loading-slow',
-  [ProjectState.opened]: 'done',
-}
-/** The spinner's phase for each project state, on the local backend. */
+/** The spinner's phase for each project state. */
 const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
   [ProjectState.closed]: 'loading-slow',
   [ProjectState.created]: 'loading-slow',

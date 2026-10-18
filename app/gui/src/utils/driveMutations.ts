@@ -230,10 +230,7 @@ export function downloadAssetsMutationOptions(backend: Backend) {
       return null
     },
     meta: {
-      invalidates: [
-        [BackendType.remote, 'listDirectory'],
-        [BackendType.local, 'listDirectory'],
-      ],
+      invalidates: [[BackendType.local, 'listDirectory']],
       awaitInvalidates: true,
     },
   })

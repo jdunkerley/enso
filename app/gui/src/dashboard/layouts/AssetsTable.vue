@@ -176,7 +176,7 @@ watch(enabledColumns, (columns) => localStorage.set('enabledColumns', [...column
   immediate: true,
 })
 const allowedColumns = computed(() =>
-  getColumnList(backend.value.type, category.value.type, query.query !== '', supportsLabels.value),
+  getColumnList(category.value.type, query.query !== '', supportsLabels.value),
 )
 const columns = computed(() =>
   allowedColumns.value.filter((column) => enabledColumns.value.has(column)),

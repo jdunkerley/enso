@@ -350,7 +350,7 @@ function useModesForBackend() {
   const backends = useBackends()
   return computed(() => {
     // Projects run only locally, and only when there is a local backend.
-    const modes: Partial<Record<BackendType, 'local' | null>> = {
+    const modes: Record<BackendType, 'local' | null> = {
       [BackendType.local]: backends.localBackend != null ? 'local' : null,
     }
     return { locally: modes, natively: modes }

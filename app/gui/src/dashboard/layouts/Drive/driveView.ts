@@ -10,14 +10,13 @@
  * asked for. Everything below the drive reads `shown`. A control that navigates passes itself as
  * the `source`, and shows a spinner while {@link DriveView.isNavigatingFrom} is true for it.
  */
-import { categoryKey, isLocalCategory, useCategories, type Category } from '$/providers/category'
+import { categoryKey, useCategories, type Category } from '$/providers/category'
 import { useDriveLocation } from '$/providers/drive'
 import { useLocalPaths } from '$/providers/localDirectories'
 import { createContextStore } from '@/providers'
 import { useQuery } from '@tanstack/vue-query'
 import {
   AssetDoesNotExistError,
-  BackendType,
   DirectoryId,
   NetworkError as OtherNetworkError,
   isUnauthorizedError,
@@ -71,11 +70,7 @@ export function directoryDetailsQueryOptions(
   const { backend, currentDirectoryId } = location
   return {
     queryKey: [backend.type, 'getAssetDetails', { id: currentDirectoryId }],
-    queryFn: () =>
-      backend.getAssetDetails(
-        currentDirectoryId,
-        backend.type === BackendType.local ? (rootPath ?? undefined) : undefined,
-      ),
+    queryFn: () => backend.getAssetDetails(currentDirectoryId, rootPath ?? undefined),
     meta: { persist: false },
     retry: (count: number, error: Error) => {
       if (isUnauthorizedError(error)) return false
@@ -122,7 +117,7 @@ export const [provideDriveView, useDriveView] = createContextStore('driveView', 
     // A category with no home directory (a Recent) is rooted at its backend's root.
     const rootDirectoryId =
       categoryHomeDir ??
-      (isLocalCategory(category) ? categories.categoryDirectoryId({ type: 'local' }) : null) ??
+      categories.categoryDirectoryId({ type: 'local' }) ??
       UNKNOWN_ROOT_DIRECTORY_ID
     const directoryId = drive.currentDirectory
     const queryDirectoryId = directoryId ?? categoryHomeDir

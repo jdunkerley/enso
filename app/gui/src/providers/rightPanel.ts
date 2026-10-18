@@ -1,5 +1,5 @@
 import { useBackends } from '$/providers/backends'
-import { CATEGORY_BACKEND, isLocalCategory, type Category } from '$/providers/category'
+import { CATEGORY_BACKEND, type Category } from '$/providers/category'
 import { rightPanelTabContribution } from '$/providers/rightPanelContributions'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import { useSyncLocalStorage } from '@/composables/syncLocalStorage'
@@ -54,11 +54,7 @@ function useRightPanelTabs(
   rightPanelContext: Ref<RightPanelContext | undefined>,
   { textRef }: TextStore,
 ) {
-  const isLocalDirectoryView = computed(
-    () =>
-      rightPanelContext.value?.category != null &&
-      isLocalCategory(rightPanelContext.value.category),
-  )
+  const isLocalDirectoryView = computed(() => rightPanelContext.value?.category != null)
   /** In the drive, for the selected asset; in a project tab, for the opened project. */
   const enabledInDriveOrProject = computed(() =>
     isLocalDirectoryView.value || rightPanelContext.value?.openedProject != null ?

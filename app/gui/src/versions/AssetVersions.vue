@@ -15,7 +15,6 @@ import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'
 import Result from '$/components/Result/Result.vue'
 import Loader from '$/components/Spinner/Loader.vue'
 import { useBackends } from '$/providers/backends'
-import { isLocalCategory } from '$/providers/category'
 import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
 import { backendQueryOptions } from '$/utils/backendQuery'
@@ -71,7 +70,7 @@ const localProjectPath = computed(() => {
   if (opened != null) return extractTypeAndPath(opened.id).path
   const category = rightPanel.context?.category
   const asset = rightPanel.focusedAsset
-  if (category == null || !isLocalCategory(category) || asset?.type !== AssetType.project) {
+  if (category == null || asset?.type !== AssetType.project) {
     return null
   }
   return extractTypeAndPath(asset.id).path
