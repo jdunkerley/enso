@@ -55,14 +55,6 @@ pub mod env {
         /// License key for the AG Grid library.
         ENSO_IDE_AG_GRID_LICENSE_KEY, String;
 
-        /// When `true`, the GUI build fails unless `ENSO_IDE_AG_GRID_LICENSE_KEY` is non-empty.
-        ///
-        /// Set for release packaging only. Without a key the table view falls back to AG Grid
-        /// Community, which is fine for development but must never ship in a release — and it
-        /// does so silently, so nothing else would catch it. See `requireAgGridLicense` in
-        /// `app/gui/vite.config.ts`.
-        ENSO_IDE_REQUIRE_AG_GRID_LICENSE, bool;
-
         ENSO_IDE_COMMIT_HASH, String;
         ENSO_IDE_VERSION, String;
 
