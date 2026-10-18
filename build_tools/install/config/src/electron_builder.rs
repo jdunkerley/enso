@@ -43,7 +43,9 @@ pub struct Config {
     pub artifact_name: String,
 
     /// Custom protocol schemes that the application handles. Example: `[{ "name": "Enso url",
-    /// "schemes": ["enso"], "role": "Editor" }]`.
+    /// "schemes": ["enso"], "role": "Editor" }]`. The IDE currently registers none, and the
+    /// generated configuration then omits the field.
+    #[serde(default)]
     pub protocols: Vec<Protocol>,
 
     /// Configuration specific to Windows builds.
@@ -127,5 +129,39 @@ impl Deref for ExtendedFileAssociation {
 
     fn deref(&self) -> &Self::Target {
         &self.base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The IDE registers no URL protocol since the cloud sign-in deep links went away, so the
+    /// generated configuration has no `protocols` field at all.
+    #[test]
+    fn parses_config_without_protocols() {
+        let json = r#"{
+            "appId": "org.enso",
+            "productName": "Enso",
+            "extraMetadata": {
+                "version": "2026.1.1-dev",
+                "installer": {
+                    "publisher": "Enso International, Inc.",
+                    "fileAssociations": [{
+                        "ext": ".enso",
+                        "name": "Enso Source File",
+                        "mimeType": "text/plain",
+                        "progId": "Enso.Source"
+                    }]
+                }
+            },
+            "copyright": "Copyright © 2026 Enso International, Inc.",
+            "artifactName": "enso-${os}-${arch}-2026.1.1-dev.${ext}",
+            "win": { "icon": "./assets/icons/icon.ico" },
+            "fileAssociations": [{ "ext": ".enso", "name": "Enso Source File" }],
+            "directories": { "output": "dist/ide" }
+        }"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(config.protocols.is_empty());
     }
 }

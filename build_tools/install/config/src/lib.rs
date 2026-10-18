@@ -58,8 +58,9 @@ define_env_var! {
 ///
 /// This function is intended to be used by the installer/uninstaller's `build.rs`.
 pub fn electron_builder_config_from_env() -> Result<electron_builder::Config> {
-    let config_path = ENSO_BUILD_ELECTRON_BUILDER_CONFIG.get()?;
+    // Before reading the variable, so that setting it later re-runs the build script.
     cargo::build::rerun_if_env_changed(ENSO_BUILD_ELECTRON_BUILDER_CONFIG);
+    let config_path = ENSO_BUILD_ELECTRON_BUILDER_CONFIG.get()?;
     cargo::build::rerun_if_file_changed(&config_path);
     ide_ci::fs::read_json(config_path)
 }
@@ -86,6 +87,13 @@ pub fn sanitize_and_expose_electron_builder_config() -> Result<electron_builder:
     // We sanitize by parsing into our structure (with only the fields we need) and then dumping
     // back to JSON.
     let config = electron_builder_config_from_env();
+    if let Err(err) = &config
+        && ENSO_BUILD_ELECTRON_BUILDER_CONFIG.is_set()
+    {
+        // A configuration was provided but is unusable. Embedding the stub would produce an
+        // installer that panics at startup, before it can log or show anything.
+        panic!("Failed to load the electron-builder configuration: {err:?}");
+    }
     let out_config_path = sanitized_electron_builder_config_path()?;
     if let Ok(config) = &config {
         let json_text = serde_json::to_string_pretty(config)?;
