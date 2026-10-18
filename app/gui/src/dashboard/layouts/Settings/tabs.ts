@@ -25,6 +25,7 @@ import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import LocalVersionsSettingsSection from './LocalVersionsSettingsSection.vue'
 import NoResults from './NoResults.vue'
 import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
+import UpdatesSettingsSection from './UpdatesSettingsSection.vue'
 
 /** The section shown when nothing in a tab matches the search. */
 export const SETTINGS_NO_RESULTS_SECTION_DATA: SettingsSectionData = {
@@ -98,6 +99,16 @@ const LOCAL_TAB: SettingsTabData = {
           type: 'custom',
           aliasesId: 'localVersionsSettingsCustomEntryAliases',
           component: LocalVersionsSettingsSection,
+        },
+      ],
+    },
+    {
+      nameId: 'updatesSettingsSection',
+      entries: [
+        {
+          type: 'custom',
+          aliasesId: 'updatesSettingsCustomEntryAliases',
+          component: UpdatesSettingsSection,
         },
       ],
     },

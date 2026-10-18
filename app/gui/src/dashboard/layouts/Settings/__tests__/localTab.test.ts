@@ -151,6 +151,26 @@ describe('the Local settings tab', () => {
     expect(mapboxSettingsStore.getState().accessToken).toBe('pk.typed')
   })
 
+  test('the Updates section has the prerelease-updates switch, off by default', async () => {
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('includePrereleasesSetting'))
+    const { useIncludePrereleases, setIncludePrereleases } =
+      await import('$/providers/updateSettings')
+    expect(useIncludePrereleases().value).toBe(false)
+    const user = userEvent.setup()
+    await user.click(
+      required(
+        [...document.querySelectorAll<HTMLElement>('[role="switch"], input[type="checkbox"]')].find(
+          (element) =>
+            element.closest('form')?.textContent.includes(getText('includePrereleasesSetting')),
+        ),
+      ),
+    )
+    await flushPromises()
+    expect(useIncludePrereleases().value).toBe(true)
+    setIncludePrereleases(false)
+  })
+
   test('a typed directory, once saved, reaches the local paths', async () => {
     await openLocalTab()
     expect(shownPaths()).toBe(`${DEFAULT_ROOT}|${DEFAULT_DOWNLOADS}`)
