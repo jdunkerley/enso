@@ -46,10 +46,11 @@ test('Project Duplicate', async ({ page }) => {
   // centre of the window, right over the tab's close button. On the Windows CI runner it can still
   // be there when the graph appears, and then the click times out (#212).
   const driveView = page.getByTestId('drive-view')
-  await driveView.getByTestId('stop-project').click()
   // The first close in the projects folder offers to keep versions with git; answer "Not now".
-  await answerRepositoryPrompt(page, () =>
-    expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0),
+  await answerRepositoryPrompt(
+    page,
+    () => driveView.getByTestId('stop-project').click(),
+    () => expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0),
   )
   // The project's play button is enabled again only once the project has finished closing.
   await expect(driveView.getByTestId('open-project')).toBeEnabled()

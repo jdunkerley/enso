@@ -143,9 +143,10 @@ export async function closeWelcome(page: Page) {
     page.waitForTimeout(3000),
   ])
   if (await welcomeProjectTab.isVisible()) {
-    await welcomeProjectTab.locator('.CloseButton').click()
-    await answerRepositoryPrompt(page, () =>
-      expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
+    await answerRepositoryPrompt(
+      page,
+      () => welcomeProjectTab.locator('.CloseButton').click(),
+      () => expect(welcomeProjectTab).toHaveCount(0, { timeout: 30_000 }),
     )
   }
 }
@@ -153,19 +154,31 @@ export async function closeWelcome(page: Page) {
 /**
  * Closing a local project may first ask "Keep versions of your projects with git?" (the first save
  * or close in a folder that is not a repository, when git is installed), and the close waits for the
- * answer. Call this right after triggering a close: it waits for either the prompt or the
- * `closed` condition, answers the prompt with "Not now" if it appeared, and then waits for `closed`.
- * Returns whether the prompt appeared.
+ * answer.
+ *
+ * This starts the close itself (`close`), so that it can race the prompt against the `project/close`
+ * request rather than against the tab disappearing: the tab goes away the moment the close is
+ * triggered, while the prompt appears up to a second or so later (the IDE first re-reads the
+ * versioning status), and the request is sent only after the prompt has been answered. Answers the
+ * prompt with "Not now" if it appeared, then waits for the request and for `closed`. Returns whether
+ * the prompt appeared.
  */
 export async function answerRepositoryPrompt(
   page: Page,
+  close: () => Promise<unknown>,
   closed: () => Promise<unknown>,
 ): Promise<boolean> {
   const prompt = page.getByTestId('repository-prompt')
-  // Whichever comes first; a failure of `closed` is reported by the final wait below.
-  await Promise.race([prompt.waitFor({ state: 'visible' }), closed().catch(() => {})])
+  const closeRequest = page.waitForRequest((request) =>
+    request.url().endsWith('/api/project-service/project/close'),
+  )
+  // If `close` throws, nothing awaits the request, so it must not leave an unhandled rejection.
+  closeRequest.catch(() => {})
+  await close()
+  await Promise.race([prompt.waitFor({ state: 'visible' }).catch(() => {}), closeRequest])
   const appeared = await prompt.isVisible()
   if (appeared) await prompt.getByTestId('alert-dialog-cancel').click()
+  await closeRequest
   await closed()
   return appeared
 }
