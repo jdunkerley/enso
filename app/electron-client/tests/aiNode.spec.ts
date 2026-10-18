@@ -24,9 +24,9 @@ import { parseAiUsageLine } from './aiMetrics'
 import {
   closeWelcome,
   createNewProject,
-  loginAsTestUser,
   test,
   visualizeData,
+  waitForDashboard,
 } from './electronTest'
 
 const AI_PROMPT_MAX_MS = 600_000
@@ -78,7 +78,7 @@ test('creates three AI nodes plus two manual nodes in one session', async ({ pag
   const consoleLines: string[] = []
   page.on('console', (msg) => consoleLines.push(msg.text()))
 
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
   await createNewProject(page)
 
@@ -192,7 +192,7 @@ test('cancelling a running AI prompt leaves the queue healthy for follow-up prom
   // budget so a slow re-prime after the cancel doesn't time us out.
   test.setTimeout(15 * 60_000)
 
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
   await createNewProject(page)
 

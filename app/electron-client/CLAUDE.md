@@ -606,11 +606,11 @@ rule in `playwright.config.ts`:
   Electron, no DOM. Fast. Run with `corepack pnpm vitest --run tests/headless`.
 - `tests/*.spec.ts` — Playwright end-to-end tests that launch the packaged
   Electron binary from `dist/ide/` and drive the app from a real user's
-  perspective (login → dashboard → project → graph editor). `electronTest.ts`
-  extends Playwright's `test` fixture to spawn Electron and exposes helpers like
-  `loginAsTestUser`, `createNewProject`, `openComponentBrowser`. See
-  `tests/README.md` for prerequisites (a built `dist/ide/`, credentials at
-  `playwright/.auth/user.json`). If on a worktree, Run with
+  perspective (dashboard → project → graph editor). `electronTest.ts` extends
+  Playwright's `test` fixture to spawn Electron and exposes helpers like
+  `waitForDashboard`, `createNewProject`, `openComponentBrowser`. See
+  `tests/README.md` for prerequisites (a built `dist/ide/`; no cloud account is
+  needed). If on a worktree, Run with
   `corepack pnpm -r --filter enso ide-integration-test [path.spec.ts]`. Runs are
   long (minutes), so avoid them in inner dev loops.
 

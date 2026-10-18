@@ -1,5 +1,4 @@
 /** @file Commonly used functions for electron tests */
-import { TEXTS } from 'enso-common/src/text'
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -13,7 +12,6 @@ import {
 } from 'playwright/test'
 
 const LOADING_TIMEOUT = 10000
-const TEXT = TEXTS.english
 
 /**
  * The packaged engine is markedly slower on the Windows CI runner — real-time antivirus scanning
@@ -26,38 +24,12 @@ const TEXT = TEXTS.english
 export const SKIP_ON_WINDOWS_CI = process.env.CI != null && process.platform === 'win32'
 export const SKIP_ON_WINDOWS_CI_REASON =
   'Slow on the Windows CI runner (see SKIP_ON_WINDOWS_CI in electronTest.ts)'
-const TEST_USER_FILE = path.join(import.meta.dirname, '../playwright/.auth/user.json')
 const POSSIBLE_ELECTRON_PATHS = [
   '../../../dist/ide/linux-unpacked/enso',
   '../../../dist/ide/win-unpacked/Enso.exe',
   '../../../dist/ide/mac/Enso.app/Contents/MacOS/Enso',
   '../../../dist/ide/mac-arm64/Enso.app/Contents/MacOS/Enso',
 ]
-
-/**
- * Enso Cloud test-user credentials, read from `playwright/.auth/user.json`.
- *
- * Empty strings when the file is missing or blank — a local-only build has no login screen, so
- * {@link loginAsTestUser} never uses them. Cloud specs that genuinely need a real account gate
- * themselves on `ENSO_TEST_CLOUD`.
- */
-export const credentials: { readonly user: string; readonly password: string } = await fs
-  .readFile(TEST_USER_FILE, { encoding: 'utf-8' })
-  .then((contents) => {
-    const parsed: unknown = JSON.parse(contents)
-    if (
-      parsed != null &&
-      typeof parsed === 'object' &&
-      'user' in parsed &&
-      typeof parsed.user === 'string' &&
-      'password' in parsed &&
-      typeof parsed.password === 'string'
-    ) {
-      return { user: parsed.user, password: parsed.password }
-    }
-    return { user: '', password: '' }
-  })
-  .catch(() => ({ user: '', password: '' }))
 
 export const electronExecutablePath = await (async () => {
   try {
@@ -111,11 +83,6 @@ export const test = base.extend<{
         ...(aiEnabled ? {} : { ENSO_AI_DISABLED: '1' }),
       },
     })
-    // Set the password as global var before turning on tracing.
-    // This way it will be not disclosed to anyone downloading traces of failed tests.
-    ;(await app.firstWindow()).evaluate((password) => {
-      ;(window as any).passwordOverride = password
-    }, credentials.password)
     await app.context().tracing.start({ screenshots: true, snapshots: true, sources: true })
     await use(app)
     await app.context().tracing.stop({ path: `test-traces/${testRunId}.zip` })
@@ -128,44 +95,12 @@ export const test = base.extend<{
   },
 })
 
-/**
- * Bring the app to a ready dashboard.
- *
- * On a build with Enso Cloud configured this logs in as the test user (credentials from
- * `playwright/.auth/user.json`) and accepts the Terms of Service / Privacy Policy. On a
- * local-only build there is no login screen — the app starts already signed in with a local
- * stand-in session — so this only waits for the app to finish loading.
- */
-export async function loginAsTestUser(page: Page) {
-  const loginHeading = page.getByText('Login to your account')
+/** Wait until the app has loaded: the drive, or the welcome project's tab on a first start. */
+export async function waitForDashboard(page: Page) {
   const dashboardReady = page
     .getByTestId('drive-view')
     .or(page.getByRole('tab', { name: 'Getting Started with Enso Analytics' }))
-  await expect(loginHeading.or(dashboardReady).first()).toBeVisible({ timeout: 60000 })
-  if (!(await loginHeading.isVisible())) return
-
-  await expect(page.getByRole('textbox', { name: 'email' })).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'password' })).toBeVisible()
-  await page.getByRole('textbox', { name: 'email' }).fill(credentials.user)
-  // Put some placeholder - the actual password was set in fixture (see above).
-  await page.getByRole('textbox', { name: 'password' }).fill('mellon')
-  await page.getByRole('button', { name: TEXT.login, exact: true }).click()
-
-  await expect(
-    page
-      .getByRole('group', { name: TEXT.licenseAgreementCheckbox })
-      .getByText(TEXT.licenseAgreementCheckbox),
-  ).toBeVisible({ timeout: 60000 })
-  await page
-    .getByRole('group', { name: TEXT.licenseAgreementCheckbox })
-    .getByText(TEXT.licenseAgreementCheckbox)
-    .click()
-  await page
-    .getByRole('group', { name: TEXT.privacyPolicyCheckbox })
-    .getByText(TEXT.privacyPolicyCheckbox)
-    .click()
-
-  await page.getByRole('button', { name: TEXT.accept }).click()
+  await expect(dashboardReady.first()).toBeVisible({ timeout: 60000 })
 }
 
 /**

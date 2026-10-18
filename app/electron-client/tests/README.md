@@ -8,18 +8,6 @@ using [Playwright Test](https://playwright.dev/) framework.
 Running end-to-test tests requires a locally build IDE, that should be present
 in `dist/ide` directory.
 
-### Test account
-
-In order to run tests locally you have to create credentials file under
-`app/electron-client/playwright/.auth/user.json`:
-
-```bash
-enso> mkdir -p app/electron-client/playwright/.auth && touch app/electron-client/playwright/.auth/user.json && chmod 600 app/electron-client/playwright/.auth/user.json && echo "{\"user\": \"$ENSO_TEST_USER\",\"password\":\"$ENSO_TEST_PASS\"}" > app/electron-client/playwright/.auth/user.json
-```
-
-The test account with `$ENSO_TEST_USER`/`$ENSO_TEST_PASS` credentials should be
-created **before** running the test suite.
-
 ### Playwright
 
 ```bash
