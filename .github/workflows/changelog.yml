@@ -10,6 +10,8 @@ on:
       - synchronize
       - opened
       - reopened
+    paths-ignore:
+      - docs/superpowers/**
 jobs:
   build-script-linux-amd64:
     name: Build Script

@@ -616,11 +616,22 @@ fn concurrency(group: impl AsRef<str>) -> Concurrency {
     }
 }
 
+/// Paths whose changes alone start no pull-request workflow: design specs and implementation
+/// plans, which nothing builds or tests. The hand-written `*-pull-request.yml` and
+/// `formatting.yml` carry the same list; keep them in step.
+pub const PR_IGNORED_PATHS: [&str; 1] = ["docs/superpowers/**"];
+
+/// The `pull_request` trigger of the PR workflows: everything but changes to
+/// [`PR_IGNORED_PATHS`] alone.
+fn pull_request_trigger() -> PullRequest {
+    PullRequest::default().with_paths_ignore(PR_IGNORED_PATHS)
+}
+
 /// Generate a workflow that checks if the changelog has been updated (if needed).
 pub fn changelog() -> Result<Workflow> {
     use PullRequestActivityType::*;
     let mut workflow = Workflow::new("Changelog");
-    workflow.on.pull_request(PullRequest::default().with_types([
+    workflow.on.pull_request(pull_request_trigger().with_types([
         Labeled,
         Unlabeled,
         Synchronize,
@@ -969,7 +980,7 @@ fn stdlib_api_change_labels_workflow() -> Result<Workflow> {
     ];
     let on = Event {
         push: Some(Push { inner_branches: Branches::new(["develop"]), ..default() }),
-        pull_request: Some(PullRequest::default()),
+        pull_request: Some(pull_request_trigger()),
         workflow_dispatch: Some(WorkflowDispatch::default()),
         workflow_call: Some(WorkflowCall::default()),
         schedule: vec![],
@@ -1103,4 +1114,25 @@ pub fn generate(
         })
         .collect();
     Ok(workflows)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A PR that changes only specs and plans starts none of the PR workflows.
+    #[test]
+    fn pull_request_workflows_ignore_spec_and_plan_changes() {
+        for (name, workflow) in [
+            ("changelog", changelog().unwrap()),
+            ("std-libs-labels", stdlib_api_change_labels_workflow().unwrap()),
+        ] {
+            let yaml = serde_yaml::to_string(&workflow).unwrap();
+            assert!(yaml.contains("paths-ignore:"), "{name} lacks paths-ignore:\n{yaml}");
+            assert!(
+                yaml.contains("docs/superpowers/**"),
+                "{name} does not ignore specs and plans:\n{yaml}"
+            );
+        }
+    }
 }
