@@ -8,8 +8,10 @@ monorepo**:
   interpreter (Truffle/GraalVM), language server, and the Enso standard library.
   Written in Scala, Java, and Rust.
 - **Enso IDE** — a desktop application (Electron) with a visual graph editor and
-  a dashboard for project/cloud management. Written in TypeScript; the UI is Vue
-  throughout (the Dashboard feature was React until #75 ported it).
+  a dashboard for local projects (the IDE has no Enso Cloud since the local-only
+  work: no login, no cloud drive; the engine and standard library still support
+  it). Written in TypeScript; the UI is Vue throughout (the Dashboard feature
+  was React until #75 ported it).
 
 The two products are glued together by several generated/shared artifacts: the
 Rust parser is compiled to **both** WASM (for the GUI) and a JNI `cdylib` (for

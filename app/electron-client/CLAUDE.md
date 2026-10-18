@@ -23,9 +23,6 @@ desktop binary (AppImage/DMG/exe + installer).
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).
-- Implements the in-app `enso://` protocol (`handleProjectProtocol`), which
-  serves project assets to the window. It is not registered with the OS: there
-  are no deep links, no sign-in, and the IDE writes no `~/.enso/credentials`.
 - Handles auto-update (electron-updater via electron-builder), custom window
   chrome.
 
@@ -56,16 +53,10 @@ the retry recovers. A healthy session shows that warning exactly once and no
 `Request timeout` lines at all. Repeated 15 s timeouts are the real failure.
 
 **Always run `git submodule update --init --recursive` before building.** In
-particular, `app/gui/.dev-env/` (a private submodule) holds `.env.staging` /
-`.env.production` with the Cognito client ids and the staging cloud API URL. A
-fresh worktree starts with that submodule empty. The build does **not**
-hard-fail when it's missing — the symlink `app/gui/.env.staging` becomes broken,
-vite silently falls back to defaults, and the resulting Electron app points the
-dashboard at the production cloud regardless of `--mode staging`. The end-to-end
-tests then fail at the login screen (`Loading Enso…` →
-`Error while fetching configuration [Error: Failed to fetch]`) because the
-in-renderer fetch hits a URL the auth flow can't handshake. Init the submodules
-before any IDE build (and before running the e2e suite that loads that build).
+particular, `app/gui/.dev-env/` is a private submodule which a fresh worktree
+must initialise for the `.env.staging` / `.env.production` symlinks. Init the
+submodules before any IDE build (and before running the e2e suite that loads
+that build).
 
 For testing, always build with `--mode staging`, to not pollute production
 backend and telemetry with test runs.
@@ -77,8 +68,7 @@ once `./run ide build` has produced the engine bundle.
 
 - `ENSO_BUILD_IDE`, `ENSO_BUILD_BACKEND` — output locations.
 - `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — which engine to bundle.
-- `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server when running
-  against a cloud backend.
+- `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 
 ## Local Claude agent
