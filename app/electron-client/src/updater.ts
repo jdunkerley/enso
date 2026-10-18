@@ -73,6 +73,8 @@ export class Updater {
       this.set({ state: 'ready', version: info.version })
     })
     updater.on('error', (error) => {
+      // A downloaded update installs on quit whatever happens afterwards.
+      if (this.current.state === 'ready') return
       this.set({
         state: 'error',
         message: error.message,
@@ -89,13 +91,20 @@ export class Updater {
   /** Looks for a newer release; never throws. Does nothing while downloading or once ready. */
   async check(allowPrerelease: boolean): Promise<UpdateStatus> {
     if (this.mode === 'manual') return this.current
-    if (this.current.state === 'downloading' || this.current.state === 'ready') return this.current
+    if (
+      this.current.state === 'checking' ||
+      this.current.state === 'downloading' ||
+      this.current.state === 'ready'
+    )
+      return this.current
     this.deps.autoUpdater.allowPrerelease = allowPrerelease
     this.set({ state: 'checking' })
     try {
       await this.deps.autoUpdater.checkForUpdates()
+      // No event fires when the updater is inactive.
+      if (this.status().state === 'checking') this.set({ state: 'none' })
     } catch (error) {
-      this.set({ state: 'error', message: messageOf(error), version: null })
+      this.fail(error, null)
     }
     return this.current
   }
@@ -105,11 +114,12 @@ export class Updater {
     if (this.mode === 'manual') return
     const version = this.version()
     if (version == null) return
+    if (this.current.state !== 'available' && this.current.state !== 'error') return
     this.set({ state: 'downloading', version, percent: 0 })
     try {
       await this.deps.autoUpdater.downloadUpdate()
     } catch (error) {
-      this.set({ state: 'error', message: messageOf(error), version })
+      this.fail(error, version)
     }
   }
 
@@ -122,6 +132,14 @@ export class Updater {
 
   private version(): string | null {
     return 'version' in this.current ? this.current.version : null
+  }
+
+  /** Publishes a rejection, unless the `error` event already did. */
+  private fail(error: unknown, version: string | null) {
+    const message = messageOf(error)
+    if (this.current.state === 'ready') return
+    if (this.current.state === 'error' && this.current.message === message) return
+    this.set({ state: 'error', message, version })
   }
 
   private set(status: UpdateStatus) {

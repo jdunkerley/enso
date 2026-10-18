@@ -159,3 +159,100 @@ describe('resolveUpdateMode', () => {
     expect(resolveUpdateMode(buildMode, environment)).toBe(expected)
   })
 })
+
+describe('Updater guards', () => {
+  const available = { version: '2026.2.0', releaseDate: '' }
+
+  test.each(['checking', 'downloading', 'ready', 'none', 'idle'])(
+    'download() does nothing from %s',
+    async (state) => {
+      const { autoUpdater, updater } = setup()
+      if (state === 'checking') {
+        autoUpdater.checkForUpdates.mockImplementation(() => new Promise(() => {}))
+        void updater.check(false)
+      } else if (state === 'downloading') {
+        autoUpdater.emit('update-available', available)
+        autoUpdater.downloadUpdate.mockImplementation(() => new Promise(() => {}))
+        void updater.download()
+      } else if (state === 'ready') {
+        autoUpdater.emit('update-downloaded', { version: '2026.2.0' })
+      } else if (state === 'none') {
+        autoUpdater.emit('update-not-available', {})
+      }
+      autoUpdater.downloadUpdate.mockClear()
+      const before = updater.status()
+      await updater.download()
+      expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
+      expect(updater.status()).toEqual(before)
+    },
+  )
+
+  test('download() does not start from an error without a version', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.checkForUpdates.mockRejectedValue(new Error('offline'))
+    await updater.check(false)
+    await updater.download()
+    expect(autoUpdater.downloadUpdate).not.toHaveBeenCalled()
+  })
+
+  test('download() retries from an error with a version', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.emit('update-available', available)
+    autoUpdater.downloadUpdate.mockRejectedValueOnce(new Error('boom'))
+    await updater.download()
+    await updater.download()
+    expect(autoUpdater.downloadUpdate).toHaveBeenCalledTimes(2)
+  })
+
+  test('an error event once ready is ignored', () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.emit('update-downloaded', { version: '2026.2.0' })
+    autoUpdater.emit('error', new Error('late'))
+    expect(updater.status()).toEqual({ state: 'ready', version: '2026.2.0' })
+  })
+
+  test.each(['checking', 'downloading', 'ready'])(
+    'check() during %s changes nothing',
+    async (state) => {
+      const { autoUpdater, updater } = setup()
+      if (state === 'checking') {
+        autoUpdater.checkForUpdates.mockImplementation(() => new Promise(() => {}))
+        void updater.check(false)
+      } else if (state === 'downloading') {
+        autoUpdater.emit('update-available', available)
+        autoUpdater.downloadUpdate.mockImplementation(() => new Promise(() => {}))
+        void updater.download()
+      } else {
+        autoUpdater.emit('update-downloaded', { version: '2026.2.0' })
+      }
+      autoUpdater.checkForUpdates.mockClear()
+      const before = updater.status()
+      await updater.check(true)
+      expect(autoUpdater.checkForUpdates).not.toHaveBeenCalled()
+      expect(autoUpdater.allowPrerelease).toBe(false)
+      expect(updater.status()).toEqual(before)
+    },
+  )
+
+  test('a check that fires no event settles to none', async () => {
+    const { updater } = setup()
+    expect(await updater.check(false)).toEqual({ state: 'none' })
+  })
+
+  test('an error that is both emitted and rejected is published once', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      const error = new Error('offline')
+      autoUpdater.emit('error', error)
+      throw error
+    })
+    await updater.check(false)
+    expect(statuses.filter((s) => s.state === 'error')).toHaveLength(1)
+  })
+
+  test('manual mode keeps its status after a check', async () => {
+    const { updater } = setup('manual')
+    await updater.check(false)
+    expect(updater.status()).toEqual({ state: 'idle' })
+  })
+})
