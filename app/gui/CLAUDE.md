@@ -134,8 +134,7 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 ## Scripts (run via `corepack pnpm`)
 
 - `dev:vite` — Vite dev server with HMR.
-- `build` / `build-cloud` — production bundle (with `ENSO_IDE_CLOUD_BUILD` env
-  toggle for cloud-specific behavior).
+- `build` — production bundle.
 - `test:unit` — vitest.
 - `test:integration` — Playwright.
 - `playwright:install` — install the pinned browser.

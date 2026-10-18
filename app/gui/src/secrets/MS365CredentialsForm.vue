@@ -47,7 +47,7 @@ function permissionText(kind: 'FilesPermission' | 'SitesPermission', item: strin
 async function submit(values: Parameters<typeof ms365.submitForm>[3]) {
   try {
     await ms365.submitForm(
-      config.remoteConfig?.ENSO_IDE_API_URL,
+      undefined,
       config.remoteConfig?.ENSO_IDE_MS365_OAUTH_CLIENT_ID,
       createCredentials,
       values,

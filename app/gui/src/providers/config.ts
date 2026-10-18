@@ -10,14 +10,6 @@ import { computed } from 'vue'
  * 5); PR 4 removes it with the cloud variables.
  */
 export interface RemoteConfig {
-  readonly ENSO_IDE_ENVIRONMENT?: string
-  readonly ENSO_IDE_API_URL?: string
-  readonly ENSO_IDE_AUTH_ENDPOINT?: string
-  readonly ENSO_IDE_STRIPE_KEY?: string
-  readonly ENSO_IDE_COGNITO_USER_POOL_ID?: string
-  readonly ENSO_IDE_COGNITO_USER_POOL_WEB_CLIENT_ID?: string
-  readonly ENSO_IDE_COGNITO_DOMAIN?: string
-  readonly ENSO_IDE_COGNITO_REGION?: string
   readonly ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID?: string
   readonly ENSO_IDE_STRAVA_OAUTH_CLIENT_ID?: string
   readonly ENSO_IDE_MS365_OAUTH_CLIENT_ID?: string
