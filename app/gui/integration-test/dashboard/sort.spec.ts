@@ -1,5 +1,6 @@
 /** @file Test sorting of assets columns. */
 import { expect, test } from 'integration-test/base'
+import type { MockLocalApi } from 'integration-test/mock/localApi'
 
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 
@@ -7,7 +8,8 @@ const START_DATE_EPOCH_MS = 1.7e12
 /** The number of milliseconds in a minute. */
 const MIN_MS = 60_000
 
-test('sort', async ({ drivePage, cloudApi }) => {
+/** Add the drive's contents. It must happen before the app loads: a later change is not listed. */
+function seed(localApi: MockLocalApi) {
   const date1 = toRfc3339(new Date(START_DATE_EPOCH_MS))
   const date2 = toRfc3339(new Date(START_DATE_EPOCH_MS + 1 * MIN_MS))
   const date3 = toRfc3339(new Date(START_DATE_EPOCH_MS + 2 * MIN_MS))
@@ -19,21 +21,21 @@ test('sort', async ({ drivePage, cloudApi }) => {
   const date6 = toRfc3339(new Date(START_DATE_EPOCH_MS + 5 * MIN_MS))
   const date7 = toRfc3339(new Date(START_DATE_EPOCH_MS + 6 * MIN_MS))
   const date8 = toRfc3339(new Date(START_DATE_EPOCH_MS + 7 * MIN_MS))
-  cloudApi.addDirectory({ modifiedAt: date4, title: 'a directory 1' })
-  cloudApi.addDirectory({ modifiedAt: date4a, title: 'a directory 10' })
-  cloudApi.addDirectory({ modifiedAt: date4b, title: 'a directory 2' })
-  cloudApi.addDirectory({ modifiedAt: date5a, title: 'a directory 11' })
-  cloudApi.addDirectory({ modifiedAt: date6, title: 'G directory' })
-  cloudApi.addProject({ modifiedAt: date7, title: 'C project' })
-  cloudApi.addSecret({ modifiedAt: date2, title: 'H secret' })
-  cloudApi.addProject({ modifiedAt: date1, title: 'b project' })
-  cloudApi.addFile({ modifiedAt: date8, title: 'd file' })
-  cloudApi.addSecret({ modifiedAt: date3, title: 'f secret' })
-  cloudApi.addFile({ modifiedAt: date5, title: 'e file' })
+  localApi.addRootDirectory('a directory 1', { attributes: { lastModifiedTime: date4 } })
+  localApi.addRootDirectory('a directory 10', { attributes: { lastModifiedTime: date4a } })
+  localApi.addRootDirectory('a directory 2', { attributes: { lastModifiedTime: date4b } })
+  localApi.addRootDirectory('a directory 11', { attributes: { lastModifiedTime: date5a } })
+  localApi.addRootDirectory('G directory', { attributes: { lastModifiedTime: date6 } })
+  localApi.addRootProject('C project', { created: date7 })
+  localApi.addRootFile('H file', { attributes: { lastModifiedTime: date2 } })
+  localApi.addRootProject('b project', { created: date1 })
+  localApi.addRootFile('d file', { attributes: { lastModifiedTime: date8 } })
+  localApi.addRootFile('f file', { attributes: { lastModifiedTime: date3 } })
+  localApi.addRootFile('e file', { attributes: { lastModifiedTime: date5 } })
   // By date:
   // b project
-  // h secret
-  // f secret
+  // H file
+  // f file
   // a directory 1
   // a directory 10
   // a directory 2
@@ -42,12 +44,17 @@ test('sort', async ({ drivePage, cloudApi }) => {
   // g directory
   // c project
   // d file
+}
 
+test.use({ setupApi: { addDefaultProject: false, local: seed } })
+
+test('sort', async ({ drivePage }) => {
   await drivePage.goToCategory
-    .cloud()
+    .local()
     .driveTable.withRows(async (rows) => {
       // By default, assets should be grouped by type.
-      // Assets in each group are ordered by insertion order.
+      // The app lists each group newest first (by modification date), whatever order the backend
+      // returns them in.
       await expect(rows).toHaveText([
         /^G directory/,
         /^a directory 11/,
@@ -58,8 +65,8 @@ test('sort', async ({ drivePage, cloudApi }) => {
         /^b project/,
         /^d file/,
         /^e file/,
-        /^f secret/,
-        /^H secret/,
+        /^f file/,
+        /^H file/,
       ])
     })
     // Sort by name ascending.
@@ -74,18 +81,18 @@ test('sort', async ({ drivePage, cloudApi }) => {
         /^C project/,
         /^d file/,
         /^e file/,
-        /^f secret/,
+        /^f file/,
         /^G directory/,
-        /^H secret/,
+        /^H file/,
       ])
     })
     // Sort by name descending.
     .driveTable.clickNameColumnHeading()
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveText([
-        /^H secret/,
+        /^H file/,
         /^G directory/,
-        /^f secret/,
+        /^f file/,
         /^e file/,
         /^d file/,
         /^C project/,
@@ -112,8 +119,8 @@ test('sort', async ({ drivePage, cloudApi }) => {
         /^b project/,
         /^d file/,
         /^e file/,
-        /^f secret/,
-        /^H secret/,
+        /^f file/,
+        /^H file/,
       ])
     })
     // Sort by date ascending.
@@ -121,8 +128,8 @@ test('sort', async ({ drivePage, cloudApi }) => {
     .driveTable.withRows(async (rows) => {
       await expect(rows).toHaveText([
         /^b project/,
-        /^H secret/,
-        /^f secret/,
+        /^H file/,
+        /^f file/,
         /^a directory 1/,
         /^a directory 10/,
         /^a directory 2/,
@@ -145,8 +152,8 @@ test('sort', async ({ drivePage, cloudApi }) => {
         /^a directory 2/,
         /^a directory 10/,
         /^a directory 1/,
-        /^f secret/,
-        /^H secret/,
+        /^f file/,
+        /^H file/,
         /^b project/,
       ])
     })
@@ -166,8 +173,8 @@ test('sort', async ({ drivePage, cloudApi }) => {
         /^b project/,
         /^d file/,
         /^e file/,
-        /^f secret/,
-        /^H secret/,
+        /^f file/,
+        /^H file/,
       ])
     })
 })

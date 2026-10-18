@@ -7,7 +7,6 @@ import {
   closeWelcome,
   createNewProject,
   fillWidgetText,
-  loginAsTestUser,
   openComponentBrowser,
   openDropdownInWidget,
   showAllComponents,
@@ -16,6 +15,7 @@ import {
   SKIP_ON_WINDOWS_CI_REASON,
   test,
   visualizeData,
+  waitForDashboard,
   waitForDownload,
 } from './electronTest'
 
@@ -23,7 +23,7 @@ test.skip(SKIP_ON_WINDOWS_CI, SKIP_ON_WINDOWS_CI_REASON)
 
 // First excercise in Enso Analytics 101
 test('Exercise 1', async ({ page, projectsDir }) => {
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
 
   // ---------------- Objective 1 ----------------
@@ -174,7 +174,7 @@ test('Exercise 1', async ({ page, projectsDir }) => {
 
 // Second exercise in Enso Analytics 101
 test('Exercise 2', async ({ page }) => {
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
 
   // ---------------- Objective 1 ----------------

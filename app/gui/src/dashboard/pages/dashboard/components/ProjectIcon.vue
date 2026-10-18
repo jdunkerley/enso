@@ -9,17 +9,11 @@ import Button from '$/components/Button/Button.vue'
 import Spinner from '$/components/Spinner/Spinner.vue'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import type { SpinnerPhase } from '$/components/Spinner/variants'
-import { useAuth } from '$/providers/auth'
 import { useContainerData, type Tab } from '$/providers/container'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { twJoin, twMerge } from '$/utils/style/tailwindMerge'
-import {
-  BackendType,
-  ProjectState,
-  type Backend,
-  type ProjectAsset,
-} from 'enso-common/src/services/Backend'
+import { ProjectState, type Backend, type ProjectAsset } from 'enso-common/src/services/Backend'
 import { computed } from 'vue'
 
 const {
@@ -34,7 +28,6 @@ const {
 
 const container = useContainerData()
 const openedProjects = useOpenedProjects()
-const auth = useAuth()
 const { getText } = useText()
 
 const isUnconditionallyDisabled = computed(() => !container.canOpenProjectLocally(backend.type))
@@ -42,10 +35,6 @@ const isUnconditionallyDisabled = computed(() => !container.canOpenProjectLocall
 // A workaround for a temporary bad state in the backend, in which `projectState` is absent.
 const projectState = computed(() => item.projectState ?? CLOSED_PROJECT_STATE)
 const isRunningInBackground = computed(() => projectState.value.executeAsync ?? false)
-const isOtherUserUsingProject = computed(
-  () =>
-    projectState.value.openedBy != null && projectState.value.openedBy !== auth.session?.user.email,
-)
 
 const isProjectOpening = computed(() => openedProjects.isProjectOpening(item))
 const isProjectOpened = computed(() => openedProjects.isProjectOpened(item))
@@ -66,16 +55,11 @@ const isDisabled = computed(
 
 const spinnerState = computed((): SpinnerPhase => {
   const status = projectState.value.type
-  return backend.type === BackendType.remote ?
-      REMOTE_SPINNER_STATE[status]
-    : LOCAL_SPINNER_STATE[status]
+  return LOCAL_SPINNER_STATE[status]
 })
 
 function tooltip(defaultTooltip: string) {
   if (isUnconditionallyDisabled.value) return getText('downloadToOpenWorkflow')
-  if (isOtherUserUsingProject.value) {
-    return getText('xIsUsingTheProject', projectState.value.openedBy ?? '')
-  }
   if (isAnotherProjectOpening.value) return getText('anotherProjectIsBeingOpenedError')
   if (isProjectClosing.value) return getText('syncingProjectFiles')
   return defaultTooltip
@@ -88,38 +72,23 @@ function doOpenProject() {
 function doCloseProject() {
   const tab: Tab = { type: 'project', id: item.id }
   if (container.isTabOpened(tab)) container.closeTab(tab)
-  else openedProjects.closeProject(item.id, { asset: item, backendType: backend.type })
+  else openedProjects.closeProject(item.id, item)
 }
 </script>
 
 <script lang="ts">
 export const CLOSED_PROJECT_STATE = { type: ProjectState.closed } as const
 
-/** The spinner's phase for each project state, on the cloud. */
-const REMOTE_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
-  [ProjectState.closed]: 'loading-slow',
-  [ProjectState.created]: 'loading-slow',
-  [ProjectState.new]: 'loading-slow',
-  [ProjectState.placeholder]: 'loading-slow',
-  [ProjectState.openInProgress]: 'loading-slow',
-  [ProjectState.hybridOpenInProgress]: 'loading-slow',
-  [ProjectState.provisioned]: 'loading-slow',
-  [ProjectState.scheduled]: 'loading-slow',
-  [ProjectState.opened]: 'done',
-  [ProjectState.hybridOpened]: 'done',
-}
-/** The spinner's phase for each project state, on the local backend. */
+/** The spinner's phase for each project state. */
 const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
   [ProjectState.closed]: 'loading-slow',
   [ProjectState.created]: 'loading-slow',
   [ProjectState.new]: 'loading-slow',
   [ProjectState.placeholder]: 'loading-medium',
   [ProjectState.openInProgress]: 'loading-slow',
-  [ProjectState.hybridOpenInProgress]: 'loading-slow',
   [ProjectState.provisioned]: 'loading-medium',
   [ProjectState.scheduled]: 'loading-medium',
   [ProjectState.opened]: 'done',
-  [ProjectState.hybridOpened]: 'done',
 }
 </script>
 
@@ -129,7 +98,7 @@ const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
       size="large"
       variant="icon"
       extraClickZone="xsmall"
-      :isDisabled="isDisabled || isOtherUserUsingProject"
+      :isDisabled="isDisabled"
       icon="workflow_stop"
       :aria-label="tooltip(getText('stopExecution'))"
       tooltipPlacement="left"
@@ -149,7 +118,7 @@ const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
         size="large"
         variant="icon"
         extraClickZone="xsmall"
-        :isDisabled="isDisabled || isOtherUserUsingProject"
+        :isDisabled="isDisabled"
         icon="workflow_stop"
         :aria-label="tooltip(getText('stopExecution'))"
         tooltipPlacement="left"

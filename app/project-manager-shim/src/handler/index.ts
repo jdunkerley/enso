@@ -4,4 +4,3 @@
 
 export * from './filesystem.js'
 export * from './projectService.js'
-export * from './watcher.js'

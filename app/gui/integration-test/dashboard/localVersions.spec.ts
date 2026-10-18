@@ -87,7 +87,11 @@ test.describe('with versions kept', () => {
     await openVersions(page)
     const menu = await openVersionMenu(page, 1)
     await menu.getByRole('menuitem', { name: 'Compare with...' }).click()
-    await page.getByRole('menuitem', { name: 'Version 1' }).click()
+    // Chosen by keyboard, not clicked. Once the right panel has finished opening, the menu sits at
+    // the window's edge and the submenu opens on its left. A click moves the pointer there in a
+    // single step, which closes the submenu before the click lands (a real pointer crosses the gap).
+    // Whether the panel had finished opening depended on the machine's load.
+    await page.getByRole('menuitem', { name: 'Version 1' }).press('Enter')
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Compare Version 2 with Version 1')
     await expect(dialog).toContainText('Saved on close')
@@ -284,18 +288,4 @@ test.describe('placeholders', () => {
     const panel = await openVersions(page)
     await expect(panel).toContainText('Install git to keep versions of local projects.')
   })
-})
-
-test('the cloud Versions tab still works: a directory has no versions', async ({
-  page,
-  drivePage,
-  cloudApi,
-}) => {
-  cloudApi.addDirectory({ title: 'Cloud folder' })
-  await drivePage.goToCategory.cloud().driveTable.clickRow('Cloud folder')
-  const panel = await openVersions(page)
-  await expect(panel).not.toContainText('In the local drive')
-  await expect(panel).toContainText(
-    'Versions are available for projects, files and datalinks only.',
-  )
 })

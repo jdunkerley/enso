@@ -1,105 +1,48 @@
-import { ConditionVariable } from '$/utils/ConditionVariable'
-import { withSetup } from '@/util/testing'
-import type { MapboxToken } from 'enso-common/src/services/Backend'
+/** @file The Mapbox token is the user's own, from Settings: stored locally, never fetched. */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { effectScope } from 'vue'
-import { createMapboxTokenStore } from '../mapboxToken'
 
-const MOCK_EXPIRE_TIME = 60 * 60 * 1000
+const KEY = 'enso-mapbox-settings'
 
-describe('Mapbox token', () => {
-  beforeEach(() => vi.useFakeTimers())
-  afterEach(() => vi.useRealTimers())
+async function load() {
+  vi.resetModules()
+  return await import('../mapboxToken')
+}
 
-  test('is same ref when getting multiple times', () =>
-    withSetup(async () => {
-      const token = '1234'
-      const getTokenFunction = vi.fn(() => {
-        return Promise.resolve({
-          token,
-          expires: new Date(Date.now() + MOCK_EXPIRE_TIME),
-        } satisfies MapboxToken)
-      })
-      const mapboxTokenStore = createMapboxTokenStore({
-        getMapboxToken: getTokenFunction,
-      })
-      // Keep the scope after await.
-      const scope = effectScope()
-      const ref1 = await mapboxTokenStore.acquire()
-      const ref2 = await scope.run(() => mapboxTokenStore.acquire())!
-      expect(getTokenFunction).toHaveBeenCalledOnce()
-      // toBe, because the Ref should be the same
-      expect(ref1.value).toBe(ref2.value)
-      expect(ref1.value.token).toBe(token)
-    }))
+describe('the Mapbox token', () => {
+  const fetchMock = vi.fn()
+  beforeEach(() => {
+    localStorage.clear()
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => vi.unstubAllGlobals())
 
-  test('is same ref when getting multiple times before backend response', () =>
-    withSetup(async () => {
-      const token = '1234'
-      let returnToken = false
-      const returnTokenCondVar = new ConditionVariable()
-      const getTokenFunction = vi.fn(async () => {
-        while (!returnToken) await returnTokenCondVar.wait()
-        return {
-          token,
-          expires: new Date(Date.now() + MOCK_EXPIRE_TIME),
-        } satisfies MapboxToken
-      })
-      const mapboxTokenStore = createMapboxTokenStore({
-        getMapboxToken: getTokenFunction,
-      })
-      const ref1Promise = mapboxTokenStore.acquire()
-      const ref2Promise = mapboxTokenStore.acquire()
-      returnToken = true
-      returnTokenCondVar.notifyAll()
-      const ref1 = await ref1Promise
-      const ref2 = await ref2Promise
-      expect(getTokenFunction).toHaveBeenCalledOnce()
-      // toBe, because the Ref should be the same
-      expect(ref1.value).toBe(ref2.value)
-      expect(ref1.value.token).toBe(token)
-    }))
+  test('is absent until the user enters one, and nothing is fetched for it', async () => {
+    const { useMapboxToken } = await load()
+    expect(useMapboxToken().value).toBeNull()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 
-  test('is refetched', () =>
-    withSetup(async () => {
-      const tokens = ['1234', '5678']
-      const tokensQueue = [...tokens]
-      const getTokenFunction = vi.fn(() => {
-        return Promise.resolve({
-          token: tokensQueue.shift() ?? 'NO-TOKEN',
-          expires: new Date(Date.now() + MOCK_EXPIRE_TIME),
-        } satisfies MapboxToken)
-      })
-      const mapboxTokenStore = createMapboxTokenStore({
-        getMapboxToken: getTokenFunction,
-      })
-      const ref = await mapboxTokenStore.acquire()
-      expect(ref.value.token).toBe(tokens[0])
-      await vi.advanceTimersToNextTimerAsync()
-      expect(ref.value.token).toBe(tokens[1])
-      expect(getTokenFunction).toHaveBeenCalledTimes(tokens.length)
-    }))
+  test('is saved trimmed, and survives a restart', async () => {
+    const { setMapboxToken, useMapboxToken } = await load()
+    const token = useMapboxToken()
+    setMapboxToken('  pk.abc  ')
+    expect(token.value).toBe('pk.abc')
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({
+      state: { accessToken: 'pk.abc' },
+      version: 1,
+    })
+    expect((await load()).useMapboxToken().value).toBe('pk.abc')
+  })
 
-  test('is not refetched if all refs are disposed', () =>
-    withSetup(async () => {
-      const token = '1234'
-      const getTokenFunction = vi.fn(() => {
-        return Promise.resolve({
-          token,
-          expires: new Date(Date.now() + MOCK_EXPIRE_TIME),
-        } satisfies MapboxToken)
-      })
-      const mapboxTokenStore = createMapboxTokenStore({
-        getMapboxToken: getTokenFunction,
-      })
-      const scope = effectScope()
-      await scope.run(async () => {
-        const ref = await mapboxTokenStore.acquire()
-        expect(ref.value.token).toBe(token)
-      })
-      scope.stop()
-      await vi.runAllTimersAsync()
-      // After timer run, we still requested for token only once
-      expect(getTokenFunction).toHaveBeenCalledOnce()
-    }))
+  test('a blank value clears it', async () => {
+    const { setMapboxToken, useMapboxToken } = await load()
+    setMapboxToken('pk.abc')
+    setMapboxToken('   ')
+    expect(useMapboxToken().value).toBeNull()
+  })
+
+  test('a malformed saved value is ignored', async () => {
+    localStorage.setItem(KEY, JSON.stringify({ state: { accessToken: 42 }, version: 1 }))
+    expect((await load()).useMapboxToken().value).toBeNull()
+  })
 })

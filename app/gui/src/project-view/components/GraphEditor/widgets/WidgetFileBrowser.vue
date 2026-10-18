@@ -15,10 +15,9 @@ import {
   useCurrentPath,
   useSetPath,
   useTextSecrets,
+  withBrowserItems,
 } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
-import { useCloudBrowser } from '@/components/GraphEditor/widgets/WidgetFileBrowser/cloudBrowser'
 import { useLocalBrowser } from '@/components/GraphEditor/widgets/WidgetFileBrowser/localBrowser'
-import { withDropdownItems } from '@/components/GraphEditor/widgets/WidgetSelection.vue'
 import {
   type CustomDropdownItem,
   ExpressionTag,
@@ -85,16 +84,14 @@ const fileTypes = computed(() => {
 })
 
 const localBrowserItems = useLocalBrowser({ dialogKind, write, currentPath, setPath, fileTypes })
-const cloudBrowserItems = useCloudBrowser({ dialogKind, write, currentPath, setPath, fileTypes })
 const textSecretsItems = useTextSecrets({ dialogKind, reprType })
 
 const items = computed((): (CustomDropdownItem | ExpressionTag)[] => [
   ...localBrowserItems.value,
-  ...cloudBrowserItems.value,
   ...textSecretsItems.value,
 ])
 
-const innerWidgetInput = computed(() => withDropdownItems(props.input, items.value))
+const innerWidgetInput = computed(() => withBrowserItems(props.input, items.value))
 </script>
 
 <script lang="ts">

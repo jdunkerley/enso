@@ -64,9 +64,9 @@ import {
   closeWelcome,
   createNewProject,
   hideVisualization,
-  loginAsTestUser,
   test,
   visualizeData,
+  waitForDashboard,
 } from './electronTest'
 
 const DATASETS_DIR = process.env.ENSO_TEST_AI_CHALLENGES_DIR
@@ -284,7 +284,7 @@ test("Preppin' Data week 32 — Pokemon Card Organising (stdlib-read isolation)"
   // test resolves), so a manual flag is the only honest signal here.
   let passed = false
   try {
-    await loginAsTestUser(page)
+    await waitForDashboard(page)
     await closeWelcome(page)
     await createNewProject(page)
     await closeRightPanel(page)
@@ -373,7 +373,7 @@ test("Preppin' Data week 51 — Strictly Positive Improvements (value-probe isol
   const usage = collectAiUsage(page)
   let passed = false
   try {
-    await loginAsTestUser(page)
+    await waitForDashboard(page)
     await closeWelcome(page)
     await createNewProject(page)
     await closeRightPanel(page)
@@ -430,7 +430,7 @@ test('Colorado COVID — cleanup, daily summary, map snapshot', async ({ page },
   const usage = collectAiUsage(page)
   let passed = false
   try {
-    await loginAsTestUser(page)
+    await waitForDashboard(page)
     await closeWelcome(page)
     await createNewProject(page)
     await closeRightPanel(page)
@@ -519,7 +519,7 @@ test('FX Rates History — fetch, daily returns, correlation matrix', async ({ p
   const usage = collectAiUsage(page)
   let passed = false
   try {
-    await loginAsTestUser(page)
+    await waitForDashboard(page)
     await closeWelcome(page)
     await createNewProject(page)
     await closeRightPanel(page)

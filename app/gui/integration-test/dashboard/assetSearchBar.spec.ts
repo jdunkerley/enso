@@ -24,8 +24,21 @@ function locateSearchBarSuggestions(page: Page) {
 
 const FIRST_ASSET_NAME = 'foo'
 
+// Added before the app loads: a change made once it has loaded is not listed.
+test.use({
+  setupApi: {
+    addDefaultProject: false,
+    local: (localApi) => {
+      localApi.addRootDirectory(FIRST_ASSET_NAME)
+      localApi.addRootProject('bar')
+      localApi.addRootFile('baz')
+      localApi.addRootFile('quux')
+    },
+  },
+})
+
 test('tags (positive)', async ({ drivePage, page }) => {
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     const tags = locateSearchBarTags(page)
 
     await searchBar.click()
@@ -41,7 +54,7 @@ test('tags (positive)', async ({ drivePage, page }) => {
 })
 
 test('tags (negative)', async ({ drivePage, page }) => {
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     const tags = locateSearchBarTags(page)
 
     await searchBar.click()
@@ -60,14 +73,14 @@ test('tags (negative)', async ({ drivePage, page }) => {
 test.skip('labels (were supported in list directory, but not supported in search)', async ({
   drivePage,
   page,
-  cloudApi,
+  localApi,
 }) => {
-  cloudApi.addLabel('aaaa', { lightness: 50, chroma: 66, hue: 7 })
-  cloudApi.addLabel('bbbb', { lightness: 50, chroma: 66, hue: 34 })
-  cloudApi.addLabel('cccc', { lightness: 50, chroma: 66, hue: 80 })
-  cloudApi.addLabel('dddd', { lightness: 50, chroma: 66, hue: 139 })
+  localApi.addLabel('aaaa', { lightness: 50, chroma: 66, hue: 7 })
+  localApi.addLabel('bbbb', { lightness: 50, chroma: 66, hue: 34 })
+  localApi.addLabel('cccc', { lightness: 50, chroma: 66, hue: 80 })
+  localApi.addLabel('dddd', { lightness: 50, chroma: 66, hue: 139 })
 
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     const labels = locateSearchBarLabels(page)
 
     await searchBar.click()
@@ -82,12 +95,8 @@ test.skip('labels (were supported in list directory, but not supported in search
   })
 })
 
-test('suggestions', async ({ drivePage, page, cloudApi }) => {
-  cloudApi.addDirectory({ title: 'foo' })
-  cloudApi.addProject({ title: 'bar' })
-  cloudApi.addSecret({ title: 'baz' })
-  cloudApi.addSecret({ title: 'quux' })
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+test('suggestions', async ({ drivePage, page }) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     const suggestions = locateSearchBarSuggestions(page)
 
     await searchBar.click()
@@ -103,13 +112,8 @@ test('suggestions', async ({ drivePage, page, cloudApi }) => {
   })
 })
 
-test('suggestions (keyboard)', async ({ drivePage, page, cloudApi }) => {
-  cloudApi.addDirectory({ title: 'foo' })
-  cloudApi.addProject({ title: 'bar' })
-  cloudApi.addSecret({ title: 'baz' })
-  cloudApi.addSecret({ title: 'quux' })
-
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+test('suggestions (keyboard)', async ({ drivePage, page }) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     const suggestions = locateSearchBarSuggestions(page)
 
     await searchBar.click()
@@ -122,12 +126,8 @@ test('suggestions (keyboard)', async ({ drivePage, page, cloudApi }) => {
   })
 })
 
-test('complex flows', async ({ drivePage, page, cloudApi }) => {
-  cloudApi.addDirectory({ title: FIRST_ASSET_NAME })
-  cloudApi.addProject({ title: 'bar' })
-  cloudApi.addSecret({ title: 'baz' })
-  cloudApi.addSecret({ title: 'quux' })
-  await drivePage.goToCategory.cloud().withSearchBar(async (searchBar) => {
+test('complex flows', async ({ drivePage, page }) => {
+  await drivePage.goToCategory.local().withSearchBar(async (searchBar) => {
     await searchBar.click()
     await page.keyboard.press('ArrowDown')
     await expect(searchBar).toHaveValue('name:' + FIRST_ASSET_NAME)

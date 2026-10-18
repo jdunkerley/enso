@@ -160,20 +160,12 @@ export default defineConfig<{ appConfig: AppConfig }>({
         },
   },
   projects: [
-    // Setup project
-    {
-      name: 'Setup',
-      testDir: './integration-test',
-      testMatch: 'setup.ts',
-    },
     {
       // Runs the whole suite with no AG Grid licence, exercising the Community fallbacks.
       name: 'Integration Tests',
       testDir: './integration-test',
       testMatch: '**/*.spec.ts',
-      dependencies: ['Setup'],
       use: {
-        storageState: path.join(dirName, './playwright/.auth/user.json'),
         appConfig: unlicensedAppConfig,
       },
     },
@@ -188,9 +180,7 @@ export default defineConfig<{ appConfig: AppConfig }>({
           testDir: './integration-test',
           testMatch: '**/*.spec.ts',
           grep: /@ag-grid/,
-          dependencies: ['Setup'],
           use: {
-            storageState: path.join(dirName, './playwright/.auth/user.json'),
             appConfig,
           },
         },

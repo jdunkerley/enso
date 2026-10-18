@@ -1,11 +1,5 @@
-import { useIsFeatureUnderPaywall } from '$/composables/paywall'
 import { useBackends } from '$/providers/backends'
-import {
-  CATEGORY_BACKEND,
-  isCloudCategory,
-  isLocalCategory,
-  type Category,
-} from '$/providers/category'
+import { CATEGORY_BACKEND, type Category } from '$/providers/category'
 import { rightPanelTabContribution } from '$/providers/rightPanelContributions'
 import { proxyRefs, type ToValue } from '$/utils/reactivity'
 import { useSyncLocalStorage } from '@/composables/syncLocalStorage'
@@ -27,9 +21,6 @@ export interface DisplayedHelp {
   aiMode: boolean
 }
 
-/** Possible elements in this screen to spotlight on. */
-export type AssetPropertiesSpotlight = 'datalink' | 'secret'
-
 /**
  * Context of right-side panels. See {@link useRightPanel}.
  */
@@ -44,7 +35,6 @@ export interface RightPanelContext {
    * this carries what is needed to tell which backend holds the project.
    */
   openedProject?: Pick<ProjectInfo, 'id' | 'title' | 'mode'> | undefined
-  spotlightOn?: AssetPropertiesSpotlight | undefined
   help?: DisplayedHelp
 }
 
@@ -62,41 +52,16 @@ interface RightPanelTabInfo {
 function useRightPanelTabs(
   focusedPanel: ToValue<Panel>,
   rightPanelContext: Ref<RightPanelContext | undefined>,
-  { textRef, getText }: TextStore,
+  { textRef }: TextStore,
 ) {
-  const isFeatureUnderPaywall = useIsFeatureUnderPaywall()
-  const isCloudDirectoryView = computed(
-    () =>
-      rightPanelContext.value?.category != null &&
-      isCloudCategory(rightPanelContext.value.category),
-  )
-  const isLocalDirectoryView = computed(
-    () =>
-      rightPanelContext.value?.category != null &&
-      isLocalCategory(rightPanelContext.value.category),
-  )
+  const isLocalDirectoryView = computed(() => rightPanelContext.value?.category != null)
   /** In the drive, for the selected asset; in a project tab, for the opened project. */
   const enabledInDriveOrProject = computed(() =>
-    (
-      isCloudDirectoryView.value ||
-      isLocalDirectoryView.value ||
-      rightPanelContext.value?.openedProject != null
-    ) ?
+    isLocalDirectoryView.value || rightPanelContext.value?.openedProject != null ?
       Ok()
     : Err('Exclusive to the drive and projects'),
   )
-  const enabledInCloudOnly = computed(() =>
-    isCloudDirectoryView.value ? Ok() : Err('Exclusive to Cloud'),
-  )
   return new Map([
-    [
-      'description',
-      {
-        icon: 'info',
-        enabled: enabledInCloudOnly,
-        title: 'Description',
-      },
-    ],
     [
       'contents',
       {
@@ -104,15 +69,6 @@ function useRightPanelTabs(
         enabled: Ok(),
         hidden: true,
         title: 'Contents',
-      },
-    ],
-    [
-      'settings',
-      {
-        icon: 'properties',
-        enabled: enabledInCloudOnly,
-        hidden: () => rightPanelTabContribution('settings') == null,
-        title: textRef('properties'),
       },
     ],
     [
@@ -130,20 +86,6 @@ function useRightPanelTabs(
         icon: 'activity',
         enabled: Ok(),
         title: textRef('projectSessions'),
-      },
-    ],
-    [
-      'executionsCalendar',
-      {
-        icon: 'schedule',
-        enabled: computed(() => {
-          if (!enabledInCloudOnly.value.ok) return enabledInCloudOnly.value
-          if (isFeatureUnderPaywall('scheduler'))
-            return Err(getText('assetProjectExecutionsCalendar.teamPlanOnly'))
-          return Ok()
-        }),
-        hidden: () => rightPanelTabContribution('executionsCalendar') == null,
-        title: textRef('executionsCalendar'),
       },
     ],
     [
@@ -183,16 +125,15 @@ export interface SessionsProject {
  * The project whose sessions the Activity tab lists.
  *
  * In the drive, it is the focused project asset, held by the current category's backend. In a
- * project tab, it is the opened project: a local project's sessions are the local backend's, while
- * a cloud or hybrid project's are the cloud project's (its `id`, not a hybrid's `runningId`).
+ * project tab, it is the opened project, whose sessions are the local backend's.
  */
 export function sessionsProjectFromContext(
   ctx: RightPanelContext | undefined,
 ): SessionsProject | undefined {
   if (ctx == null) return undefined
   if (ctx.openedProject != null) {
-    const { id, title, mode } = ctx.openedProject
-    return { backendType: mode === 'local' ? BackendType.local : BackendType.remote, id, title }
+    const { id, title } = ctx.openedProject
+    return { backendType: BackendType.local, id, title }
   }
   const asset = ctx.item ?? ctx.defaultItem
   if (ctx.category == null || typeof asset !== 'object' || asset.type !== AssetType.project) {

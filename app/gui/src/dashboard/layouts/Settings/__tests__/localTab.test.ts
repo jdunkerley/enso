@@ -11,14 +11,18 @@ import LocalStorage from '$/utils/LocalStorage'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import { Path, Plan, type User } from 'enso-common/src/services/Backend'
+import { EmailAddress, Path, UserId, type User } from 'enso-common/src/services/Backend'
 import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { z } from 'zod'
 import SettingsPage from '../SettingsPage.vue'
 import { required } from './dom'
 
-const USER = { name: 'user name', email: 'user@example.com', plan: Plan.solo } as User
+const USER: User = {
+  userId: UserId('user-1'),
+  name: 'user name',
+  email: EmailAddress('user@example.com'),
+}
 const DEFAULT_ROOT = Path('/projects')
 const DEFAULT_DOWNLOADS = Path('/downloads')
 
@@ -41,11 +45,7 @@ const versioning = vi.hoisted(() => ({
 
 vi.mock('$/providers/auth', () => ({
   useAuth: () => ({
-    session: {
-      user: USER,
-      email: USER.email,
-      accessToken: `.${btoa(JSON.stringify({ username: USER.email }))}.`,
-    },
+    session: { user: USER, email: USER.email },
   }),
 }))
 // The global store keeps the first router it sees; each test has its own.
@@ -53,13 +53,11 @@ vi.mock('$/providers/queryParams', async (importOriginal) => {
   const original = await importOriginal<typeof QueryParamsModule>()
   return { ...original, useQueryParams: () => original.createQueryParams() }
 })
-vi.mock('$/providers/session', () => ({ useSession: () => ({ changePassword: vi.fn() }) }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return {
     useBackends: () =>
       mockBackends({
-        remoteBackend: { getOrganization: vi.fn(() => Promise.resolve(null)) },
         localBackend: {
           rootPath: () => Path('/projects'),
           versioningStatus: (path: Path) => versioning.versioningStatus(path),
@@ -104,10 +102,13 @@ async function openLocalTab() {
 }
 
 const shownPaths = () => required(document.querySelector('[data-testid="local-paths"]')).textContent
-const input = (labelId: 'downloadDirectorySettingsInput' | 'localRootPathSettingsInput') =>
+const input = (
+  labelId:
+    'downloadDirectorySettingsInput' | 'localRootPathSettingsInput' | 'mapboxTokenSettingsInput',
+) =>
   required(
-    [...document.querySelectorAll<HTMLInputElement>('input')].find(
-      (element) => element.labels?.[0]?.textContent.trim() === getText(labelId),
+    [...document.querySelectorAll<HTMLInputElement>('input')].find((element) =>
+      element.labels?.[0]?.textContent.trim().startsWith(getText(labelId)),
     ),
   )
 const button = (name: string) =>
@@ -137,6 +138,19 @@ afterEach(() => {
 })
 
 describe('the Local settings tab', () => {
+  test('the Maps section saves the Mapbox token to the local store', async () => {
+    const { mapboxSettingsStore } = await import('$/providers/mapboxToken')
+    mapboxSettingsStore.setState({ accessToken: null })
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    expect(input('mapboxTokenSettingsInput').type).toBe('password')
+    const user = userEvent.setup()
+    await user.type(input('mapboxTokenSettingsInput'), ' pk.typed ')
+    await user.click(button(getText('save')))
+    await flushPromises()
+    expect(mapboxSettingsStore.getState().accessToken).toBe('pk.typed')
+  })
+
   test('a typed directory, once saved, reaches the local paths', async () => {
     await openLocalTab()
     expect(shownPaths()).toBe(`${DEFAULT_ROOT}|${DEFAULT_DOWNLOADS}`)

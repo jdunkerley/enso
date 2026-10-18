@@ -23,11 +23,6 @@ function locateDriveView(page: Page) {
   return page.getByTestId('drive-view')
 }
 
-/** Find a "create" button. */
-function locateCreateButton(page: Page) {
-  return page.getByRole('button', { name: TEXT.create }).getByText(TEXT.create)
-}
-
 /** Find an assets table. */
 function locateAssetsTable(page: Page) {
   return page.getByTestId('drive-view').getByRole('grid')
@@ -45,43 +40,10 @@ function locateNonAssetRows(page: Page) {
   )
 }
 
-/** Find a "new secret" icon. */
-function locateNewSecretIcon(page: Page) {
-  return page.getByRole('button', { name: 'New Secret' })
-}
-
-/** Find an "upsert secret" modal. */
-function locateUpsertSecretModal(page: Page) {
-  // This has no identifying features.
-  return page.getByTestId('upsert-secret-modal')
-}
-
-/** Find a "name" input for an "upsert secret" modal. */
-function locateSecretNameInput(page: Page) {
-  return locateUpsertSecretModal(page).getByPlaceholder(TEXT.secretNamePlaceholder)
-}
-
-/** Find a "value" input for an "upsert secret" modal. */
-function locateSecretValueInput(page: Page) {
-  return locateUpsertSecretModal(page).getByPlaceholder(TEXT.secretValuePlaceholder)
-}
-
-/** The sidebar's group of categories: the cloud's or the local ones. */
-type CategoryGroup = 'cloud' | 'local'
-
-/** The group of the category with the given `categoryKey`. */
-function categoryGroup(key: string): CategoryGroup {
-  return key.startsWith('local') ? 'local' : 'cloud'
-}
-
-/**
- * Find a radio button that navigates to specified drive category. Both groups have a "Recent", so
- * the button is looked for in its group.
- */
-function locateCategoryButton(page: Page, category: string, group: CategoryGroup): Locator {
+/** Find a radio button that navigates to specified drive category. */
+function locateCategoryButton(page: Page, category: string): Locator {
   return page
     .locator('.LeftPanel .leftBar .categories')
-    .nth(group === 'cloud' ? 0 : 1)
     .getByRole('button', { name: category, exact: true })
 }
 
@@ -99,12 +61,8 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
 
   /** Switch to a different category. */
   goToCategory = {
-    /** Switch to the "cloud" category. */
-    cloud: () => this.goToCategoryNamed('Cloud', 'cloud'),
     local: () => this.goToCategoryNamed('Local', 'local'),
-    recent: () => this.goToCategoryNamed('Recent', 'recent'),
     localRecent: () => this.goToCategoryNamed('Recent', 'localRecent'),
-    trash: () => this.goToCategoryNamed('Trash', 'trash'),
   }
 
   /** Interact with the assets search bar. */
@@ -120,17 +78,16 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
    */
   goToCategoryNamed(this: DrivePageActions<Context>, category: string, key: string) {
     return this.step(`Go to "${category}" category`, async (page) => {
-      await locateCategoryButton(page, category, categoryGroup(key)).click()
+      await locateCategoryButton(page, category).click()
       // Move the cursor off the leftBar so its `mouseenter`-triggered auto-expand
       // timer is cleared and any in-flight expansion collapses. The expanded leftBar
       // (~150px wide, `position: absolute; z-index: 2`) otherwise covers the leftmost
       // toolbar/table buttons and intercepts subsequent clicks.
       await page.mouse.move(0, 0)
-      await this.expectCategory(category, categoryGroup(key))
+      await this.expectCategory(category)
       // The sidebar marks the new category at once, but the drive view keeps showing the old one
       // (`layouts/Drive/driveView.ts`): until the new category has loaded, the previous one's rows
-      // stay on screen and take clicks. Wait for no drive view still showing another category (the
-      // check passes when there is no drive view at all, e.g. the "cloud unavailable" stub).
+      // stay on screen and take clicks. Wait for no drive view still showing another category.
       await expect(
         page.locator(`[data-testid="drive-view"][data-category]:not([data-category="${key}"])`),
       ).toHaveCount(0)
@@ -138,12 +95,9 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
   }
 
   /** Expect the category to be selected. */
-  expectCategory(
-    category: string,
-    group: CategoryGroup = category === 'Local' ? 'local' : 'cloud',
-  ) {
+  expectCategory(category: string) {
     return this.step(`Expect category '${category}'`, (page) =>
-      expect(locateCategoryButton(page, category, group)).toContainClass('toggledOn'),
+      expect(locateCategoryButton(page, category)).toContainClass('toggledOn'),
     )
   }
 
@@ -280,17 +234,13 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       /** Drag a row to a different category. */
       dragRowToCategory(
         row: number | string,
-        /** The category button's name: `Cloud`, `Local`, `Recent`, `Trash`, or a team's name. */
+        /** The category button's name: `Local` or `Recent`. */
         category: string,
       ) {
         return self.step(
           `Drag drive table row '${row}' to '${category}' category`,
           async (page) => {
-            const categoryElement = locateCategoryButton(
-              page,
-              category,
-              category === 'Local' ? 'local' : 'cloud',
-            )
+            const categoryElement = locateCategoryButton(page, category)
 
             await getRow(page, row).dragTo(categoryElement, {
               sourcePosition: ASSET_ROW_SAFE_POSITION,
@@ -338,18 +288,6 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           await expect(nonAssetRows).toHaveText(/This folder is empty/)
         })
       },
-      /**
-       * A test assertion to confirm that there is only one row visible, and that row is the
-       * placeholder row displayed when there are no assets in Trash.
-       */
-      expectTrashPlaceholderRow() {
-        return self.step('Expect trash placeholder row', async (page) => {
-          await expect(locateAssetRows(page)).toHaveCount(0)
-          const nonAssetRows = locateNonAssetRows(page)
-          await expect(nonAssetRows).toHaveCount(1)
-          await expect(nonAssetRows).toHaveText(/Your trash is empty/)
-        })
-      },
       /** Toggle a column's visibility. */
       get toggleColumn() {
         return {
@@ -357,12 +295,6 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
           modified() {
             return self.step('Toggle "modified" column', (page) =>
               page.getByLabel(TEXT.modifiedColumnName).click(),
-            )
-          },
-          /** Toggle visibility for the "shared with" column. */
-          sharedWith() {
-            return self.step('Toggle "shared with" column', (page) =>
-              page.getByLabel(TEXT.sharedWithColumnName).click(),
             )
           },
           /** Toggle visibility for the "labels" column. */
@@ -401,14 +333,6 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
     }).into(EditorPageActions<Context>)
   }
 
-  /** Clear trash. */
-  clearTrash() {
-    return this.step('Clear trash', async (page) => {
-      await page.getByText(TEXT.clearTrash).click()
-      await page.getByRole('button', { name: TEXT.delete }).getByText(TEXT.delete).click()
-    })
-  }
-
   /** Create a new empty project. */
   newEmptyProject() {
     return this.step('Create empty project', async (page) => {
@@ -444,16 +368,6 @@ export default class DrivePageActions<Context = object> extends PageActions<Cont
       await page.getByRole('button', { name: TEXT.uploadFiles, exact: true }).click()
       const fileChooser = await fileChooserPromise
       await fileChooser.setFiles([{ name, buffer: Buffer.from(contents), mimeType }])
-    })
-  }
-
-  /** Create a new secret using the icon in the Drive Bar. */
-  createSecret(name: string, value: string) {
-    return this.step(`Create secret '${name}' = '${value}'`, async (page) => {
-      await locateNewSecretIcon(page).click()
-      await locateSecretNameInput(page).fill(name)
-      await locateSecretValueInput(page).fill(value)
-      await locateCreateButton(page).click()
     })
   }
 

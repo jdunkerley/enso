@@ -432,3 +432,33 @@ describe('downloadProjectSessionLogs', () => {
     await expect(downloadProjectSessionLogs(sessionId)).resolves.toBe('only active\n')
   })
 })
+
+describe('datalink entries', () => {
+  let tmpDir: string
+  beforeEach(async () => {
+    tmpDir = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'filesystem-datalink-'))
+  })
+  afterEach(async () => {
+    await fsPromises.rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 1000 })
+  })
+
+  test('a .datalink file lists as a DatalinkEntry, other files as FileEntry', async () => {
+    await fsPromises.writeFile(path.join(tmpDir, 'Sales.datalink'), '{"type":"S3"}')
+    await fsPromises.writeFile(path.join(tmpDir, 'notes.txt'), 'x')
+    const entries = (await listEntries(tmpDir)) as { type: string; path: string }[]
+    expect(entries.map(({ type, path: p }) => [type, path.basename(p)]).sort()).toEqual([
+      ['DatalinkEntry', 'Sales.datalink'],
+      ['FileEntry', 'notes.txt'],
+    ])
+  })
+
+  test('a datalink with invalid JSON is still listed, not dropped', async () => {
+    await fsPromises.writeFile(path.join(tmpDir, 'Broken.datalink'), '{ not json')
+    expect(await listEntries(tmpDir)).toEqual([
+      expect.objectContaining({
+        type: 'DatalinkEntry',
+        path: path.join(tmpDir, 'Broken.datalink'),
+      }),
+    ])
+  })
+})

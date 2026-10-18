@@ -67,9 +67,9 @@ class DropDownLocator {
   }
 }
 
-const CHOOSE_CLOUD_FILE = 'Choose file in cloud…'
 const CHOOSE_LOCAL_FILE = 'Choose file…'
-const CHOOSE_FILE_OPTIONS = [CHOOSE_CLOUD_FILE, CHOOSE_LOCAL_FILE]
+// Only the system file dialog: the IDE is local-only, so there is no "Choose file in cloud…".
+const CHOOSE_FILE_OPTIONS = [CHOOSE_LOCAL_FILE]
 
 test('Widget in plain AST', async ({ editorPage, page }) => {
   await editorPage
@@ -422,6 +422,7 @@ test.describe('Dynamic configuration updates', () => {
     await pathArg.click()
     const pathDropdown = new DropDownLocator(pathArg)
     await pathDropdown.expectVisibleWithOptions([...CHOOSE_FILE_OPTIONS])
+    await expect(pathDropdown.items.filter({ hasText: 'in cloud' })).toHaveCount(0)
     // Provide dynamic configuration for `path` argument.
     // (we use Folder_Browser here, and check how dropdown items have changed)
     await localApi.updateVisualization('.read', [
@@ -434,7 +435,8 @@ test.describe('Dynamic configuration updates', () => {
         },
       ],
     ])
-    await pathDropdown.expectVisibleWithOptions(['Choose directory…', 'Choose directory in cloud…'])
+    await pathDropdown.expectVisibleWithOptions(['Choose directory…'])
+    await expect(pathDropdown.items.filter({ hasText: 'in cloud' })).toHaveCount(0)
   })
 
   /**
@@ -760,6 +762,7 @@ test('File Browser widget', async ({ editorPage, page }) => {
   const pathDropdown = new DropDownLocator(pathArg)
   await pathArg.click()
   await pathDropdown.expectVisibleWithOptions([...CHOOSE_FILE_OPTIONS, 'File 1', 'File 2'])
+  await expect(pathDropdown.items.filter({ hasText: 'in cloud' })).toHaveCount(0)
   await pathDropdown.clickOption(CHOOSE_LOCAL_FILE)
   await expect(pathArg.getByTestId('widget-text-content')).toHaveText('/path/to/some/mock/file')
 })

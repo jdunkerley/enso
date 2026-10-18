@@ -1,6 +1,3 @@
-import { useAuth } from '$/providers/auth'
-import { useConfig } from '$/providers/config'
-import { flagsStore } from '$/providers/featureFlags'
 import { loadSettingsContributions } from '$/providers/settingsContributions'
 import {
   maybeRedirectToProject,
@@ -8,40 +5,21 @@ import {
   openTab,
   redirectFromPath,
 } from '$/router/dashboardGuards'
-import { withDataLoader } from '$/router/dataLoader'
-import {
-  APP_CONTAINER_LAYOUT_ROUTE,
-  CLOUD_DISABLED_ROUTE,
-  PROTECTED_LAYOUT_ROUTE,
-} from '$/router/routeNames'
-import { shouldWaitForResolvedSession } from '$/router/sessionResolution'
+import { APP_CONTAINER_LAYOUT_ROUTE, PROTECTED_LAYOUT_ROUTE } from '$/router/routeNames'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const UNAVAILABLE_PATH = '/UNAVAILABLE'
 
-function requireCloudBrowserEnabled() {
-  const isCloudExecutionEnabled = flagsStore.getState().featureFlags.enableCloudExecution
-  // The page is the cloud's (`registerCloud` adds it); a build without it has nowhere to send to.
-  if (!isCloudExecutionEnabled && router.hasRoute(CLOUD_DISABLED_ROUTE)) {
-    return { name: CLOUD_DISABLED_ROUTE }
-  }
-}
-
-// The cloud's authentication pages (sign-in, sign-up, password reset, …), the page shown when
-// running projects in the browser is disabled, and the subscription and payments success pages are
-// not listed here: `registerCloud` (`$/cloud`) adds them, some as children of the layouts.
 const routes = [
   {
     name: PROTECTED_LAYOUT_ROUTE,
     path: UNAVAILABLE_PATH,
-    component: withDataLoader(() => import('$/components/ProtectedLayout.vue')),
+    component: () => import('$/components/ProtectedLayout.vue'),
     children: [
       {
         name: APP_CONTAINER_LAYOUT_ROUTE,
         path: UNAVAILABLE_PATH,
-        meta: { access: 'anyLoggedIn' },
-        component: withDataLoader(() => import('$/components/AppContainerLayout.vue')),
-        beforeEnter: requireCloudBrowserEnabled,
+        component: () => import('$/components/AppContainerLayout.vue'),
         children: [
           {
             name: 'dashboard',
@@ -62,7 +40,7 @@ const routes = [
               {
                 name: 'settings',
                 path: 'settings',
-                // The cloud's sections of the Account tab load with the page.
+                // The contributed settings sections load with the page.
                 component: () =>
                   Promise.all([import('#/layouts/Settings'), loadSettingsContributions()]).then(
                     ([mod]) => mod.default,
@@ -91,19 +69,6 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async () => {
-  const config = useConfig()
-  // A failed configuration fetch must not block navigation: `useConfig` records the error and
-  // the app continues in local-only mode (see `authDisabled` in the authentication service).
-  await config.waitForRemoteConfig().catch(() => {})
-})
-router.beforeEach(async (to, from) => {
-  const auth = useAuth()
-
-  if (shouldWaitForResolvedSession(to.meta.access, from.meta.access, auth.session)) {
-    await auth.waitForSession()
-  }
-})
 router.beforeEach(openTab)
 
 router.onError((error) => console.error('Router error', error))

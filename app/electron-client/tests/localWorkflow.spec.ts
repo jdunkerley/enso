@@ -7,9 +7,9 @@ import {
   closeWelcome,
   createNewProject,
   getNewestProject,
-  loginAsTestUser,
   SKIP_ON_WINDOWS_CI,
   test,
+  waitForDashboard,
 } from './electronTest'
 
 const startTimestamp = Date.now()
@@ -31,7 +31,7 @@ async function writeToFocusedComponentBrowser(page: Page, content: string): Prom
 // first read of the project fail and restart its Language Server client, and until #143 that
 // restart left the IDE's proxy channel closed, so the IDE's requests were never delivered.
 test('Project Duplicate', async ({ page }) => {
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
   // The graph appearing shows that the project opened and its Language Server connection works.
   // The visualization is not what this test is about, and on the Windows CI runner it took
@@ -46,10 +46,11 @@ test('Project Duplicate', async ({ page }) => {
   // centre of the window, right over the tab's close button. On the Windows CI runner it can still
   // be there when the graph appears, and then the click times out (#212).
   const driveView = page.getByTestId('drive-view')
-  await driveView.getByTestId('stop-project').click()
   // The first close in the projects folder offers to keep versions with git; answer "Not now".
-  await answerRepositoryPrompt(page, () =>
-    expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0),
+  await answerRepositoryPrompt(
+    page,
+    () => driveView.getByTestId('stop-project').click(),
+    () => expect(page.getByRole('tab', { name: 'New Project 1', exact: true })).toHaveCount(0),
   )
   // The project's play button is enabled again only once the project has finished closing.
   await expect(driveView.getByTestId('open-project')).toBeEnabled()
@@ -74,7 +75,7 @@ localWorkflowTest('Local Workflow', async ({ page, app, projectsDir }) => {
   const OUTPUT_FILE = 'output.txt'
   const TEXT_TO_WRITE = 'Some text'
 
-  await loginAsTestUser(page)
+  await waitForDashboard(page)
   await closeWelcome(page)
 
   await createNewProject(page)

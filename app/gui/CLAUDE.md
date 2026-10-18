@@ -1,7 +1,7 @@
 # app/gui
 
 The main Enso IDE GUI — a single-page web app built with Vite, served by
-Electron (desktop) or a static host (cloud). Published as package `enso-gui`.
+Electron (desktop) or the Vite dev server. Published as package `enso-gui`.
 
 ## Source layout
 
@@ -14,7 +14,7 @@ feature:
 - `src/project-view/` — the **ProjectView** feature subtree (graph editor,
   component browser, code editor, visualizations, documentation editor). Vue.
   Uses `@vueuse/core`, `@tanstack/vue-query`, `yjs`. Import via `@/…`.
-- `src/dashboard/` — the **Dashboard** feature subtree (cloud storage, project
+- `src/dashboard/` — the **Dashboard** feature subtree (the local drive, project
   browser, settings). Vue, ported from React (#75; React itself was removed in
   #94). TailwindCSS for styling. Import via `#/…`.
 
@@ -23,6 +23,12 @@ plan is to move genuinely shared UI/utilities **out** of `project-view/` and
 into `src/` proper so each feature subtree holds only its own feature-specific
 code. When you add something new, ask: is it ProjectView-only, Dashboard-only,
 or shared? Shared goes at `src/`.
+
+**Local-only.** The IDE runs with no Enso Cloud: no remote configuration fetch,
+always the one local user and session (`makeLocalSession` in
+`src/providers/session.ts`, no authentication), core contributions are in
+`src/registerCore.ts`. See
+`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`.
 
 **Rule of thumb for new work:** default to Vue, put cross-feature code at
 `src/`, put feature-specific code in the matching subtree.
@@ -73,13 +79,12 @@ framework-free, move it to `src/` (as #77 did) rather than adding an entry.
   time, persistence, invalidations), typed with `@tanstack/query-core`, which
   vue-query consumes in the one shared `QueryClient`; `executeMutation` runs one
   from outside any component. `driveQueries.ts` (listings, search, new names),
-  `driveMutations.ts` (the batched delete, restore, copy, move and download; the
-  move's duplicate resolver is injected) and `transferBetweenCategories.ts`
-  (with its context injected) build on it. The Vue wrappers are
-  `@/composables/backend` and `$/composables/transferBetweenCategories`; the
-  drive's own (mutation state, new folder and project, rename, uploads) are in
-  `#/layouts/Drive/driveActions` (#91). Never give a key different options on
-  the two sides.
+  `driveMutations.ts` (the batched delete, copy, move and download; the move's
+  duplicate resolver is injected) build on it. The Vue wrappers are
+  `@/composables/backend` and `$/composables/moveAssets` (copy or move assets
+  between the local folders); the drive's own (mutation state, new folder and
+  project, rename, uploads) are in `#/layouts/Drive/driveActions` (#91). Never
+  give a key different options on the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and
@@ -103,23 +108,23 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 `docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md` ("Rulings from
 #170").
 
-- `src/cloud/` — code that only makes sense against the Enso Cloud: at the top,
-  framework-free logic (service-credential recipes, organization-invite email
-  parsing, the Cognito password rule, permission classes); in
-  `src/cloud/<area>/`, ported cloud-only features (`auth/`: the sign-in, sign-up
-  and password pages; `account/`: the Account and API keys settings tabs'
-  sections; `organization/`: the Organization, Members, User groups and Activity
-  log tabs' sections and the "Invite" dialog; `billing/`: the paywall, the
-  Billing & Plans and Usage tabs, the subscription page with the Stripe
-  checkout, the payments success page and the top bar's billing parts;
-  `versions/` and `properties/`: the right panel's Versions, Schedule and
-  Properties tabs; `credentials/` and `datalinks/`: the drive's secret,
-  credential and datalink dialogs). Keep cloud-only code here rather than in
-  `src/utils/`, so a build without the cloud can drop one folder. The core
-  reaches the areas only through `registerCloud` (`src/cloud/index.ts`), which
-  `entrypoint.ts` calls; see `src/cloud/CLAUDE.md`. Labels are not cloud-only:
-  the drive's labels code is in `src/dashboard/components/labels/`, and asks the
-  backend's `supportsLabels` rather than whether it is the cloud.
+- `src/versions/` — the Versions tab, registered by `src/registerCore.ts` (local
+  git versions).
+- `src/versionChecker/` — the "new version available" dialog (GitHub releases),
+  mounted by `App.vue`.
+- `src/secrets/` — dormant: the secret and per-service credential forms and the
+  project view's `UpsertSecretPanel`, kept compiling and tested for local
+  secrets later (decision 5); nothing opens them.
+- `src/datalinks/` — dormant until PR 2b: the datalink editor and its dialog.
+- **Contribution registries.** The core reaches optional parts of the UI through
+  registries, not by importing them: `contributeRightPanelTab` in
+  `$/providers/rightPanelContributions` (the Versions tab uses it, from
+  `registerCore.ts`), `contributeSettingsSections` in
+  `$/providers/settingsContributions` (no contributor now). A contribution is a
+  loader (`() => import(…)`), so its code stays out of the initial chunk; a tab
+  or section that nothing contributes is hidden. Labels are not cloud-only: the
+  drive's labels code is in `src/dashboard/components/labels/`, and asks the
+  backend's `supportsLabels`.
 
 ## Entry points
 
@@ -129,8 +134,7 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 ## Scripts (run via `corepack pnpm`)
 
 - `dev:vite` — Vite dev server with HMR.
-- `build` / `build-cloud` — production bundle (with `ENSO_IDE_CLOUD_BUILD` env
-  toggle for cloud-specific behavior).
+- `build` — production bundle.
 - `test:unit` — vitest.
 - `test:integration` — Playwright.
 - `playwright:install` — install the pinned browser.
@@ -145,18 +149,18 @@ side uses the Rust parser compiled to WASM (`rust-ffi` package →
 
 ## Dashboard ↔ backend
 
-The Dashboard subtree talks to the Enso Cloud over HTTPS (AWS Amplify +
-Cognito). In local/desktop mode it also talks to the local TypeScript Project
-Manager (`app/project-manager-shim/`), which is used in both dev and the
-packaged Electron build. The old Scala Project Manager is no longer wired in.
+The Dashboard talks to the local Project Manager shim, the only backend. The
+shim (`app/project-manager-shim/`) is the local TypeScript Project Manager, used
+in both dev and the packaged Electron build. The old Scala Project Manager is no
+longer wired in.
 
 The drive's sidebar is a list of **categories** (`$/providers/category`), each
-on one backend (`CATEGORY_BACKEND`): the cloud's Cloud, Recent, Trash and teams;
-the local Local, Recent (`localRecent`) and the saved local directories.
+on one backend (`CATEGORY_BACKEND`, always the local one): Local, Recent
+(`localRecent`) and the saved local directories (`localDirectory`).
 
-- **Ask `isRecentCategory`, never `type === 'recent'`**: both Recent lists
-  behave alike (no new folder or project, no navigating up, drops into or out of
-  them are cancelled, the listing asks `recentProjects`).
+- **Ask `isRecentCategory`, never `type === 'localRecent'`**: a Recent list has
+  no new folder or project and no navigating up, drops into or out of it are
+  cancelled, and the listing asks `recentProjects`.
 - A category with no home directory (a Recent) is rooted at its backend's root
   (`driveView.ts`).
 - Local Recent's context menu keeps Open, Close, Label, Open in File Browser and

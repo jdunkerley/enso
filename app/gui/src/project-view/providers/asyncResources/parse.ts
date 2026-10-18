@@ -5,7 +5,7 @@ import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { toValue } from 'vue'
 
 export type ParsedAssetUrl =
-  | { kind: 'projectRelative'; relativePath: string; uploading: boolean }
+  | { kind: 'projectRelative'; relativePath: string }
   | { kind: 'ensoPath'; ensoPath: EnsoPath }
   | { kind: 'webUrl'; url: URL } // only allowed web protocols
 
@@ -56,7 +56,6 @@ export function parseResourceUrl(
         return Ok({
           kind: 'projectRelative',
           relativePath: relativePath.substring(CANARY_ROOT.length + 2), // drop canary root and slashes
-          uploading: asProjectUrl.searchParams.get('uploading') != null,
         })
       }
     }

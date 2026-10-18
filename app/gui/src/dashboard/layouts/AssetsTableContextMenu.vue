@@ -7,39 +7,26 @@
 import ContextMenu from '#/components/ContextMenu.vue'
 import type { ContextMenuEntry } from '#/components/contextMenuEntry'
 import { useAssetItems } from '#/layouts/Drive/assetItems'
-import {
-  useExportArchive,
-  useMutationCallback,
-  useUploadFileToCloud,
-  useUploadFileToLocal,
-} from '#/layouts/Drive/driveActions'
+import { useExportArchive, useMutationCallback } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useGlobalContextMenuEntries } from '#/layouts/Drive/globalContextMenuEntries'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useCopy } from '$/components/Button/copy'
 import { useMenuEntries } from '$/composables/menuEntries'
-import { useAuth } from '$/providers/auth'
-import { useBackends } from '$/providers/backends'
-import {
-  canTransferBetweenCategories,
-  isCloudCategory,
-  isRecentCategory,
-} from '$/providers/category'
+import { canTransferBetweenCategories, isRecentCategory } from '$/providers/category'
 import { useDriveStore } from '$/providers/driveStore'
 import { useFeatureFlag } from '$/providers/featureFlags'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
-import { deleteAssetsMutationOptions, restoreAssetsMutationOptions } from '$/utils/driveMutations'
+import { deleteAssetsMutationOptions } from '$/utils/driveMutations'
 import * as backendModule from 'enso-common/src/services/Backend'
-import invariant from 'tiny-invariant'
 import { computed } from 'vue'
 
-const { currentDirectoryId, bindingTarget, position, doCopy, doCut, doPaste } = defineProps<{
+const { currentDirectoryId, bindingTarget, position, doCut, doPaste } = defineProps<{
   currentDirectoryId: backendModule.DirectoryId
   /** The element whose keys the entries' shortcuts act on: the assets table. */
   bindingTarget: HTMLElement | null | undefined
   position: Pick<MouseEvent, 'pageX' | 'pageY'>
-  doCopy: () => void
   doCut: () => void
   doPaste: (newParentId: backendModule.DirectoryId) => void
 }>()
@@ -47,8 +34,6 @@ const { currentDirectoryId, bindingTarget, position, doCopy, doCut, doPaste } = 
 const open = defineModel<boolean>('open', { required: true })
 
 const { getText } = useText()
-const auth = useAuth()
-const { localBackend } = useBackends()
 const driveStore = useDriveStore()
 const driveView = useDriveView()
 const assetItems = useAssetItems()
@@ -58,21 +43,10 @@ const { copy } = useCopy()
 
 const category = computed(() => driveView.location.category)
 const backend = computed(() => driveView.location.backend)
-const isCloud = computed(() => isCloudCategory(category.value))
-const user = computed(() => {
-  const value = auth.session?.user
-  invariant(value != null, 'The drive is only shown to a signed-in user.')
-  return value
-})
 const selectedAssets = computed(() => driveStore.selectedAssets)
 
 const deleteAssets = useMutationCallback(() => deleteAssetsMutationOptions(backend.value))
-const restoreAssets = useMutationCallback(() => restoreAssetsMutationOptions(backend.value))
-const uploadFileToCloud = useUploadFileToCloud()
-const uploadFileToLocal = useUploadFileToLocal(category)
 const exportArchive = useExportArchive(backend, driveStore)
-
-const canUploadToCloud = computed(() => user.value.plan !== backendModule.Plan.free)
 
 const globalContextMenuEntries = useGlobalContextMenuEntries({
   backend,
@@ -81,39 +55,6 @@ const globalContextMenuEntries = useGlobalContextMenuEntries({
   directoryId: null,
   doPaste: (id) => doPaste(id),
 })
-
-/** Whether every selected asset is a project. */
-const areAllSelectedProjects = computed(() =>
-  [...driveStore.selectedIds].every(
-    (id) => backendModule.getAssetTypeFromId(id) === backendModule.AssetType.project,
-  ),
-)
-const canUploadAllProjectsToCloud = computed(
-  () => !isCloud.value && localBackend != null && areAllSelectedProjects.value,
-)
-const canDownloadAllProjectsToLocal = computed(
-  () => isCloud.value && localBackend != null && areAllSelectedProjects.value,
-)
-
-/** The selected assets, as listed. */
-function selectedListedAssets() {
-  return [...driveStore.selectedIds].flatMap((id) => {
-    const asset = assetItems.getAsset(id)
-    return asset ? [asset] : []
-  })
-}
-
-async function uploadFilesToCloud() {
-  invariant(localBackend != null, 'Cannot upload to cloud when not on Local backend')
-  await uploadFileToCloud(localBackend, {
-    assets: selectedListedAssets(),
-    targetDirectoryId: user.value.rootDirectoryId,
-  })
-}
-
-async function downloadFilesToLocal() {
-  await uploadFileToLocal(selectedListedAssets())
-}
 
 /** Whether there is something to paste here: cut or copied assets this category can take. */
 const hasPasteData = computed(() => {
@@ -165,63 +106,13 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
   }
 
   if (isRecentCategory(category.value)) return [copyIdsMenuEntry]
-  if (category.value.type === 'trash') {
-    return selected.length === 0 ?
-        []
-      : [
-          pasteAllMenuEntry,
-          {
-            action: 'undelete',
-            label: getText('restoreFromTrashShortcut'),
-            doAction: () => {
-              void restoreAssets({ ids: selected.map((asset) => asset.id), parentId: null })
-            },
-          },
-          {
-            action: 'delete',
-            label: getText('deleteForeverShortcut'),
-            doAction: () => {
-              const soleAssetName = selected[0]?.title ?? '(unknown)'
-              modals.closeAll()
-              modals.open(ConfirmDeleteModal, {
-                actionText:
-                  selected.length === 1 ?
-                    getText('deleteSelectedAssetForeverActionText', soleAssetName)
-                  : getText('deleteSelectedAssetsForeverActionText', selected.length),
-                onConfirm: async () => {
-                  driveStore.setSelectedAssets([])
-                  await deleteAssets([selected.map((otherAsset) => otherAsset.id), true])
-                },
-              })
-            },
-          },
-          copyIdsMenuEntry,
-        ]
-  }
   return [
-    selected.length !== 0 &&
-      canUploadAllProjectsToCloud.value && {
-        isUnderPaywall: !canUploadToCloud.value,
-        action: 'uploadToCloud',
-        feature: 'uploadToCloud',
-        doAction: () => {
-          void uploadFilesToCloud()
-        },
-      },
-    selected.length !== 0 &&
-      canDownloadAllProjectsToLocal.value && {
-        action: 'downloadToLocal',
-        doAction: () => {
-          void downloadFilesToLocal()
-        },
-      },
     selected.length !== 0 && {
       action: 'exportArchive',
       doAction: () => {
         void exportArchive()
       },
     },
-    selected.length !== 0 && isCloud.value && { action: 'copy', doAction: doCopy },
     selected.length !== 0 && {
       action: 'cut',
       doAction: () => {
@@ -232,7 +123,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
     ...globalContextMenuEntries.value,
     selected.length !== 0 && {
       action: 'delete',
-      label: isCloud.value ? getText('moveToTrashShortcut') : getText('deleteShortcut'),
+      label: getText('deleteShortcut'),
       doAction: () => {
         doDeleteAll()
       },

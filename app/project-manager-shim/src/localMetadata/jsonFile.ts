@@ -53,6 +53,63 @@ export async function writeJsonAtomic(filePath: string, value: unknown): Promise
 }
 
 /**
+ * Error codes meaning the file system cannot hard-link, so an exclusive write falls back.
+ * - `EPERM`, `ENOTSUP`, `EOPNOTSUPP`, `ENOSYS`: the volume or driver has no hard links.
+ * - `EXDEV`: the link would cross devices.
+ * - `EISDIR`: on Windows, `CreateHardLinkW` on a volume without hard links (exFAT, FAT32) fails
+ *   with `ERROR_INVALID_FUNCTION`, which libuv maps to `EISDIR`. A link onto an existing path,
+ *   directory or not, reports `EEXIST`, so a genuine directory is never mistaken for this.
+ *
+ * `UNKNOWN` is deliberately left out: nothing shows it means "no hard links", and the fallback
+ * must not hide other failures.
+ */
+const NO_HARD_LINK_CODES = new Set(['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS', 'EISDIR'])
+
+/**
+ * Write `value` as JSON to `filePath` only if nothing is there (an existing file or a dangling
+ * symlink included), failing with `EEXIST` otherwise. The content is written to a temporary file
+ * that is hard-linked into place, so readers never see a partial write and a file created by
+ * another process in the meantime is never overwritten. Where the file system has no hard links
+ * the write is exclusive (`wx`) but not atomic.
+ */
+export async function writeJsonExclusive(filePath: string, value: unknown): Promise<void> {
+  const text = JSON.stringify(value, null, 2)
+  const temporaryPath = path.join(
+    path.dirname(filePath),
+    `${path.basename(filePath)}.tmp-${process.pid}-${crypto.randomUUID()}`,
+  )
+  try {
+    await fs.writeFile(temporaryPath, text)
+    try {
+      await fs.link(temporaryPath, filePath)
+    } catch (error) {
+      if (!NO_HARD_LINK_CODES.has(errorCode(error) ?? '')) throw error
+      await writeFileExclusively(filePath, text)
+    }
+  } finally {
+    await fs.rm(temporaryPath, { force: true })
+  }
+}
+
+/**
+ * Create `filePath` with `text`, failing with `EEXIST` if anything is there; a write that fails
+ * part way removes the partial file. Unlike the hard-link path this is not atomic: a crash (not an
+ * error) mid-write leaves a truncated file that readers can see.
+ */
+async function writeFileExclusively(filePath: string, text: string): Promise<void> {
+  const handle = await fs.open(filePath, 'wx')
+  try {
+    await handle.writeFile(text)
+    await handle.sync()
+  } catch (error) {
+    await handle.close().catch(() => {})
+    await fs.rm(filePath, { force: true })
+    throw error
+  }
+  await handle.close()
+}
+
+/**
  * Rename `from` over `to`, retrying a few times on the errors Windows reports while another
  * process briefly holds either file.
  */

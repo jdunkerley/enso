@@ -1,13 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defaultGetText } from '../../text'
 import { Rfc3339DateTime } from '../../utilities/data/dateTime'
-import {
-  EnsoPath,
-  FilterBy,
-  ProjectId,
-  ProjectSessionId,
-  type ListDirectoryRequestParams,
-} from '../Backend'
+import { FilterBy, type ListDirectoryRequestParams } from '../Backend'
 import { HttpClient } from '../HttpClient'
 import { LocalBackend, newDirectoryId, newProjectId } from '../LocalBackend'
 import { ProjectManager } from '../ProjectManager/ProjectManager'
@@ -181,25 +175,12 @@ describe('LocalBackend: the local Recent list', () => {
       expect(projectManager.recordRecentProject).not.toHaveBeenCalled()
     })
 
-    it('records nothing for a hybrid open', async () => {
+    it('records every successful open', async () => {
       vi.spyOn(projectManager, 'openProject').mockResolvedValue(
         {} as Awaited<ReturnType<ProjectManager['openProject']>>,
       )
-      await makeBackend().openProject(
-        PROJECT_ID,
-        {
-          executeAsync: false,
-          cognitoCredentials: null,
-          openHybridProjectParameters: {
-            cloudProjectDirectoryPath: EnsoPath('enso://Users/u'),
-            cloudProjectId: ProjectId('project-cloud'),
-            cloudProjectSessionId: ProjectSessionId('session'),
-            cloudApiUrl: 'https://example.com',
-          },
-        },
-        'P1',
-      )
-      expect(projectManager.recordRecentProject).not.toHaveBeenCalled()
+      await makeBackend().openProject(PROJECT_ID, { executeAsync: false }, 'P1')
+      expect(projectManager.recordRecentProject).toHaveBeenCalledOnce()
     })
 
     it('a failed record does not fail the open', async () => {

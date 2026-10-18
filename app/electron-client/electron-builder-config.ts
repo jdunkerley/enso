@@ -191,31 +191,6 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     // simplified for the MSI installer to cope.
     artifactName: 'enso-${os}-${arch}-' + BUILD_INFO.version + '.${ext}',
 
-    /**
-     * Definitions of URL {@link electronBuilder.Protocol} schemes used by the IDE.
-     *
-     * Electron will register all URL protocol schemes defined here with the OS.
-     * Once a URL protocol scheme is registered with the OS, any links using that scheme
-     * will function as "deep links".
-     * Deep links are used to redirect the user from external sources (e.g., system web browser,
-     * email client) to the IDE.
-     *
-     * Clicking a deep link will:
-     * - open the IDE (if it is not already open),
-     * - focus the IDE, and
-     * - navigate to the location specified by the URL of the deep link.
-     *
-     * For details on how this works, see:
-     * https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app.
-     */
-    protocols: [
-      /** Electron URL protocol scheme definition for deep links to authentication pages. */
-      {
-        name: `${common.PRODUCT_NAME} url`,
-        schemes: [common.DEEP_LINK_SCHEME],
-        role: 'Editor',
-      },
-    ],
     mac: {
       // Compression is not used as the build time is huge and file size saving
       // almost zero.

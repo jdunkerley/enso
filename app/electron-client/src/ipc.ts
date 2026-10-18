@@ -14,12 +14,6 @@ export enum Channel {
   info = 'info',
   warn = 'warn',
   error = 'error',
-  /** Channel for requesting that a URL be opened by the system browser. */
-  openUrlInSystemBrowser = 'open-url-in-system-browser',
-  /** Channel for signaling that a deep link to this application was opened. */
-  openDeepLink = 'open-deep-link',
-  /** Channel for signaling that access token be saved to a credentials file. */
-  saveAccessToken = 'save-access-token',
   /** Channel for importing a project or project bundle from the given path. */
   importProjectFromPath = 'import-project-from-path',
   /** Channel for opening project */

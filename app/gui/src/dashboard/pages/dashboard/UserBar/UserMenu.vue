@@ -8,17 +8,9 @@
  * (`useMenuEntries`): they are in the command palette, and their shortcuts (`Mod+,` for Settings,
  * `Mod+/` for About) work anywhere.
  *
- * The cloud-only parts come from `src/cloud/` (the organization switcher, "Upgrade Plan"); they are
- * imported directly, as the cloud registries of decision 6b do not exist yet.
- *
- * In local mode (`isAuthDisabled`: no Cognito, an offline stand-in session) there is no cloud
- * account to bill, switch or sign out of: "Working locally" stands in for the plan, and the
- * organization switcher, "Upgrade Plan" and "Logout" are left out, from the menu and from the global
- * actions alike.
+ * There is no account to sign out of: the app always runs as the local user, and "Working locally"
+ * stands in for the plan.
  */
-import { upgradePlanEntry } from '$/cloud/billing/userMenu'
-import OrganizationSwitcher from '$/cloud/organization/OrganizationSwitcher.vue'
-import { useOrganizationSwitcherEntries } from '$/cloud/organization/organizationSwitcher'
 import { openAboutModal } from '$/components/AboutModal/aboutModal'
 import Button from '$/components/Button/Button.vue'
 import Popover from '$/components/Dialog/Popover.vue'
@@ -28,45 +20,27 @@ import Text from '$/components/Text/Text.vue'
 import { useMenuEntries, type MenuEntryAction } from '$/composables/menuEntries'
 import type { UserSession } from '$/providers/auth'
 import { useBackends } from '$/providers/backends'
-import { useDevtoolsStore } from '$/providers/devTools'
 import { useModals } from '$/providers/modals'
-import { useSession } from '$/providers/session'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { download } from '$/utils/download'
 import { getDownloadUrl } from '$/utils/github'
-import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
-import { computed } from 'vue'
-import { useRouter } from 'vue-router'
 
-const {
-  user,
-  isAuthDisabled = false,
-  goToSettingsPage,
-} = defineProps<{
+const { user, goToSettingsPage } = defineProps<{
   user: UserSession['user']
-  /** Local mode: authentication is disabled, so there is no cloud account. */
-  isAuthDisabled?: boolean | undefined
   goToSettingsPage: () => void
 }>()
 
-const emit = defineEmits<{ signOut: [] }>()
-
-const router = useRouter()
 const backends = useBackends()
-const { signOut } = useSession()
 const { getText } = useText()
 const toasts = useToasts()
 const modals = useModals()
-const devtools = useDevtoolsStore()
 
 /** Show an error toast, and log it. */
 function toastAndLog(message: string) {
   toasts.show(message, { type: 'error' })
   console.error(message)
 }
-
-const organizationEntries = useOrganizationSwitcherEntries(() => user)
 
 const entries = useMenuEntries<MenuEntryAction>(() => [
   backends.localBackend == null && {
@@ -84,30 +58,7 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
   },
   { action: 'settings', doAction: goToSettingsPage },
   { action: 'aboutThisApp', doAction: openAboutModal },
-  user.isEnsoTeamMember &&
-    IS_DEV_MODE && {
-      action: 'toggleEnsoDevtools',
-      doAction: () => {
-        devtools.showEnsoDevtools = !devtools.showEnsoDevtools
-      },
-    },
-  !isAuthDisabled && upgradePlanEntry(user, router, () => emit('signOut')),
 ])
-
-const tailEntries = useMenuEntries<MenuEntryAction>(() => [
-  !isAuthDisabled && {
-    action: 'signOut',
-    doAction: () => {
-      emit('signOut')
-      void signOut()
-    },
-  },
-])
-
-// Local mode has no plan: the synthetic user's ("Community") would mislead.
-const planText = computed(() =>
-  isAuthDisabled ? getText('userMenuWorkingLocally') : getText(user.plan),
-)
 </script>
 
 <template>
@@ -115,39 +66,26 @@ const planText = computed(() =>
     <template #trigger>
       <Button size="custom" variant="icon" class="ml-2" :aria-label="getText('userMenuLabel')">
         <template #icon>
-          <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+          <ProfilePicture :picture="null" :name="user.name" />
         </template>
       </Button>
     </template>
     <div
       class="mb-2 flex select-none items-center gap-icons overflow-hidden px-menu-entry transition-all duration-user-menu"
     >
-      <ProfilePicture :picture="user.profilePicture" :name="user.name" />
+      <ProfilePicture :picture="null" :name="user.name" />
       <div class="flex min-w-0 flex-col">
         <Text disableLineHeightCompensation variant="body" truncate="1" weight="semibold">
           {{ user.name }}
         </Text>
-        <Text disableLineHeightCompensation>{{ planText }}</Text>
+        <!-- There is no plan: the local user's synthetic one ("Community") would mislead. -->
+        <Text disableLineHeightCompensation>{{ getText('userMenuWorkingLocally') }}</Text>
       </div>
     </div>
-
-    <OrganizationSwitcher
-      v-if="!isAuthDisabled && user.maintainerAccount"
-      :entries="organizationEntries"
-    />
 
     <div class="flex flex-col overflow-hidden">
       <MenuEntry
         v-for="entry in entries"
-        :key="entry.action"
-        :action="entry.action"
-        @press="entry.doAction"
-      />
-    </div>
-
-    <div class="flex flex-col overflow-hidden">
-      <MenuEntry
-        v-for="entry in tailEntries"
         :key="entry.action"
         :action="entry.action"
         @press="entry.doAction"

@@ -1,4 +1,4 @@
-/** @file The Vue info bar and menu (#83): the logo button, About, and Logout when signed in. */
+/** @file The Vue info bar and menu (#83): the logo button and About; there is no Logout. */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import InfoBar from '$/components/InfoBar/InfoBar.vue'
 import { useText } from '$/providers/text'
@@ -8,11 +8,13 @@ import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive } from 'vue'
 
-const auth = reactive<{ session: object | null }>({ session: null })
+// The local session: the only one there is.
+const LOCAL_SESSION = {
+  email: 'local@enso.localhost',
+  user: { userId: 'user-local', name: 'Offline', email: 'local@enso.localhost' },
+}
+const auth = reactive<{ session: object }>({ session: LOCAL_SESSION })
 vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
-
-const signOut = vi.fn(async () => {})
-vi.mock('$/providers/session', () => ({ useSession: () => ({ signOut }) }))
 
 const { getText } = useText()
 
@@ -21,7 +23,7 @@ beforeEach(() => {
   portalRoot = document.createElement('div')
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
-  auth.session = null
+  auth.session = LOCAL_SESSION
 })
 afterEach(() => {
   portalRoot.remove()
@@ -58,15 +60,12 @@ describe('InfoBar', () => {
     expect(useAboutModal().isOpen.value).toBe(true)
   })
 
-  test('signed in: Logout signs out, then goes to the login page', async () => {
-    auth.session = {}
-    const { router } = await mountWithProviders(InfoBar, { route: '/registration' })
+  test('the info menu has no Logout', async () => {
+    await mountWithProviders(InfoBar)
     const user = userEvent.setup()
     await user.click(logoButton())
     await flushPromises()
-    await user.click(entry(getText('signOutShortcut'))!)
-    await flushPromises()
-    expect(signOut).toHaveBeenCalledOnce()
-    expect(router.currentRoute.value.path).toBe('/login')
+    expect(entry(getText('aboutThisAppShortcut'))).toBeDefined()
+    expect(entry(getText('signOutShortcut'))).toBeUndefined()
   })
 })

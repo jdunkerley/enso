@@ -8,6 +8,7 @@ import * as zlib from 'node:zlib'
 
 import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
 import * as yaml from 'yaml'
+import { isDatalinkPath } from '../datalinks.js'
 import { getEngineLogDirectory } from '../distributionManager.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import { updateJsonFile } from '../localMetadata/jsonFile.js'
@@ -69,18 +70,29 @@ export interface Attributes {
 // =======================
 
 /** Metadata for an arbitrary file system entry. */
-export type FileSystemEntry = DirectoryEntry | FileEntry | ProjectEntry
+export type FileSystemEntry = DatalinkEntry | DirectoryEntry | FileEntry | ProjectEntry
 
 /** The discriminator value for {@link FileSystemEntry}. */
 export enum FileSystemEntryType {
   DirectoryEntry = 'DirectoryEntry',
   ProjectEntry = 'ProjectEntry',
   FileEntry = 'FileEntry',
+  DatalinkEntry = 'DatalinkEntry',
 }
 
 /** Metadata for a file. */
 export interface FileEntry {
   readonly type: FileSystemEntryType.FileEntry
+  readonly path: string
+  readonly attributes: Attributes
+}
+
+/**
+ * Metadata for a datalink: a `<name>.datalink` file. Its content is not read while listing, so a
+ * datalink that is not valid JSON is still listed; reading it reports the problem.
+ */
+export interface DatalinkEntry {
+  readonly type: FileSystemEntryType.DatalinkEntry
   readonly path: string
   readonly attributes: Attributes
 }
@@ -464,12 +476,16 @@ async function readFileSystemEntry(
     lastModifiedTime: new Date(stat.mtimeMs).toISOString(),
   }
   if (stat.isFile()) {
+    const entry: FileEntry | DatalinkEntry = {
+      type:
+        isDatalinkPath(entryPath) ?
+          FileSystemEntryType.DatalinkEntry
+        : FileSystemEntryType.FileEntry,
+      path: entryPath,
+      attributes,
+    }
     return {
-      entry: {
-        type: FileSystemEntryType.FileEntry,
-        path: entryPath,
-        attributes,
-      },
+      entry,
       labels: [],
     }
   } else {

@@ -1,28 +1,23 @@
 /** @file The drive's labels popover (#198, #207): where it opens from the context menu. */
-import { expect, test } from 'integration-test/base'
-
 import { COLORS } from 'enso-common/src/services/Backend'
+import { expect, test } from 'integration-test/base'
 
 const LABEL_NAME = 'a label'
 
-test.use({
-  setupApi: {
-    cloud: (cloudApi) => {
-      cloudApi.addLabel(LABEL_NAME, COLORS[0])
-      cloudApi.addDirectory({ title: 'a folder' })
-    },
-  },
-})
-
-test('"Label" in the context menu opens the popover under the row', async ({ drivePage }) => {
+test('"Label" in the context menu opens the popover under the row', async ({
+  drivePage,
+  localApi,
+}) => {
+  localApi.addLabel(LABEL_NAME, COLORS[0])
   await drivePage.goToCategory
-    .cloud()
-    .driveTable.rightClickRow(0)
+    .local()
+    // Labels are for projects only (`supportsLabels`).
+    .driveTable.rightClickRow('Mock Project')
     .contextMenu.label()
     .do(async (page) => {
       const popover = page.getByRole('dialog').filter({ hasText: LABEL_NAME })
       await expect(popover).toBeVisible()
-      const row = page.getByTestId('asset-row').first()
+      const row = page.getByTestId('asset-row').filter({ hasText: 'Mock Project' })
       const rowBox = (await row.boundingBox())!
       // Once its entry animation has settled.
       await expect
@@ -36,6 +31,6 @@ test('"Label" in the context menu opens the popover under the row', async ({ dri
     .press('Escape')
     .do(async (page) => {
       await expect(page.getByRole('dialog')).toHaveCount(0)
-      await expect(page.getByTestId('asset-row').first()).toBeFocused()
+      await expect(page.getByTestId('asset-row').filter({ hasText: 'Mock Project' })).toBeFocused()
     })
 })

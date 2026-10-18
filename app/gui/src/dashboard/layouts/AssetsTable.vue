@@ -16,9 +16,8 @@
  * stop that roves with the focus (`Drive/rovingTabStop.ts`) and row positions; drags of rows are
  * announced in a live region (`Drive/dragAnnouncements.ts`).
  */
-import { Column } from '#/pages/dashboard/components/column/columnUtils'
+import { Column, enabledColumnsSchema } from '#/pages/dashboard/components/column/columnUtils'
 import LocalStorage from '$/utils/LocalStorage'
-import * as z from 'zod'
 
 declare module '$/utils/LocalStorage' {
   interface LocalStorageData {
@@ -27,7 +26,7 @@ declare module '$/utils/LocalStorage' {
 }
 
 LocalStorage.registerKey('enabledColumns', {
-  schema: z.nativeEnum(Column).array().readonly(),
+  schema: enabledColumnsSchema,
 })
 
 /** The height of each row in the table body. It MUST be the one Tailwind's `h-table-row` sets. */
@@ -51,12 +50,12 @@ import { useAutoScroll } from '#/layouts/Drive/autoScroll'
 import { useDragAnnouncements } from '#/layouts/Drive/dragAnnouncements'
 import { ASSET_ROWS, setDragImageToBlank, type AssetRowsDragPayload } from '#/layouts/Drive/drag'
 import {
-  useEditSecret,
   useListDirectoryRefetchInterval,
   usePaste,
   usePendingMutations,
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
+import { useEditDatalink } from '#/layouts/Drive/datalinkActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
 import { useRovingTabStop } from '#/layouts/Drive/rovingTabStop'
 import { STOP_PRESS_AND_POINTER_PROPAGATION } from '#/layouts/Drive/pressPropagation'
@@ -76,8 +75,6 @@ import Scroller from '$/components/Scroller/Scroller.vue'
 import SelectionBrush, { type OnDragParams } from '$/components/SelectionBrush/SelectionBrush.vue'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import Text from '$/components/Text/Text.vue'
-import UserWithPopover from '$/components/UserWithPopover/UserWithPopover.vue'
-import { useAuth } from '$/providers/auth'
 import { categoryKey, isRecentCategory, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDashboardInputBindings } from '$/providers/dashboardInputBindings'
@@ -95,9 +92,7 @@ import { withPresence } from '$/utils/data/set'
 import {
   deleteAssetsMutationKey,
   moveAssetsMutationKey,
-  restoreAssetsMutationKey,
   type DeleteAssetsVariables,
-  type RestoreAssetsVariables,
   type TransferAssetsVariables,
 } from '$/utils/driveMutations'
 import { listDirectoryQueryOptions, searchDirectoryQueryOptions } from '$/utils/driveQueries'
@@ -112,7 +107,6 @@ import { useDebounceFn, useEventListener, useResizeObserver } from '@vueuse/core
 import {
   AssetType,
   IS_OPENING_OR_OPENED,
-  isAssetCredential,
   isUnauthorizedError,
   LabelName,
   supportsAnyLabels,
@@ -121,12 +115,7 @@ import {
   type DirectoryId,
   type PaginationToken,
 } from 'enso-common/src/services/Backend'
-import {
-  userGroupIdToDirectoryId,
-  userIdToDirectoryId,
-} from 'enso-common/src/services/RemoteBackend/ids'
 import { fileExtension } from 'enso-common/src/utilities/file'
-import invariant from 'tiny-invariant'
 import {
   computed,
   h,
@@ -142,7 +131,6 @@ import {
 const { query } = defineProps<{ query: AssetQuery }>()
 
 const { getText } = useText()
-const auth = useAuth()
 const categories = useCategories()
 const container = useContainerData()
 const rightPanel = useRightPanelData()
@@ -158,23 +146,15 @@ const localStorage = LocalStorage.getInstance()
 
 const location = computed(() => driveView.location)
 const backend = computed(() => location.value.backend)
+const editDatalink = useEditDatalink(backend)
 const category = computed(() => location.value.category)
 const currentDirectoryId = computed(() => location.value.currentDirectoryId)
-const user = computed(() => {
-  const value = auth.session?.user
-  invariant(value != null, 'The drive is only shown to a signed-in user.')
-  return value
-})
 
 const supportsLabels = computed(() => supportsAnyLabels(backend.value))
 const labelsQuery = useQuery(
   computed(() =>
     backendQueryOptions(backend.value, 'listTags', [], { enabled: supportsLabels.value }),
   ),
-)
-const usersQuery = useQuery(computed(() => backendQueryOptions(backend.value, 'listUsers', [])))
-const userGroupsQuery = useQuery(
-  computed(() => backendQueryOptions(backend.value, 'listUserGroups', [])),
 )
 const labels = computed(() => labelsQuery.data.value ?? [])
 
@@ -187,13 +167,7 @@ watch(enabledColumns, (columns) => localStorage.set('enabledColumns', [...column
   immediate: true,
 })
 const allowedColumns = computed(() =>
-  getColumnList(
-    user.value.plan,
-    backend.value.type,
-    category.value.type,
-    query.query !== '',
-    supportsLabels.value,
-  ),
+  getColumnList(category.value.type, query.query !== '', supportsLabels.value),
 )
 const columns = computed(() =>
   allowedColumns.value.filter((column) => enabledColumns.value.has(column)),
@@ -220,21 +194,8 @@ function setSortInfo(value: SortInfo<AssetSortExpression> | null) {
 
 // === The listing ===
 
-/** The directory to list: an `owner:` term in the query lists that user's or group's home. */
-const queryDirectoryId = computed((): DirectoryId | null => {
-  const raw = location.value.queryDirectoryId
-  const ownerLower = query.owners[0]?.toLowerCase()
-  if (ownerLower == null) return raw
-  const userId = usersQuery.data.value?.find((otherUser) =>
-    otherUser.name.toLowerCase().includes(ownerLower),
-  )?.userId
-  if (userId != null) return userIdToDirectoryId(userId)
-  const userGroupId = userGroupsQuery.data.value?.find((userGroup) =>
-    userGroup.groupName.toLowerCase().includes(ownerLower),
-  )?.id
-  if (userGroupId != null) return userGroupIdToDirectoryId(userGroupId)
-  return raw
-})
+/** The directory to list. */
+const queryDirectoryId = computed((): DirectoryId | null => location.value.queryDirectoryId)
 const listDirectoryRefetchInterval = useListDirectoryRefetchInterval()
 const debouncedQueryDelayMs = useFeatureFlag('dataCatalogQueryDebounceDelay')
 const pageSize = useFeatureFlag('listDirectoryPageSize')
@@ -422,7 +383,7 @@ function suggestion(
 }
 
 watch(
-  [() => query, labels, assets, () => usersQuery.data.value, () => userGroupsQuery.data.value],
+  [() => query, labels, assets],
   () => {
     const allVisible = () =>
       assets.value.map((node) => suggestion(node.id, () => node.title, 'names', node.title))
@@ -515,27 +476,6 @@ watch(
         )
         break
       }
-      case 'owner': {
-        setSuggestions([
-          ...(usersQuery.data.value ?? []).map((otherUser) =>
-            suggestion(
-              otherUser.userId,
-              () => h(UserWithPopover, { user: otherUser }),
-              'owners',
-              otherUser.name,
-            ),
-          ),
-          ...(userGroupsQuery.data.value ?? []).map((userGroup) =>
-            suggestion(
-              userGroup.id,
-              () => AssetQuery.termToString({ tag: 'owner', values: [userGroup.groupName] }),
-              'owners',
-              userGroup.groupName,
-            ),
-          ),
-        ])
-        break
-      }
       default: {
         setSuggestions(shouldOmitNames ? [] : allVisible())
         break
@@ -620,10 +560,6 @@ const deletingSingle = usePendingMutations(
   () => backendMutationOptions(backend.value, 'deleteAsset').mutationKey ?? [],
 )
 const deletingMultiple = usePendingMutations(() => deleteAssetsMutationKey(backend.value.type))
-const restoringSingle = usePendingMutations(
-  () => backendMutationOptions(backend.value, 'undoDeleteAsset').mutationKey ?? [],
-)
-const restoringMultiple = usePendingMutations(() => restoreAssetsMutationKey(backend.value.type))
 const updatingSingle = usePendingMutations(
   () => backendMutationOptions(backend.value, 'updateAsset').mutationKey ?? [],
 )
@@ -642,15 +578,6 @@ const deletingIds = computed(
       ...firstArguments(deletingSingle.value),
       ...deletingMultiple.value.flatMap(
         (mutation) => (mutation.state.variables as DeleteAssetsVariables | undefined)?.[0] ?? [],
-      ),
-    ]),
-)
-const restoringIds = computed(
-  () =>
-    new Set<unknown>([
-      ...firstArguments(restoringSingle.value),
-      ...restoringMultiple.value.flatMap(
-        (mutation) => (mutation.state.variables as RestoreAssetsVariables | undefined)?.ids ?? [],
       ),
     ]),
 )
@@ -675,8 +602,6 @@ function setMostRecentlySelectedIndex(index: number | null, isKeyboard = false) 
   mostRecentlySelectedIndex = index
   keyboardSelectedIndex.value = isKeyboard ? index : null
 }
-
-const editSecret = useEditSecret(backend)
 
 /** The grid's one tab stop: the row focused last (or the first selected, or the first). */
 const rovingTabStop = useRovingTabStop(
@@ -745,17 +670,7 @@ function onKeyDown(event: KeyboardEvent) {
             case AssetType.datalink: {
               event.preventDefault()
               event.stopPropagation()
-              rightPanel.setTemporaryTab('settings')
-              break
-            }
-            case AssetType.secret: {
-              if (isAssetCredential(item)) {
-                toasts.show(getText('cannotEditCredentialError'), { type: 'warning' })
-              } else {
-                event.preventDefault()
-                event.stopPropagation()
-                editSecret(item)
-              }
+              void editDatalink(item)
               break
             }
             case AssetType.file:
@@ -1058,7 +973,7 @@ function onRowDragStart(event: DragEvent, asset: AnyAsset) {
 }
 
 function onRowDrop(event: DragEvent, item: AnyAsset | null = null) {
-  if (category.value.type === 'trash' || isRecentCategory(category.value)) {
+  if (isRecentCategory(category.value)) {
     dragAnnouncements.rejected()
     return
   }
@@ -1180,10 +1095,7 @@ const specialEmptyText = computed(() =>
 )
 
 const emptyText = computed(() =>
-  category.value.type === 'trash' ? (specialEmptyText.value ?? getText('yourTrashIsEmpty'))
-  : category.value.type === 'recent' ?
-    (specialEmptyText.value ?? getText('youHaveNoRecentProjects'))
-  : category.value.type === 'localRecent' ?
+  category.value.type === 'localRecent' ?
     (specialEmptyText.value ?? getText('noRecentLocalProjects'))
   : (specialEmptyText.value ?? getText('youHaveNoFiles')),
 )
@@ -1286,7 +1198,6 @@ const isLoadingRow = computed(
                         :rowIndex="index + 2"
                         :onRowFocus="onRowFocus"
                         :isDeleting="deletingIds.has(item.id)"
-                        :isRestoring="restoringIds.has(item.id)"
                         :isUpdating="updatingIds.has(item.id)"
                         :grabKeyboardFocus="grabRowKeyboardFocus"
                         :onRowClick="onRowClick"
@@ -1319,7 +1230,7 @@ const isLoadingRow = computed(
                     :class="
                       twMerge(
                         'sticky left-1 grid max-w-[calc(100cqw_-_0.5rem)] grow place-items-center pb-40 pt-20',
-                        (isRecentCategory(category) || category.type === 'trash') && 'hidden',
+                        isRecentCategory(category) && 'hidden',
                       )
                     "
                     @dragenter="onDropzoneDragOver"

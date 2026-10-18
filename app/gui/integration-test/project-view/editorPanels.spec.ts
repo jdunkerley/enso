@@ -70,22 +70,6 @@ test.describe('Main method documentation rendering', () => {
     await link.click({ modifiers: ['ControlOrMeta'] })
     await expect(newPagePromise).resolves.toHaveURL('https://example.com')
   })
-
-  test.use({
-    setupApi: {
-      cloud: (cloudApi) => {
-        cloudApi.addProject({ title: 'MockProject' })
-      },
-    },
-  })
-
-  test('Enso links', async ({ drivePage, editorPage }) => {
-    const { docsContent } = await goToGraphAndGetDocs(editorPage)
-    const link = docsContent.locator('a').nth(1)
-    await expect(link).toHaveText('A reference to another project')
-    await link.click({ modifiers: ['ControlOrMeta'] })
-    await drivePage.expectProjectEditorOpened('MockProject')
-  })
 })
 
 test.describe('Panels', () => {

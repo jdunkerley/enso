@@ -12,7 +12,7 @@ import {
   type LocalDirectory,
 } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
-import { useTransferBetweenCategories } from '$/composables/transferBetweenCategories'
+import { useMoveAssets } from '$/composables/moveAssets'
 import { useDriveLocation } from '$/providers/drive'
 import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import { useModals } from '$/providers/modals'
@@ -40,7 +40,7 @@ const { categoryLabel, removeLocalDirectory } = useCategories()
 const drive = useDriveLocation()
 const { currentCategory } = toRefs(drive)
 const { leftPanelShown, leftPanelToggledOn } = toRefs(useContainerData())
-const transferBetweenCategories = useTransferBetweenCategories()
+const moveAssets = useMoveAssets()
 const modals = useModals()
 const { getText } = useText()
 const router = useRouter()
@@ -91,27 +91,12 @@ async function onDrop(event: DragEvent) {
   if (firstItem == null) return
   event.preventDefault()
 
-  const transfer = async () => {
-    await Promise.all(
-      payloads.map((payload) => {
-        const fromCategory = categoryFromKey(payload.category)
-        return fromCategory && transferBetweenCategories(fromCategory, category, payload.items)
-      }),
-    )
-  }
-
-  if (category.type === 'trash') {
-    const itemsCount = payloads.flatMap(({ items }) => items).length
-    void modals.ask(ConfirmDeleteModal, {
-      actionText:
-        itemsCount === 1 ?
-          getText('deleteSelectedAssetActionText', firstItem.title)
-        : getText('deleteSelectedAssetsActionText', itemsCount),
-      onConfirm: transfer,
-    })
-  } else {
-    await transfer()
-  }
+  await Promise.all(
+    payloads.map((payload) => {
+      const fromCategory = categoryFromKey(payload.category)
+      return fromCategory && moveAssets(fromCategory, category, payload.items)
+    }),
+  )
 }
 
 function onRemoveLocalDirClick(directory: LocalDirectory) {
