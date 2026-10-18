@@ -3,7 +3,7 @@ import type * as http from 'node:http'
 import * as datalinkFiles from '../datalinks.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
 import type { LocalVersioning } from '../localVersioning/index.js'
-import { ProjectService, type CloudParams } from '../projectService/index.js'
+import { ProjectService } from '../projectService/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
 import { toJSONRPCError, toJSONRPCResult } from './jsonrpc.js'
 
@@ -273,12 +273,11 @@ export async function handleProjectServiceRequest(
       interface Body {
         readonly projectId: UUID
         readonly projectsDirectory: Path
-        readonly cloud?: CloudParams
       }
       bodyJson<Body>(request)
         .then(async (body) => {
           const projectService = await getProjectService()
-          return projectService.openProject(body.projectId, body.projectsDirectory, body.cloud)
+          return projectService.openProject(body.projectId, body.projectsDirectory)
         })
         .then((result) => {
           response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))

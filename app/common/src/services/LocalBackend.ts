@@ -561,9 +561,6 @@ export class LocalBackend extends backend.Backend {
       await this.projectManager.openProject({
         projectPath: path,
         missingComponentAction: MissingComponentAction.install,
-        ...(body?.openHybridProjectParameters != null ?
-          { cloud: body.openHybridProjectParameters }
-        : {}),
       })
     } catch (error) {
       throw new Error(
@@ -573,12 +570,9 @@ export class LocalBackend extends backend.Backend {
         { cause: error },
       )
     }
-    // A hybrid project is a cloud project's local copy, and cloud projects are not recorded.
-    if (body?.openHybridProjectParameters == null) {
-      await this.projectManager.recordRecentProject(path).catch((error: unknown) => {
-        console.warn(`Could not add the project at '${path}' to the recent projects:`, error)
-      })
-    }
+    await this.projectManager.recordRecentProject(path).catch((error: unknown) => {
+      console.warn(`Could not add the project at '${path}' to the recent projects:`, error)
+    })
   }
 
   /**

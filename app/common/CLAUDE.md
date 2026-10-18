@@ -30,9 +30,8 @@ neutral ground — anything Vue-specific belongs in its own package.
   returns that listing's own asset, so a row in Recent is the same asset as in
   the folder view (and a project that cannot be listed any more drops out).
   Unpaged, newest first unless a sort is asked for.
-- **Opens are recorded** after a successful `openProject`, except a hybrid
-  project's (a cloud project's local copy); a failure to record only warns.
-  `forgetRecentProject` backs "Remove from Recent".
+- **Opens are recorded** after a successful `openProject`; a failure to record
+  only warns. `forgetRecentProject` backs "Remove from Recent".
 - **Versioning**: `LocalBackend.versioningStatus` is the read both the saving
   GUI and the Versions tab use; their writes are added by PR 4 and PR 5. The
   `ProjectManager` methods (`versioningStatus`, `initVersioning`,
