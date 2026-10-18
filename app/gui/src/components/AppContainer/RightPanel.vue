@@ -67,7 +67,6 @@ const component = computed(() => {
     case 'contents':
       return AssetContentsEditor
     case 'versions':
-    case 'executionsCalendar':
       return contributedTab(data.displayedTab)
     case 'sessions':
       return ProjectSessions

@@ -18,11 +18,9 @@ import Text from '$/components/Text/Text.vue'
 import UserWithPopover from '$/components/UserWithPopover/UserWithPopover.vue'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
-import { useQuery } from '@tanstack/vue-query'
 import { useElementBounding } from '@vueuse/core'
 import {
   AssetType,
-  BackendType,
   type Backend,
   type DatalinkAsset,
   type FileAsset,
@@ -30,8 +28,6 @@ import {
 } from 'enso-common/src/services/Backend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import { computed, ref } from 'vue'
-import AddVersionTag from './AddVersionTag.vue'
-import { useRemoveVersionTag, versionTagsQueryOptions } from './queries'
 import { normalizeVersionComment, type DuplicateOptions, type Version } from './version'
 import VersionComment from './VersionComment.vue'
 import VersionCommentButton from './VersionCommentButton.vue'
@@ -77,18 +73,6 @@ const comparableVersions = computed(() =>
     .map((other, index) => ({ ...other, number: otherVersions.length - index }))
     .filter((other) => other.versionId !== version.versionId),
 )
-
-/** Only the cloud tags versions; a local version is a git commit, and git tags are repository-wide. */
-const hasTags = computed(() => backend.type !== BackendType.local)
-const tagsQuery = useQuery(
-  computed(() => ({
-    ...versionTagsQueryOptions(backend),
-    enabled: hasTags.value,
-  })),
-)
-const availableTags = computed(() => tagsQuery.data.value ?? [])
-
-const removeVersionTag = useRemoveVersionTag(backend)
 
 function restore() {
   return doRestore(version)
@@ -178,27 +162,12 @@ const shouldCollapseTags = computed(() => {
                   :key="`${version.versionId}-${tag}-${index}`"
                   class="min-w-0 shrink"
                 >
-                  <VersionTag
-                    :tooltip="tag"
-                    :onDelete="
-                      tag !== getText('latestIndicator') ?
-                        () => removeVersionTag(item.id, version.versionId, tag)
-                      : undefined
-                    "
-                  >
+                  <VersionTag :tooltip="tag">
                     {{ tag }}
                   </VersionTag>
                 </div>
               </div>
             </template>
-            <AddVersionTag
-              v-if="hasTags"
-              :availableTags="availableTags"
-              :item="item"
-              :version="version"
-              :backend="backend"
-              :refetchAvailableTags="tagsQuery.refetch"
-            />
           </div>
 
           <!-- Copies of the title and of one tag, measured for the tags' collapsing. -->

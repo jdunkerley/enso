@@ -1,15 +1,13 @@
 <script setup lang="ts">
 /**
- * @file The right panel's Versions tab: the versions of the asset selected in a cloud category, or
- * of a local project in an enabled git repository, newest first, with their tags and comments, and
- * actions to compare, restore or duplicate them. In a project tab, it lists the opened project's
- * versions: a local project's are the local backend's, a cloud or hybrid project's the cloud's (by
+ * @file The right panel's Versions tab: the versions of the local project selected in the drive, in
+ * an enabled git repository, newest first, with their comments, and actions to compare, restore or
+ * duplicate them. In a project tab, it lists the opened project's versions, the local backend's (by
  * its `id`). The project view gives only the project's id, so its asset is fetched first.
  *
- * With nothing selected, for an asset without versions (in the cloud, only projects, files and
- * datalinks have them; locally, only projects), or for a local project whose versions are not kept
- * (no git, no repository, or the repository is not enabled) it says so, and if its status cannot be
- * read, it shows the error. The list itself (`AssetVersionList.vue`) loads in a `SuspenseLoader`,
+ * With nothing selected, for an asset without versions (only projects have them), or for a project
+ * whose versions are not kept (no git, no repository, or the repository is not enabled) it says
+ * so, and if its status cannot be read, it shows the error. The list itself (`AssetVersionList.vue`) loads in a `SuspenseLoader`,
  * and is remounted for each asset.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
@@ -42,19 +40,17 @@ defineProps<{
 }>()
 
 const rightPanel = useRightPanelData()
-const { remoteBackend, localBackend } = useBackends()
+const { localBackend } = useBackends()
 const { getText } = useText()
 
 /**
- * The project opened in this project tab, and the backend which holds it: the local backend for a
- * local project (`null` when there is none), the cloud for a cloud or hybrid one. `null` outside a
- * project tab.
+ * The project opened in this project tab, and the backend which holds it: the local backend (`null`
+ * when there is none). `null` outside a project tab.
  */
 const openedProject = computed(() => {
   const opened = rightPanel.context?.openedProject
   if (opened == null) return null
-  const local = opened.mode === 'local'
-  return { id: opened.id, local, backend: local ? (localBackend ?? null) : remoteBackend }
+  return { id: opened.id, backend: localBackend ?? null }
 })
 /** The opened project's asset, which the list needs whole (its title and parent, too). */
 const openedProjectQuery = useQuery(
@@ -72,7 +68,7 @@ const openedProjectQuery = useQuery(
 /** The path of the local project whose versions are listed, if it is one. */
 const localProjectPath = computed(() => {
   const opened = openedProject.value
-  if (opened != null) return opened.local ? extractTypeAndPath(opened.id).path : null
+  if (opened != null) return extractTypeAndPath(opened.id).path
   const category = rightPanel.context?.category
   const asset = rightPanel.focusedAsset
   if (category == null || !isLocalCategory(category) || asset?.type !== AssetType.project) {
@@ -121,9 +117,7 @@ function openedProjectState(opened: NonNullable<typeof openedProject.value>): St
   if (asset?.type !== AssetType.project) {
     return { placeholder: getText('assetVersions.notSelected') }
   }
-  return opened.local ?
-      localProjectState(asset, opened.backend)
-    : { asset, backend: opened.backend }
+  return localProjectState(asset, opened.backend)
 }
 
 const state = computed((): State => {

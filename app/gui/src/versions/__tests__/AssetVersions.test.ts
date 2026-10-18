@@ -10,7 +10,6 @@ import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import {
   AssetType,
-  DirectoryId,
   EmailAddress,
   Path,
   ProjectId,
@@ -28,21 +27,10 @@ import VersionDialog from '../VersionDialog.vue'
 
 // `useBackends` and `useContainerData` are global stores (see `mountWithProviders`), so they are
 // replaced by module mocks; the right panel's store is a context store, given to the mount.
-const backend = vi.hoisted(() => ({
-  type: 'remote',
-  listAssetVersions: vi.fn(),
-  listAssetVersionTags: vi.fn(),
-  restoreAsset: vi.fn(),
-  copyAsset: vi.fn(),
-  updateAsset: vi.fn(),
-  getMainFileContent: vi.fn(),
-  getAssetDetails: vi.fn(),
-}))
 const localBackend = vi.hoisted(() => ({
   type: 'local',
   versioningStatus: vi.fn(),
   listAssetVersions: vi.fn(),
-  listAssetVersionTags: vi.fn(),
   restoreAsset: vi.fn(),
   copyAsset: vi.fn(),
   updateAsset: vi.fn(),
@@ -52,7 +40,6 @@ const localBackend = vi.hoisted(() => ({
 const backends = vi.hoisted(() => ({ localAvailable: true }))
 vi.mock('$/providers/backends', () => ({
   useBackends: () => ({
-    remoteBackend: backend,
     localBackend: backends.localAvailable ? localBackend : null,
   }),
 }))
@@ -65,20 +52,12 @@ vi.mock('$/providers/openedProjects', () => ({ useOpenedProjects: () => openedPr
 const openProjectLocally = vi.fn()
 vi.mock('$/providers/container', () => ({ useContainerData: () => ({ openProjectLocally }) }))
 
-const PROJECT_ID = ProjectId('project-1')
-const PARENT_ID = DirectoryId('directory-parent')
-const project = {
-  type: AssetType.project,
-  id: PROJECT_ID,
-  title: 'My Project',
-  parentId: PARENT_ID,
-} as unknown as AnyAsset
-
+const PARENT_ID = newDirectoryId(Path('/root'))
 const LOCAL_PROJECT = {
   type: AssetType.project,
   id: newProjectId(Path('/root/P')),
   title: 'P',
-  parentId: newDirectoryId(Path('/root')),
+  parentId: PARENT_ID,
 } as unknown as AnyAsset
 
 function localStatus(extra: object = {}) {
@@ -96,7 +75,7 @@ function localStatus(extra: object = {}) {
 
 const category = ref<Category>()
 const asset = ref<AnyAsset>()
-const openedProject = ref<{ id: ProjectId; title: string; mode: 'local' | 'cloud' | 'hybrid' }>()
+const openedProject = ref<{ id: ProjectId; title: string; mode: 'local' }>()
 const rightPanel = reactive({
   context: {
     get category() {
@@ -128,8 +107,8 @@ beforeEach(() => {
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
   backends.localAvailable = true
-  category.value = { type: 'cloud' }
-  asset.value = project
+  category.value = { type: 'local' }
+  asset.value = LOCAL_PROJECT
   openedProject.value = undefined
   versions = [
     version(3, {
@@ -140,16 +119,23 @@ beforeEach(() => {
     version(2, { comment: 'Fixed the join' }),
     version(1),
   ]
-  backend.listAssetVersions.mockImplementation(() =>
-    Promise.resolve({ versions } satisfies AssetVersionsResponse),
-  )
-  backend.listAssetVersionTags.mockResolvedValue(['release', 'nightly', 'Night build'])
-  backend.restoreAsset.mockResolvedValue(undefined)
-  backend.copyAsset.mockResolvedValue({ asset: { ...project, id: ProjectId('project-copy') } })
-  backend.updateAsset.mockResolvedValue(undefined)
-  backend.getMainFileContent.mockImplementation((_id: unknown, versionId: unknown) =>
-    Promise.resolve(`main = "${String(versionId)}"`),
-  )
+  localBackend.versioningStatus.mockReset().mockResolvedValue(localStatus())
+  localBackend.listAssetVersions
+    .mockReset()
+    .mockImplementation(() => Promise.resolve({ versions } satisfies AssetVersionsResponse))
+  localBackend.restoreAsset.mockReset().mockResolvedValue(undefined)
+  localBackend.copyAsset.mockReset().mockResolvedValue({
+    asset: { ...LOCAL_PROJECT, id: newProjectId(Path('/root/P_1')) },
+  })
+  localBackend.updateAsset.mockReset().mockResolvedValue(undefined)
+  localBackend.getAssetDetails.mockReset().mockResolvedValue(LOCAL_PROJECT)
+  localBackend.getMainFileContent
+    .mockReset()
+    .mockImplementation((_id: unknown, versionId: unknown) =>
+      Promise.resolve(`main = "${String(versionId)}"`),
+    )
+  openedProjects.closeProject.mockReset()
+  openedProjects.waitForProcess.mockReset().mockResolvedValue(undefined)
   openProjectLocally.mockReset()
   openedProjects.get.mockReset().mockReturnValue(undefined)
   // jsdom lays nothing out: give the version's header room for its tags, so that they show
@@ -231,12 +217,10 @@ describe('placeholders', () => {
   })
 
   test('a folder has no versions', async () => {
-    asset.value = { ...project, type: AssetType.directory } as unknown as AnyAsset
+    asset.value = { ...LOCAL_PROJECT, type: AssetType.directory } as unknown as AnyAsset
     const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain(
-      'Versions are available for projects, files and datalinks only.',
-    )
-    expect(backend.listAssetVersions).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('In the local drive, only projects have versions.')
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
 
   test('an asset without versions says so', async () => {
@@ -246,32 +230,21 @@ describe('placeholders', () => {
   })
 })
 
-describe('in a local category', () => {
+describe('in the drive', () => {
   /** Newest first. */
   let localVersions: S3ObjectVersion[]
 
   beforeEach(() => {
-    category.value = { type: 'local' }
-    asset.value = LOCAL_PROJECT
     localVersions = [version(2, { isLatest: true, comment: 'Saved' }), version(1)]
-    localBackend.versioningStatus.mockReset().mockResolvedValue(localStatus())
-    localBackend.listAssetVersions
-      .mockReset()
-      .mockImplementation(() => Promise.resolve({ versions: localVersions }))
-    localBackend.listAssetVersionTags.mockReset().mockResolvedValue([])
-    localBackend.restoreAsset.mockReset().mockResolvedValue(undefined)
-    localBackend.copyAsset.mockReset()
-    localBackend.updateAsset.mockReset().mockResolvedValue(undefined)
-    localBackend.getMainFileContent.mockReset().mockResolvedValue('main = 1')
-    openedProjects.closeProject.mockReset()
-    openedProjects.waitForProcess.mockReset().mockResolvedValue(undefined)
+    localBackend.listAssetVersions.mockImplementation(() =>
+      Promise.resolve({ versions: localVersions }),
+    )
   })
 
   test('lists a project’s versions from the local backend', async () => {
     const { wrapper } = await renderTab()
     expect(localBackend.versioningStatus).toHaveBeenCalledWith('/root/P')
     expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
-    expect(backend.listAssetVersions).not.toHaveBeenCalled()
     expect(wrapper.text()).toMatch(/Version 2.*Version 1/)
     expect(wrapper.text()).toContain('Saved')
   })
@@ -316,12 +289,11 @@ describe('in a local category', () => {
     expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
 
-  test('no tags: no "Add tag" button, no suggestions; "Latest" still shows', async () => {
+  test('tags cannot be added or removed; "Latest" still shows', async () => {
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('Latest')
-    // In the cloud, each version has an "add" button for a tag (see the tags tests).
     expect(buttonsWithIcon('add')).toHaveLength(0)
-    expect(localBackend.listAssetVersionTags).not.toHaveBeenCalled()
+    expect(buttonsWithIcon('close')).toHaveLength(0)
   })
 
   test('a comment is added from the comment button, and saved with Enter', async () => {
@@ -499,16 +471,9 @@ describe('in a project tab', () => {
   beforeEach(() => {
     category.value = undefined
     asset.value = undefined
-    localBackend.versioningStatus.mockReset().mockResolvedValue(localStatus())
-    localBackend.getAssetDetails.mockReset().mockResolvedValue(LOCAL_PROJECT)
-    localBackend.listAssetVersions.mockReset().mockResolvedValue({
+    localBackend.listAssetVersions.mockResolvedValue({
       versions: [version(2, { isLatest: true, comment: 'Saved' }), version(1)],
     })
-    localBackend.listAssetVersionTags.mockReset().mockResolvedValue([])
-    localBackend.restoreAsset.mockReset().mockResolvedValue(undefined)
-    backend.getAssetDetails.mockReset().mockResolvedValue(project)
-    openedProjects.closeProject.mockReset()
-    openedProjects.waitForProcess.mockReset().mockResolvedValue(undefined)
   })
 
   test('a local project: lists its versions from the local backend', async () => {
@@ -518,7 +483,6 @@ describe('in a project tab', () => {
     expect(localBackend.getAssetDetails).toHaveBeenCalledWith(LOCAL_PROJECT.id, undefined)
     expect(localBackend.versioningStatus).toHaveBeenCalledWith('/root/P')
     expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
-    expect(backend.listAssetVersions).not.toHaveBeenCalled()
     expect(wrapper.text()).not.toContain('Select a single asset')
   })
 
@@ -539,30 +503,12 @@ describe('in a project tab', () => {
     expect(wrapper.text()).toContain('The local drive is not available.')
   })
 
-  test('a cloud project: lists its versions from the cloud', async () => {
-    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'cloud' }
-    const { wrapper } = await renderTab()
-    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 3.*Version 2.*Version 1/))
-    expect(backend.getAssetDetails).toHaveBeenCalledWith(PROJECT_ID, undefined)
-    expect(backend.listAssetVersions).toHaveBeenCalledWith(PROJECT_ID)
-    expect(localBackend.getAssetDetails).not.toHaveBeenCalled()
-    expect(localBackend.versioningStatus).not.toHaveBeenCalled()
-  })
-
-  test('a hybrid project: lists the cloud project’s versions', async () => {
-    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'hybrid' }
-    const { wrapper } = await renderTab()
-    await vi.waitFor(() => expect(wrapper.text()).toMatch(/Version 3/))
-    expect(backend.listAssetVersions).toHaveBeenCalledWith(PROJECT_ID)
-    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
-  })
-
   test('a project whose details cannot be read shows the error', async () => {
-    openedProject.value = { id: PROJECT_ID, title: 'My Project', mode: 'cloud' }
-    backend.getAssetDetails.mockRejectedValue(new Error('no such project'))
+    openedProject.value = { id: LOCAL_PROJECT.id as ProjectId, title: 'P', mode: 'local' }
+    localBackend.getAssetDetails.mockRejectedValue(new Error('no such project'))
     const { wrapper } = await renderTab()
     await vi.waitFor(() => expect(wrapper.text()).toContain('no such project'), { timeout: 5000 })
-    expect(backend.listAssetVersions).not.toHaveBeenCalled()
+    expect(localBackend.listAssetVersions).not.toHaveBeenCalled()
   })
 
   test('restoring finishes, and the project opens again, even if the list unmounts', async () => {
@@ -596,20 +542,12 @@ describe('in a project tab', () => {
 describe('the list', () => {
   test('shows each version, newest first, with its tags, comment and author', async () => {
     const { wrapper } = await renderTab()
-    expect(backend.listAssetVersions).toHaveBeenCalledWith(PROJECT_ID)
+    expect(localBackend.listAssetVersions).toHaveBeenCalledWith(LOCAL_PROJECT.id)
     expect(wrapper.text()).toMatch(/Version 3.*Version 2.*Version 1/)
     expect(wrapper.text()).toContain('Latest')
     expect(wrapper.text()).toContain('release')
     expect(wrapper.text()).toContain('Fixed the join')
     expect(wrapper.text()).toContain('Ada')
-  })
-
-  test('a version of another asset has no "See changes"', async () => {
-    asset.value = { ...project, type: AssetType.file } as unknown as AnyAsset
-    const { wrapper } = await renderTab()
-    expect(wrapper.text()).toContain('Version 3')
-    expect(wrapper.text()).not.toContain('See changes')
-    expect(wrapper.text()).toContain('Actions')
   })
 })
 
@@ -627,17 +565,21 @@ describe('actions', () => {
     await renderTab()
     const user = await openMenu(1)
     await choose(user, 'Restore')
-    expect(backend.restoreAsset).toHaveBeenCalledWith(PROJECT_ID, versions[1]!.versionId)
+    expect(localBackend.restoreAsset).toHaveBeenCalledWith(LOCAL_PROJECT.id, versions[1]!.versionId)
   })
 
   test('"Duplicate and open" duplicates the version and opens the copy', async () => {
     await renderTab()
     const user = await openMenu(1)
     await choose(user, 'Duplicate and open')
-    expect(backend.copyAsset).toHaveBeenCalledWith(PROJECT_ID, PARENT_ID, versions[1]!.versionId)
+    expect(localBackend.copyAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      PARENT_ID,
+      versions[1]!.versionId,
+    )
     expect(openProjectLocally).toHaveBeenCalledWith(
-      expect.objectContaining({ id: ProjectId('project-copy') }),
-      'remote',
+      expect.objectContaining({ id: newProjectId(Path('/root/P_1')) }),
+      'local',
     )
   })
 
@@ -669,8 +611,14 @@ describe('"See changes"', () => {
     expect(dialog.textContent).toContain('Compare Version 3 with Version 2')
     expect(dialog.querySelector('.cm-merge-a')?.textContent).toContain('version-2')
     expect(dialog.querySelector('.cm-merge-b')?.textContent).toContain('version-3')
-    expect(backend.getMainFileContent).toHaveBeenCalledWith(PROJECT_ID, versions[0]!.versionId)
-    expect(backend.getMainFileContent).toHaveBeenCalledWith(PROJECT_ID, versions[1]!.versionId)
+    expect(localBackend.getMainFileContent).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      versions[0]!.versionId,
+    )
+    expect(localBackend.getMainFileContent).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
+      versions[1]!.versionId,
+    )
     // The latest version cannot be restored; it can be duplicated.
     const actions = [...dialog.querySelectorAll('button')].map((button) =>
       button.textContent?.trim(),
@@ -693,10 +641,10 @@ describe('comments', () => {
     expect(document.activeElement).toBe(textArea)
     await user.keyboard('First release{Enter}')
     await flushPromises()
-    expect(backend.updateAsset).toHaveBeenCalledWith(
-      PROJECT_ID,
+    expect(localBackend.updateAsset).toHaveBeenCalledWith(
+      LOCAL_PROJECT.id,
       { versionId: versions[0]!.versionId, comment: 'First release' },
-      'My Project',
+      'P',
     )
     expect(text()).toContain('First release')
   })
@@ -709,37 +657,12 @@ describe('comments', () => {
     await user.keyboard('{Control>}a{/Control}Changed{Escape}')
     await flushPromises()
     expect(document.querySelector('textarea')).toBeNull()
-    expect(backend.updateAsset).not.toHaveBeenCalled()
+    expect(localBackend.updateAsset).not.toHaveBeenCalled()
     expect(text()).toContain('Fixed the join')
   })
 })
 
 describe('tags', () => {
-  test('a tag is added from the popover, which suggests the other tags', async () => {
-    await renderTab()
-    const user = userEvent.setup()
-    const addTag = buttonsWithIcon('add')[1]!
-    await user.click(addTag)
-    await flushPromises()
-    const input = document.querySelector<HTMLInputElement>('input[aria-label="Add tag"]')!
-    // Focused after a short delay, once the popover's own focus handling has settled.
-    await vi.waitFor(() => expect(document.activeElement).toBe(input))
-    expect(backend.listAssetVersionTags).toHaveBeenCalledTimes(2)
-    // The filter is case-insensitive.
-    await user.keyboard('NIGHT')
-    const suggestions = [...document.querySelectorAll<HTMLElement>('form button')].map((button) =>
-      button.textContent?.trim(),
-    )
-    expect(suggestions).toEqual(['nightly', 'Night build'])
-    await user.keyboard('{Enter}')
-    await flushPromises()
-    expect(backend.updateAsset).toHaveBeenCalledWith(
-      PROJECT_ID,
-      { versionId: versions[1]!.versionId, tag: 'NIGHT', remove: false },
-      PROJECT_ID,
-    )
-  })
-
   test('tags that do not fit beside the title collapse into one', async () => {
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
       new DOMRect(0, 0, 40, 20),
@@ -747,19 +670,5 @@ describe('tags', () => {
     const { wrapper } = await renderTab()
     expect(wrapper.text()).toContain('2 tags')
     expect(buttonsWithIcon('close')).toHaveLength(0)
-  })
-
-  test('a tag is removed with its close button; "Latest" has none', async () => {
-    await renderTab()
-    const user = userEvent.setup()
-    const removeButtons = buttonsWithIcon('close')
-    expect(removeButtons).toHaveLength(1)
-    await user.click(removeButtons[0]!)
-    await flushPromises()
-    expect(backend.updateAsset).toHaveBeenCalledWith(
-      PROJECT_ID,
-      { versionId: versions[0]!.versionId, tag: 'release', remove: true },
-      PROJECT_ID,
-    )
   })
 })

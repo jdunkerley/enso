@@ -1,15 +1,11 @@
 /**
  * @file The queries behind the right panel's Versions tab: an asset's versions, and the contents of
- * a project version's `Main.enso`, plus the optimistic tag updates. Their keys and options come
- * from the shared `backendQueryOptions` (#192), so that the cache, its persistence and the
+ * a project version's `Main.enso`. Their keys and options come from the shared `backendQueryOptions` (#192), so that the cache, its persistence and the
  * invalidations of `INVALIDATION_MAP` behave as before.
  */
 import { backendQueryKey, backendQueryOptions } from '$/utils/backendQuery'
-import { backendMutationOptions } from '@/composables/backend'
-import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type {
   AssetId,
-  AssetVersions,
   Backend,
   DatalinkId,
   FileId,
@@ -31,11 +27,6 @@ export function assetVersionsQueryOptions(
   return backendQueryOptions(backend, 'listAssetVersions', [assetId])
 }
 
-/** Options for a query of the organization's version tags, offered as suggestions. */
-export function versionTagsQueryOptions(backend: Backend) {
-  return backendQueryOptions(backend, 'listAssetVersionTags', [])
-}
-
 /** Options for a query of the contents of a project version's `Main.enso`. */
 export function versionContentQueryOptions(params: {
   readonly backend: Backend
@@ -50,67 +41,4 @@ export function versionContentQueryOptions(params: {
     queryFn: () => backend.getMainFileContent(projectId, versionId),
     select: (data: string) => (metadata ? data : splitFileContents(data).code),
   }
-}
-
-/** Apply `updateTags` to the tags of one version in a cached version list. */
-function mapVersionTags(
-  versions: AssetVersions,
-  versionId: S3ObjectVersionId,
-  updateTags: (tags: readonly string[]) => readonly string[],
-): AssetVersions {
-  return {
-    ...versions,
-    versions: versions.versions.map((version) =>
-      version.versionId !== versionId ?
-        version
-      : { ...version, tags: [...updateTags(version.tags ?? [])] },
-    ),
-  }
-}
-
-/**
- * Add or remove a version's tag, showing the change at once. The cached list is restored if the
- * request fails, and refetched either way.
- */
-function useUpdateVersionTag(
-  backend: Backend,
-  remove: boolean,
-  optimisticUpdate: (tag: string, tags: readonly string[]) => readonly string[],
-) {
-  const queryClient = useQueryClient()
-  const updateAsset = useMutation(backendMutationOptions('updateAsset', backend))
-
-  return async (assetId: AssetId, versionId: S3ObjectVersionId, tag: string) => {
-    const queryKey = assetVersionsQueryKey(backend, assetId)
-    await queryClient.cancelQueries({ queryKey })
-    const previousVersions = queryClient.getQueryData<AssetVersions>(queryKey)
-    if (previousVersions != null) {
-      queryClient.setQueryData<AssetVersions>(
-        queryKey,
-        mapVersionTags(previousVersions, versionId, (tags) => optimisticUpdate(tag, tags)),
-      )
-    }
-    try {
-      await updateAsset.mutateAsync([assetId, { versionId, tag, remove }, assetId])
-    } catch (error) {
-      if (previousVersions != null) queryClient.setQueryData(queryKey, previousVersions)
-      throw error
-    } finally {
-      await queryClient.invalidateQueries({ queryKey })
-    }
-  }
-}
-
-/** A function adding a tag to an asset's version. */
-export function useAddVersionTag(backend: Backend) {
-  return useUpdateVersionTag(backend, false, (tag, tags) =>
-    tags.includes(tag) ? tags : [...tags, tag],
-  )
-}
-
-/** A function removing a tag from an asset's version. */
-export function useRemoveVersionTag(backend: Backend) {
-  return useUpdateVersionTag(backend, true, (tag, tags) =>
-    tags.filter((existingTag) => existingTag !== tag),
-  )
 }

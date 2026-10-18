@@ -93,15 +93,6 @@ function useRightPanelTabs(
       },
     ],
     [
-      'executionsCalendar',
-      {
-        icon: 'schedule',
-        enabled: Err('Exclusive to Cloud'),
-        hidden: () => rightPanelTabContribution('executionsCalendar') == null,
-        title: textRef('executionsCalendar'),
-      },
-    ],
-    [
       'documentation',
       {
         icon: 'docs',
