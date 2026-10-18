@@ -86,10 +86,6 @@ pub mod secret {
     pub const ENSO_LIB_S3_AWS_REGION: &str = "ENSO_LIB_S3_AWS_REGION";
     pub const ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: &str = "ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY";
 
-    // === Enso Cloud deployment ===
-    /// Static token for admin requests on our Lambdas.
-    pub const ENSO_ADMIN_TOKEN: &str = "ENSO_ADMIN_TOKEN";
-
     // === Enso Cloud Test Account ===
     pub const ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: &str =
         "ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID";

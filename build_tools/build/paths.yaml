@@ -97,10 +97,6 @@
     Benchmarks/:
   tools/:
     ci/:
-      docker/:
-        engine/:
-          docker-entrypoint.sh:
-          Dockerfile:
     simple-library-server/:
   std-bits/:
     benchmarks/:
