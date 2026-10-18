@@ -484,16 +484,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT_PASSWORD }}
           WIN_CSC_LINK: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT }}
-      - name: Smoke-test the installer
-        run: ./tools/ci/windows-installer-smoke.ps1 -Installer (Get-Item dist/ide/enso-win-x64-*.exe).FullName
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload ide
         uses: actions/upload-artifact@v5
         with:
           name: ide-windows
           path: dist/ide/enso-*.exe
+      - name: Smoke-test the installer
+        run: ./tools/ci/windows-installer-smoke.ps1 -Installer (Get-Item dist/ide/enso-win-x64-*.exe).FullName
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Package Tests
         run: corepack pnpm -r --filter enso ide-integration-test
         env:
