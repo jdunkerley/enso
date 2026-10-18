@@ -28,8 +28,9 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
-- Handles auto-update (electron-updater via electron-builder), custom window
-  chrome.
+- Handles custom window chrome. There is no auto-update yet: the build only
+  configures the GitHub update feed (`publish` in `electron-builder-config.ts`);
+  the in-app updater is a later part of the standard-installer work.
 
 ## Build
 
@@ -37,6 +38,20 @@ Currently driven by `./run ide build` (the legacy Enso build CLI). Don't call
 `electron-builder` or `pnpm run dist` manually unless you're debugging packaging
 — the build CLI wires the engine bundle, GUI, and Electron together with the
 right env vars.
+
+### Windows installer
+
+The Windows installer is built by electron-builder's NSIS target, not a custom
+installer (the Rust installer under `build_tools/install` was removed).
+
+- It is a per-user install to `%LOCALAPPDATA%\Programs\enso`, with a single
+  entry under installed apps, and supports silent install and uninstall (`/S`).
+- `build/installer.nsh` migrates an existing install made by the old Rust
+  installer: it removes that installer's uninstall key, `App Paths` entry and
+  ProgIDs, and keeps `.enso` file association working.
+- `tools/ci/windows-installer-smoke.ps1` runs in CI on every packaging run: it
+  installs silently, starts the app, and uninstalls.
+- Builds are unsigned for now.
 
 **Build the engine locally — don't bundle a released one.** `./run ide build`
 defaults to `--backend-source build`, which compiles the engine from these

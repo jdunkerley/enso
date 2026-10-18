@@ -2,6 +2,8 @@
 
 #### Enso IDE
 
+- [The Windows installer is a standard installer: it can install silently (`/S`)
+  and shows a single entry under installed apps.][NNN]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -294,6 +296,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [116]: https://github.com/jdunkerley/enso/pull/116
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
