@@ -239,6 +239,11 @@ platform. So each release should contain the following assets:
 
 #### Marking a Release as Broken
 
+> **This fork:** releases are IDE-only GitHub releases, and there is no
+> broken-marking workflow (`release-update-broken.yml` was removed with the S3
+> release code). Uploading a `broken` file marks nothing anywhere else. The
+> upstream description below is kept for reference.
+
 We intend to _never_ delete a release from GitHub, as users may have projects
 that depend on specific versions of Enso. Instead, we provide a mechanism for
 marking releases as broken that works as follows:

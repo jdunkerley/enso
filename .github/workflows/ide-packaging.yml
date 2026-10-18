@@ -85,6 +85,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
@@ -181,6 +182,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
@@ -261,6 +263,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Cache Rust build
@@ -337,6 +340,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script
@@ -432,6 +436,7 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version-file: .node-version
+          package-manager-cache: false
       - if: runner.os != 'Linux'
         run: npm install -g --force corepack@0.36.0 && corepack --version
       - name: Download Build Script

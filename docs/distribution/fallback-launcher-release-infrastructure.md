@@ -103,6 +103,11 @@ requirements:
 
 ## Current Fallback Infrastructure Implementation
 
+> **This fork:** releases are IDE-only GitHub releases. Nothing is uploaded to
+> S3, and there is no broken-marking workflow (`release-update-broken.yml` was
+> removed). The upstream description of the S3 implementation below is kept for
+> reference.
+
 Currently the fallback mechanism is disabled, as it should only be enabled in
 case the primary release provider becomes permanently unavailable (or at least
 in case the unavailability is not temporary and is known to span a long enough
