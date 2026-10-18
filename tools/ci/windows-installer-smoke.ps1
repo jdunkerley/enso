@@ -9,6 +9,8 @@ $ErrorActionPreference = 'Stop'
 $uninstallRoot = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall'
 
 function Get-EnsoUninstallEntries {
+  # A fresh CI runner has no per-user Uninstall key until something installs per-user.
+  if (-not (Test-Path $uninstallRoot)) { return @() }
   @(Get-ChildItem $uninstallRoot | ForEach-Object { Get-ItemProperty $_.PSPath } |
     Where-Object { $_.DisplayName -like 'Enso*' })
 }
