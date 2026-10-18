@@ -14,18 +14,14 @@ import { twMerge } from '$/utils/style/tailwindMerge'
 import type { DirectoryAsset } from 'enso-common/src/services/Backend'
 import { directoryNavigationSource, useNameCell } from './nameColumn'
 
-const { item, isEditable } = defineProps<{
+const { item } = defineProps<{
   item: DirectoryAsset
-  isEditable: boolean
 }>()
 
 const { getText } = useText()
 const drive = useDriveLocation()
 const driveView = useDriveView()
-const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
-  () => item,
-  () => isEditable,
-)
+const { isEditingName, setIsEditing, doRename, schema } = useNameCell(() => item)
 
 /** What opening this directory is, for the drive to show its spinner on this row's button. */
 const navigationSource = directoryNavigationSource(item.id)

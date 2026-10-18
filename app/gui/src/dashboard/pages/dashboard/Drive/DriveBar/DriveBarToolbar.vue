@@ -91,7 +91,7 @@ function downloadFiles() {
 <template>
   <ButtonGroup v-if="isRecentCategory(category)" class="grow-0">
     <PasteStatus v-if="effectivePasteData" :pasteData="effectivePasteData" />
-    <AssetSearchBar :backend="backend" :isCloud="false" :query="query" :setQuery="setQuery" />
+    <AssetSearchBar :backend="backend" :query="query" :setQuery="setQuery" />
   </ButtonGroup>
   <div v-else class="flex w-full flex-1 shrink-0 gap-2">
     <ButtonGroup class="grow-0">
@@ -143,6 +143,6 @@ function downloadFiles() {
       </div>
     </ButtonGroup>
     <PasteStatus v-if="effectivePasteData" :pasteData="effectivePasteData" />
-    <AssetSearchBar :backend="backend" :isCloud="false" :query="query" :setQuery="setQuery" />
+    <AssetSearchBar :backend="backend" :query="query" :setQuery="setQuery" />
   </div>
 </template>

@@ -1,6 +1,7 @@
 /** @file Types and constants related to `Column`s. */
 import { isRecentCategory, type CategoryType } from '$/providers/category'
 import type { Icon } from '@/util/iconMetadata/iconName'
+import * as z from 'zod'
 
 /** Column type. */
 export enum Column {
@@ -73,3 +74,24 @@ export function getColumnList(
 
   return columns.flatMap((column) => (column !== false ? [column] : []))
 }
+
+const COLUMN_NAMES: readonly string[] = Object.values(Column)
+
+/**
+ * The schema of the saved list of enabled columns. A column that no longer exists (such as "Shared
+ * with") is dropped, not a reason to forget the user's other choices; and a list of only such
+ * columns, which would leave nothing to show, is replaced by the defaults. The schema reads any
+ * strings, which the column type cannot express.
+ */
+const readEnabledColumns = z
+  .string()
+  .array()
+  .transform((columns) => {
+    const known = columns.filter((column): column is Column => COLUMN_NAMES.includes(column))
+    return columns.length > 0 && known.length === 0 ? [...DEFAULT_ENABLED_COLUMNS] : known
+  })
+  .readonly()
+
+// `LocalStorage` wants a schema whose input is its output.
+// eslint-disable-next-line no-restricted-syntax
+export const enabledColumnsSchema = readEnabledColumns as z.ZodType<readonly Column[]>

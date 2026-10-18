@@ -340,11 +340,19 @@ export async function mockLocalApi(page: Page) {
     return path
   }
 
-  /** Whether some project already has the name (the shim's `ProjectRepository.exists`). */
-  const projectNameTaken = (name: string) =>
-    [...fileSystem.values()].some(
-      (entry) => entry.type === 'ProjectEntry' && entry.entry.metadata.name === name,
+  /**
+   * Whether a project in the projects directory `parentPath` already has the name (the shim's
+   * `ProjectRepository.exists`, which lists that directory only).
+   */
+  const projectNameTaken = (name: string, parentPath: Path = ROOT_PATH) => {
+    const parent = fileSystem.get(parentPath)
+    return (
+      parent?.type === 'DirectoryEntry' &&
+      parent.children.some(
+        (entry) => entry.type === 'ProjectEntry' && entry.entry.metadata.name === name,
+      )
     )
+  }
 
   /** Add a project under the root, by title; returns its directory. */
   const addRootProject = (
@@ -461,11 +469,19 @@ export async function mockLocalApi(page: Page) {
       // does: a clash gets `_1`, `_2`, ... after it.
       const suggestedName = `${original.entry.metadata.name} (copy)`
       let suffix = 0
-      while (projectNameTaken(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`)) {
+      while (
+        projectNameTaken(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`, parentPath)
+      ) {
         suffix += 1
       }
       const name = ProjectName(suffix === 0 ? suggestedName : `${suggestedName}_${suffix}`)
-      const path = Path(`${parentPath}/${name}`)
+      // The directory is named after the normalized name, and made unique like the shim's
+      // `findTargetPath`.
+      const normalizedName = normalizeProjectName(name)
+      let path = Path(`${parentPath}/${normalizedName}`)
+      for (let dirSuffix = 1; fileSystem.has(path); dirSuffix += 1) {
+        path = Path(`${parentPath}/${normalizedName}_${dirSuffix}`)
+      }
       const id = UUID(uuidv4())
       addProject({
         path,
@@ -474,7 +490,7 @@ export async function mockLocalApi(page: Page) {
       const result: DuplicatedProject = {
         projectId: id,
         projectName: name,
-        projectNormalizedName: name,
+        projectNormalizedName: normalizedName,
         projectPath: path,
       }
       return route.fulfill({
@@ -583,7 +599,7 @@ export async function mockLocalApi(page: Page) {
       if (name.trim().length === 0) {
         return toJSONRPCError('Project name cannot be empty.')
       }
-      if (projectNameTaken(name)) {
+      if (projectNameTaken(name, getDirectoryAndName(project.entry.path).directoryPath)) {
         return toJSONRPCError(`Project with name '${name}' already exists.`)
       }
       const oldPath = project.entry.path

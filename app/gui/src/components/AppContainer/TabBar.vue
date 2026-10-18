@@ -77,9 +77,6 @@ function projectIcon(project: Project): Icon | undefined {
   if (project.error != null) {
     return 'error'
   }
-  if (project.state.status === 'closed-by-backend') {
-    return 'warning'
-  }
   if (project.nextTask?.process === 'opening' || project.nextTask?.process === 'restoring') {
     return undefined
   }

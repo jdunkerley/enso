@@ -7,8 +7,8 @@
  *
  * With nothing selected, for an asset without versions (only projects have them), or for a project
  * whose versions are not kept (no git, no repository, or the repository is not enabled) it says
- * so, and if its status cannot be read, it shows the error. The list itself (`AssetVersionList.vue`) loads in a `SuspenseLoader`,
- * and is remounted for each asset.
+ * so, and if its status cannot be read, it shows the error. The list itself
+ * (`AssetVersionList.vue`) loads in a `SuspenseLoader`, and is remounted for each asset.
  */
 import ErrorBoundary from '$/components/ErrorBoundary/ErrorBoundary.vue'
 import SuspenseLoader from '$/components/ErrorBoundary/SuspenseLoader.vue'

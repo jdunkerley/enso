@@ -1,9 +1,6 @@
 <script setup lang="ts">
-import Result from '$/components/Result/Result.vue'
 import WithCurrentProject from '$/components/WithCurrentProject.vue'
 import type { ProjectTab } from '$/providers/container'
-import { useOpenedProjects } from '$/providers/openedProjects'
-import { useText } from '$/providers/text'
 import GraphEditor from '@/components/GraphEditor.vue'
 import { provideVisibility } from '@/providers/visibility'
 import { provideSettings } from '@/stores/settings'
@@ -12,9 +9,6 @@ import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
 const props = defineProps<{ tab: ProjectTab }>()
 
 const projectId = computed(() => props.tab.id)
-const openedProjects = useOpenedProjects()
-const projectState = computed(() => projectId.value && openedProjects.get(projectId.value)?.state)
-const { getText } = useText()
 
 provideSettings()
 const visible = ref(false)
@@ -27,17 +21,7 @@ onDeactivated(() => (visible.value = false))
 
 <template>
   <div id="ProjectView" class="ProjectView">
-    <Result
-      v-if="projectState?.status === 'closed-by-backend'"
-      status="info"
-      :title="getText('projectStopped')"
-      :subtitle="getText('projectStoppedDescription')"
-    >
-      <button @click="openedProjects.openProject(projectState.info)">
-        {{ getText('openProject') }}
-      </button>
-    </Result>
-    <WithCurrentProject v-else :id="projectId">
+    <WithCurrentProject :id="projectId">
       <!-- Key property is needed because of still many usages of deprecated useXStore 
        (see WithCurrentProject.vue). Once all those usages disappear, fully remouting GraphEditor
        will be no longer necessary -->

@@ -1,7 +1,8 @@
 /**
  * @file The queries behind the right panel's Versions tab: an asset's versions, and the contents of
- * a project version's `Main.enso`. Their keys and options come from the shared `backendQueryOptions` (#192), so that the cache, its persistence and the
- * invalidations of `INVALIDATION_MAP` behave as before.
+ * a project version's `Main.enso`. Their keys and options come from the shared
+ * `backendQueryOptions` (#192), so that the cache, its persistence and the invalidations of
+ * `INVALIDATION_MAP` behave as before.
  */
 import { backendQueryKey, backendQueryOptions } from '$/utils/backendQuery'
 import type {

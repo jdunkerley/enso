@@ -81,23 +81,12 @@ export interface ToRestore {
 }
 
 /**
- * A project which was running when application closed, but cannot be restored, because it was
- * closed/released by backend in the meantime.
- */
-export interface ClosedByBackend {
-  status: 'closed-by-backend'
-  info: RunningProjectInfo
-  scope: EffectScope
-  details: Ref<ProjectDetails>
-}
-
-/**
  *  A state of a project.
  *
  * The states covers entire possible lifespan of a project, may be discerned by `status` field.
  * The main, working state of opened project is {@link Initialized}; it contains all project stores.
  */
-export type ProjectState = NotOpened | Opened | Initialized | ToRestore | ClosedByBackend
+export type ProjectState = NotOpened | Opened | Initialized | ToRestore
 
 /**
  * A composable with project state transiting operations.
@@ -307,17 +296,12 @@ export function useProjectStates() {
   }
 
   /** Restore project after app restart: a local project is opened outright. */
-  async function restoreProject(project: ToRestore): Promise<Result<Opened | ClosedByBackend>> {
-    return openProject({ status: 'not-opened', info: project.info })
-  }
-
-  /** Confirm a restored project reopening. */
-  async function reopenProject(project: ClosedByBackend): Promise<Result<Opened>> {
+  async function restoreProject(project: ToRestore): Promise<Result<Opened>> {
     return openProject({ status: 'not-opened', info: project.info })
   }
 
   /** Discard the restored project. */
-  async function discardProject(project: ToRestore | ClosedByBackend): Promise<Result<NotOpened>> {
+  async function discardProject(project: ToRestore): Promise<Result<NotOpened>> {
     return Ok({ status: 'not-opened', info: project.info })
   }
 
@@ -328,7 +312,6 @@ export function useProjectStates() {
     closeProjectInBackend,
     renameProject,
     restoreProject,
-    reopenProject,
     discardProject,
   }
 }

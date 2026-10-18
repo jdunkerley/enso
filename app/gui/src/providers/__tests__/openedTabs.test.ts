@@ -5,7 +5,7 @@
 import '$/providers/container'
 import LocalStorage from '$/utils/LocalStorage'
 import { PRODUCT_NAME } from 'enso-common/src/constants'
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
 const runningProject = {
   id: 'project-/root/P',
@@ -14,6 +14,10 @@ const runningProject = {
   ensoPath: '/root/P',
 }
 
+// A parsed value stays cached in the `LocalStorage` singleton, so each test gets a fresh one.
+beforeEach(() => {
+  ;(LocalStorage as unknown as { instance: LocalStorage | null }).instance = null
+})
 afterEach(() => localStorage.clear())
 
 test.each(['cloud', 'hybrid'])('a saved %s project tab restores no tabs', (mode) => {
@@ -27,7 +31,6 @@ test.each(['cloud', 'hybrid'])('a saved %s project tab restores no tabs', (mode)
   expect(LocalStorage.getInstance().get('openedTabs')).toBeUndefined()
 })
 
-// Last: a parsed value stays cached in the `LocalStorage` singleton.
 test('a saved local project tab is restored', () => {
   const tab = {
     type: 'project',

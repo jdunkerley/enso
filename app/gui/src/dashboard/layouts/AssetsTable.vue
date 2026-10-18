@@ -16,9 +16,8 @@
  * stop that roves with the focus (`Drive/rovingTabStop.ts`) and row positions; drags of rows are
  * announced in a live region (`Drive/dragAnnouncements.ts`).
  */
-import { Column } from '#/pages/dashboard/components/column/columnUtils'
+import { Column, enabledColumnsSchema } from '#/pages/dashboard/components/column/columnUtils'
 import LocalStorage from '$/utils/LocalStorage'
-import * as z from 'zod'
 
 declare module '$/utils/LocalStorage' {
   interface LocalStorageData {
@@ -26,16 +25,8 @@ declare module '$/utils/LocalStorage' {
   }
 }
 
-const COLUMNS: readonly string[] = Object.values(Column)
-
 LocalStorage.registerKey('enabledColumns', {
-  // A column that no longer exists (such as "Shared with") is dropped, not a reason to forget the
-  // user's other choices. The schema reads any strings, which its declared type cannot express.
-  schema: z
-    .string()
-    .array()
-    .transform((columns) => columns.filter((column): column is Column => COLUMNS.includes(column)))
-    .readonly() as z.ZodType<readonly Column[]>,
+  schema: enabledColumnsSchema,
 })
 
 /** The height of each row in the table body. It MUST be the one Tailwind's `h-table-row` sets. */

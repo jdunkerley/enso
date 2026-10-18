@@ -27,7 +27,6 @@ const { currentDirectoryId, bindingTarget, position, doCut, doPaste } = definePr
   /** The element whose keys the entries' shortcuts act on: the assets table. */
   bindingTarget: HTMLElement | null | undefined
   position: Pick<MouseEvent, 'pageX' | 'pageY'>
-  doCopy: () => void
   doCut: () => void
   doPaste: (newParentId: backendModule.DirectoryId) => void
 }>()

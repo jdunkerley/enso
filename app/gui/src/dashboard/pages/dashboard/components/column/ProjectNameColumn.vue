@@ -14,20 +14,14 @@ import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import { computed } from 'vue'
 import { useNameCell } from './nameColumn'
 
-const { item, isEditable } = defineProps<{
+const { item } = defineProps<{
   item: ProjectAsset
-  isEditable: boolean
 }>()
 
 const container = useContainerData()
 const driveView = useDriveView()
 const backend = computed(() => driveView.location.backend)
-const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
-  () => item,
-  () => isEditable,
-)
-
-const canExecute = computed(() => isEditable)
+const { isEditingName, setIsEditing, doRename, schema } = useNameCell(() => item)
 
 function onKeyDown(event: KeyboardEvent) {
   if (isEditingName.value && isOnMacOS() && event.key === 'Enter') event.stopPropagation()
@@ -36,7 +30,7 @@ function onKeyDown(event: KeyboardEvent) {
 function onClick(event: MouseEvent) {
   if (isEditingName.value) {
     // The project should not be opened while it is being renamed.
-  } else if (isDoubleClick(event) && canExecute.value) {
+  } else if (isDoubleClick(event)) {
     container.openProjectLocally(item, backend.value.type)
   }
 }
@@ -48,18 +42,12 @@ function onClick(event: MouseEvent) {
     @keydown="onKeyDown"
     @click="onClick"
   >
-    <ProjectIcon :isDisabled="!canExecute" :backend="backend" :item="item" />
+    <ProjectIcon :isDisabled="false" :backend="backend" :item="item" />
     <EditableSpan
       testId="asset-row-name"
       :text="item.title"
       :editable="isEditingName"
-      :class="
-        twMerge(
-          'grow bg-transparent',
-          canExecute && 'cursor-pointer',
-          isEditingName && 'cursor-text',
-        )
-      "
+      :class="twMerge('grow bg-transparent', 'cursor-pointer', isEditingName && 'cursor-text')"
       :schema="schema"
       :onSubmit="doRename"
       :onCancel="() => setIsEditing(false)"

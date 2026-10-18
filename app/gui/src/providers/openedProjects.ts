@@ -191,8 +191,6 @@ export function createOpenedProjectsStore() {
           break
         case 'to-restore':
           return projectStates.restoreProject(state)
-        case 'closed-by-backend':
-          return projectStates.reopenProject(state)
       }
     },
     closing: (state: ProjectState) => {
@@ -205,13 +203,10 @@ export function createOpenedProjectsStore() {
             offer: !closingWithoutOffer.has(state.info.id),
           })
         case 'to-restore':
-        case 'closed-by-backend':
           return projectStates.discardProject(state)
       }
     },
-    restoring: (state: ProjectState, abort: AbortSignal) => {
-      if (state.status !== 'closed-by-backend') return PROCESS_STEPS.opening(state, abort)
-    },
+    restoring: (state: ProjectState, abort: AbortSignal) => PROCESS_STEPS.opening(state, abort),
   }
 
   /** Wait for the current project's process finish (including failure). */

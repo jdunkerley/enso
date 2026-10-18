@@ -303,7 +303,6 @@ function createContainerStore() {
             case 'opened':
             case 'initialized':
             case 'to-restore':
-            case 'closed-by-backend':
               runningProject = project.state.info
               break
           }

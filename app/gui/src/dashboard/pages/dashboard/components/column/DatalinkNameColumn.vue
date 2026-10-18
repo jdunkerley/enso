@@ -12,17 +12,13 @@ import { isDoubleClick } from '$/utils/event'
 import type { DatalinkAsset } from 'enso-common/src/services/Backend'
 import { useNameCell } from './nameColumn'
 
-const { item, isEditable } = defineProps<{
+const { item } = defineProps<{
   item: DatalinkAsset
-  isEditable: boolean
 }>()
 
 const driveView = useDriveView()
 const editDatalink = useEditDatalink(() => driveView.location.backend)
-const { isEditingName, setIsEditing, doRename, schema } = useNameCell(
-  () => item,
-  () => isEditable,
-)
+const { isEditingName, setIsEditing, doRename, schema } = useNameCell(() => item)
 
 function onKeyDown(event: KeyboardEvent) {
   if (isEditingName.value && event.key === 'Enter') event.stopPropagation()

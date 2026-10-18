@@ -92,6 +92,24 @@ describe('useMoveAssets', () => {
     expect(local.copyAsset).toHaveBeenCalledWith('file-a', LOCAL_DIR_ID)
   })
 
+  test('a drop onto a folder moves into that folder, even within the same category', async () => {
+    const move = await setup()
+    const folder = DirectoryId('directory-folder')
+    await move({ type: 'local' }, { type: 'local' }, [asset('file-a')], folder, 'move')
+    expect(local.updateAsset).toHaveBeenCalledWith(
+      'file-a',
+      expect.objectContaining({ parentDirectoryId: folder }),
+      '(unknown)',
+    )
+  })
+
+  test('copy into a folder copies into that folder rather than the category root', async () => {
+    const move = await setup()
+    const folder = DirectoryId('directory-folder')
+    await move({ type: 'local' }, LOCAL_DIR, [asset('file-a')], folder, 'copy')
+    expect(local.copyAsset).toHaveBeenCalledWith('file-a', folder)
+  })
+
   test('a drop into Recent does nothing', async () => {
     const move = await setup()
     await move({ type: 'local' }, { type: 'localRecent' }, [asset('file-a')])

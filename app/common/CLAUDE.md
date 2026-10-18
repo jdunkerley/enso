@@ -6,10 +6,10 @@ neutral ground — anything Vue-specific belongs in its own package.
 
 ## Contents
 
-- `src/services/` — the `Backend` interface and its two implementations:
-  `RemoteBackend` (Enso Cloud over HTTPS) and `LocalBackend` (the local drive,
-  over the project-manager shim's `ProjectManager` client). Shared helpers such
-  as `doesAssetMatchQuery` and `compareAssets` live in `Backend.ts`.
+- `src/services/` — the `Backend` interface and its one implementation,
+  `LocalBackend` (the local drive, over the project-manager shim's
+  `ProjectManager` client). Shared helpers such as `doesAssetMatchQuery` and
+  `compareAssets` live in `Backend.ts`.
 - `src/text/`, `src/text.ts` — i18n text table + lookup helpers used by both
   dashboard and Electron UI.
 - `src/download.ts` — HTTP download with progress.

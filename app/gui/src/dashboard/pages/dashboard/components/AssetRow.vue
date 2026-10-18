@@ -272,7 +272,7 @@ function onDrop(event: DragEvent) {
     @drop="onDrop"
   >
     <td v-for="column in columns" :key="column" :class="COLUMN_CSS_CLASS[column]">
-      <AssetColumnCell :column="column" :item="item" :labels="labels" :isEditable="true" />
+      <AssetColumnCell :column="column" :item="item" :labels="labels" />
     </td>
   </tr>
 </template>

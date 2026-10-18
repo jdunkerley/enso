@@ -1,7 +1,7 @@
 # app/gui
 
 The main Enso IDE GUI — a single-page web app built with Vite, served by
-Electron (desktop) or a static host (cloud). Published as package `enso-gui`.
+Electron (desktop) or the Vite dev server. Published as package `enso-gui`.
 
 ## Source layout
 
@@ -14,7 +14,7 @@ feature:
 - `src/project-view/` — the **ProjectView** feature subtree (graph editor,
   component browser, code editor, visualizations, documentation editor). Vue.
   Uses `@vueuse/core`, `@tanstack/vue-query`, `yjs`. Import via `@/…`.
-- `src/dashboard/` — the **Dashboard** feature subtree (cloud storage, project
+- `src/dashboard/` — the **Dashboard** feature subtree (the local drive, project
   browser, settings). Vue, ported from React (#75; React itself was removed in
   #94). TailwindCSS for styling. Import via `#/…`.
 
@@ -79,13 +79,12 @@ framework-free, move it to `src/` (as #77 did) rather than adding an entry.
   time, persistence, invalidations), typed with `@tanstack/query-core`, which
   vue-query consumes in the one shared `QueryClient`; `executeMutation` runs one
   from outside any component. `driveQueries.ts` (listings, search, new names),
-  `driveMutations.ts` (the batched delete, restore, copy, move and download; the
-  move's duplicate resolver is injected) and `transferBetweenCategories.ts`
-  (with its context injected) build on it. The Vue wrappers are
-  `@/composables/backend` and `$/composables/transferBetweenCategories`; the
-  drive's own (mutation state, new folder and project, rename, uploads) are in
-  `#/layouts/Drive/driveActions` (#91). Never give a key different options on
-  the two sides.
+  `driveMutations.ts` (the batched delete, copy, move and download; the move's
+  duplicate resolver is injected) build on it. The Vue wrappers are
+  `@/composables/backend` and `$/composables/moveAssets` (copy or move assets
+  between the local folders); the drive's own (mutation state, new folder and
+  project, rename, uploads) are in `#/layouts/Drive/driveActions` (#91). Never
+  give a key different options on the two sides.
 - `src/configurations/` — static configuration: the keyboard shortcuts (the
   dashboard's `inputBindings.ts`, the graph editor's `graphInputBindings.ts`,
   and `keyboardShortcuts.ts`, the one registry over both with their scopes and
@@ -110,7 +109,7 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 #170").
 
 - `src/versions/` — the Versions tab, registered by `src/registerCore.ts` (local
-  git versions; until PR 3 also the cloud's version branches).
+  git versions).
 - `src/versionChecker/` — the "new version available" dialog (GitHub releases),
   mounted by `App.vue`.
 - `src/secrets/` — dormant: the secret and per-service credential forms and the
@@ -121,12 +120,11 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   registries, not by importing them: `contributeRightPanelTab` in
   `$/providers/rightPanelContributions` (the Versions tab uses it, from
   `registerCore.ts`), `contributeSettingsSections` in
-  `$/providers/settingsContributions`, and `contributeAppContainerModals` in
-  `$/providers/layoutContributions`. The last two have no contributor now. A
-  contribution is a loader (`() => import(…)`), so its code stays out of the
-  initial chunk; a tab or modal that nothing contributes is hidden. Labels are
-  not cloud-only: the drive's labels code is in
-  `src/dashboard/components/labels/`, and asks the backend's `supportsLabels`.
+  `$/providers/settingsContributions` (no contributor now). A contribution is a
+  loader (`() => import(…)`), so its code stays out of the initial chunk; a tab
+  or section that nothing contributes is hidden. Labels are not cloud-only: the
+  drive's labels code is in `src/dashboard/components/labels/`, and asks the
+  backend's `supportsLabels`.
 
 ## Entry points
 
@@ -152,18 +150,18 @@ side uses the Rust parser compiled to WASM (`rust-ffi` package →
 
 ## Dashboard ↔ backend
 
-The Dashboard talks to the local Project Manager shim; the remote backend that
-remains until PR 3 is never reached. The shim (`app/project-manager-shim/`) is
-the local TypeScript Project Manager, used in both dev and the packaged Electron
-build. The old Scala Project Manager is no longer wired in.
+The Dashboard talks to the local Project Manager shim, the only backend. The
+shim (`app/project-manager-shim/`) is the local TypeScript Project Manager, used
+in both dev and the packaged Electron build. The old Scala Project Manager is no
+longer wired in.
 
 The drive's sidebar is a list of **categories** (`$/providers/category`), each
-on one backend (`CATEGORY_BACKEND`): the cloud's Cloud, Recent, Trash and teams;
-the local Local, Recent (`localRecent`) and the saved local directories.
+on one backend (`CATEGORY_BACKEND`, always the local one): Local, Recent
+(`localRecent`) and the saved local directories (`localDirectory`).
 
-- **Ask `isRecentCategory`, never `type === 'recent'`**: both Recent lists
-  behave alike (no new folder or project, no navigating up, drops into or out of
-  them are cancelled, the listing asks `recentProjects`).
+- **Ask `isRecentCategory`, never `type === 'localRecent'`**: a Recent list has
+  no new folder or project and no navigating up, drops into or out of it are
+  cancelled, and the listing asks `recentProjects`.
 - A category with no home directory (a Recent) is rooted at its backend's root
   (`driveView.ts`).
 - Local Recent's context menu keeps Open, Close, Label, Open in File Browser and

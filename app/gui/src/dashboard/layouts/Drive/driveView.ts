@@ -3,8 +3,9 @@
  *
  * The drive location (`$/providers/drive`) changes the moment a category button, a breadcrumb or a
  * row asks it to. The drive shows the change only once it has loaded: the old directory (its bar,
- * its rows, its `data-category`) stays on screen until the new directory's details have loaded, while `isNavigating` shows the category button's spinner and the
- * button that asked shows its own (#90, ruling 5). The specs rely on that through `data-category`.
+ * its rows, its `data-category`) stays on screen until the new directory's details have loaded,
+ * while `isNavigating` shows the category button's spinner and the button that asked shows its
+ * own (#90, ruling 5). The specs rely on that through `data-category`.
  *
  * {@link provideDriveView} does this: `shown` is the location whose data is there, `target` the one
  * asked for. Everything below the drive reads `shown`. A control that navigates passes itself as

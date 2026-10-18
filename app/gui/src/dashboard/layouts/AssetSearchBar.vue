@@ -36,12 +36,10 @@ import {
   type Backend,
   type Label as BackendLabel,
 } from 'enso-common/src/services/Backend'
-import { isOnMacOS } from 'enso-common/src/utilities/detect'
 import { computed, nextTick, onMounted, onUpdated, ref, shallowRef, watch } from 'vue'
 
-const { backend, isCloud, query, setQuery } = defineProps<{
+const { backend, query, setQuery } = defineProps<{
   backend: Backend | null
-  isCloud: boolean
   query: AssetQuery
   setQuery: (query: AssetQuery) => void
 }>()
@@ -76,12 +74,7 @@ const selectedIndices = shallowRef<ReadonlySet<number>>(new Set())
 const root = ref<HTMLLabelElement>()
 const searchInput = ref<HTMLInputElement>()
 
-const placeholder = computed(() =>
-  isCloud ?
-    isOnMacOS() ? getText('remoteBackendSearchPlaceholderMacOs')
-    : getText('remoteBackendSearchPlaceholder')
-  : getText('localBackendSearchPlaceholder'),
-)
+const placeholder = computed(() => getText('localBackendSearchPlaceholder'))
 
 watch(rawSuggestions, (newSuggestions) => {
   if (querySource !== QuerySource.tabbing) suggestions.value = newSuggestions
@@ -260,9 +253,7 @@ function onRootFocusOut(event: FocusEvent) {
 }
 
 const tagNames = computed(() =>
-  (isCloud ? AssetQuery.tagNames : AssetQuery.localTagNames).flatMap(([key, tag]) =>
-    tag == null ? [] : [{ key, tag }],
-  ),
+  AssetQuery.localTagNames.flatMap(([key, tag]) => (tag == null ? [] : [{ key, tag }])),
 )
 
 function addTag(key: AssetQueryKey) {

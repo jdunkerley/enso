@@ -9,7 +9,6 @@ import Button from '$/components/Button/Button.vue'
 import Spinner from '$/components/Spinner/Spinner.vue'
 import StatelessSpinner from '$/components/Spinner/StatelessSpinner.vue'
 import type { SpinnerPhase } from '$/components/Spinner/variants'
-import { useAuth } from '$/providers/auth'
 import { useContainerData, type Tab } from '$/providers/container'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
@@ -29,7 +28,6 @@ const {
 
 const container = useContainerData()
 const openedProjects = useOpenedProjects()
-const auth = useAuth()
 const { getText } = useText()
 
 const isUnconditionallyDisabled = computed(() => !container.canOpenProjectLocally(backend.type))
@@ -37,10 +35,6 @@ const isUnconditionallyDisabled = computed(() => !container.canOpenProjectLocall
 // A workaround for a temporary bad state in the backend, in which `projectState` is absent.
 const projectState = computed(() => item.projectState ?? CLOSED_PROJECT_STATE)
 const isRunningInBackground = computed(() => projectState.value.executeAsync ?? false)
-const isOtherUserUsingProject = computed(
-  () =>
-    projectState.value.openedBy != null && projectState.value.openedBy !== auth.session.user.email,
-)
 
 const isProjectOpening = computed(() => openedProjects.isProjectOpening(item))
 const isProjectOpened = computed(() => openedProjects.isProjectOpened(item))
@@ -66,9 +60,6 @@ const spinnerState = computed((): SpinnerPhase => {
 
 function tooltip(defaultTooltip: string) {
   if (isUnconditionallyDisabled.value) return getText('downloadToOpenWorkflow')
-  if (isOtherUserUsingProject.value) {
-    return getText('xIsUsingTheProject', projectState.value.openedBy ?? '')
-  }
   if (isAnotherProjectOpening.value) return getText('anotherProjectIsBeingOpenedError')
   if (isProjectClosing.value) return getText('syncingProjectFiles')
   return defaultTooltip
@@ -107,7 +98,7 @@ const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
       size="large"
       variant="icon"
       extraClickZone="xsmall"
-      :isDisabled="isDisabled || isOtherUserUsingProject"
+      :isDisabled="isDisabled"
       icon="workflow_stop"
       :aria-label="tooltip(getText('stopExecution'))"
       tooltipPlacement="left"
@@ -127,7 +118,7 @@ const LOCAL_SPINNER_STATE: Readonly<Record<ProjectState, SpinnerPhase>> = {
         size="large"
         variant="icon"
         extraClickZone="xsmall"
-        :isDisabled="isDisabled || isOtherUserUsingProject"
+        :isDisabled="isDisabled"
         icon="workflow_stop"
         :aria-label="tooltip(getText('stopExecution'))"
         tooltipPlacement="left"

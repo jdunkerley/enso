@@ -180,7 +180,7 @@ const entries = computed((): (ContextMenuEntry | false | null | undefined)[] => 
       },
     },
     pasteMenuEntry,
-    canDownloadAsset(false, asset.type) && {
+    canDownloadAsset(asset.type) && {
       isDisabled: asset.type === backendModule.AssetType.secret,
       action: 'download',
       doAction: () => {

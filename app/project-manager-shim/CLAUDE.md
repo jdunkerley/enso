@@ -19,7 +19,6 @@ Consumers import by subpath (see `package.json#exports`):
 
 - `project-manager-shim` — public helpers (`downloadEnsoEngine`,
   `findEnsoExecutable`, …).
-- `project-manager-shim/fs` — filesystem glue.
 - `project-manager-shim/handler` — JSON-RPC request handler.
 - `project-manager-shim/localMetadata` — local labels and Recent store (see
   below).

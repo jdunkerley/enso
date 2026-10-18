@@ -29,7 +29,12 @@ const USER: User = {
 }
 
 const auth = vi.hoisted(() => {
-  const value: { session: unknown } = { session: null }
+  const value: { session: unknown } = {
+    session: {
+      email: 'local@enso.localhost',
+      user: { userId: 'user-local', name: 'Offline', email: 'local@enso.localhost' },
+    },
+  }
   return value
 })
 const backends = vi.hoisted(() => ({ hasLocalBackend: true }))

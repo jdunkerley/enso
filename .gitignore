@@ -189,6 +189,7 @@ test-results/
 test-traces/
 playwright-report/
 playwright/.cache/
+playwright/.auth/
 
 #########
 ## Git ##
