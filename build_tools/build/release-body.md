@@ -20,21 +20,6 @@ Download links:
 
 This is the recommended download for most users.
 
-## Enso Engine
-
-If you are interested in using Enso Engine command line tools only, download the Enso Engine bundle.
-
-Download links:
-{{#each assets.engine}}
-- [{{target_pretty}}]({{url}})
-{{/each}}
-
-These are archives containing the [Enso portable distribution](https://enso.org/docs/developer/enso/distribution/distribution.html#portable-enso-distribution-layout). User is responsible for setting up the environment variables and adding the `bin` directory to the `PATH`.
-
-Note that these distributions do not allow you to use the Enso IDE.
-
-It is recommended only for advanced users, who want to just try the compiler CLI.
-
 # Anonymous Data Collection
 
 Please note that this release collects anonymous usage data which will be used to improve Enso and prepare it for a stable release. We will switch to opt-in data collection in stable version releases. The usage data will not contain your code (expressions above nodes), however, reported errors may contain brief snippets of out of context code that specifically leads to the error, like "the method 'foo' does not exist on Number". The following data will be collected:
