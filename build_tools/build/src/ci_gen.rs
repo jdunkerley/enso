@@ -151,26 +151,13 @@ pub mod secret {
 
 pub mod variables {
     pub const ENSO_HOST: &str = "ENSO_HOST";
-    pub const ENSO_CLOUD_ENVIRONMENT: &str = "ENSO_CLOUD_ENVIRONMENT";
-    pub const ENSO_CLOUD_API_URL: &str = "ENSO_CLOUD_API_URL";
-    pub const ENSO_CLOUD_CHAT_URL: &str = "ENSO_CLOUD_CHAT_URL";
     pub const ENSO_CLOUD_SENTRY_DSN: &str = "ENSO_CLOUD_SENTRY_DSN";
-    pub const ENSO_CLOUD_STRIPE_KEY: &str = "ENSO_CLOUD_STRIPE_KEY";
-    pub const ENSO_CLOUD_AUTH_ENDPOINT: &str = "ENSO_CLOUD_AUTH_ENDPOINT";
-    pub const ENSO_CLOUD_COGNITO_USER_POOL_ID: &str = "ENSO_CLOUD_COGNITO_USER_POOL_ID";
-    pub const ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: &str =
-        "ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID";
-    pub const ENSO_CLOUD_COGNITO_DOMAIN: &str = "ENSO_CLOUD_COGNITO_DOMAIN";
-    pub const ENSO_CLOUD_COGNITO_REGION: &str = "ENSO_CLOUD_COGNITO_REGION";
     pub const ENSO_CLOUD_GOOGLE_ANALYTICS_TAG: &str = "ENSO_CLOUD_GOOGLE_ANALYTICS_TAG";
     pub const ENSO_CLOUD_SENTRY_ORGANIZATION: &str = "ENSO_CLOUD_SENTRY_ORGANIZATION";
     pub const ENSO_CLOUD_SENTRY_PROJECT: &str = "ENSO_CLOUD_SENTRY_PROJECT";
 
     /// License key for the AG Grid library.
     pub const ENSO_AG_GRID_LICENSE_KEY: &str = "ENSO_AG_GRID_LICENSE_KEY";
-
-    /// The Mapbox API token for the GeoMap visualization.
-    pub const ENSO_MAPBOX_API_TOKEN: &str = "ENSO_MAPBOX_API_TOKEN";
 }
 
 /// Return an expression piece that evaluates to `true` if the current branch is not the default.

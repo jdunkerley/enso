@@ -23,7 +23,7 @@ const config = useConfig()
 
 function submit(values: Parameters<typeof google.submitForm>[3]) {
   return google.submitForm(
-    config.remoteConfig?.ENSO_IDE_API_URL,
+    undefined,
     config.remoteConfig?.ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID,
     createCredentials,
     values,

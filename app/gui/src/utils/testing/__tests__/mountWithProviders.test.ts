@@ -26,7 +26,7 @@ const Probe = defineComponent({
     const query = useQuery({ queryKey: ['probe'], queryFn: () => Promise.resolve('loaded') })
     return () =>
       h('div', [
-        h('p', { id: 'text' }, getText('cloudCategory')),
+        h('p', { id: 'text' }, getText('localCategory')),
         h('p', { id: 'route' }, route.path),
         h('p', { id: 'store' }, store?.value),
         h('p', { id: 'backend' }, backends.backendForType(BackendType.local).type),
@@ -42,7 +42,7 @@ test('provides text, router, context stores, mocked backends and a query client'
     stores: { probe: { value: 'provided' } },
     queryClient,
   })
-  expect(wrapper.find('#text').text()).toBe('Cloud')
+  expect(wrapper.find('#text').text()).toBe('Local')
   expect(wrapper.find('#route').text()).toBe('/drive')
   expect(router.currentRoute.value.path).toBe('/drive')
   expect(wrapper.find('#store').text()).toBe('provided')

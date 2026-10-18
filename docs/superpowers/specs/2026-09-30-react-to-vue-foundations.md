@@ -27,18 +27,18 @@ change.
 
 ## Summary
 
-| #   | Decision                   | Recommendation                                                                                                                                 | Status                                                              |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| 1   | Headless accessibility lib | **Reka UI 2.10.5**, exact pin. Hand-roll only what it lacks (tables, drag and drop, selection brush), as React does today                      | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 2   | Forms                      | **In-house `useForm` over zod**, keeping today's `Form`/`Field`/`Submit`/`Reset`/`FormError`/`FieldValue` API. No vee-validate                 | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 3   | Toasts                     | **In-house `useToast` store + one `ToastHost.vue` on Reka `Toast` primitives.** No vue-sonner                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 4   | Modal stack                | **Global `{ component, props }` stack + one `ModalHost.vue`**, with a shim that keeps React `setModal`/`unsetModal` callers working            | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 5   | Tailwind modifiers         | **No mapping plugin.** Use Tailwind's built-in `aria-*:` and `data-[…]:` variants in Vue code. Drop `tailwindcss-react-aria-components` in #94 | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 6   | Where code goes            | Primitives in `src/components/`, features in `src/dashboard/` as `.vue`, stores via `createContextStore` (global state only where it must be)  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 6a  | zustand                    | **Keep until #93** as framework-neutral glue; no new zustand stores; replace with Vue state and `useStorage` when the last React reader goes   | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 6b  | Cloud-only separability    | **Top-level `src/cloud/<area>/`** behind a lint boundary and a contribution registry                                                           | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
-| 7   | Port or delete             | **Port every cloud-only area; delete none.** The fork diverges freely from upstream                                                            | Decided                                                             |
-| 8   | Port playbook              | Appended to `app/gui/src/dashboard/CLAUDE.md`                                                                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review) |
+| #   | Decision                   | Recommendation                                                                                                                                 | Status                                                                                                     |
+| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1   | Headless accessibility lib | **Reka UI 2.10.5**, exact pin. Hand-roll only what it lacks (tables, drag and drop, selection brush), as React does today                      | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 2   | Forms                      | **In-house `useForm` over zod**, keeping today's `Form`/`Field`/`Submit`/`Reset`/`FormError`/`FieldValue` API. No vee-validate                 | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 3   | Toasts                     | **In-house `useToast` store + one `ToastHost.vue` on Reka `Toast` primitives.** No vue-sonner                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 4   | Modal stack                | **Global `{ component, props }` stack + one `ModalHost.vue`**, with a shim that keeps React `setModal`/`unsetModal` callers working            | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 5   | Tailwind modifiers         | **No mapping plugin.** Use Tailwind's built-in `aria-*:` and `data-[…]:` variants in Vue code. Drop `tailwindcss-react-aria-components` in #94 | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 6   | Where code goes            | Primitives in `src/components/`, features in `src/dashboard/` as `.vue`, stores via `createContextStore` (global state only where it must be)  | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 6a  | zustand                    | **Keep until #93** as framework-neutral glue; no new zustand stores; replace with Vue state and `useStorage` when the last React reader goes   | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
+| 6b  | Cloud-only separability    | **Top-level `src/cloud/<area>/`** behind a lint boundary and a contribution registry                                                           | Superseded 2026-10-17 by `2026-10-17-local-only-ide-design.md` (the cloud code was deleted, not separated) |
+| 7   | Port or delete             | **Port every cloud-only area; delete none.** The fork diverges freely from upstream                                                            | Decided                                                                                                    |
+| 8   | Port playbook              | Appended to `app/gui/src/dashboard/CLAUDE.md`                                                                                                  | Provisionally accepted 2026-09-30 (delegated; maintainer to review)                                        |
 
 ## How the evidence was gathered
 
@@ -564,6 +564,12 @@ while both frameworks read it. From now on:
   app.
 
 ### 6b. Keeping cloud-only ports separable
+
+> **Superseded (2026-10-17).** The IDE no longer has Enso Cloud: the cloud-only
+> areas were deleted, not split out
+> (`docs/superpowers/specs/2026-10-17-local-only-ide-design.md`, decision 1).
+> `src/cloud/`, `registerCloud` and the `CLOUD_AREAS` lint boundary are gone;
+> the text below is kept as the record of the earlier decision.
 
 The maintainer may later move cloud-only areas into a separate community version
 (see decision 7). Recommendation:

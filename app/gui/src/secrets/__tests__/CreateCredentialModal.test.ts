@@ -22,13 +22,17 @@ vi.mock('$/utils/window', () => ({ openInNewBrowserTab }))
 vi.mock('$/providers/config', () => ({
   useConfig: () => ({
     remoteConfig: {
-      ENSO_IDE_API_URL: 'https://api.example.com',
       ENSO_IDE_GOOGLE_OAUTH_CLIENT_ID: 'google-client',
       ENSO_IDE_STRAVA_OAUTH_CLIENT_ID: 'strava-client',
       ENSO_IDE_MS365_OAUTH_CLIENT_ID: 'ms365-client',
       ENSO_IDE_SALESFORCE_OAUTH_CLIENT_ID: 'salesforce-client',
     },
   }),
+}))
+// No API URL is configured any more, so the redirect URI that needs one is stubbed.
+vi.mock('$/secrets/serviceCredentials/utilities', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('$/secrets/serviceCredentials/utilities')>()),
+  getOauthRedirectUri: () => 'https://api.example.com/callback',
 }))
 const showToast = vi.hoisted(() => vi.fn())
 vi.mock('$/providers/toasts', () => ({ useToasts: () => ({ show: showToast }) }))

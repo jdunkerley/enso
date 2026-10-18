@@ -21,3 +21,21 @@ too.
 - The dialogs are meant for the modal stack: the Vue drive opens them with
   `useModals().open`.
 - Tests: `__tests__/`.
+
+## Before enabling these screens
+
+Three things are missing, and each would fail only at run time:
+
+- **A real OAuth redirect source.** `getOauthRedirectUri`
+  (`serviceCredentials/utilities.ts`) asserts with `invariant` that an API URL
+  is defined, and every recipe passes it one. `ENSO_IDE_API_URL` is gone with
+  Enso Cloud, so today it always throws. Enabling the credential forms needs a
+  genuine redirect URI source (and a callback endpoint behind it) to replace it.
+- **A submit path that is tested.** `CreateCredentialModal.test.ts` stubs
+  `getOauthRedirectUri`, so the forms' submit path is never exercised against
+  the real function.
+- **A `catch` on the Google form.** `submit()` in `GoogleCredentialsForm.vue`
+  does not catch a rejection from the recipe, so the invariant above would
+  surface as an unhandled error rather than a toast. Add one, as the Strava,
+  MS365, Salesforce and Snowflake forms have (`toastAndLogError`, see
+  `toastAndLog.ts`), before enabling it.

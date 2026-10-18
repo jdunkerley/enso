@@ -39,7 +39,7 @@ test('starts on the local drive with no login, and asks Enso Cloud for nothing',
     .click({ button: 'right' })
   const menu = page.getByTestId('context-menu')
   await expect(menu).toBeVisible()
-  await expect(menu).not.toContainText(TEXT.uploadToCloudShortcut)
+  await expect(menu).not.toContainText('Export to Cloud')
   await page.keyboard.press('Escape')
 
   await BaseActions.press(page, 'Mod+,')
