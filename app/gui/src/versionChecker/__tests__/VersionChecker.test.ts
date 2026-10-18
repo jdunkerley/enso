@@ -5,10 +5,12 @@
 import { useDevtoolsStore } from '$/providers/devTools'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
+import { setIncludePrereleases } from '$/providers/updateSettings'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import VersionChecker from '$/versionChecker/VersionChecker.vue'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
+import type { UpdateStatus } from 'enso-common/src/updater'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { isNewerRelease } from '../versionChecker'
 
@@ -25,6 +27,7 @@ const getDownloadUrl = vi.fn(async () => 'https://example.com/enso.exe')
 vi.mock('$/utils/github', () => ({
   getLatestRelease: () => getLatestRelease(),
   getDownloadUrl: () => getDownloadUrl(),
+  RELEASES_REPOSITORY: 'jdunkerley/enso',
 }))
 const download = vi.fn(async () => {})
 vi.mock('$/utils/download', () => ({ download: (options: unknown) => download(options) }))
@@ -33,6 +36,7 @@ const { getText } = useText()
 
 let portalRoot: HTMLElement
 beforeEach(() => {
+  setIncludePrereleases(false)
   portalRoot = document.createElement('div')
   portalRoot.id = 'enso-portal-root'
   document.body.appendChild(portalRoot)
@@ -73,6 +77,79 @@ describe('VersionChecker', () => {
     await user.click(closeButtons.at(-1)!)
     await vi.waitFor(() => expect(useDevtoolsStore().showVersionChecker).toBe(false))
     await vi.waitFor(() => expect(dialog()).toBeNull())
+  })
+})
+
+function fakeUpdater(initial: UpdateStatus) {
+  let listener: ((status: UpdateStatus) => void) | null = null
+  const updater = {
+    mode: vi.fn(async () => 'auto' as const),
+    check: vi.fn(async () => initial),
+    download: vi.fn(async () => {
+      listener?.({ state: 'downloading', version: '2026.2.0', percent: 50 })
+      listener?.({ state: 'ready', version: '2026.2.0' })
+    }),
+    quitAndInstall: vi.fn(async () => {}),
+    onStatus: vi.fn((handler: (status: UpdateStatus) => void) => {
+      listener = handler
+      return () => (listener = null)
+    }),
+  }
+  Object.assign(window, { api: { updater } })
+  return updater
+}
+
+describe('automatic updates', () => {
+  afterEach(() => Reflect.deleteProperty(window, 'api'))
+
+  test('Update downloads, then Restart installs', async () => {
+    const updater = fakeUpdater({
+      state: 'available',
+      version: '2026.2.0',
+      releaseDate: '2026-11-01',
+    })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    await userEvent.setup().click(button(getText('updateNow'))!)
+    await vi.waitFor(() => expect(button(getText('restartToUpdate'))).not.toBeUndefined())
+    await userEvent.setup().click(button(getText('restartToUpdate'))!)
+    expect(updater.quitAndInstall).toHaveBeenCalled()
+    expect(getDownloadUrl).not.toHaveBeenCalled()
+  })
+
+  test('passes the prerelease setting to the check', async () => {
+    setIncludePrereleases(true)
+    const updater = fakeUpdater({ state: 'none' })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(updater.check).toHaveBeenCalledWith(true))
+    expect(dialog()).toBeNull()
+  })
+
+  test('a reloaded window shows a download in progress, and a ready update', async () => {
+    fakeUpdater({ state: 'downloading', version: '2026.2.0', percent: 30 })
+    const wrapper = await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    expect(dialog()!.querySelector('progress')).not.toBeNull()
+    wrapper.unmount()
+    await vi.waitFor(() => expect(dialog()).toBeNull())
+    fakeUpdater({ state: 'ready', version: '2026.2.0' })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(button(getText('restartToUpdate'))).not.toBeUndefined())
+  })
+
+  test('a failed download offers Retry and Download manually', async () => {
+    const updater = fakeUpdater({ state: 'available', version: '2026.2.0', releaseDate: '' })
+    updater.download.mockImplementation(async () => {})
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(dialog()).not.toBeNull())
+    await userEvent.setup().click(button(getText('updateNow'))!)
+    updater.onStatus.mock.calls[0]![0]({
+      state: 'error',
+      message: 'offline',
+      version: '2026.2.0',
+    })
+    await vi.waitFor(() => expect(button(getText('retry'))).not.toBeUndefined())
+    expect(button(getText('downloadManually'))).not.toBeUndefined()
   })
 })
 
