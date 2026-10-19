@@ -13,7 +13,6 @@ pub mod prelude {
     pub use ide_ci::prelude::*;
 }
 
-pub mod aws;
 pub mod changelog;
 pub mod ci;
 pub mod ci_gen;

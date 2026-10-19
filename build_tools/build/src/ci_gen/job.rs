@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-use crate::ci_gen::RELEASE_CLEANING_POLICY;
 use crate::ci_gen::RunStepsBuilder;
 use crate::ci_gen::RunnerType;
 use crate::ci_gen::not_default_branch;
@@ -853,75 +852,6 @@ impl JobArchetype for BuildBackend {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct UploadBackend;
-
-impl JobArchetype for UploadBackend {
-    fn job(&self, target: Target) -> Job {
-        RunStepsBuilder::new("backend upload")
-            .cleaning(RELEASE_CLEANING_POLICY)
-            .customize(move |step| {
-                let mut steps = vec![step];
-
-                if target.0 == OS::Linux {
-                    let upload_edition_file = step::upload_artifact("Upload Edition File")
-                        .with_custom_argument("name", paths::EDITION_FILE_ARTIFACT_NAME)
-                        .with_custom_argument("path", "distribution/editions/*.yaml");
-                    steps.push(upload_edition_file);
-                }
-
-                steps
-            })
-            .build_job("Upload Backend", target)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct DeployRuntime;
-
-impl JobArchetype for DeployRuntime {
-    fn job(&self, target: Target) -> Job {
-        RunStepsBuilder::new("release deploy-runtime")
-            .customize(|step| {
-                vec![
-                    step.with_secret_exposed_as(
-                        secret::CI_PRIVATE_TOKEN,
-                        ide_ci::github::GITHUB_TOKEN,
-                    )
-                    .with_env("ENSO_BUILD_ECR_REPOSITORY", crate::aws::ecr::runtime::NAME)
-                    .with_secret_exposed_as(
-                        secret::ECR_PUSH_RUNTIME_ACCESS_KEY_ID,
-                        "AWS_ACCESS_KEY_ID",
-                    )
-                    .with_secret_exposed_as(
-                        secret::ECR_PUSH_RUNTIME_SECRET_ACCESS_KEY,
-                        "AWS_SECRET_ACCESS_KEY",
-                    )
-                    .with_env("AWS_DEFAULT_REGION", crate::aws::ecr::runtime::REGION),
-                ]
-            })
-            .build_job("Upload Runtime to ECR", target)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct DispatchBuildImage;
-
-impl JobArchetype for DispatchBuildImage {
-    fn job(&self, target: Target) -> Job {
-        RunStepsBuilder::new("release dispatch-build-image")
-            .customize(|step| {
-                vec![
-                    step.with_secret_exposed_as(
-                        secret::CI_PRIVATE_TOKEN,
-                        ide_ci::github::GITHUB_TOKEN,
-                    ),
-                ]
-            })
-            .build_job("Dispatch Cloud build-image workflow", target)
-    }
-}
-
 pub fn expose_os_specific_signing_secret(os: OS, step: Step) -> Step {
     match os {
         OS::Windows => step
@@ -966,15 +896,11 @@ pub enum PackagingTarget {
 ///
 /// This involves:
 /// * exposing secrets necessary for code signing and notarization;
-/// * exposing the GUI's build variables (host, Sentry, Analytics, AG Grid);
-/// * for releases, requiring an AG Grid Enterprise license.
+/// * exposing the GUI's build variables (host, Sentry, Analytics, AG Grid).
 pub fn prepare_packaging_steps(os: OS, step: Step, packaging_target: PackagingTarget) -> Vec<Step> {
     let step = expose_gui_vars(step);
     let step = if packaging_target == PackagingTarget::Release {
-        // A release must never silently fall back to AG Grid Community, so the GUI build fails
-        // outright if `ENSO_AG_GRID_LICENSE_KEY` was not supplied.
         expose_debugging_vars(step)
-            .with_env(ide::web::env::ENSO_IDE_REQUIRE_AG_GRID_LICENSE, "true")
     } else {
         step
     };

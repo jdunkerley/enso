@@ -37,8 +37,6 @@ Each module handles one artifact family or one integration:
   `_get_with_headers` (octocrab's own helpers buffer the whole body), so they
   keep the caller's authentication.
 - `handlebars` for templated text output.
-- `aws-sdk-*` and `aws-config` (pinned to 0.21 / 0.51) — don't bump without
-  coordinating with the installer code.
 
 ## Patterns
 

@@ -4,32 +4,6 @@ This folder contains miscellaneous utilities for CI.
 
 # Docker
 
-## Building
-
-A custom docker image requires a certain number of directories to be present
-from a desired _edition_. The root directory of the docker build context can be
-provided in the `docker build` command:
-
-```bash
-docker build \
-  -t runtime:latest \
-  -f tools/ci/docker/engine/Dockerfile \
-  --build-context docker-tools=tools/ci/docker/engine \
-  built-distribution/enso-engine-0.0.0-dev-linux-amd64/enso-0.0.0-dev
-```
-
-## Running
-
-To start Language Server with a default configuration, run the built image and
-mount the project directory:
-
-```bash
-docker run -it --rm \
-  --network=host \
-  --mount type=bind,src=~/Documents/enso-projects/NewProject,dst=/volumes/workspace/project_root \
-  runtime:latest
-```
-
 ## Running
 
 Both images `ydoc-server-nodejs` and `ydoc-server-polyglot` are started the same

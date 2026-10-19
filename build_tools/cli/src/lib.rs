@@ -575,8 +575,13 @@ impl Processor {
                 .upload_asset_file_with_custom_name(&artifacts.image, add_prefix.clone())
                 .await?;
             release
-                .upload_asset_file_with_custom_name(&artifacts.image_checksum, add_prefix)
+                .upload_asset_file_with_custom_name(&artifacts.image_checksum, add_prefix.clone())
                 .await?;
+            // Update files keep their own names: `latest*.yml` names the files it points at,
+            // so a prefix would break the feed.
+            for file in artifacts.update_files() {
+                release.upload_asset_file(&file).await?;
+            }
             Ok(())
         }
         .boxed()
@@ -748,18 +753,6 @@ pub async fn main_internal(config: Option<Config>) -> Result {
             Action::CreateDraft => {
                 let commit = ide_ci::actions::env::GITHUB_SHA.get()?;
                 enso_build::release::draft_a_new_release(&ctx, &commit).await?;
-            }
-            Action::DeployRuntime(args) => {
-                enso_build::release::deploy_runtime_to_ecr(&ctx, args.ecr_repository).await?;
-            }
-            Action::DispatchBuildImage => {
-                if ctx.triple.versions.version.pre.is_empty() {
-                    enso_build::repo::cloud::build_image_workflow_dispatch_input(
-                        &ctx.octocrab,
-                        &ctx.triple.versions.version,
-                    )
-                    .await?;
-                }
             }
             Action::Publish => {
                 enso_build::release::publish_release(&ctx).await?;

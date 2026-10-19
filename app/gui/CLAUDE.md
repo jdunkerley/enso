@@ -190,16 +190,14 @@ default, 2px round strokes only for the tools family, `currentColor`, one 0.3
 secondary tone). `src/project-view/assets/__tests__/iconStyle.test.ts` enforces
 the mechanical rules; see `src/project-view/assets/CLAUDE.md`.
 
-## Gotcha: releases require an AG Grid licence
+## Gotcha: builds without an AG Grid licence ship AG Grid Community
 
 The table view falls back to AG Grid Community when
-`ENSO_IDE_AG_GRID_LICENSE_KEY` is empty — silently, by design, so development,
-CI and third-party builds work without a key. Because nothing at runtime reveals
-the fallback, `vite.config.ts` carries a `requireAgGridLicense` plugin that
-**fails the build** when `ENSO_IDE_REQUIRE_AG_GRID_LICENSE=true` and the key is
-empty. CI sets that flag for release packaging only (`prepare_packaging_steps`
-in `build_tools/build/src/ci_gen/job.rs` → `release.yml`); `ide-packaging.yml`
-and `gui-checks.yml` deliberately do not.
+`ENSO_IDE_AG_GRID_LICENSE_KEY` is empty — silently, with no watermark or console
+error. This applies to releases too: CI passes the `ENSO_AG_GRID_LICENSE_KEY`
+repository variable when it exists, and the fork has none, so its releases ship
+Community. (Releases used to fail the build without a key; that gate was removed
+so the fork can release.)
 
 Note `.env` sets `ENSO_IDE_AG_GRID_LICENSE_KEY=` as an empty placeholder, so any
 check on this key must test for non-empty, never merely "is set".

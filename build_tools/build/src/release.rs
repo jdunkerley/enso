@@ -4,22 +4,14 @@ use crate::prelude::*;
 
 use crate::changelog::Changelog;
 use crate::context::BuildContext;
-use crate::env::ENSO_ADMIN_TOKEN;
-use crate::paths::TargetTriple;
-use crate::paths::generated;
 use crate::project;
 use crate::version;
 use crate::version::Versions;
 use crate::version::promote::Designation;
 
 use ide_ci::github;
-use ide_ci::io::web::handle_error_response;
-use ide_ci::programs::Docker;
-use ide_ci::programs::SevenZip;
 use octocrab::models::repos::Release;
 use octocrab::params::repos::Reference;
-use reqwest::Response;
-use serde_json::json;
 use tempfile::tempdir;
 
 // ==============
@@ -124,7 +116,10 @@ pub async fn draft_a_new_release(context: &BuildContext, commit: &str) -> Result
     Ok(release)
 }
 
-/// Publish a previously drafted release and update edition file in the cloud.
+/// Publish a previously drafted release and upload the assets manifest.
+///
+/// The draft was created with the prerelease flag already set according to the version (see
+/// [`draft_a_new_release`]), so publishing it keeps prereleases marked as such.
 ///
 /// Requires the release ID to be set in the environment variable `ENSO_RELEASE_ID`.
 pub async fn publish_release(context: &BuildContext) -> Result {
@@ -138,26 +133,36 @@ pub async fn publish_release(context: &BuildContext) -> Result {
     let release = release_handle.get().await?;
     ensure!(release.draft, "Release has been already published!");
 
+    // macOS does not block publishing (see `add_release_steps`), so its installer may be absent.
+    let uploaded: Vec<String> = release.assets.iter().map(|asset| asset.name.clone()).collect();
+    let (manifest, missing) =
+        manifest::Assets::new_uploaded(&remote_repo, &triple.versions.version, &uploaded);
+    if !missing.is_empty() {
+        let platforms = missing.iter().map(|asset| asset.target_pretty.as_str()).join(", ");
+        warn!("Publishing without installers for: {platforms}.");
+        let note = format!(
+            "\n\n> [!NOTE]\n> This release has no installer for {platforms}: that build failed. \
+             Re-run its jobs in the release workflow to add it."
+        );
+        let body = format!("{}{note}", release.body.as_deref().unwrap_or_default());
+        // A draft's tag does not exist yet; editing the draft without restating the tag turns it
+        // into `untagged-…`, and the release then publishes without a tag.
+        remote_repo
+            .repos()
+            .releases()
+            .update(release_id.0)
+            .tag_name(&release.tag_name)
+            .target_commitish(&release.target_commitish)
+            .body(&body)
+            .send()
+            .await?;
+    }
+
     debug!("Found the target release, will publish it.");
     release_handle.publish().await?;
     debug!("Done. Release URL: {}", release.url);
 
-    let edition_file_path = generated::RepoRootDistributionEditions::new_root(
-        context.inner.repo_root.distribution.editions.clone(),
-        triple.versions.edition_name(),
-    )
-    .edition_yaml;
-
-    ensure!(
-        edition_file_path.exists(),
-        format!("Edition file does not exist at path {}.", edition_file_path)
-    );
-
-    debug!("Updating edition in the AWS S3.");
-    crate::aws::update_manifest(&remote_repo, &edition_file_path).await?;
-
     // Add assets manifest.
-    let manifest = manifest::Assets::new(&remote_repo, &triple.versions.version);
     let tempdir = tempdir()?;
     let manifest_path = tempdir.path().join(manifest::ASSETS_MANIFEST_FILENAME);
     ide_ci::fs::write_json(&manifest_path, &manifest)?;
@@ -194,101 +199,6 @@ pub async fn validate_release(release: github::release::Handle) -> Result {
         ensure!(response.status().is_success(), "Failed to download asset: {}", asset.url);
     }
     Ok(())
-}
-
-/// Download the Enso Engine distribution from the GitHub release.
-pub async fn get_engine_package<R: IsRepo>(
-    repo: &github::repo::Handle<R>,
-    output: impl AsRef<Path>,
-    triple: &TargetTriple,
-) -> Result<generated::EnginePackage> {
-    let release_id = crate::env::ENSO_RELEASE_ID.get()?;
-    let package_name =
-        generated::RepoRootBuiltDistributionEnsoEngineTriple::segment_name(triple.to_string());
-    let release = repo.find_release_by_id(release_id).await?;
-    let asset = github::find_asset_by_text(&release, &package_name)?;
-    let temp_for_archive = tempdir()?;
-    let downloaded_asset =
-        repo.download_asset_to(asset, temp_for_archive.path().to_owned()).await?;
-
-    ide_ci::archive::extract_to(&downloaded_asset, output.as_ref()).await?;
-
-    let engine_package =
-        generated::EnginePackage::new_under(output.as_ref(), triple.versions.version.to_string());
-    Ok(engine_package)
-}
-
-/// Download the Enso Engine distribution from the GitHub release and build Runtime Docker image
-/// from it.
-pub async fn generate_runtime_image(
-    context: &BuildContext,
-    tag: impl Into<String>,
-) -> Result<ide_ci::programs::docker::ImageId> {
-    // Our runtime images always target Linux.
-    let linux_triple = TargetTriple { os: OS::Linux, ..context.triple.clone() };
-    let temp_for_extraction = tempdir()?;
-    let engine_package = get_engine_package(
-        &context.remote_repo_handle(),
-        temp_for_extraction.path(),
-        &linux_triple,
-    )
-    .await?;
-    crate::aws::ecr::runtime::build_runtime_image(
-        &context.repo_root.tools.ci.docker.engine,
-        &engine_package,
-        tag.into(),
-    )
-    .await
-}
-
-/// Perform deploy of the backend to the ECR.
-///
-/// Downloads the Engine package from the release, builds the runtime image from it and pushes it
-/// to our ECR.
-pub async fn deploy_runtime_to_ecr(context: &BuildContext, repository: String) -> Result {
-    let client = crate::aws::ecr::client_from_env().await;
-    let repository_uri = crate::aws::ecr::get_repository_uri(&client, &repository).await?;
-    let tag = format!("{}:{}", repository_uri, context.triple.versions.version);
-    // We don't care about the image ID, we will refer to it by the tag.
-    let _image_id = generate_runtime_image(context, &tag).await?;
-    let credentials = crate::aws::ecr::get_credentials(&client).await?;
-    Docker.while_logged_in(credentials, || async move { Docker.push(&tag).await }).await?;
-    Ok(())
-}
-
-/// Packs given files with `gzip` and uploads them to the S3 bucket.
-///
-/// The files are uploaded with the same name, but with `.gz` extension.
-pub async fn put_files_gzipping(
-    bucket: &crate::aws::s3::BucketContext,
-    files: impl IntoIterator<Item = impl AsRef<Path>>,
-) -> Result {
-    let temp_for_gzipping = tempdir()?;
-    for file in files {
-        let gzipped_file = file.with_parent(&temp_for_gzipping).with_appended_extension("gz");
-        SevenZip.pack(&gzipped_file, [file]).await?;
-        bucket.put_file(&gzipped_file).await?;
-    }
-    Ok(())
-}
-
-/// Deploy the built GUI (frontend) to the cloud.
-#[context("Failed to notify the cloud about GUI upload in version {}.", version)]
-pub async fn notify_cloud_about_gui(version: &Version) -> Result<Response> {
-    let body = json!({
-        "versionNumber": version.to_string(),
-        "versionType": "Ide"
-    });
-    let response = ide_ci::io::web::client::new()
-        .post("https://7aqkn3tnbc.execute-api.eu-west-1.amazonaws.com/versions")
-        .header("x-enso-organization-id", "org-2BqGX0q2yCdONdmx3Om1MVZzmv3")
-        .header("x-enso-admin-token", ENSO_ADMIN_TOKEN.get()?)
-        .header("Content-Type", "application/json")
-        .json(&body)
-        .send()
-        .await?;
-    debug!("Response code from the cloud: {}.", response.status());
-    handle_error_response(response).await
 }
 
 /// Step output reporting whether [`update_latest_release_version`] changed the build config.
@@ -341,17 +251,9 @@ pub async fn promote_release(context: &BuildContext, version_designation: Design
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::paths::TargetTriple;
     use ide_ci::cache::Cache;
     use ide_ci::github::setup_octocrab;
-
-    #[tokio::test]
-    #[ignore]
-    async fn notify_cloud() -> Result {
-        setup_logging().ok();
-        let version = Version::from_str("2022.1.1-rc.2")?;
-        notify_cloud_about_gui(&version).await?;
-        Ok(())
-    }
 
     #[tokio::test]
     #[ignore]

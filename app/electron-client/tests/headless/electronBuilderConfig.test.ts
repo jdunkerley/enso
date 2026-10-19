@@ -15,7 +15,12 @@ beforeAll(async () => {
 
 const savedEnv = { ...process.env }
 afterEach(() => {
-  for (const key of ['ENSO_BUILD_UPDATE_INFO', 'CSC_LINK', 'ENSO_BUILD_WIN_PUBLISHER_NAME']) {
+  for (const key of [
+    'ENSO_BUILD_UPDATE_INFO',
+    'CSC_LINK',
+    'WIN_CSC_LINK',
+    'ENSO_BUILD_WIN_PUBLISHER_NAME',
+  ]) {
     if (savedEnv[key] == null) Reflect.deleteProperty(process.env, key)
     else Reflect.set(process.env, key, savedEnv[key])
   }
@@ -46,14 +51,20 @@ describe('Windows', () => {
     expect(configFor(electronBuilder.Platform.WINDOWS).nsis?.differentialPackage).toBe(true)
   })
 
-  test('verifies the update publisher only when one is configured', () => {
-    expect(configFor(electronBuilder.Platform.WINDOWS).win?.signtoolOptions?.publisherName).toBe(
-      undefined,
-    )
+  test('verifies the update publisher only when a publisher and a certificate are configured', () => {
+    const publisherName = () =>
+      configFor(electronBuilder.Platform.WINDOWS).win?.signtoolOptions?.publisherName
+    expect(publisherName()).toBe(undefined)
     Reflect.set(process.env, 'ENSO_BUILD_WIN_PUBLISHER_NAME', 'Example Ltd')
-    expect(configFor(electronBuilder.Platform.WINDOWS).win?.signtoolOptions?.publisherName).toBe(
-      'Example Ltd',
-    )
+    // Unsigned: a publisher name would make every update fail signature verification.
+    expect(publisherName()).toBe(undefined)
+    Reflect.set(process.env, 'WIN_CSC_LINK', '')
+    expect(publisherName()).toBe(undefined)
+    Reflect.set(process.env, 'WIN_CSC_LINK', 'certificate')
+    expect(publisherName()).toBe('Example Ltd')
+    Reflect.deleteProperty(process.env, 'WIN_CSC_LINK')
+    Reflect.set(process.env, 'CSC_LINK', 'certificate')
+    expect(publisherName()).toBe('Example Ltd')
   })
 })
 

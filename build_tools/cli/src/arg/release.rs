@@ -3,12 +3,6 @@ use crate::prelude::*;
 use clap::Args;
 use clap::Subcommand;
 
-#[derive(Args, Clone, Debug)]
-pub struct DeployRuntime {
-    #[clap(long, default_value = enso_build::aws::ecr::runtime::NAME, enso_env())]
-    pub ecr_repository: String,
-}
-
 /// Structure that represents `promote` subcommand arguments.
 #[derive(Args, Clone, Copy, Debug)]
 pub struct Promote {
@@ -21,10 +15,6 @@ pub struct Promote {
 pub enum Action {
     /// Create a release draft on GitHub.
     CreateDraft,
-    /// Build the runtime image and push it to ECR.
-    DeployRuntime(DeployRuntime),
-    /// Dispatches the Cloud build-image workflow.
-    DispatchBuildImage,
     Publish,
     Promote(Promote),
     /// Record the released version as the latest one in `build-config.yaml`.

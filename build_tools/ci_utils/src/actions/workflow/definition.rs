@@ -75,14 +75,20 @@ pub fn is_github_hosted() -> String {
     "startsWith(runner.name, 'GitHub Actions') || startsWith(runner.name, 'Hosted Agent')".into()
 }
 
+/// Step that installs the Node.js version named in `.node-version`.
+///
+/// `package-manager-cache` is disabled because `actions/setup-node@v5` otherwise turns on pnpm
+/// caching on its own (the root `package.json` names `pnpm` as its `packageManager`), and the
+/// cache setup runs `pnpm store path` — before [`setup_corepack`] has put `pnpm` on the `PATH`.
+/// The step then fails with `Unable to locate executable file: pnpm`.
 pub fn setup_node() -> Step {
     Step {
         name: Some("Setup nodejs version".into()),
         uses: Some("actions/setup-node@v5".into()),
-        with: Some(step::Argument::Other(BTreeMap::from([(
-            "node-version-file".to_string(),
-            Value::String(".node-version".to_string()),
-        )]))),
+        with: Some(step::Argument::Other(BTreeMap::from([
+            ("node-version-file".to_string(), Value::String(".node-version".to_string())),
+            ("package-manager-cache".to_string(), Value::Bool(false)),
+        ]))),
         r#if: Some(is_macos_runner()),
         ..default()
     }
