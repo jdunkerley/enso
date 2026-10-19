@@ -145,7 +145,17 @@ pub async fn publish_release(context: &BuildContext) -> Result {
              Re-run its jobs in the release workflow to add it."
         );
         let body = format!("{}{note}", release.body.as_deref().unwrap_or_default());
-        remote_repo.repos().releases().update(release_id.0).body(&body).send().await?;
+        // A draft's tag does not exist yet; editing the draft without restating the tag turns it
+        // into `untagged-…`, and the release then publishes without a tag.
+        remote_repo
+            .repos()
+            .releases()
+            .update(release_id.0)
+            .tag_name(&release.tag_name)
+            .target_commitish(&release.target_commitish)
+            .body(&body)
+            .send()
+            .await?;
     }
 
     debug!("Found the target release, will publish it.");
