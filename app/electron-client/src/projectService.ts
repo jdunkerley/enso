@@ -1,18 +1,24 @@
 /** @file Project Manager Shim bindings. */
 
+import { Entry } from '@napi-rs/keyring'
 import { app, net } from 'electron'
+import * as os from 'node:os'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
 import * as paths from '@/paths'
+import { SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
+import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
 import { LocalVersioning, VersioningConsent } from 'project-manager-shim/localVersioning'
 import { ProjectService } from 'project-manager-shim/projectService'
 
 let projectService: ProjectService | null = null
 let localMetadata: LocalMetadata | null = null
 let localVersioning: LocalVersioning | null = null
+let localSecrets: LocalSecrets | null = null
+let secretsKeySource: SecretsKeySource | null = null
 let extraArgs: readonly string[] = []
 
 /** The local labels and Recent store, kept in Electron's `userData` directory. */
@@ -29,6 +35,39 @@ export function getLocalVersioning(): LocalVersioning {
   return localVersioning
 }
 
+/** The encrypted local secrets file (`~/.enso/secrets.json`, or `ENSO_SECRETS_FILE`). */
+export function getLocalSecrets(): LocalSecrets {
+  localSecrets ??= new LocalSecrets({
+    filePath: defaultSecretsFilePath(process.env, os.homedir()),
+    getKey: () => getSecretsKeySource().current(),
+  })
+  return localSecrets
+}
+
+/**
+ * The master key: `ENSO_SECRETS_KEY`, or the keychain item service `Enso`, account `secrets-key`.
+ *
+ * Use the plain `new Entry(service, account)`, never `Entry.withTarget`: in `@napi-rs/keyring` 2.1.2
+ * merely constructing a `withTarget` entry wipes an existing Windows credential. On Linux the store
+ * is pinned to the Secret Service, because the default silently falls back to the kernel keyring,
+ * which the engine's reader cannot see.
+ */
+export function getSecretsKeySource(): SecretsKeySource {
+  secretsKeySource ??= new SecretsKeySource({
+    env: process.env,
+    entry: (account) => new Entry('Enso', account, { linux: { store: 'secret-service' } }),
+    fileKeyId: () => getLocalSecrets().fileKeyId(),
+    fileHasSecrets: async () => (await getLocalSecrets().list()).length > 0,
+  })
+  return secretsKeySource
+}
+
+/** The master key for an engine's environment, when there is one. */
+function secretsKeyEnvironment(): readonly (readonly [string, string])[] {
+  const key = getSecretsKeySource().current()
+  return key ? [[SECRETS_KEY_VARIABLE, encodeKey(key)]] : []
+}
+
 /** Get the project service. */
 function getProjectService(electron: Electron | undefined, electronIsDev: boolean): ProjectService {
   if (!projectService) {
@@ -37,6 +76,7 @@ function getProjectService(electron: Electron | undefined, electronIsDev: boolea
       extraArgs,
       getLocalMetadata(),
       getLocalVersioning(),
+      secretsKeyEnvironment,
     )
   }
   return projectService
@@ -55,6 +95,7 @@ export function setupProjectService(
       args,
       getLocalMetadata(),
       getLocalVersioning(),
+      secretsKeyEnvironment,
     )
   }
   return projectService

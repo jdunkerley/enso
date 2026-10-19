@@ -90,3 +90,20 @@ test('carries no metadata for the removed Rust installer', () => {
   expect(config.extraMetadata).toEqual({ version: expect.any(String) })
   expect(config).not.toHaveProperty('msi')
 })
+
+describe('Native addons', () => {
+  test('esbuild copies `.node` binaries next to the bundle', async () => {
+    const { bundlerOptions } = await import('../../esbuildConfig')
+    expect(bundlerOptions('out').loader).toMatchObject({ '.node': 'copy' })
+  })
+
+  test('electron-builder unpacks them from the asar, where they cannot be loaded', () => {
+    for (const platform of [
+      electronBuilder.Platform.WINDOWS,
+      electronBuilder.Platform.LINUX,
+      electronBuilder.Platform.MAC,
+    ]) {
+      expect(configFor(platform).asarUnpack).toEqual(['**/*.node'])
+    }
+  })
+})

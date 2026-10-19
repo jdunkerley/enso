@@ -190,6 +190,11 @@ const updater: ElectronApi['updater'] = {
   },
 }
 
+const secrets: ElectronApi['secrets'] = {
+  copyKey: () => electron.ipcRenderer.invoke(ipc.Channel.secretsCopyKey),
+  reset: () => electron.ipcRenderer.invoke(ipc.Channel.secretsReset),
+}
+
 const api: ElectronApi = {
   navigation,
   menu,
@@ -213,6 +218,7 @@ const api: ElectronApi = {
   },
   ai,
   updater,
+  secrets,
 }
 
 exposeInMainWorld(API_KEY, api)

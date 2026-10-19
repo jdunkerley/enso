@@ -1,8 +1,9 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import * as paths from '@/paths'
+import { getLocalSecrets, getSecretsKeySource } from '@/projectService'
 import { initUpdaterIpc } from '@/updaterIpc'
-import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
+import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { download } from 'electron-dl'
 import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
@@ -62,6 +63,18 @@ export function initIpc(
   electronIsDev: boolean,
 ) {
   initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater)
+  // The key is written to the clipboard here, in main: it never crosses into the renderer.
+  ipcMain.handle(Channel.secretsCopyKey, () => {
+    const key = getSecretsKeySource().exportKey()
+    if (key == null) return false
+    clipboard.writeText(key)
+    return true
+  })
+  ipcMain.handle(Channel.secretsReset, async () => {
+    await getLocalSecrets().reset()
+    getSecretsKeySource().forget()
+    await getSecretsKeySource().initialise()
+  })
   ipcMain.on(Channel.error, (_event, data) => {
     console.error(...data)
   })

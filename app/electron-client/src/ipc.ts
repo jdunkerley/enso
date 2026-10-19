@@ -67,4 +67,11 @@ export enum Channel {
   updaterQuitAndInstall = 'updater-quit-and-install',
   /** Main → renderer: broadcast whenever the `UpdateStatus` changes. */
   updaterStatus = 'updater-status',
+  /**
+   * Renderer → main: copy the local secrets key to the clipboard. Main writes the clipboard itself,
+   * so the key never reaches the renderer; resolves `false` when there is no key.
+   */
+  secretsCopyKey = 'secrets-copy-key',
+  /** Renderer → main: delete the local secrets file and key, then create a new key. */
+  secretsReset = 'secrets-reset',
 }
