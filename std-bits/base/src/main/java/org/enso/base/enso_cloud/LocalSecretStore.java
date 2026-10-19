@@ -1,5 +1,8 @@
 package org.enso.base.enso_cloud;
 
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.core.util.Separators;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -47,6 +50,14 @@ final class LocalSecretStore {
   private static final int TAG_BITS = 128;
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  // Two-space indent, LF line endings and `"key": value`, as Node and prettier write JSON.
+  private static final DefaultPrettyPrinter PRINTER =
+      new DefaultPrettyPrinter()
+          .withSeparators(
+              Separators.createDefaultInstance()
+                  .withObjectFieldValueSpacing(Separators.Spacing.AFTER))
+          .withObjectIndenter(new DefaultIndenter("  ", "\n"))
+          .withArrayIndenter(new DefaultIndenter("  ", "\n"));
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final Path file;
@@ -182,12 +193,19 @@ final class LocalSecretStore {
           }
           mutation.apply(root, now);
           var tmp = file.resolveSibling(file.getFileName() + ".tmp");
-          Files.write(tmp, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(root));
           try {
-            Files.move(
-                tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-          } catch (AtomicMoveNotSupportedException e) {
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(
+                tmp,
+                (MAPPER.writer(PRINTER).writeValueAsString(root) + "\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            try {
+              Files.move(
+                  tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+              Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+          } finally {
+            Files.deleteIfExists(tmp);
           }
         });
   }
