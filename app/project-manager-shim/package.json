@@ -19,6 +19,11 @@
       "types": "./dist/localMetadata/index.d.ts",
       "import": "./dist/localMetadata/index.js"
     },
+    "./localSecrets": {
+      "source": "./src/localSecrets/index.ts",
+      "types": "./dist/localSecrets/index.d.ts",
+      "import": "./dist/localSecrets/index.js"
+    },
     "./localVersioning": {
       "source": "./src/localVersioning/index.ts",
       "types": "./dist/localVersioning/index.d.ts",
