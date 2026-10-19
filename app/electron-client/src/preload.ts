@@ -14,6 +14,7 @@ import type {
   AiToolCallReply,
   AiToolCallRequest,
 } from 'enso-common/src/ai'
+import type { UpdateStatus } from 'enso-common/src/updater'
 import type { $Config } from 'enso-gui/src/config'
 import type { ElectronApi } from 'enso-gui/src/electronApi'
 import type { MenuItem, MenuItemHandler } from 'enso-gui/src/project-view/util/menuItems'
@@ -174,6 +175,21 @@ const ai: ElectronApi['ai'] = {
   },
 }
 
+const updater: ElectronApi['updater'] = {
+  mode: () => electron.ipcRenderer.invoke(ipc.Channel.updaterMode),
+  check: (allowPrerelease) =>
+    electron.ipcRenderer.invoke(ipc.Channel.updaterCheck, allowPrerelease),
+  download: () => electron.ipcRenderer.invoke(ipc.Channel.updaterDownload),
+  quitAndInstall: () => electron.ipcRenderer.invoke(ipc.Channel.updaterQuitAndInstall),
+  onStatus: (handler) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => handler(status)
+    electron.ipcRenderer.on(ipc.Channel.updaterStatus, listener)
+    return () => {
+      electron.ipcRenderer.removeListener(ipc.Channel.updaterStatus, listener)
+    }
+  },
+}
+
 const api: ElectronApi = {
   navigation,
   menu,
@@ -196,6 +212,7 @@ const api: ElectronApi = {
     },
   },
   ai,
+  updater,
 }
 
 exposeInMainWorld(API_KEY, api)

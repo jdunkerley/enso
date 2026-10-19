@@ -1,12 +1,15 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import * as paths from '@/paths'
+import { initUpdaterIpc } from '@/updaterIpc'
 import { dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { download } from 'electron-dl'
+import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import { unlinkSync } from 'node:fs'
 import { basename, dirname, extname } from 'node:path'
 import { importProjectFromPath, isProjectBundle, isProjectRoot } from 'project-manager-shim'
+import BUILD_INFO from '../buildInfo'
 import { toElectronFileFilter, type FileFilter } from './fileBrowser'
 
 export type Electron = typeof import('electron')
@@ -58,6 +61,7 @@ export function initIpc(
   electron: Electron | undefined,
   electronIsDev: boolean,
 ) {
+  initUpdaterIpc(BUILD_INFO.updates, electronUpdater.autoUpdater)
   ipcMain.on(Channel.error, (_event, data) => {
     console.error(...data)
   })

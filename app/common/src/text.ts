@@ -87,6 +87,9 @@ interface PlaceholderOverrides {
   readonly uploadLargeFileStatus: [uploadedMb: string, totalMb: string]
 
   readonly latestVersion: [version: string, date: string]
+  readonly updateDownloading: [percent: number]
+  readonly updateReady: [version: string]
+  readonly updateFailed: [message: string]
 
   readonly 'manageLabelsModal.createLabelWithTitle': [labelName: string]
 

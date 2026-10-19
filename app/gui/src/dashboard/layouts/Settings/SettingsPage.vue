@@ -113,7 +113,9 @@ const tabSections = computed(() =>
     ...tabSection,
     tabs: tabSection.tabs.map((tabData) => ({
       ...tabData,
-      sections: [...tabData.sections, ...settingsContributions(tabData.settingsTab)],
+      sections: [...tabData.sections, ...settingsContributions(tabData.settingsTab)].filter(
+        (section) => section.visible?.() ?? true,
+      ),
     })),
   })),
 )

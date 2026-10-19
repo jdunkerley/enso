@@ -4,6 +4,9 @@
 
 - [The Windows installer is a standard installer: it can install silently (`/S`)
   and shows a single entry under installed apps.][255]
+- [Enso updates itself: when a new version is out, it offers to download it and
+  installs it on restart. Settings → Local can include prerelease
+  versions.][256]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -297,6 +300,7 @@
 
 [116]: https://github.com/jdunkerley/enso/pull/116
 [255]: https://github.com/jdunkerley/enso/pull/255
+[256]: https://github.com/jdunkerley/enso/pull/256
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71

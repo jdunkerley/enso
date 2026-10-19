@@ -28,9 +28,24 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
-- Handles custom window chrome. There is no auto-update yet: the build only
-  configures the GitHub update feed (`publish` in `electron-builder-config.ts`);
-  the in-app updater is a later part of the standard-installer work.
+- Handles custom window chrome.
+- Updates itself from the fork's GitHub Releases (`publish` in
+  `electron-builder-config.ts`). `src/updater.ts` wraps `electron-updater` in an
+  ask-then-download state machine (`idle` → `checking` → `none`/`available` →
+  `downloading` → `ready`, or `error`): nothing downloads until the user agrees,
+  and a downloaded update installs on restart or the next quit.
+  `src/updaterIpc.ts` exposes it to the GUI (mode, check, download,
+  quit-and-install handlers, and a status broadcast). The update mode is fixed
+  at build time: `ENSO_IDE_UPDATES` is `auto` or `manual`, chosen by
+  `update_mode` in `build_tools/build/src/ide/web.rs` — `manual` for dev builds,
+  and for unsigned macOS, which cannot replace itself; an unpackaged run or a
+  Linux build outside an AppImage is also `manual` at run time
+  (`resolveUpdateMode`). Manual mode never touches `electron-updater`. The
+  "Include prerelease versions" setting sets `allowPrerelease` for each check;
+  because `electron-updater` then matches only tags of the current version's
+  channel (an `rc` install sees only `rc` tags), a prerelease check that finds
+  nothing is followed by a stable-only check (`/releases/latest`), whose failure
+  counts as no update. Don't set `channel` instead: it enables `allowDowngrade`.
 
 ## Build
 
@@ -90,6 +105,8 @@ once `./run ide build` has produced the engine bundle.
 - `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — which engine to bundle.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
+- `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
+  `update_mode` in `build_tools/build/src/ide/web.rs`.
 
 ## Local Claude agent
 
