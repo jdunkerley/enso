@@ -651,12 +651,22 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
     let mut publish_deps = vec![prepare_job_id.clone(), license_check_job_id];
 
     // Each platform builds its own engine and IDE, and uploads the installer and the update feed
-    // to the draft. The release is published only when all of them succeed.
+    // to the draft. The release is published when Windows and Linux succeed. macOS does not block
+    // it: GitHub's `macos-latest` pool hands out some runners with 7 GB of memory, too little for
+    // the engine's native image, which then swaps until GraalVM gives up. A release published
+    // without its `.dmg` says so in its notes, and re-running the macOS jobs adds it.
     let engine_launcher = engine::EngineLauncher::Native;
     for target in RELEASE_TARGETS {
         let backend_job_id = workflow.add(target, job::BuildBackend { engine_launcher });
         let build_ide_job_id =
             workflow.add_dependent(target, UploadIde, [&prepare_job_id, &backend_job_id]);
+        if target.0 == OS::MacOS {
+            for id in [&backend_job_id, &build_ide_job_id] {
+                if let Some(job) = workflow.jobs.get_mut(id) {
+                    job.continue_on_error = Some(true);
+                }
+            }
+        }
         publish_deps.push(build_ide_job_id);
     }
 
@@ -1160,5 +1170,23 @@ mod tests {
             );
         }
         assert!(yaml.contains("ENSO_BUILD_UPDATE_INFO"), "{yaml}");
+    }
+
+    #[test]
+    fn only_macos_release_jobs_may_fail_without_blocking_publishing() {
+        let workflow = release().unwrap();
+        let tolerant: BTreeSet<_> = workflow
+            .jobs
+            .iter()
+            .filter(|(_, job)| job.continue_on_error == Some(true))
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert_eq!(
+            tolerant,
+            BTreeSet::from([
+                "enso-build-ci-gen-job-build-backend-macos-aarch64",
+                "enso-build-ci-gen-upload-ide-macos-aarch64",
+            ])
+        );
     }
 }

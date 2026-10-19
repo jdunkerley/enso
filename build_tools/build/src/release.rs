@@ -133,12 +133,26 @@ pub async fn publish_release(context: &BuildContext) -> Result {
     let release = release_handle.get().await?;
     ensure!(release.draft, "Release has been already published!");
 
+    // macOS does not block publishing (see `add_release_steps`), so its installer may be absent.
+    let uploaded: Vec<String> = release.assets.iter().map(|asset| asset.name.clone()).collect();
+    let (manifest, missing) =
+        manifest::Assets::new_uploaded(&remote_repo, &triple.versions.version, &uploaded);
+    if !missing.is_empty() {
+        let platforms = missing.iter().map(|asset| asset.target_pretty.as_str()).join(", ");
+        warn!("Publishing without installers for: {platforms}.");
+        let note = format!(
+            "\n\n> [!NOTE]\n> This release has no installer for {platforms}: that build failed. \
+             Re-run its jobs in the release workflow to add it."
+        );
+        let body = format!("{}{note}", release.body.as_deref().unwrap_or_default());
+        remote_repo.repos().releases().update(release_id.0).body(&body).send().await?;
+    }
+
     debug!("Found the target release, will publish it.");
     release_handle.publish().await?;
     debug!("Done. Release URL: {}", release.url);
 
     // Add assets manifest.
-    let manifest = manifest::Assets::new(&remote_repo, &triple.versions.version);
     let tempdir = tempdir()?;
     let manifest_path = tempdir.path().join(manifest::ASSETS_MANIFEST_FILENAME);
     ide_ci::fs::write_json(&manifest_path, &manifest)?;

@@ -243,6 +243,7 @@ jobs:
       - build-script-macos-aarch64
     runs-on:
       - macos-latest
+    continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -639,6 +640,7 @@ jobs:
       - enso-build-ci-gen-job-build-backend-macos-aarch64
     runs-on:
       - macos-latest
+    continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
