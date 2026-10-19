@@ -128,21 +128,3 @@ allowBuilds:
   # Its postinstall runs `vue-demi-switch`, which picks the shim for Vue 2 vs Vue 3. This repo is
   # Vue 3 only, which is what the package already ships by default.
   vue-demi: false
-# `@napi-rs/keyring` 2.1.2 (and its per-platform binaries) is the exact version the local-secrets
-# keychain spike validated (see the pin note in `app/electron-client/package.json`). It was published
-# on 2026-10-19, inside pnpm's release-age window when it was added; these entries only exempt that
-# one version and can go once it is older than the window.
-minimumReleaseAgeExclude:
-  - "@napi-rs/keyring-darwin-arm64@2.1.2"
-  - "@napi-rs/keyring-darwin-x64@2.1.2"
-  - "@napi-rs/keyring-freebsd-x64@2.1.2"
-  - "@napi-rs/keyring-linux-arm-gnueabihf@2.1.2"
-  - "@napi-rs/keyring-linux-arm64-gnu@2.1.2"
-  - "@napi-rs/keyring-linux-arm64-musl@2.1.2"
-  - "@napi-rs/keyring-linux-riscv64-gnu@2.1.2"
-  - "@napi-rs/keyring-linux-x64-gnu@2.1.2"
-  - "@napi-rs/keyring-linux-x64-musl@2.1.2"
-  - "@napi-rs/keyring-win32-arm64-msvc@2.1.2"
-  - "@napi-rs/keyring-win32-ia32-msvc@2.1.2"
-  - "@napi-rs/keyring-win32-x64-msvc@2.1.2"
-  - "@napi-rs/keyring@2.1.2"

@@ -19,7 +19,7 @@
   "dependencies": {
     "@electron/asar": "^3.2.9",
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "@napi-rs/keyring": "2.1.2",
+    "@napi-rs/keyring": "2.1.1",
     "chalk": "^6.0.0",
     "commander": "^14.0.1",
     "create-servers": "3.2.0",
@@ -45,7 +45,7 @@
   },
   "//": [
     "vite is required for the watch script",
-    "@napi-rs/keyring is pinned exactly: the keychain identity it writes (Windows target `secrets-key.Enso`, UTF-16LE blob; Linux Secret Service attributes `service`/`username`) must match what the engine's JNA reader expects, and in 2.1.2 merely constructing `Entry.withTarget` wipes an existing Windows credential. Re-verify both before bumping.",
+    "@napi-rs/keyring is pinned exactly: the keychain identity it writes (Windows target `secrets-key.Enso`, UTF-16LE blob; Linux Secret Service attributes `service`/`username`) must match what the engine's JNA reader expects, and `Entry.withTarget` must never be used (in 2.1.2 merely constructing one wipes an existing Windows credential). 2.1.1 rather than the spike's 2.1.2 because 2.1.2 was inside pnpm's minimum-release-age window; the identity was re-verified on 2.1.1 (Windows and Linux). Re-verify the identity before bumping.",
     "electron-builder-squirrel-windows is pinned only to satisfy app-builder-lib's required peer with a matching version — without it, pnpm keeps a stale 24.x subtree alongside the current one. The Squirrel Windows target is not used."
   ],
   "devDependencies": {
