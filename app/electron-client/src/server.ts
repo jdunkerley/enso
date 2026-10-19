@@ -184,7 +184,7 @@ export class Server {
   private projectService: ProjectService
   private localMetadata: LocalMetadata
   private localVersioning: LocalVersioning
-  private localSecrets?: LocalSecrets
+  private localSecrets: LocalSecrets | undefined
   private keyFromEnvironment: boolean
 
   /**
