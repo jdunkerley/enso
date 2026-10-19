@@ -1,4 +1,4 @@
-import { parseArgs, withoutDeepLink } from '@/configParser'
+import { parseArgs, withoutDeepLink, withoutInstallerFlags } from '@/configParser'
 import { defaultOptions, PASS_TO_WEB } from 'enso-common/src/options'
 import { expect, test } from 'vitest'
 
@@ -24,4 +24,12 @@ test('only a sole `enso:` argument is dropped', () => {
   expect(withoutDeepLink(['/home/user/project.enso-project'])).toEqual([
     '/home/user/project.enso-project',
   ])
+})
+
+test('the relaunch after an update starts the IDE with the default options', () => {
+  // The NSIS installer relaunches the IDE with `--updated` after an update installs.
+  const args = withoutInstallerFlags(['--updated'])
+  expect(args).toEqual([])
+  expect(parseArgs(args)).toEqual(defaultOptions())
+  expect(withoutInstallerFlags(['--updated', '--no-engine'])).toEqual(['--no-engine'])
 })

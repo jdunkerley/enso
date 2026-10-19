@@ -85,6 +85,22 @@ export function withoutDeepLink(args: readonly string[]): readonly string[] {
   return args
 }
 
+/** Flags the installer passes when it launches the IDE, which the IDE has no use for. */
+const INSTALLER_FLAGS: ReadonlySet<string> = new Set([
+  // electron-builder's NSIS installer relaunches the IDE with this after an update installs.
+  '--updated',
+])
+
+/**
+ * The client arguments without the flags the installer launches the IDE with.
+ *
+ * The parser rejects an unknown flag and exits before the window opens, so without this the IDE
+ * would quit silently right after every update.
+ */
+export function withoutInstallerFlags(args: readonly string[]): readonly string[] {
+  return args.filter((arg) => !INSTALLER_FLAGS.has(arg))
+}
+
 /** Parse command line arguments to validated options. */
 export function parseArgs(argv: readonly string[]): Options {
   const command = new Command()

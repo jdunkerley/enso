@@ -23,7 +23,7 @@ import { join as joinPath } from 'node:path'
 import process from 'node:process'
 import { downloadSamples, runLocalProjectByPath } from 'project-manager-shim'
 import { shutdownClaudeAgent } from './ai/claudeAgent.js'
-import { parseArgs, withoutDeepLink } from './configParser.js'
+import { parseArgs, withoutDeepLink, withoutInstallerFlags } from './configParser.js'
 import { VERSION } from './contentConfig.js'
 import { printInfo, VERSION_INFO } from './debug.js'
 import { initIpc, registerShortcuts, setChromeOptions } from './electron.js'
@@ -238,7 +238,7 @@ class App {
   processArguments(args: readonly string[]): ParsedArguments {
     // We parse only "client arguments", so we don't have to worry about the Electron-Dev vs
     // Electron-Proper distinction.
-    const clientArgs = withoutDeepLink(args)
+    const clientArgs = withoutDeepLink(withoutInstallerFlags(args))
     const fileToOpen = getFileToOpen(clientArgs)
     // If we are opening a file (i.e. we were spawned with just a path of the file to open as
     // the argument), it means that effectively we don't have any non-standard arguments.
