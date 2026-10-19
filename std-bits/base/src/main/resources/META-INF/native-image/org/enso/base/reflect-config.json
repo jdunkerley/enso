@@ -116,6 +116,45 @@
         "name": "org.enso.base.enso_cloud.EnsoSecretHelper"
     },
     {
+        "name": "org.enso.base.enso_cloud.LocalSecrets",
+        "methods": [
+            {
+                "name": "list"
+            },
+            {
+                "name": "exists"
+            },
+            {
+                "name": "create"
+            },
+            {
+                "name": "update"
+            },
+            {
+                "name": "delete"
+            }
+        ]
+    },
+    {
+        "name": "org.enso.base.enso_cloud.LocalSecretException",
+        "methods": [
+            {
+                "name": "kind"
+            },
+            {
+                "name": "getMessage"
+            }
+        ]
+    },
+    {
+        "name": "org.enso.base.enso_cloud.LocalSecretException$Kind",
+        "methods": [
+            {
+                "name": "name"
+            }
+        ]
+    },
+    {
         "name": "org.enso.base.enso_cloud.ExternalLibrarySecretHelper",
         "methods": [
             {

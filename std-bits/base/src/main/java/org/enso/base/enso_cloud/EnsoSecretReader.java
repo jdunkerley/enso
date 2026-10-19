@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.enso.base.cache.ReloadDetector;
 
-/** * Internal class to read secrets from the Enso Cloud. */
+/** Internal class to read secrets from the Enso Cloud or the local secrets file. */
 class EnsoSecretReader implements ReloadDetector.HasClearableCache {
   static final EnsoSecretReader INSTANCE = new EnsoSecretReader();
 
@@ -36,6 +36,15 @@ class EnsoSecretReader implements ReloadDetector.HasClearableCache {
    * @return the secret value.
    */
   String readSecret(String secretId) {
+    // Local secrets are re-read every time (never cached), so an update takes effect at once.
+    if (secretId.startsWith(LocalSecrets.ID_PREFIX)) {
+      try {
+        return LocalSecrets.read(secretId.substring(LocalSecrets.ID_PREFIX.length()));
+      } catch (IOException e) {
+        throw new IllegalArgumentException("Unable to read secret: " + e.getMessage());
+      }
+    }
+
     ReloadDetector.clearOnReloadIfRegistered(this);
 
     if (secrets.containsKey(secretId)) {

@@ -107,7 +107,7 @@ final class LocalSecretStore {
           if (secrets.has(name)) {
             throw new LocalSecretException(
                 LocalSecretException.Kind.ALREADY_EXISTS,
-                "A local secret named '" + name + "' already exists.");
+                "A secret with the name \"" + name + "\" already exists.");
           }
           var entry = encrypt(name, value);
           entry.put("created", now);
@@ -277,7 +277,7 @@ final class LocalSecretStore {
 
   private static LocalSecretException notFound(String name) {
     return new LocalSecretException(
-        LocalSecretException.Kind.NOT_FOUND, "No local secret named '" + name + "'.");
+        LocalSecretException.Kind.NOT_FOUND, "Cannot find secret: secret://" + name);
   }
 
   private ObjectNode encrypt(String name, String value) {
