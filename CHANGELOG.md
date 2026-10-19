@@ -276,7 +276,7 @@
 
 #### Enso Standard Library
 
-- [Secrets work without Enso Cloud][PRNUM]: `Enso_Secret.create` and `get` keep
+- [Secrets work without Enso Cloud][262]: `Enso_Secret.create` and `get` keep
   secrets in an encrypted local file (`secret://name`), which can be used in
   HTTP headers, database credentials and datalinks. Without a `parent`,
   `Enso_Secret` calls are now local; pass a cloud folder as `parent` (or an
@@ -304,7 +304,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [116]: https://github.com/jdunkerley/enso/pull/116
-[PRNUM]: https://github.com/jdunkerley/enso/pull/PRNUM
+[262]: https://github.com/jdunkerley/enso/pull/262
 [255]: https://github.com/jdunkerley/enso/pull/255
 [256]: https://github.com/jdunkerley/enso/pull/256
 [69]: https://github.com/jdunkerley/enso/pull/69
