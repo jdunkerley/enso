@@ -22,6 +22,8 @@ import {
   type DuplicateProjectParams,
   type FileSystemEntry,
   type JSONRPCResponse,
+  type LocalSecretsStatus,
+  type LocalSecretSummary,
   type OpenProject,
   type OpenProjectParams,
   type ProjectState,
@@ -474,6 +476,31 @@ export class ProjectManager {
   /** Delete the datalink file `path`. */
   async deleteDatalink(path: Path): Promise<void> {
     await this.runProjectServiceCommand('datalink/delete', { path })
+  }
+
+  /** The local secrets' names and times. Values are never returned. */
+  async listSecrets(): Promise<readonly LocalSecretSummary[]> {
+    return this.runProjectServiceCommand('secrets/list', {})
+  }
+
+  /** Save a new local secret. */
+  async createSecret(name: string, value: string): Promise<void> {
+    await this.runProjectServiceCommand('secrets/create', { name, value })
+  }
+
+  /** Replace the value of the local secret `name`. */
+  async updateSecret(name: string, value: string): Promise<void> {
+    await this.runProjectServiceCommand('secrets/update', { name, value })
+  }
+
+  /** Delete the local secret `name`. */
+  async deleteSecret(name: string): Promise<void> {
+    await this.runProjectServiceCommand('secrets/delete', { name })
+  }
+
+  /** Whether local secrets exist and can be unlocked, and where the key comes from. */
+  async secretsStatus(): Promise<LocalSecretsStatus> {
+    return this.runProjectServiceCommand('secrets/status', {})
   }
 
   /** Whether the project at `path` is versioned, has unsaved changes, and its last version. */

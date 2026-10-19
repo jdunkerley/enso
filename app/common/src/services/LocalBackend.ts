@@ -105,6 +105,21 @@ function assetHasAllLabels(labels: readonly backend.LabelName[]) {
     labels.every((label) => asset.labels?.includes(label) === true)
 }
 
+/** The prefix of a local secret's path in Enso. */
+const LOCAL_SECRET_PREFIX = 'local:'
+const LOCAL_SECRET_PATH_PREFIX = 'secret://'
+
+/** The id of the local secret `name`. */
+function localSecretId(name: string) {
+  return backend.SecretId(`${LOCAL_SECRET_PREFIX}${name}`)
+}
+
+/** The name of the local secret with this id. */
+function localSecretName(id: backend.SecretId) {
+  if (!id.startsWith(LOCAL_SECRET_PREFIX)) throw new Error(`Not a local secret: ${id}`)
+  return id.slice(LOCAL_SECRET_PREFIX.length)
+}
+
 /**
  * Class for sending requests to the Project Manager API endpoints.
  * This is used instead of the cloud backend API when managing local projects from the dashboard.
@@ -1105,9 +1120,10 @@ export class LocalBackend extends backend.Backend {
     await this.projectManager.deleteDatalink(backend.extractTypeAndPath(datalinkId).path)
   }
 
-  /** Invalid operation. */
-  override createSecret() {
-    return this.invalidOperation()
+  /** Save a local secret. Local secrets live in no folder, so `parentDirectoryId` is ignored. */
+  override async createSecret(body: backend.CreateSecretRequestBody) {
+    await this.projectManager.createSecret(body.name, body.value)
+    return localSecretId(body.name)
   }
 
   /** Invalid operation. */
@@ -1115,19 +1131,38 @@ export class LocalBackend extends backend.Backend {
     return this.invalidOperation()
   }
 
-  /** Invalid operation. */
-  override updateSecret() {
-    return this.invalidOperation()
+  /** Replace a local secret's value. Renaming is not supported. */
+  override async updateSecret(
+    secretId: backend.SecretId,
+    body: backend.UpdateSecretRequestBody,
+    _title?: string,
+  ) {
+    if (body.value == null) return this.invalidOperation()
+    await this.projectManager.updateSecret(localSecretName(secretId), body.value)
   }
 
-  /** Invalid operation. */
-  override getSecret() {
-    return this.invalidOperation()
+  /** Values are never read back, so the value is empty. */
+  override getSecret(secretId: backend.SecretId, _title?: string) {
+    return Promise.resolve({ id: secretId, value: '' })
   }
 
-  /** Return an empty array. This function should never need to be called. */
-  override listSecrets() {
-    return Promise.resolve([])
+  /** The local secrets' names, as `secret://` paths. */
+  override async listSecrets() {
+    return (await this.projectManager.listSecrets()).map(({ name }): backend.SecretInfo => ({
+      name,
+      id: localSecretId(name),
+      path: `${LOCAL_SECRET_PATH_PREFIX}${name}`,
+    }))
+  }
+
+  /** Delete a local secret. (Cloud secrets are deleted as assets, so the abstract class has none.) */
+  async deleteLocalSecret(name: string) {
+    await this.projectManager.deleteSecret(name)
+  }
+
+  /** Whether local secrets exist and can be unlocked, and where the key comes from. */
+  secretsStatus() {
+    return this.projectManager.secretsStatus()
   }
 
   /** Only projects can carry labels locally. */

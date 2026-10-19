@@ -339,3 +339,13 @@ that is not valid JSON is still listed; reading it reports the problem.
   refuses a missing file, `delete` anything but a file; `read` of a missing file
   says `Datalink not found`. Values must be JSON objects. Schema validation is
   the GUI's.
+
+### Secrets routes (`handler/projectService.ts`)
+
+`secrets/list`, `create {name,value}`, `update {name,value}`, `delete {name}`
+and `status` (the store's status plus `keyFromEnvironment`) are served from the
+`LocalSecrets` passed to `handleProjectServiceRequest` (after `localVersioning`,
+then `keyFromEnvironment`). No route returns a value. Without a store they fail
+with `Local secrets are not available in this host.`; store errors surface as
+`secrets/<op> failed: <message>`. `ProjectService.default(…, extraEnvironment)`
+appends its entries to every engine's environment (Task 8 uses it for the key).

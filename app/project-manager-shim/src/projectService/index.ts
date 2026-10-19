@@ -87,6 +87,8 @@ export class ProjectService {
     private readonly logger: Console = console,
     private readonly lifecycle?: ProjectLifecycleListener,
     private readonly versioning?: LocalVersioning,
+    /** Environment variables added to every engine this service starts. */
+    private readonly extraEnvironment?: () => readonly (readonly [string, string])[],
   ) {}
 
   /** Why the last close-commit of each project (by path) failed, until `closeProject` reports it. */
@@ -98,6 +100,7 @@ export class ProjectService {
     extraArgs: readonly string[] = [],
     lifecycle?: ProjectLifecycleListener,
     versioning?: LocalVersioning,
+    extraEnvironment?: () => readonly (readonly [string, string])[],
   ): ProjectService {
     const ensoPath = findEnsoExecutable(workDir)
     if (!ensoPath) {
@@ -110,7 +113,14 @@ export class ProjectService {
     const envArgsArray = envArgs ? envArgs.split(/\s+/).filter((arg) => arg.length > 0) : []
     const allExtraArgs = [...envArgsArray, ...extraArgs]
 
-    return new ProjectService(runner, allExtraArgs, console, lifecycle, versioning)
+    return new ProjectService(
+      runner,
+      allExtraArgs,
+      console,
+      lifecycle,
+      versioning,
+      extraEnvironment,
+    )
   }
 
   /** Tell {@link lifecycle} about a change that has already happened; failures are only logged. */
@@ -200,6 +210,7 @@ export class ProjectService {
     return [
       ['ENSO_LOCAL_PROJECT_ID', localProjectKey],
       ['ENSO_LOCAL_PROJECT_SESSION_ID', localSessionId],
+      ...(this.extraEnvironment?.() ?? []),
     ]
   }
 

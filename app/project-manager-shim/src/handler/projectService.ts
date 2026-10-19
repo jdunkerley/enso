@@ -2,6 +2,7 @@ import { LabelName, Path, UUID, type LChColor } from 'enso-common/src/services/B
 import type * as http from 'node:http'
 import * as datalinkFiles from '../datalinks.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
+import type { LocalSecrets } from '../localSecrets/index.js'
 import type { LocalVersioning } from '../localVersioning/index.js'
 import { ProjectService } from '../projectService/index.js'
 import { bodyJson, bodyJsonOrEmpty } from './http.js'
@@ -107,6 +108,37 @@ const LOCAL_VERSIONING_ROUTES: Readonly<Record<string, RouteHandler<VersioningCo
   },
 }
 
+/** What the {@link LOCAL_SECRETS_ROUTES} handlers use. */
+interface SecretsContext {
+  readonly store: LocalSecrets
+  /** Whether the key comes from `ENSO_SECRETS_KEY`, so the app cannot rotate it. */
+  readonly keyFromEnvironment: boolean
+}
+
+/**
+ * The routes served by {@link LocalSecrets}. None returns a secret value: the app writes values
+ * and never reads them back.
+ */
+const LOCAL_SECRETS_ROUTES: Readonly<Record<string, RouteHandler<SecretsContext>>> = {
+  'secrets/list': ({ store }) => store.list(),
+  'secrets/create': async ({ store }, body) => {
+    await store.create(requireString(body, 'name'), requireString(body, 'value'))
+    return null
+  },
+  'secrets/update': async ({ store }, body) => {
+    await store.update(requireString(body, 'name'), requireString(body, 'value'))
+    return null
+  },
+  'secrets/delete': async ({ store }, body) => {
+    await store.delete(requireString(body, 'name'))
+    return null
+  },
+  'secrets/status': async ({ store, keyFromEnvironment }) => ({
+    ...(await store.status()),
+    keyFromEnvironment,
+  }),
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value != null && !Array.isArray(value)
 }
@@ -199,7 +231,8 @@ async function handleStoreRequest<Store>(
  * Handle project service requests.
  *
  * The label and Recent routes are served by `localMetadata`, the `versioning/` routes by
- * `localVersioning`, and the `datalink/` routes by `datalinks.ts`; without their store they answer with an error.
+ * `localVersioning`, the `secrets/` routes by `localSecrets` (`keyFromEnvironment` says where its key
+ * comes from), and the `datalink/` routes by `datalinks.ts`; without their store they answer with an error.
  */
 export async function handleProjectServiceRequest(
   request: http.IncomingMessage,
@@ -209,6 +242,8 @@ export async function handleProjectServiceRequest(
   headers: Record<string, string>,
   localMetadata?: LocalMetadata,
   localVersioning?: LocalVersioning,
+  localSecrets?: LocalSecrets,
+  keyFromEnvironment = false,
 ): Promise<void> {
   const routeName = requestPath.replace(/^\/api\/project-service\//, '')
   if (request.method === 'POST') {
@@ -232,6 +267,17 @@ export async function handleProjectServiceRequest(
           LOCAL_VERSIONING_ROUTES[routeName]!({ versioning: store, getProjectService }, body),
         localVersioning,
         'Local versioning is not available in this host.',
+        headers,
+      )
+    }
+    if (Object.hasOwn(LOCAL_SECRETS_ROUTES, routeName)) {
+      return handleStoreRequest(
+        request,
+        response,
+        routeName,
+        (store, body) => LOCAL_SECRETS_ROUTES[routeName]!({ store, keyFromEnvironment }, body),
+        localSecrets,
+        'Local secrets are not available in this host.',
         headers,
       )
     }
