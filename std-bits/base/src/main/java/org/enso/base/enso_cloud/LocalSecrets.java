@@ -57,7 +57,13 @@ public final class LocalSecrets {
             : Path.of(fileOverride);
     byte[] key;
     if (keyOverride != null && !keyOverride.isEmpty()) {
-      key = LocalSecretStore.decodeKey(keyOverride);
+      try {
+        key = LocalSecretStore.decodeKey(keyOverride);
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            "ENSO_SECRETS_KEY is not a valid secrets key: expected 32 bytes as unpadded"
+                + " base64url.");
+      }
     } else {
       key = keychain.get();
     }

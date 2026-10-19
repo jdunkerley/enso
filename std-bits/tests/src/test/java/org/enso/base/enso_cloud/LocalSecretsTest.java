@@ -81,4 +81,15 @@ public class LocalSecretsTest {
       LocalSecrets.testOverride = null;
     }
   }
+
+  @Test
+  public void aMalformedKeyNamesTheVariableWithoutEchoingIt() {
+    var e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> LocalSecrets.open(null, "not-a-key!!", tmp.getRoot().toPath(), () -> null));
+    assertEquals(
+        "ENSO_SECRETS_KEY is not a valid secrets key: expected 32 bytes as unpadded base64url.",
+        e.getMessage());
+  }
 }

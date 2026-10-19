@@ -36,12 +36,13 @@ class EnsoSecretReader implements ReloadDetector.HasClearableCache {
    * @return the secret value.
    */
   String readSecret(String secretId) {
-    // Local secrets are re-read every time (never cached), so an update takes effect at once.
+    // Not cached: the app can change a local value under a running engine, and a cache would go
+    // stale.
     if (secretId.startsWith(LocalSecrets.ID_PREFIX)) {
       try {
         return LocalSecrets.read(secretId.substring(LocalSecrets.ID_PREFIX.length()));
       } catch (IOException e) {
-        throw new IllegalArgumentException("Unable to read secret: " + e.getMessage());
+        throw new IllegalArgumentException("Unable to read secret: " + e.getMessage(), e);
       }
     }
 
