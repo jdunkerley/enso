@@ -440,8 +440,8 @@ add_specs suite_builder =
 
         group_builder.specify "Should work with secrets in the URI" pending="https://github.com/enso-org/enso/issues/12575" <| Test.with_retries <|
             cloud_setup.with_prepared_environment <|
-                secret1 = Enso_Secret.create "http-cache-secret-1-"+Random.uuid "My Value"
-                secret2 = Enso_Secret.create "http-cache-secret-2-"+Random.uuid "Some Value"
+                secret1 = Enso_Secret.create "http-cache-secret-1-"+Random.uuid "My Value" parent=Enso_File.current_working_directory
+                secret2 = Enso_Secret.create "http-cache-secret-2-"+Random.uuid "Some Value" parent=Enso_File.current_working_directory
                 cleanup =
                     secret1.delete
                     secret2.delete
@@ -461,8 +461,8 @@ add_specs suite_builder =
 
         group_builder.specify "Should work with secrets in the headers" pending="https://github.com/enso-org/enso/issues/12575" <| Test.with_retries <|
             cloud_setup.with_prepared_environment <|
-                secret1 = Enso_Secret.create "http-cache-secret-1-"+Random.uuid "My Value"
-                secret2 = Enso_Secret.create "http-cache-secret-2-"+Random.uuid "Some Value"
+                secret1 = Enso_Secret.create "http-cache-secret-1-"+Random.uuid "My Value" parent=Enso_File.current_working_directory
+                secret2 = Enso_Secret.create "http-cache-secret-2-"+Random.uuid "Some Value" parent=Enso_File.current_working_directory
                 cleanup =
                     secret1.delete
                     secret2.delete

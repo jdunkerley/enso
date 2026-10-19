@@ -33,7 +33,9 @@
 - Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value.from that:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret -> Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
 - type Enso_Secret_Error
     - Access_Denied
+    - Locked
     - Not_Found resolved_path:Standard.Base.Any.Any
+    - Wrong_Key
     - to_display_text self -> Standard.Base.Any.Any
 - as_credential_reference secret:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret credential_reference:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - secret_asset_uri secret:Standard.Base.Any.Any -> Standard.Base.Any.Any

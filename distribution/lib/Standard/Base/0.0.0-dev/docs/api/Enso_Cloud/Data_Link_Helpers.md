@@ -24,7 +24,7 @@
 - read_data_link_as_stream file:Standard.Base.System.File.Generic.File_Like.File_Like open_options:Standard.Base.Data.Vector.Vector f:(Standard.Base.System.Input_Stream.Input_Stream -> Standard.Base.Any.Any) -> Standard.Base.Any.Any
 - resolve_path path:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - save_data_link_to_file data_link_instance:Standard.Base.Any.Any target_file:Standard.Base.System.File.Generic.Writable_File.Writable_File -> Standard.Base.Any.Any
-- save_password_for_data_link data_link_location:Standard.Base.Enso_Cloud.Enso_File.Enso_File secure_value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret) name_hint:Standard.Base.Data.Text.Text= -> Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret
+- save_password_for_data_link data_link_location:Standard.Base.Any.Any secure_value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret) name_hint:Standard.Base.Data.Text.Text= -> Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret
 - secure_value_to_json value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret) -> (Standard.Base.Data.Json.JS_Object|Standard.Base.Data.Text.Text)
-- store_as_secret base_location:Standard.Base.Enso_Cloud.Enso_File.Enso_File name_hint:Standard.Base.Data.Text.Text secure_value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret) -> Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret
+- store_as_secret base_location:(Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.Nothing.Nothing) name_hint:Standard.Base.Data.Text.Text secure_value:(Standard.Base.Data.Text.Text|Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret) -> Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret
 - write_data_link_as_stream file:Standard.Base.System.File.Generic.File_Like.File_Like open_options:Standard.Base.Data.Vector.Vector f:(Standard.Base.System.Output_Stream.Output_Stream -> Standard.Base.Any.Any) -> Standard.Base.Any.Any

@@ -67,6 +67,7 @@ import project.Network.Http.Request_Spec as Http_Request_Spec
 import project.Network.Http.Http_Auto_Parse_Spec
 import project.Network.Http.Http_Data_Link_Spec
 import project.Network.Http_Spec
+import project.Network.Local_Secrets_Spec
 import project.Network.URI_Spec
 
 import project.Runtime.Ascribed_Parameters_Spec
@@ -120,6 +121,7 @@ main filter=Nothing =
         Http_Header_Spec.add_specs suite_builder
         Http_Request_Spec.add_specs suite_builder
         Http_Spec.add_specs suite_builder
+        Local_Secrets_Spec.add_specs suite_builder
         Http_Auto_Parse_Spec.add_specs suite_builder
         Http_Data_Link_Spec.add_specs suite_builder
         Import_Loop_Spec.add_specs suite_builder

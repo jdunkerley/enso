@@ -240,9 +240,10 @@ disallow_links_in_move source target ~action =
    representation of it.
    If given an existing secret, it will be returned as-is.
    However, if given a plain text, it will create a new secret in the provided
-   directory. Because it may be creating new secret, this should only be run
+   Enso Cloud directory, or in the local secrets store if `base_location` is
+   `Nothing`. Because it may be creating new secret, this should only be run
    within an enabled Output context.
-store_as_secret base_location:Enso_File name_hint:Text secure_value:Text|Enso_Secret -> Enso_Secret = case secure_value of
+store_as_secret base_location:Enso_File|Nothing name_hint:Text secure_value:Text|Enso_Secret -> Enso_Secret = case secure_value of
     existing_secret : Enso_Secret -> existing_secret
     plain_text : Text ->
         create_fresh_secret ix =
@@ -255,11 +256,18 @@ store_as_secret base_location:Enso_File name_hint:Text secure_value:Text|Enso_Se
 ## ---
    private: true
    ---
-save_password_for_data_link data_link_location:Enso_File secure_value:Text|Enso_Secret name_hint:Text="password" -> Enso_Secret =
-    secret_location = data_link_location.parent.if_nothing (Error.throw (Illegal_State.Error "Trying to create a secret to store the Data Link password, but the provided data link location: "+data_link_location.to_text+" does not have a parent directory. This should not happen."))
-    location_name = if data_link_location.name.ends_with data_link_extension then data_link_location.name.drop (..Last data_link_extension.length) else data_link_location.name
-    secret_location.if_not_error <|
-        store_as_secret secret_location location_name+"-"+name_hint secure_value
+   Saves the password of a data link as a secret: next to the data link if it
+   is in the Enso Cloud, otherwise in the local secrets store.
+save_password_for_data_link data_link_location secure_value:Text|Enso_Secret name_hint:Text="password" -> Enso_Secret =
+    base_name = data_link_location.name
+    location_name = if base_name.ends_with data_link_extension then base_name.drop (..Last data_link_extension.length) else base_name
+    case data_link_location of
+        cloud_location : Enso_File ->
+            secret_location = cloud_location.parent.if_nothing (Error.throw (Illegal_State.Error "Trying to create a secret to store the Data Link password, but the provided data link location: "+cloud_location.to_text+" does not have a parent directory. This should not happen."))
+            secret_location.if_not_error <|
+                store_as_secret secret_location location_name+"-"+name_hint secure_value
+        _ ->
+            store_as_secret Nothing location_name+"-"+name_hint secure_value
 
 ## ---
    private: true
