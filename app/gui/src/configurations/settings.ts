@@ -229,6 +229,8 @@ export interface SettingsSectionData extends SettingsSearchableSection<SettingsE
   /** `false` hides the section's heading. */
   readonly heading?: false
   readonly columnClass?: string
+  /** `false` leaves the section out, for one that only works in some builds. */
+  readonly visible?: () => boolean
 }
 
 /**

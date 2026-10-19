@@ -151,7 +151,15 @@ describe('the Local settings tab', () => {
     expect(mapboxSettingsStore.getState().accessToken).toBe('pk.typed')
   })
 
+  test('the Updates section is left out without the desktop updater', async () => {
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    expect(document.body.textContent).not.toContain(getText('includePrereleasesSetting'))
+  })
+
   test('the Updates section has the prerelease-updates switch, off by default', async () => {
+    // Only the desktop app exposes the updater; the section reads no more than its presence.
+    vi.stubGlobal('api', { ...window.api, updater: {} })
     await openLocalTab()
     expect(document.body.textContent).toContain(getText('includePrereleasesSetting'))
     const { useIncludePrereleases, setIncludePrereleases } =
@@ -169,6 +177,7 @@ describe('the Local settings tab', () => {
     await flushPromises()
     expect(useIncludePrereleases().value).toBe(true)
     setIncludePrereleases(false)
+    vi.unstubAllGlobals()
   })
 
   test('a typed directory, once saved, reaches the local paths', async () => {

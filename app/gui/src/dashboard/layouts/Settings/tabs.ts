@@ -104,6 +104,8 @@ const LOCAL_TAB: SettingsTabData = {
     },
     {
       nameId: 'updatesSettingsSection',
+      // Only the desktop app updates itself; a browser build has no updater to configure.
+      visible: () => window.api?.updater != null,
       entries: [
         {
           type: 'custom',
