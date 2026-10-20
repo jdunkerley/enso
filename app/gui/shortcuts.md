@@ -25,6 +25,7 @@ Shortcuts are designed to work well with both the mouse and the touchpad.
 | --------------------------------------------------------------------------------- | ------------------------------ |
 | <kbd>Escape</kbd>                                                                 | Cancel current interaction     |
 | <kbd>Meta</kbd>+<kbd>`</kbd>                                                      | Show/hide Code Editor          |
+| <kbd>Meta</kbd>+<kbd>L</kbd>                                                      | Show/hide Engine Logs          |
 | <kbd>Meta</kbd>+<kbd>D</kbd>                                                      | Show/hide Documentation Editor |
 | <kbd>Meta</kbd>+<kbd>,</kbd>                                                      | Show Settings                  |
 | <kbd>Meta</kbd>+<kbd>/</kbd>                                                      | Show About Window              |

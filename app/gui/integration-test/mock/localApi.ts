@@ -82,6 +82,11 @@ const INITIAL_CALLS_OBJECT = {
   duplicateProject: array<{ projectId: string }>(),
   moveFile: array<{ from: string; to: string }>(),
   deletePath: array<{ path: string }>(),
+  engineLogStreams: array<{
+    project: string | null
+    channel: string | null
+    after: string | null
+  }>(),
 }
 
 const READONLY_INITIAL_CALLS_OBJECT: TrackedCallsInternal = INITIAL_CALLS_OBJECT
@@ -134,6 +139,15 @@ export async function mockLocalApi(page: Page) {
   let recentProjects: RecentProjectEntry[] = []
   /** The sessions every local project reports, as the engine's log files would list them. */
   const projectSessions: { projectSessionId: string; createdAt: string }[] = []
+  /**
+   * The engine log the mock stream (`GET /api/engine-logs/stream`) serves, numbered from 1. With
+   * no events the stream answers that the project is not open, and the client retries with
+   * backoff (at most every 10 s), so specs that do not use it make few requests.
+   */
+  const engineLog = {
+    channel: 'mock-engine-log',
+    events: [] as { seq: number; event: string; data: Record<string, unknown> }[],
+  }
 
   const callsObjects = new Set<typeof INITIAL_CALLS_OBJECT>()
 
@@ -949,6 +963,42 @@ export async function mockLocalApi(page: Page) {
       })
     })
 
+    await page.route('/api/engine-logs/stream?*', async (route, request) => {
+      const url = new URL(request.url())
+      const channel = url.searchParams.get('channel')
+      const after = url.searchParams.get('after')
+      called('engineLogStreams', { project: url.searchParams.get('project'), channel, after })
+      const sse = (event: string, data: unknown) =>
+        `event: ${event}
+data: ${JSON.stringify(data)}
+
+`
+      if (engineLog.events.length === 0) {
+        return route.fulfill({
+          contentType: 'text/event-stream',
+          body: sse('end', { reason: 'not-open' }),
+        })
+      }
+      const from = channel === engineLog.channel && after != null ? Number(after) : 0
+      const session = [...engineLog.events].reverse().find((e) => e.event === 'session')
+      const hello = {
+        channel: engineLog.channel,
+        oldestSeq: 1,
+        nextSeq: engineLog.events.length + 1,
+        sessionId: session?.data['sessionId'] ?? null,
+        logFile: session?.data['logFile'] ?? null,
+      }
+      // A fulfilled route closes the stream: the client reconnects with `after` and gets what was
+      // added since, which is how a spec's later lines arrive.
+      const body =
+        sse('hello', hello) +
+        engineLog.events
+          .filter((e) => e.seq > from)
+          .map((e) => sse(e.event, { seq: e.seq, ...e.data }))
+          .join('')
+      return route.fulfill({ contentType: 'text/event-stream', body })
+    })
+
     await page.route('/api/run-project-manager-command?*', async (route, request) => {
       const succeed = (result: unknown, contentType = 'application/json') => {
         return route.fulfill({ contentType, body: JSON.stringify(toJSONRPCResult(result)) })
@@ -1117,6 +1167,19 @@ export async function mockLocalApi(page: Page) {
     projectSessions.push({ projectSessionId: `local-session-${projectSessions.length}`, createdAt })
   }
 
+  /** Add an event to the mock engine log stream. */
+  function addEngineLogEvent(
+    event: 'line' | 'session' | 'waiting',
+    data: Record<string, unknown> = {},
+  ) {
+    engineLog.events.push({ seq: engineLog.events.length + 1, event, data })
+  }
+
+  /** Add a line to the mock engine log stream. */
+  function addEngineLogLine(text: string, source: 'file' | 'stderr' = 'file') {
+    addEngineLogEvent('line', { source, sessionId: 'mock-session', text })
+  }
+
   async function updateVisualization(preprocessor: string, data: unknown) {
     updateVisualizationData(preprocessor, data)
   }
@@ -1135,6 +1198,8 @@ export async function mockLocalApi(page: Page) {
     datalinkValue,
     removeEntry,
     addProjectSession,
+    addEngineLogEvent,
+    addEngineLogLine,
     updateVisualization,
     addLabel,
     addRecentProject,

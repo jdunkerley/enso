@@ -51,3 +51,8 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   (`selectLine`) there and the shortcut cannot double-fire. If a binding for
   `Mod-l` is ever added to that keymap, CodeMirror must keep it inside the
   editor and the graph handler must be told to skip it, or both would run.
+- The dock's tabs are `@/components/BottomPanel/` (`dockTab.ts`,
+  `BottomPanelTabs.vue`); `GraphEditor.vue` creates the stream and passes it to
+  `EngineLogPanel`.
+- Playwright: `integration-test/project-view/engineLogs.spec.ts`, against the
+  mock stream in `mock/localApi.ts`.
