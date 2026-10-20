@@ -98,6 +98,15 @@ labels:
   - name: "CI: Build IDE"
     color: "#ffffff"
     description: Run the IDE build and packaging jobs even if no IDE files changed.
+  - name: "CI: macOS Engine"
+    color: "#ffffff"
+    description: Also run the engine's JVM tests on the self-hosted macOS runner.
+  - name: "CI: macOS Libraries"
+    color: "#ffffff"
+    description: Also run the Standard Library tests on the self-hosted macOS runner.
+  - name: "CI: macOS GUI"
+    color: "#ffffff"
+    description: Also run the GUI checks on the self-hosted macOS runner.
 
   - name: "Difficulty: Beginner"
     color: "#d1e9c4"

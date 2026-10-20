@@ -385,9 +385,9 @@ pub fn setup_script_steps(fetch_depth: Option<u32>) -> Vec<Step> {
 pub fn share_build_script(workflow: &mut Workflow) {
     fn os_of(job: &Job) -> Option<OS> {
         job.runs_on.iter().find_map(|label| match label {
-            RunnerLabel::LinuxLatest => Some(OS::Linux),
-            RunnerLabel::WindowsLatest => Some(OS::Windows),
-            RunnerLabel::MacOSLatest => Some(OS::MacOS),
+            RunnerLabel::LinuxLatest | RunnerLabel::Linux => Some(OS::Linux),
+            RunnerLabel::WindowsLatest | RunnerLabel::Windows => Some(OS::Windows),
+            RunnerLabel::MacOSLatest | RunnerLabel::MacOS => Some(OS::MacOS),
             _ => None,
         })
     }
@@ -395,7 +395,7 @@ pub fn share_build_script(workflow: &mut Workflow) {
         job.steps.iter().any(|s| s.name.as_deref() == Some("Build Script Setup"))
     }
     fn target_for(os: OS) -> Target {
-        // GitHub-hosted runner arch: Linux/Windows are x86-64, macOS is Apple silicon.
+        // Linux/Windows run on x86-64; macOS runs on our self-hosted Apple silicon runner.
         (os, if os == OS::MacOS { Arch::AArch64 } else { Arch::X86_64 })
     }
 
@@ -404,7 +404,11 @@ pub fn share_build_script(workflow: &mut Workflow) {
     for os in [OS::Linux, OS::Windows, OS::MacOS] {
         let used = workflow.jobs.values().any(|j| uses_build_script(j) && os_of(j) == Some(os));
         if used {
-            ids.push((os, workflow.add(target_for(os), job::BuildScript)));
+            // Keep a job that is already there: workflows that gate their macOS jobs share their
+            // build script early, so the gate covers it (see `skip_macos_if_runner_offline`).
+            let (id, job) = job::BuildScript.entry(target_for(os));
+            workflow.jobs.entry(id.clone()).or_insert(job);
+            ids.push((os, id));
         }
     }
     for job in workflow.jobs.values_mut() {
@@ -652,9 +656,10 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 
     // Each platform builds its own engine and IDE, and uploads the installer and the update feed
     // to the draft. The release is published when Windows and Linux succeed. macOS does not block
-    // it: GitHub's `macos-latest` pool hands out some runners with 7 GB of memory, too little for
-    // the engine's native image, which then swaps until GraalVM gives up. A release published
-    // without its `.dmg` says so in its notes, and re-running the macOS jobs adds it.
+    // it: it runs on a single self-hosted machine, which may be offline or busy. Its jobs may fail
+    // without failing the release, and are skipped if the machine is not online within
+    // `MACOS_RUNNER_WAIT_MINUTES`. A release published without its `.dmg` says so in its notes,
+    // and re-running the macOS jobs adds it.
     let engine_launcher = engine::EngineLauncher::Native;
     for target in RELEASE_TARGETS {
         let backend_job_id = workflow.add(target, job::BuildBackend { engine_launcher });
@@ -670,7 +675,15 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
         publish_deps.push(build_ide_job_id);
     }
 
+    let required_deps: Vec<String> =
+        publish_deps.iter().filter(|id| !id.ends_with("-macos-aarch64")).cloned().collect();
     let publish_job_id = workflow.add_dependent(PRIMARY_TARGET, PublishRelease, publish_deps);
+    // A skipped macOS job would skip publishing too, unless the condition names what it needs.
+    if let Some(job) = workflow.jobs.get_mut(&publish_job_id) {
+        let required =
+            required_deps.iter().map(|id| format!(" && needs.{id}.result == 'success'")).join("");
+        job.r#if = Some(format!("!cancelled(){required}"));
+    }
     // Depends on the draft-release job as well, since that is what exposes `ENSO_VERSION`.
     let _update_latest_job_id = workflow.add_dependent(
         PRIMARY_TARGET,
@@ -678,7 +691,115 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
         [&prepare_job_id, &publish_job_id],
     );
     workflow.env("RUST_BACKTRACE", "full");
+    skip_macos_if_runner_offline(workflow);
     Ok(())
+}
+
+/// How long a workflow waits for the self-hosted macOS runner before going ahead without it.
+///
+/// `macos-pull-request.yml` passes the same number to the script by hand; keep the two in step.
+const MACOS_RUNNER_WAIT_MINUTES: u32 = 1;
+
+/// Secret holding a token that may list the repository's self-hosted runners.
+///
+/// The workflow's own `GITHUB_TOKEN` cannot: that needs the "Administration: read" permission,
+/// which only a personal access token can be given.
+const RUNNER_STATUS_TOKEN_SECRET: &str = "RUNNER_STATUS_TOKEN";
+
+/// Skip every macOS job unless a self-hosted macOS runner is online within
+/// [`MACOS_RUNNER_WAIT_MINUTES`].
+///
+/// GitHub has no queue timeout: a job for a runner that is offline waits a day before failing,
+/// and holds up the jobs that need it. A GitHub-hosted job checks instead, with
+/// `tools/ci/wait-for-macos-runner.sh`.
+///
+/// Shares the build script first, so that the macOS Build Script job is gated too.
+fn skip_macos_if_runner_offline(workflow: &mut Workflow) {
+    share_build_script(workflow);
+    const OUTPUT: &str = "online";
+    let step = Step {
+        id: Some("wait".into()),
+        name: Some("Wait for the macOS runner".into()),
+        run: Some(format!("./tools/ci/wait-for-macos-runner.sh {MACOS_RUNNER_WAIT_MINUTES} skip")),
+        shell: Some(Shell::Bash),
+        env: BTreeMap::from([(
+            "RUNNER_STATUS_TOKEN".into(),
+            format!("${{{{ secrets.{RUNNER_STATUS_TOKEN_SECRET} }}}}"),
+        )]),
+        ..default()
+    };
+    let mut gate = Job {
+        name: "Check the macOS runner".into(),
+        runs_on: vec![RunnerLabel::LinuxLatest],
+        timeout_minutes: Some(MACOS_RUNNER_WAIT_MINUTES + 5),
+        steps: vec![checkout_repo_step(None)],
+        ..default()
+    };
+    gate.add_step_with_output(step, [OUTPUT]);
+    let gate_id = workflow.add_job(gate);
+
+    for job in workflow.jobs.values_mut() {
+        if job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)) {
+            job.needs.insert(gate_id.clone());
+            job.r#if = Some(format!("needs.{gate_id}.outputs.{OUTPUT} == 'true'"));
+        }
+    }
+}
+
+/// Input of [`macos_checks`] that runs the engine's JVM tests.
+const MACOS_ENGINE_INPUT: &str = "engine";
+/// Input of [`macos_checks`] that runs the Standard Library tests.
+const MACOS_LIBRARIES_INPUT: &str = "libraries";
+
+/// Engine and Standard Library checks on the self-hosted macOS runner, run on request.
+///
+/// Called by the hand-written `macos-pull-request.yml` when a PR has one of the `CI: macOS …`
+/// labels. That workflow waits for the runner first and fails when it is offline, so this one does
+/// not check again.
+pub fn macos_checks() -> Result<Workflow> {
+    // Starts from the usual `clean_build_required` input, which the cleaning steps read.
+    let inputs = manual_workflow_dispatch()
+        .with_input(
+            MACOS_ENGINE_INPUT,
+            WorkflowDispatchInput::new_boolean("Run the engine's JVM tests.", false, false),
+        )
+        .with_input(
+            MACOS_LIBRARIES_INPUT,
+            WorkflowDispatchInput::new_boolean("Run the Standard Library tests.", false, false),
+        );
+    let on = Event { workflow_call: Some(WorkflowCall::try_from(inputs)?), ..default() };
+    let mut workflow = Workflow { name: "macOS Checks".into(), on, ..default() };
+
+    let target = (OS::MacOS, Arch::AArch64);
+    let graal_edition = graalvm::Edition::Community;
+    let engine_launcher = engine::EngineLauncher::TestNative;
+    let distribution =
+        workflow.add(target, job::BuildEngineDistribution { graal_edition, engine_launcher });
+
+    let jvm_tests = workflow.add_dependent(
+        target,
+        job::JvmTests { graal_edition, engine_launcher },
+        [&distribution],
+    );
+    let mut requested = vec![(jvm_tests, MACOS_ENGINE_INPUT)];
+    for scope in [
+        job::StandardLibraryTestsScope::StandardLibraryInNative,
+        job::StandardLibraryTestsScope::StandardLibraryJvm,
+        job::StandardLibraryTestsScope::Aws,
+    ] {
+        let id = workflow.add_dependent(
+            target,
+            job::StandardLibraryTests { graal_edition, engine_launcher, scope },
+            [&distribution],
+        );
+        requested.push((id, MACOS_LIBRARIES_INPUT));
+    }
+    for (id, input) in requested {
+        let job = workflow.jobs.get_mut(&id).expect("the job was just added");
+        assert!(job.r#if.is_none(), "{id} already has a condition");
+        job.r#if = Some(format!("inputs.{input}"));
+    }
+    Ok(workflow)
 }
 
 /// Add jobs that perform backend checks, including Scala and Standard Library tests.
@@ -903,6 +1024,7 @@ pub fn engine_checks_nightly() -> Result<Workflow> {
         graalvm::Edition::Community,
         engine_launcher,
     );
+    skip_macos_if_runner_offline(&mut workflow);
     Ok(workflow)
 }
 
@@ -1079,6 +1201,7 @@ pub fn generate(
         (repo_root.nightly_yml.to_path_buf(), nightly()?),
         (repo_root.engine_checks_yml.to_path_buf(), engine_checks()?),
         (repo_root.engine_checks_nightly_yml.to_path_buf(), engine_checks_nightly()?),
+        (repo_root.macos_checks_yml.to_path_buf(), macos_checks()?),
         (repo_root.extra_nightly_tests_yml.to_path_buf(), extra_nightly_tests()?),
         (repo_root.ide_packaging_yml.to_path_buf(), ide_packaging()?),
         (repo_root.engine_benchmark_yml.to_path_buf(), engine_benchmark()?),
@@ -1170,6 +1293,72 @@ mod tests {
             );
         }
         assert!(yaml.contains("ENSO_BUILD_UPDATE_INFO"), "{yaml}");
+    }
+
+    #[test]
+    fn release_skips_macos_jobs_without_holding_up_publishing() {
+        let workflow = release().unwrap();
+        let macos: BTreeSet<_> = workflow
+            .jobs
+            .iter()
+            .filter(|(_, job)| job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)))
+            .map(|(id, _)| id.as_str())
+            .collect();
+        assert_eq!(
+            macos,
+            BTreeSet::from([
+                "build-script-macos-aarch64",
+                "enso-build-ci-gen-job-build-backend-macos-aarch64",
+                "enso-build-ci-gen-upload-ide-macos-aarch64",
+            ])
+        );
+        for id in &macos {
+            let job = &workflow.jobs[*id];
+            assert!(job.needs.contains("check-the-mac-os-runner"), "{id}: {:?}", job.needs);
+            assert!(job.r#if.as_deref().unwrap_or_default().contains("outputs.online"), "{id}");
+        }
+        let publish = &workflow.jobs["enso-build-ci-gen-publish-release-linux-amd64"];
+        let condition = publish.r#if.as_deref().unwrap();
+        assert!(publish.needs.contains("enso-build-ci-gen-upload-ide-macos-aarch64"));
+        assert!(!condition.contains("macos"), "{condition}");
+        for required in ["upload-ide-linux-amd64", "upload-ide-windows-amd64", "draft-release"] {
+            assert!(condition.contains(required), "{required} missing from {condition}");
+        }
+    }
+
+    #[test]
+    fn macos_checks_run_only_what_is_requested() {
+        let workflow = macos_checks().unwrap();
+        let condition = |id: &str| workflow.jobs[id].r#if.as_deref();
+        assert_eq!(
+            condition("enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64"),
+            None
+        );
+        let gated: BTreeMap<_, _> = workflow
+            .jobs
+            .iter()
+            .filter_map(|(id, job)| Some((id.as_str(), job.r#if.as_deref()?)))
+            .collect();
+        assert_eq!(gated.values().filter(|c| **c == "inputs.engine").count(), 1, "{gated:?}");
+        assert_eq!(gated.values().filter(|c| **c == "inputs.libraries").count(), 3, "{gated:?}");
+        for job in workflow.jobs.values() {
+            assert!(job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)));
+        }
+    }
+
+    #[test]
+    fn nightly_skips_macos_jobs_when_runner_offline() {
+        let workflow = engine_checks_nightly().unwrap();
+        let macos: Vec<_> = workflow
+            .jobs
+            .iter()
+            .filter(|(_, job)| job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)))
+            .collect();
+        assert!(macos.iter().any(|(id, _)| id.as_str() == "build-script-macos-aarch64"));
+        for (id, job) in macos {
+            assert!(job.needs.contains("check-the-mac-os-runner"), "{id}: {:?}", job.needs);
+            assert!(job.r#if.as_deref().unwrap_or_default().contains("outputs.online"), "{id}");
+        }
     }
 
     #[test]

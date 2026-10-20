@@ -11,6 +11,7 @@
       engine-checks.yml:
       extra-nightly-tests.yml:
       ide-packaging.yml:
+      macos-checks.yml:
       nightly.yml:
       promote.yml:
       release.yml:

@@ -44,8 +44,12 @@ jobs:
           retention-days: 1
   build-script-macos-aarch64:
     name: Build Script
+    needs:
+      - check-the-mac-os-runner
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -92,6 +96,24 @@ jobs:
           name: enso-build-cli-${{ runner.os }}
           path: target/rust/debug/enso-build-cli.exe
           retention-days: 1
+  check-the-mac-os-runner:
+    name: Check the macOS runner
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - id: wait
+        name: Wait for the macOS runner
+        run: ./tools/ci/wait-for-macos-runner.sh 1 skip
+        shell: bash
+        env:
+          RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+    outputs:
+      online: ${{ steps.wait.outputs.online }}
+    timeout-minutes: 6
   enso-build-ci-gen-draft-release-linux-amd64:
     name: Create a release draft.
     needs:
@@ -241,8 +263,11 @@ jobs:
     name: Build Backend (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.
@@ -421,6 +446,7 @@ jobs:
       - enso-build-ci-gen-upload-ide-macos-aarch64
       - enso-build-ci-gen-upload-ide-windows-amd64
       - license-check-linux-amd64
+    if: "!cancelled() && needs.enso-build-ci-gen-draft-release-linux-amd64.result == 'success' && needs.license-check-linux-amd64.result == 'success' && needs.enso-build-ci-gen-upload-ide-windows-amd64.result == 'success' && needs.enso-build-ci-gen-upload-ide-linux-amd64.result == 'success'"
     runs-on:
       - ubuntu-latest
     steps:
@@ -636,10 +662,13 @@ jobs:
     name: Build IDE (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-build-backend-macos-aarch64
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.
