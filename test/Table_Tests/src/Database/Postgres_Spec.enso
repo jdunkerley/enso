@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Enso_Cloud.Data_Link.Data_Link
+import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
 import Standard.Base.Runtime.Ref.Ref
@@ -878,6 +879,46 @@ add_table_specs suite_builder =
                                     table = connection.read (..Raw_SQL "SELECT application_name FROM pg_stat_activity")
                                     application_names = table.at 0 . to_vector
                                     application_names.should_contain my_secret_name
+
+            suite_builder.group "[PostgreSQL] Saving as a local Data Link" group_builder->
+                ## datalink support
+                group_builder.specify "should save a connection to a local .datalink with the password as a local secret, and read it back" <|
+                    with_local_secrets <|
+                        details = Postgres.Server db_host db_port db_name credentials=(Credentials.Username_And_Password db_user db_password)
+                        connection = Database.connect details
+                        Panic.with_finalizer connection.close <|
+                            temp_dir = File.create_temporary_file "pg-local-link" ".dir"
+                            temp_dir.delete
+                            temp_dir.create_directory
+                            Panic.with_finalizer (temp_dir.delete recursive=True) <|
+                                # The extension is added when missing.
+                                saved = connection.save_as_data_link (temp_dir / "pg")
+                                saved.should_succeed
+                                link_file = temp_dir / "pg.datalink"
+                                link_file.exists . should_be_true
+
+                                raw = Text.from_bytes (link_file.with_input_stream [File_Access.Read, Data_Link_Access.No_Follow] .read_all_bytes) Encoding.utf_8
+                                json = raw.parse_json
+                                json.get "type" . should_equal "Postgres_Connection"
+                                password_json = json.get "credentials" . get "password"
+                                password_json.get "type" . should_equal "secret"
+                                password_json.get "secretPath" . should_equal "secret://pg-password"
+                                raw.contains db_password . should_be_false
+
+                                # The default behaviour does not overwrite.
+                                connection.save_as_data_link link_file . should_fail_with File_Error
+                                connection.save_as_data_link link_file ..Overwrite . should_succeed
+
+                                data_link_connection = Data.read link_file
+                                Panic.with_finalizer data_link_connection.close <|
+                                    q = data_link_connection.query (..Raw_SQL 'SELECT 1 AS "A"')
+                                    q.at "A" . to_vector . should_equal [1]
+
+                                # Tables are saved the same way.
+                                table_link = (connection.query (..Raw_SQL 'SELECT 2 AS "B"')).save_as_data_link (temp_dir / "pg-table")
+                                table_link.should_succeed
+                                table_data = Data.read (temp_dir / "pg-table.datalink")
+                                table_data.at "B" . to_vector . should_equal [2]
 
 with_secret name value callback =
     secret = Enso_Secret.create name+Random.uuid value

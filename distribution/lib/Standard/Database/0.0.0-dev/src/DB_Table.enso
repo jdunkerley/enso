@@ -36,6 +36,7 @@ import project.Internal.Common.Offset_Helpers
 import project.Internal.Common.Ordering_Helpers
 import project.Internal.Common.Row_Number_Helpers
 import project.Internal.DB_Data_Link_Helpers
+from project.Internal.Data_Link_Setup import with_data_link_extension
 import project.Internal.Helpers
 import project.Internal.IR.Internal_Column.Internal_Column
 import project.Internal.IR.Order_Descriptor.Order_Descriptor
@@ -294,9 +295,9 @@ type DB_Table
        this table.
     @path (Widget.File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)
     @on_existing_file (Existing_File_Behavior.widget include_backup=False include_append=False)
-    save_as_data_link self path:Enso_File on_existing_file:Existing_File_Behavior=..Error =
+    save_as_data_link self path:(Enso_File | File) on_existing_file:Existing_File_Behavior=..Error =
         if path.is_data_link then DB_Data_Link_Helpers.save_table_as_data_link self path on_existing_file else
-            self.save_as_data_link (Enso_File.new path.path+".datalink") on_existing_file
+            self.save_as_data_link (with_data_link_extension path) on_existing_file
 
 ## ---
    private: true

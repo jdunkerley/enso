@@ -11,8 +11,9 @@
     - interpret self connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - to_js_object self -> Standard.Base.Any.Any
 - type Data_Link_Setup
-    - Available create_data_link_structure:(Standard.Base.Enso_Cloud.Enso_File.Enso_File -> Standard.Base.Data.Json.JS_Object)
+    - Available create_data_link_structure:((Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File) -> Standard.Base.Data.Json.JS_Object)
     - Unavailable cause:Standard.Base.Data.Text.Text
     - already_a_data_link -> Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup
     - save_as_data_link self destination:Standard.Base.Any.Any on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior link_type:Standard.Database.Internal.Data_Link_Setup.DB_Data_Link_Type= -> Standard.Base.Any.Any
-    - save_credentials_for_data_link data_link_location:Standard.Base.Enso_Cloud.Enso_File.Enso_File credentials:Standard.Database.Connection.Credentials.Credentials -> Standard.Base.Data.Json.JS_Object
+    - save_credentials_for_data_link data_link_location:(Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File) credentials:Standard.Database.Connection.Credentials.Credentials -> Standard.Base.Data.Json.JS_Object
+- with_data_link_extension path:(Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File) -> (Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File)

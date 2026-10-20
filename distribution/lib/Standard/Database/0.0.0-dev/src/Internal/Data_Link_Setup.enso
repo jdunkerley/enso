@@ -17,7 +17,7 @@ type Data_Link_Setup
     ## ---
        private: true
        ---
-    Available create_data_link_structure:Enso_File->JS_Object
+    Available create_data_link_structure:(Enso_File | File)->JS_Object
 
     ## ---
        private: true
@@ -37,8 +37,8 @@ type Data_Link_Setup
     save_as_data_link self destination on_existing_file:Existing_File_Behavior link_type:DB_Data_Link_Type=..Database = case self of
         Data_Link_Setup.Available create_fn ->
             Context.Output.check_enabled disabled_message="As writing is disabled, cannot save to a Data Link. Press the Write button ▶ to perform the operation."
-            case destination of
-                _ : Enso_File ->
+            case destination.is_a Enso_File || destination.is_a File of
+                True ->
                     replace_existing = case on_existing_file of
                         Existing_File_Behavior.Overwrite -> True
                         Existing_File_Behavior.Error -> False
@@ -48,7 +48,7 @@ type Data_Link_Setup
                     connection_description = create_fn destination
                     json = link_type.add_to_data_link_description connection_description
                     Data_Link.write_config destination json replace_existing
-                _ -> Error.throw (Illegal_Argument.Error "Currently a connection can only be saved as a Data Link into the Enso Cloud. Please provide an `Enso_File` as destination.")
+                False -> Error.throw (Illegal_Argument.Error "A connection can only be saved as a Data Link into the Enso Cloud (an `Enso_File`) or a local file (a `File`). Please provide one of these as destination.")
         Data_Link_Setup.Unavailable cause ->
             word = case link_type of
                 DB_Data_Link_Type.Database -> "connection"
@@ -60,12 +60,23 @@ type Data_Link_Setup
     ## ---
        private: true
        ---
-    save_credentials_for_data_link data_link_location:Enso_File credentials:Credentials -> JS_Object =
+    save_credentials_for_data_link data_link_location:(Enso_File | File) credentials:Credentials -> JS_Object =
         # A plain text is automatically promoted to a secret.
         secret_password = save_password_for_data_link data_link_location credentials.password
 
         # But we keep the username as-is - if it was in plain text, it will stay in plain text.
         JS_Object.from_pairs [["username", secure_value_to_json credentials.username], ["password", secure_value_to_json secret_password]]
+
+## ---
+   private: true
+   ---
+   Returns the destination with the `.datalink` extension added, unless it is
+   already a Data Link. Works for both cloud (`Enso_File`) and local (`File`)
+   destinations.
+with_data_link_extension (path : Enso_File | File) -> Enso_File | File =
+    if path.is_data_link then path else case path of
+        _ : Enso_File -> Enso_File.new path.path+".datalink"
+        _ : File -> File.new path.path+".datalink"
 
 ## ---
    private: true
