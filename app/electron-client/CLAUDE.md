@@ -19,7 +19,15 @@ desktop binary (AppImage/DMG/exe + installer).
 
 ## What this process does
 
-- Serves the GUI bundle (from `app/gui/dist/`) in a BrowserWindow.
+- Serves the GUI bundle (from `app/gui/dist/`) in a BrowserWindow, from the
+  HTTPS content server in `src/server.ts`. The server listens on the loopback
+  interface only (`127.0.0.1`, and `::1` when the machine has IPv6, since the
+  window loads `https://localhost:<port>`), and every request first passes
+  `acceptLocalRequest` from `project-manager-shim/handler`: a `Host` that is not
+  a loopback name and the port is refused (DNS rebinding), and so is an `/api/`
+  request from another site (`Sec-Fetch-Site`, `Origin`). The API can change
+  secrets and run commands, so do not add a route that bypasses the check or
+  bind any other address. Tests: `tests/headless/server.test.ts`.
 - Runs the Project Manager in-process via the TS `project-manager-shim` (the
   Scala Project Manager is no longer used, not even in the packaged Electron
   build).

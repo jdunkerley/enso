@@ -5,7 +5,7 @@ import postcssNesting from 'postcss-nesting'
 import { downloadEnsoEngine, findEnsoExecutable } from 'project-manager-shim'
 import tailwindcss from 'tailwindcss'
 import tailwindcssNesting from 'tailwindcss/nesting'
-import { defaultClientConditions, defineConfig, type Plugin } from 'vite'
+import { defaultClientConditions, defineConfig, type Connect, type Plugin } from 'vite'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import wasm from 'vite-plugin-wasm'
 import tailwindConfig from './tailwind.config'
@@ -132,6 +132,16 @@ export default defineConfig({
 async function projectManagerShim(): Promise<Plugin> {
   const module = await import('./project-manager-shim-middleware')
   const projectManagerShimMiddleware = new module.ProjectManagerShimMiddleware(setupEnsoRunnerPath)
+  /** Serve the shim's routes on a server configured with `host`. */
+  const middleware =
+    (host: string | boolean | undefined): Connect.NextHandleFunction =>
+    (request, response, next) =>
+      projectManagerShimMiddleware.handler(
+        request,
+        response,
+        next,
+        typeof host === 'string' ? [host] : [],
+      )
 
   if (isDevMode) {
     await setupEnsoRunnerPath()
@@ -140,14 +150,10 @@ async function projectManagerShim(): Promise<Plugin> {
   return {
     name: 'project-manager-shim',
     configureServer(server) {
-      server.middlewares.use(
-        projectManagerShimMiddleware.handler.bind(projectManagerShimMiddleware),
-      )
+      server.middlewares.use(middleware(server.config.server.host))
     },
     configurePreviewServer(server) {
-      server.middlewares.use(
-        projectManagerShimMiddleware.handler.bind(projectManagerShimMiddleware),
-      )
+      server.middlewares.use(middleware(server.config.preview.host))
     },
   }
 }
