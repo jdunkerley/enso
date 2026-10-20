@@ -13,6 +13,11 @@ import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Text from '$/components/Text/Text.vue'
 import CopySecretsKeyModal from '$/dashboard/layouts/Settings/CopySecretsKeyModal.vue'
+import {
+  LOCAL_SECRETS_KEY,
+  useCreateLocalSecret,
+  useLocalSecretsQuery,
+} from '$/providers/localSecrets'
 import { useModals } from '$/providers/modals'
 import { useSettingsContext } from '$/providers/settingsContext'
 import { useText } from '$/providers/text'
@@ -23,8 +28,7 @@ import { SecretId } from 'enso-common/src/services/Backend'
 import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { computed } from 'vue'
 
-const LIST_KEY = ['localSecrets', 'list'] as const
-const STATUS_KEY = ['localSecrets', 'status'] as const
+const STATUS_KEY = [...LOCAL_SECRETS_KEY, 'status'] as const
 
 const context = useSettingsContext()
 const { getText } = useText()
@@ -34,11 +38,7 @@ const queryClient = useQueryClient()
 
 const backend = computed(() => context.value.localBackend)
 
-const listQuery = useQuery({
-  queryKey: LIST_KEY,
-  queryFn: async () => (await backend.value?.listSecrets()) ?? [],
-  enabled: computed(() => backend.value != null),
-})
+const listQuery = useLocalSecretsQuery(backend)
 const statusQuery = useQuery({
   queryKey: STATUS_KEY,
   queryFn: async () => (await backend.value?.secretsStatus()) ?? null,
@@ -61,19 +61,14 @@ function showError(error: unknown) {
 }
 
 function refetch() {
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: LIST_KEY }),
-    queryClient.invalidateQueries({ queryKey: STATUS_KEY }),
-  ])
+  return queryClient.invalidateQueries({ queryKey: LOCAL_SECRETS_KEY })
 }
 
+const create = useCreateLocalSecret(backend)
+
 const save = useMutation({
-  mutationFn: async ({ name, value, isNew }: { name: string; value: string; isNew: boolean }) => {
-    if (isNew) {
-      await backend.value?.createSecret({ name, value, parentDirectoryId: null })
-    } else {
-      await backend.value?.updateSecret(SecretId(`local:${name}`), { title: null, value }, name)
-    }
+  mutationFn: async ({ name, value }: { name: string; value: string }) => {
+    await backend.value?.updateSecret(SecretId(`local:${name}`), { title: null, value }, name)
   },
   onError: showError,
   onSettled: refetch,
@@ -108,7 +103,8 @@ const reset = useMutation({
 
 function newSecret() {
   modals.open(UpsertSecretModal, {
-    onCreate: (name: string, value: string) => save.mutate({ name, value, isNew: true }),
+    onCreate: (name: string, value: string) =>
+      create.mutate({ name, value }, { onError: showError }),
   })
 }
 
@@ -116,7 +112,7 @@ function changeValue(name: string) {
   modals.open(UpsertSecretModal, {
     secretId: SecretId(`local:${name}`),
     name,
-    onCreate: (_name: string, value: string) => save.mutate({ name, value, isNew: false }),
+    onCreate: (_name: string, value: string) => save.mutate({ name, value }),
   })
 }
 

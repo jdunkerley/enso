@@ -456,7 +456,7 @@
   "credentialNamePlaceholder": "Enter the name of the credential",
   "credentialTypeLabel": "Credential type",
   "datalinkNamePlaceholder": "Enter the name of the Datalink",
-  "datalinkSecretsUnavailable": "Enso secrets are not available yet. This value is saved as plain text in the datalink file.",
+  "datalinkNewSecret": "New secret…",
   "labelNamePlaceholder": "Enter the name of the label",
   "labelSearchPlaceholder": "Type labels to search",
   "inviteUserPlaceholder": "Type usernames or emails to search or invite",

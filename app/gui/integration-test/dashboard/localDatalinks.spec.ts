@@ -1,6 +1,6 @@
 /**
  * @file Local datalinks: creating one from the toolbar and the context menu, opening and saving it,
- * and the plain-value rule for secret fields.
+ * and the choices a secure value offers.
  */
 import { Path } from 'enso-common/src/services/Backend'
 import { expect, test, type Page } from 'integration-test/base'
@@ -122,19 +122,20 @@ test('a duplicate name is refused, and an unreadable datalink shows an error and
   })
 })
 
-test('secret fields take plain values only', async ({ drivePage }) => {
+test('secure values offer text or a secret, and Enso File is not offered', async ({
+  drivePage,
+}) => {
   await drivePage.goToCategory.local().do(async (page) => {
     await page.getByRole('button', { name: TEXT.newDatalink }).click()
     const created = dialog(page, TEXT.createDatalink)
     // Open the type dropdown as a user does, then pick the option with a real click.
     await created.getByTestId('dropdown-trigger').first().click()
     await created.getByRole('option', { name: 'Postgres Database Connection' }).click()
-    // The secure value's own dropdown rendered and lists its (only) choice, so the absences below
-    // are not vacuous.
+    // The secure value's own dropdown rendered and lists its choices, so the absence below is not
+    // vacuous.
     const username = created.getByRole('listbox', { name: TEXT.options }).nth(1)
     await expect(username.getByRole('option', { name: 'Text' })).toHaveCount(1)
-    await expect(created.getByRole('option', { name: 'Enso Secret' })).toHaveCount(0)
-    await expect(created.getByText(TEXT.datalinkSecretsUnavailable).first()).toBeVisible()
+    await expect(username.getByRole('option', { name: 'Enso Secret' })).toHaveCount(1)
     await expect(created.getByRole('option', { name: 'Enso File' })).toHaveCount(0)
   })
 })
