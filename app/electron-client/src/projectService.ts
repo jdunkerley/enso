@@ -1,13 +1,12 @@
 /** @file Project Manager Shim bindings. */
 
-import { Entry } from '@napi-rs/keyring'
 import { app, net } from 'electron'
 import * as os from 'node:os'
 import * as url from 'node:url'
 
 import type { Electron } from '@/electron'
 import * as paths from '@/paths'
-import { SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
+import { lazyKeyringEntries, SECRETS_KEY_VARIABLE, SecretsKeySource } from '@/secretsKey'
 import { getProjectRoot } from 'project-manager-shim'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
 import { defaultSecretsFilePath, encodeKey, LocalSecrets } from 'project-manager-shim/localSecrets'
@@ -51,11 +50,18 @@ export function getLocalSecrets(): LocalSecrets {
  * merely constructing a `withTarget` entry wipes an existing Windows credential. On Linux the store
  * is pinned to the Secret Service, because the default silently falls back to the kernel keyring,
  * which the engine's reader cannot see.
+ *
+ * The native module is imported on first use, so one that cannot load leaves the app without a key
+ * instead of stopping it from starting. esbuild still bundles it: a dynamic `import()` of a bundled
+ * module is inlined, and its `.node` binary is copied (`loader` in `esbuildConfig.ts`).
  */
 export function getSecretsKeySource(): SecretsKeySource {
   secretsKeySource ??= new SecretsKeySource({
     env: process.env,
-    entry: (account) => new Entry('Enso', account, { linux: { store: 'secret-service' } }),
+    entry: lazyKeyringEntries(async () => {
+      const { Entry } = await import('@napi-rs/keyring')
+      return (account) => new Entry('Enso', account, { linux: { store: 'secret-service' } })
+    }),
     fileKeyId: () => getLocalSecrets().fileKeyId(),
     fileHasSecrets: async () => (await getLocalSecrets().list()).length > 0,
   })

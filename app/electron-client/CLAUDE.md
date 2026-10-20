@@ -59,8 +59,11 @@ desktop binary (AppImage/DMG/exe + installer).
   `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
   `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
   credential), and without the pinned Linux store the default falls back to the
-  kernel keyring, which the engine cannot read. Tests use a fake keyring only:
-  never touch the real `Enso` / `secrets-key` item.
+  kernel keyring, which the engine cannot read. The module is loaded lazily
+  (`lazyKeyringEntries`, a dynamic `import()` that esbuild inlines), so a native
+  module that fails to load only leaves the app without a key; keep it out of
+  any top-level `import`. Tests use a fake keyring only: never touch the real
+  `Enso` / `secrets-key` item.
 
 ## Build
 

@@ -1,25 +1,37 @@
 /** @file The master key's sources in Electron main (`src/secretsKey.ts`), against an in-memory keyring. */
 import { randomBytes } from 'node:crypto'
 import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 
-import { SecretsKeySource, type KeyringEntryLike } from '../../src/secretsKey'
+import { lazyKeyringEntries, SecretsKeySource, type KeyringEntryLike } from '../../src/secretsKey'
 
 /** An in-memory keyring keyed by account; the service is always `Enso`. */
 class FakeKeyring {
   readonly items = new Map<string, string>()
   readonly accounts: string[] = []
+  readonly setPassword = vi.fn((account: string, password: string) => {
+    this.items.set(account, password)
+  })
+  getPassword: (account: string) => string | null = (account) => this.items.get(account) ?? null
 
-  entry = (account: string): KeyringEntryLike => {
+  entry = async (account: string): Promise<KeyringEntryLike> => this.syncEntry(account)
+
+  /** What `@napi-rs/keyring`'s `new Entry(...)` gives once loaded. */
+  syncEntry = (account: string): KeyringEntryLike => {
     this.accounts.push(account)
     return {
-      getPassword: () => this.items.get(account) ?? null,
-      setPassword: (password) => {
-        this.items.set(account, password)
-      },
+      getPassword: () => this.getPassword(account),
+      setPassword: (password) => this.setPassword(account, password),
       deletePassword: () => this.items.delete(account),
     }
   }
+}
+
+async function rejection(promise: Promise<unknown>): Promise<unknown> {
+  return promise.then(
+    () => undefined,
+    (e: unknown) => e,
+  )
 }
 
 function source(
@@ -43,9 +55,7 @@ describe('SecretsKeySource', () => {
     const key = randomBytes(32)
     const keySource = new SecretsKeySource({
       env: { ENSO_SECRETS_KEY: encodeKey(key) },
-      entry: () => {
-        throw new Error('The keyring must not be used.')
-      },
+      entry: () => Promise.reject(new Error('The keyring must not be used.')),
       fileKeyId: async () => null,
       fileHasSecrets: async () => true,
     })
@@ -107,7 +117,7 @@ describe('SecretsKeySource', () => {
     const keySource = source(keyring)
     await keySource.initialise()
     const first = keySource.current()
-    keySource.forget()
+    await keySource.forget()
     expect(keyring.items.has('secrets-key')).toBe(false)
     expect(keySource.current()).toBeNull()
     await keySource.initialise()
@@ -119,13 +129,88 @@ describe('SecretsKeySource', () => {
     const key = randomBytes(32)
     const keySource = new SecretsKeySource({
       env: { ENSO_SECRETS_KEY: encodeKey(key) },
-      entry: () => {
-        throw new Error('The keyring must not be used.')
-      },
+      entry: () => Promise.reject(new Error('The keyring must not be used.')),
       fileKeyId: async () => null,
       fileHasSecrets: async () => false,
     })
-    keySource.forget()
+    await keySource.forget()
     expect(keySource.current()).toEqual(key)
+  })
+
+  test('a keychain that throws on read is never written to', async () => {
+    const keyring = new FakeKeyring()
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    const keySource = source(keyring)
+    await expect(keySource.initialise()).rejects.toThrow('The keychain is locked.')
+    expect(keyring.setPassword).not.toHaveBeenCalled()
+    expect(keySource.current()).toBeNull()
+  })
+
+  test.each([
+    ['not base64url', 'not a key!'],
+    ['the wrong length', encodeKey(randomBytes(16))],
+  ])('a stored item that is %s is never overwritten', async (_, stored) => {
+    const keyring = new FakeKeyring()
+    keyring.items.set('secrets-key', stored)
+    const keySource = source(keyring)
+    const error = await rejection(keySource.initialise())
+    expect(error).toBeInstanceOf(Error)
+    // The message start-up logs must not carry the item.
+    expect(String(error)).not.toContain(stored)
+    expect(keyring.setPassword).not.toHaveBeenCalled()
+    expect(keyring.items.get('secrets-key')).toBe(stored)
+    expect(keySource.current()).toBeNull()
+  })
+})
+
+describe('lazyKeyringEntries', () => {
+  test('loads the native module on the first entry, once', async () => {
+    const keyring = new FakeKeyring()
+    const load = vi.fn(async () => keyring.syncEntry)
+    const entries = lazyKeyringEntries(load)
+    expect(load).not.toHaveBeenCalled()
+    const keySource = new SecretsKeySource({
+      env: {},
+      entry: entries,
+      fileKeyId: async () => null,
+      fileHasSecrets: async () => false,
+    })
+    expect(load).not.toHaveBeenCalled()
+    await keySource.initialise()
+    await keySource.forget()
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(keyring.accounts).toEqual(['secrets-key', 'secrets-key'])
+  })
+
+  test('is never loaded when ENSO_SECRETS_KEY is set', async () => {
+    const load = vi.fn(() => Promise.reject(new Error('must not load')))
+    const keySource = new SecretsKeySource({
+      env: { ENSO_SECRETS_KEY: encodeKey(randomBytes(32)) },
+      entry: lazyKeyringEntries(load),
+      fileKeyId: async () => null,
+      fileHasSecrets: async () => false,
+    })
+    await keySource.initialise()
+    await keySource.forget()
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  test('a module that fails to load leaves no key, and is not retried', async () => {
+    const load = vi.fn(() =>
+      Promise.reject(new Error('Cannot find module keyring.win32-x64-msvc.node')),
+    )
+    const keySource = new SecretsKeySource({
+      env: {},
+      entry: lazyKeyringEntries(load),
+      fileKeyId: async () => null,
+      fileHasSecrets: async () => false,
+    })
+    await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
+    expect(keySource.current()).toBeNull()
+    expect(keySource.exportKey()).toBeNull()
+    await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
+    expect(load).toHaveBeenCalledTimes(1)
   })
 })

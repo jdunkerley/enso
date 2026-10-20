@@ -8,6 +8,10 @@
  * key then would only make it `wrong`.
  *
  * The key never crosses into the renderer: "Copy secrets key" writes it to the clipboard from main.
+ *
+ * `@napi-rs/keyring` is a native module, loaded on first use ({@link lazyKeyringEntries}) rather
+ * than when the bundle loads: if it cannot load, `initialise` fails, start-up logs that and carries
+ * on with no key (Settings shows the secrets as locked), instead of the app failing to start.
  */
 import { randomBytes } from 'node:crypto'
 import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
@@ -33,8 +37,11 @@ export interface SecretsKeySourceOptions {
    * here (`globals.d.ts`) admits no object literal, so tests can pass one.
    */
   readonly env: { readonly [SECRETS_KEY_VARIABLE]?: string | undefined }
-  /** The keychain entry for an account; the service is always `Enso`. */
-  readonly entry: (account: string) => KeyringEntryLike
+  /**
+   * The keychain entry for an account; the service is always `Enso`. Asynchronous, so the native
+   * module behind it can load on first use: see {@link lazyKeyringEntries}.
+   */
+  readonly entry: (account: string) => Promise<KeyringEntryLike>
   /** The `keyId` the secrets file was written with (from `LocalSecrets`); used by rotation recovery. */
   readonly fileKeyId: () => Promise<string | null>
   /** Whether the secrets file exists and has at least one secret in it. */
@@ -68,7 +75,7 @@ export class SecretsKeySource {
    */
   async initialise(): Promise<void> {
     if (this.fromEnvironment) return
-    const entry = this.#options.entry(SECRETS_KEY_ACCOUNT)
+    const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
     const stored = entry.getPassword()
     if (stored != null && stored !== '') {
       this.#key = decodeKey(stored)
@@ -97,9 +104,22 @@ export class SecretsKeySource {
    * Delete the keychain key; the caller deletes the file and then calls {@link initialise}. An
    * environment key is left alone: it is not ours to forget.
    */
-  forget(): void {
+  async forget(): Promise<void> {
     if (this.fromEnvironment) return
-    this.#options.entry(SECRETS_KEY_ACCOUNT).deletePassword()
+    const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
+    entry.deletePassword()
     this.#key = null
   }
+}
+
+/**
+ * A keychain entry factory whose native module is loaded by `load` on the first entry, not before:
+ * a module that fails to load then fails that call (which start-up catches and logs), rather than
+ * the whole app at start-up. The load is attempted once; a failure is remembered.
+ */
+export function lazyKeyringEntries(
+  load: () => Promise<(account: string) => KeyringEntryLike>,
+): (account: string) => Promise<KeyringEntryLike> {
+  let factory: Promise<(account: string) => KeyringEntryLike> | undefined
+  return async (account) => (await (factory ??= load()))(account)
 }

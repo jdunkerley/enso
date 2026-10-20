@@ -72,7 +72,7 @@ export function initIpc(
   })
   ipcMain.handle(Channel.secretsReset, async () => {
     await getLocalSecrets().reset()
-    getSecretsKeySource().forget()
+    await getSecretsKeySource().forget()
     await getSecretsKeySource().initialise()
   })
   ipcMain.on(Channel.error, (_event, data) => {
