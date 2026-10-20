@@ -9,7 +9,7 @@
     - limit self max_rows:Standard.Base.Data.Numbers.Integer= -> ((Standard.Table.Table.Table&Standard.Database.DB_Table.DB_Table)|Standard.Base.Any.Any)
     - make_column self internal:Standard.Database.Internal.IR.Internal_Column.Internal_Column -> ((Standard.Table.Column.Column&Standard.Database.DB_Column.DB_Column)|Standard.Base.Any.Any)
     - name self -> Standard.Base.Data.Text.Text
-    - save_as_data_link self path:Standard.Base.Enso_Cloud.Enso_File.Enso_File on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior= -> Standard.Base.Any.Any
+    - save_as_data_link self path:(Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File) on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior= -> Standard.Base.Any.Any
     - table_name_schema self -> Standard.Base.Any.Any
     - to_select_query self -> Standard.Base.Any.Any
     - to_sql self -> Standard.Database.SQL.SQL_Statement

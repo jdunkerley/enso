@@ -280,6 +280,9 @@
 
 #### Enso Standard Library
 
+- [Database connections and tables can be saved as local datalinks][276]:
+  `save_as_data_link` now accepts a local `File` as well as an `Enso_File`. The
+  password is stored as a local secret reference, not in the `.datalink` file.
 - [Secrets work without Enso Cloud][262]: `Enso_Secret.create` and `get` keep
   secrets in an encrypted local file (`secret://name`), which can be used in
   HTTP headers, database credentials and datalinks. Without a `parent`,
@@ -308,6 +311,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [116]: https://github.com/jdunkerley/enso/pull/116
+[276]: https://github.com/jdunkerley/enso/pull/276
 [262]: https://github.com/jdunkerley/enso/pull/262
 [255]: https://github.com/jdunkerley/enso/pull/255
 [256]: https://github.com/jdunkerley/enso/pull/256

@@ -4,6 +4,7 @@ from Standard.Base.Runtime import assert
 import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Runtime.Context
+import Standard.Base.System.File.Data_Link_Access.Data_Link_Access
 import Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret_Error
 import Standard.Test.Test_Environment
 
@@ -14,6 +15,8 @@ from Standard.Database import all
 import Standard.Database.Connection.SQLite_Connection.SQLite_Connection
 import Standard.Database.Dialects.Feature.Feature
 from Standard.Database.Errors import SQL_Error, Unsupported_Database_Type
+import Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup
+from Standard.Database.Internal.Data_Link_Setup import with_data_link_extension
 
 from Standard.Test import all
 
@@ -477,6 +480,45 @@ add_specs suite_builder =
                 connect_with secret . catch . should_equal Enso_Secret_Error.Wrong_Key
             secret.delete . should_succeed
             connect_with secret . catch . should_equal (Enso_Secret_Error.Not_Found "secret://sqlite-option")
+
+    suite_builder.group "Data_Link_Setup: saving as a local Data Link" group_builder->
+        # No database server is needed: the connection description is a fixed
+        # Postgres one, only the credentials go through the real code.
+        setup = Data_Link_Setup.Available destination->
+            credentials = Data_Link_Setup.save_credentials_for_data_link destination (Credentials.Username_And_Password "me" "hunter2-pw")
+            JS_Object.from_pairs [["type", "Postgres_Connection"], ["libraryName", "Standard.Database"], ["host", "localhost"], ["port", 5432], ["database_name", "db"], ["credentials", credentials]]
+
+        with_temp_dir action =
+            temp_dir = File.create_temporary_file "local-link" ".dir"
+            temp_dir.delete
+            temp_dir.create_directory
+            Panic.with_finalizer (temp_dir.delete recursive=True) (action temp_dir)
+
+        group_builder.specify "should store the password as a local secret reference, never the plain password" <| with_local_secrets <| with_temp_dir temp_dir->
+            link = temp_dir / "my.datalink"
+            setup.save_as_data_link link Existing_File_Behavior.Error . should_succeed
+            raw = Text.from_bytes (link.with_input_stream [File_Access.Read, Data_Link_Access.No_Follow] .read_all_bytes) Encoding.utf_8
+            json = raw.parse_json
+            json.get "credentials" . get "username" . should_equal "me"
+            password_json = json.get "credentials" . get "password"
+            password_json.get "type" . should_equal "secret"
+            password_json.get "secretPath" . should_equal "secret://my-password"
+            raw.contains "hunter2-pw" . should_be_false
+            (Enso_Secret.get "secret://my-password").should_succeed
+
+        group_builder.specify "should respect on_existing_file" <| with_local_secrets <| with_temp_dir temp_dir->
+            link = temp_dir / "x.datalink"
+            setup.save_as_data_link link Existing_File_Behavior.Error . should_succeed
+            setup.save_as_data_link link Existing_File_Behavior.Error . should_fail_with File_Error
+            setup.save_as_data_link link Existing_File_Behavior.Overwrite . should_succeed
+            setup.save_as_data_link link Existing_File_Behavior.Backup . should_fail_with Illegal_Argument
+
+        group_builder.specify "should add the .datalink extension to a local file when missing" <|
+            (with_data_link_extension (File.new "a/b")).path . should_equal (File.new "a/b.datalink").path
+            (with_data_link_extension (File.new "a/b.datalink")).path . should_equal (File.new "a/b.datalink").path
+
+        group_builder.specify "should still reject other destinations" <|
+            setup.save_as_data_link "foo.datalink" Existing_File_Behavior.Error . should_fail_with Illegal_Argument
 
 main filter=Nothing =
     suite = Test.build suite_builder->

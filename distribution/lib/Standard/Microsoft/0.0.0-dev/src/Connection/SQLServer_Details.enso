@@ -68,7 +68,7 @@ type SQLServer_Details
 ## ---
    private: true
    ---
-private create_data_link_structure details:SQLServer_Details data_link_location:Enso_File -> JS_Object =
+private create_data_link_structure details:SQLServer_Details data_link_location:(Enso_File | File) -> JS_Object =
     credentials_json = case details.credentials of
         SQLServer_Credentials.None -> JS_Object.from_pairs []
         SQLServer_Credentials.Active_Directory_Default -> JS_Object.from_pairs [["type", "ActiveDirectoryDefault"]]

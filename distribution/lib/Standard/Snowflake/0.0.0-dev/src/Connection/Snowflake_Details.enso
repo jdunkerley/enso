@@ -88,7 +88,7 @@ type Snowflake_Details
 ## ---
    private: true
    ---
-private create_data_link_structure details:Snowflake_Details data_link_location:Enso_File -> JS_Object =
+private create_data_link_structure details:Snowflake_Details data_link_location:(Enso_File | File) -> JS_Object =
     credentials_json = Data_Link_Setup.save_credentials_for_data_link data_link_location details.credentials
     JS_Object.from_pairs <|
         header = [["type", "Snowflake_Connection"], ["libraryName", "Standard.Snowflake"]]

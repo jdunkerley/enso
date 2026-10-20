@@ -147,7 +147,7 @@ default_postgres_database = Environment.get "PGDATABASE" "postgres"
 ## ---
    private: true
    ---
-private create_data_link_structure details:Postgres data_link_location:Enso_File -> JS_Object =
+private create_data_link_structure details:Postgres data_link_location:(Enso_File | File) -> JS_Object =
     credentials_json = details.credentials.if_not_nothing <|
         Data_Link_Setup.save_credentials_for_data_link data_link_location details.credentials
     if (details.use_ssl != SSL_Mode.Prefer) || details.client_cert.is_nothing.not then Error.throw (Illegal_Argument.Error "Cannot save connection as Data Link: custom SSL settings are currently unsupported.") else

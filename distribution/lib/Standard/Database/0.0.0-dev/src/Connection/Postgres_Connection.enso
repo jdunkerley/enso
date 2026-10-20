@@ -406,7 +406,7 @@ type Postgres_Connection
        Creates a Data Link that will open the same connection.
     @path (File_Browse file_types=[File_Type.Option "DataLink" ["datalink"]] existing_only=False display=..Always)
     @on_existing_file (Existing_File_Behavior.widget include_backup=False include_append=False)
-    save_as_data_link self path:Enso_File (on_existing_file:Existing_File_Behavior = ..Error) =
+    save_as_data_link self path:(Enso_File | File) (on_existing_file:Existing_File_Behavior = ..Error) =
         self.base_connection.save_as_data_link path on_existing_file
 
     ## ---

@@ -27,7 +27,7 @@
     - query self query:Standard.Database.SQL_Query.SQL_Query alias:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - read self query:Standard.Database.SQL_Query.SQL_Query limit:Standard.Table.Rows_To_Read.Rows_To_Read= -> Standard.Base.Any.Any
     - remove_from_stage self stage:Standard.Snowflake.Identifier.Identifier= path:Standard.Base.Data.Text.Text= pattern:Standard.Base.Data.Text.Text= -> Standard.Base.Any.Any
-    - save_as_data_link self path:Standard.Base.Enso_Cloud.Enso_File.Enso_File on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior= -> Standard.Base.Any.Any
+    - save_as_data_link self path:(Standard.Base.Enso_Cloud.Enso_File.Enso_File|Standard.Base.System.File.File) on_existing_file:Standard.Base.System.File.Existing_File_Behavior.Existing_File_Behavior= -> Standard.Base.Any.Any
     - schema self -> Standard.Base.Any.Any
     - schemas self -> Standard.Base.Any.Any
     - set_database self database:Standard.Base.Any.Any -> Standard.Base.Any.Any
