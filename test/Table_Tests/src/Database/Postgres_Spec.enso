@@ -31,8 +31,8 @@ import project.Common_Table_Operations
 from project.Common_Table_Operations.Util import all
 from project.Database.Types.Postgres_Type_Mapping_Spec import default_text
 
-import enso_dev.Cloud_Tests.Network.Enso_Cloud.Cloud_Tests_Setup.Cloud_Tests_Setup
 import enso_dev.Base_Tests.Network.Http.Http_Test_Setup
+from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets
 import enso_dev.Generic_JDBC_Tests.Generic_JDBC_Connection_Spec
 import enso_dev.Table_Tests
 
@@ -860,10 +860,11 @@ add_table_specs suite_builder =
             Transaction_Spec.add_specs suite_builder connection_builder "[PostgreSQL] "
 
             suite_builder.group "[PostgreSQL] Secrets in connection settings" group_builder->
-                cloud_setup = Cloud_Tests_Setup.prepare
+                # The secrets are local ones (a temporary store with a fixture
+                # key), which also shows they work as JDBC credentials.
                 ## secret support
-                group_builder.specify "should allow to set up a connection with the password passed as a secret" pending=cloud_setup.pending <|
-                    cloud_setup.with_prepared_environment <|
+                group_builder.specify "should allow to set up a connection with the password passed as a secret" <|
+                    with_local_secrets <|
                         with_secret "my_postgres_username" db_user username_secret-> with_secret "my_postgres_password" db_password password_secret->
                             my_secret_name = "Enso Test: My Secret App NAME " + (Random.uuid.take 5)
                             with_secret "my_postgres_app_name" my_secret_name app_name_secret-> Test.with_retries <|
