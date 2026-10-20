@@ -88,7 +88,14 @@ export class SecretsKeySource {
   async initialise(): Promise<void> {
     if (this.fromEnvironment) return
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
-    await this.#recoverRotation(entry)
+    const unpromoted = await this.#recoverRotation(entry)
+    if (unpromoted != null) {
+      // The file is under the pending key, which the keychain would not save as `secrets-key`:
+      // use it, and keep the item, so that the next start-up tries again.
+      console.error(`Could not promote ${SECRETS_KEY_NEXT_ACCOUNT}; using it for now.`)
+      this.#key = unpromoted
+      return
+    }
     const stored = entry.getPassword()
     if (stored != null && stored !== '') {
       this.#key = decodeKey(stored)
@@ -106,23 +113,31 @@ export class SecretsKeySource {
   /**
    * Finish or undo a rotation that stopped part way: see Note [Crash-Safe Key Rotation]. A pending
    * key the file was re-encrypted with replaces `secrets-key`; any other is dropped, because the
-   * rotation never reached the file. Reading failures propagate before anything is written.
+   * rotation never reached the file, unless it is the key in use. Reading failures propagate
+   * before anything is written.
+   * @returns the pending key when it is still needed and could not be promoted (the keychain did
+   * not keep it as `secrets-key`, or it is the key in use while the file is not under it); the item
+   * is then kept. `null` when no rotation is pending any more.
    */
-  async #recoverRotation(entry: KeyringEntryLike): Promise<void> {
+  async #recoverRotation(entry: KeyringEntryLike): Promise<Buffer | null> {
     const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
     const next = nextEntry.getPassword()
-    if (next == null || next === '') return
-    let nextKeyId: string | null
+    if (next == null || next === '') return null
+    let nextKey: Buffer | null
     try {
-      nextKeyId = keyId(decodeKey(next))
+      nextKey = decodeKey(next)
     } catch {
       // Not a key, so not the one the file was written with.
-      nextKeyId = null
+      nextKey = null
     }
-    if (nextKeyId != null && nextKeyId === (await this.#options.fileKeyId())) {
+    if (nextKey != null && keyId(nextKey) === (await this.#options.fileKeyId())) {
       entry.setPassword(next)
+      if (entry.getPassword() !== next) return nextKey
+    } else if (nextKey != null && this.#key != null && nextKey.equals(this.#key)) {
+      return nextKey
     }
     nextEntry.deletePassword()
+    return null
   }
 
   /**
@@ -134,9 +149,25 @@ export class SecretsKeySource {
     if (this.fromEnvironment) throw new Error(`The key is set by ${SECRETS_KEY_VARIABLE}.`)
     const oldKey = this.#key
     if (oldKey == null) throw new Error('There is no secrets key to rotate.')
+    // Note [Settle A Pending Rotation First]
+    const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
+    const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
+    const unpromoted = await this.#recoverRotation(entry)
+    const current = this.#key
+    if (
+      unpromoted != null ||
+      current == null ||
+      !current.equals(oldKey) ||
+      entry.getPassword() !== encodeKey(oldKey) ||
+      (nextEntry.getPassword() ?? '') !== ''
+    ) {
+      throw new Error(
+        'The secrets key cannot be rotated now: the keychain does not hold the key in use. ' +
+          'Restart Enso and try again.',
+      )
+    }
     const newKey = randomBytes(KEY_BYTES)
     const encoded = encodeKey(newKey)
-    const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
     nextEntry.setPassword(encoded)
     if (nextEntry.getPassword() !== encoded) {
       // Nothing has touched the file, so whatever the item holds is worthless.
@@ -169,7 +200,6 @@ export class SecretsKeySource {
         throw error
       }
     }
-    const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
     entry.setPassword(encoded)
     if (entry.getPassword() !== encoded) {
       // Keep `-next`: the next start-up promotes it, since the file is under it.
@@ -180,6 +210,15 @@ export class SecretsKeySource {
     }
     nextEntry.deletePassword()
   }
+
+  /* Note [Settle A Pending Rotation First]
+   * =======================================
+   * A failed rotation can leave `-next` as the only item holding the file's key (the `secrets-key`
+   * read-back failed, or the file's `keyId` could not be read). Another rotation started then would
+   * overwrite `-next` before touching the file, or drop it when that rotation fails. So a rotation
+   * first runs start-up's recovery against the current file, and goes ahead only when afterwards
+   * `secrets-key` holds the key in use and no `-next` is left; otherwise it refuses. Reset needs no
+   * such check: it deletes the file along with both items. */
 
   /* Note [A Rotation That Fails After The Rename]
    * =============================================
