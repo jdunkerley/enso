@@ -78,12 +78,14 @@ export function checkPullRequestsIgnoreSpecs({ workflows }) {
  */
 export function checkSetupNodeCache({ workflows, actions }) {
   const problems = []
+  let checked = 0
   const check = (where, steps) => {
     let pnpmReady = false
     for (const step of steps ?? []) {
       const uses = String(step?.uses ?? '')
       if (uses.startsWith('pnpm/action-setup@')) pnpmReady = true
       if (!uses.startsWith('actions/setup-node@') || pnpmReady) continue
+      checked++
       const cache = step.with?.['package-manager-cache']
       if (cache !== false && cache !== 'false') {
         problems.push(
@@ -98,6 +100,7 @@ export function checkSetupNodeCache({ workflows, actions }) {
   for (const [name, { doc }] of Object.entries(actions)) {
     check(`.github/actions/${name}`, doc?.runs?.steps)
   }
+  if (checked === 0) problems.push('no `setup-node` step runs before pnpm is set up: nothing was checked')
   return problems
 }
 
@@ -150,6 +153,13 @@ export function checkReleaseIsIdeOnly({ workflows }) {
   return problems
 }
 
+/** The macOS jobs of `release.yml`: the Mac builds the backend and the IDE, nothing else. */
+const MACOS_RELEASE_JOBS = [
+  'build-script-macos-aarch64',
+  'enso-build-ci-gen-job-build-backend-macos-aarch64',
+  'enso-build-ci-gen-upload-ide-macos-aarch64',
+]
+
 /** Only macOS jobs may fail without blocking publishing (`only_macos_release_jobs_may_fail_...`). */
 export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
   const jobs = Object.entries(workflows['release.yml']?.doc?.jobs ?? {})
@@ -163,7 +173,14 @@ export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
       problems.push(`release.yml › ${id}: a macOS backend or IDE job must not block publishing`)
     }
   }
-  if (!jobs.some(([id, job]) => isMacos(job) && /upload-ide/.test(id))) {
+  const macosIds = jobs.filter(([, job]) => isMacos(job)).map(([id]) => id)
+  for (const required of MACOS_RELEASE_JOBS) {
+    if (!macosIds.includes(required)) problems.push(`release.yml: has no macOS job \`${required}\``)
+  }
+  for (const id of macosIds) {
+    if (!MACOS_RELEASE_JOBS.includes(id)) problems.push(`release.yml › ${id}: unexpected macOS job`)
+  }
+  if (!macosIds.some((id) => /upload-ide/.test(id))) {
     problems.push('release.yml: has no macOS IDE upload job')
   }
   return problems
@@ -178,8 +195,14 @@ export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
 export function checkMacosJobsAreGated({ workflows }) {
   const problems = []
   for (const file of ['release.yml', 'engine-checks-nightly.yml']) {
-    const jobs = workflows[file]?.doc?.jobs ?? {}
-    if (!('check-the-mac-os-runner' in jobs)) continue
+    if (!workflows[file]) continue
+    const jobs = workflows[file].doc?.jobs ?? {}
+    if (file === 'engine-checks-nightly.yml' && !('build-script-macos-aarch64' in jobs)) {
+      problems.push(`${file}: has no macOS job \`build-script-macos-aarch64\``)
+    }
+    if (!('check-the-mac-os-runner' in jobs) && Object.values(jobs).some(isMacos)) {
+      problems.push(`${file}: has macOS jobs but no \`check-the-mac-os-runner\` gate job`)
+    }
     for (const [id, job] of Object.entries(jobs)) {
       if (!isMacos(job)) continue
       const needs = [job.needs ?? []].flat()
@@ -193,8 +216,8 @@ export function checkMacosJobsAreGated({ workflows }) {
       }
     }
   }
-  const release = workflows['release.yml']?.doc?.jobs ?? {}
-  if ('check-the-mac-os-runner' in release) {
+  const release = workflows['release.yml']?.doc?.jobs
+  if (release) {
     const entry = Object.entries(release).find(([id]) => id.includes('publish-release'))
     if (!entry) return [...problems, 'release.yml: has no publish job']
     const [id, publish] = entry
@@ -211,8 +234,9 @@ export function checkMacosJobsAreGated({ workflows }) {
       'upload-ide-windows-amd64',
       'draft-release',
     ]) {
-      if (!condition.includes(required))
+      if (!condition.includes(required)) {
         problems.push(`release.yml › ${id}: its \`if\` lacks ${required}`)
+      }
     }
   }
   return problems
@@ -224,14 +248,18 @@ export function checkMacosChecksRunWhatIsRequested({ workflows }) {
   if (!jobs) return []
   const problems = []
   const conditions = Object.entries(jobs).map(([id, job]) => [id, job?.if])
+  if (!conditions.some(([id]) => /build-engine-distribution/.test(id))) {
+    problems.push('macos-checks.yml: has no engine distribution job')
+  }
   for (const [id, condition] of conditions) {
     if (/build-engine-distribution/.test(id) && condition !== undefined) {
       problems.push(`macos-checks.yml › ${id}: the engine distribution must always be built`)
     }
   }
   const count = (input) => conditions.filter(([, condition]) => condition === input).length
-  if (count('inputs.engine') !== 1)
+  if (count('inputs.engine') !== 1) {
     problems.push('macos-checks.yml: exactly one job must run on `inputs.engine`')
+  }
   if (count('inputs.libraries') !== 3) {
     problems.push('macos-checks.yml: exactly three jobs must run on `inputs.libraries`')
   }
@@ -249,13 +277,23 @@ const IDE_FORBIDDEN = [
   'MAPBOX',
 ]
 
-/** The IDE is local-only: packaging needs no Enso Cloud account (`ide_jobs_need_no_cloud_account`). */
+/**
+ * The IDE is local-only: packaging and the GUI end-to-end job need no Enso Cloud account
+ * (`ide_jobs_need_no_cloud_account`).
+ */
 export function checkIdePackagingNeedsNoCloudAccount({ workflows }) {
-  const packaging = workflows['ide-packaging.yml']
-  if (!packaging) return ['ide-packaging.yml: missing']
-  return IDE_FORBIDDEN.filter((text) => packaging.text.includes(text)).map(
-    (text) => `ide-packaging.yml: mentions \`${text}\``,
-  )
+  const problems = []
+  for (const file of ['ide-packaging.yml', 'gui-checks.yml']) {
+    const workflow = workflows[file]
+    if (!workflow) {
+      problems.push(`${file}: missing`)
+      continue
+    }
+    for (const text of IDE_FORBIDDEN) {
+      if (workflow.text.includes(text)) problems.push(`${file}: mentions \`${text}\``)
+    }
+  }
+  return problems
 }
 
 /**

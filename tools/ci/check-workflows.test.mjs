@@ -49,9 +49,30 @@ jobs:
       - run: ./run release update-latest-version && ./run ide upload
         env:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
-  enso-build-ci-gen-upload-ide-macos-aarch64:
-    runs-on: [macos-latest]
+  check-the-mac-os-runner:
+    runs-on: ubuntu-latest
+    steps: []
+  build-script-macos-aarch64:
+    needs: [check-the-mac-os-runner]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    steps: []
+  enso-build-ci-gen-job-build-backend-macos-aarch64:
+    needs: [check-the-mac-os-runner, build-script-macos-aarch64]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
     continue-on-error: true
+    steps: []
+  enso-build-ci-gen-upload-ide-macos-aarch64:
+    needs: [check-the-mac-os-runner]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    continue-on-error: true
+    steps: []
+  enso-build-ci-gen-publish-release-linux-amd64:
+    runs-on: ubuntu-latest
+    needs: [enso-build-ci-gen-upload-ide-macos-aarch64]
+    if: always() && needs.upload-ide-linux-amd64.result == 'success' && needs.upload-ide-windows-amd64.result == 'success' && needs.draft-release.result == 'success'
     steps: []
 `
 
@@ -136,11 +157,28 @@ describe('checkOnlyMacosReleaseJobsMayFail', () => {
   })
 })
 
+const MACOS_UPLOAD = 'enso-build-ci-gen-upload-ide-macos-aarch64'
+const PUBLISH = 'enso-build-ci-gen-publish-release-linux-amd64'
+const GATE_IF = "if: needs.check-the-mac-os-runner.outputs.online == 'true'"
+
 describe('checkMacosJobsAreGated', () => {
-  test('applies only once the gate job exists', () => {
-    assert.deepEqual(checkMacosJobsAreGated(fixture({ 'workflows/release.yml': RELEASE_OK })), [])
+  const problems = (text) =>
+    checkMacosJobsAreGated(fixture({ 'workflows/release.yml': text }))
+  test('accepts a gated release whose publish job does not wait on macOS', () => {
+    assert.deepEqual(problems(RELEASE_OK), [])
   })
-  test('rejects an ungated macOS job', () => {
+  test('accepts a gated nightly', () => {
+    const repo = fixture({
+      'workflows/engine-checks-nightly.yml': `
+on: workflow_dispatch
+jobs:
+  check-the-mac-os-runner: { runs-on: ubuntu-latest, steps: [] }
+  build-script-macos-aarch64: { needs: [check-the-mac-os-runner], ${GATE_IF}, runs-on: [self-hosted, macOS], steps: [] }
+`,
+    })
+    assert.deepEqual(checkMacosJobsAreGated(repo), [])
+  })
+  test('rejects an ungated macOS job in the nightly, and a nightly without its macOS script job', () => {
     const repo = fixture({
       'workflows/engine-checks-nightly.yml': `
 on: workflow_dispatch
@@ -149,44 +187,56 @@ jobs:
   tests-macos: { runs-on: [self-hosted, macOS], steps: [] }
 `,
     })
-    assert.equal(checkMacosJobsAreGated(repo).length, 1)
+    const found = checkMacosJobsAreGated(repo)
+    assert.equal(found.length, 2)
+    assert.ok(found.some((p) => p.includes('tests-macos')))
+    assert.ok(found.some((p) => p.includes('build-script-macos-aarch64')))
   })
-})
-
-const PUBLISH_GATED = `
-on: workflow_dispatch
-jobs:
-  check-the-mac-os-runner: { runs-on: ubuntu-latest, steps: [] }
-  upload-ide-macos: { needs: [check-the-mac-os-runner], if: needs.check-the-mac-os-runner.outputs.online == 'true', runs-on: [self-hosted, macOS], steps: [] }
-  publish-release:
-    runs-on: ubuntu-latest
-    needs: [upload-ide-macos]
-    if: always() && needs.upload-ide-linux-amd64.result == 'success' && needs.upload-ide-windows-amd64.result == 'success' && needs.draft-release.result == 'success'
-    steps: []
-`
-
-describe('checkMacosJobsAreGated, publishing', () => {
-  const run = (text) => checkMacosJobsAreGated(fixture({ 'workflows/release.yml': text }))
-  test('accepts a publish job that needs the macOS upload but does not wait on it', () => {
-    assert.deepEqual(run(PUBLISH_GATED), [])
+  test('rejects macOS jobs when the gate job is missing', () => {
+    const text = RELEASE_OK.replace(
+      '  check-the-mac-os-runner:\n    runs-on: ubuntu-latest\n    steps: []\n',
+      '',
+    )
+    assert.ok(problems(text).some((p) => p.includes('no `check-the-mac-os-runner` gate job')))
+  })
+  test('rejects an ungated macOS job in the release', () => {
+    const text = RELEASE_OK.replace(
+      `    needs: [check-the-mac-os-runner, build-script-macos-aarch64]\n    ${GATE_IF}\n`,
+      '    needs: [build-script-macos-aarch64]\n',
+    )
+    assert.ok(problems(text).some((p) => p.includes('build-backend-macos-aarch64')))
+  })
+  test('rejects a release with no publish job', () => {
+    const text = RELEASE_OK.replace(PUBLISH, 'something-else')
+    assert.ok(problems(text).some((p) => p.includes('no publish job')))
+  })
+  test('rejects a publish job that no longer needs the macOS upload', () => {
+    const text = RELEASE_OK.replace(`needs: [${MACOS_UPLOAD}]`, 'needs: []')
+    assert.ok(problems(text).some((p) => p.includes('must still need the macOS IDE upload')))
   })
   test('rejects a publish job that waits on macOS, and one that drops the Windows upload', () => {
-    const waits = run(
-      PUBLISH_GATED.replace('always() &&', "always() && needs.upload-ide-macos.result == 'success' &&"),
+    const waits = problems(
+      RELEASE_OK.replace('always() &&', "always() && needs.upload-ide-macos.result == 'success' &&"),
     )
     assert.ok(waits.some((p) => p.includes('must not wait on a macOS job')))
-    const drops = run(
-      PUBLISH_GATED.replace(" && needs.upload-ide-windows-amd64.result == 'success'", ''),
+    const drops = problems(
+      RELEASE_OK.replace(" && needs.upload-ide-windows-amd64.result == 'success'", ''),
     )
     assert.ok(drops.some((p) => p.includes('lacks upload-ide-windows-amd64')))
   })
 })
 
-describe('checkOnlyMacosReleaseJobsMayFail, macOS upload', () => {
-  test('rejects a release without a macOS IDE upload job', () => {
-    const text = RELEASE_OK.replace('enso-build-ci-gen-upload-ide-macos-aarch64', 'something-else')
-    const problems = checkOnlyMacosReleaseJobsMayFail(fixture({ 'workflows/release.yml': text }))
-    assert.ok(problems.some((p) => p.includes('no macOS IDE upload job')))
+describe('checkOnlyMacosReleaseJobsMayFail, macOS jobs', () => {
+  const problems = (text) =>
+    checkOnlyMacosReleaseJobsMayFail(fixture({ 'workflows/release.yml': text }))
+  test('rejects a release without its macOS IDE upload job', () => {
+    const found = problems(RELEASE_OK.replace(MACOS_UPLOAD + ':', 'something-else:'))
+    assert.ok(found.some((p) => p.includes('no macOS IDE upload job')))
+    assert.ok(found.some((p) => p.includes(`has no macOS job \`${MACOS_UPLOAD}\``)))
+  })
+  test('rejects a macOS job that is not one of the release jobs', () => {
+    const found = problems(RELEASE_OK.replace('build-script-macos-aarch64:', 'build-script-mac:'))
+    assert.ok(found.some((p) => p.includes('unexpected macOS job')))
   })
 })
 
@@ -211,6 +261,31 @@ ${libraries.map((id) => `  ${id}: ${job('inputs.libraries')}`).join('\n')}
     const repo = fixture({ 'workflows/macos-checks.yml': checks('inputs.other', ['a', 'b']) })
     assert.equal(checkMacosChecksRunWhatIsRequested(repo).length, 2)
   })
+  test('rejects a gated engine distribution, and one that is missing', () => {
+    const good = checks('inputs.engine', ['a', 'b', 'c'])
+    const gated = good.replace(
+      'build-engine-distribution: { runs-on',
+      'build-engine-distribution: { if: inputs.engine, runs-on',
+    )
+    const found = checkMacosChecksRunWhatIsRequested(
+      fixture({ 'workflows/macos-checks.yml': gated }),
+    )
+    assert.ok(found.some((p) => p.includes('must always be built')))
+    const missing = good.replace('build-engine-distribution:', 'build-something:')
+    assert.deepEqual(
+      checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': missing })),
+      ['macos-checks.yml: has no engine distribution job'],
+    )
+  })
+  test('rejects a job that does not run on macOS', () => {
+    const text = checks('inputs.engine', ['a', 'b', 'c']).replace(
+      'a: { runs-on: [self-hosted, macOS]',
+      'a: { runs-on: ubuntu-latest',
+    )
+    const found = checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': text }))
+    assert.equal(found.length, 1)
+    assert.match(found[0], /a: must run on macOS/)
+  })
 })
 
 describe('IDE packaging', () => {
@@ -224,12 +299,20 @@ jobs:
         uses: actions/upload-artifact@v5
       ${smoke}
 `
+  const smokeStep =
+    "- if: matrix.os == 'windows'\n        run: ./tools/ci/windows-installer-smoke.ps1"
+  const windowsJob = (steps) => `
+on: workflow_call
+jobs:
+  package-ide:
+    runs-on: [windows-latest]
+    steps:
+${steps}
+`
+  const upload = '      - name: Upload ide\n        uses: actions/upload-artifact@v5'
+  const guiChecks = { 'workflows/gui-checks.yml': 'on: workflow_call\njobs: {}\n' }
   test('accepts a Windows-only smoke test after the upload', () => {
-    const repo = fixture({
-      'workflows/ide-packaging.yml': packaging(
-        "- if: matrix.os == 'windows'\n        run: ./tools/ci/windows-installer-smoke.ps1",
-      ),
-    })
+    const repo = fixture({ 'workflows/ide-packaging.yml': packaging(smokeStep), ...guiChecks })
     assert.deepEqual(checkWindowsInstallerSmokeTest(repo), [])
     assert.deepEqual(checkIdePackagingNeedsNoCloudAccount(repo), [])
   })
@@ -238,12 +321,41 @@ jobs:
       'workflows/ide-packaging.yml': packaging(
         '- run: ./tools/ci/windows-installer-smoke.ps1\n        env: { ENSO_TEST_USER: x }',
       ),
+      ...guiChecks,
     })
     assert.equal(checkWindowsInstallerSmokeTest(repo).length, 1)
     assert.equal(checkIdePackagingNeedsNoCloudAccount(repo).length, 1)
+  })
+  test('rejects a cloud account in the GUI end-to-end workflow, and a missing one', () => {
+    const packagingOnly = { 'workflows/ide-packaging.yml': packaging(smokeStep) }
+    const repo = fixture({
+      ...packagingOnly,
+      'workflows/gui-checks.yml': 'on: workflow_call\nenv: { ENSO_TEST_USER: x }\njobs: {}\n',
+    })
+    assert.equal(checkIdePackagingNeedsNoCloudAccount(repo).length, 1)
+    assert.equal(checkIdePackagingNeedsNoCloudAccount(fixture(packagingOnly)).length, 1)
+  })
+  test('rejects a smoke test that runs before the upload', () => {
+    const repo = fixture({
+      'workflows/ide-packaging.yml': windowsJob(
+        `      - run: ./tools/ci/windows-installer-smoke.ps1\n${upload}`,
+      ),
+    })
+    const found = checkWindowsInstallerSmokeTest(repo)
+    assert.equal(found.length, 1)
+    assert.match(found[0], /uploaded before it is smoke-tested/)
+  })
+  test('rejects packaging with no smoke test at all', () => {
+    const repo = fixture({ 'workflows/ide-packaging.yml': windowsJob(upload) })
+    assert.match(checkWindowsInstallerSmokeTest(repo)[0], /no step runs/)
   })
 })
 
 test('the repository follows the policy', () => {
   assert.deepEqual(checkRepo(repoRoot), [])
+})
+
+test('checkSetupNodeCache fails when it finds nothing to check', () => {
+  const repo = fixture({ 'workflows/a.yml': 'on: push\njobs: {}\n' })
+  assert.equal(checkSetupNodeCache(repo).length, 1)
 })
