@@ -135,11 +135,12 @@ mounted and are switched with `v-show`. Each tab's shortcut (`` Mod+` ``,
 the closed dock on its tab, switches the open dock to it, or closes the dock
 when its tab shows (`dockTabActions` in `BottomPanel/dockTab.ts`). While the
 dock is closed, a Code and a Logs button sit at the bottom of the graph's left
-gutter (the Logs one with a dot for unseen errors); the open dock's header has
-the tabs on the left and fullscreen (`panel.fullscreen`) and close
-(`panel.close`) on the right. The Logs tab and its stream client are in
-`project-view/components/EngineLogs/` (see its `CLAUDE.md`); `GraphEditor.vue`
-owns the stream so that the tab's error badge counts while it is hidden.
+gutter (the Logs one with a dot for unseen errors, whose count is in the
+button's accessible name); the open dock's header has the tabs on the left and
+fullscreen (`panel.fullscreen`) and close (`panel.close`) on the right. The Logs
+tab and its stream client are in `project-view/components/EngineLogs/` (see its
+`CLAUDE.md`); `GraphEditor.vue` owns the stream so that the tab's error badge
+counts while it is hidden.
 
 ## Entry points
 

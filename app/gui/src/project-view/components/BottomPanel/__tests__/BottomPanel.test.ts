@@ -1,9 +1,9 @@
-/* eslint-disable vue/one-component-per-file -- The tab contents and the host that wires the dock as `GraphEditor.vue` does. */
+/* eslint-disable vue/one-component-per-file -- Tab contents, and a host wiring the dock. */
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { initializeActions, registerHandlers, type Actions } from '@/providers/action'
 import { provideFullscreenRoot } from '@/providers/fullscreenRoot'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import { defineComponent, h, ref, watch, type Component } from 'vue'
+import { defineComponent, h, nextTick, ref, watch, type Component } from 'vue'
 import BottomPanel from '../../BottomPanel.vue'
 import { dockTabActions, provideCodeTabFocus, useCodeTabFocus, type DockTab } from '../dockTab'
 
@@ -21,6 +21,9 @@ function counting(name: string, mounts: Record<string, number>, onSetup = () => 
 const originalAnimate = Element.prototype.animate
 beforeAll(() => {
   Element.prototype.animate = function () {
+    // A stub, not an `Animation`: it has none of its other members, so a single `as Animation` is
+    // rejected (the types do not overlap enough) and the cast has to go through `unknown`. Only
+    // jsdom's missing API is stood in for; no third-party type is being narrowed.
     return { finished: Promise.resolve() } as unknown as Animation
   }
 })
@@ -240,14 +243,56 @@ describe('BottomPanel', () => {
     expect([show.value, tab.value]).toEqual([true, 'logs'])
   })
 
-  test('the collapsed Logs button shows a dot while there are unseen errors', async () => {
+  test('the collapsed Logs button shows a dot, and names the unseen errors', async () => {
     const { wrapper, setProps } = await mountDock({ show: false, tab: 'code', logsBadge: 2 })
     const dot = () => wrapper.find('[data-testid="logs-error-dot"]')
+    const logsButton = () => wrapper.find('[data-testid="action:graph.toggleLogs"]')
     expect(dot().exists()).toBe(true)
-    expect(dot().attributes('aria-label')).toBe('2 new errors')
+    // The dot is decorative: the count is in the button's accessible name (and its tooltip).
+    expect(dot().attributes('aria-hidden')).toBe('true')
+    expect(logsButton().attributes('aria-label')).toMatch(/^Engine Logs, 2 new errors \(.+L\)$/)
     await setProps({ logsBadge: 1 })
-    expect(dot().attributes('aria-label')).toBe('1 new error')
+    expect(logsButton().attributes('aria-label')).toMatch(/^Engine Logs, 1 new error \(.+L\)$/)
     await setProps({ logsBadge: 0 })
     expect(dot().exists()).toBe(false)
+    expect(logsButton().attributes('aria-label')).toMatch(/^Engine Logs \(.+L\)$/)
+  })
+
+  test.each(['code', 'logs'] as const)(
+    'a collapsed button puts the keyboard on the %s tab it opened',
+    async (name) => {
+      const { wrapper } = await mountDock({ show: false, tab: name === 'code' ? 'logs' : 'code' })
+      const action = name === 'code' ? 'graph.toggleCodeEditor' : 'graph.toggleLogs'
+      await wrapper.find(`[data-testid="action:${action}"]`).trigger('click')
+      await nextTick()
+      expect(document.activeElement).toBe(wrapper.find(`[data-testid="dock-tab-${name}"]`).element)
+    },
+  )
+
+  test('closing the dock with the keyboard in it returns it to the collapsed button', async () => {
+    const { wrapper, run } = await mountDock({ show: true, tab: 'logs' })
+    const focused = () => document.activeElement?.getAttribute('data-testid')
+    ;(wrapper.find('[data-testid="dock-tab-logs"]').element as HTMLElement).focus()
+    await wrapper.find('[data-testid="action:panel.close"]').trigger('click')
+    expect(focused()).toBe('action:graph.toggleLogs')
+
+    // By a shortcut, from the Code tab.
+    await run('graph.toggleCodeEditor')
+    ;(wrapper.find('[data-testid="dock-tab-code"]').element as HTMLElement).focus()
+    await run('graph.toggleCodeEditor')
+    expect(focused()).toBe('action:graph.toggleCodeEditor')
+  })
+
+  test('closing the dock with the keyboard elsewhere leaves it there', async () => {
+    const outside = document.createElement('button')
+    document.body.appendChild(outside)
+    try {
+      const { run } = await mountDock({ show: true, tab: 'logs' })
+      outside.focus()
+      await run('graph.toggleLogs')
+      expect(document.activeElement).toBe(outside)
+    } finally {
+      outside.remove()
+    }
   })
 })

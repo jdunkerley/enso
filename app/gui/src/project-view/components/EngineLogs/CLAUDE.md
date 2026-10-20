@@ -55,7 +55,10 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   open dock to Logs, or closes the dock while Logs shows (`` Mod+` `` does the
   same for Code). While the dock is closed, the Logs button in the graph's
   gutter shows a dot for unseen errors, from the same count as the tab's badge.
-  The graph's key handler is a capture-phase window listener, so it runs before
+  The dot is `aria-hidden`; the count is in the button's name. A collapsed
+  button moves the keyboard to the tab it opened, and closing the dock while the
+  keyboard is in it returns the keyboard to the matching collapsed button. The
+  graph's key handler is a capture-phase window listener, so it runs before
   CodeMirror and works with the code editor focused (as `Mod+D` does). Our
   CodeMirror keymap (`util/codemirror/keymap.ts`) does not include CodeMirror's
   default keymap, so nothing binds `Mod-l` (`selectLine`) there and the shortcut

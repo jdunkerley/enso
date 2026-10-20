@@ -7,10 +7,11 @@ import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { useResizeObserver } from '@/composables/events'
-import { registerHandlers } from '@/providers/action'
+import { injectActions, registerHandlers } from '@/providers/action'
+import type { ActionContext } from '@/providers/actionContext'
 import { useText } from '$/providers/text'
 import { useLocalStorage } from '@vueuse/core'
-import { computed, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, toValue, useId, watch } from 'vue'
 
 defineOptions({
   inheritAttrs: false,
@@ -31,17 +32,81 @@ const rootElement = ref<HTMLElement>()
 const show = defineModel<boolean>('show', { required: true })
 const tab = defineModel<DockTab>('tab', { required: true })
 
-// `GraphEditor.vue` provides it, so that the Code shortcut can ask too; a dock on its own has its own.
+// `GraphEditor.vue` provides it, so that the Code shortcut can ask too; a dock on its own has its
+// own.
 const codeTabFocus = useCodeTabFocus(() => [] as const)
 const { getText } = useText()
 
-// The header's close button.
-registerHandlers({
-  'panel.close': {
-    available: true,
-    action: () => (show.value = false),
+/** The action of each tab's button and shortcut. */
+const TAB_ACTIONS = {
+  code: 'graph.toggleCodeEditor',
+  logs: 'graph.toggleLogs',
+} as const satisfies Record<DockTab, string>
+
+const unseenErrors = computed(() =>
+  logsBadge === 1 ? getText('engineLogsUnseenError') : getText('engineLogsUnseenErrors', logsBadge),
+)
+
+const outerActions = injectActions()
+const dockLayout = ref<HTMLElement>()
+const collapsedButtons = ref<HTMLElement>()
+
+/** A collapsed button opens the dock and puts the keyboard on the tab it opened. */
+function openFromButton(name: DockTab, ctx: ActionContext | undefined) {
+  outerActions[TAB_ACTIONS[name]].action?.(ctx)
+  // The models follow the parent's state once it has re-rendered.
+  void nextTick(() => {
+    if (show.value && tab.value === name) document.getElementById(`${idBase}-tab-${name}`)?.focus()
+  })
+}
+
+// These handlers reach only the dock's own subtree, so only the collapsed buttons: the shortcuts
+// are dispatched by `GraphEditor.vue` with its handlers.
+registerHandlers(
+  {
+    'panel.close': {
+      available: true,
+      action: () => (show.value = false),
+    },
+    'graph.toggleCodeEditor': { action: (ctx) => openFromButton('code', ctx) },
+    'graph.toggleLogs': {
+      action: (ctx) => openFromButton('logs', ctx),
+      // The unseen errors reach screen readers in the button's name (the dot is decorative).
+      description: () =>
+        logsBadge > 0 ?
+          `${toValue(outerActions['graph.toggleLogs'].description)}, ${unseenErrors.value}`
+        : undefined,
+    },
   },
-})
+  outerActions,
+)
+
+// Closing the dock (by its Close button or a shortcut) while the keyboard is in it hands the
+// keyboard to the collapsed button of the tab that showed, rather than dropping it on the page.
+let refocusOnClose = false
+watch(
+  show,
+  (now, before) => {
+    if (!before || now) return
+    const active = document.activeElement
+    refocusOnClose =
+      active != null &&
+      ((rootElement.value?.contains(active) ?? false) ||
+        (dockLayout.value?.contains(active) ?? false))
+  },
+  { flush: 'pre' },
+)
+watch(
+  show,
+  (now) => {
+    if (now || !refocusOnClose) return
+    refocusOnClose = false
+    collapsedButtons.value
+      ?.querySelector<HTMLElement>(`[data-testid="action:${TAB_ACTIONS[tab.value]}"]`)
+      ?.focus()
+  },
+  { flush: 'post' },
+)
 
 /** Picking the Code tab while Logs shows hands the keyboard to the code editor. */
 function onPicked(picked: DockTab) {
@@ -74,21 +139,11 @@ const style = computed(() =>
 
 <template>
   <!-- While the dock is closed: a button per tab, which opens it there. -->
-  <div v-if="!show" class="collapsedButtons" data-testid="bottomDockButtons">
+  <div v-if="!show" ref="collapsedButtons" class="collapsedButtons" data-testid="bottomDockButtons">
     <ActionButton action="graph.toggleCodeEditor" />
     <div class="logsButton">
       <ActionButton action="graph.toggleLogs" />
-      <span
-        v-if="logsBadge > 0"
-        class="errorDot"
-        role="img"
-        data-testid="logs-error-dot"
-        :aria-label="
-          logsBadge === 1 ?
-            getText('engineLogsUnseenError')
-          : getText('engineLogsUnseenErrors', logsBadge)
-        "
-      />
+      <span v-if="logsBadge > 0" class="errorDot" aria-hidden="true" data-testid="logs-error-dot" />
     </div>
   </div>
   <Transition>
@@ -101,7 +156,7 @@ const style = computed(() =>
       v-bind="$attrs"
     >
       <WithFullscreenMode v-model="fullscreen">
-        <div class="dockLayout">
+        <div ref="dockLayout" class="dockLayout">
           <div class="dockHeader">
             <BottomPanelTabs
               v-model:tab="tab"
