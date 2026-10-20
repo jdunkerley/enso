@@ -64,12 +64,19 @@ export type LocalSecretsStatus =
   | { readonly state: 'ready'; readonly keyCreated: string }
   /** Secrets, but no key. */
   | { readonly state: 'missing' }
+  /**
+   * No key, because the keychain could not be read (locked, or its module failed to load). Not the
+   * same as `missing`: the key may well be there, so nothing may be reset.
+   */
+  | { readonly state: 'unavailable' }
   /** Secrets under another key. */
   | { readonly state: 'wrong' }
 
 export interface LocalSecretsOptions {
   readonly filePath: string
   readonly getKey: () => Buffer | null
+  /** Whether the key's source (the keychain) could not be read; `status()` then says so. */
+  readonly isKeyUnavailable?: () => boolean
   readonly now?: () => Date
 }
 
@@ -161,6 +168,7 @@ async function removeQuietly(filePath: string): Promise<void> {
 export class LocalSecrets {
   readonly #filePath: string
   readonly #getKey: () => Buffer | null
+  readonly #isKeyUnavailable: () => boolean
   readonly #now: () => Date
 
   /**
@@ -169,6 +177,7 @@ export class LocalSecrets {
   constructor(options: LocalSecretsOptions) {
     this.#filePath = options.filePath
     this.#getKey = options.getKey
+    this.#isKeyUnavailable = options.isKeyUnavailable ?? (() => false)
     this.#now = options.now ?? (() => new Date())
     registerTestReader(this, (name) => this.#readValue(name))
   }
@@ -232,6 +241,7 @@ export class LocalSecrets {
    * wrote) gets one now, so the key's age counts from the first time the app saw it.
    */
   async status(): Promise<LocalSecretsStatus> {
+    if (this.#getKey() == null && this.#isKeyUnavailable()) return { state: 'unavailable' }
     const root = await this.#readRoot()
     if (root == null || Object.keys(secretsOf(root)).length === 0) return { state: 'empty' }
     const key = this.#getKey()

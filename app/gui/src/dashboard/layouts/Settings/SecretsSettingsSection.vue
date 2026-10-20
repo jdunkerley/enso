@@ -4,7 +4,8 @@
  * buttons to create one, change a value or delete one; a button to copy the secrets key; and, when
  * the key is missing or does not fit the secrets file, a message with a reset; and, for a key made
  * on this computer, a button to rotate it (with a note once it is over a year old). If the names or the
- * status cannot be read, it says so, rather than looking like there are no secrets.
+ * status cannot be read, it says so, rather than looking like there are no secrets. A keychain that
+ * could not be read gets its own message and no reset: the key may be there all along.
  *
  * Values only ever go one way: into the secrets file. The only thing that comes back is the key,
  * and only through Electron main, which writes it to the clipboard.
@@ -72,6 +73,8 @@ const projectsOpen = computed(() =>
     (project) => project.state.status !== 'not-opened' || project.nextTask != null,
   ),
 )
+/** The keychain could not be read. Not {@link keyUnusable}: resetting could destroy the key. */
+const keychainUnavailable = computed(() => status.value?.state === 'unavailable')
 /** Why the names or the status could not be read, or `null`. */
 const loadError = computed(() => {
   const error = listQuery.error.value ?? statusQuery.error.value
@@ -198,6 +201,9 @@ async function askReset() {
     <Text v-if="loadError != null" color="danger" testId="local-secrets-error">
       {{ getText('secretsLoadFailed', loadError) }}
     </Text>
+    <Text v-else-if="keychainUnavailable" testId="local-secrets-keychain-unavailable">
+      {{ getText('secretsKeychainUnavailable') }}
+    </Text>
     <Text v-else-if="keyUnusable">
       {{ getText(status?.state === 'missing' ? 'secretsKeyMissing' : 'secretsKeyWrong') }}
     </Text>
@@ -227,10 +233,20 @@ async function askReset() {
     </Text>
     <Text v-if="status?.keyFromEnvironment">{{ getText('secretsKeyFromEnvironment') }}</Text>
     <ButtonGroup class="grow-0">
-      <Button v-if="!keyUnusable" size="small" variant="outline" @press="newSecret">
+      <Button
+        v-if="!keyUnusable && !keychainUnavailable"
+        size="small"
+        variant="outline"
+        @press="newSecret"
+      >
         {{ getText('newSecret') }}
       </Button>
-      <Button v-if="!keyUnusable" size="small" variant="outline" @press="askCopyKey">
+      <Button
+        v-if="!keyUnusable && !keychainUnavailable"
+        size="small"
+        variant="outline"
+        @press="askCopyKey"
+      >
         {{ getText('secretsCopyKey') }}
       </Button>
       <Button

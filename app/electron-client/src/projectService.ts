@@ -39,6 +39,7 @@ export function getLocalSecrets(): LocalSecrets {
   localSecrets ??= new LocalSecrets({
     filePath: defaultSecretsFilePath(process.env, os.homedir()),
     getKey: () => getSecretsKeySource().current(),
+    isKeyUnavailable: () => getSecretsKeySource().keychainUnavailable,
   })
   return localSecrets
 }

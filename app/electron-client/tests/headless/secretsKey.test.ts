@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import {
   lazyKeyringEntries,
+  RESET_BLOCKED_BY_KEYCHAIN,
   resetSecrets,
   rotateSecretsKey,
   SecretsKeySource,
@@ -157,6 +158,38 @@ describe('SecretsKeySource', () => {
     expect(keySource.current()).toBeNull()
   })
 
+  test('a keychain that could not be read is unavailable, and forget() refuses', async () => {
+    const keyring = new FakeKeyring()
+    keyring.items.set('secrets-key', encodeKey(randomBytes(32)))
+    const realGetPassword = keyring.getPassword
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    const keySource = source(keyring, { fileHasSecrets: true })
+    expect(keySource.keychainUnavailable).toBe(false)
+    await expect(keySource.initialise()).rejects.toThrow('The keychain is locked.')
+    expect(keySource.keychainUnavailable).toBe(true)
+    expect(() => keySource.assertKeychainReadable()).toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    await expect(keySource.forget()).rejects.toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    // The item nobody could read is still there.
+    expect(keyring.items.has('secrets-key')).toBe(true)
+    // Once the keychain can be read again, so can the key, and the state clears.
+    keyring.getPassword = realGetPassword
+    await keySource.initialise()
+    expect(keySource.keychainUnavailable).toBe(false)
+    expect(keySource.current()).not.toBeNull()
+    expect(() => keySource.assertKeychainReadable()).not.toThrow()
+  })
+
+  test('a keychain that reads but has no key is not unavailable', async () => {
+    const keyring = new FakeKeyring()
+    const keySource = source(keyring, { fileHasSecrets: true })
+    await keySource.initialise()
+    expect(keySource.current()).toBeNull()
+    expect(keySource.keychainUnavailable).toBe(false)
+    expect(() => keySource.assertKeychainReadable()).not.toThrow()
+  })
+
   test.each([
     ['not base64url', 'not a key!'],
     ['the wrong length', encodeKey(randomBytes(16))],
@@ -225,6 +258,7 @@ describe('lazyKeyringEntries', () => {
     await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
     expect(keySource.current()).toBeNull()
     expect(keySource.exportKey()).toBeNull()
+    expect(keySource.keychainUnavailable).toBe(true)
     await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
     expect(load).toHaveBeenCalledTimes(1)
   })
@@ -604,6 +638,23 @@ describe('rotation', () => {
     keyring.items.set('secrets-key-next', encodeKey(randomBytes(32)))
     await keySource.forget()
     expect(keyring.items.size).toBe(0)
+  })
+
+  test('resetSecrets refuses while the keychain could not be read, and changes nothing', async () => {
+    const before = await fs.readFile(file, 'utf8')
+    const item = keyring.items.get('secrets-key')
+    const realGetPassword = keyring.getPassword
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    keySource = newSource()
+    await expect(keySource.initialise()).rejects.toThrow('The keychain is locked.')
+    await expect(
+      resetSecrets({ keySource, store, hasRunningProjects: async () => false }),
+    ).rejects.toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    keyring.getPassword = realGetPassword
+    expect(keyring.items.get('secrets-key')).toBe(item)
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
   })
 
   describe('while a project is running', () => {
