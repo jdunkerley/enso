@@ -14,6 +14,7 @@ declare module 'create-servers' {
     readonly handler: http.RequestListener
     readonly https?: {
       readonly port: number
+      readonly host?: string
       readonly key: string
       readonly cert: string
     }
@@ -22,6 +23,7 @@ declare module 'create-servers' {
   /** An error passed to a callback when a HTTP request fails. */
   interface HttpError {
     readonly http: string
+    readonly https?: NodeJS.ErrnoException
   }
 
   /** Created server instances of various types. */

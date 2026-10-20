@@ -43,6 +43,7 @@ import { fileURLToPath } from 'node:url'
 import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
 import {
+  acceptLocalRequest,
   handleFilesystemCommand,
   handleProjectServiceRequest,
   isProjectServiceRequest,
@@ -109,10 +110,26 @@ export class ProjectManagerShimMiddleware {
     return this.projectService
   }
 
-  /** A middleware handler.  */
-  handler(request: http.IncomingMessage, response: http.ServerResponse, next: () => void) {
+  /**
+   * A middleware handler.
+   * @param serverHostnames - The host names the server is configured to answer to besides the
+   * loopback ones (Vite's `server.host`); an `/api/` request naming any other host is refused.
+   */
+  handler(
+    request: http.IncomingMessage,
+    response: http.ServerResponse,
+    next: () => void,
+    serverHostnames: readonly string[] = [],
+  ) {
     const requestUrl = request.url ?? ''
     if (!requestUrl.startsWith('/api/')) return next()
+    // Vite checks `Host` for the other paths itself (`server.allowedHosts`).
+    const server = {
+      protocol: 'encrypted' in request.socket && request.socket.encrypted ? 'https:' : 'http:',
+      port: request.socket.localPort ?? 0,
+      extraHostnames: serverHostnames,
+    } as const
+    if (!acceptLocalRequest(request, response, server, COMMON_HEADERS)) return
     const url = new URL(requestUrl, 'https://apishim.local')
     const requestPath = url.pathname
     if (isProjectServiceRequest(requestPath)) {

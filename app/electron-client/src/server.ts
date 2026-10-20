@@ -2,6 +2,7 @@
 
 import * as mkcert from 'mkcert'
 import * as http from 'node:http'
+import type * as https from 'node:https'
 import * as path from 'node:path'
 import * as stream from 'node:stream'
 import * as streamConsumers from 'node:stream/consumers'
@@ -14,6 +15,7 @@ import type * as vite from 'vite'
 import { COOP_COEP_CORP_HEADERS } from 'enso-common/src/constants'
 import * as projectManagement from 'project-manager-shim'
 import {
+  acceptLocalRequest,
   handleFilesystemCommand,
   handleProjectServiceRequest,
   isProjectServiceRequest,
@@ -81,6 +83,17 @@ ydocServer.configureAllDebugLogs(
 const HTTP_STATUS_OK = 200
 const HTTP_STATUS_BAD_REQUEST = 400
 const HTTP_STATUS_NOT_FOUND = 404
+
+/**
+ * The addresses the server listens on: the loopback interface only, so nothing off this machine
+ * can reach it. The window loads `https://localhost:<port>`, and `localhost` may resolve to either
+ * address, so both are bound. The IPv6 one is optional: a machine without IPv6 cannot bind it.
+ */
+const IPV4_LOOPBACK = '127.0.0.1'
+const IPV6_LOOPBACK = '::1'
+
+/** The `listen` errors that mean the machine has no IPv6 loopback to bind. */
+const NO_IPV6_ERROR_CODES = new Set(['EADDRNOTAVAIL', 'EAFNOSUPPORT', 'EINVAL'])
 
 // ==================
 // === fileExists ===
@@ -166,7 +179,8 @@ export class Config {
 
 /**
  * Determine the initial available communication endpoint, starting from the specified port,
- * to provide file hosting services.
+ * to provide file hosting services. `portfinder` checks the port on every local address, the
+ * loopback ones among them, so a port it returns is free for {@link Server.run}.
  */
 async function findPort(port: number): Promise<number> {
   return await portfinder.getPortPromise({ port, startPort: port, stopPort: port + 4 })
@@ -180,6 +194,7 @@ async function findPort(port: number): Promise<number> {
  */
 export class Server {
   private projectsRootDirectory: string
+  private servers: https.Server[] = []
   private devServer?: vite.ViteDevServer
   private projectService: ProjectService
   private localMetadata: LocalMetadata
@@ -249,39 +264,61 @@ export class Server {
       validity: defaultValidity,
     })
 
+    const ipv4Server = await this.listen(cert, IPV4_LOOPBACK)
+    let ipv6Server: https.Server | undefined
+    try {
+      ipv6Server = await this.listen(cert, IPV6_LOOPBACK)
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code == null || !NO_IPV6_ERROR_CODES.has(code)) {
+        ipv4Server.close()
+        throw error
+      }
+      console.warn(`Not listening on [${IPV6_LOOPBACK}]: ${code}.`)
+    }
+    this.servers = ipv6Server ? [ipv4Server, ipv6Server] : [ipv4Server]
+    if (process.env.ELECTRON_DEV_MODE === 'true') {
+      // Vite's hot-reload WebSocket listens for upgrades on one server; hand it both.
+      ipv6Server?.on('upgrade', (...args) => ipv4Server.emit('upgrade', ...args))
+      const vite = (await import(
+        pathToFileURL(process.env.NODE_MODULES_PATH + '/vite/dist/node/index.js').href
+      )) as typeof import('vite')
+      this.devServer = await vite.createServer({
+        server: {
+          middlewareMode: true,
+          hmr: { server: ipv4Server },
+        },
+        configFile: process.env.GUI_CONFIG_PATH ?? false,
+        mode: process.env.MODE ?? 'staging',
+      })
+    }
+  }
+
+  /** Listen on one address, failing with the `listen` error. */
+  private listen(cert: { key: string; cert: string }, host: string): Promise<https.Server> {
     return new Promise((resolve, reject) => {
       createServer(
         {
-          https: {
-            key: cert.key,
-            cert: cert.cert,
-            port: this.config.port,
-          },
+          https: { key: cert.key, cert: cert.cert, port: this.config.port, host },
           handler: this.process.bind(this),
         },
-        async (err, { https: httpsServer, http: httpServer }) => {
-          const server = httpsServer ?? httpServer
-          if (process.env.ELECTRON_DEV_MODE === 'true') {
-            const vite = (await import(
-              pathToFileURL(process.env.NODE_MODULES_PATH + '/vite/dist/node/index.js').href
-            )) as typeof import('vite')
-            this.devServer = await vite.createServer({
-              server: {
-                middlewareMode: true,
-                hmr: server ? { server } : {},
-              },
-              configFile: process.env.GUI_CONFIG_PATH ?? false,
-              mode: process.env.MODE ?? 'staging',
-            })
+        (err, { https: server }) => {
+          if (err != null || server == null) {
+            if (server?.listening) server.close()
+            reject(err?.https ?? new Error(`Could not listen on ${host}.`))
+          } else {
+            resolve(server)
           }
-          if (err) {
-            console.error('Error creating server:', err.http)
-            reject(err)
-          }
-          resolve()
         },
       )
     })
+  }
+
+  /** Stop listening. */
+  async close(): Promise<void> {
+    await this.devServer?.close()
+    await Promise.all(this.servers.map((server) => new Promise((resolve) => server.close(resolve))))
+    this.servers = []
   }
 
   /**
@@ -291,6 +328,12 @@ export class Server {
    */
   async process(request: http.IncomingMessage, response: http.ServerResponse) {
     const requestUrl = request.url
+    const server = { protocol: 'https:', port: this.config.port } as const
+    if (
+      !acceptLocalRequest(request, response, server, Object.fromEntries(COOP_COEP_CORP_HEADERS))
+    ) {
+      return
+    }
     if (requestUrl == null) {
       console.error('Request URL is null.')
     } else if (isProjectServiceRequest(requestUrl)) {

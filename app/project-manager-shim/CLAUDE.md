@@ -19,7 +19,15 @@ Consumers import by subpath (see `package.json#exports`):
 
 - `project-manager-shim` — public helpers (`downloadEnsoEngine`,
   `findEnsoExecutable`, …).
-- `project-manager-shim/handler` — JSON-RPC request handler.
+- `project-manager-shim/handler` — JSON-RPC request handler, and
+  `acceptLocalRequest` / `checkLocalRequest` (`handler/localRequest.ts`): the
+  one check both hosts (Electron's `server.ts`, the Vite middleware in
+  `app/gui/project-manager-shim-middleware/`) run before serving a request. It
+  refuses a `Host` other than a loopback name (plus a dev server's configured
+  host) with the server's port, and an `/api/` request whose `Sec-Fetch-Site` is
+  not `same-origin`/`none` or whose `Origin` is not the server's own. Requests
+  with neither header (curl, scripts) pass. Every route this package serves over
+  HTTP relies on it: none checks the caller itself.
 - `project-manager-shim/localMetadata` — local labels and Recent store (see
   below).
 - `project-manager-shim/localSecrets` — the encrypted local secrets file (see
