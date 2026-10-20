@@ -64,7 +64,10 @@ public final class BindingSorter {
 
     private int compareTypeAndMethod(Type type, Method method) {
       if (method.typeName().isDefined()) {
-        if (isExtensionMethod(method)) {
+        // Extension methods and conversions sort after every type. Conversions must not be
+        // ordered by type name: they sort after all explicit methods, so doing so would make the
+        // comparator non-transitive (a method on type B, a conversion onto type A, and type B).
+        if (method instanceof Method.Conversion || isExtensionMethod(method)) {
           return -1;
         }
         var typeName = type.name().name();

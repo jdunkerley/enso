@@ -4,10 +4,12 @@
     - Value original_value:Standard.Base.Any.Any length:Standard.Base.Data.Numbers.Integer getter:(Standard.Base.Data.Numbers.Integer -> Standard.Base.Any.Any) columns:Standard.Base.Data.Vector.Vector= is_sequence:Standard.Base.Data.Boolean.Boolean=
     - align_sequence_only self sequence_only:Standard.Base.Data.Boolean.Boolean -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
     - to_vector self -> Standard.Base.Any.Any
-- Standard.Table.Conversions.Convertible_To_Rows.Key_Value.at self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- Standard.Table.Conversions.Convertible_To_Rows.Key_Value.get self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- Standard.Table.Conversions.Convertible_To_Rows.Key_Value.is_empty self -> Standard.Base.Any.Any
-- Standard.Table.Conversions.Convertible_To_Rows.Key_Value.length self -> Standard.Base.Any.Any
+- type Key_Value
+    - Pair key:Standard.Base.Any.Any value:Standard.Base.Any.Any
+    - at self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - get self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - is_empty self -> Standard.Base.Any.Any
+    - length self -> Standard.Base.Any.Any
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Table.Table.Table -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Table.Column.Column -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Base.Data.Vector.Vector -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
@@ -19,10 +21,4 @@
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Base.Data.Dictionary.Dictionary -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Base.Data.Json.JS_Object -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
 - Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows.from that:Standard.Base.Any.Any -> Standard.Table.Conversions.Convertible_To_Rows.Convertible_To_Rows
-- type Key_Value
-    - Pair key:Standard.Base.Any.Any value:Standard.Base.Any.Any
-    - at self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - get self idx:Standard.Base.Any.Any -> Standard.Base.Any.Any
-    - is_empty self -> Standard.Base.Any.Any
-    - length self -> Standard.Base.Any.Any
 - Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns.from that:Standard.Table.Conversions.Convertible_To_Rows.Key_Value -> Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
