@@ -7,6 +7,8 @@
 - [Enso updates itself: when a new version is out, it offers to download it and
   installs it on restart. Settings → Local can include prerelease
   versions.][256]
+- [Secrets without Enso Cloud: create and manage encrypted secrets in Settings →
+  Local → Secrets, and use them in workflows.][264]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -307,6 +309,7 @@
 [262]: https://github.com/jdunkerley/enso/pull/262
 [255]: https://github.com/jdunkerley/enso/pull/255
 [256]: https://github.com/jdunkerley/enso/pull/256
+[264]: https://github.com/jdunkerley/enso/pull/264
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
