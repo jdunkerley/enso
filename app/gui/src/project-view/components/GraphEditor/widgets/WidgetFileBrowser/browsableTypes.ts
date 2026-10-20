@@ -336,7 +336,7 @@ export function useTextSecrets({
  * The file browser's input for its inner widget: its items added as a dropdown, or the input
  * unchanged when there are none. Any dropdown items, even an empty list, make the selection widget
  * take the input, whose arrow would then open nothing: this is the case of an argument that takes
- * only a secret, now that there is no secret browser.
+ * only a secret where there are no local secret items (the browser build, with no local backend).
  */
 export function withBrowserItems(
   input: WidgetInput,

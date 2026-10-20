@@ -6,7 +6,6 @@ import {
 import type { ToValue } from '$/utils/reactivity'
 import type { BrowserItem } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
 import type { CustomDropdownItem } from '@/components/GraphEditor/widgets/WidgetSelection/tags'
-import { assert } from '@/util/assert'
 import type { FileFilter } from '@/util/fileFilter'
 import { computed, toValue, type ComputedRef } from 'vue'
 
@@ -73,7 +72,8 @@ export function useLocalBrowser({
     }
 
     const rawKind = toValue(dialogKind)
-    assert(rawKind !== 'secret')
+    // A secret is picked from the local secrets' items (`localSecrets.ts`), not a dialog.
+    if (rawKind === 'secret') return
     const kind = rawKind === 'file' && toValue(write) ? 'filePath' : rawKind
     const filters =
       rawKind === 'file' ? dialogFileFilters(toValue(fileTypes), toValue(write)) : undefined

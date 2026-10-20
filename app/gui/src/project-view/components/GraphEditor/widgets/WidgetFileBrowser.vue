@@ -18,6 +18,7 @@ import {
   withBrowserItems,
 } from '@/components/GraphEditor/widgets/WidgetFileBrowser/browsableTypes'
 import { useLocalBrowser } from '@/components/GraphEditor/widgets/WidgetFileBrowser/localBrowser'
+import { useLocalSecretItems } from '@/components/GraphEditor/widgets/WidgetFileBrowser/localSecrets'
 import {
   type CustomDropdownItem,
   ExpressionTag,
@@ -84,10 +85,12 @@ const fileTypes = computed(() => {
 })
 
 const localBrowserItems = useLocalBrowser({ dialogKind, write, currentPath, setPath, fileTypes })
+const localSecretItems = useLocalSecretItems({ dialogKind, setPath })
 const textSecretsItems = useTextSecrets({ dialogKind, reprType })
 
 const items = computed((): (CustomDropdownItem | ExpressionTag)[] => [
   ...localBrowserItems.value,
+  ...localSecretItems.value,
   ...textSecretsItems.value,
 ])
 
