@@ -134,8 +134,8 @@ test('secure values offer text or a secret, and Enso File is not offered', async
     // The secure value's own dropdown rendered and lists its choices, so the absence below is not
     // vacuous.
     const username = created.getByRole('listbox', { name: TEXT.options }).nth(1)
-    await expect(username.getByRole('option', { name: 'Text' })).toHaveCount(1)
-    await expect(username.getByRole('option', { name: 'Enso Secret' })).toHaveCount(1)
+    await expect(username.getByRole('option', { name: 'Plain text', exact: true })).toHaveCount(1)
+    await expect(username.getByRole('option', { name: 'Secret', exact: true })).toHaveCount(1)
     await expect(created.getByRole('option', { name: 'Enso File' })).toHaveCount(0)
   })
 })

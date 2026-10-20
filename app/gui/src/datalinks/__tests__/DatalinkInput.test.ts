@@ -156,24 +156,24 @@ describe('DatalinkInput', () => {
     expect(value.value).not.toHaveProperty('schema')
   })
 
-  test('a secure value offers Text and Enso Secret', async () => {
+  test('a secure value offers Plain text and Secret', async () => {
     await mountEditor()
     await chooseType('Postgres Database Connection')
     const options = [...element().querySelectorAll('[role="option"]')].map((o) =>
       o.textContent?.trim(),
     )
-    expect(options).toContain('Text')
-    expect(options).toContain('Enso Secret')
+    expect(options).toContain('Plain text')
+    expect(options).toContain('Secret')
   })
 
   /** The index of the (Postgres) password's type list. */
   const PASSWORD_LIST = 2
 
-  /** Open a Postgres datalink, and choose Enso Secret for its password. */
+  /** Open a Postgres datalink, and choose Secret for its password. */
   async function chooseSecretPassword() {
     const editor = await mountEditor()
     await chooseType('Postgres Database Connection')
-    await chooseType('Enso Secret', PASSWORD_LIST)
+    await chooseType('Secret', PASSWORD_LIST)
     return editor
   }
 
@@ -185,7 +185,7 @@ describe('DatalinkInput', () => {
   const isDisabled = (el: Element) =>
     el.closest('[data-disabled]') ?? el.querySelector('[data-disabled]')
 
-  test('choosing Enso Secret shows the picker; picking a secret sets its secret:// path', async () => {
+  test('choosing Secret shows the picker; picking a secret sets its secret:// path', async () => {
     const { value } = await chooseSecretPassword()
     expect(value.value).toMatchObject({ credentials: { password: { type: 'secret' } } })
     await userEvent.setup().click(pickerOption('db')!)
@@ -235,6 +235,16 @@ describe('DatalinkInput', () => {
     expect(pickerOption(getText('datalinkNewSecret'))).toBeUndefined()
   })
 
+  test('when the secrets cannot be listed, the picker says so', async () => {
+    fake.listSecrets.mockImplementation(() => Promise.reject(new Error('locked')))
+    await chooseSecretPassword()
+    await vi.waitFor(() =>
+      expect(element().querySelector('[data-testid="secret-picker-error"]')?.textContent).toContain(
+        getText('secretsLoadFailed', 'locked'),
+      ),
+    )
+  })
+
   const WITH_SECRET = {
     type: 'Postgres_Connection',
     libraryName: 'Standard.Database',
@@ -264,13 +274,13 @@ describe('DatalinkInput', () => {
       .setup()
       .click(
         [...passwordList.querySelectorAll('[role="option"]')].find(
-          (o) => o.textContent?.trim() === 'Text',
+          (o) => o.textContent?.trim() === 'Plain text',
         )!,
       )
     expect(value.value).toMatchObject({ credentials: { username: 'me', password: '' } })
     expect(
       [...passwordList.querySelectorAll('[role="option"]')].map((o) => o.textContent?.trim()),
-    ).toEqual(['Text', 'Enso Secret'])
+    ).toEqual(['Plain text', 'Secret'])
   })
 
   test('an existing Enso File datalink opens, its path as plain text', async () => {
