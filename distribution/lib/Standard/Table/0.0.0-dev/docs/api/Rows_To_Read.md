@@ -9,8 +9,8 @@
     - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
     - rows_to_read self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
     - rows_to_write self -> (Standard.Base.Data.Numbers.Integer|Standard.Base.Nothing.Nothing)
-- Standard.Table.Rows_To_Read.Rows_To_Read.from that:Standard.Base.Nothing.Nothing -> Standard.Table.Rows_To_Read.Rows_To_Read
-- Standard.Table.Rows_To_Read.Rows_To_Read.from that:Standard.Base.Data.Numbers.Integer -> Standard.Table.Rows_To_Read.Rows_To_Read
 - type When
     - Always
     - In_Design_Mode
+- Standard.Table.Rows_To_Read.Rows_To_Read.from that:Standard.Base.Nothing.Nothing -> Standard.Table.Rows_To_Read.Rows_To_Read
+- Standard.Table.Rows_To_Read.Rows_To_Read.from that:Standard.Base.Data.Numbers.Integer -> Standard.Table.Rows_To_Read.Rows_To_Read
