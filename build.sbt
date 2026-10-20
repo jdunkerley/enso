@@ -110,7 +110,12 @@ GatherLicenses.distributions := Seq(
       `language-server`
     )
   ),
-  makeStdLibDistribution("Base", Distribution.sbtProjects(`std-base`)),
+  makeStdLibDistribution(
+    "Base",
+    // JNA (for the keychain) is `provided` to `std-base` and shipped through
+    // `jna-wrapper-extracted`.
+    Distribution.sbtProjects(`std-base`, `jna-wrapper`)
+  ),
   makeStdLibDistribution(
     "Generic_JDBC",
     Distribution.sbtProjects(`std-generic-jdbc`)
@@ -4995,6 +5000,7 @@ val `std-lib-root` = file("distribution/lib/Standard/")
 def stdLibComponentRoot(name: String): File =
   `std-lib-root` / name / stdLibVersion
 val `base-polyglot-root`  = stdLibComponentRoot("Base") / "polyglot" / "java"
+val `base-native-libs`    = stdLibComponentRoot("Base") / "polyglot" / "lib"
 val `table-polyglot-root` = stdLibComponentRoot("Table") / "polyglot" / "java"
 val `image-polyglot-root` = stdLibComponentRoot("Image") / "polyglot" / "java"
 val `image-native-libs`   = stdLibComponentRoot("Image") / "polyglot" / "lib"
@@ -5059,16 +5065,26 @@ lazy val `std-base` = project
           libraryUpdates     = (Compile / update).value,
           logger             = streams.value.log,
           cacheStoreFactory  = cacheStoreFactory,
-          unmanagedClasspath = (Compile / unmanagedJars).value
+          unmanagedClasspath = (Compile / unmanagedJars).value,
+          // JNA reads the secrets key from the OS keychain (`OsKeychain`).
+          polyglotLibDir = Some(`base-native-libs`),
+          extractedNativeLibsDirs = Seq(
+            (`jna-wrapper-extracted` / extractedFilesDir).value
+          ),
+          extraJars = Seq(
+            (`jna-wrapper-extracted` / thinJarOutput).value
+          )
         )
       result
     },
     clean := Def.task {
       val _ = clean.value
       IO.delete(`base-polyglot-root`)
+      IO.delete(`base-native-libs`)
     }.value
   )
   .dependsOn(`common-polyglot-core-utils`)
+  .dependsOn(`jna-wrapper` % "provided") // the OS keychain, see `OsKeychain`
 
 lazy val `common-polyglot-core-utils` = project
   .in(file("lib/scala/common-polyglot-core-utils"))
