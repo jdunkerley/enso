@@ -1,0 +1,19 @@
+name: Set up Rust
+description: >-
+  The Cargo cache for a job that compiles Rust. The toolchain itself comes from
+  `rust-toolchain.toml`: rustup installs it on the first `cargo` call. Only `develop` saves the
+  cache, so pull requests share one warm cache instead of each writing their own.
+inputs:
+  shared-key:
+    description: >-
+      `Swatinem/rust-cache` key shared by the jobs that build the same crates (`build-script` for
+      the `./run` CLI, `wasm-parser` for the GUI's parser).
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Cache Rust build
+      uses: Swatinem/rust-cache@v2
+      with:
+        save-if: ${{ github.ref == 'refs/heads/develop' }}
+        shared-key: ${{ inputs.shared-key }}
