@@ -1,3 +1,4 @@
+import { makeProjectTelemetryKey } from 'enso-common/src/services/ProjectManager/projectIdentity'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -7,7 +8,7 @@ import { createProject } from '../../localMetadata/__tests__/testUtils.js'
 import type { ProjectLifecycleListener } from '../../localMetadata/index.js'
 import { createVersioning } from '../../localVersioning/__tests__/testRepo.js'
 import { VERSIONING_TIMEOUT_MS, type LocalVersioning } from '../../localVersioning/index.js'
-import type { Runner } from '../ensoRunner.js'
+import type { EngineLogSink, Runner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path, UUID } from '../types.js'
 
@@ -51,6 +52,7 @@ function fakeRunner(): Runner {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'project-service-lifecycle-'))
+  vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(root, 'logs'))
   hooks = []
   running = false
   listener = { projectMoved: vi.fn(async () => {}), projectDeleted: vi.fn(async () => {}) }
@@ -58,6 +60,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
@@ -285,5 +288,64 @@ describe('extra environment', () => {
     const env = (runProject.mock.calls[0] as unknown as [string, [string, string][]])[1]
     expect(env).toContainEqual(['ENSO_SECRETS_KEY', 'abc'])
     expect(env.map(([name]) => name)).toContain('ENSO_LOCAL_PROJECT_ID')
+  })
+})
+
+describe('engine logs', () => {
+  const SOCKETS = {
+    jsonSocket: { host: '127.0.0.1', port: 1 },
+    ydocSocket: { host: '127.0.0.1', port: 2 },
+  }
+
+  test("opening a project opens its log channel in the project's log directory; closing closes it", async () => {
+    const projectPath = await createProject(path.join(root, 'P'), 'id-1')
+    let sink: EngineLogSink | undefined
+    const openProject: Runner['openProject'] = async (_path, _id, _args, _env, logSink) => {
+      sink = logSink
+      return SOCKETS
+    }
+    const logs = new ProjectService({ ...fakeRunner(), openProject }, [])
+    try {
+      await logs.openProject(UUID('id-1'), Path(root))
+      const channel = logs.engineLogs.get(projectPath)
+      expect(channel).toBeDefined()
+      expect(sink).toBe(channel)
+      const key = await makeProjectTelemetryKey(Path(root), 'id-1')
+      expect(channel!.logDirectory).toBe(path.join(root, 'logs', key))
+      await logs.closeProject(UUID('id-1'), Path(root))
+      expect(logs.engineLogs.get(projectPath)).toBeUndefined()
+    } finally {
+      await logs.engineLogs.get(projectPath)?.close()
+    }
+  })
+
+  test('a close that throws still closes the channel', async () => {
+    const projectPath = await createProject(path.join(root, 'P'), 'id-1')
+    const closeProject: Runner['closeProject'] = async () => {
+      throw new Error('shutdown failed')
+    }
+    const logs = new ProjectService({ ...fakeRunner(), closeProject }, [])
+    try {
+      await logs.openProject(UUID('id-1'), Path(root))
+      expect(logs.engineLogs.get(projectPath)).toBeDefined()
+      await expect(logs.closeProject(UUID('id-1'), Path(root))).rejects.toThrow('shutdown failed')
+      expect(logs.engineLogs.get(projectPath)).toBeUndefined()
+    } finally {
+      await logs.engineLogs.get(projectPath)?.close()
+    }
+  })
+
+  test('a failed open closes the channel', async () => {
+    const projectPath = await createProject(path.join(root, 'P'), 'id-1')
+    const openProject: Runner['openProject'] = async () => {
+      throw new Error('Language server startup timeout')
+    }
+    const logs = new ProjectService({ ...fakeRunner(), openProject }, [])
+    try {
+      await expect(logs.openProject(UUID('id-1'), Path(root))).rejects.toThrow('startup timeout')
+      expect(logs.engineLogs.get(projectPath)).toBeUndefined()
+    } finally {
+      await logs.engineLogs.get(projectPath)?.close()
+    }
   })
 })

@@ -1,6 +1,7 @@
 import { createDeferred, type Deferred } from 'enso-common/src/utilities/async'
 import {
   WatchedChildProcess,
+  type ChildProcessHandle,
   type UnexpectedExitInfo,
 } from 'enso-common/src/utilities/childProcess'
 import extractZip from 'extract-zip'
@@ -29,6 +30,7 @@ export interface Runner {
     projectId: string,
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
+    logSink?: EngineLogSink,
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
@@ -60,6 +62,47 @@ export interface LanguageServerSockets {
 export interface Socket {
   readonly host: string
   readonly port: number
+}
+
+/**
+ * Where an opened project's engine output goes, besides this process's own stderr: the engine
+ * logs panel (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
+ */
+export interface EngineLogSink {
+  /** An engine process has started (the first, or a respawn): a new log session begins. */
+  engineStarted(): void
+  /** A chunk the engine wrote to stderr. It has already been written to this process's stderr. */
+  engineStderr(chunk: Buffer): void
+  /** The project has closed; no engine will start for it again. */
+  projectClosed(): void
+}
+
+let stderrErrorHandled = false
+
+/**
+ * Write `chunk` to this process's stderr, as when the engine inherited it. This is a best-effort
+ * terminal echo and must never crash the shim: a broken stream (EPIPE, EBADF) is logged once and
+ * then ignored, and back-pressure is not waited for.
+ */
+function echoToStderr(chunk: Buffer): void {
+  if (!stderrErrorHandled) {
+    stderrErrorHandled = true
+    let reported = false
+    process.stderr.on('error', (error) => {
+      if (reported) return
+      reported = true
+      try {
+        console.error('Failed to echo the engine stderr; no longer reported:', error)
+      } catch {
+        // Nowhere left to report to.
+      }
+    })
+  }
+  try {
+    process.stderr.write(chunk)
+  } catch {
+    // As above: the echo is best-effort.
+  }
 }
 
 /**
@@ -100,11 +143,15 @@ class OpenedProject {
     private path: Path,
     public sockets: LanguageServerSockets,
     spawner: () => Promise<childProcess.ChildProcess>,
+    private readonly logSink: EngineLogSink | undefined,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
     this.watcher = new WatchedChildProcess(spawner, {
-      onChildStarted: () => this.startLoadingRoutine(),
+      onChildStarted: (handle) => {
+        this.captureStderr(handle)
+        this.startLoadingRoutine()
+      },
       onUnexpectedExit: (reason, info) => this.onUnexpectedExit(reason, info),
       crashLoopLimit: {
         maxCrashes: LANGUAGE_SERVER_CRASH_LOOP_MAX,
@@ -118,12 +165,13 @@ class OpenedProject {
     jsonPort: number,
     ydocPort: number,
     spawner: () => Promise<childProcess.ChildProcess>,
+    logSink?: EngineLogSink,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
       ydocSocket: { host: '127.0.0.1', port: ydocPort },
     }
-    const project = new OpenedProject(path, sockets, spawner)
+    const project = new OpenedProject(path, sockets, spawner, logSink)
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
     return project
@@ -133,7 +181,13 @@ class OpenedProject {
     console.log('Closing Project', this.path)
     this.closed = true
     clearTimeout(this.nextWatchdogCheck)
-    await this.gracefulShutdown()
+    try {
+      await this.gracefulShutdown()
+    } finally {
+      // The engine has exited (or failed to stop): its log is complete. Closed before the hooks,
+      // which may take a while, and even when the shutdown threw, so no tailer is left polling.
+      this.logSink?.projectClosed()
+    }
 
     for (const [hookType, hook] of this.shutdownHooks) {
       try {
@@ -146,6 +200,18 @@ class OpenedProject {
         )
       }
     }
+  }
+
+  /**
+   * Pass the engine's stderr through to this process's stderr, as when it was inherited, and to the
+   * log sink. It is read even without a sink: an unread pipe would fill up and block the engine.
+   */
+  private captureStderr(handle: ChildProcessHandle): void {
+    this.logSink?.engineStarted()
+    handle.child.stderr?.on('data', (chunk: Buffer) => {
+      echoToStderr(chunk)
+      this.logSink?.engineStderr(chunk)
+    })
   }
 
   private startLoadingRoutine(): void {
@@ -375,6 +441,7 @@ export class EnsoRunner implements Runner {
     projectId: string,
     extraArgs?: readonly string[],
     extraEnv?: readonly (readonly [string, string])[],
+    logSink?: EngineLogSink,
   ): Promise<LanguageServerSockets> {
     // Check if the project is already running
     const runningProject = this.runningProjects.get(projectPath)
@@ -415,16 +482,21 @@ export class EnsoRunner implements Runner {
         }
 
         const cwd = path.dirname(projectPath)
-        const project = await OpenedProject.create(projectPath, jsonPort, ydocPort, () =>
-          this.runProcess(args, (cmd, cmdArgs) =>
-            childProcess.spawn(cmd, cmdArgs, {
-              env,
-              detached: false,
-              cwd,
-              stdio: ['pipe', 'inherit', 'inherit'],
-              windowsHide: true,
-            }),
-          ),
+        const project = await OpenedProject.create(
+          projectPath,
+          jsonPort,
+          ydocPort,
+          () =>
+            this.runProcess(args, (cmd, cmdArgs) =>
+              childProcess.spawn(cmd, cmdArgs, {
+                env,
+                detached: false,
+                cwd,
+                stdio: ['pipe', 'inherit', 'pipe'],
+                windowsHide: true,
+              }),
+            ),
+          logSink,
         )
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)

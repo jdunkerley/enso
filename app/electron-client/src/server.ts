@@ -16,8 +16,10 @@ import { COOP_COEP_CORP_HEADERS } from 'enso-common/src/constants'
 import * as projectManagement from 'project-manager-shim'
 import {
   acceptLocalRequest,
+  handleEngineLogStream,
   handleFilesystemCommand,
   handleProjectServiceRequest,
+  isEngineLogStreamRequest,
   isProjectServiceRequest,
 } from 'project-manager-shim/handler'
 import type { LocalMetadata } from 'project-manager-shim/localMetadata'
@@ -336,6 +338,13 @@ export class Server {
     }
     if (requestUrl == null) {
       console.error('Request URL is null.')
+    } else if (isEngineLogStreamRequest(requestUrl)) {
+      handleEngineLogStream(
+        request,
+        response,
+        this.projectService.engineLogs,
+        Object.fromEntries(COOP_COEP_CORP_HEADERS),
+      )
     } else if (isProjectServiceRequest(requestUrl)) {
       const headers = Object.fromEntries(COOP_COEP_CORP_HEADERS)
       handleProjectServiceRequest(

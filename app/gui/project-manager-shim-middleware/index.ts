@@ -44,8 +44,10 @@ import { createGzip } from 'node:zlib'
 import * as projectManagement from 'project-manager-shim'
 import {
   acceptLocalRequest,
+  handleEngineLogStream,
   handleFilesystemCommand,
   handleProjectServiceRequest,
+  isEngineLogStreamRequest,
   isProjectServiceRequest,
 } from 'project-manager-shim/handler'
 import { LocalMetadata } from 'project-manager-shim/localMetadata'
@@ -132,7 +134,10 @@ export class ProjectManagerShimMiddleware {
     if (!acceptLocalRequest(request, response, server, COMMON_HEADERS)) return
     const url = new URL(requestUrl, 'https://apishim.local')
     const requestPath = url.pathname
-    if (isProjectServiceRequest(requestPath)) {
+    if (isEngineLogStreamRequest(requestPath)) {
+      // No project service yet means no project is open: the stream says so and ends.
+      handleEngineLogStream(request, response, this.projectService?.engineLogs, COMMON_HEADERS)
+    } else if (isProjectServiceRequest(requestPath)) {
       handleProjectServiceRequest(
         request,
         response,

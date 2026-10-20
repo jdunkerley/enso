@@ -169,3 +169,15 @@ describe('acceptLocalRequest', () => {
     expect((await send(port, { host: `evil.example:${port}` })).status).toBe(403)
   })
 })
+
+describe('the engine log stream', () => {
+  const STREAM = '/api/engine-logs/stream?project=project-x'
+  const host = `localhost:${PORT}`
+
+  test('is an /api/ route: refused cross-site or from another origin, served same-origin', () => {
+    expect(allowed(STREAM, { host, 'sec-fetch-site': 'cross-site' })).toBe(false)
+    expect(allowed(STREAM, { host, origin: 'https://evil.example' })).toBe(false)
+    expect(allowed(STREAM, { host, 'sec-fetch-site': 'same-origin' })).toBe(true)
+    expect(allowed(STREAM, { host: `evil.example:${PORT}` })).toBe(false)
+  })
+})

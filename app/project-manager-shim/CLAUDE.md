@@ -330,6 +330,48 @@ stays staged).
   after that commit says so:
   `Restoring failed; your work was saved as the version 'Saved before restore' and can be restored from the list. (<git's message>)`.
 
+## Engine logs (`src/engineLogs/`)
+
+`ProjectService.engineLogs` (an `EngineLogHub`) holds one `EngineLogChannel` per
+open project, keyed by its directory (resolved, lower case on Windows).
+`openProject` opens it before the engine starts, so start-up lands in the replay
+buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
+`engineStderr`, `projectClosed`), and `closeProject` closes it too.
+
+- **Sources.** The engine's stderr: spawned piped, every chunk still written to
+  this process's stderr. And the session's active `.log` file,
+  `<getEngineLogDirectory()>/<local project key>/<prefix>-yyyy-MM-dd-HH-mm-ss.log`
+  — the newest such file that was not there when the engine started — followed
+  by `LogFileTailer` (a directory `fs.watch` plus a 500 ms poll; a smaller or a
+  different file is a roll-over, read again from offset 0).
+- **Events.** `waiting` (an engine started; its file is not there yet),
+  `session` (`sessionId` in the `listProjectSessions` format, `logFile`) and
+  `line` (`source`, `sessionId` — `null` before the file is found — `text`).
+  Each takes the next `seq` in a 5,000-event `ReplayBuffer`.
+- **Route.**
+  `GET /api/engine-logs/stream?project=<GUI project id>[&channel=<id>&after=<seq>]`
+  (`handler/engineLogs.ts`), as server-sent events:
+  1. `hello` (`channel`, `oldestSeq`, `nextSeq`, `sessionId`, `logFile`);
+  2. the buffered events after `after` (all of them unless `channel` is the
+     current one);
+  3. live events, with a `: heartbeat` comment every 15 s;
+  4. `end`: `closed`, or `not-open` when the project has no channel.
+
+  Both hosts route it right after `acceptLocalRequest`. The wire types are in
+  `enso-common/src/services/engineLogs.ts`. A write to a socket that has gone
+  away ends the subscription quietly instead of throwing into the channel.
+
+- **Tests** never touch real log directories: channels take a temporary
+  `logDirectory`, and code that calls `getEngineLogDirectory()` runs with
+  `ENSO_LOG_DIRECTORY` stubbed.
+- **Known limitation:** lines appended to the old file between the last read and
+  a roll-over are not streamed. They are in the rolled archive, so they show up
+  in the panel's history.
+- **Only rolling logback configurations are supported.** The finder looks for a
+  file whose name ends `-yyyy-MM-dd-HH-mm-ss.log`; with a non-rolling config
+  (one fixed file name) it never finds the session's file, and the panel stays
+  on "Waiting for the engine…" (stderr lines still stream).
+
 ## Local datalinks (`src/datalinks.ts`)
 
 A datalink is a `<name>.datalink` file holding the datalink's JSON, the format

@@ -36,6 +36,9 @@ desktop binary (AppImage/DMG/exe + installer).
   serves project assets to the window and refuses paths outside a project. The
   OS deep-link registration (`setAsDefaultProtocolClient`) was removed: there
   are no deep links.
+- Streams the open project's engine log to the window
+  (`GET /api/engine-logs/stream`, served by the shim's `handleEngineLogStream`
+  from `ProjectService.engineLogs`; see `app/project-manager-shim/CLAUDE.md`).
 - Handles custom window chrome.
 - Updates itself from the fork's GitHub Releases (`publish` in
   `electron-builder-config.ts`). `src/updater.ts` wraps `electron-updater` in an
