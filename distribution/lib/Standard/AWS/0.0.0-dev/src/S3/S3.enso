@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Enso_Cloud.Data_Link_Helpers
+from Standard.Base.Enso_Cloud.Enso_Secret import handle_local_secret_panics
 import Standard.Base.Metadata.Widget.Text_Input
 import Standard.Base.Network.HTTP.Response_Body.Response_Body
 import Standard.Base.Runtime.Context
@@ -254,7 +255,8 @@ read_bucket bucket:Text prefix:Text="" credentials:AWS_Credential=..Default deli
    Makes a client for the default region.
 private _make_client credentials:AWS_Credential -> S3ClientWrapper =
     region = credentials.get_default_region.as_java
-    S3ClientWrapper.forCredential credentials.as_java region
+    handle_local_secret_panics <|
+        S3ClientWrapper.forCredential credentials.as_java region
 
 ## ---
    private: true
@@ -264,7 +266,8 @@ private _make_client credentials:AWS_Credential -> S3ClientWrapper =
    `PermanentRedirect` errors.
 private _make_client_for_bucket bucket_name:Text credentials:AWS_Credential -> S3ClientWrapper =
     java_credential = credentials.as_java
-    S3ClientWrapper.forBucket java_credential bucket_name credentials.get_default_region.as_java
+    handle_local_secret_panics <|
+        S3ClientWrapper.forBucket java_credential bucket_name credentials.get_default_region.as_java
 
 private _wrap_response bucket key response =
     s3_uri = URI.parse (uri_prefix + bucket + "/") / key

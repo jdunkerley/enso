@@ -2,6 +2,7 @@ private
 
 from Standard.Base import all
 import Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
+from Standard.Base.Enso_Cloud.Enso_Secret import handle_local_secret_panics
 import Standard.Base.Network.Email.Email_Body.Email_Body
 import Standard.Base.Network.Email.Email_Send_Response.Send_Response
 import Standard.Base.Network.Email.Send_Error.Send_Error
@@ -21,7 +22,9 @@ type Email_Provider_SMTP_Implementation
         java_email = HtmlEmail.new
         java_email.setHostName self.config.server
         java_email.setSmtpPort self.config.port
-        CredentialSetter.setAuthenticator java_email self.config.username (Derived_Secret_Value.from self.config.password)
+        set_authenticator = handle_local_secret_panics <|
+            CredentialSetter.setAuthenticator java_email self.config.username (Derived_Secret_Value.from self.config.password)
+        Error.return_if_error set_authenticator
         java_email.setSSLOnConnect self.config.use_tls
 
         from_address = email.from_address

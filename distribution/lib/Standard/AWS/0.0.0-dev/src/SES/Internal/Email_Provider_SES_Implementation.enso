@@ -2,6 +2,7 @@ private
 
 from Standard.Base import all
 
+from Standard.Base.Enso_Cloud.Enso_Secret import handle_local_secret_panics
 import Standard.Base.Network.Email.Email_Body.Email_Body
 import Standard.Base.Network.Email.Email_Send_Response.Send_Response
 import project.SES.Email_Provider_SES.Email_Provider_SES
@@ -26,6 +27,7 @@ type Email_Provider_SES_Implementation
 
 _send_email_with_ses_provider email:Email region credentials =
     ses_client = _make_client credentials region
+    Error.return_if_error ses_client
     if email.attachments.length > 0 then
         Error.throw (Send_Error.Error "SES provider does not support attachments yet.")
     
@@ -54,7 +56,8 @@ _send_email_with_ses_provider email:Email region credentials =
 
 _make_client credentials region =
     builder = ClientBuilder.new credentials.as_java region.as_java
-    builder.buildSESClient
+    handle_local_secret_panics <|
+        builder.buildSESClient
 
 _build_content text:Text =
     Content.builder.data text . build

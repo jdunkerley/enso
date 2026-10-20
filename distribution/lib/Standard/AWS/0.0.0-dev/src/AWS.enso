@@ -1,5 +1,6 @@
 from Standard.Base import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
+from Standard.Base.Enso_Cloud.Enso_Secret import handle_local_secret_panics
 import Standard.Base.Network.HTTP.HTTP_Error.HTTP_Error
 import Standard.Base.Network.HTTP.Request.Request
 import Standard.Base.Network.HTTP.Request_Body.Request_Body
@@ -150,4 +151,5 @@ type AWS_Region_Service
 private _make_client credentials region_service http hash =
     _ = http
     builder = ClientBuilder.new credentials.as_java (AWS_Region.Region region_service.region).as_java
-    builder.createSignedClient region_service.region region_service.service hash
+    handle_local_secret_panics <|
+        builder.createSignedClient region_service.region region_service.service hash

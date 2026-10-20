@@ -184,6 +184,7 @@ type HTTP
 
         # Create HttpClient
         http_client = self.make_client self resolved_body.hash
+        Error.return_if_error http_client
 
         java_response = self.enso_secret_helper.makeRequest http_client req.method.to_http_method_name resolved_body.publisher req.uri.to_uri_string req.uri.additional_query_parameters all_headers use_cache
         response = Response.new java_response
