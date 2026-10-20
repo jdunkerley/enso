@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** @file The bottom dock's tab strip: Code and Logs, with the count of unseen errors on Logs. */
 import { useText } from '$/providers/text'
-import { nextTick, useId, useTemplateRef } from 'vue'
+import { nextTick, useId } from 'vue'
 import { DOCK_TABS, type DockTab } from './dockTab'
 
 const tab = defineModel<DockTab>('tab', { required: true })
@@ -13,7 +13,10 @@ const { logsBadge = 0, idBase = useId() } = defineProps<{
 }>()
 const { getText } = useText()
 
-const buttons = useTemplateRef<HTMLButtonElement[]>('buttons')
+const buttons: (HTMLButtonElement | undefined)[] = []
+function setButton(index: number, element: unknown) {
+  buttons[index] = element instanceof HTMLButtonElement ? element : undefined
+}
 
 /** Arrow keys (and Home/End) move between the tabs, selecting as they go. */
 function onKeydown(event: KeyboardEvent) {
@@ -37,7 +40,7 @@ function onKeydown(event: KeyboardEvent) {
   }
   event.preventDefault()
   tab.value = DOCK_TABS[next]!
-  void nextTick(() => buttons.value?.[next]?.focus())
+  void nextTick(() => buttons[next]?.focus())
 }
 </script>
 
@@ -49,34 +52,22 @@ function onKeydown(event: KeyboardEvent) {
     @keydown="onKeydown"
   >
     <button
-      :id="`${idBase}-tab-code`"
-      ref="buttons"
+      v-for="(name, index) in DOCK_TABS"
+      :id="`${idBase}-tab-${name}`"
+      :key="name"
+      :ref="(el) => setButton(index, el)"
       type="button"
       role="tab"
       class="tab"
-      :aria-controls="`${idBase}-panel-code`"
-      :aria-selected="tab === 'code'"
-      :tabindex="tab === 'code' ? 0 : -1"
-      data-testid="dock-tab-code"
-      @click="tab = 'code'"
+      :aria-controls="`${idBase}-panel-${name}`"
+      :aria-selected="tab === name"
+      :tabindex="tab === name ? 0 : -1"
+      :data-testid="`dock-tab-${name}`"
+      @click="tab = name"
     >
-      {{ getText('bottomDockCodeTab') }}
-    </button>
-    <button
-      :id="`${idBase}-tab-logs`"
-      ref="buttons"
-      type="button"
-      role="tab"
-      class="tab"
-      :aria-controls="`${idBase}-panel-logs`"
-      :aria-selected="tab === 'logs'"
-      :tabindex="tab === 'logs' ? 0 : -1"
-      data-testid="dock-tab-logs"
-      @click="tab = 'logs'"
-    >
-      {{ getText('bottomDockLogsTab') }}
+      {{ getText(name === 'code' ? 'bottomDockCodeTab' : 'bottomDockLogsTab') }}
       <span
-        v-if="logsBadge > 0 && tab !== 'logs'"
+        v-if="name === 'logs' && logsBadge > 0 && tab !== 'logs'"
         class="badge"
         data-testid="logs-badge"
         :aria-label="

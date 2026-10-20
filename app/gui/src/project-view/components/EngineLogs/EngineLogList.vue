@@ -91,6 +91,16 @@ watch(
   },
 )
 
+// The Logs tab stays mounted while hidden, with a zero-height scroller: when it shows again, the
+// rows that arrived meanwhile are below the view, so follow them (the virtual range re-measures
+// itself from `scrollerSize`).
+watch(
+  () => scrollerSize.value.y,
+  (height, before) => {
+    if (before === 0 && height > 0 && follow.value) void nextTick(scrollToEnd)
+  },
+)
+
 watch(follow, (following) => {
   if (following) void nextTick(scrollToEnd)
 })

@@ -20,7 +20,8 @@ import {
 import { lintGutter } from '@codemirror/lint'
 import { highlightSelectionMatches } from '@codemirror/search'
 import { drawSelection, keymap } from '@codemirror/view'
-import { onMounted, toRef, useTemplateRef, type ComponentInstance } from 'vue'
+import { useResizeObserver } from '@/composables/events'
+import { onMounted, toRef, useTemplateRef, watch, type ComponentInstance } from 'vue'
 
 const { store: project, module, graph } = useCurrentProject()
 
@@ -58,6 +59,16 @@ connectModuleListener()
 onMounted(() => {
   editorView.focus()
 })
+
+// The dock keeps this editor mounted while its Logs tab shows (hidden, zero-sized): focus it again
+// when the Code tab comes back, as a remount would have.
+const editorSize = useResizeObserver(editorRoot)
+watch(
+  () => editorSize.value.y,
+  (height, before) => {
+    if (before === 0 && height > 0) editorView.focus()
+  },
+)
 </script>
 
 <template>

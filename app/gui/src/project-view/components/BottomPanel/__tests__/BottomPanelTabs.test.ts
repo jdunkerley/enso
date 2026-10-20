@@ -1,5 +1,6 @@
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { expect, test } from 'vitest'
+import { nextTick } from 'vue'
 import BottomPanelTabs from '../BottomPanelTabs.vue'
 
 test('lists the tabs and selects one', async () => {
@@ -45,8 +46,12 @@ test('arrow keys move between the tabs, with a roving tabindex and linked panels
   ])
   await wrapper.find('[role="tablist"]').trigger('keydown', { key: 'ArrowRight' })
   expect(wrapper.emitted('update:tab')).toEqual([['logs']])
+  await nextTick()
+  expect(document.activeElement).toBe(tabs()[1]!.element)
   await setProps({ tab: 'logs' })
   expect(tabs().map((tab) => tab.attributes('tabindex'))).toEqual(['-1', '0'])
   await wrapper.find('[role="tablist"]').trigger('keydown', { key: 'ArrowLeft' })
   expect(wrapper.emitted('update:tab')?.[1]).toEqual(['code'])
+  await nextTick()
+  expect(document.activeElement).toBe(tabs()[0]!.element)
 })
