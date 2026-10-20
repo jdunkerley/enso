@@ -15,7 +15,6 @@ from Standard.Database import all
 import Standard.Database.Connection.SQLite_Connection.SQLite_Connection
 import Standard.Database.Dialects.Feature.Feature
 from Standard.Database.Errors import SQL_Error, Unsupported_Database_Type
-import Standard.Database.Connection.Credentials.Credentials
 import Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup
 from Standard.Database.Internal.Data_Link_Setup import with_data_link_extension
 
