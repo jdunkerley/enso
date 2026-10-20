@@ -13,7 +13,10 @@
   and copy its `secret://` path from the confirmation.][272]
 - [Engine logs in the project view: a Logs tab next to the code editor follows
   the engine's log as it is written, flags errors, and scrolls back through
-  earlier lines and sessions.][279]
+  earlier lines and sessions. Code and Logs buttons at the bottom left open the
+  panel on either tab (a red dot marks new errors); `` Ctrl+` `` and `Ctrl+L`
+  open the panel on Code or Logs, switch to it, or close the panel, and the
+  panel's header has fullscreen and close buttons.][279]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —

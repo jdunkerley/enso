@@ -130,11 +130,16 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
 
 The bottom dock (`project-view/components/BottomPanel.vue`) has Code and Logs
 tabs (`BottomPanel/`; the tab is saved under `bottom-dock-tab`). Both stay
-mounted and are switched with `v-show`. `` Mod+` `` toggles the dock on its last
-tab; `graph.toggleLogs` (`Mod+L`) opens it on Logs or closes it. The Logs tab
-and its stream client are in `project-view/components/EngineLogs/` (see its
-`CLAUDE.md`); `GraphEditor.vue` owns the stream so that the tab's error badge
-counts while it is hidden.
+mounted and are switched with `v-show`. Each tab's shortcut (`` Mod+` ``,
+`graph.toggleCodeEditor`, for Code; `Mod+L`, `graph.toggleLogs`, for Logs) opens
+the closed dock on its tab, switches the open dock to it, or closes the dock
+when its tab shows (`dockTabActions` in `BottomPanel/dockTab.ts`). While the
+dock is closed, a Code and a Logs button sit at the bottom of the graph's left
+gutter (the Logs one with a dot for unseen errors); the open dock's header has
+the tabs on the left and fullscreen (`panel.fullscreen`) and close
+(`panel.close`) on the right. The Logs tab and its stream client are in
+`project-view/components/EngineLogs/` (see its `CLAUDE.md`); `GraphEditor.vue`
+owns the stream so that the tab's error badge counts while it is hidden.
 
 ## Entry points
 

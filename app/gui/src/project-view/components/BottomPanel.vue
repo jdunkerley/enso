@@ -2,11 +2,13 @@
 /** @file The bottom dock: a resizable panel with a Code tab and a Logs tab. */
 import ActionButton from '@/components/ActionButton.vue'
 import BottomPanelTabs from '@/components/BottomPanel/BottomPanelTabs.vue'
-import { provideCodeTabFocus, type DockTab } from '@/components/BottomPanel/dockTab'
+import { useCodeTabFocus, type DockTab } from '@/components/BottomPanel/dockTab'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { useResizeObserver } from '@/composables/events'
+import { registerHandlers } from '@/providers/action'
+import { useText } from '$/providers/text'
 import { useLocalStorage } from '@vueuse/core'
 import { computed, ref, useId, watch } from 'vue'
 
@@ -29,7 +31,17 @@ const rootElement = ref<HTMLElement>()
 const show = defineModel<boolean>('show', { required: true })
 const tab = defineModel<DockTab>('tab', { required: true })
 
-const codeTabFocus = provideCodeTabFocus()
+// `GraphEditor.vue` provides it, so that the Code shortcut can ask too; a dock on its own has its own.
+const codeTabFocus = useCodeTabFocus(() => [] as const)
+const { getText } = useText()
+
+// The header's close button.
+registerHandlers({
+  'panel.close': {
+    available: true,
+    action: () => (show.value = false),
+  },
+})
 
 /** Picking the Code tab while Logs shows hands the keyboard to the code editor. */
 function onPicked(picked: DockTab) {
@@ -48,7 +60,6 @@ function clampSize(size: number) {
 }
 
 const fullscreen = ref(false)
-const fullscreenAnimating = ref(false)
 
 watch(show, (show) => {
   if (!show) fullscreen.value = false
@@ -62,11 +73,24 @@ const style = computed(() =>
 </script>
 
 <template>
-  <ActionButton
-    action="graph.toggleCodeEditor"
-    class="gutterButton bottomOfGutter"
-    :class="{ aboveFullscreen: fullscreen || fullscreenAnimating }"
-  />
+  <!-- While the dock is closed: a button per tab, which opens it there. -->
+  <div v-if="!show" class="collapsedButtons" data-testid="bottomDockButtons">
+    <ActionButton action="graph.toggleCodeEditor" />
+    <div class="logsButton">
+      <ActionButton action="graph.toggleLogs" />
+      <span
+        v-if="logsBadge > 0"
+        class="errorDot"
+        role="img"
+        data-testid="logs-error-dot"
+        :aria-label="
+          logsBadge === 1 ?
+            getText('engineLogsUnseenError')
+          : getText('engineLogsUnseenErrors', logsBadge)
+        "
+      />
+    </div>
+  </div>
   <Transition>
     <div
       v-if="show"
@@ -76,20 +100,21 @@ const style = computed(() =>
       data-testid="bottomDock"
       v-bind="$attrs"
     >
-      <WithFullscreenMode v-model="fullscreen" @update:animating="fullscreenAnimating = $event">
-        <ActionButton
-          action="panel.fullscreen"
-          class="gutterButton topOfGutter"
-          :class="{ aboveFullscreen: fullscreen || fullscreenAnimating }"
-        />
+      <WithFullscreenMode v-model="fullscreen">
         <div class="dockLayout">
-          <BottomPanelTabs
-            v-model:tab="tab"
-            class="tabs"
-            :logsBadge="logsBadge"
-            :idBase="idBase"
-            @picked="onPicked"
-          />
+          <div class="dockHeader">
+            <BottomPanelTabs
+              v-model:tab="tab"
+              class="tabs"
+              :logsBadge="logsBadge"
+              :idBase="idBase"
+              @picked="onPicked"
+            />
+            <div class="headerActions">
+              <ActionButton action="panel.fullscreen" />
+              <ActionButton action="panel.close" />
+            </div>
+          </div>
           <div class="dockBody">
             <!-- Both stay mounted: switching tabs keeps the editor's cursor and the log's scroll. -->
             <div
@@ -152,10 +177,20 @@ const style = computed(() =>
   height: 100%;
 }
 
-.tabs {
+.dockHeader {
   flex: none;
-  /* Clear of the fullscreen button in the gutter. */
-  padding-left: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 28px;
+  padding-right: 4px;
 }
 
 .dockPanel {
@@ -168,20 +203,30 @@ const style = computed(() =>
   min-height: 0;
 }
 
-.gutterButton {
+/* In the graph's left gutter, where the single dock button was. */
+.collapsedButtons {
   position: absolute;
   z-index: 1;
   left: 12px;
-  &.aboveFullscreen {
-    z-index: 2;
-  }
-}
-
-.bottomOfGutter {
   bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.topOfGutter {
-  top: 12px;
+.logsButton {
+  position: relative;
+  display: flex;
+}
+
+.errorDot {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--color-error);
+  pointer-events: none;
 }
 </style>
