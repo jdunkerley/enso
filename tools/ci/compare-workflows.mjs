@@ -30,6 +30,15 @@ import { parse } from 'yaml'
 
 /** Reads repository files as of a git ref; `null` when absent. */
 export function gitReader(ref, cwd = process.cwd()) {
+  // A mistyped ref must fail loudly, not read as an empty tree.
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`], {
+      cwd,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+  } catch {
+    throw new Error(`Not a git ref that resolves to a commit: ${ref}`)
+  }
   return (file) => {
     try {
       return execFileSync('git', ['show', `${ref}:${file}`], {
@@ -254,9 +263,18 @@ export function runnerOsOf(runsOn) {
 const normalizeToken = (value) =>
   typeof value === 'string' ? value.replace(/\bgithub\.token\b/g, 'secrets.GITHUB_TOKEN') : value
 
+/** JSON with object keys sorted, so that key order alone is not a difference. */
+function stableJson(value) {
+  return JSON.stringify(value, (_key, item) =>
+    item && typeof item === 'object' && !Array.isArray(item) ?
+      Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)))
+    : item,
+  )
+}
+
 function render(value) {
   if (value === undefined || value === null) return ''
-  if (typeof value === 'object') return JSON.stringify(value)
+  if (typeof value === 'object') return stableJson(value)
   return String(value)
 }
 
@@ -292,6 +310,9 @@ function expandSteps(steps, context, runnerOs, read, outerCondition) {
       shell,
       with: resolved.with,
       env: resolved.env,
+      workingDirectory: resolved['working-directory'],
+      continueOnError: resolved['continue-on-error'],
+      timeout: resolved['timeout-minutes'],
       if: combined,
     })
   }
@@ -309,6 +330,11 @@ function stepLine(step) {
     parts.push(`with: ${inputs.join('; ')}`)
   }
   if (step.if) parts.push(`if: ${oneLine(step.if)}`)
+  if (step.workingDirectory !== undefined)
+    parts.push(`working-directory: ${oneLine(render(step.workingDirectory))}`)
+  if (step.continueOnError !== undefined)
+    parts.push(`continue-on-error: ${oneLine(render(step.continueOnError))}`)
+  if (step.timeout !== undefined) parts.push(`timeout-minutes: ${oneLine(render(step.timeout))}`)
   if (step.env) {
     const env = Object.entries(step.env)
       .sort(([a], [b]) => a.localeCompare(b))
@@ -330,12 +356,34 @@ function jobLines(job) {
   if (job.continueOnError !== undefined)
     lines.push(`continue-on-error: ${render(job.continueOnError)}`)
   if (job.timeout !== undefined) lines.push(`timeout-minutes: ${render(job.timeout)}`)
+  for (const [key, value] of Object.entries(job.extra ?? {})) {
+    if (value !== undefined) lines.push(`${key}: ${oneLine(render(value))}`)
+  }
+  for (const call of job.calls ?? []) {
+    lines.push(
+      `call: ${call.uses}` +
+        (call.with ? ` | with: ${oneLine(render(call.with))}` : '') +
+        (call.secrets !== undefined ? ` | secrets: ${oneLine(render(call.secrets))}` : '') +
+        (call.permissions !== undefined ? ` | permissions: ${oneLine(render(call.permissions))}` : ''),
+    )
+  }
   for (const step of job.steps) lines.push(stepLine(step))
   const text = normalizeToken(JSON.stringify({ ...job, needs: [] }))
-  const names = (pattern) =>
-    [...new Set([...text.matchAll(pattern)].map((match) => match[1]))].sort()
-  const secrets = names(/secrets\.([A-Za-z0-9_]+)/g)
-  const vars = names(/vars\.([A-Za-z0-9_]+)/g)
+  const names = (word) =>
+    [
+      ...new Set(
+        [
+          ...text.matchAll(
+            new RegExp(
+              `${word}\\.([A-Za-z0-9_]+)|${word}\\[\\s*\\\\?["']([A-Za-z0-9_]+)\\\\?["']\\s*\\]`,
+              'g',
+            ),
+          ),
+        ].map((match) => match[1] ?? match[2]),
+      ),
+    ].sort()
+  const secrets = names('secrets')
+  const vars = names('vars')
   if (secrets.length > 0) lines.push(`secrets: ${secrets.join(', ')}`)
   if (vars.length > 0) lines.push(`vars: ${vars.join(', ')}`)
   const artifacts = (action) =>
@@ -353,7 +401,7 @@ function jobLines(job) {
  * Expands a workflow into its jobs: `{ header: string[], jobs: Map<name, string[]> }`. `inputs`
  * are the values a caller passes (the called workflow's defaults fill the rest).
  */
-export function expandWorkflow(read, file, inputs = {}, collected = []) {
+export function expandWorkflow(read, file, inputs = {}, collected = [], callers = []) {
   const text = read(file)
   if (text === null) throw new Error(`Missing workflow ${file}`)
   const doc = parse(text)
@@ -374,7 +422,19 @@ export function expandWorkflow(read, file, inputs = {}, collected = []) {
       if (!condition.keep) continue
       if (typeof job.uses === 'string' && job.uses.startsWith('./.github/workflows/')) {
         const before = collected.length
-        expandWorkflow(read, job.uses.slice(2), substitute(job.with ?? {}, context), collected)
+        const call = {
+          uses: job.uses,
+          with: substitute(job.with, context),
+          secrets: substitute(job.secrets, context),
+          permissions: job.permissions,
+        }
+        expandWorkflow(
+          read,
+          job.uses.slice(2),
+          substitute(job.with ?? {}, context),
+          collected,
+          [...callers, call],
+        )
         entriesById.get(id).push(...collected.slice(before))
         continue
       }
@@ -398,6 +458,17 @@ export function expandWorkflow(read, file, inputs = {}, collected = []) {
         permissions: job.permissions,
         continueOnError: substitute(job['continue-on-error'], context),
         timeout: job['timeout-minutes'],
+        calls: callers,
+        extra: {
+          defaults: substitute(job.defaults, context),
+          container: substitute(job.container, context),
+          services: substitute(job.services, context),
+          outputs: substitute(job.outputs, context),
+          environment: substitute(job.environment, context),
+          concurrency: substitute(job.concurrency, context),
+          'fail-fast': substitute(job.strategy?.['fail-fast'], context),
+          'max-parallel': substitute(job.strategy?.['max-parallel'], context),
+        },
         steps: expandSteps(job.steps, context, runnerOs, read, undefined),
       }
       entriesById.get(id).push(entry)
@@ -419,16 +490,28 @@ export function describeWorkflow(read, file) {
     `on: ${render(doc.on)}`,
     `concurrency: ${render(doc.concurrency)}`,
     `permissions: ${render(doc.permissions)}`,
+    `defaults: ${render(doc.defaults)}`,
     `env: ${render(doc.env)}`,
   ]
   const counts = new Map()
   for (const job of jobs) counts.set(job.name, (counts.get(job.name) ?? 0) + 1)
-  const keyOf = (job) =>
+  const baseKey = (job) =>
     counts.get(job.name) > 1 ? `${job.name} [${[job.runsOn].flat().join(', ')}]` : job.name
+  // Jobs that still share a key (same name and runs-on) are numbered, never overwritten.
+  const keyCounts = new Map()
+  for (const job of jobs) keyCounts.set(baseKey(job), (keyCounts.get(baseKey(job)) ?? 0) + 1)
+  const seen = new Map()
+  const keys = new Map()
+  for (const job of jobs) {
+    const key = baseKey(job)
+    const index = (seen.get(key) ?? 0) + 1
+    seen.set(key, index)
+    keys.set(job, keyCounts.get(key) > 1 ? `${key} #${index}` : key)
+  }
   const byName = new Map()
   for (const job of jobs) {
-    const needs = job.needs.map((need) => (counts.has(need.name) ? keyOf(need) : need.name))
-    byName.set(keyOf(job), jobLines({ ...job, needs }))
+    const needs = job.needs.map((need) => keys.get(need) ?? need.name)
+    byName.set(keys.get(job), jobLines({ ...job, needs }))
   }
   return { header, jobs: byName }
 }
@@ -515,6 +598,11 @@ export function compareWorkflow(baseRead, headRead, file, renames = new Map()) {
   return out.join('\n')
 }
 
+function fail(message) {
+  console.error(message)
+  process.exit(2)
+}
+
 function main(argv) {
   let base
   let headRead
@@ -522,12 +610,23 @@ function main(argv) {
   const files = []
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index]
-    if (arg === '--base') base = argv[++index]
-    else if (arg === '--head') headRead = gitReader(argv[++index])
-    else if (arg === '--head-dir') headRead = dirReader(path.resolve(argv[++index]))
+    const value = () => {
+      if (index + 1 >= argv.length) fail(`${arg} needs a value`)
+      return argv[++index]
+    }
+    if (arg === '--base') base = value()
+    else if (arg === '--head') {
+      try {
+        headRead = gitReader(value())
+      } catch (error) {
+        fail(error.message)
+      }
+    } else if (arg === '--head-dir') headRead = dirReader(path.resolve(value()))
     else if (arg === '--rename') {
-      const [from, to] = argv[++index].split('=')
-      renames.set(from, to)
+      const pair = value()
+      const split = pair.indexOf('=')
+      if (split <= 0 || split === pair.length - 1) fail(`--rename needs "<base>=<head>": ${pair}`)
+      renames.set(pair.slice(0, split), pair.slice(split + 1))
     } else files.push(arg)
   }
   if (!base || files.length === 0) {
@@ -536,7 +635,12 @@ function main(argv) {
     )
     process.exit(2)
   }
-  const baseRead = gitReader(base)
+  let baseRead
+  try {
+    baseRead = gitReader(base)
+  } catch (error) {
+    fail(error.message)
+  }
   headRead ??= dirReader(process.cwd())
   const reports = files.map((file) =>
     compareWorkflow(
