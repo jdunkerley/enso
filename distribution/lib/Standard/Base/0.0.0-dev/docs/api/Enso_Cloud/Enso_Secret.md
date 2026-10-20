@@ -30,7 +30,6 @@
     - to_js_object self -> Standard.Base.Any.Any
     - to_text self -> Standard.Base.Any.Any
     - update_value self new_value:Standard.Base.Data.Text.Text -> Standard.Base.Any.Any
-- Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value.from that:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret -> Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
 - type Enso_Secret_Error
     - Access_Denied
     - Locked
@@ -38,6 +37,9 @@
     - Wrong_Key
     - to_display_text self -> Standard.Base.Any.Any
 - as_credential_reference secret:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret credential_reference:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- handle_local_secret_panics ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- local_secret_error e:Standard.Base.Any.Any name:(Standard.Base.Data.Text.Text|Standard.Base.Nothing.Nothing)= -> Standard.Base.Any.Any
 - secret_asset_uri secret:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - secret_resource_uri secret:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value.from that:Standard.Base.Data.Text.Text -> Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
+- Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value.from that:Standard.Base.Enso_Cloud.Enso_Secret.Enso_Secret -> Standard.Base.Enso_Cloud.Enso_Secret.Derived_Secret_Value
