@@ -294,6 +294,9 @@ importers:
       prettier-plugin-tailwindcss:
         specifier: ^0.5.14
         version: 0.5.14(@ianvs/prettier-plugin-sort-imports@4.3.0(@vue/compiler-sfc@3.5.43)(prettier@3.9.8)(supports-color@8.1.1))(prettier-plugin-organize-imports@4.3.0(prettier@3.9.8)(typescript@6.0.3)(vue-tsc@3.3.11(typescript@6.0.3)))(prettier@3.9.8)
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
 
   app/common:
     dependencies:

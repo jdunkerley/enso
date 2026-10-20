@@ -8,7 +8,7 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 - `enso4igv/` — Enso language support for the GraalVM Ideal Graph Visualizer (IGV). Load this when debugging Truffle compilation graphs. See `docs/runtime-guide.md` §Tips.
 - `build-performance/` — Benchmark script (`bench-build.sh`) for measuring SBT build performance.
 - `performance/` — Engine benchmarks and analysis scaffolding (`engine-benchmarks/`, `benchmark-analysis/`).
-- `ci/` — CI helper scripts: `check-changelog.js`, `wait-for-macos-runner.sh` (gates jobs for the self-hosted Mac), docker images (`docker/`), nightly release (`nightly/`), release tooling (`releases/`).
+- `ci/` — CI helper scripts: `check-changelog.js`, `compare-workflows.mjs` (temporary: job-by-job workflow comparison for the Phase 1 rewrites; test with `node --test tools/ci/compare-workflows.test.mjs`), `wait-for-macos-runner.sh` (gates jobs for the self-hosted Mac), docker images (`docker/`), nightly release (`nightly/`), release tooling (`releases/`).
 - `native-image-config-cleanup/` — TypeScript tool that de-duplicates Native Image `reflect-config.json` / `resource-config.json` across GraalVM builds.
 - `legal-review/`, `legal-review-helper/` — Third-party dependency license-review inputs and helpers.
 - `simple-library-server/` — Minimal HTTP library-server stub for testing the library download flow without touching the real library repository.
