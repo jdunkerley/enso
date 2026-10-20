@@ -46,8 +46,33 @@ desktop binary (AppImage/DMG/exe + installer).
   channel (an `rc` install sees only `rc` tags), a prerelease check that finds
   nothing is followed by a stable-only check (`/releases/latest`), whose failure
   counts as no update. Don't set `channel` instead: it enables `allowDowngrade`.
+- Holds the local secrets master key (`src/secretsKey.ts`, wired in
+  `projectService.ts`). Sources, in order: `ENSO_SECRETS_KEY`, then the keychain
+  item service `Enso`, account `secrets-key`, through `@napi-rs/keyring`. At
+  start-up (`initialiseSecretsKey` in `index.ts`, before the server) it creates
+  the key only when there is nothing to lose: no environment key, no item, and
+  no secrets file with secrets in it. Every engine gets the key as
+  `ENSO_SECRETS_KEY` (`ProjectService.default`'s `extraEnvironment`). The key
+  never enters the renderer: IPC `secrets.copyKey` writes it to the clipboard
+  from main, and `secrets.reset` deletes the file and the item, then creates a
+  new key. Status comes from the shim's `secrets/status` route, not IPC. Use
+  `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
+  `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
+  credential), and without the pinned Linux store the default falls back to the
+  kernel keyring, which the engine cannot read. The module is loaded lazily
+  (`lazyKeyringEntries`, a dynamic `import()` that esbuild inlines), so a native
+  module that fails to load only leaves the app without a key; keep it out of
+  any top-level `import`. Tests use a fake keyring only: never touch the real
+  `Enso` / `secrets-key` item.
 
 ## Build
+
+**Native addons.** esbuild copies a `.node` file next to the bundle
+(`loader: { '.node': 'copy' }`) and rewrites its `require`, and electron-builder
+unpacks it from the asar (`asarUnpack: ['**/*.node']`). Only the build host's
+binary is bundled (pnpm installs just that optional dependency), so each
+platform must be packaged on its own OS. The other platforms' `require`s stay in
+the bundle as runtime requires inside `try`, which is harmless.
 
 Currently driven by `./run ide build` (the legacy Enso build CLI). Don't call
 `electron-builder` or `pnpm run dist` manually unless you're debugging packaging

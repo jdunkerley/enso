@@ -40,7 +40,9 @@ import { filterByRole, inheritMenuItem, makeMenuItem, replaceMenuItems } from '.
 import { capitalizeFirstLetter } from './naming.js'
 import {
   getLocalMetadata,
+  getLocalSecrets,
   getLocalVersioning,
+  getSecretsKeySource,
   handleProjectProtocol,
   setupProjectService,
   version,
@@ -298,6 +300,8 @@ class App {
     // and enter a "zombie mode", where user is not aware of the app still running.
     try {
       if (this.electron) {
+        // Before the server and any engine start, so both see the key.
+        await this.initialiseSecretsKey()
         // Note that we want to do all the actions synchronously, so when the window
         // appears, it serves the website immediately.
         await this.startContentServerIfEnabled(args)
@@ -309,6 +313,18 @@ class App {
     } catch (err) {
       console.error('Failed to initialize the application, shutting down. Error: ', err)
       this.quit()
+    }
+  }
+
+  /**
+   * Read (or, when there is nothing to lose, create) the local secrets key. A keychain failure is
+   * only logged: the app runs without the key, and Settings says the keychain could not be read.
+   */
+  async initialiseSecretsKey() {
+    try {
+      await getSecretsKeySource().initialise()
+    } catch (error) {
+      console.error('Failed to read the local secrets key from the keychain:', error)
     }
   }
 
@@ -340,6 +356,8 @@ class App {
       projectService,
       getLocalMetadata(),
       getLocalVersioning(),
+      getLocalSecrets(),
+      getSecretsKeySource().fromEnvironment,
     )
     console.log('Content server started.')
   }

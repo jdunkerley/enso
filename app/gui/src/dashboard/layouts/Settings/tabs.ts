@@ -25,6 +25,7 @@ import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import LocalVersionsSettingsSection from './LocalVersionsSettingsSection.vue'
 import NoResults from './NoResults.vue'
 import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
+import SecretsSettingsSection from './SecretsSettingsSection.vue'
 import UpdatesSettingsSection from './UpdatesSettingsSection.vue'
 
 /** The section shown when nothing in a tab matches the search. */
@@ -99,6 +100,18 @@ const LOCAL_TAB: SettingsTabData = {
           type: 'custom',
           aliasesId: 'localVersionsSettingsCustomEntryAliases',
           component: LocalVersionsSettingsSection,
+        },
+      ],
+    },
+    {
+      nameId: 'secretsSettingsSection',
+      // Only the desktop app has a secrets key to manage; a browser build has no `window.api`.
+      visible: () => window.api?.secrets != null,
+      entries: [
+        {
+          type: 'custom',
+          aliasesId: 'secretsSettingsCustomEntryAliases',
+          component: SecretsSettingsSection,
         },
       ],
     },

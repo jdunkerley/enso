@@ -22,6 +22,8 @@ Consumers import by subpath (see `package.json#exports`):
 - `project-manager-shim/handler` — JSON-RPC request handler.
 - `project-manager-shim/localMetadata` — local labels and Recent store (see
   below).
+- `project-manager-shim/localSecrets` — the encrypted local secrets file (see
+  below).
 - `project-manager-shim/localVersioning` — git-based versioning of local
   projects.
 - `project-manager-shim/projectService` — project-lifecycle service.
@@ -36,6 +38,22 @@ under `~/.cache/enso` (or platform equivalent).
 Historically some advanced features (multi-engine, upgrade) deferred to the old
 Scala PM. Those paths now need to live here or be served by the language server
 directly — don't add Scala-PM back-references when extending this package.
+
+## Local secrets (`src/localSecrets/`)
+
+`LocalSecrets` is the Node side of `~/.enso/secrets.json` (`ENSO_SECRETS_FILE`
+overrides), byte-for-byte compatible with the engine's Java `LocalSecretStore`.
+The format, crypto (AES-256-GCM, AAD = name), lock file (`<file>.lock`) and
+error kinds are specified in
+`docs/superpowers/specs/2026-10-18-local-secrets-design.md`; the fixtures in
+`test/fixtures/local-secrets/` pin the compatibility in both directions.
+
+- It never returns a decrypted value. `readValueForTests` (in `crypto.ts`, not
+  re-exported) is for tests only.
+- Writes take the in-process `serialised` queue and the cross-process lock file,
+  re-read inside the lock, and write `<file>.tmp` then rename.
+- Bad names throw a plain `Error`; the store's own failures are
+  `LocalSecretsError` with a `kind`.
 
 ## Local metadata (`src/localMetadata/`)
 
@@ -321,3 +339,13 @@ that is not valid JSON is still listed; reading it reports the problem.
   refuses a missing file, `delete` anything but a file; `read` of a missing file
   says `Datalink not found`. Values must be JSON objects. Schema validation is
   the GUI's.
+
+### Secrets routes (`handler/projectService.ts`)
+
+`secrets/list`, `create {name,value}`, `update {name,value}`, `delete {name}`
+and `status` (the store's status plus `keyFromEnvironment`) are served from the
+`LocalSecrets` passed to `handleProjectServiceRequest` (after `localVersioning`,
+then `keyFromEnvironment`). No route returns a value. Without a store they fail
+with `Local secrets are not available in this host.`; store errors surface as
+`secrets/<op> failed: <message>`. `ProjectService.default(…, extraEnvironment)`
+appends its entries to every engine's environment (Task 8 uses it for the key).
