@@ -27,7 +27,7 @@ project's history, including earlier sessions.
   `ProjectLog.vue`, `ProjectLogTable.vue`, `ProjectLogToolbar.vue` and
   `projectLogData.ts` (parsing into `{level, timestamp, module, event}`).
 - `BottomPanel.vue` is a single-slot dock holding `CodeEditor`, toggled by
-  `graph.toggleCodeEditor` (`Mod+\``). It persists its height only.
+  `graph.toggleCodeEditor` (`` Mod+` ``). It persists its height only.
 
 ## Decisions
 
@@ -74,9 +74,9 @@ project's history, including earlier sessions.
 
 - **Dock tabs.** `BottomPanel.vue` gains a tab strip (**Code**, **Logs**). The
   selected tab is persisted (local storage, alongside the height); height,
-  resize and fullscreen apply to both.
-  `Mod+\`` toggles the dock as now; a new action `graph.toggleLogs`(default`Mod+Shift+\``,
-  rebindable) opens the dock on Logs, or closes it if Logs is showing.
+  resize and fullscreen apply to both. `` Mod+` `` toggles the dock as now; a
+  new action `graph.toggleLogs` (default `` Mod+Shift+` ``, rebindable) opens
+  the dock on Logs, or closes it if Logs is showing.
 - **Logs tab** (`EngineLogPanel.vue`), reusing `projectLogData.ts` parsing and
   `ProjectLogTable.vue` presentation where they fit:
   - live lines append at the bottom; the view follows the tail unless the user
