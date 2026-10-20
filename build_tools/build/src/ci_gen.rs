@@ -385,9 +385,9 @@ pub fn setup_script_steps(fetch_depth: Option<u32>) -> Vec<Step> {
 pub fn share_build_script(workflow: &mut Workflow) {
     fn os_of(job: &Job) -> Option<OS> {
         job.runs_on.iter().find_map(|label| match label {
-            RunnerLabel::LinuxLatest => Some(OS::Linux),
-            RunnerLabel::WindowsLatest => Some(OS::Windows),
-            RunnerLabel::MacOSLatest => Some(OS::MacOS),
+            RunnerLabel::LinuxLatest | RunnerLabel::Linux => Some(OS::Linux),
+            RunnerLabel::WindowsLatest | RunnerLabel::Windows => Some(OS::Windows),
+            RunnerLabel::MacOSLatest | RunnerLabel::MacOS => Some(OS::MacOS),
             _ => None,
         })
     }
@@ -395,7 +395,7 @@ pub fn share_build_script(workflow: &mut Workflow) {
         job.steps.iter().any(|s| s.name.as_deref() == Some("Build Script Setup"))
     }
     fn target_for(os: OS) -> Target {
-        // GitHub-hosted runner arch: Linux/Windows are x86-64, macOS is Apple silicon.
+        // Linux/Windows run on x86-64; macOS runs on our self-hosted Apple silicon runner.
         (os, if os == OS::MacOS { Arch::AArch64 } else { Arch::X86_64 })
     }
 
@@ -652,9 +652,8 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 
     // Each platform builds its own engine and IDE, and uploads the installer and the update feed
     // to the draft. The release is published when Windows and Linux succeed. macOS does not block
-    // it: GitHub's `macos-latest` pool hands out some runners with 7 GB of memory, too little for
-    // the engine's native image, which then swaps until GraalVM gives up. A release published
-    // without its `.dmg` says so in its notes, and re-running the macOS jobs adds it.
+    // it: it runs on a single self-hosted machine, which may be offline or busy. A release
+    // published without its `.dmg` says so in its notes, and re-running the macOS jobs adds it.
     let engine_launcher = engine::EngineLauncher::Native;
     for target in RELEASE_TARGETS {
         let backend_job_id = workflow.add(target, job::BuildBackend { engine_launcher });

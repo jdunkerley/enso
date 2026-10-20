@@ -39,7 +39,8 @@ jobs:
   build-script-macos-aarch64:
     name: Build Script
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -157,7 +158,8 @@ jobs:
     needs:
       - build-script-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -517,7 +519,8 @@ jobs:
       - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -947,7 +950,8 @@ jobs:
       - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -1226,7 +1230,8 @@ jobs:
       - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -1506,7 +1511,8 @@ jobs:
       - build-script-macos-aarch64
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8

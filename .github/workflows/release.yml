@@ -45,7 +45,8 @@ jobs:
   build-script-macos-aarch64:
     name: Build Script
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -242,7 +243,8 @@ jobs:
     needs:
       - build-script-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.
@@ -639,7 +641,8 @@ jobs:
       - enso-build-ci-gen-draft-release-linux-amd64
       - enso-build-ci-gen-job-build-backend-macos-aarch64
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     continue-on-error: true
     steps:
       - name: Expose Artifact API and context information.

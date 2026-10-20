@@ -88,10 +88,13 @@ impl RunsOn for OS {
 impl RunsOn for (OS, Arch) {
     fn runs_on(&self) -> Vec<RunnerLabel> {
         match self {
-            // GitHub-hosted `macos-latest` is already Apple silicon (arm64).
-            (os, Arch::X86_64) | (os @ OS::MacOS, Arch::AArch64) => {
+            (os @ (OS::Linux | OS::Windows), Arch::X86_64) => {
                 runs_on(*os, RunnerType::GitHubHosted)
             }
+            // macOS jobs run on our self-hosted Apple silicon runner: GitHub's `macos-latest`
+            // pool hands out some machines with 7 GB of memory, too little for the engine's
+            // native image.
+            (OS::MacOS, Arch::AArch64) => runs_on(OS::MacOS, RunnerType::SelfHosted),
             _ => panic!("Unsupported OS/arch combination: {self:?}"),
         }
     }
