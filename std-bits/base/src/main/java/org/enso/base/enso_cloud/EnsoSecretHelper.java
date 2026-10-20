@@ -40,6 +40,13 @@ public final class EnsoSecretHelper extends SecretValueResolver {
                   "Unimplemented",
                   "Error",
                   unsupportedOperationException.getMessage());
+          // A local secret that cannot be read (locked store, another key, deleted): the
+          // Enso side turns it into an Enso_Secret_Error.
+          case LocalSecretException localSecretException ->
+              EnsoMeta.callStaticModuleMethod(
+                  "Standard.Base.Enso_Cloud.Enso_Secret",
+                  "local_secret_error",
+                  localSecretException);
           case IllegalArgumentException argException ->
               EnsoMeta.makeInstance(
                   "Standard.Base.Errors.Illegal_Argument",
