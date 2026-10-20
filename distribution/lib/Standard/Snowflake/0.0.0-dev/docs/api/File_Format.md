@@ -4,8 +4,6 @@
     - Auto
     - FALSE
     - TRUE
-- Standard.Snowflake.File_Format.Auto_Boolean.from that:Standard.Base.Data.Boolean.Boolean -> Standard.Snowflake.File_Format.Auto_Boolean
-- Standard.Snowflake.File_Format.Auto_Boolean.from that:Standard.Base.Nothing.Nothing -> Standard.Snowflake.File_Format.Auto_Boolean
 - type Compression
     - Auto
     - BZ2
@@ -26,3 +24,5 @@
     - Saved name:Standard.Snowflake.Identifier.Identifier=
     - XML
 - Standard.Snowflake.File_Format.Snowflake_File_Format.from that:Standard.Snowflake.Identifier.Identifier -> Standard.Snowflake.File_Format.Snowflake_File_Format
+- Standard.Snowflake.File_Format.Auto_Boolean.from that:Standard.Base.Data.Boolean.Boolean -> Standard.Snowflake.File_Format.Auto_Boolean
+- Standard.Snowflake.File_Format.Auto_Boolean.from that:Standard.Base.Nothing.Nothing -> Standard.Snowflake.File_Format.Auto_Boolean

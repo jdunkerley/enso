@@ -103,10 +103,10 @@
     - year self -> (Standard.Table.Column.Column&Standard.Base.Any.Any)!Standard.Table.Errors.Invalid_Value_Type
     - zip self right:(Standard.Table.Column.Column|Standard.Table.Table.Table)= keep_unmatched:(Standard.Base.Data.Boolean.Boolean|Standard.Base.Data.Vector.Report_Unmatched)= right_prefix:Standard.Base.Data.Text.Text= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> Standard.Table.Table.Table
     - || self other:(Standard.Table.Column.Column|Standard.Base.Any.Any) -> (Standard.Table.Column.Column&Standard.Base.Any.Any)
-- default_row_limit_for_read column:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- Standard.Table.Column.Column.from that:Standard.Base.Data.Vector.Vector name:Standard.Base.Data.Text.Text= -> Standard.Table.Column.Column
 - type Rest_Of_String
 - default_date_period column:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- default_row_limit_for_read column:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- Standard.Table.Column.Column.from that:Standard.Base.Data.Vector.Vector name:Standard.Base.Data.Text.Text= -> Standard.Table.Column.Column
 - Standard.Base.Data.Vector.Vector.from that:Standard.Table.Column.Column -> Standard.Base.Data.Vector.Vector
 - Standard.Base.Data.Vector.Vector.from that:Standard.Table.Table.Table -> Standard.Base.Data.Vector.Vector
 - Standard.Table.Column.Column.from that:Standard.Base.Data.Range.Range name:Standard.Base.Data.Text.Text= -> Standard.Table.Column.Column
