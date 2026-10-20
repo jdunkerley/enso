@@ -71,6 +71,8 @@ export function initIpc(
     return true
   })
   ipcMain.handle(Channel.secretsReset, async () => {
+    // Before the file goes: a keychain that could not be read may hold the right key.
+    getSecretsKeySource().assertKeychainReadable()
     await getLocalSecrets().reset()
     await getSecretsKeySource().forget()
     await getSecretsKeySource().initialise()

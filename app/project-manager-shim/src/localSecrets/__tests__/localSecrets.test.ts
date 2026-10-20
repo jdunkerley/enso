@@ -250,6 +250,16 @@ describe('status', () => {
     expect(await storeFor(OTHER_KEY).status()).toEqual({ state: 'wrong' })
   })
 
+  test('unavailable, not missing, when the keychain could not be read', async () => {
+    const unreadable = (key: Buffer | null) =>
+      new LocalSecrets({ filePath: file, getKey: () => key, isKeyUnavailable: () => true })
+    expect(await unreadable(null).status()).toEqual({ state: 'unavailable' })
+    await storeFor(FIXTURE_KEY).create('a', 'b')
+    expect(await unreadable(null).status()).toEqual({ state: 'unavailable' })
+    // A key that is known is used, whatever the last keychain read did.
+    expect(await unreadable(FIXTURE_KEY).status()).toMatchObject({ state: 'ready' })
+  })
+
   test('a file without keyCreated gets one on the first status, and keeps it', async () => {
     await storeFor(FIXTURE_KEY).create('a', 'b')
     const json = await readFile()
