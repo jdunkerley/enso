@@ -21,11 +21,14 @@ const HTTP_STATUS_METHOD_NOT_ALLOWED = 405
 export interface EventStreamRequest {
   readonly url?: string | undefined
   readonly method?: string | undefined
+  readonly destroyed?: boolean | undefined
   once(event: 'close', listener: () => void): unknown
 }
 
 /** The slice of `http.ServerResponse` the stream uses. */
 export interface EventStreamResponse {
+  readonly destroyed?: boolean | undefined
+  once(event: 'close', listener: () => void): unknown
   writeHead(statusCode: number, headers: Record<string, string>): unknown
   flushHeaders(): void
   write(chunk: string): boolean
@@ -173,6 +176,7 @@ export function handleEngineLogStream(
 
   // A reply to a closed connection has no one to read it, so this comes before any write.
   request.once('close', finish)
+  response.once('close', finish)
   const subscription = channel.subscribe(
     {
       event: (event) => send(formatEngineLogEvent(event)),
@@ -187,7 +191,9 @@ export function handleEngineLogStream(
     endStream('closed')
     return
   }
-  // A write failed during the replay: the client is gone.
+  // A write failed during the replay, or the connection closed before we got here (its `close`
+  // event is already past): the client is gone.
+  if (request.destroyed === true || response.destroyed === true) finish()
   if (finished) return
   const heartbeat = setInterval(
     () => send(': heartbeat\n\n'),

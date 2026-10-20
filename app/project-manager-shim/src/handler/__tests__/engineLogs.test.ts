@@ -14,6 +14,7 @@ import {
 } from '../engineLogs.js'
 
 class FakeRequest extends EventEmitter implements EventStreamRequest {
+  destroyed = false
   constructor(
     readonly url: string,
     readonly method = 'GET',
@@ -22,7 +23,8 @@ class FakeRequest extends EventEmitter implements EventStreamRequest {
   }
 }
 
-class FakeResponse implements EventStreamResponse {
+class FakeResponse extends EventEmitter implements EventStreamResponse {
+  destroyed = false
   status: number | undefined
   headers: Record<string, string> = {}
   readonly chunks: string[] = []
@@ -149,6 +151,7 @@ describe('handleEngineLogStream', () => {
     const { response } = open(projectQuery(), {}, 'POST')
     expect(response.status).toBe(405)
     expect(response.headers['Allow']).toBe('GET')
+    expect(response.ended).toBe(true)
   })
 
   test('sends hello, then the buffered events, then live ones', () => {
@@ -201,6 +204,26 @@ describe('handleEngineLogStream', () => {
     request.emit('close')
     channel.engineStderr(Buffer.from('unseen\n'))
     expect(response.body).not.toContain('unseen')
+  })
+
+  test('stops when the response closes, or when the request had closed before dispatch', () => {
+    const first = open(projectQuery())
+    first.response.emit('close')
+    channel.engineStderr(Buffer.from('unseen\n'))
+    expect(first.response.body).not.toContain('unseen')
+
+    vi.useFakeTimers()
+    const clear = vi.spyOn(globalThis, 'clearInterval')
+    const request = new FakeRequest(`/api/engine-logs/stream?${projectQuery()}`)
+    request.destroyed = true
+    const response = new FakeResponse()
+    handleEngineLogStream(request, response, hub, HEADERS)
+    const written = response.chunks.length
+    channel.engineStderr(Buffer.from('later\n'))
+    vi.advanceTimersByTime(60_000)
+    expect(response.chunks).toHaveLength(written)
+    expect(response.body).not.toContain('later')
+    expect(clear).not.toHaveBeenCalledWith(undefined)
   })
 
   test('a write to a socket that is already gone does not throw out of the subscriber', () => {
