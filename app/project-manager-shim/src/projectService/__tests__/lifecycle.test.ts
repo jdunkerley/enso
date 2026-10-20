@@ -40,6 +40,7 @@ function fakeRunner(): Runner {
       for (const hook of pending) await hook()
     },
     isProjectRunning: async () => running,
+    hasRunningProjects: async () => running,
     renameProject: async () => {},
     registerShutdownHook: async (_path, _type, hook) => {
       hooks.push(hook)

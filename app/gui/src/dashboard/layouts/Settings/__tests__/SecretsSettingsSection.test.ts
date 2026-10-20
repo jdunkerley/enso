@@ -219,6 +219,23 @@ describe('SecretsSettingsSection', () => {
     expect(fake.reset).toHaveBeenCalledOnce()
   })
 
+  test('a reset refused because a project is open says so', async () => {
+    fake.status = { state: 'wrong', keyFromEnvironment: false }
+    // As Electron delivers main's rejection to the renderer.
+    fake.reset.mockRejectedValue(
+      new Error(
+        "Error invoking remote method 'secrets-reset': Error: Close open projects to reset your secrets.",
+      ),
+    )
+    await mountSection()
+    const user = userEvent.setup()
+    await user.click(button(getText('secretsReset')))
+    await vi.waitFor(dialog)
+    await user.click(button(getText('secretsReset'), dialog()))
+    await flushPromises()
+    expect(fake.show).toHaveBeenCalledWith(getText('secretsResetCloseProjects'), { type: 'error' })
+  })
+
   test('a ready key has no Reset button', async () => {
     await mountSection()
     expect(findButton(getText('secretsReset'))).toBeUndefined()

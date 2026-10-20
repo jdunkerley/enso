@@ -1,7 +1,8 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
 import * as paths from '@/paths'
-import { getLocalSecrets, getSecretsKeySource } from '@/projectService'
+import { getLocalSecrets, getSecretsKeySource, hasRunningProjects } from '@/projectService'
+import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
 import { initUpdaterIpc } from '@/updaterIpc'
 import { clipboard, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { download } from 'electron-dl'
@@ -70,11 +71,21 @@ export function initIpc(
     clipboard.writeText(key)
     return true
   })
-  ipcMain.handle(Channel.secretsReset, async () => {
-    await getLocalSecrets().reset()
-    await getSecretsKeySource().forget()
-    await getSecretsKeySource().initialise()
-  })
+  // Both refuse while an engine runs: it holds the old key and could write under it afterwards.
+  ipcMain.handle(Channel.secretsReset, () =>
+    resetSecrets({
+      keySource: getSecretsKeySource(),
+      store: getLocalSecrets(),
+      hasRunningProjects,
+    }),
+  )
+  ipcMain.handle(Channel.secretsRotate, () =>
+    rotateSecretsKey({
+      keySource: getSecretsKeySource(),
+      store: getLocalSecrets(),
+      hasRunningProjects,
+    }),
+  )
   ipcMain.on(Channel.error, (_event, data) => {
     console.error(...data)
   })

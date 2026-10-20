@@ -68,6 +68,14 @@ export function getSecretsKeySource(): SecretsKeySource {
   return secretsKeySource
 }
 
+/**
+ * Whether any engine (an opened project, or a `--run`) is running. Rotating or resetting the
+ * secrets key needs none: each engine holds the key it was started with.
+ */
+export async function hasRunningProjects(): Promise<boolean> {
+  return projectService == null ? false : projectService.hasRunningProjects()
+}
+
 /** The master key for an engine's environment, when there is one. */
 function secretsKeyEnvironment(): readonly (readonly [string, string])[] {
   const key = getSecretsKeySource().current()

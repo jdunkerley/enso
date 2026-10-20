@@ -331,3 +331,92 @@ describe('paths, keys and names', () => {
     await storeFor(FIXTURE_KEY).create('a'.repeat(200), 'v')
   })
 })
+
+describe('rotate', () => {
+  const LATER = new Date('2027-11-19T08:09:10.500Z')
+
+  test('re-encrypts every value under the new key and renews keyId and keyCreated', async () => {
+    await storeFor(FIXTURE_KEY).create('a', 'first')
+    await storeFor(FIXTURE_KEY).create('__proto__', 'second')
+    const json = await readFile()
+    json.futureField = { kept: true }
+    json.secrets.a.futureEntryField = 'kept too'
+    await fs.writeFile(file, JSON.stringify(json))
+
+    await storeFor(FIXTURE_KEY, file, LATER).rotate(FIXTURE_KEY, OTHER_KEY)
+
+    const after = await readFile()
+    expect(after.keyId).toBe(keyId(OTHER_KEY))
+    expect(after.keyCreated).toBe('2027-11-19T08:09:10Z')
+    expect(after.futureField).toEqual({ kept: true })
+    expect(after.secrets.a.futureEntryField).toBe('kept too')
+    // A value's own times do not change: only the key did.
+    expect(after.secrets.a.created).toBe('2026-10-18T14:02:11Z')
+    expect(after.secrets.a.updated).toBe('2026-10-18T14:02:11Z')
+    expect(after.secrets.a.nonce).not.toBe(json.secrets.a.nonce)
+    const rotated = storeFor(OTHER_KEY)
+    expect(await readValueForTests(rotated, 'a')).toBe('first')
+    expect(await readValueForTests(rotated, '__proto__')).toBe('second')
+    await expectKind(readValueForTests(storeFor(FIXTURE_KEY), 'a'), 'WRONG_KEY')
+    expect(await rotated.status()).toEqual({ state: 'ready', keyCreated: '2027-11-19T08:09:10Z' })
+  })
+
+  test('keyCreated is added after keyId when the file had none', async () => {
+    await storeFor(FIXTURE_KEY).create('a', 'v')
+    const json = await readFile()
+    delete json.keyCreated
+    await fs.writeFile(file, JSON.stringify(json))
+    await storeFor(FIXTURE_KEY, file, LATER).rotate(FIXTURE_KEY, OTHER_KEY)
+    const after = await readFile()
+    expect(Object.keys(after)).toEqual(['version', 'keyId', 'keyCreated', 'secrets'])
+    expect(after.keyCreated).toBe('2027-11-19T08:09:10Z')
+  })
+
+  test('the wrong old key is WRONG_KEY and leaves the file byte for byte', async () => {
+    await storeFor(FIXTURE_KEY).create('a', 'v')
+    const before = await fs.readFile(file, 'utf8')
+    const third = Buffer.alloc(32, 9)
+    await expectKind(storeFor(OTHER_KEY).rotate(OTHER_KEY, third), 'WRONG_KEY')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+    expect(await fs.readdir(path.dirname(file))).toEqual(['secrets.json'])
+  })
+
+  test('a value that does not decrypt is WRONG_KEY and leaves the file byte for byte', async () => {
+    const store = storeFor(FIXTURE_KEY)
+    await store.create('a', 'v')
+    await store.create('b', 'w')
+    const json = await readFile()
+    // Under the right keyId, but encrypted for another name.
+    json.secrets.b = json.secrets.a
+    await fs.writeFile(file, JSON.stringify(json))
+    const before = await fs.readFile(file, 'utf8')
+    await expectKind(store.rotate(FIXTURE_KEY, OTHER_KEY), 'WRONG_KEY')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
+  test('with no file, writes an empty file under the new key', async () => {
+    await storeFor(null, file, LATER).rotate(FIXTURE_KEY, OTHER_KEY)
+    expect(Object.keys(await readFile())).toEqual(['version', 'keyId', 'keyCreated', 'secrets'])
+    expect(await readFile()).toEqual({
+      version: 1,
+      keyId: keyId(OTHER_KEY),
+      keyCreated: '2027-11-19T08:09:10Z',
+      secrets: {},
+    })
+  })
+
+  test('NEWER_VERSION is refused', async () => {
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(file, JSON.stringify({ version: 2, secrets: {} }))
+    await expectKind(storeFor(FIXTURE_KEY).rotate(FIXTURE_KEY, OTHER_KEY), 'NEWER_VERSION')
+  })
+
+  test('runs under the lock, after a pending write', async () => {
+    const store = storeFor(FIXTURE_KEY)
+    await store.create('a', 'v')
+    await Promise.all([store.create('b', 'w'), store.rotate(FIXTURE_KEY, OTHER_KEY)])
+    const rotated = storeFor(OTHER_KEY)
+    expect(await readValueForTests(rotated, 'b')).toBe('w')
+    expect(await fs.readdir(path.dirname(file))).toEqual(['secrets.json'])
+  })
+})

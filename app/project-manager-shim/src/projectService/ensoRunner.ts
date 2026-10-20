@@ -32,6 +32,11 @@ export interface Runner {
   ): Promise<LanguageServerSockets>
   closeProject(projectPath: Path): Promise<void>
   isProjectRunning(projectPath: Path): Promise<boolean>
+  /**
+   * Whether any engine this runner started is still alive: an opened project (loading included)
+   * or a `--run`. Each holds the environment it was started with, such as the secrets key.
+   */
+  hasRunningProjects(): Promise<boolean>
   renameProject(
     projectPath: Path,
     namespace: string,
@@ -270,6 +275,8 @@ class OpenedProject {
 export class EnsoRunner implements Runner {
   private runningProjects = new Map<Path, OpenedProject>()
   private loadingProjects = new Map<Path, Promise<OpenedProject>>()
+  /** The `--run` processes that have not exited yet. */
+  private activeRuns = 0
 
   /** Creates a new EnsoRunner with the path to the Enso executable. */
   constructor(private ensoPath: Path) {}
@@ -334,6 +341,15 @@ export class EnsoRunner implements Runner {
     const spawnedProcess = await this.runProcess(args, (cmd, cmdArgs) =>
       childProcess.spawn(cmd, cmdArgs, { env, cwd, stdio: ['inherit', 'inherit', 'inherit'] }),
     )
+    this.activeRuns += 1
+    let counted = true
+    const finished = () => {
+      if (counted) this.activeRuns -= 1
+      counted = false
+    }
+    // A spawn failure emits `error` and no `exit`; an exit may also be followed by an `error`.
+    spawnedProcess.once('error', finished)
+    spawnedProcess.once('exit', finished)
     return new Promise((resolve, reject) => {
       spawnedProcess.on('error', (error) => {
         reject(new Error(`Failed to spawn enso process: ${error.message}`))
@@ -445,6 +461,11 @@ export class EnsoRunner implements Runner {
   /** Checks if a project's language server is currently running. */
   async isProjectRunning(projectPath: Path): Promise<boolean> {
     return this.runningProjects.has(projectPath)
+  }
+
+  /** Whether any opened (or opening) project or `--run` process is alive. */
+  async hasRunningProjects(): Promise<boolean> {
+    return this.runningProjects.size > 0 || this.loadingProjects.size > 0 || this.activeRuns > 0
   }
 
   /** Registers an action to be executed when the project is closed. */

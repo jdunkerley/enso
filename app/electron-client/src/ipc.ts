@@ -72,6 +72,14 @@ export enum Channel {
    * so the key never reaches the renderer; resolves `false` when there is no key.
    */
   secretsCopyKey = 'secrets-copy-key',
-  /** Renderer → main: delete the local secrets file and key, then create a new key. */
+  /**
+   * Renderer → main: delete the local secrets file and key, then create a new key. Rejects while
+   * any project is running.
+   */
   secretsReset = 'secrets-reset',
+  /**
+   * Renderer → main: rotate the local secrets key, re-encrypting the file. Rejects while any
+   * project is running, and when the key comes from `ENSO_SECRETS_KEY`.
+   */
+  secretsRotate = 'secrets-rotate',
 }

@@ -13,6 +13,7 @@ import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Text from '$/components/Text/Text.vue'
 import CopySecretsKeyModal from '$/dashboard/layouts/Settings/CopySecretsKeyModal.vue'
+import { isSecretsBlockedByProjects } from '$/electronApi'
 import {
   LOCAL_SECRETS_KEY,
   useCreateLocalSecret,
@@ -97,7 +98,13 @@ const reset = useMutation({
   mutationFn: async () => {
     await window.api?.secrets.reset()
   },
-  onError: showError,
+  onError: (error) => {
+    if (isSecretsBlockedByProjects(error, 'reset')) {
+      toasts.show(getText('secretsResetCloseProjects'), { type: 'error' })
+    } else {
+      showError(error)
+    }
+  },
   onSettled: refetch,
 })
 

@@ -717,6 +717,7 @@
   "secretsKeyWrong": "Your secrets were saved with a different key. Set ENSO_SECRETS_KEY to that key, or reset your secrets.",
   "secretsReset": "Reset secrets",
   "secretsResetActionText": "delete every secret and start with a new key",
+  "secretsResetCloseProjects": "Close open projects to reset your secrets.",
   "secretsKeyFromEnvironment": "The key is set by ENSO_SECRETS_KEY.",
   "lookAndFeelSettingsTabSection": "Look and feel",
   "appearanceSettingsTab": "Appearance",

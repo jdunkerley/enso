@@ -193,6 +193,7 @@ const updater: ElectronApi['updater'] = {
 const secrets: ElectronApi['secrets'] = {
   copyKey: () => electron.ipcRenderer.invoke(ipc.Channel.secretsCopyKey),
   reset: () => electron.ipcRenderer.invoke(ipc.Channel.secretsReset),
+  rotate: () => electron.ipcRenderer.invoke(ipc.Channel.secretsRotate),
 }
 
 const api: ElectronApi = {

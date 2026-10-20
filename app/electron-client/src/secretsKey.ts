@@ -14,14 +14,26 @@
  * on with no key (Settings shows the secrets as locked), instead of the app failing to start.
  */
 import { randomBytes } from 'node:crypto'
-import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
+import { decodeKey, encodeKey, keyId, type LocalSecrets } from 'project-manager-shim/localSecrets'
 
 /** The keychain account of the master key. The service is always `Enso`. */
 export const SECRETS_KEY_ACCOUNT = 'secrets-key'
+/** The keychain account of a rotation's new key, until the rotation completes. */
+export const SECRETS_KEY_NEXT_ACCOUNT = 'secrets-key-next'
 /** The environment variable that overrides the keychain. */
 export const SECRETS_KEY_VARIABLE = 'ENSO_SECRETS_KEY'
 
 const KEY_BYTES = 32
+
+/**
+ * Why `secrets.rotate` and `secrets.reset` refuse while an engine runs. Each engine was started
+ * with the key in its environment, and could write under the old key after the file is
+ * re-encrypted or deleted. These are the IPC errors' messages; the GUI recognises them with
+ * `isSecretsBlockedByProjects` in `app/gui/src/electronApi.ts` (keep the two in step) and shows
+ * its own localized text from `english.json`.
+ */
+export const ROTATE_BLOCKED_BY_PROJECTS = 'Close open projects to rotate the key.'
+export const RESET_BLOCKED_BY_PROJECTS = 'Close open projects to reset your secrets.'
 
 /** The slice of `@napi-rs/keyring`'s `Entry` this module uses. */
 export interface KeyringEntryLike {
@@ -76,6 +88,7 @@ export class SecretsKeySource {
   async initialise(): Promise<void> {
     if (this.fromEnvironment) return
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
+    await this.#recoverRotation(entry)
     const stored = entry.getPassword()
     if (stored != null && stored !== '') {
       this.#key = decodeKey(stored)
@@ -90,6 +103,67 @@ export class SecretsKeySource {
     this.#key = key
   }
 
+  /**
+   * Finish or undo a rotation that stopped part way: see Note [Crash-Safe Key Rotation]. A pending
+   * key the file was re-encrypted with replaces `secrets-key`; any other is dropped, because the
+   * rotation never reached the file. Reading failures propagate before anything is written.
+   */
+  async #recoverRotation(entry: KeyringEntryLike): Promise<void> {
+    const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
+    const next = nextEntry.getPassword()
+    if (next == null || next === '') return
+    let nextKeyId: string | null
+    try {
+      nextKeyId = keyId(decodeKey(next))
+    } catch {
+      // Not a key, so not the one the file was written with.
+      nextKeyId = null
+    }
+    if (nextKeyId != null && nextKeyId === (await this.#options.fileKeyId())) {
+      entry.setPassword(next)
+    }
+    nextEntry.deletePassword()
+  }
+
+  /**
+   * Replace the key with a new one, re-encrypting `store`: see Note [Crash-Safe Key Rotation]. The
+   * caller makes sure no engine is running (see {@link rotateSecretsKey}).
+   */
+  async rotate(store: LocalSecrets): Promise<void> {
+    if (this.fromEnvironment) throw new Error(`The key is set by ${SECRETS_KEY_VARIABLE}.`)
+    const oldKey = this.#key
+    if (oldKey == null) throw new Error('There is no secrets key to rotate.')
+    const newKey = randomBytes(KEY_BYTES)
+    const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
+    nextEntry.setPassword(encodeKey(newKey))
+    try {
+      await store.rotate(oldKey, newKey)
+    } catch (error) {
+      // The file is untouched, so the pending key is worthless.
+      nextEntry.deletePassword()
+      throw error
+    }
+    // From here the file is under the new key: use it now, even if the keychain fails below (the
+    // next start-up then promotes the pending item).
+    this.#key = newKey
+    const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
+    entry.setPassword(encodeKey(newKey))
+    nextEntry.deletePassword()
+  }
+
+  /* Note [Crash-Safe Key Rotation]
+   * ==============================
+   * 1. Generate a new key.
+   * 2. Save it as the keychain item `secrets-key-next`.
+   * 3. `LocalSecrets.rotate`: under one hold of the lock, decrypt every value with the old key,
+   *    re-encrypt it with the new one, and replace the file atomically with the new `keyId` and
+   *    `keyCreated`.
+   * 4. Save the new key as `secrets-key`, then delete `secrets-key-next`.
+   *
+   * At every point some keychain item opens the file. A crash before 3 leaves the file under the
+   * old key, and start-up deletes `-next`. A crash after 3 leaves the file under `-next`'s key, and
+   * start-up promotes it (`#recoverRotation`, which compares the file's `keyId`). */
+
   /** The key, or null; never creates one. */
   current(): Buffer | null {
     return this.#key
@@ -101,15 +175,41 @@ export class SecretsKeySource {
   }
 
   /**
-   * Delete the keychain key; the caller deletes the file and then calls {@link initialise}. An
-   * environment key is left alone: it is not ours to forget.
+   * Delete the keychain key, and any pending rotation's; the caller deletes the file and then calls
+   * {@link initialise}. An environment key is left alone: it is not ours to forget.
    */
   async forget(): Promise<void> {
     if (this.fromEnvironment) return
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
     entry.deletePassword()
     this.#key = null
+    const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
+    nextEntry.deletePassword()
   }
+}
+
+/** What the `secrets.rotate` and `secrets.reset` IPC handlers work on. */
+export interface SecretsActionOptions {
+  readonly keySource: SecretsKeySource
+  readonly store: LocalSecrets
+  /** Whether any engine is running; see `ProjectService.hasRunningProjects`. */
+  readonly hasRunningProjects: () => Promise<boolean>
+}
+
+/** `secrets.rotate`: rotate the key, unless an engine is running. */
+export async function rotateSecretsKey(options: SecretsActionOptions): Promise<void> {
+  if (await options.hasRunningProjects()) throw new Error(ROTATE_BLOCKED_BY_PROJECTS)
+  await options.keySource.rotate(options.store)
+}
+
+/**
+ * `secrets.reset`: delete the file and the key, then create a new key, unless an engine is running.
+ */
+export async function resetSecrets(options: SecretsActionOptions): Promise<void> {
+  if (await options.hasRunningProjects()) throw new Error(RESET_BLOCKED_BY_PROJECTS)
+  await options.store.reset()
+  await options.keySource.forget()
+  await options.keySource.initialise()
 }
 
 /**

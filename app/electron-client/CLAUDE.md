@@ -55,9 +55,14 @@ desktop binary (AppImage/DMG/exe + installer).
   `ENSO_SECRETS_KEY` (`ProjectService.default`'s `extraEnvironment`). The key
   never enters the renderer: IPC `secrets.copyKey` writes it to the clipboard
   from main, and `secrets.reset` deletes the file and the item, then creates a
-  new key. Status comes from the shim's `secrets/status` route, not IPC. Use
-  `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
-  `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
+  new key. `secrets.rotate` re-encrypts the file under a new key through the
+  pending item `secrets-key-next`, and `initialise()` finishes or undoes a
+  rotation a crash interrupted (Note [Crash-Safe Key Rotation] in
+  `secretsKey.ts`). Rotate and reset both refuse while any engine runs
+  (`ProjectService.hasRunningProjects`), since each engine holds the key it was
+  started with. Status comes from the shim's `secrets/status` route, not IPC.
+  Use `new Entry('Enso', account, { linux: { store: 'secret-service' } })`,
+  never `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
   credential), and without the pinned Linux store the default falls back to the
   kernel keyring, which the engine cannot read. The module is loaded lazily
   (`lazyKeyringEntries`, a dynamic `import()` that esbuild inlines), so a native
