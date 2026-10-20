@@ -4,8 +4,8 @@
  * editor (`DatalinkInput.vue`) is this over the datalink schema.
  *
  * - A `const` schema shows nothing: the value cannot change.
- * - `string` is a text field; `format: "enso-secret"` shows the secret's path read-only (there are
- *   no local secrets), `format: "enso-file"` is a plain text field.
+ * - `string` is a text field; `format: "enso-secret"` is a picker of the local secrets
+ *   (`SecretPicker.vue`), `format: "enso-file"` is a plain text field.
  * - `number` and `integer` are number fields; `boolean` a checkbox.
  * - `object` lists its properties that are not constant, each under a button that adds or removes
  *   an optional one.
@@ -31,6 +31,7 @@ import type { TextId } from 'enso-common/src/text'
 import { asObject, singletonObjectOrNull } from 'enso-common/src/utilities/data/object'
 import { computed, h, ref, watch, type FunctionalComponent } from 'vue'
 import SchemaTextInput from './SchemaTextInput.vue'
+import SecretPicker from './SecretPicker.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -228,13 +229,10 @@ const partCount = computed(() => {
 <template>
   <Parts v-if="!isConst && partCount > 0" :wrap="partCount > 1">
     <template v-if="schemaType === 'string'">
-      <SchemaTextInput
+      <SecretPicker
         v-if="schemaFormat === 'enso-secret'"
-        type="text"
-        :readOnly="true"
-        :value="value"
-        :validationErrorClass="validationErrorClass"
-        :error="error"
+        :value="typeof value === 'string' ? value : null"
+        :readOnly="readOnly"
         @change="onChange"
       />
       <SchemaTextInput

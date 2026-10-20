@@ -111,8 +111,36 @@ export interface SecretsApi {
    * Resolves `false` when there is no key.
    */
   readonly copyKey: () => Promise<boolean>
-  /** Delete the secrets file and the key, then create a new key. */
+  /**
+   * Delete the secrets file and the key, then create a new key. Rejects while any project is
+   * running (see {@link isSecretsBlockedByProjects}).
+   */
   readonly reset: () => Promise<void>
+  /**
+   * Replace the key with a new one, re-encrypting every secret. Rejects while any project is
+   * running (see {@link isSecretsBlockedByProjects}), and when the key comes from
+   * `ENSO_SECRETS_KEY`.
+   */
+  readonly rotate: () => Promise<void>
+}
+
+/**
+ * The messages Electron main rejects `secrets.rotate` and `secrets.reset` with while a project is
+ * running; they mirror `ROTATE_BLOCKED_BY_PROJECTS` and `RESET_BLOCKED_BY_PROJECTS` in
+ * `app/electron-client/src/secretsKey.ts`. Electron prefixes a rejected IPC call's message, so
+ * match with {@link isSecretsBlockedByProjects}, then show the localized text.
+ */
+const SECRETS_BLOCKED_BY_PROJECTS = {
+  rotate: 'Close open projects to rotate the key.',
+  reset: 'Close open projects to reset your secrets.',
+} as const
+
+/** Whether `error` is main refusing `secrets[action]` because a project is running. */
+export function isSecretsBlockedByProjects(
+  error: unknown,
+  action: keyof typeof SECRETS_BLOCKED_BY_PROJECTS,
+): boolean {
+  return error instanceof Error && error.message.endsWith(SECRETS_BLOCKED_BY_PROJECTS[action])
 }
 
 export interface ElectronApi {

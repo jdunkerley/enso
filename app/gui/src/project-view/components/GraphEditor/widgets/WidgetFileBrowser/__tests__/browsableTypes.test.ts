@@ -361,7 +361,7 @@ describe('withBrowserItems', () => {
     selectionWidget.score({ input } as WidgetProps<WidgetInput>, {} as GraphDb)
 
   test('with no items, leaves the input unwrapped, so it gets no dropdown arrow', () => {
-    // An argument that takes only a secret: there is no secret browser, so nothing to choose.
+    // An argument that takes only a secret, with no local secret items: nothing to choose.
     const input = WidgetInput.FromAst(Ast.parseExpression('secret')!)
     const inner = withBrowserItems(input, [])
     expect(inner).toBe(input)

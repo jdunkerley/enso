@@ -52,6 +52,11 @@ error kinds are specified in
   re-exported) is for tests only.
 - Writes take the in-process `serialised` queue and the cross-process lock file,
   re-read inside the lock, and write `<file>.tmp` then rename.
+- `rotate(oldKey, newKey)` (Electron main only) decrypts everything before
+  writing anything, under one hold of the lock; a wrong old key is `WRONG_KEY`
+  with the file untouched.
+- `EnsoRunner.hasRunningProjects()` counts opened projects (loading included)
+  and live `--run` processes; key rotation and reset wait for it to be false.
 - Bad names throw a plain `Error`; the store's own failures are
   `LocalSecretsError` with a `kind`.
 

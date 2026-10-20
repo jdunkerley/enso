@@ -134,6 +134,36 @@ function getOwn(object: Json, key: string): unknown {
   return Object.hasOwn(object, key) ? object[key] : undefined
 }
 
+/**
+ * `root` with `keyId` and `keyCreated` set, keeping `keyCreated` right after `keyId` as every
+ * writer lays the file out, and every other field (own properties included) where it was.
+ */
+function withKey(root: Json, id: unknown, created: string): Json {
+  const result: Json = {}
+  for (const [k, v] of Object.entries(root)) {
+    if (k === 'keyCreated') continue
+    setOwn(result, k, k === 'keyId' ? id : v)
+    if (k === 'keyId') setOwn(result, 'keyCreated', created)
+  }
+  if (!Object.hasOwn(result, 'keyId')) setOwn(result, 'keyId', id)
+  if (!Object.hasOwn(result, 'keyCreated')) setOwn(result, 'keyCreated', created)
+  return result
+}
+
+/**
+ * Remove a lock or temporary file, logging rather than throwing on failure. By then the write has
+ * either happened or already thrown, and a cleanup error (EPERM or EBUSY from an indexer or
+ * antivirus on Windows) must not turn a completed write into a reported failure: a caller would
+ * then roll back state that matches the new file. A lock left behind goes stale after 30 s.
+ */
+async function removeQuietly(filePath: string): Promise<void> {
+  try {
+    await fs.rm(filePath, { force: true })
+  } catch (error) {
+    console.warn(`Could not remove ${filePath}:`, error)
+  }
+}
+
 /** The encrypted local secrets file. */
 export class LocalSecrets {
   readonly #filePath: string
@@ -223,17 +253,51 @@ export class LocalSecrets {
       if (current == null) return null
       if (typeof current.keyCreated === 'string') return current.keyCreated
       const created = timestamp(this.#now())
-      // Keep `keyCreated` after `keyId`, as the other writers lay the file out.
-      const reordered: Json = {}
-      for (const [k, v] of Object.entries(current)) {
-        setOwn(reordered, k, v)
-        if (k === 'keyId') reordered.keyCreated = created
-      }
-      if (!('keyCreated' in reordered)) reordered.keyCreated = created
-      await this.#writeRoot(reordered)
+      await this.#writeRoot(withKey(current, current.keyId, created))
       return created
     })
     return keyCreated == null ? { state: 'empty' } : { state: 'ready', keyCreated }
+  }
+
+  /**
+   * Re-encrypt every value from `oldKey` to `newKey`, and give the file the new `keyId` and a new
+   * `keyCreated`. Everything is decrypted before anything is written, under one hold of the lock,
+   * and the file is replaced atomically: a wrong `oldKey`, or a value it cannot decrypt, is
+   * `WRONG_KEY` with the file untouched. A missing file becomes an empty one under `newKey`. Only
+   * Electron main calls this (never over HTTP); see Note [Crash-Safe Key Rotation] in
+   * `app/electron-client/src/secretsKey.ts` for the steps around it.
+   * @param onReplaced - Called once the file is under `newKey`, still holding the lock, so that the
+   * caller's `getKey` returns `newKey` before any write queued behind the rotation runs.
+   */
+  async rotate(oldKey: Buffer, newKey: Buffer, onReplaced?: () => void): Promise<void> {
+    await this.#withLock(async () => {
+      const now = timestamp(this.#now())
+      const root = (await this.#readRoot()) ?? {
+        version: VERSION,
+        keyId: keyId(newKey),
+        keyCreated: now,
+        secrets: {},
+      }
+      const secrets = secretsOf(root)
+      const names = Object.keys(secrets)
+      // Note [An Empty File Adopts The Current Key]: with nothing to decrypt, any keyId will do.
+      if (names.length !== 0 && root.keyId !== keyId(oldKey)) throw wrongKey()
+      const rotated: Json = {}
+      for (const name of names) {
+        const entry = getOwn(secrets, name)
+        if (!isRecord(entry)) throw wrongKey()
+        let value: string
+        try {
+          value = decrypt(oldKey, name, { nonce: String(entry.nonce), value: String(entry.value) })
+        } catch {
+          throw wrongKey()
+        }
+        setOwn(rotated, name, { ...entry, ...encrypt(newKey, name, value) })
+      }
+      setOwn(root, 'secrets', rotated)
+      await this.#writeRoot(withKey(root, keyId(newKey), now))
+      onReplaced?.()
+    })
   }
 
   /** Delete the file. Only Electron main calls this (never over HTTP). */
@@ -282,9 +346,10 @@ export class LocalSecrets {
   }
 
   async #write(mutate: (key: Buffer, root: Json, now: string) => void): Promise<void> {
-    const key = this.#getKey()
-    if (key == null) throw locked()
     await this.#withLock(async () => {
+      // Read the key under the lock: a rotation ahead of this write may have replaced it.
+      const key = this.#getKey()
+      if (key == null) throw locked()
       const now = timestamp(this.#now())
       let root = await this.#readRoot()
       if (root == null) {
@@ -314,7 +379,7 @@ export class LocalSecrets {
       await fs.writeFile(temporaryPath, JSON.stringify(root, null, 2) + '\n')
       await renameWithRetry(temporaryPath, this.#filePath)
     } finally {
-      await fs.rm(temporaryPath, { force: true })
+      await removeQuietly(temporaryPath)
     }
   }
 
@@ -348,7 +413,7 @@ export class LocalSecrets {
       try {
         return await action()
       } finally {
-        await fs.rm(lockPath, { force: true })
+        await removeQuietly(lockPath)
       }
     })
   }

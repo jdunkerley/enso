@@ -1,14 +1,19 @@
 # src/secrets/
 
-Secrets and service credentials. Vue. Dormant until there are local secrets
-(decision 5 of the local-only programme): no UI entry point opens them; their
-unit tests are the guard against rot. `UpsertSecretPanel.vue` (the file
-browser's "New Secret" panel) and `serviceCredentials/` (the recipes) live here
-too.
+Secrets and service credentials. Vue. The secret dialogs are live for local
+secrets: `UpsertSecretModal.vue` creates one from Settings → Secrets, the
+datalink editor's picker (`$/datalinks/SecretPicker.vue`) and the graph editor's
+`Enso_Secret` dropdown (`WidgetFileBrowser/localSecrets.ts`), all through
+`$/providers/localSecrets`. Still dormant: the service-credential forms
+(`CreateCredentialModal.vue` and `serviceCredentials/`, which need OAuth, see
+below) and `UpsertSecretPanel.vue` (the cloud file browser's "New Secret"
+panel); no UI entry point opens them, and their unit tests are the guard against
+rot.
 
 - `UpsertSecretForm.vue` (#82) — creating or updating a secret; the project
   view's file browser (`UpsertSecretPanel.vue`) uses it.
-- `UpsertSecretModal.vue` (#92) — the drive's secret dialog around it.
+- `UpsertSecretModal.vue` (#92) — the secret dialog around it, opened with
+  `useModals().open`.
 - `CreateCredentialModal.vue` (#198) — the "New Credential" dialog: a list of
   the services (`credentialInfos.ts`, in display order) and the chosen one's
   form: `SnowflakeCredentialsForm.vue`, `GoogleCredentialsForm.vue`,
@@ -22,7 +27,7 @@ too.
   `useModals().open`.
 - Tests: `__tests__/`.
 
-## Before enabling these screens
+## Before enabling the credential forms
 
 Three things are missing, and each would fail only at run time:
 

@@ -55,3 +55,8 @@ is already on the row, drawn by `WidgetIcon` at the root.
 - `WidgetIcon.vue` — owns the `DisplayIcon` symbol. Other widgets attach to it
   via `input[DisplayIcon] = { icon, showContents?, noGap? }` to request an
   inline icon in front of a child widget.
+- `WidgetFileBrowser.vue` — a file, folder or `Enso_Secret` argument's dropdown:
+  `WidgetFileBrowser/localBrowser.ts` (the native file dialog),
+  `localSecrets.ts` (the local secrets and **New secret…**, which set
+  `Enso_Secret.get 'secret://<name>'`), and `browsableTypes.ts` (which kind an
+  argument takes, its current path, and the edit that sets one).

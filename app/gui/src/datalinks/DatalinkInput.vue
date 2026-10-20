@@ -25,11 +25,9 @@ const DEFS: Record<string, object> = SCHEMA.$defs
 
 /**
  * Schema members the local IDE cannot offer yet, with the note shown where one is left out.
- * `EnsoSecret`: there are no local secrets yet, so a secure value is plain text.
  * `EnsoFileDataLink`: its path is an Enso Cloud path (`enso://Users/…`).
  */
 const UNAVAILABLE_SCHEMAS: ReadonlyMap<string, TextId | null> = new Map([
-  ['#/$defs/EnsoSecret', 'datalinkSecretsUnavailable'],
   ['#/$defs/EnsoFileDataLink', null],
 ])
 
