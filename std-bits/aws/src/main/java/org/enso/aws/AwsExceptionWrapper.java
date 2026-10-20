@@ -3,6 +3,7 @@ package org.enso.aws;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.function.BiFunction;
+import org.enso.base.enso_cloud.LocalSecretException;
 import org.enso.base.polyglot.EnsoExceptionWrapper;
 import org.enso.base.polyglot.EnsoMeta;
 import org.graalvm.polyglot.Value;
@@ -45,6 +46,10 @@ class AwsExceptionWrapper {
    * @throws RuntimeException if the exception cannot be wrapped into an Enso error atom
    */
   public static Value handleS3ClientError(String bucket, String key, Exception exception) {
+    if (exception instanceof LocalSecretException localSecretException) {
+      // Not an S3 error: leave it as it is, so that Enso can turn it into an Enso_Secret_Error.
+      throw localSecretException;
+    }
     var ensoAtom =
         Optional.ofNullable(wrapS3Errors(bucket, key, exception))
             .or(() -> Optional.ofNullable(wrapSDKErrors(exception)))
