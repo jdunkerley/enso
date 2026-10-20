@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "keyId": "630dcd2966c43366",
+  "keyCreated": "2026-10-18T14:02:11Z",
+  "secrets": {
+    "alpha": {
+      "nonce": "YOU4Xs8YM3fgnXai",
+      "value": "aKitWwZ0AZbptLwRGNxDYvVlmYpVGmxJnVk0",
+      "created": "2026-10-18T14:02:11Z",
+      "updated": "2026-10-18T14:02:11Z"
+    },
+    "unicode-é": {
+      "nonce": "eGkv9p7DWUzwhv1I",
+      "value": "ucBHkPOq7/5NPWzu46pEpKEzR72+EIqS6301qCe1xA==",
+      "created": "2026-10-18T14:02:11Z",
+      "updated": "2026-10-18T14:02:11Z"
+    }
+  }
+}

@@ -276,6 +276,11 @@
 
 #### Enso Standard Library
 
+- [Secrets work without Enso Cloud][262]: `Enso_Secret.create` and `get` keep
+  secrets in an encrypted local file (`secret://name`), which can be used in
+  HTTP headers, database credentials and datalinks. Without a `parent`,
+  `Enso_Secret` calls are now local; pass a cloud folder as `parent` (or an
+  `enso://` path) for Enso Cloud secrets.
 - [AWS libraries updated][69]: `Standard.AWS` no longer ships the AWS SDK for
   Java v1, which reached end of support in December 2025; the AWS SDK for Java
   v2 moves to 2.55.6 (from 2.25.40) and the Redshift JDBC driver to 2.2.9 (from
@@ -299,6 +304,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [116]: https://github.com/jdunkerley/enso/pull/116
+[262]: https://github.com/jdunkerley/enso/pull/262
 [255]: https://github.com/jdunkerley/enso/pull/255
 [256]: https://github.com/jdunkerley/enso/pull/256
 [69]: https://github.com/jdunkerley/enso/pull/69
