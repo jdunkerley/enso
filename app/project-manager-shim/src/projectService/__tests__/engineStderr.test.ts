@@ -4,6 +4,7 @@
  * The engine is a fake `enso`: a Node script that answers the health check, writes to stderr and
  * crashes when a `<project>.crash` file appears.
  */
+import { ChildProcessHandle } from 'enso-common/src/utilities/childProcess'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
@@ -98,8 +99,20 @@ test("the engine's stderr reaches the sink and this process's stderr, start by s
     expect(calls.filter((call) => call === 'started')).toHaveLength(2)
     expect(written.join('')).toContain('engine 1 started')
     expect(written.join('')).toContain('crashing now')
+
+    // A close whose graceful shutdown throws still tells the sink, so no tailer is left polling.
+    // (Checked here rather than in a test of its own: every fake engine started in parallel with
+    // other test files can race them for a port.) The shutdown's wait for the exit is the one
+    // `waitForExit` call made from here on; the fake engine still exits, on the newline written
+    // to its stdin.
+    vi.spyOn(ChildProcessHandle.prototype, 'waitForExit').mockRejectedValueOnce(
+      new Error('shutdown failed'),
+    )
+    await expect(runner.closeProject(project)).rejects.toThrow('shutdown failed')
+    expect(calls.at(-1)).toBe('closed')
   } finally {
-    // Always stop the fake engine, by the runner's own handle on it.
+    // Always stop the fake engine, by the runner's own handle on it, and wait for it to exit.
+    vi.restoreAllMocks()
     await runner.closeProject(project)
   }
   expect(calls.at(-1)).toBe('closed')

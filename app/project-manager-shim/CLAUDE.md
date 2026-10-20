@@ -367,6 +367,10 @@ buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
 - **Known limitation:** lines appended to the old file between the last read and
   a roll-over are not streamed. They are in the rolled archive, so they show up
   in the panel's history.
+- **Only rolling logback configurations are supported.** The finder looks for a
+  file whose name ends `-yyyy-MM-dd-HH-mm-ss.log`; with a non-rolling config
+  (one fixed file name) it never finds the session's file, and the panel stays
+  on "Waiting for the engine…" (stderr lines still stream).
 
 ## Local datalinks (`src/datalinks.ts`)
 

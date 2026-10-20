@@ -303,9 +303,13 @@ export class ProjectService {
     }
     this.logger.debug('Closing project', projectId, projectsDirectory)
     this.versioningWarnings.delete(project.path)
-    await this.runner.closeProject(project.path)
-    // The runner closes it too when the engine stops (`projectClosed`); this covers runners that do not.
-    await this.engineLogs.get(project.path)?.close()
+    try {
+      await this.runner.closeProject(project.path)
+    } finally {
+      // The runner closes it too when the engine stops (`projectClosed`); this covers runners that
+      // do not, and a close that threw.
+      await this.engineLogs.get(project.path)?.close()
+    }
     const versioningWarning = this.versioningWarnings.get(project.path)
     this.versioningWarnings.delete(project.path)
     return versioningWarning != null ? { versioningWarning } : {}

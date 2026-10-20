@@ -319,6 +319,22 @@ describe('engine logs', () => {
     }
   })
 
+  test('a close that throws still closes the channel', async () => {
+    const projectPath = await createProject(path.join(root, 'P'), 'id-1')
+    const closeProject: Runner['closeProject'] = async () => {
+      throw new Error('shutdown failed')
+    }
+    const logs = new ProjectService({ ...fakeRunner(), closeProject }, [])
+    try {
+      await logs.openProject(UUID('id-1'), Path(root))
+      expect(logs.engineLogs.get(projectPath)).toBeDefined()
+      await expect(logs.closeProject(UUID('id-1'), Path(root))).rejects.toThrow('shutdown failed')
+      expect(logs.engineLogs.get(projectPath)).toBeUndefined()
+    } finally {
+      await logs.engineLogs.get(projectPath)?.close()
+    }
+  })
+
   test('a failed open closes the channel', async () => {
     const projectPath = await createProject(path.join(root, 'P'), 'id-1')
     const openProject: Runner['openProject'] = async () => {
