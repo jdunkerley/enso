@@ -3,7 +3,9 @@
 Secrets and service credentials. Vue. The secret dialogs are live for local
 secrets: `UpsertSecretModal.vue` creates one from Settings → Secrets, the
 datalink editor's picker (`$/datalinks/SecretPicker.vue`) and the graph editor's
-`Enso_Secret` dropdown (`WidgetFileBrowser/localSecrets.ts`), all through
+`Enso_Secret` dropdown (`WidgetFileBrowser/localSecrets.ts`) and the Drive bar's
+New secret button (`DriveBarToolbar.vue`, which shows `NewSecretToast.vue`: the
+new `secret://` path with a Copy button), all through
 `$/providers/localSecrets`. Still dormant: the service-credential forms
 (`CreateCredentialModal.vue` and `serviceCredentials/`, which need OAuth, see
 below) and `UpsertSecretPanel.vue` (the cloud file browser's "New Secret"

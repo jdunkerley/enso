@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * @file The drive's toolbar: the buttons creating assets (a project, a folder, a datalink, which
- * opens the datalink dialog on the modal stack), uploading and downloading, the count of cut or
+ * opens the datalink dialog on the modal stack; a secret, in the desktop app), uploading and downloading, the count of cut or
  * copied assets, and the search bar. In Recent, only the count and the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
@@ -14,15 +14,21 @@ import {
   useUploadFiles,
 } from '#/layouts/Drive/driveActions'
 import { useDriveView } from '#/layouts/Drive/driveView'
+import NewSecretToast from '$/secrets/NewSecretToast.vue'
+import UpsertSecretModal from '$/secrets/UpsertSecretModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import { canTransferBetweenCategories, isRecentCategory } from '$/providers/category'
+import { useBackends } from '$/providers/backends'
 import { useDriveStore } from '$/providers/driveStore'
+import { useCreateLocalSecret } from '$/providers/localSecrets'
 import { useModals } from '$/providers/modals'
 import { useText } from '$/providers/text'
+import { useToasts } from '$/providers/toasts'
 import type AssetQuery from '$/utils/AssetQuery'
 import { downloadAssetsMutationOptions } from '$/utils/driveMutations'
 import { isProjectId } from 'enso-common/src/services/Backend'
+import { getMessageOrToString } from 'enso-common/src/utilities/errors'
 import { readUserSelectedFile } from 'enso-common/src/utilities/file'
 import { computed, shallowRef } from 'vue'
 import PasteStatus from './PasteStatus.vue'
@@ -36,6 +42,8 @@ const { getText } = useText()
 const driveStore = useDriveStore()
 const driveView = useDriveView()
 const modals = useModals()
+const toasts = useToasts()
+const backends = useBackends()
 
 const category = computed(() => driveView.location.category)
 const backend = computed(() => driveView.location.backend)
@@ -65,6 +73,29 @@ const isDatalinkModalOpen = computed(() => {
 })
 function openNewDatalink() {
   openedDatalinkModal.value = newDatalink(currentDirectoryId.value).key
+}
+/**
+ * Whether the drive can make secrets: only the desktop app has a secrets key (a browser build has
+ * no `window.api`), the same test as the Settings page's Secrets section.
+ */
+const canCreateSecret = computed(() => window.api?.secrets != null && backends.localBackend != null)
+const createSecret = useCreateLocalSecret(() => backends.localBackend)
+/** Open the secret dialog; a secret is not a file, so nothing is added to the listing. */
+function openNewSecret() {
+  modals.open(UpsertSecretModal, {
+    onCreate: (name: string, value: string) =>
+      createSecret.mutate(
+        { name, value },
+        {
+          onSuccess: (path: string) =>
+            toasts.show(
+              { component: NewSecretToast, props: { path } },
+              { type: 'success', autoClose: 10_000 },
+            ),
+          onError: (error: unknown) => toasts.show(getMessageOrToString(error), { type: 'error' }),
+        },
+      ),
+  })
 }
 const newProject = useMutationCallback({
   mutationKey: ['newProject'],
@@ -120,6 +151,14 @@ function downloadFiles() {
           :aria-expanded="isDatalinkModalOpen"
           :aria-label="getText('newDatalink')"
           @press="openNewDatalink"
+        />
+        <Button
+          v-if="canCreateSecret"
+          variant="icon"
+          size="medium"
+          icon="key_add"
+          :aria-label="getText('newSecret')"
+          @press="openNewSecret"
         />
       </div>
       <div
