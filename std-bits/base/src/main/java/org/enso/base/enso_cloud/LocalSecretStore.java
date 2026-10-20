@@ -189,7 +189,14 @@ final class LocalSecretStore {
             root.put("keyCreated", now);
             root.set("secrets", JsonNodeFactory.instance.objectNode());
           } else if (!keyId(key).equals(root.path("keyId").asText())) {
-            throw LocalSecretException.wrongKey();
+            // A file with no secrets holds nothing the old key could decrypt, so it adopts the
+            // current key rather than failing every save after a lost keychain item. Note
+            // [An Empty File Adopts The Current Key] in the app's Node store does the same.
+            if (!secretsOf(root).isEmpty()) {
+              throw LocalSecretException.wrongKey();
+            }
+            root.put("keyId", keyId(key));
+            root.put("keyCreated", now);
           }
           mutation.apply(root, now);
           var tmp = file.resolveSibling(file.getFileName() + ".tmp");

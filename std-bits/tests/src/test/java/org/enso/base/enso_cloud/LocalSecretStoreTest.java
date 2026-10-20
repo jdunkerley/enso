@@ -137,4 +137,45 @@ public class LocalSecretStoreTest {
         root.get("keyId").asText());
     assertEquals("2026-10-18T14:02:11Z", root.get("keyCreated").asText());
   }
+
+  @Test
+  public void anEmptyFileUnderAnotherKeyAdoptsTheCurrentKey() throws Exception {
+    var file = tmp.getRoot().toPath().resolve("secrets.json");
+    Files.writeString(
+        file,
+        "{\"version\": 1, \"keyId\": \"0123456789abcdef\", \"keyCreated\":"
+            + " \"2020-01-01T00:00:00Z\", \"futureField\": 42, \"secrets\": {}}");
+    var s = store(file, FIXTURE_KEY);
+    s.create("a", "1");
+    assertEquals("1", s.read("a"));
+    var root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(Files.readString(file));
+    assertEquals(
+        LocalSecretStore.keyId(LocalSecretStore.decodeKey(FIXTURE_KEY)),
+        root.get("keyId").asText());
+    assertEquals("2026-10-18T14:02:11Z", root.get("keyCreated").asText());
+    assertEquals(42, root.get("futureField").asInt());
+  }
+
+  @Test
+  public void aFileWithSecretsUnderAnotherKeyRefusesWrites() throws Exception {
+    var file = tmp.getRoot().toPath().resolve("secrets.json");
+    store(file, FIXTURE_KEY).create("a", "1");
+    var before = Files.readString(file);
+    var other = store(file, LocalSecretStore.encodeKey(new byte[32]));
+    assertEquals(
+        LocalSecretException.Kind.WRONG_KEY,
+        assertThrows(LocalSecretException.class, () -> other.create("b", "2")).kind());
+    assertEquals(before, Files.readString(file));
+  }
+
+  @Test
+  public void objectPrototypeNamesAreOrdinaryNames() throws Exception {
+    // The Node store must special-case these; pin that Java agrees.
+    var s = store(tmp.getRoot().toPath().resolve("secrets.json"), FIXTURE_KEY);
+    for (var name : List.of("__proto__", "constructor", "prototype")) {
+      s.create(name, "v-" + name);
+    }
+    assertEquals(List.of("__proto__", "constructor", "prototype"), s.list());
+    assertEquals("v-__proto__", s.read("__proto__"));
+  }
 }
