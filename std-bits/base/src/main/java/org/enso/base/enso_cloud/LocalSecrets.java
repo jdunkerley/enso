@@ -64,17 +64,19 @@ public final class LocalSecrets {
         fileOverride == null || fileOverride.isEmpty()
             ? home.resolve(".enso").resolve("secrets.json")
             : Path.of(fileOverride);
-    byte[] key;
+    Supplier<byte[]> key;
     if (keyOverride != null && !keyOverride.isEmpty()) {
       try {
-        key = LocalSecretStore.decodeKey(keyOverride);
+        var decoded = LocalSecretStore.decodeKey(keyOverride);
+        key = () -> decoded;
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException(
             "ENSO_SECRETS_KEY is not a valid secrets key: expected 32 bytes as unpadded"
                 + " base64url.");
       }
     } else {
-      key = keychain.get();
+      // Read only when an operation needs the key, so listing never touches the keychain.
+      key = keychain;
     }
     return new LocalSecretStore(file, key, Clock.systemUTC());
   }

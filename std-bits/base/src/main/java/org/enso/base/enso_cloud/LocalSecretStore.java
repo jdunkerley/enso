@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.function.Supplier;
 import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
@@ -61,13 +62,32 @@ final class LocalSecretStore {
   private static final SecureRandom RANDOM = new SecureRandom();
 
   private final Path file;
-  private final byte[] key;
+  private final Supplier<byte[]> keySource;
   private final Clock clock;
+  private boolean keyResolved = false;
+  private byte[] resolvedKey;
 
   LocalSecretStore(Path file, byte[] keyOrNull, Clock clock) {
+    this(file, () -> keyOrNull, clock);
+  }
+
+  /**
+   * The key is resolved on first use, and only by the operations that need it: {@link #list} and
+   * {@link #exists} never ask, so they cause no keychain prompt. {@code keySource} may return
+   * {@code null} for "no key".
+   */
+  LocalSecretStore(Path file, Supplier<byte[]> keySource, Clock clock) {
     this.file = file;
-    this.key = keyOrNull;
+    this.keySource = keySource;
     this.clock = clock;
+  }
+
+  private synchronized byte[] key() {
+    if (!keyResolved) {
+      resolvedKey = keySource.get();
+      keyResolved = true;
+    }
+    return resolvedKey;
   }
 
   List<String> list() throws IOException {
@@ -86,6 +106,7 @@ final class LocalSecretStore {
   }
 
   String read(String name) throws IOException {
+    var key = key();
     if (key == null) {
       throw LocalSecretException.locked();
     }
@@ -170,6 +191,7 @@ final class LocalSecretStore {
   }
 
   private void write(Mutation mutation) throws IOException {
+    var key = key();
     if (key == null) {
       throw LocalSecretException.locked();
     }
@@ -294,7 +316,7 @@ final class LocalSecretStore {
       var cipher = Cipher.getInstance("AES/GCM/NoPadding");
       cipher.init(
           Cipher.ENCRYPT_MODE,
-          new SecretKeySpec(key, "AES"),
+          new SecretKeySpec(key(), "AES"),
           new GCMParameterSpec(TAG_BITS, nonce));
       cipher.updateAAD(name.getBytes(StandardCharsets.UTF_8));
       var body = cipher.doFinal(value.getBytes(StandardCharsets.UTF_8));
@@ -312,7 +334,7 @@ final class LocalSecretStore {
       var cipher = Cipher.getInstance("AES/GCM/NoPadding");
       cipher.init(
           Cipher.DECRYPT_MODE,
-          new SecretKeySpec(key, "AES"),
+          new SecretKeySpec(key(), "AES"),
           new GCMParameterSpec(TAG_BITS, Base64.getDecoder().decode(nonce)));
       cipher.updateAAD(name.getBytes(StandardCharsets.UTF_8));
       var plain = cipher.doFinal(Base64.getDecoder().decode(value));

@@ -34,7 +34,15 @@ so scripts that use secrets created in the app work without any setup:
 
 Enso only reads the keychain; it never creates or changes the item. If the
 keychain cannot be reached (for example over SSH, or on a server with no Secret
-Service), Enso has no key and the secrets are locked (see below).
+Service), Enso has no key and the secrets are locked (see below). On Linux, if
+`DBUS_SESSION_BUS_ADDRESS` is not set but a display is, GLib may start a session
+`dbus-daemon` to look for the keychain, and that daemon keeps running after
+`enso` exits.
+
+Enso reads the keychain only when it needs the key, to use, create, update or
+delete a secret. Listing secrets, or checking whether one exists, does not touch
+the keychain. The key is not cached: each operation that needs it reads it
+again.
 
 On a server, or anywhere else without the desktop app, set `ENSO_SECRETS_KEY`
 yourself. To make a key:
