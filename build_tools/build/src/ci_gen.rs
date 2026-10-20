@@ -697,7 +697,7 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 }
 
 /// How long a release waits for the self-hosted macOS runner before going ahead without it.
-const MACOS_RUNNER_WAIT_MINUTES: u32 = 15;
+const MACOS_RUNNER_WAIT_MINUTES: u32 = 1;
 
 /// Secret holding a token that may list the repository's self-hosted runners.
 ///
@@ -728,7 +728,7 @@ for minute in $(seq 0 {MACOS_RUNNER_WAIT_MINUTES}); do
   fi
   if [ "$minute" -lt {MACOS_RUNNER_WAIT_MINUTES} ]; then sleep 60; fi
 done
-echo "::warning::No self-hosted macOS runner came online within {MACOS_RUNNER_WAIT_MINUTES} minutes; releasing without macOS."
+echo "::warning::No self-hosted macOS runner came online within {MACOS_RUNNER_WAIT_MINUTES} min; releasing without macOS."
 echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT""#
     );
     let step = Step {

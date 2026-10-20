@@ -110,23 +110,23 @@ jobs:
             exit 0
           fi
           online_macos='.runners[] | select(.status == "online" and any(.labels[]; .name == "self-hosted") and any(.labels[]; .name == "macOS")) | .name'
-          for minute in $(seq 0 15); do
+          for minute in $(seq 0 1); do
             runners=$(GH_TOKEN="$RUNNER_STATUS_TOKEN" gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners" --jq "$online_macos")
             if [ -n "$runners" ]; then
               echo "Self-hosted macOS runner online: $runners"
               echo "online=true" >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            if [ "$minute" -lt 15 ]; then sleep 60; fi
+            if [ "$minute" -lt 1 ]; then sleep 60; fi
           done
-          echo "::warning::No self-hosted macOS runner came online within 15 minutes; releasing without macOS."
+          echo "::warning::No self-hosted macOS runner came online within 1 min; releasing without macOS."
           echo "online=false" >> "$GITHUB_OUTPUT"
         shell: bash
         env:
           RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
     outputs:
       online: ${{ steps.wait.outputs.online }}
-    timeout-minutes: 20
+    timeout-minutes: 6
   enso-build-ci-gen-draft-release-linux-amd64:
     name: Create a release draft.
     needs:
