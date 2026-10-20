@@ -55,6 +55,14 @@ const GRAPH_BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
       icon: 'bottom_panel',
       category: 'graphEditor',
     },
+    'graph.toggleLogs': {
+      // Not the spec's `Mod+Shift+\``: with Shift held, `event.key` is `~` (US) or `¬` (UK), so that
+      // binding never matches. `Mod+L` is the drive's Label too, but the drive and the graph are
+      // never active together (see `keyboardShortcuts.ts`).
+      bindings: ['Mod+L'],
+      icon: 'log',
+      category: 'graphEditor',
+    },
     'graph.toggleDocumentationEditor': {
       bindings: ['Mod+D'],
       icon: 'right_panel',

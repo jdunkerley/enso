@@ -57,6 +57,7 @@ describe('the graph editor’s defaults', () => {
     // rebindable. The order is the order in which a key is offered to the actions.
     expect(mapEntries(GRAPH_BINDINGS, (_key, info) => info.bindings)).toStrictEqual({
       'graph.toggleCodeEditor': ['Mod+`'],
+      'graph.toggleLogs': ['Mod+L'],
       'graph.toggleDocumentationEditor': ['Mod+D'],
       'graph.undo': ['Mod+Z'],
       'graph.redo': isMacLike ? ['Mod+Shift+Z', 'Mod+Y'] : ['Mod+Y', 'Mod+Shift+Z'],
@@ -82,6 +83,7 @@ describe('the graph editor’s defaults', () => {
     })
     expect(Object.keys(GRAPH_BINDINGS)).toEqual([
       'graph.toggleCodeEditor',
+      'graph.toggleLogs',
       'graph.toggleDocumentationEditor',
       'graph.undo',
       'graph.redo',
@@ -296,4 +298,15 @@ test('saving a version conflicts with nothing in the defaults', () => {
   const conflicts = currentConflicts(defaultShortcuts())
   expect([...conflicts.keys()]).not.toContain('graph.saveVersion')
   expect([...conflicts.keys()]).not.toContain('graph.saveVersionWithComment')
+})
+
+describe('graph.toggleLogs', () => {
+  test('defaults to Mod+L, which nothing active over the graph has (the drive Label is drive-only)', () => {
+    const shortcuts = defaultShortcuts()
+    const logs = byId(shortcuts, 'graph.toggleLogs')
+    expect(logs.defaults).toEqual(['Mod+L'])
+    expect(logs.scope).toBe('graph')
+    expect(conflictsFor(shortcuts, logs, 'Mod+L')).toEqual([])
+    expect(byId(shortcuts, 'label').bindings).toContain('Mod+L')
+  })
 })
