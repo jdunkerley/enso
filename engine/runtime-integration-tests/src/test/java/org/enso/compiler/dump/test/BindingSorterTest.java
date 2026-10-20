@@ -2,6 +2,7 @@ package org.enso.compiler.dump.test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertEquals;
 
@@ -136,6 +137,36 @@ public final class BindingSorterTest {
     var sorted = sortBindings(conversionMethod, moduleMethod);
     assertThat(sorted.get(0), is(moduleMethod));
     assertThat(sorted.get(1), is(conversionMethod));
+  }
+
+  /**
+   * A conversion onto a type defined in the same module must not break the transitivity of the
+   * comparator. With enough bindings TimSort detects the violation and throws {@code
+   * IllegalArgumentException: Comparison method violates its general contract!}.
+   */
+  @Test
+  public void conversionOntoLocalTypeKeepsComparatorConsistent() {
+    var expected = new java.util.ArrayList<Definition>();
+    var conversions = new java.util.ArrayList<Definition>();
+    for (var i = 0; i < 40; i++) {
+      var typeName = "Type_%02d".formatted(i);
+      expected.add(type(typeName));
+      expected.add(method(typeName, "method_a"));
+      expected.add(method(typeName, "method_b"));
+      conversions.add(conversionMethod(typeName, "Any"));
+    }
+    var all = new java.util.ArrayList<Definition>(expected);
+    all.addAll(conversions);
+    // A fixed seed keeps the test deterministic; the input must be unsorted for TimSort to merge
+    java.util.Collections.shuffle(all, new java.util.Random(42));
+    var input = all;
+    var sorted = sortBindings(input.toArray(new Definition[0]));
+    assertThat(sorted.size(), is(all.size()));
+    assertSameItems(expected, sorted.subList(0, expected.size()));
+    assertThat(
+        "Conversions are last",
+        sorted.subList(expected.size(), sorted.size()),
+        containsInAnyOrder(conversions.toArray()));
   }
 
   private static <T, U> void assertSameItems(List<T> expected, List<U> actual) {
