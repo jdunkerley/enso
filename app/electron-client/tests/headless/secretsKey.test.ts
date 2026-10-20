@@ -366,6 +366,18 @@ describe('rotation', () => {
     expect(await fs.readFile(file, 'utf8')).toBe(before)
   })
 
+  test('a padded or whitespace-wrapped stored key does not stop a rotation', async () => {
+    const oldKey = (await restart()).current()!
+    keyring.items.set('secrets-key', `  ${encodeKey(oldKey)}==` + String.fromCharCode(10))
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(oldKey)
+    await restarted.rotate(store)
+    const newKey = restarted.current()!
+    expect(newKey).not.toEqual(oldKey)
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(newKey))
+    await expectReadable(newKey)
+  })
+
   test('with ENSO_SECRETS_KEY, rotate throws and touches nothing', async () => {
     const envSource = new SecretsKeySource({
       env: { ENSO_SECRETS_KEY: encodeKey(randomBytes(32)) },

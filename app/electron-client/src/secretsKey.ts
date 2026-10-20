@@ -158,7 +158,7 @@ export class SecretsKeySource {
       unpromoted != null ||
       current == null ||
       !current.equals(oldKey) ||
-      entry.getPassword() !== encodeKey(oldKey) ||
+      !storedKeyEquals(entry.getPassword(), oldKey) ||
       (nextEntry.getPassword() ?? '') !== ''
     ) {
       throw new Error(
@@ -315,4 +315,14 @@ export function lazyKeyringEntries(
 ): (account: string) => Promise<KeyringEntryLike> {
   let factory: Promise<(account: string) => KeyringEntryLike> | undefined
   return async (account) => (await (factory ??= load()))(account)
+}
+
+/** Whether the keychain's text decodes to `key`: padding and whitespace around it do not matter. */
+function storedKeyEquals(stored: string | null, key: Buffer): boolean {
+  if (stored == null) return false
+  try {
+    return decodeKey(stored).equals(key)
+  } catch {
+    return false
+  }
 }
