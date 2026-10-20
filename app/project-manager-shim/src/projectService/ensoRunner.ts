@@ -181,9 +181,13 @@ class OpenedProject {
     console.log('Closing Project', this.path)
     this.closed = true
     clearTimeout(this.nextWatchdogCheck)
-    await this.gracefulShutdown()
-    // The engine has exited: its log is complete. Closed before the hooks, which may take a while.
-    this.logSink?.projectClosed()
+    try {
+      await this.gracefulShutdown()
+    } finally {
+      // The engine has exited (or failed to stop): its log is complete. Closed before the hooks,
+      // which may take a while, and even when the shutdown threw, so no tailer is left polling.
+      this.logSink?.projectClosed()
+    }
 
     for (const [hookType, hook] of this.shutdownHooks) {
       try {

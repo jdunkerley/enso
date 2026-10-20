@@ -51,7 +51,11 @@ export interface EngineLogHelloData {
   readonly logFile: string | null
 }
 
-/** Why the stream ended: the project closed, or it was not open. The client does not reconnect. */
+/**
+ * Why the stream ended: the project closed, or it was not open. On `not-open` the client retries
+ * with backoff while it is active (the project may still be opening); `closed` is terminal until
+ * the project or the client's active state changes.
+ */
 export type EngineLogEndReason = 'closed' | 'not-open'
 
 /** `end`: the last event of a stream. */
