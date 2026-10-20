@@ -29,7 +29,7 @@ import enso_dev.Table_Tests.Database.Helpers.Name_Generator
 import enso_dev.Table_Tests.Common_Table_Operations
 from enso_dev.Table_Tests.Common_Table_Operations.Util import all
 
-import enso_dev.Cloud_Tests.Network.Enso_Cloud.Cloud_Tests_Setup.Cloud_Tests_Setup
+from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets
 
 import project.Auth_Spec
 
@@ -604,10 +604,11 @@ add_table_specs suite_builder =
             Save_Connection_Data_Link.add_specs suite_builder prefix connection_details pending=Nothing
 
             suite_builder.group "[Snowflake] Secrets in connection settings" group_builder->
-                cloud_setup = Cloud_Tests_Setup.prepare
                 base_details = get_configured_connection_details
-                group_builder.specify "should allow to set up a connection with the password passed as a secret" pending=cloud_setup.pending <|
-                    cloud_setup.with_prepared_environment <|
+                ## The secrets are local ones (a temporary store with a fixture
+                   key), which also shows they work as JDBC credentials.
+                group_builder.specify "should allow to set up a connection with the password passed as a secret" <|
+                    with_local_secrets <|
                         with_secret "my_snowflake_username" base_details.credentials.username username_secret-> with_secret "my_snowflake_password" base_details.credentials.password password_secret->
                             secret_credentials = Credentials.Username_And_Password username_secret password_secret
                             details = Snowflake_Details.Snowflake base_details.account secret_credentials base_details.database base_details.schema base_details.warehouse
