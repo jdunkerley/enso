@@ -704,6 +704,7 @@
   "localVersionsAskAgainDescription": "Ask again about the folders and repositories you chose \"Don't ask again\" for.",
   "secretsSettingsSection": "Secrets",
   "secretsSettingsCustomEntryAliases": "secrets\npasswords\napi keys\ncredentials",
+  "secretCreated": "Created $0",
   "secretsNone": "No secrets yet. Secrets are encrypted on this computer and can be used in workflows and datalinks.",
   "secretsChangeValue": "Change value",
   "secretsDeleteActionText": "delete the secret '$0'",
