@@ -127,38 +127,76 @@ export class SecretsKeySource {
 
   /**
    * Replace the key with a new one, re-encrypting `store`: see Note [Crash-Safe Key Rotation]. The
-   * caller makes sure no engine is running (see {@link rotateSecretsKey}).
+   * caller makes sure no engine is running, and that rotations and resets do not overlap (see
+   * {@link rotateSecretsKey}).
    */
-  async rotate(store: LocalSecrets): Promise<void> {
+  async rotate(store: Pick<LocalSecrets, 'rotate' | 'fileKeyId'>): Promise<void> {
     if (this.fromEnvironment) throw new Error(`The key is set by ${SECRETS_KEY_VARIABLE}.`)
     const oldKey = this.#key
     if (oldKey == null) throw new Error('There is no secrets key to rotate.')
     const newKey = randomBytes(KEY_BYTES)
+    const encoded = encodeKey(newKey)
     const nextEntry = await this.#options.entry(SECRETS_KEY_NEXT_ACCOUNT)
-    nextEntry.setPassword(encodeKey(newKey))
-    try {
-      await store.rotate(oldKey, newKey)
-    } catch (error) {
-      // The file is untouched, so the pending key is worthless.
+    nextEntry.setPassword(encoded)
+    if (nextEntry.getPassword() !== encoded) {
+      // Nothing has touched the file, so whatever the item holds is worthless.
       nextEntry.deletePassword()
-      throw error
+      throw new Error(`The keychain did not keep the new key (${SECRETS_KEY_NEXT_ACCOUNT}).`)
     }
-    // From here the file is under the new key: use it now, even if the keychain fails below (the
-    // next start-up then promotes the pending item).
-    this.#key = newKey
+    try {
+      // Switch to the new key inside the store's lock, before any write queued behind this one.
+      await store.rotate(oldKey, newKey, () => {
+        this.#key = newKey
+      })
+    } catch (error) {
+      // Note [A Rotation That Fails After The Rename]
+      let fileKeyId: string | null | undefined
+      try {
+        fileKeyId = await store.fileKeyId()
+      } catch {
+        fileKeyId = undefined
+      }
+      if (fileKeyId === keyId(newKey)) {
+        console.warn('The secrets file was rotated, but the store then failed:', error)
+        this.#key = newKey
+      } else {
+        if (fileKeyId !== undefined) {
+          // The file is still under the old key, so the pending key is worthless.
+          this.#key = oldKey
+          nextEntry.deletePassword()
+        }
+        // Otherwise, the file is unknown: keep `-next` for start-up's `#recoverRotation`.
+        throw error
+      }
+    }
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
-    entry.setPassword(encodeKey(newKey))
+    entry.setPassword(encoded)
+    if (entry.getPassword() !== encoded) {
+      // Keep `-next`: the next start-up promotes it, since the file is under it.
+      throw new Error(
+        `The keychain did not keep the new key (${SECRETS_KEY_ACCOUNT}); ` +
+          'Enso will finish the rotation when it next starts.',
+      )
+    }
     nextEntry.deletePassword()
   }
+
+  /* Note [A Rotation That Fails After The Rename]
+   * =============================================
+   * `LocalSecrets.rotate` can reject after the file was replaced (say, a cleanup or a filesystem
+   * error after the rename). Rolling back then would leave the file under a key no item holds. So a
+   * failure is judged by the file, not by the rejection: if its `keyId` is the new key's, the
+   * rotation goes on to step 4; if it is any other, `-next` is dropped; if it cannot be read,
+   * `-next` stays and the next start-up decides, as for a crash. */
 
   /* Note [Crash-Safe Key Rotation]
    * ==============================
    * 1. Generate a new key.
-   * 2. Save it as the keychain item `secrets-key-next`.
+   * 2. Save it as the keychain item `secrets-key-next`, and read it back.
    * 3. `LocalSecrets.rotate`: under one hold of the lock, decrypt every value with the old key,
    *    re-encrypt it with the new one, and replace the file atomically with the new `keyId` and
    *    `keyCreated`.
-   * 4. Save the new key as `secrets-key`, then delete `secrets-key-next`.
+   * 4. Save the new key as `secrets-key`, read it back, then delete `secrets-key-next`.
    *
    * At every point some keychain item opens the file. A crash before 3 leaves the file under the
    * old key, and start-up deletes `-next`. A crash after 3 leaves the file under `-next`'s key, and
@@ -196,20 +234,36 @@ export interface SecretsActionOptions {
   readonly hasRunningProjects: () => Promise<boolean>
 }
 
+let secretsActionQueue: Promise<unknown> = Promise.resolve()
+
+/**
+ * Run `action` after every rotation or reset started before it has settled, so that two IPC calls
+ * never interleave their keychain and file steps.
+ */
+function queued<T>(action: () => Promise<T>): Promise<T> {
+  const result = secretsActionQueue.then(action, action)
+  secretsActionQueue = result.catch(() => undefined)
+  return result
+}
+
 /** `secrets.rotate`: rotate the key, unless an engine is running. */
-export async function rotateSecretsKey(options: SecretsActionOptions): Promise<void> {
-  if (await options.hasRunningProjects()) throw new Error(ROTATE_BLOCKED_BY_PROJECTS)
-  await options.keySource.rotate(options.store)
+export function rotateSecretsKey(options: SecretsActionOptions): Promise<void> {
+  return queued(async () => {
+    if (await options.hasRunningProjects()) throw new Error(ROTATE_BLOCKED_BY_PROJECTS)
+    await options.keySource.rotate(options.store)
+  })
 }
 
 /**
  * `secrets.reset`: delete the file and the key, then create a new key, unless an engine is running.
  */
-export async function resetSecrets(options: SecretsActionOptions): Promise<void> {
-  if (await options.hasRunningProjects()) throw new Error(RESET_BLOCKED_BY_PROJECTS)
-  await options.store.reset()
-  await options.keySource.forget()
-  await options.keySource.initialise()
+export function resetSecrets(options: SecretsActionOptions): Promise<void> {
+  return queued(async () => {
+    if (await options.hasRunningProjects()) throw new Error(RESET_BLOCKED_BY_PROJECTS)
+    await options.store.reset()
+    await options.keySource.forget()
+    await options.keySource.initialise()
+  })
 }
 
 /**

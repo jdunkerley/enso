@@ -60,9 +60,10 @@ desktop binary (AppImage/DMG/exe + installer).
   rotation a crash interrupted (Note [Crash-Safe Key Rotation] in
   `secretsKey.ts`). Rotate and reset both refuse while any engine runs
   (`ProjectService.hasRunningProjects`), since each engine holds the key it was
-  started with. Status comes from the shim's `secrets/status` route, not IPC.
-  Use `new Entry('Enso', account, { linux: { store: 'secret-service' } })`,
-  never `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
+  started with, and run one at a time. Status comes from the shim's
+  `secrets/status` route, not IPC. Use
+  `new Entry('Enso', account, { linux: { store: 'secret-service' } })`, never
+  `Entry.withTarget` (in 2.1.2 constructing one wipes an existing Windows
   credential), and without the pinned Linux store the default falls back to the
   kernel keyring, which the engine cannot read. The module is loaded lazily
   (`lazyKeyringEntries`, a dynamic `import()` that esbuild inlines), so a native

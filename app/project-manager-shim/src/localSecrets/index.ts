@@ -143,6 +143,20 @@ function withKey(root: Json, id: unknown, created: string): Json {
   return result
 }
 
+/**
+ * Remove a lock or temporary file, logging rather than throwing on failure. By then the write has
+ * either happened or already thrown, and a cleanup error (EPERM or EBUSY from an indexer or
+ * antivirus on Windows) must not turn a completed write into a reported failure: a caller would
+ * then roll back state that matches the new file. A lock left behind goes stale after 30 s.
+ */
+async function removeQuietly(filePath: string): Promise<void> {
+  try {
+    await fs.rm(filePath, { force: true })
+  } catch (error) {
+    console.warn(`Could not remove ${filePath}:`, error)
+  }
+}
+
 /** The encrypted local secrets file. */
 export class LocalSecrets {
   readonly #filePath: string
@@ -242,8 +256,10 @@ export class LocalSecrets {
    * `WRONG_KEY` with the file untouched. A missing file becomes an empty one under `newKey`. Only
    * Electron main calls this (never over HTTP); see Note [Crash-Safe Key Rotation] in
    * `app/electron-client/src/secretsKey.ts` for the steps around it.
+   * @param onReplaced - Called once the file is under `newKey`, still holding the lock, so that the
+   * caller's `getKey` returns `newKey` before any write queued behind the rotation runs.
    */
-  async rotate(oldKey: Buffer, newKey: Buffer): Promise<void> {
+  async rotate(oldKey: Buffer, newKey: Buffer, onReplaced?: () => void): Promise<void> {
     await this.#withLock(async () => {
       const now = timestamp(this.#now())
       const root = (await this.#readRoot()) ?? {
@@ -270,6 +286,7 @@ export class LocalSecrets {
       }
       setOwn(root, 'secrets', rotated)
       await this.#writeRoot(withKey(root, keyId(newKey), now))
+      onReplaced?.()
     })
   }
 
@@ -319,9 +336,10 @@ export class LocalSecrets {
   }
 
   async #write(mutate: (key: Buffer, root: Json, now: string) => void): Promise<void> {
-    const key = this.#getKey()
-    if (key == null) throw locked()
     await this.#withLock(async () => {
+      // Read the key under the lock: a rotation ahead of this write may have replaced it.
+      const key = this.#getKey()
+      if (key == null) throw locked()
       const now = timestamp(this.#now())
       let root = await this.#readRoot()
       if (root == null) {
@@ -351,7 +369,7 @@ export class LocalSecrets {
       await fs.writeFile(temporaryPath, JSON.stringify(root, null, 2) + '\n')
       await renameWithRetry(temporaryPath, this.#filePath)
     } finally {
-      await fs.rm(temporaryPath, { force: true })
+      await removeQuietly(temporaryPath)
     }
   }
 
@@ -385,7 +403,7 @@ export class LocalSecrets {
       try {
         return await action()
       } finally {
-        await fs.rm(lockPath, { force: true })
+        await removeQuietly(lockPath)
       }
     })
   }

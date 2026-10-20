@@ -419,4 +419,47 @@ describe('rotate', () => {
     expect(await readValueForTests(rotated, 'b')).toBe('w')
     expect(await fs.readdir(path.dirname(file))).toEqual(['secrets.json'])
   })
+
+  /** A store whose key the rotation switches inside the lock, as Electron main's does. */
+  function switchingStore() {
+    let current = FIXTURE_KEY
+    const store = new LocalSecrets({ filePath: file, getKey: () => current, now: () => NOW })
+    const rotate = () =>
+      store.rotate(FIXTURE_KEY, OTHER_KEY, () => {
+        current = OTHER_KEY
+      })
+    return { store, rotate }
+  }
+
+  test('a write queued behind a rotation uses the key in force when it writes', async () => {
+    const { store, rotate } = switchingStore()
+    await store.create('a', 'v')
+    await Promise.all([rotate(), store.create('b', 'w')])
+    expect((await readFile()).keyId).toBe(keyId(OTHER_KEY))
+    const rotated = storeFor(OTHER_KEY)
+    expect(await readValueForTests(rotated, 'a')).toBe('v')
+    expect(await readValueForTests(rotated, 'b')).toBe('w')
+  })
+
+  test('an empty file rotated with a write queued behind keeps the new key', async () => {
+    const { store, rotate } = switchingStore()
+    await store.create('a', 'v')
+    await store.delete('a')
+    await Promise.all([rotate(), store.create('b', 'w')])
+    // Before the fix, the write adopted the key it had read before the lock: the old one.
+    expect((await readFile()).keyId).toBe(keyId(OTHER_KEY))
+    expect(await readValueForTests(storeFor(OTHER_KEY), 'b')).toBe('w')
+  })
+
+  test('onReplaced is not called when the rotation fails', async () => {
+    await storeFor(FIXTURE_KEY).create('a', 'v')
+    let called = false
+    await expectKind(
+      storeFor(OTHER_KEY).rotate(OTHER_KEY, FIXTURE_KEY, () => {
+        called = true
+      }),
+      'WRONG_KEY',
+    )
+    expect(called).toBe(false)
+  })
 })
