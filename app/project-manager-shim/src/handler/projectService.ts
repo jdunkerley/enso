@@ -228,8 +228,11 @@ async function handleStoreRequest<Store>(
     try {
       body = await bodyJsonOrEmpty(request)
     } catch (error) {
-      // A new error with no `cause`, so the parser's message is not logged below either.
-      if (sensitiveBody && error instanceof SyntaxError) throw new Error(INVALID_JSON_MESSAGE)
+      if (sensitiveBody && error instanceof SyntaxError) {
+        // No `cause` on purpose: it would put the parser's message in the log below.
+        // eslint-disable-next-line preserve-caught-error
+        throw new Error(INVALID_JSON_MESSAGE)
+      }
       throw error
     }
     if (!isRecord(body)) {
