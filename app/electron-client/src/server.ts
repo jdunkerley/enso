@@ -19,6 +19,7 @@ import {
   isProjectServiceRequest,
 } from 'project-manager-shim/handler'
 import type { LocalMetadata } from 'project-manager-shim/localMetadata'
+import type { LocalSecrets } from 'project-manager-shim/localSecrets'
 import type { LocalVersioning } from 'project-manager-shim/localVersioning'
 import * as ydocServer from 'ydoc-server'
 
@@ -183,22 +184,30 @@ export class Server {
   private projectService: ProjectService
   private localMetadata: LocalMetadata
   private localVersioning: LocalVersioning
+  private localSecrets: LocalSecrets | undefined
+  private keyFromEnvironment: boolean
 
   /**
    * Create a simple HTTP server.
    * @param localMetadata - The local labels and Recent store, in Electron's `userData` directory.
    * @param localVersioning - The git-based versioning of local projects.
+   * @param localSecrets - The encrypted local secrets store; without it the `secrets/` routes fail.
+   * @param keyFromEnvironment - Whether the secrets key comes from `ENSO_SECRETS_KEY`.
    */
   constructor(
     public config: Config,
     projectService: ProjectService,
     localMetadata: LocalMetadata,
     localVersioning: LocalVersioning,
+    localSecrets?: LocalSecrets,
+    keyFromEnvironment = false,
   ) {
     this.projectsRootDirectory = projectManagement.getProjectsDirectory()
     this.projectService = projectService
     this.localMetadata = localMetadata
     this.localVersioning = localVersioning
+    this.localSecrets = localSecrets
+    this.keyFromEnvironment = keyFromEnvironment
   }
 
   /** Server constructor. */
@@ -207,10 +216,19 @@ export class Server {
     projectService: ProjectService,
     localMetadata: LocalMetadata,
     localVersioning: LocalVersioning,
+    localSecrets?: LocalSecrets,
+    keyFromEnvironment = false,
   ): Promise<Server> {
     const localConfig = Object.assign({}, config)
     localConfig.port = await findPort(localConfig.port)
-    const server = new Server(localConfig, projectService, localMetadata, localVersioning)
+    const server = new Server(
+      localConfig,
+      projectService,
+      localMetadata,
+      localVersioning,
+      localSecrets,
+      keyFromEnvironment,
+    )
     await server.run()
     return server
   }
@@ -285,6 +303,8 @@ export class Server {
         headers,
         this.localMetadata,
         this.localVersioning,
+        this.localSecrets,
+        this.keyFromEnvironment,
       )
     } else if (request.url?.startsWith('/api/')) {
       const route = new URL(`https://example.com${requestUrl.replace('/api/', '/')}`)

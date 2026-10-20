@@ -101,6 +101,20 @@ export interface UpdaterApi {
   readonly onStatus: (handler: (status: UpdateStatus) => void) => () => void
 }
 
+/**
+ * The local secrets key, which only Electron main holds; see `app/electron-client/src/secretsKey.ts`.
+ * The key's status comes from the shim's `secrets/status` route instead.
+ */
+export interface SecretsApi {
+  /**
+   * Copy the key to the clipboard. Main writes it, so the key never reaches the renderer.
+   * Resolves `false` when there is no key.
+   */
+  readonly copyKey: () => Promise<boolean>
+  /** Delete the secrets file and the key, then create a new key. */
+  readonly reset: () => Promise<void>
+}
+
 export interface ElectronApi {
   readonly navigation: NavigationApi
   readonly menu: MenuApi
@@ -111,5 +125,6 @@ export interface ElectronApi {
   readonly log: LogApi
   readonly ai: AiApi
   readonly updater: UpdaterApi
+  readonly secrets: SecretsApi
 }
 export type { FileFilter, MenuItem, MenuItemHandler }

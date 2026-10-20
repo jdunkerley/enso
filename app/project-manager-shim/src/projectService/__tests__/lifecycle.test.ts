@@ -266,3 +266,23 @@ describe('versioning on close', () => {
     }
   })
 })
+
+describe('extra environment', () => {
+  test('is passed to the engine that runs a project', async () => {
+    await createProject(path.join(root, 'P'), 'id-1')
+    const runProject = vi.fn(async () => 0)
+    const extra = new ProjectService(
+      { ...fakeRunner(), runProject },
+      [],
+      console,
+      undefined,
+      undefined,
+      () => [['ENSO_SECRETS_KEY', 'abc']],
+    )
+    await extra.runProject(UUID('id-1'), Path(root))
+    expect(runProject).toHaveBeenCalledOnce()
+    const env = (runProject.mock.calls[0] as unknown as [string, [string, string][]])[1]
+    expect(env).toContainEqual(['ENSO_SECRETS_KEY', 'abc'])
+    expect(env.map(([name]) => name)).toContain('ENSO_LOCAL_PROJECT_ID')
+  })
+})

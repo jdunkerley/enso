@@ -64,6 +64,8 @@ vi.mock('$/providers/backends', async () => {
           initVersioning: (path: Path) => versioning.initVersioning(path),
           enableVersioning: (path: Path) => versioning.enableVersioning(path),
           disableVersioning: (path: Path) => versioning.disableVersioning(path),
+          listSecrets: () => Promise.resolve([]),
+          secretsStatus: () => Promise.resolve({ state: 'empty', keyFromEnvironment: false }),
         },
       }),
   }
@@ -149,6 +151,20 @@ describe('the Local settings tab', () => {
     await user.click(button(getText('save')))
     await flushPromises()
     expect(mapboxSettingsStore.getState().accessToken).toBe('pk.typed')
+  })
+
+  test('the Secrets section is left out without the desktop secrets API', async () => {
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('mapsSettingsSection'))
+    expect(document.body.textContent).not.toContain(getText('secretsSettingsSection'))
+  })
+
+  test('the Secrets section shows with the desktop secrets API', async () => {
+    vi.stubGlobal('api', { ...window.api, secrets: {} })
+    await openLocalTab()
+    await vi.waitFor(() => expect(document.body.textContent).toContain(getText('secretsNone')))
+    expect(document.body.textContent).toContain(getText('secretsSettingsSection'))
+    vi.unstubAllGlobals()
   })
 
   test('the Updates section is left out without the desktop updater', async () => {

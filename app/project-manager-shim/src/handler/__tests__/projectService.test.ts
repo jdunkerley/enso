@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createProject, readProjectJson } from '../../localMetadata/__tests__/testUtils.js'
 import { LocalMetadata } from '../../localMetadata/index.js'
 import { readPackageLabels } from '../../localMetadata/packageYaml.js'
+import { LocalSecrets } from '../../localSecrets/index.js'
 import { createVersioning, withTempRepo } from '../../localVersioning/__tests__/testRepo.js'
 import type { LocalVersioning } from '../../localVersioning/index.js'
 import type { Runner } from '../../projectService/ensoRunner.js'
@@ -19,6 +20,8 @@ let server: http.Server
 let baseUrl: string
 let store: LocalMetadata | undefined
 let versioning: LocalVersioning | undefined
+let secrets: LocalSecrets | undefined
+let keyFromEnvironment = false
 let running = false
 /** The only part of the runner these routes use. */
 const runner: Partial<Runner> = { isProjectRunning: () => Promise.resolve(running) }
@@ -31,6 +34,11 @@ beforeEach(async () => {
     logger: { warn: vi.fn() },
   })
   running = false
+  keyFromEnvironment = false
+  secrets = new LocalSecrets({
+    filePath: path.join(root, 'secrets.json'),
+    getKey: () => Buffer.alloc(32, 7),
+  })
   versioning = createVersioning(path.join(root, 'userData'))
   server = http.createServer((request, response) => {
     void handleProjectServiceRequest(
@@ -41,6 +49,8 @@ beforeEach(async () => {
       {},
       store,
       versioning,
+      secrets,
+      keyFromEnvironment,
     )
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -386,5 +396,89 @@ describe('project/open', () => {
       cloud: { cloudProjectId: 'x', cloudApiUrl: 'https://example.com' },
     })
     expect(open).toHaveBeenCalledExactlyOnceWith('id-1', root)
+  })
+})
+
+describe('secrets routes', () => {
+  const VALUE = 'hunter2-very-secret'
+
+  test('create, list, update and delete; no response carries the value', async () => {
+    const responses = [
+      await call('secrets/create', { name: 'token', value: VALUE }),
+      await call('secrets/list', {}),
+      await call('secrets/update', { name: 'token', value: `${VALUE}-2` }),
+      await call('secrets/status', {}),
+      await call('secrets/list', {}),
+    ]
+    expect(responses[0]!.result).toBeNull()
+    expect(responses[1]!.result).toEqual([expect.objectContaining({ name: 'token' })])
+    expect(responses[2]!.result).toBeNull()
+    expect(responses[3]!.result).toMatchObject({ state: 'ready', keyFromEnvironment: false })
+    expect(JSON.stringify(responses)).not.toContain('hunter2')
+    expect((await call('secrets/delete', { name: 'token' })).result).toBeNull()
+    expect((await call('secrets/list', {})).result).toEqual([])
+  })
+
+  test('status reports where the key comes from', async () => {
+    keyFromEnvironment = true
+    expect((await call('secrets/status', {})).result).toEqual({
+      state: 'empty',
+      keyFromEnvironment: true,
+    })
+  })
+
+  test('an unreadable keychain is reported as unavailable, with nothing else', async () => {
+    secrets = new LocalSecrets({
+      filePath: path.join(root, 'secrets.json'),
+      getKey: () => null,
+      isKeyUnavailable: () => true,
+    })
+    expect((await call('secrets/status', {})).result).toEqual({
+      state: 'unavailable',
+      keyFromEnvironment: false,
+    })
+  })
+
+  test('store failures are JSON-RPC errors with the message', async () => {
+    await call('secrets/create', { name: 'a', value: 'x' })
+    const duplicate = await call('secrets/create', { name: 'a', value: 'y' })
+    expect(duplicate.error).toMatchObject({ message: expect.stringContaining('secrets/create') })
+    const badName = await call('secrets/create', { name: 'a/b', value: 'y' })
+    expect(badName.error).toBeDefined()
+    expect((await call('secrets/create', { name: 'a' })).error).toBeDefined()
+  })
+
+  test.each(['secrets/create', 'secrets/update'])(
+    '%s with a body that is not JSON: a fixed message, and the body is never logged',
+    async (name) => {
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        // V8 quotes text near the fault in some messages, e.g. `Unexpected token 'h', "hunter2-..."`.
+        const response = await fetch(`${baseUrl}/api/project-service/${name}`, {
+          method: 'POST',
+          body: `{"name": "token", "value": ${VALUE}}`,
+        })
+        const json = (await response.json()) as { error?: { message?: unknown } }
+        expect(json.error?.message).toBe(`${name} failed: The request body is not valid JSON.`)
+        expect(JSON.stringify(json)).not.toContain('hunter2')
+        expect(errorLog).toHaveBeenCalled()
+        const logged = errorLog.mock.calls
+          .flat()
+          .map((arg) =>
+            arg instanceof Error ? `${arg.message} ${arg.stack} ${String(arg.cause)}` : String(arg),
+          )
+          .join(' ')
+        expect(logged).not.toContain('hunter2')
+      } finally {
+        errorLog.mockRestore()
+      }
+    },
+  )
+
+  test('without a store the routes answer with an error', async () => {
+    secrets = undefined
+    expect((await call('secrets/list', {})).error).toMatchObject({
+      message: expect.stringContaining('Local secrets are not available in this host.'),
+    })
   })
 })

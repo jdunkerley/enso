@@ -73,6 +73,11 @@ declare global {
       readonly ENSO_AI_SOFT_CONTEXT_THRESHOLD?: string
       // @ts-expect-error The index signature is intentional to disallow unknown env vars.
       readonly ENSO_AI_HARD_CONTEXT_THRESHOLD?: string
+
+      // === Local secrets ===
+
+      // @ts-expect-error The index signature is intentional to disallow unknown env vars.
+      readonly ENSO_SECRETS_KEY?: string
     }
   }
 }

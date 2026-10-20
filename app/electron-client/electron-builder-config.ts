@@ -197,6 +197,10 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       { from: `${passedArgs.guiDist}/`, to: '.' },
       { from: `${passedArgs.ideDist}/client`, to: '.' },
     ],
+    // Native addons (`@napi-rs/keyring`'s binary, copied next to the bundle by esbuild's `.node`
+    // loader) cannot be loaded from inside the asar. Electron redirects their `require` to
+    // `app.asar.unpacked`.
+    asarUnpack: ['**/*.node'],
     extraResources: [
       {
         from: `${passedArgs.backendDist}/`,

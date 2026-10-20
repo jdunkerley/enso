@@ -267,6 +267,23 @@ export interface VersionSummary {
   readonly date: string
 }
 
+/** A local secret's name and times; never its value. */
+export interface LocalSecretSummary {
+  readonly name: string
+  readonly created: string
+  readonly updated: string
+}
+
+/** The state of the local secrets file and its key, and where the key comes from. */
+export type LocalSecretsStatus = (
+  | { readonly state: 'empty' }
+  | { readonly state: 'ready'; readonly keyCreated: string }
+  | { readonly state: 'missing' }
+  /** The keychain could not be read: the key may exist, so the secrets must not be reset. */
+  | { readonly state: 'unavailable' }
+  | { readonly state: 'wrong' }
+) & { readonly keyFromEnvironment: boolean }
+
 /** What is known about a local project's versioning. */
 export interface VersioningStatus {
   readonly git: boolean
