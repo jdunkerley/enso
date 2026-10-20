@@ -161,11 +161,27 @@ export class EngineLogChannel {
       this.emitLines('stderr', this.stderrLines.flush(), this.sessionId)
       const tailer = this.tailer
       this.tailer = undefined
-      await tailer?.stop()
+      try {
+        await tailer?.stop()
+      } catch (error) {
+        console.error('Failed to stop following the engine log:', error)
+      }
       this.state = 'closed'
-      for (const subscriber of this.subscribers) subscriber.end('closed')
+      for (const subscriber of this.subscribers) {
+        try {
+          subscriber.end('closed')
+        } catch (error) {
+          console.error('An engine log subscriber failed to end:', error)
+        }
+      }
       this.subscribers.clear()
-      for (const callback of this.closedCallbacks) callback()
+      for (const callback of this.closedCallbacks) {
+        try {
+          callback()
+        } catch (error) {
+          console.error('An engine log channel close callback failed:', error)
+        }
+      }
     })()
     return this.closing
   }
@@ -199,7 +215,13 @@ export class EngineLogChannel {
   private push(event: EngineLogEvent): void {
     if (this.state === 'closed') return
     const sequenced = this.buffer.push(event)
-    for (const subscriber of this.subscribers) subscriber.event(sequenced)
+    for (const subscriber of this.subscribers) {
+      try {
+        subscriber.event(sequenced)
+      } catch (error) {
+        console.error('An engine log subscriber failed:', error)
+      }
+    }
   }
 
   private emitLines(

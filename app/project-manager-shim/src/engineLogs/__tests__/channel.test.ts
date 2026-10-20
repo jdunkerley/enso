@@ -175,6 +175,42 @@ describe('EngineLogChannel', () => {
     expect(channel.subscribe(NOOP).closed).toBe(true)
   })
 
+  test('a throwing subscriber does not stop the others, nor the close', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      channel.subscribe({
+        event: () => {
+          throw new Error('bad subscriber')
+        },
+        end: () => {
+          throw new Error('bad subscriber')
+        },
+      })
+      const log = collect()
+      channel.engineStderr(Buffer.from('one\n'))
+      await channel.close()
+      expect(log.lines('stderr')).toEqual(['one'])
+      expect(log.ends).toEqual(['closed'])
+    } finally {
+      error.mockRestore()
+    }
+  })
+
+  test('a throwing closed callback does not stop the others', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const called: string[] = []
+      channel.onClosed(() => {
+        throw new Error('bad callback')
+      })
+      channel.onClosed(() => void called.push('second'))
+      await channel.close()
+      expect(called).toEqual(['second'])
+    } finally {
+      error.mockRestore()
+    }
+  })
+
   test('closing stops following the file', async () => {
     const log = collect()
     channel.engineStarted()
