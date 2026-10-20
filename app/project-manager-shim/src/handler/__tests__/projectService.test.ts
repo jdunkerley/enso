@@ -436,6 +436,33 @@ describe('secrets routes', () => {
     expect((await call('secrets/create', { name: 'a' })).error).toBeDefined()
   })
 
+  test.each(['secrets/create', 'secrets/update'])(
+    '%s with a body that is not JSON: a fixed message, and the body is never logged',
+    async (name) => {
+      const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        // V8 quotes text near the fault in some messages, e.g. `Unexpected token 'h', "hunter2-..."`.
+        const response = await fetch(`${baseUrl}/api/project-service/${name}`, {
+          method: 'POST',
+          body: `{"name": "token", "value": ${VALUE}}`,
+        })
+        const json = (await response.json()) as { error?: { message?: unknown } }
+        expect(json.error?.message).toBe(`${name} failed: The request body is not valid JSON.`)
+        expect(JSON.stringify(json)).not.toContain('hunter2')
+        expect(errorLog).toHaveBeenCalled()
+        const logged = errorLog.mock.calls
+          .flat()
+          .map((arg) =>
+            arg instanceof Error ? `${arg.message} ${arg.stack} ${String(arg.cause)}` : String(arg),
+          )
+          .join(' ')
+        expect(logged).not.toContain('hunter2')
+      } finally {
+        errorLog.mockRestore()
+      }
+    },
+  )
+
   test('without a store the routes answer with an error', async () => {
     secrets = undefined
     expect((await call('secrets/list', {})).error).toMatchObject({

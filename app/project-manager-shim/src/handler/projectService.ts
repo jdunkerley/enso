@@ -195,11 +195,21 @@ function requireColor(body: Record<string, unknown>, key: string): LChColor {
   throw new Error(`'${key}' must be an LCh colour.`)
 }
 
+/**
+ * The error for a secrets request whose body does not parse. V8's `JSON.parse` messages can quote
+ * part of the text, which here may be part of a secret value, so neither the response nor the log
+ * may carry them.
+ */
+const INVALID_JSON_MESSAGE = 'The request body is not valid JSON.'
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Answer a request for one of the routes served by `store`. */
+/**
+ * Answer a request for one of the routes served by `store`. With `sensitiveBody`, a body that is
+ * not valid JSON fails with {@link INVALID_JSON_MESSAGE} rather than the parser's message.
+ */
 async function handleStoreRequest<Store>(
   request: http.IncomingMessage,
   response: http.ServerResponse,
@@ -208,12 +218,20 @@ async function handleStoreRequest<Store>(
   store: Store | undefined,
   unavailableMessage: string,
   headers: Record<string, string>,
+  sensitiveBody = false,
 ): Promise<void> {
   try {
     if (store == null) {
       throw new Error(unavailableMessage)
     }
-    const body = await bodyJsonOrEmpty(request)
+    let body: unknown
+    try {
+      body = await bodyJsonOrEmpty(request)
+    } catch (error) {
+      // A new error with no `cause`, so the parser's message is not logged below either.
+      if (sensitiveBody && error instanceof SyntaxError) throw new Error(INVALID_JSON_MESSAGE)
+      throw error
+    }
     if (!isRecord(body)) {
       throw new Error('The request body must be a JSON object.')
     }
@@ -279,6 +297,7 @@ export async function handleProjectServiceRequest(
         localSecrets,
         'Local secrets are not available in this host.',
         headers,
+        true,
       )
     }
     if (Object.hasOwn(DATALINK_ROUTES, routeName)) {
