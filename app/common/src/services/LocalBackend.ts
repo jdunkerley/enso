@@ -105,8 +105,9 @@ function assetHasAllLabels(labels: readonly backend.LabelName[]) {
     labels.every((label) => asset.labels?.includes(label) === true)
 }
 
-/** The prefix of a local secret's path in Enso. */
+/** The prefix of a local secret's id (`local:<name>`), as the Java side gives it. */
 const LOCAL_SECRET_PREFIX = 'local:'
+/** The prefix of a local secret's path in Enso (`secret://<name>`). */
 const LOCAL_SECRET_PATH_PREFIX = 'secret://'
 
 /** The id of the local secret `name`. */
