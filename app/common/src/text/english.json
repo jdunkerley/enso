@@ -715,6 +715,7 @@
   "secretsLoadFailed": "Your secrets could not be read: $0",
   "secretsKeyMissing": "Your secrets cannot be read: their key is not on this computer. Set ENSO_SECRETS_KEY, or reset your secrets.",
   "secretsKeyWrong": "Your secrets were saved with a different key. Set ENSO_SECRETS_KEY to that key, or reset your secrets.",
+  "secretsKeychainUnavailable": "Your keychain could not be read. Unlock it or restart Enso.",
   "secretsReset": "Reset secrets",
   "secretsResetActionText": "delete every secret and start with a new key",
   "secretsKeyFromEnvironment": "The key is set by ENSO_SECRETS_KEY.",

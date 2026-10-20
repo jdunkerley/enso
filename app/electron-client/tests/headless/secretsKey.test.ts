@@ -3,7 +3,12 @@ import { randomBytes } from 'node:crypto'
 import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
 import { describe, expect, test, vi } from 'vitest'
 
-import { lazyKeyringEntries, SecretsKeySource, type KeyringEntryLike } from '../../src/secretsKey'
+import {
+  lazyKeyringEntries,
+  RESET_BLOCKED_BY_KEYCHAIN,
+  SecretsKeySource,
+  type KeyringEntryLike,
+} from '../../src/secretsKey'
 
 /** An in-memory keyring keyed by account; the service is always `Enso`. */
 class FakeKeyring {
@@ -148,6 +153,38 @@ describe('SecretsKeySource', () => {
     expect(keySource.current()).toBeNull()
   })
 
+  test('a keychain that could not be read is unavailable, and forget() refuses', async () => {
+    const keyring = new FakeKeyring()
+    keyring.items.set('secrets-key', encodeKey(randomBytes(32)))
+    const realGetPassword = keyring.getPassword
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    const keySource = source(keyring, { fileHasSecrets: true })
+    expect(keySource.keychainUnavailable).toBe(false)
+    await expect(keySource.initialise()).rejects.toThrow('The keychain is locked.')
+    expect(keySource.keychainUnavailable).toBe(true)
+    expect(() => keySource.assertKeychainReadable()).toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    await expect(keySource.forget()).rejects.toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    // The item nobody could read is still there.
+    expect(keyring.items.has('secrets-key')).toBe(true)
+    // Once the keychain can be read again, so can the key, and the state clears.
+    keyring.getPassword = realGetPassword
+    await keySource.initialise()
+    expect(keySource.keychainUnavailable).toBe(false)
+    expect(keySource.current()).not.toBeNull()
+    expect(() => keySource.assertKeychainReadable()).not.toThrow()
+  })
+
+  test('a keychain that reads but has no key is not unavailable', async () => {
+    const keyring = new FakeKeyring()
+    const keySource = source(keyring, { fileHasSecrets: true })
+    await keySource.initialise()
+    expect(keySource.current()).toBeNull()
+    expect(keySource.keychainUnavailable).toBe(false)
+    expect(() => keySource.assertKeychainReadable()).not.toThrow()
+  })
+
   test.each([
     ['not base64url', 'not a key!'],
     ['the wrong length', encodeKey(randomBytes(16))],
@@ -210,6 +247,7 @@ describe('lazyKeyringEntries', () => {
     await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
     expect(keySource.current()).toBeNull()
     expect(keySource.exportKey()).toBeNull()
+    expect(keySource.keychainUnavailable).toBe(true)
     await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
     expect(load).toHaveBeenCalledTimes(1)
   })

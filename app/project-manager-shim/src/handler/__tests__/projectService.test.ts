@@ -427,6 +427,18 @@ describe('secrets routes', () => {
     })
   })
 
+  test('an unreadable keychain is reported as unavailable, with nothing else', async () => {
+    secrets = new LocalSecrets({
+      filePath: path.join(root, 'secrets.json'),
+      getKey: () => null,
+      isKeyUnavailable: () => true,
+    })
+    expect((await call('secrets/status', {})).result).toEqual({
+      state: 'unavailable',
+      keyFromEnvironment: false,
+    })
+  })
+
   test('store failures are JSON-RPC errors with the message', async () => {
     await call('secrets/create', { name: 'a', value: 'x' })
     const duplicate = await call('secrets/create', { name: 'a', value: 'y' })

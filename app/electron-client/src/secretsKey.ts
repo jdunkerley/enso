@@ -11,10 +11,19 @@
  *
  * `@napi-rs/keyring` is a native module, loaded on first use ({@link lazyKeyringEntries}) rather
  * than when the bundle loads: if it cannot load, `initialise` fails, start-up logs that and carries
- * on with no key (Settings shows the secrets as locked), instead of the app failing to start.
+ * on with no key, instead of the app failing to start.
+ *
+ * A keychain that could not be read is not a missing key: the item may hold the right key all
+ * along. {@link SecretsKeySource.keychainUnavailable} records it, Settings then says so instead of
+ * offering a reset, and {@link SecretsKeySource.assertKeychainReadable} stops a reset, which would
+ * delete the secrets file and an item nobody could read.
  */
 import { randomBytes } from 'node:crypto'
 import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
+
+/** Why a reset is refused while the keychain cannot be read. */
+export const RESET_BLOCKED_BY_KEYCHAIN =
+  'Your keychain could not be read, so your secrets cannot be reset. Unlock it or restart Enso.'
 
 /** The keychain account of the master key. The service is always `Enso`. */
 export const SECRETS_KEY_ACCOUNT = 'secrets-key'
@@ -53,6 +62,7 @@ export class SecretsKeySource {
   readonly fromEnvironment: boolean
   readonly #options: SecretsKeySourceOptions
   #key: Buffer | null = null
+  #keychainUnavailable = false
 
   /** Read `ENSO_SECRETS_KEY`; an invalid value is reported and leaves the key unset. */
   constructor(options: SecretsKeySourceOptions) {
@@ -71,10 +81,34 @@ export class SecretsKeySource {
   /**
    * Called once at start-up (and after a reset): read the keychain key, and create it when there
    * is nothing to lose. Keychain failures propagate, so an unreadable keychain never leads to a key
-   * being overwritten.
+   * being overwritten, and are remembered: see {@link keychainUnavailable}.
    */
   async initialise(): Promise<void> {
     if (this.fromEnvironment) return
+    try {
+      await this.#readOrCreate()
+      this.#keychainUnavailable = false
+    } catch (error) {
+      this.#keychainUnavailable = true
+      throw error
+    }
+  }
+
+  /**
+   * Whether the last {@link initialise} failed, so the keychain may hold a key nobody could read.
+   * Never true when the key comes from `ENSO_SECRETS_KEY`.
+   */
+  get keychainUnavailable(): boolean {
+    return this.#keychainUnavailable
+  }
+
+  /** Throw {@link RESET_BLOCKED_BY_KEYCHAIN} if the keychain could not be read. */
+  assertKeychainReadable(): void {
+    if (this.#keychainUnavailable) throw new Error(RESET_BLOCKED_BY_KEYCHAIN)
+  }
+
+  /** {@link initialise}'s keychain work. */
+  async #readOrCreate(): Promise<void> {
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
     const stored = entry.getPassword()
     if (stored != null && stored !== '') {
@@ -102,10 +136,12 @@ export class SecretsKeySource {
 
   /**
    * Delete the keychain key; the caller deletes the file and then calls {@link initialise}. An
-   * environment key is left alone: it is not ours to forget.
+   * environment key is left alone: it is not ours to forget. Refused while the keychain could not
+   * be read: an item nobody could read is never deleted.
    */
   async forget(): Promise<void> {
     if (this.fromEnvironment) return
+    this.assertKeychainReadable()
     const entry = await this.#options.entry(SECRETS_KEY_ACCOUNT)
     entry.deletePassword()
     this.#key = null

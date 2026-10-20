@@ -279,6 +279,8 @@ export type LocalSecretsStatus = (
   | { readonly state: 'empty' }
   | { readonly state: 'ready'; readonly keyCreated: string }
   | { readonly state: 'missing' }
+  /** The keychain could not be read: the key may exist, so the secrets must not be reset. */
+  | { readonly state: 'unavailable' }
   | { readonly state: 'wrong' }
 ) & { readonly keyFromEnvironment: boolean }
 

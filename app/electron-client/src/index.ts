@@ -318,7 +318,7 @@ class App {
 
   /**
    * Read (or, when there is nothing to lose, create) the local secrets key. A keychain failure is
-   * only logged: the app runs without the key, and Settings shows the secrets as locked.
+   * only logged: the app runs without the key, and Settings says the keychain could not be read.
    */
   async initialiseSecretsKey() {
     try {

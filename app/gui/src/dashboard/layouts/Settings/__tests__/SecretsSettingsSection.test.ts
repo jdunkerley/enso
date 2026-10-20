@@ -1,6 +1,7 @@
 /**
  * @file The Local tab's Secrets section: the names (never a value), creating, changing and
- * deleting a secret, copying the key, and resetting when the key is missing or wrong.
+ * deleting a secret, copying the key, resetting when the key is missing or wrong, and no reset when
+ * the keychain could not be read.
  */
 import ModalHost from '$/components/ModalHost/ModalHost.vue'
 import { useModals } from '$/providers/modals'
@@ -217,6 +218,18 @@ describe('SecretsSettingsSection', () => {
     await user.click(button(getText('secretsReset'), dialog()))
     await flushPromises()
     expect(fake.reset).toHaveBeenCalledOnce()
+  })
+
+  test('a keychain that could not be read says so, and offers no Reset', async () => {
+    fake.status = { state: 'unavailable', keyFromEnvironment: false }
+    await mountSection()
+    expect(
+      document.querySelector('[data-testid="local-secrets-keychain-unavailable"]')?.textContent,
+    ).toContain(getText('secretsKeychainUnavailable'))
+    expect(document.body.textContent).not.toContain(getText('secretsKeyMissing'))
+    expect(findButton(getText('secretsReset'))).toBeUndefined()
+    expect(findButton(getText('newSecret'))).toBeUndefined()
+    expect(findButton(getText('secretsCopyKey'))).toBeUndefined()
   })
 
   test('a ready key has no Reset button', async () => {
