@@ -117,6 +117,46 @@ public class LocalSecretsKeychainTest {
   }
 
   @Test
+  public void keychainOffNeverReadsTheKeychainSoTheStoreIsLocked() throws Exception {
+    LocalSecrets.keychainReader =
+        (service, account) -> {
+          throw new AssertionError("keychain must not be read");
+        };
+    var file = tmp.getRoot().toPath().resolve("secrets.json");
+    for (var off : List.of("off", "OFF", " off ")) {
+      var s =
+          LocalSecrets.open(
+              file.toString(), null, off, tmp.getRoot().toPath(), LocalSecrets.keychain);
+      var e = assertThrows(LocalSecretException.class, () -> s.create("a", "1"));
+      assertEquals(LocalSecretException.Kind.LOCKED, e.kind());
+    }
+  }
+
+  @Test
+  public void keychainOffStillHonoursTheEnvironmentKey() throws Exception {
+    LocalSecrets.keychainReader =
+        (service, account) -> {
+          throw new AssertionError("keychain must not be read");
+        };
+    var s =
+        LocalSecrets.open(null, FIXTURE_KEY, "off", tmp.getRoot().toPath(), LocalSecrets.keychain);
+    s.create("a", "1");
+    assertEquals("1", s.read("a"));
+  }
+
+  @Test
+  public void onlyOffTurnsTheKeychainOff() throws Exception {
+    LocalSecrets.keychainReader = (service, account) -> FIXTURE_KEY;
+    for (var value : java.util.Arrays.asList(null, "", "on", "0", "false")) {
+      assertFalse(LocalSecrets.keychainDisabled(value));
+      var dir = tmp.newFolder();
+      var s = LocalSecrets.open(null, null, value, dir.toPath(), LocalSecrets.keychain);
+      s.create("a", "1");
+      assertEquals("1", s.read("a"));
+    }
+  }
+
+  @Test
   public void theWindowsTargetIsAccountDotService() {
     assertEquals("secrets-key.Enso", OsKeychain.windowsTarget("Enso", "secrets-key"));
   }

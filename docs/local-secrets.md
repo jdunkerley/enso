@@ -44,6 +44,12 @@ delete a secret. Listing secrets, or checking whether one exists, does not touch
 the keychain. The key is not cached: each operation that needs it reads it
 again.
 
+To make Enso ignore the keychain altogether, set `ENSO_SECRETS_KEYCHAIN=off`
+(any other value, or none, leaves it on). Only `ENSO_SECRETS_KEY` then counts,
+and without it the secrets are locked. A server can use this so that its key
+comes from one place only, and the standard library's tests set it so that they
+never read, or encrypt with, the key on the developer's own machine.
+
 On a server, or anywhere else without the desktop app, set `ENSO_SECRETS_KEY`
 yourself. To make a key:
 

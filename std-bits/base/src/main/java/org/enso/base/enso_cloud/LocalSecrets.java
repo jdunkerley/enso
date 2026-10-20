@@ -20,6 +20,13 @@ public final class LocalSecrets {
 
   static final String KEYCHAIN_ACCOUNT = "secrets-key";
 
+  /**
+   * The environment variable that turns the keychain lookup off: {@code ENSO_SECRETS_KEYCHAIN=off}.
+   * Tests set it so that they never reach the developer's real keychain; a server can set it so
+   * that only {@code ENSO_SECRETS_KEY} counts.
+   */
+  static final String KEYCHAIN_SWITCH_VARIABLE = "ENSO_SECRETS_KEYCHAIN";
+
   /** Reads the keychain; tests replace it with a fake. */
   static volatile KeychainReader keychainReader = new OsKeychain();
 
@@ -82,6 +89,26 @@ public final class LocalSecrets {
   }
 
   /**
+   * As {@link #open(String, String, Path, Supplier)}, but with no keychain at all when {@code
+   * keychainSwitch} (the value of {@code ENSO_SECRETS_KEYCHAIN}) is {@code off}: the keychain
+   * supplier is then never called, so a key in the real keychain is never seen.
+   */
+  static LocalSecretStore open(
+      String fileOverride,
+      String keyOverride,
+      String keychainSwitch,
+      Path home,
+      Supplier<byte[]> keychain) {
+    Supplier<byte[]> source = keychainDisabled(keychainSwitch) ? () -> null : keychain;
+    return open(fileOverride, keyOverride, home, source);
+  }
+
+  /** Whether {@code ENSO_SECRETS_KEYCHAIN} turns the keychain off; only {@code off} does. */
+  static boolean keychainDisabled(String keychainSwitch) {
+    return keychainSwitch != null && keychainSwitch.trim().equalsIgnoreCase("off");
+  }
+
+  /**
    * Reads the key stored under {@code account} for the {@code Enso} service. A missing, unreadable
    * or malformed item gives {@code null}, so the store reports it as locked.
    */
@@ -110,6 +137,7 @@ public final class LocalSecrets {
     return open(
         env("ENSO_SECRETS_FILE"),
         env("ENSO_SECRETS_KEY"),
+        env(KEYCHAIN_SWITCH_VARIABLE),
         Path.of(System.getProperty("user.home")),
         keychain);
   }
