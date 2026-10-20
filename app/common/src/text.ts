@@ -106,6 +106,7 @@ interface PlaceholderOverrides {
   readonly localVersionsOptedOut: [repository: string]
   readonly localVersionsEnabled: [repository: string]
   readonly secretsDeleteActionText: [name: string]
+  readonly secretsLoadFailed: [reason: string]
 
   readonly dragAnnouncementOneAsset: [assetTitle: string]
   readonly dragAnnouncementAssets: [count: number]

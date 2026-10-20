@@ -2,7 +2,8 @@
 /**
  * @file The Local tab's Secrets section: the names of the local secrets (never a value), with
  * buttons to create one, change a value or delete one; a button to copy the secrets key; and, when
- * the key is missing or does not fit the secrets file, a message with a reset.
+ * the key is missing or does not fit the secrets file, a message with a reset. If the names or the
+ * status cannot be read, it says so, rather than looking like there are no secrets.
  *
  * Values only ever go one way: into the secrets file. The only thing that comes back is the key,
  * and only through Electron main, which writes it to the clipboard.
@@ -11,6 +12,7 @@ import ConfirmDeleteModal from '$/components/AlertDialog/ConfirmDeleteModal.vue'
 import Button from '$/components/Button/Button.vue'
 import ButtonGroup from '$/components/Button/ButtonGroup.vue'
 import Text from '$/components/Text/Text.vue'
+import CopySecretsKeyModal from '$/dashboard/layouts/Settings/CopySecretsKeyModal.vue'
 import { useModals } from '$/providers/modals'
 import { useSettingsContext } from '$/providers/settingsContext'
 import { useText } from '$/providers/text'
@@ -47,6 +49,11 @@ const status = computed(() => statusQuery.data.value ?? null)
 const keyUnusable = computed(
   () => status.value?.state === 'missing' || status.value?.state === 'wrong',
 )
+/** Why the names or the status could not be read, or `null`. */
+const loadError = computed(() => {
+  const error = listQuery.error.value ?? statusQuery.error.value
+  return error == null ? null : error.message
+})
 
 /** Show a failure as a toast. */
 function showError(error: unknown) {
@@ -84,6 +91,8 @@ const copyKey = useMutation({
   mutationFn: async () => {
     if (await window.api?.secrets.copyKey()) {
       toasts.show(getText('secretsKeyCopied'), { type: 'success' })
+    } else {
+      toasts.show(getText('secretsNoKeyToCopy'), { type: 'error' })
     }
   },
   onError: showError,
@@ -121,11 +130,7 @@ async function askDelete(name: string) {
 }
 
 async function askCopyKey() {
-  const answer = await modals.ask(ConfirmDeleteModal, {
-    alert: getText('secretsCopyKeyWarning'),
-    actionText: getText('secretsCopyKey').toLowerCase(),
-    actionButtonLabel: getText('secretsCopyKey'),
-  })
+  const answer = await modals.ask(CopySecretsKeyModal, {})
   if (answer === 'confirm') copyKey.mutate()
 }
 
@@ -141,7 +146,10 @@ async function askReset() {
 
 <template>
   <div v-if="backend != null" class="flex flex-col gap-2" data-testid="local-secrets-section">
-    <Text v-if="keyUnusable">
+    <Text v-if="loadError != null" color="danger" testId="local-secrets-error">
+      {{ getText('secretsLoadFailed', loadError) }}
+    </Text>
+    <Text v-else-if="keyUnusable">
       {{ getText(status?.state === 'missing' ? 'secretsKeyMissing' : 'secretsKeyWrong') }}
     </Text>
     <Text v-else-if="secrets.length === 0 && listQuery.isSuccess.value">

@@ -157,11 +157,50 @@ describe('SecretsSettingsSection', () => {
     await user.click(button(getText('secretsCopyKey')))
     await vi.waitFor(dialog)
     expect(dialog().textContent).toContain(getText('secretsCopyKeyWarning'))
+    expect(dialog().textContent).toContain(
+      getText('confirmPrompt', getText('secretsCopyKeyActionText')),
+    )
+    // A plain confirm: copying deletes nothing.
+    const confirm = required(dialog().querySelector('[data-alert-dialog-confirm]'))
+    expect(confirm.className).not.toContain('bg-danger')
     expect(fake.copyKey).not.toHaveBeenCalled()
     await user.click(button(getText('secretsCopyKey'), dialog()))
     await flushPromises()
     expect(fake.copyKey).toHaveBeenCalledOnce()
     expect(fake.show).toHaveBeenCalledWith(getText('secretsKeyCopied'), expect.anything())
+  })
+
+  test('Copy secrets key with no key to copy says so', async () => {
+    fake.copyKey.mockResolvedValue(false)
+    await mountSection()
+    const user = userEvent.setup()
+    await user.click(button(getText('secretsCopyKey')))
+    await vi.waitFor(dialog)
+    await user.click(button(getText('secretsCopyKey'), dialog()))
+    await flushPromises()
+    expect(fake.copyKey).toHaveBeenCalledOnce()
+    expect(fake.show).toHaveBeenCalledExactlyOnceWith(getText('secretsNoKeyToCopy'), {
+      type: 'error',
+    })
+  })
+
+  test.each([
+    ['list', fake.listSecrets],
+    ['status', fake.secretsStatus],
+  ])('a failed %s query shows an error, not "no secrets"', async (_, query) => {
+    fake.names = []
+    query.mockImplementation(() => Promise.reject(new Error('secrets/x failed: unreadable file')))
+    await mountSection()
+    const error = required(document.querySelector('[data-testid="local-secrets-error"]'))
+    expect(error.textContent).toContain(
+      getText('secretsLoadFailed', 'secrets/x failed: unreadable file'),
+    )
+    expect(document.body.textContent).not.toContain(getText('secretsNone'))
+  })
+
+  test('no error is shown when both queries succeed', async () => {
+    await mountSection()
+    expect(document.querySelector('[data-testid="local-secrets-error"]')).toBeNull()
   })
 
   test.each([
