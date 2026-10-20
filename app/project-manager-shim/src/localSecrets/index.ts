@@ -104,8 +104,27 @@ function timestamp(date: Date): string {
 }
 
 function secretsOf(root: Json): Json {
-  if (!isRecord(root.secrets)) root.secrets = {}
+  if (!isRecord(root.secrets)) setOwn(root, 'secrets', {})
   return root.secrets as Json
+}
+
+/**
+ * Set `object[key]` as an own, enumerable property. A plain assignment to `__proto__` would call
+ * `Object.prototype`'s setter instead, so a secret with that name would silently not be stored.
+ * `JSON.parse` already defines such keys as own properties, and `JSON.stringify` writes them back.
+ */
+function setOwn(object: Json, key: string, value: unknown): void {
+  Object.defineProperty(object, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  })
+}
+
+/** `object[key]` when it is an own property, so that `__proto__` or `constructor` read as absent. */
+function getOwn(object: Json, key: string): unknown {
+  return Object.hasOwn(object, key) ? object[key] : undefined
 }
 
 /** The encrypted local secrets file. */
@@ -132,7 +151,8 @@ export class LocalSecrets {
     return Object.keys(secrets)
       .sort()
       .map((name) => {
-        const entry = isRecord(secrets[name]) ? secrets[name] : {}
+        const value = getOwn(secrets, name)
+        const entry = isRecord(value) ? value : {}
         return { name, created: String(entry.created ?? ''), updated: String(entry.updated ?? '') }
       })
   }
@@ -148,7 +168,7 @@ export class LocalSecrets {
           `A secret with the name "${name}" already exists.`,
         )
       }
-      secrets[name] = { ...encrypt(key, name, value), created: now, updated: now }
+      setOwn(secrets, name, { ...encrypt(key, name, value), created: now, updated: now })
     })
   }
 
@@ -157,13 +177,13 @@ export class LocalSecrets {
     validateName(name)
     await this.#write((key, root, now) => {
       const secrets = secretsOf(root)
-      const old = Object.hasOwn(secrets, name) ? secrets[name] : undefined
+      const old = getOwn(secrets, name)
       if (!isRecord(old)) throw notFound(name)
-      secrets[name] = {
+      setOwn(secrets, name, {
         ...encrypt(key, name, value),
         created: typeof old.created === 'string' ? old.created : now,
         updated: now,
-      }
+      })
     })
   }
 
@@ -196,7 +216,7 @@ export class LocalSecrets {
       // Keep `keyCreated` after `keyId`, as the other writers lay the file out.
       const reordered: Json = {}
       for (const [k, v] of Object.entries(current)) {
-        reordered[k] = v
+        setOwn(reordered, k, v)
         if (k === 'keyId') reordered.keyCreated = created
       }
       if (!('keyCreated' in reordered)) reordered.keyCreated = created
@@ -221,7 +241,7 @@ export class LocalSecrets {
     const key = this.#getKey()
     if (key == null) throw locked()
     const root = await this.#readRoot()
-    const entry = root == null ? undefined : secretsOf(root)[name]
+    const entry = root == null ? undefined : getOwn(secretsOf(root), name)
     if (root == null || !isRecord(entry)) throw notFound(name)
     if (keyId(key) !== root.keyId) throw wrongKey()
     try {
@@ -260,12 +280,23 @@ export class LocalSecrets {
       if (root == null) {
         root = { version: VERSION, keyId: keyId(key), keyCreated: now, secrets: {} }
       } else if (keyId(key) !== root.keyId) {
-        throw wrongKey()
+        // Note [An Empty File Adopts The Current Key]
+        if (Object.keys(secretsOf(root)).length !== 0) throw wrongKey()
+        root.keyId = keyId(key)
+        root.keyCreated = now
       }
       mutate(key, root, now)
       await this.#writeRoot(root)
     })
   }
+
+  /* Note [An Empty File Adopts The Current Key]
+   * ===========================================
+   * A file with no secrets holds nothing the old key could decrypt, and `status()` reports it as
+   * `empty`. If its `keyId` is foreign (say the keychain item was lost and the app made a new key),
+   * the next write takes the current key, rewriting `keyId` and `keyCreated`, rather than failing
+   * every save with `WRONG_KEY`. With one secret or more, a mismatch stays `WRONG_KEY`. The Java
+   * `LocalSecretStore` does the same. */
 
   async #writeRoot(root: Json): Promise<void> {
     const temporaryPath = `${this.#filePath}.tmp`

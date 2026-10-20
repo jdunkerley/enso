@@ -186,6 +186,32 @@ describe('errors', () => {
     )
   })
 
+  test('a file with no secrets under another key adopts the current key on a write', async () => {
+    await storeFor(OTHER_KEY).create('a', 'v')
+    await storeFor(OTHER_KEY).delete('a')
+    const json = await readFile()
+    json.futureField = 42
+    json.keyCreated = '2020-01-01T00:00:00Z'
+    await fs.writeFile(file, JSON.stringify(json))
+    const store = storeFor(FIXTURE_KEY)
+    expect(await store.status()).toEqual({ state: 'empty' })
+    await store.create('b', 'v2')
+    const after = await readFile()
+    expect(after.keyId).toBe(keyId(FIXTURE_KEY))
+    expect(after.keyCreated).toBe('2026-10-18T14:02:11Z')
+    expect(after.futureField).toBe(42)
+    expect(await readValueForTests(store, 'b')).toBe('v2')
+    expect(await store.status()).toEqual({ state: 'ready', keyCreated: '2026-10-18T14:02:11Z' })
+  })
+
+  test('a file with secrets under another key stays WRONG_KEY and unchanged', async () => {
+    await storeFor(OTHER_KEY).create('a', 'v')
+    const before = await fs.readFile(file, 'utf8')
+    await expectKind(storeFor(FIXTURE_KEY).delete('a'), 'WRONG_KEY')
+    await expectKind(storeFor(FIXTURE_KEY).create('b', 'v'), 'WRONG_KEY')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
   test('a value moved to another name is WRONG_KEY', async () => {
     const store = storeFor(FIXTURE_KEY)
     await store.create('a', 'v')
@@ -276,6 +302,28 @@ describe('paths, keys and names', () => {
         expect(error).toBeInstanceOf(Error)
         expect(error).not.toBeInstanceOf(LocalSecretsError)
       }
+    },
+  )
+
+  test.each(['__proto__', 'constructor', 'prototype', 'toString', 'hasOwnProperty'])(
+    'the name %s is stored like any other',
+    async (name) => {
+      const store = storeFor(FIXTURE_KEY)
+      await expectKind(readValueForTests(store, name), 'NOT_FOUND')
+      await expectKind(store.update(name, 'x'), 'NOT_FOUND')
+      await expectKind(store.delete(name), 'NOT_FOUND')
+      await store.create('plain', 'p')
+      await store.create(name, 'v1')
+      expect((await store.list()).map((s) => s.name)).toEqual([name, 'plain'].sort())
+      expect(Object.keys((await readFile()).secrets)).toContain(name)
+      expect(await readValueForTests(store, name)).toBe('v1')
+      await expectKind(store.create(name, 'again'), 'ALREADY_EXISTS')
+      await store.update(name, 'v2')
+      expect(await readValueForTests(store, name)).toBe('v2')
+      expect(await readValueForTests(store, 'plain')).toBe('p')
+      expect(Object.getPrototypeOf((await readFile()).secrets)).toBe(Object.prototype)
+      await store.delete(name)
+      expect((await store.list()).map((s) => s.name)).toEqual(['plain'])
     },
   )
 
