@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * @file The drive's toolbar: the buttons creating assets (a project, a folder, a datalink, which
- * opens the datalink dialog on the modal stack; a secret, in the desktop app), uploading and downloading, the count of cut or
- * copied assets, and the search bar. In Recent, only the count and the search bar.
+ * opens the datalink dialog on the modal stack; a secret, in the desktop app), uploading and
+ * downloading, the count of cut or copied assets, and the search bar. In Recent, only the count and
+ * the search bar.
  */
 import AssetSearchBar from '#/layouts/AssetSearchBar.vue'
 import { useNewDatalink } from '#/layouts/Drive/datalinkActions'
