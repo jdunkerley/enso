@@ -1,21 +1,40 @@
 <script setup lang="ts">
+/** @file The bottom dock: a resizable panel with a Code tab and a Logs tab. */
 import ActionButton from '@/components/ActionButton.vue'
+import BottomPanelTabs from '@/components/BottomPanel/BottomPanelTabs.vue'
+import { provideCodeTabFocus, type DockTab } from '@/components/BottomPanel/dockTab'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { useResizeObserver } from '@/composables/events'
 import { useLocalStorage } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 
 defineOptions({
   inheritAttrs: false,
 })
+
+const { logsBadge = 0 } = defineProps<{
+  /** ERROR and stderr lines the Logs tab has not shown yet. */
+  logsBadge?: number
+}>()
+defineSlots<{ code(): unknown; logs(): unknown }>()
+
+const idBase = useId()
 
 const MIN_DOCK_SIZE_PX = 20
 
 const rootElement = ref<HTMLElement>()
 
 const show = defineModel<boolean>('show', { required: true })
+const tab = defineModel<DockTab>('tab', { required: true })
+
+const codeTabFocus = provideCodeTabFocus()
+
+/** Picking the Code tab while Logs shows hands the keyboard to the code editor. */
+function onPicked(picked: DockTab) {
+  if (picked === 'code') codeTabFocus.request()
+}
 
 const savedSize = useLocalStorage<{ height: number | null }>('code-editor-size', { height: null })
 
@@ -63,7 +82,36 @@ const style = computed(() =>
           class="gutterButton topOfGutter"
           :class="{ aboveFullscreen: fullscreen || fullscreenAnimating }"
         />
-        <slot />
+        <div class="dockLayout">
+          <BottomPanelTabs
+            v-model:tab="tab"
+            class="tabs"
+            :logsBadge="logsBadge"
+            :idBase="idBase"
+            @picked="onPicked"
+          />
+          <div class="dockBody">
+            <!-- Both stay mounted: switching tabs keeps the editor's cursor and the log's scroll. -->
+            <div
+              v-show="tab === 'code'"
+              :id="`${idBase}-panel-code`"
+              class="dockPanel"
+              role="tabpanel"
+              :aria-labelledby="`${idBase}-tab-code`"
+            >
+              <slot name="code" />
+            </div>
+            <div
+              v-show="tab === 'logs'"
+              :id="`${idBase}-panel-logs`"
+              class="dockPanel"
+              role="tabpanel"
+              :aria-labelledby="`${idBase}-tab-logs`"
+            >
+              <slot name="logs" />
+            </div>
+          </div>
+        </div>
       </WithFullscreenMode>
       <ResizeHandles top v-on="resizeHandles.events" />
     </div>
@@ -95,6 +143,29 @@ const style = computed(() =>
 .v-enter-from,
 .v-leave-to {
   height: 0;
+}
+
+.dockLayout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.tabs {
+  flex: none;
+  /* Clear of the fullscreen button in the gutter. */
+  padding-left: 44px;
+}
+
+.dockPanel {
+  width: 100%;
+  height: 100%;
+}
+
+.dockBody {
+  flex: 1;
+  min-height: 0;
 }
 
 .gutterButton {

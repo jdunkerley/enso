@@ -126,6 +126,16 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   drive's labels code is in `src/dashboard/components/labels/`, and asks the
   backend's `supportsLabels`.
 
+## Engine logs (the bottom dock's Logs tab)
+
+The bottom dock (`project-view/components/BottomPanel.vue`) has Code and Logs
+tabs (`BottomPanel/`; the tab is saved under `bottom-dock-tab`). Both stay
+mounted and are switched with `v-show`. `` Mod+` `` toggles the dock on its last
+tab; `graph.toggleLogs` (`Mod+L`) opens it on Logs or closes it. The Logs tab
+and its stream client are in `project-view/components/EngineLogs/` (see its
+`CLAUDE.md`); `GraphEditor.vue` owns the stream so that the tab's error badge
+counts while it is hidden.
+
 ## Entry points
 
 - `index.html` → `src/entrypoint.ts` (browser bundle)

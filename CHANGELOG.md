@@ -11,6 +11,9 @@
   Local → Secrets, and use them in workflows.][264]
 - [New secret button in the Drive bar: create a secret without opening Settings,
   and copy its `secret://` path from the confirmation.][272]
+- [Engine logs in the project view: a Logs tab next to the code editor follows
+  the engine's log as it is written, flags errors, and scrolls back through
+  earlier lines and sessions.][279]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -317,6 +320,7 @@
 [256]: https://github.com/jdunkerley/enso/pull/256
 [264]: https://github.com/jdunkerley/enso/pull/264
 [272]: https://github.com/jdunkerley/enso/pull/272
+[279]: https://github.com/jdunkerley/enso/pull/279
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71

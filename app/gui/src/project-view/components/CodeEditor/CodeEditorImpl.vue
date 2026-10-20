@@ -4,6 +4,7 @@ import { useEnsoDiagnostics } from '@/components/CodeEditor/diagnostics'
 import { ensoSyntax } from '@/components/CodeEditor/ensoSyntax'
 import { useEnsoSourceSync } from '@/components/CodeEditor/sync'
 import { ensoHoverTooltip } from '@/components/CodeEditor/tooltips'
+import { useCodeTabFocus } from '@/components/BottomPanel/dockTab'
 import CodeMirrorRoot from '@/components/CodeMirrorRoot.vue'
 import VueHostRender, { VueHostInstance } from '@/components/VueHostRender.vue'
 import { useAutoBlur } from '@/util/autoBlur'
@@ -20,7 +21,7 @@ import {
 import { lintGutter } from '@codemirror/lint'
 import { highlightSelectionMatches } from '@codemirror/search'
 import { drawSelection, keymap } from '@codemirror/view'
-import { onMounted, toRef, useTemplateRef, type ComponentInstance } from 'vue'
+import { onMounted, toRef, useTemplateRef, watch, type ComponentInstance } from 'vue'
 
 const { store: project, module, graph } = useCurrentProject()
 
@@ -58,6 +59,14 @@ connectModuleListener()
 onMounted(() => {
   editorView.focus()
 })
+
+// The dock keeps this editor mounted while its Logs tab shows: when the user picks the Code tab
+// again, take focus as a remount would have. Only then — not when the editor merely becomes visible
+// (a kept-alive project tab re-activated, a resize), which would take the keyboard from the graph.
+const codeTabFocus = useCodeTabFocus(true)
+if (codeTabFocus != null) {
+  watch(codeTabFocus.requests, () => editorView.focus(), { flush: 'post' })
+}
 </script>
 
 <template>

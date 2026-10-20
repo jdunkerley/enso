@@ -19,7 +19,10 @@ import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
 import { graphBindings } from '@/bindings'
 import BottomPanel from '@/components/BottomPanel.vue'
+import { toggleDockTab, useDockTab } from '@/components/BottomPanel/dockTab'
 import CodeEditor from '@/components/CodeEditor.vue'
+import EngineLogPanel from '@/components/EngineLogs/EngineLogPanel.vue'
+import { useEngineLogStream } from '@/components/EngineLogs/engineLogStream'
 import ComponentBrowser, { type AiPromptSubmission } from '@/components/ComponentBrowser.vue'
 import { useAiToolHandler } from '@/components/ComponentBrowser/aiToolHandler'
 import type { Usage } from '@/components/ComponentBrowser/input'
@@ -234,6 +237,7 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 // === Action Handlers ===
 
 const showCodeEditor = ref(false)
+const dockTab = useDockTab()
 const graphTidy = useGraphTidy(graphStore, module)
 
 const localVersioning = useLocalVersioning()
@@ -265,6 +269,10 @@ const actionHandlers = registerHandlers({
     },
   },
   'graph.toggleCodeEditor': toggledAction(showCodeEditor),
+  'graph.toggleLogs': {
+    action: () => toggleDockTab(showCodeEditor, dockTab, 'logs'),
+    toggled: () => showCodeEditor.value && dockTab.value === 'logs',
+  },
   'graph.toggleDocumentationEditor': {
     action: () => rightPanel.toggleTab('documentation'),
     toggled: () => rightPanel.tab === 'documentation',
@@ -423,6 +431,19 @@ const actionHandlers = registerHandlers({
 const isActive = ref(true)
 onActivated(() => (isActive.value = true))
 onDeactivated(() => (isActive.value = false))
+
+// === Engine logs ===
+
+// Owned here, not by the Logs tab, so that the tab's badge counts while it is hidden.
+const engineLogs = useEngineLogStream({
+  project: () => assetId.value,
+  active: isActive,
+})
+const logsVisible = computed(() => showCodeEditor.value && dockTab.value === 'logs')
+// Whenever the Logs tab is showing, whatever arrives counts as seen.
+watchEffect(() => {
+  if (logsVisible.value && engineLogs.state.unseenErrors > 0) engineLogs.markSeen()
+})
 
 useGraphPaletteActions(actionHandlers, isActive)
 
@@ -786,6 +807,7 @@ const contextMenuActions: DisplayableActionName[] = [
   'components.tidyUp',
   'graph.pasteNode',
   'graph.toggleCodeEditor',
+  'graph.toggleLogs',
   'graph.toggleDocumentationEditor',
 ]
 </script>
@@ -844,8 +866,16 @@ const contextMenuActions: DisplayableActionName[] = [
       </ContextMenuTrigger>
     </PopoverRootProvider>
     <PopoverRootProvider>
-      <BottomPanel v-model:show="showCodeEditor" class="bottomPanel">
-        <CodeEditor />
+      <BottomPanel
+        v-model:show="showCodeEditor"
+        v-model:tab="dockTab"
+        :logsBadge="logsVisible ? 0 : engineLogs.state.unseenErrors"
+        class="bottomPanel"
+      >
+        <template #code><CodeEditor /></template>
+        <template #logs>
+          <EngineLogPanel :key="assetId" :stream="engineLogs" :projectId="assetId" />
+        </template>
       </BottomPanel>
     </PopoverRootProvider>
   </div>

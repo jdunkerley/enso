@@ -206,6 +206,11 @@ const displayableActions = {
     description: 'Code Editor',
     shortcut: () => graphBindings.bindings['graph.toggleCodeEditor'],
   },
+  'graph.toggleLogs': {
+    icon: 'log',
+    description: 'Engine Logs',
+    shortcut: () => graphBindings.bindings['graph.toggleLogs'],
+  },
   'graph.toggleDocumentationEditor': {
     icon: 'right_panel',
     description: 'Documentation Editor',

@@ -243,3 +243,8 @@ description and ticks it off. The flake baseline it compares against is
   of starting a selection brush. `toggleDocsAssetPanel` (and so the `editorPage`
   fixture) waits for the panel's `data-transitioning` marker to clear; do the
   same after anything else that resizes the viewport.
+- The engine log stream (`GET /api/engine-logs/stream`) is mocked in
+  `mock/localApi.ts`. With no events it answers `end` (`not-open`), and the
+  client retries with backoff. A spec adds events with `addEngineLogEvent` /
+  `addEngineLogLine` in `setupApi.local`; a fulfilled route closes the stream,
+  so events added later arrive as the client reconnects (about every 0.5 s).

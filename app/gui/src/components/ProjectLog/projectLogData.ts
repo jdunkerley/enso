@@ -11,7 +11,7 @@ export interface LogEntry {
   event: string
 }
 
-const LOG_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE']
+export const LOG_LEVELS = ['ERROR', 'WARN', 'INFO', 'DEBUG', 'TRACE'] as const
 
 // === Fetching ===
 
@@ -70,7 +70,7 @@ export function useLogData(options: LogDataOptions) {
 
 const entryRe = new RegExp(`\\[(${LOG_LEVELS.join('|')})] \\[([^\\]]+)] \\[([^\\]]+)] (.*)`)
 
-/** @internal */
+/** Parse a log line that starts an entry; `undefined` for any other line (a stack trace's, say). */
 export function parseEntry(line: string): LogEntry | undefined {
   const matched = entryRe.exec(line)
   if (!matched) return undefined
