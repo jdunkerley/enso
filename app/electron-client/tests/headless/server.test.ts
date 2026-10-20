@@ -122,6 +122,24 @@ describe('requests', () => {
     expect(reply.body).toContain('Local secrets are not available')
   })
 
+  test('the engine log stream answers a same-origin request as an event stream', async () => {
+    const reply = await send({
+      path: '/api/engine-logs/stream?project=project-x',
+      headers: sameOrigin(),
+    })
+    expect(reply.status).toBe(200)
+    // The test server's project service has no open project.
+    expect(reply.body).toBe('event: end\ndata: {"reason":"not-open"}\n\n')
+  })
+
+  test('a cross-site engine log stream request is refused', async () => {
+    const reply = await send({
+      path: '/api/engine-logs/stream?project=project-x',
+      headers: { origin: 'https://evil.example', 'sec-fetch-site': 'cross-site' },
+    })
+    expect(reply.status).toBe(403)
+  })
+
   test('a request from a tool, with neither Origin nor Sec-Fetch-Site, is served', async () => {
     expect((await send({ path: '/api/root-directory-path' })).status).toBe(200)
   })
