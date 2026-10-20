@@ -20,11 +20,24 @@ The values are encrypted with a 32-byte key, written as unpadded base64url. Enso
 finds it in this order:
 
 1. The `ENSO_SECRETS_KEY` environment variable.
-2. The operating system's keychain (coming with the desktop app: it will create
-   and keep the key for you).
+2. The operating system's keychain: the item `secrets-key` of the service
+   `Enso`, which the desktop app creates and keeps for you.
 
-Until the desktop app supports it, set `ENSO_SECRETS_KEY` yourself. To make a
-key:
+On the desktop, `enso` on the command line reads the key from the keychain too,
+so scripts that use secrets created in the app work without any setup:
+
+- **Windows:** Windows Credential Manager.
+- **Linux:** the Secret Service (GNOME Keyring, KWallet and others). The keyring
+  must be running and unlocked, as it is in a desktop session.
+- **macOS:** the login keychain. The first time, macOS asks whether `enso` may
+  use the item, and it asks again after Enso is updated.
+
+Enso only reads the keychain; it never creates or changes the item. If the
+keychain cannot be reached (for example over SSH, or on a server with no Secret
+Service), Enso has no key and the secrets are locked (see below).
+
+On a server, or anywhere else without the desktop app, set `ENSO_SECRETS_KEY`
+yourself. To make a key:
 
 ```bash
 openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n'
