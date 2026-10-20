@@ -26,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
-import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -284,7 +283,7 @@ final class LocalSecretStore {
 
   private static LocalSecretException notFound(String name) {
     return new LocalSecretException(
-        LocalSecretException.Kind.NOT_FOUND, "Cannot find secret: secret://" + name);
+        LocalSecretException.Kind.NOT_FOUND, "Cannot find secret: secret://" + name, name);
   }
 
   private ObjectNode encrypt(String name, String value) {
@@ -317,10 +316,11 @@ final class LocalSecretStore {
       cipher.updateAAD(name.getBytes(StandardCharsets.UTF_8));
       var plain = cipher.doFinal(Base64.getDecoder().decode(value));
       return new String(plain, StandardCharsets.UTF_8);
-    } catch (AEADBadTagException e) {
-      throw LocalSecretException.wrongKey();
     } catch (GeneralSecurityException | IllegalArgumentException e) {
-      throw new IllegalStateException("Could not decrypt the secret.", e);
+      // A tag that does not verify is the usual case, but a malformed nonce or value lands here
+      // too. Like the Node store, report every failure to decrypt as WRONG_KEY, so that using the
+      // secret is an Enso_Secret_Error rather than a Java panic.
+      throw LocalSecretException.wrongKey();
     }
   }
 }

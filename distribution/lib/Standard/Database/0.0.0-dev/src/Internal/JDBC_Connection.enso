@@ -8,6 +8,7 @@ import Standard.Base.Runtime.Context
 import Standard.Base.Runtime.Managed_Resource.Managed_Resource
 import Standard.Base.Runtime.State
 
+from Standard.Base.Enso_Cloud.Enso_Secret import handle_local_secret_panics
 from Standard.Table import Value_Type
 
 import project.Internal.In_Transaction.In_Transaction
@@ -202,7 +203,10 @@ create types_record url:Text properties:Vector catalog:Text="" schema:Text="" =
 
     sql_error_handler = create_sql_error_handler types_record
     java_props = properties_dict properties
-    java_connection = sql_error_handler <| types_record.getConnectionWithCatalogSchema url java_props catalog schema
+    ## Resolving a local secret among the properties can fail (a locked store,
+       another key, a deleted secret): that is an `Enso_Secret_Error`.
+    java_connection = handle_local_secret_panics <| sql_error_handler <|
+        types_record.getConnectionWithCatalogSchema url java_props catalog schema
     resource = Managed_Resource.register java_connection close_connection
     JDBC_Connection.Value resource types_record.newOperationSynchronizer sql_error_handler types_record.newBatchInsert
 

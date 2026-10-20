@@ -84,11 +84,25 @@ public class LocalSecretStoreTest {
   }
 
   @Test
+  public void aMalformedEntryIsWrongKeyLikeInNode() throws Exception {
+    var file = tmp.getRoot().toPath().resolve("secrets.json");
+    var s = store(file, FIXTURE_KEY);
+    s.create("a", "1");
+    var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    var root = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(file.toFile());
+    var entry = (com.fasterxml.jackson.databind.node.ObjectNode) root.get("secrets").get("a");
+    entry.put("nonce", "not base64!");
+    Files.writeString(file, mapper.writeValueAsString(root));
+    var e = assertThrows(LocalSecretException.class, () -> s.read("a"));
+    assertEquals(LocalSecretException.Kind.WRONG_KEY, e.kind());
+  }
+
+  @Test
   public void missingAndDuplicateNames() throws Exception {
     var s = store(tmp.getRoot().toPath().resolve("secrets.json"), FIXTURE_KEY);
-    assertEquals(
-        LocalSecretException.Kind.NOT_FOUND,
-        assertThrows(LocalSecretException.class, () -> s.read("nope")).kind());
+    var missing = assertThrows(LocalSecretException.class, () -> s.read("nope"));
+    assertEquals(LocalSecretException.Kind.NOT_FOUND, missing.kind());
+    assertEquals("nope", missing.secretName());
     s.create("a", "1");
     assertEquals(
         LocalSecretException.Kind.ALREADY_EXISTS,
