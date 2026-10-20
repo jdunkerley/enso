@@ -34,3 +34,20 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   with 18 px rows. It follows the newest row until the user scrolls up, keeps
   its place when rows are added above or dropped, and emits `reachedTop` (on a
   scroll, or a wheel at the top) to load history.
+
+## The dock and the shortcut
+
+- The Logs panel lives in the bottom dock beside the Code editor
+  (`../BottomPanel.vue`). Both tabs stay mounted and are switched with `v-show`,
+  so the code editor keeps its cursor and undo history and the log keeps its
+  scroll position and filters; only closing the dock unmounts them.
+- The stream is owned by `GraphEditor.vue`, not the panel, so the Logs tab's
+  error badge counts while the dock is closed. `markSeen()` runs while the dock
+  is open on the Logs tab.
+- `graph.toggleLogs` is `Mod+L`. The graph's key handler is a capture-phase
+  window listener, so it runs before CodeMirror and works with the code editor
+  focused (as `Mod+D` does). Our CodeMirror keymap (`util/codemirror/keymap.ts`)
+  does not include CodeMirror's default keymap, so nothing binds `Mod-l`
+  (`selectLine`) there and the shortcut cannot double-fire. If a binding for
+  `Mod-l` is ever added to that keymap, CodeMirror must keep it inside the
+  editor and the graph handler must be told to skip it, or both would run.

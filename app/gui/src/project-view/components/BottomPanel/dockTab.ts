@@ -6,6 +6,9 @@ import type { Ref } from 'vue'
 export type DockTab = 'code' | 'logs'
 
 /** Its own key: the dock's height stays under `code-editor-size`, in the shape it has always had. */
+/** The tabs in display order. */
+export const DOCK_TABS: readonly DockTab[] = ['code', 'logs']
+
 export const DOCK_TAB_STORAGE_KEY = 'bottom-dock-tab'
 
 /** The selected tab, saved in local storage. */

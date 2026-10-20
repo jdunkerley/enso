@@ -822,6 +822,7 @@
   "bottomDockTabs": "Bottom panel",
   "bottomDockCodeTab": "Code",
   "engineLogsUnseenErrors": "$0 new errors",
+  "engineLogsUnseenError": "1 new error",
   "graphToggleDocumentationEditorShortcut": "Show/Hide Documentation Editor",
   "bottomDockLogsTab": "Logs",
   "engineLogsWaiting": "Waiting for the engine…",

@@ -8,7 +8,7 @@ import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
 import { useResizeObserver } from '@/composables/events'
 import { useLocalStorage } from '@vueuse/core'
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 
 defineOptions({
   inheritAttrs: false,
@@ -19,6 +19,8 @@ const { logsBadge = 0 } = defineProps<{
   logsBadge?: number
 }>()
 defineSlots<{ code(): unknown; logs(): unknown }>()
+
+const idBase = useId()
 
 const MIN_DOCK_SIZE_PX = 20
 
@@ -74,10 +76,27 @@ const style = computed(() =>
           :class="{ aboveFullscreen: fullscreen || fullscreenAnimating }"
         />
         <div class="dockLayout">
-          <BottomPanelTabs v-model:tab="tab" class="tabs" :logsBadge="logsBadge" />
+          <BottomPanelTabs v-model:tab="tab" class="tabs" :logsBadge="logsBadge" :idBase="idBase" />
           <div class="dockBody">
-            <slot v-if="tab === 'code'" name="code" />
-            <slot v-else name="logs" />
+            <!-- Both stay mounted: switching tabs keeps the editor's cursor and the log's scroll. -->
+            <div
+              v-show="tab === 'code'"
+              :id="`${idBase}-panel-code`"
+              class="dockPanel"
+              role="tabpanel"
+              :aria-labelledby="`${idBase}-tab-code`"
+            >
+              <slot name="code" />
+            </div>
+            <div
+              v-show="tab === 'logs'"
+              :id="`${idBase}-panel-logs`"
+              class="dockPanel"
+              role="tabpanel"
+              :aria-labelledby="`${idBase}-tab-logs`"
+            >
+              <slot name="logs" />
+            </div>
           </div>
         </div>
       </WithFullscreenMode>
@@ -124,6 +143,11 @@ const style = computed(() =>
   flex: none;
   /* Clear of the fullscreen button in the gutter. */
   padding-left: 44px;
+}
+
+.dockPanel {
+  width: 100%;
+  height: 100%;
 }
 
 .dockBody {
