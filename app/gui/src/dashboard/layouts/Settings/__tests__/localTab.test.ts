@@ -71,6 +71,11 @@ vi.mock('$/providers/backends', async () => {
   }
 })
 
+// The Secrets section asks which projects are open, which needs the app's whole project machinery.
+vi.mock('$/providers/openedProjects', () => ({
+  useOpenedProjects: () => ({ listProjects: () => [].values() }),
+}))
+
 vi.mock('$/providers/localVersioning', () => ({
   useLocalVersioning: () => ({ resetPrompts: versioning.resetPrompts }),
 }))

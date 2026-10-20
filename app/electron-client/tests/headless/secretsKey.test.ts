@@ -1,11 +1,16 @@
 /** @file The master key's sources in Electron main (`src/secretsKey.ts`), against an in-memory keyring. */
-import { randomBytes } from 'node:crypto'
-import { decodeKey, encodeKey } from 'project-manager-shim/localSecrets'
-import { describe, expect, test, vi } from 'vitest'
+import { createDecipheriv, randomBytes } from 'node:crypto'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import * as path from 'node:path'
+import { decodeKey, encodeKey, keyId, LocalSecrets } from 'project-manager-shim/localSecrets'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 import {
   lazyKeyringEntries,
   RESET_BLOCKED_BY_KEYCHAIN,
+  resetSecrets,
+  rotateSecretsKey,
   SecretsKeySource,
   type KeyringEntryLike,
 } from '../../src/secretsKey'
@@ -218,7 +223,13 @@ describe('lazyKeyringEntries', () => {
     await keySource.initialise()
     await keySource.forget()
     expect(load).toHaveBeenCalledTimes(1)
-    expect(keyring.accounts).toEqual(['secrets-key', 'secrets-key'])
+    // `initialise` also looks for a pending rotation, and `forget` deletes both items.
+    expect(keyring.accounts).toEqual([
+      'secrets-key',
+      'secrets-key-next',
+      'secrets-key',
+      'secrets-key-next',
+    ])
   })
 
   test('is never loaded when ENSO_SECRETS_KEY is set', async () => {
@@ -250,5 +261,441 @@ describe('lazyKeyringEntries', () => {
     expect(keySource.keychainUnavailable).toBe(true)
     await expect(keySource.initialise()).rejects.toThrow('Cannot find module')
     expect(load).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('rotation', () => {
+  let root: string
+  let file: string
+  let keyring: FakeKeyring
+  let keySource: SecretsKeySource
+  let store: LocalSecrets
+
+  /** A key source over the shared keyring and file, as a fresh start of the app makes. */
+  function newSource(): SecretsKeySource {
+    return new SecretsKeySource({
+      env: {},
+      entry: keyring.entry,
+      fileKeyId: () => store.fileKeyId(),
+      fileHasSecrets: async () => (await store.list()).length > 0,
+    })
+  }
+
+  beforeEach(async () => {
+    root = await fs.mkdtemp(path.join(os.tmpdir(), 'secrets-rotation-'))
+    file = path.join(root, 'secrets.json')
+    keyring = new FakeKeyring()
+    store = new LocalSecrets({ filePath: file, getKey: () => keySource.current() })
+    keySource = newSource()
+    await keySource.initialise()
+    await store.create('a', 'first')
+    await store.create('b', 'second')
+  })
+
+  afterEach(async () => {
+    await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+  })
+
+  /** Decrypt a value straight from the file, independently of the store. */
+  async function readWith(key: Buffer, name: string): Promise<string> {
+    const json = JSON.parse(await fs.readFile(file, 'utf8'))
+    const entry = json.secrets[name]
+    const body = Buffer.from(entry.value, 'base64')
+    const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(entry.nonce, 'base64'))
+    decipher.setAAD(Buffer.from(name, 'utf8'))
+    decipher.setAuthTag(body.subarray(body.length - 16))
+    return Buffer.concat([
+      decipher.update(body.subarray(0, body.length - 16)),
+      decipher.final(),
+    ]).toString('utf8')
+  }
+
+  async function expectReadable(key: Buffer) {
+    expect(await store.fileKeyId()).toBe(keyId(key))
+    expect(await readWith(key, 'a')).toBe('first')
+    expect(await readWith(key, 'b')).toBe('second')
+  }
+
+  /** A fresh start of the app, over the same keyring and file. */
+  async function restart(): Promise<SecretsKeySource> {
+    keySource = newSource()
+    await keySource.initialise()
+    return keySource
+  }
+
+  test('a full rotation leaves one keychain item and a readable file', async () => {
+    const oldKey = keySource.current()!
+    await keySource.rotate(store)
+    const newKey = keySource.current()!
+    expect(newKey).not.toEqual(oldKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(decodeKey(keyring.items.get('secrets-key')!)).toEqual(newKey)
+    await expectReadable(newKey)
+    await expect(readWith(oldKey, 'a')).rejects.toThrow()
+    // The pending item is written before the file, and the main item after it.
+    expect(keyring.setPassword.mock.calls.map(([account]) => account)).toEqual([
+      'secrets-key',
+      'secrets-key-next',
+      'secrets-key',
+    ])
+    expect((await store.status()).state).toBe('ready')
+    // A restart finds nothing to recover.
+    expect((await restart()).current()).toEqual(newKey)
+  })
+
+  test('crash after step 2: start-up deletes the pending item and keeps the old key', async () => {
+    const oldKey = keySource.current()!
+    keyring.items.set('secrets-key-next', encodeKey(randomBytes(32)))
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(oldKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(oldKey))
+    await expectReadable(oldKey)
+  })
+
+  test('crash after step 3: start-up promotes the pending item, and values read', async () => {
+    const oldKey = keySource.current()!
+    const newKey = randomBytes(32)
+    keyring.items.set('secrets-key-next', encodeKey(newKey))
+    await store.rotate(oldKey, newKey)
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(newKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(newKey))
+    await expectReadable(newKey)
+    expect((await store.status()).state).toBe('ready')
+  })
+
+  test('an unreadable pending item is deleted, and never replaces the key', async () => {
+    const oldKey = keySource.current()!
+    keyring.items.set('secrets-key-next', 'not a key!')
+    expect((await restart()).current()).toEqual(oldKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+  })
+
+  test('a keychain that throws on reading the pending item is never written to', async () => {
+    keyring.items.set('secrets-key-next', encodeKey(randomBytes(32)))
+    keyring.setPassword.mockClear()
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    await expect(newSource().initialise()).rejects.toThrow('The keychain is locked.')
+    expect(keyring.setPassword).not.toHaveBeenCalled()
+    expect(keyring.items.has('secrets-key-next')).toBe(true)
+  })
+
+  test('a failed re-encryption deletes the pending item and keeps the old key', async () => {
+    const oldKey = keySource.current()!
+    // Put the file under another key, so that the store refuses with WRONG_KEY.
+    await store.reset()
+    const other = new LocalSecrets({ filePath: file, getKey: () => Buffer.alloc(32, 7) })
+    await other.create('c', 'v')
+    const before = await fs.readFile(file, 'utf8')
+    await expect(keySource.rotate(store)).rejects.toThrow(
+      'The local secrets file was created with a different key.',
+    )
+    expect(keySource.current()).toEqual(oldKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(oldKey))
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
+  test('a padded or whitespace-wrapped stored key does not stop a rotation', async () => {
+    const oldKey = (await restart()).current()!
+    keyring.items.set('secrets-key', `  ${encodeKey(oldKey)}==` + String.fromCharCode(10))
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(oldKey)
+    await restarted.rotate(store)
+    const newKey = restarted.current()!
+    expect(newKey).not.toEqual(oldKey)
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(newKey))
+    await expectReadable(newKey)
+  })
+
+  test('with ENSO_SECRETS_KEY, rotate throws and touches nothing', async () => {
+    const envSource = new SecretsKeySource({
+      env: { ENSO_SECRETS_KEY: encodeKey(randomBytes(32)) },
+      entry: () => Promise.reject(new Error('The keyring must not be used.')),
+      fileKeyId: async () => null,
+      fileHasSecrets: async () => true,
+    })
+    const before = await fs.readFile(file, 'utf8')
+    await expect(envSource.rotate(store)).rejects.toThrow('The key is set by ENSO_SECRETS_KEY.')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
+  test('with no key, rotate throws and touches nothing', async () => {
+    const empty = new FakeKeyring()
+    const locked = new SecretsKeySource({
+      env: {},
+      entry: empty.entry,
+      fileKeyId: () => store.fileKeyId(),
+      fileHasSecrets: async () => true,
+    })
+    await locked.initialise()
+    const before = await fs.readFile(file, 'utf8')
+    await expect(locked.rotate(store)).rejects.toThrow('There is no secrets key to rotate.')
+    expect(empty.items.size).toBe(0)
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
+  test('crash after setting secrets-key, before deleting -next: one item remains', async () => {
+    const oldKey = keySource.current()!
+    const newKey = randomBytes(32)
+    await store.rotate(oldKey, newKey)
+    keyring.items.set('secrets-key', encodeKey(newKey))
+    keyring.items.set('secrets-key-next', encodeKey(newKey))
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(newKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    await expectReadable(newKey)
+  })
+
+  test('a store that fails after replacing the file still completes the rotation', async () => {
+    const oldKey = keySource.current()!
+    // As when removing the lock or `.tmp` fails (EPERM from an indexer) after the rename.
+    const failingAfterRename: Pick<LocalSecrets, 'rotate' | 'fileKeyId'> = {
+      rotate: async (from, to, onReplaced) => {
+        await store.rotate(from, to, onReplaced)
+        throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
+      },
+      fileKeyId: () => store.fileKeyId(),
+    }
+    await keySource.rotate(failingAfterRename)
+    const newKey = keySource.current()!
+    expect(newKey).not.toEqual(oldKey)
+    await expectReadable(newKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect((await restart()).current()).toEqual(newKey)
+    await expectReadable(newKey)
+  })
+
+  test('a store failure with the file unknown keeps -next for start-up', async () => {
+    const failing: Pick<LocalSecrets, 'rotate' | 'fileKeyId'> = {
+      rotate: async (from, to) => {
+        // The file was replaced, but the store did not get as far as reporting it.
+        await store.rotate(from, to)
+        throw new Error('EBUSY')
+      },
+      fileKeyId: () => Promise.reject(new Error('EBUSY')),
+    }
+    await expect(keySource.rotate(failing)).rejects.toThrow('EBUSY')
+    expect(keyring.items.has('secrets-key-next')).toBe(true)
+    // A restart reaches a key that opens the file.
+    const restarted = await restart()
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    await expectReadable(restarted.current()!)
+  })
+
+  test('a keychain that does not keep -next aborts before the file changes', async () => {
+    const oldKey = keySource.current()!
+    keyring.setPassword.mockImplementation((account, password) => {
+      if (account !== 'secrets-key-next') keyring.items.set(account, password)
+    })
+    const before = await fs.readFile(file, 'utf8')
+    await expect(keySource.rotate(store)).rejects.toThrow('The keychain did not keep')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+    expect(keySource.current()).toEqual(oldKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+  })
+
+  test('a keychain that does not keep secrets-key leaves -next for start-up', async () => {
+    keyring.setPassword.mockImplementation((account, password) => {
+      if (account !== 'secrets-key') keyring.items.set(account, password)
+    })
+    await expect(keySource.rotate(store)).rejects.toThrow('The keychain did not keep')
+    const newKey = keySource.current()!
+    await expectReadable(newKey)
+    expect(keyring.items.get('secrets-key-next')).toBe(encodeKey(newKey))
+    keyring.setPassword.mockImplementation((account, password) => {
+      keyring.items.set(account, password)
+    })
+    expect((await restart()).current()).toEqual(newKey)
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    await expectReadable(newKey)
+  })
+
+  test('two rotations at once run one after the other and end consistent', async () => {
+    const options = { keySource, store, hasRunningProjects: async () => false }
+    const results = await Promise.allSettled([rotateSecretsKey(options), rotateSecretsKey(options)])
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled'])
+    const key = keySource.current()!
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(key))
+    await expectReadable(key)
+  })
+
+  test('a reset and a rotation at once do not interleave', async () => {
+    const options = { keySource, store, hasRunningProjects: async () => false }
+    const results = await Promise.allSettled([resetSecrets(options), rotateSecretsKey(options)])
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'fulfilled'])
+    const key = keySource.current()!
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(key))
+    expect(await store.fileKeyId()).toBe(keyId(key))
+  })
+
+  /** A store that fails before replacing the file, as a WRONG_KEY or a full disk would. */
+  const failingBeforeRename = (): Pick<LocalSecrets, 'rotate' | 'fileKeyId'> => ({
+    rotate: () => Promise.reject(new Error('ENOSPC: no space left on device')),
+    fileKeyId: () => store.fileKeyId(),
+  })
+
+  /** After a fresh start, exactly `secrets-key` opens the file. */
+  async function expectOnlySecretsKeyOpensFile() {
+    keyring.setPassword.mockImplementation((account, password) => {
+      keyring.items.set(account, password)
+    })
+    keyring.getPassword = (account) => keyring.items.get(account) ?? null
+    const restarted = await restart()
+    expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    expect(restarted.current()).toEqual(decodeKey(keyring.items.get('secrets-key')!))
+    await expectReadable(restarted.current()!)
+  }
+
+  test('a failed secrets-key read-back refuses a second rotation while it persists', async () => {
+    keyring.setPassword.mockImplementation((account, password) => {
+      if (account !== 'secrets-key') keyring.items.set(account, password)
+    })
+    await expect(keySource.rotate(store)).rejects.toThrow('The keychain did not keep')
+    const pending = keyring.items.get('secrets-key-next')!
+    await expect(keySource.rotate(failingBeforeRename())).rejects.toThrow('cannot be rotated now')
+    // The item holding the file's key is untouched.
+    expect(keyring.items.get('secrets-key-next')).toBe(pending)
+    await expectReadable(decodeKey(pending))
+    await expectOnlySecretsKeyOpensFile()
+  })
+
+  test('a failed secrets-key read-back is finished by the next rotation', async () => {
+    keyring.setPassword.mockImplementation((account, password) => {
+      if (account !== 'secrets-key') keyring.items.set(account, password)
+    })
+    await expect(keySource.rotate(store)).rejects.toThrow('The keychain did not keep')
+    const firstKey = keySource.current()!
+    // The keychain works again; the second rotation's store fails before the rename.
+    keyring.setPassword.mockImplementation((account, password) => {
+      keyring.items.set(account, password)
+    })
+    await expect(keySource.rotate(failingBeforeRename())).rejects.toThrow('ENOSPC')
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(firstKey))
+    expect(keyring.items.has('secrets-key-next')).toBe(false)
+    expect(keySource.current()).toEqual(firstKey)
+    await expectOnlySecretsKeyOpensFile()
+  })
+
+  test('after an unreadable keyId, a rotation is refused, then finishes the first', async () => {
+    let fileReadable = false
+    const fileKeyId = () =>
+      fileReadable ? store.fileKeyId() : Promise.reject(new Error('EBUSY: file key'))
+    // The same unreadable file, as both the key source and the store see it.
+    keySource = new SecretsKeySource({
+      env: {},
+      entry: keyring.entry,
+      fileKeyId,
+      fileHasSecrets: async () => true,
+    })
+    fileReadable = true
+    await keySource.initialise()
+    fileReadable = false
+    const flaky: Pick<LocalSecrets, 'rotate' | 'fileKeyId'> = {
+      rotate: async (from, to, onReplaced) => {
+        await store.rotate(from, to, onReplaced)
+        throw new Error('EBUSY')
+      },
+      fileKeyId,
+    }
+    await expect(keySource.rotate(flaky)).rejects.toThrow('EBUSY')
+    const firstKey = keySource.current()!
+    expect(keyring.items.get('secrets-key-next')).toBe(encodeKey(firstKey))
+    // Still unreadable: refused, and the pending item is kept.
+    await expect(keySource.rotate(flaky)).rejects.toThrow('EBUSY: file key')
+    expect(keyring.items.get('secrets-key-next')).toBe(encodeKey(firstKey))
+    // Readable again, but this rotation's store fails before the rename.
+    fileReadable = true
+    await expect(
+      keySource.rotate({
+        rotate: () => Promise.reject(new Error('ENOSPC')),
+        fileKeyId: () => store.fileKeyId(),
+      }),
+    ).rejects.toThrow('ENOSPC')
+    expect(keyring.items.get('secrets-key')).toBe(encodeKey(firstKey))
+    await expectOnlySecretsKeyOpensFile()
+  })
+
+  test('start-up that cannot promote -next still uses its key, and keeps it', async () => {
+    const oldKey = keySource.current()!
+    const newKey = randomBytes(32)
+    await store.rotate(oldKey, newKey)
+    keyring.items.set('secrets-key-next', encodeKey(newKey))
+    keyring.setPassword.mockImplementation(() => {})
+    const restarted = await restart()
+    expect(restarted.current()).toEqual(newKey)
+    expect(keyring.items.get('secrets-key-next')).toBe(encodeKey(newKey))
+    await expectOnlySecretsKeyOpensFile()
+  })
+
+  test('forget() also deletes a pending item', async () => {
+    keyring.items.set('secrets-key-next', encodeKey(randomBytes(32)))
+    await keySource.forget()
+    expect(keyring.items.size).toBe(0)
+  })
+
+  test('resetSecrets refuses while the keychain could not be read, and changes nothing', async () => {
+    const before = await fs.readFile(file, 'utf8')
+    const item = keyring.items.get('secrets-key')
+    const realGetPassword = keyring.getPassword
+    keyring.getPassword = () => {
+      throw new Error('The keychain is locked.')
+    }
+    keySource = newSource()
+    await expect(keySource.initialise()).rejects.toThrow('The keychain is locked.')
+    await expect(
+      resetSecrets({ keySource, store, hasRunningProjects: async () => false }),
+    ).rejects.toThrow(RESET_BLOCKED_BY_KEYCHAIN)
+    keyring.getPassword = realGetPassword
+    expect(keyring.items.get('secrets-key')).toBe(item)
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+  })
+
+  describe('while a project is running', () => {
+    test('rotateSecretsKey refuses, and changes nothing', async () => {
+      const oldKey = keySource.current()!
+      const before = await fs.readFile(file, 'utf8')
+      await expect(
+        rotateSecretsKey({ keySource, store, hasRunningProjects: async () => true }),
+      ).rejects.toThrow('Close open projects to rotate the key.')
+      expect(keySource.current()).toEqual(oldKey)
+      expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+      expect(await fs.readFile(file, 'utf8')).toBe(before)
+    })
+
+    test('resetSecrets refuses, and changes nothing', async () => {
+      const oldKey = keySource.current()!
+      const before = await fs.readFile(file, 'utf8')
+      await expect(
+        resetSecrets({ keySource, store, hasRunningProjects: async () => true }),
+      ).rejects.toThrow('Close open projects to reset your secrets.')
+      expect(keySource.current()).toEqual(oldKey)
+      expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+      expect(await fs.readFile(file, 'utf8')).toBe(before)
+    })
+  })
+
+  describe('with no project running', () => {
+    test('rotateSecretsKey rotates', async () => {
+      const oldKey = keySource.current()!
+      await rotateSecretsKey({ keySource, store, hasRunningProjects: async () => false })
+      expect(keySource.current()).not.toEqual(oldKey)
+      await expectReadable(keySource.current()!)
+    })
+
+    test('resetSecrets deletes the file and the key, then creates a new key', async () => {
+      const oldKey = keySource.current()!
+      await resetSecrets({ keySource, store, hasRunningProjects: async () => false })
+      await expect(fs.access(file)).rejects.toThrow()
+      expect(keySource.current()).not.toBeNull()
+      expect(keySource.current()).not.toEqual(oldKey)
+      expect([...keyring.items.keys()]).toEqual(['secrets-key'])
+    })
   })
 })

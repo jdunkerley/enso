@@ -29,9 +29,14 @@ const fake = vi.hoisted(() => ({
   secretsStatus: vi.fn(),
   copyKey: vi.fn(),
   reset: vi.fn(),
+  rotate: vi.fn(),
+  projects: [] as { state: { status: string }; nextTask: undefined }[],
   show: vi.fn(),
 }))
 
+vi.mock('$/providers/openedProjects', () => ({
+  useOpenedProjects: () => ({ listProjects: () => fake.projects.values() }),
+}))
 vi.mock('$/providers/toasts', () => ({ useToasts: () => ({ show: fake.show }) }))
 
 const { getText } = useText()
@@ -58,7 +63,12 @@ beforeEach(() => {
   fake.deleteLocalSecret.mockResolvedValue(undefined)
   fake.copyKey.mockResolvedValue(true)
   fake.reset.mockResolvedValue(undefined)
-  vi.stubGlobal('api', { ...window.api, secrets: { copyKey: fake.copyKey, reset: fake.reset } })
+  fake.rotate.mockResolvedValue(undefined)
+  fake.projects = []
+  vi.stubGlobal('api', {
+    ...window.api,
+    secrets: { copyKey: fake.copyKey, reset: fake.reset, rotate: fake.rotate },
+  })
   useModals().closeAll()
 })
 
@@ -220,6 +230,23 @@ describe('SecretsSettingsSection', () => {
     expect(fake.reset).toHaveBeenCalledOnce()
   })
 
+  test('a reset refused because a project is open says so', async () => {
+    fake.status = { state: 'wrong', keyFromEnvironment: false }
+    // As Electron delivers main's rejection to the renderer.
+    fake.reset.mockRejectedValue(
+      new Error(
+        "Error invoking remote method 'secrets-reset': Error: Close open projects to reset your secrets.",
+      ),
+    )
+    await mountSection()
+    const user = userEvent.setup()
+    await user.click(button(getText('secretsReset')))
+    await vi.waitFor(dialog)
+    await user.click(button(getText('secretsReset'), dialog()))
+    await flushPromises()
+    expect(fake.show).toHaveBeenCalledWith(getText('secretsResetCloseProjects'), { type: 'error' })
+  })
+
   test('a keychain that could not be read says so, and offers no Reset', async () => {
     fake.status = { state: 'unavailable', keyFromEnvironment: false }
     await mountSection()
@@ -241,5 +268,100 @@ describe('SecretsSettingsSection', () => {
     fake.status = { state: 'ready', keyCreated: '2026-10-18T14:02:11Z', keyFromEnvironment: true }
     await mountSection()
     expect(document.body.textContent).toContain(getText('secretsKeyFromEnvironment'))
+  })
+
+  describe('rotating the key', () => {
+    const YEAR_OLD = '2020-01-01T00:00:00Z'
+
+    test('a young key shows no banner', async () => {
+      fake.status = {
+        state: 'ready',
+        keyCreated: new Date().toISOString(),
+        keyFromEnvironment: false,
+      }
+      await mountSection()
+      expect(document.body.textContent).not.toContain(getText('secretsKeyOld'))
+    })
+
+    test('a key over a year old shows the banner', async () => {
+      fake.status = { state: 'ready', keyCreated: YEAR_OLD, keyFromEnvironment: false }
+      await mountSection()
+      expect(document.body.textContent).toContain(getText('secretsKeyOld'))
+    })
+
+    test('Rotate key asks first, then rotates and refetches the status', async () => {
+      await mountSection()
+      const user = userEvent.setup()
+      await user.click(button(getText('secretsRotateKey')))
+      await vi.waitFor(dialog)
+      expect(dialog().textContent).toContain(getText('secretsRotateActionText'))
+      expect(fake.rotate).not.toHaveBeenCalled()
+      const calls = fake.secretsStatus.mock.calls.length
+      await user.click(button(getText('secretsRotateKey'), dialog()))
+      await flushPromises()
+      expect(fake.rotate).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(fake.secretsStatus.mock.calls.length).toBeGreaterThan(calls))
+      expect(fake.show).toHaveBeenCalledWith(getText('secretsKeyRotated'), { type: 'success' })
+    })
+
+    test('Rotate key is disabled, and says why, while a project is open', async () => {
+      fake.projects = [{ state: { status: 'initialized' }, nextTask: undefined }]
+      await mountSection()
+      const rotate = button(getText('secretsRotateKey')) as HTMLButtonElement
+      expect(rotate.disabled).toBe(true)
+      expect(document.body.textContent).toContain(getText('secretsRotateCloseProjects'))
+    })
+
+    test('a closed project does not disable Rotate key', async () => {
+      fake.projects = [{ state: { status: 'not-opened' }, nextTask: undefined }]
+      await mountSection()
+      expect((button(getText('secretsRotateKey')) as HTMLButtonElement).disabled).toBe(false)
+    })
+
+    test('has no Rotate key when the key comes from the environment', async () => {
+      fake.status = { state: 'ready', keyCreated: YEAR_OLD, keyFromEnvironment: true }
+      await mountSection()
+      expect(findButton(getText('secretsRotateKey'))).toBeUndefined()
+      expect(document.body.textContent).not.toContain(getText('secretsKeyOld'))
+    })
+
+    test('has no Rotate key when the key is unusable', async () => {
+      fake.status = { state: 'missing', keyFromEnvironment: false }
+      await mountSection()
+      expect(findButton(getText('secretsRotateKey'))).toBeUndefined()
+    })
+
+    test('a rotation refused because a project is open says so', async () => {
+      fake.rotate.mockRejectedValue(
+        new Error(
+          "Error invoking remote method 'secrets-rotate': Error: Close open projects to rotate the key.",
+        ),
+      )
+      await mountSection()
+      const user = userEvent.setup()
+      await user.click(button(getText('secretsRotateKey')))
+      await vi.waitFor(dialog)
+      await user.click(button(getText('secretsRotateKey'), dialog()))
+      await flushPromises()
+      expect(fake.show).toHaveBeenCalledWith(getText('secretsRotateCloseProjects'), {
+        type: 'error',
+      })
+    })
+
+    test('any other failure to rotate is shown as it is', async () => {
+      fake.rotate.mockRejectedValue(
+        new Error('The secrets key cannot be rotated now. Restart Enso and try again.'),
+      )
+      await mountSection()
+      const user = userEvent.setup()
+      await user.click(button(getText('secretsRotateKey')))
+      await vi.waitFor(dialog)
+      await user.click(button(getText('secretsRotateKey'), dialog()))
+      await flushPromises()
+      expect(fake.show).toHaveBeenCalledWith(
+        'The secrets key cannot be rotated now. Restart Enso and try again.',
+        { type: 'error' },
+      )
+    })
   })
 })

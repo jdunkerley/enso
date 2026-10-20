@@ -381,6 +381,11 @@ export class ProjectService {
     }
   }
 
+  /** Whether any engine this service started is still running; see `Runner.hasRunningProjects`. */
+  async hasRunningProjects(): Promise<boolean> {
+    return this.runner.hasRunningProjects()
+  }
+
   /** Whether the project at `projectPath` is running. */
   async isProjectRunning(projectPath: Path): Promise<boolean> {
     return this.runner.isProjectRunning(projectPath)
