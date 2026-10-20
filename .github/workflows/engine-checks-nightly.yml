@@ -95,26 +95,13 @@ jobs:
     runs-on:
       - ubuntu-latest
     steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
       - id: wait
         name: Wait for the macOS runner
-        run: |-
-          if [ -z "$RUNNER_STATUS_TOKEN" ]; then
-            echo "::warning::The RUNNER_STATUS_TOKEN secret is not set; skipping the macOS jobs."
-            echo "online=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          online_macos='.runners[] | select(.status == "online" and any(.labels[]; .name == "self-hosted") and any(.labels[]; .name == "macOS")) | .name'
-          for minute in $(seq 0 1); do
-            runners=$(GH_TOKEN="$RUNNER_STATUS_TOKEN" gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners" --jq "$online_macos")
-            if [ -n "$runners" ]; then
-              echo "Self-hosted macOS runner online: $runners"
-              echo "online=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            if [ "$minute" -lt 1 ]; then sleep 60; fi
-          done
-          echo "::warning::No self-hosted macOS runner came online within 1 min; skipping the macOS jobs."
-          echo "online=false" >> "$GITHUB_OUTPUT"
+        run: ./tools/ci/wait-for-macos-runner.sh 1 skip
         shell: bash
         env:
           RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}

@@ -696,6 +696,8 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
 }
 
 /// How long a workflow waits for the self-hosted macOS runner before going ahead without it.
+///
+/// `macos-pull-request.yml` passes the same number to the script by hand; keep the two in step.
 const MACOS_RUNNER_WAIT_MINUTES: u32 = 1;
 
 /// Secret holding a token that may list the repository's self-hosted runners.
@@ -708,35 +710,17 @@ const RUNNER_STATUS_TOKEN_SECRET: &str = "RUNNER_STATUS_TOKEN";
 /// [`MACOS_RUNNER_WAIT_MINUTES`].
 ///
 /// GitHub has no queue timeout: a job for a runner that is offline waits a day before failing,
-/// and holds up the jobs that need it. A GitHub-hosted job checks instead.
+/// and holds up the jobs that need it. A GitHub-hosted job checks instead, with
+/// `tools/ci/wait-for-macos-runner.sh`.
 ///
 /// Shares the build script first, so that the macOS Build Script job is gated too.
 fn skip_macos_if_runner_offline(workflow: &mut Workflow) {
     share_build_script(workflow);
     const OUTPUT: &str = "online";
-    let script = format!(
-        r#"if [ -z "$RUNNER_STATUS_TOKEN" ]; then
-  echo "::warning::The {RUNNER_STATUS_TOKEN_SECRET} secret is not set; skipping the macOS jobs."
-  echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT"
-  exit 0
-fi
-online_macos='.runners[] | select(.status == "online" and any(.labels[]; .name == "self-hosted") and any(.labels[]; .name == "macOS")) | .name'
-for minute in $(seq 0 {MACOS_RUNNER_WAIT_MINUTES}); do
-  runners=$(GH_TOKEN="$RUNNER_STATUS_TOKEN" gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runners" --jq "$online_macos")
-  if [ -n "$runners" ]; then
-    echo "Self-hosted macOS runner online: $runners"
-    echo "{OUTPUT}=true" >> "$GITHUB_OUTPUT"
-    exit 0
-  fi
-  if [ "$minute" -lt {MACOS_RUNNER_WAIT_MINUTES} ]; then sleep 60; fi
-done
-echo "::warning::No self-hosted macOS runner came online within {MACOS_RUNNER_WAIT_MINUTES} min; skipping the macOS jobs."
-echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT""#
-    );
     let step = Step {
         id: Some("wait".into()),
         name: Some("Wait for the macOS runner".into()),
-        run: Some(script),
+        run: Some(format!("./tools/ci/wait-for-macos-runner.sh {MACOS_RUNNER_WAIT_MINUTES} skip")),
         shell: Some(Shell::Bash),
         env: BTreeMap::from([(
             "RUNNER_STATUS_TOKEN".into(),
@@ -748,6 +732,7 @@ echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT""#
         name: "Check the macOS runner".into(),
         runs_on: vec![RunnerLabel::LinuxLatest],
         timeout_minutes: Some(MACOS_RUNNER_WAIT_MINUTES + 5),
+        steps: vec![checkout_repo_step(None)],
         ..default()
     };
     gate.add_step_with_output(step, [OUTPUT]);
@@ -759,6 +744,62 @@ echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT""#
             job.r#if = Some(format!("needs.{gate_id}.outputs.{OUTPUT} == 'true'"));
         }
     }
+}
+
+/// Input of [`macos_checks`] that runs the engine's JVM tests.
+const MACOS_ENGINE_INPUT: &str = "engine";
+/// Input of [`macos_checks`] that runs the Standard Library tests.
+const MACOS_LIBRARIES_INPUT: &str = "libraries";
+
+/// Engine and Standard Library checks on the self-hosted macOS runner, run on request.
+///
+/// Called by the hand-written `macos-pull-request.yml` when a PR has one of the `CI: macOS …`
+/// labels. That workflow waits for the runner first and fails when it is offline, so this one does
+/// not check again.
+pub fn macos_checks() -> Result<Workflow> {
+    // Starts from the usual `clean_build_required` input, which the cleaning steps read.
+    let inputs = manual_workflow_dispatch()
+        .with_input(
+            MACOS_ENGINE_INPUT,
+            WorkflowDispatchInput::new_boolean("Run the engine's JVM tests.", false, false),
+        )
+        .with_input(
+            MACOS_LIBRARIES_INPUT,
+            WorkflowDispatchInput::new_boolean("Run the Standard Library tests.", false, false),
+        );
+    let on = Event { workflow_call: Some(WorkflowCall::try_from(inputs)?), ..default() };
+    let mut workflow = Workflow { name: "macOS Checks".into(), on, ..default() };
+
+    let target = (OS::MacOS, Arch::AArch64);
+    let graal_edition = graalvm::Edition::Community;
+    let engine_launcher = engine::EngineLauncher::TestNative;
+    let distribution =
+        workflow.add(target, job::BuildEngineDistribution { graal_edition, engine_launcher });
+
+    let jvm_tests = workflow.add_dependent(
+        target,
+        job::JvmTests { graal_edition, engine_launcher },
+        [&distribution],
+    );
+    let mut requested = vec![(jvm_tests, MACOS_ENGINE_INPUT)];
+    for scope in [
+        job::StandardLibraryTestsScope::StandardLibraryInNative,
+        job::StandardLibraryTestsScope::StandardLibraryJvm,
+        job::StandardLibraryTestsScope::Aws,
+    ] {
+        let id = workflow.add_dependent(
+            target,
+            job::StandardLibraryTests { graal_edition, engine_launcher, scope },
+            [&distribution],
+        );
+        requested.push((id, MACOS_LIBRARIES_INPUT));
+    }
+    for (id, input) in requested {
+        let job = workflow.jobs.get_mut(&id).expect("the job was just added");
+        assert!(job.r#if.is_none(), "{id} already has a condition");
+        job.r#if = Some(format!("inputs.{input}"));
+    }
+    Ok(workflow)
 }
 
 /// Add jobs that perform backend checks, including Scala and Standard Library tests.
@@ -1160,6 +1201,7 @@ pub fn generate(
         (repo_root.nightly_yml.to_path_buf(), nightly()?),
         (repo_root.engine_checks_yml.to_path_buf(), engine_checks()?),
         (repo_root.engine_checks_nightly_yml.to_path_buf(), engine_checks_nightly()?),
+        (repo_root.macos_checks_yml.to_path_buf(), macos_checks()?),
         (repo_root.extra_nightly_tests_yml.to_path_buf(), extra_nightly_tests()?),
         (repo_root.ide_packaging_yml.to_path_buf(), ide_packaging()?),
         (repo_root.engine_benchmark_yml.to_path_buf(), engine_benchmark()?),
@@ -1281,6 +1323,26 @@ mod tests {
         assert!(!condition.contains("macos"), "{condition}");
         for required in ["upload-ide-linux-amd64", "upload-ide-windows-amd64", "draft-release"] {
             assert!(condition.contains(required), "{required} missing from {condition}");
+        }
+    }
+
+    #[test]
+    fn macos_checks_run_only_what_is_requested() {
+        let workflow = macos_checks().unwrap();
+        let condition = |id: &str| workflow.jobs[id].r#if.as_deref();
+        assert_eq!(
+            condition("enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64"),
+            None
+        );
+        let gated: BTreeMap<_, _> = workflow
+            .jobs
+            .iter()
+            .filter_map(|(id, job)| Some((id.as_str(), job.r#if.as_deref()?)))
+            .collect();
+        assert_eq!(gated.values().filter(|c| **c == "inputs.engine").count(), 1, "{gated:?}");
+        assert_eq!(gated.values().filter(|c| **c == "inputs.libraries").count(), 3, "{gated:?}");
+        for job in workflow.jobs.values() {
+            assert!(job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)));
         }
     }
 
