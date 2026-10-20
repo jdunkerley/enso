@@ -142,10 +142,10 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
   }
 
   watch(
-    () => [toValue(options.active), toValue(options.project)] as const,
+    [() => toValue(options.active), () => toValue(options.project)] as const,
     ([active, project], previous) => {
       disconnect()
-      if (previous != null && previous[1] !== project) {
+      if (previous.length > 0 && previous[1] !== project) {
         model = new EngineLogModel()
         rows.value = []
       }
@@ -167,8 +167,17 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
       model.markSeen()
       state.unseenErrors = 0
     },
-    /** Put the current session's earlier lines (its whole history, oldest first) above the rows. */
-    loadHistory(lines: readonly string[]) {
+    /**
+     * Put the earlier lines of `request.sessionId` (its whole history, oldest first) above the rows.
+     * Discarded unless the stream still shows that session of that project: the fetch is slow, and
+     * the session may have restarted or the project changed meanwhile.
+     */
+    loadHistory(
+      lines: readonly string[],
+      request: { readonly project: string; readonly sessionId: string },
+    ) {
+      if (request.project !== toValue(options.project) || request.sessionId !== model.sessionId)
+        return
       model.prependHistory(lines)
       rows.value = model.rows.slice()
       publish()

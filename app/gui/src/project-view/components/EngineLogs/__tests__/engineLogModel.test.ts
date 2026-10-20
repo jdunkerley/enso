@@ -184,6 +184,30 @@ describe('EngineLogModel', () => {
     expect(f.model.sessionStartHeld).toBe(true)
   })
 
+  test('prepends history at the current session after a channel change', () => {
+    const f = feed()
+    f.hello({ sessionId: 's1' })
+    f.line('old1')
+    f.hello({ channel: 'c2', sessionId: 's2' })
+    f.skipTo(1)
+    f.line('new1')
+    f.model.prependHistory(['n0', 'new1'])
+    expect(texts(f.model.rows)).toEqual(['old1', '--skipped--', 'n0', 'new1'])
+    expect(f.model.sessionStartHeld).toBe(true)
+  })
+
+  test('a gap that changes the session lets its earlier lines be loaded', () => {
+    const f = feed()
+    f.hello()
+    f.waiting()
+    f.session('s1')
+    f.line('a')
+    f.model.commit()
+    expect(f.model.sessionStartHeld).toBe(true)
+    f.hello({ oldestSeq: 50, nextSeq: 60, sessionId: 's2' })
+    expect(f.model.sessionStartHeld).toBe(false)
+  })
+
   test('prepends every line when none of the live ones is in the history', () => {
     const f = feed()
     f.hello({ sessionId: 's1' })

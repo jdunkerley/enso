@@ -187,7 +187,33 @@ test('loadHistory puts earlier lines above the live ones', () => {
   source.emit('line', line(5, 'L3'))
   runFrames()
   expect(stream.state.sessionStartHeld).toBe(false)
-  stream.loadHistory(['L1', 'L2', 'L3'])
+  stream.loadHistory(['L1', 'L2', 'L3'], { project: PROJECT, sessionId: 's1' })
   expect(texts(stream)).toEqual(['L1', 'L2', 'L3'])
   expect(stream.state.sessionStartHeld).toBe(true)
+})
+
+test('loadHistory discards lines requested for another session or project', async () => {
+  const project = ref(PROJECT)
+  const stream = start({ project })
+  const source = FakeEventSource.latest()
+  source.emit('hello', { ...HELLO, sessionId: 's2' })
+  source.emit('line', line(5, 'L3'))
+  runFrames()
+  stream.loadHistory(['L1', 'L2', 'L3'], { project: PROJECT, sessionId: 's1' })
+  expect(texts(stream)).toEqual(['L3'])
+  project.value = 'project-other'
+  await nextTick()
+  stream.loadHistory(['L1'], { project: PROJECT, sessionId: 's2' })
+  expect(texts(stream)).toEqual([])
+})
+
+test('an unrelated change in a getter does not reconnect or clear a closed stream', async () => {
+  const unrelated = ref(0)
+  const stream = start({ active: () => unrelated.value >= 0 })
+  FakeEventSource.latest().emit('end', { reason: 'closed' })
+  runFrames()
+  unrelated.value = 1
+  await nextTick()
+  expect(FakeEventSource.created).toHaveLength(1)
+  expect(stream.state.ended).toBe('closed')
 })

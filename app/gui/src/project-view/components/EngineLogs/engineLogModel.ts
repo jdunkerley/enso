@@ -145,6 +145,9 @@ export class EngineLogModel {
   private hadEngine = false
   private sessionBeganInView = false
   private sessionFirstKey: number | undefined
+  /** The key of the first live row of the current session; history goes in at or after it. */
+  private sessionAnchorKey = 0
+  private historyLoaded = false
   private sessionRowsDropped = false
   private readonly classifier = new LineClassifier()
 
@@ -168,12 +171,12 @@ export class EngineLogModel {
       this.addDivider('skipped')
     } else if (sameChannel && this.lastSeq != null && data.oldestSeq > this.lastSeq + 1) {
       this.addDivider('skipped')
+      // The lost lines may have held a restart: a different session starts out of view.
+      if (data.sessionId !== this.sessionId) this.startSessionOutOfView()
     }
     if (!sameChannel) {
       this.lastSeq = undefined
-      this.sessionBeganInView = false
-      this.sessionRowsDropped = false
-      this.sessionFirstKey = undefined
+      this.startSessionOutOfView()
     }
     this.channel = data.channel
     this.sessionId = data.sessionId
@@ -207,6 +210,8 @@ export class EngineLogModel {
     this.sessionBeganInView = true
     this.sessionRowsDropped = false
     this.sessionFirstKey = this.nextKey
+    this.sessionAnchorKey = this.nextKey
+    this.historyLoaded = false
     this.classifier.reset()
   }
 
@@ -254,8 +259,9 @@ export class EngineLogModel {
    */
   prependHistory(lines: readonly string[]): void {
     this.commit()
+    if (this.historyLoaded) return
     const firstFileIndex = this.rows.findIndex(
-      (row) => row.kind === 'line' && row.source === 'file',
+      (row) => row.kind === 'line' && row.source === 'file' && row.key >= this.sessionAnchorKey,
     )
     const liveFile =
       firstFileIndex < 0 ?
@@ -284,9 +290,19 @@ export class EngineLogModel {
     }))
     this.previousKey -= added.length
     this.rows.splice(firstFileIndex < 0 ? this.rows.length : firstFileIndex, 0, ...keyed)
+    this.historyLoaded = true
     this.sessionBeganInView = true
     this.sessionRowsDropped = false
     this.sessionFirstKey = keyed[0]?.key ?? this.sessionFirstKey ?? this.nextKey
+  }
+
+  /** The rows from here on belong to a session whose start is not in view. */
+  private startSessionOutOfView(): void {
+    this.sessionBeganInView = false
+    this.sessionRowsDropped = false
+    this.sessionFirstKey = this.nextKey
+    this.sessionAnchorKey = this.nextKey
+    this.historyLoaded = false
   }
 
   private accept(seq: number): boolean {
