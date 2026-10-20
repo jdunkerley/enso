@@ -132,14 +132,31 @@ final class OsKeychain implements KeychainReader {
     private static final int SECRET_SCHEMA_ATTRIBUTES_OFFSET = 16;
     private static final int SECRET_SCHEMA_ATTRIBUTE_SIZE = 16;
 
-    private static final String SECURITY_FRAMEWORK =
-        "/System/Library/Frameworks/Security.framework/Security";
+    /*
+     * The libraries are held for the life of the process. JNA closes a `NativeLibrary` once it is
+     * garbage-collected, and libsecret cannot be loaded a second time: its GObject types are still
+     * registered, so the next lookup logged "cannot register existing type 'SecretService'" and
+     * hung. Each holder loads on first use; if loading fails, every later read fails too.
+     */
+    private static final class Windows {
+      static final NativeLibrary ADVAPI = NativeLibrary.getInstance("Advapi32");
+    }
+
+    private static final class Linux {
+      static final NativeLibrary GLIB = load("libglib-2.0.so.0", "glib-2.0");
+      static final NativeLibrary SECRET = load("libsecret-1.so.0", "secret-1");
+    }
+
+    private static final class Mac {
+      static final NativeLibrary SECURITY =
+          NativeLibrary.getInstance("/System/Library/Frameworks/Security.framework/Security");
+    }
 
     private Jna() {}
 
     static String readWindows(String target) {
       requireSixtyFourBit();
-      var advapi = NativeLibrary.getInstance("Advapi32");
+      var advapi = Windows.ADVAPI;
       var name = new Memory((target.length() + 1L) * Native.WCHAR_SIZE);
       name.setWideString(0, target);
       var out = pointerSlot();
@@ -167,8 +184,8 @@ final class OsKeychain implements KeychainReader {
 
     static String readLinux(String service, String account) {
       requireSixtyFourBit();
-      var glib = load("libglib-2.0.so.0", "glib-2.0");
-      var secret = load("libsecret-1.so.0", "secret-1");
+      var glib = Linux.GLIB;
+      var secret = Linux.SECRET;
 
       var schemaName = utf8(GENERIC_SCHEMA);
       var serviceAttribute = utf8("service");
@@ -230,7 +247,7 @@ final class OsKeychain implements KeychainReader {
 
     static String readMac(String service, String account) {
       requireSixtyFourBit();
-      var security = NativeLibrary.getInstance(SECURITY_FRAMEWORK);
+      var security = Mac.SECURITY;
       byte[] serviceBytes = service.getBytes(StandardCharsets.UTF_8);
       byte[] accountBytes = account.getBytes(StandardCharsets.UTF_8);
       var serviceName = bytes(serviceBytes);
