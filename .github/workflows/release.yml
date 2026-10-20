@@ -105,7 +105,7 @@ jobs:
         name: Wait for the macOS runner
         run: |-
           if [ -z "$RUNNER_STATUS_TOKEN" ]; then
-            echo "::warning::The RUNNER_STATUS_TOKEN secret is not set; releasing without macOS."
+            echo "::warning::The RUNNER_STATUS_TOKEN secret is not set; skipping the macOS jobs."
             echo "online=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -119,7 +119,7 @@ jobs:
             fi
             if [ "$minute" -lt 1 ]; then sleep 60; fi
           done
-          echo "::warning::No self-hosted macOS runner came online within 1 min; releasing without macOS."
+          echo "::warning::No self-hosted macOS runner came online within 1 min; skipping the macOS jobs."
           echo "online=false" >> "$GITHUB_OUTPUT"
         shell: bash
         env:

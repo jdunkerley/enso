@@ -404,8 +404,8 @@ pub fn share_build_script(workflow: &mut Workflow) {
     for os in [OS::Linux, OS::Windows, OS::MacOS] {
         let used = workflow.jobs.values().any(|j| uses_build_script(j) && os_of(j) == Some(os));
         if used {
-            // Keep a job that is already there: the release workflow shares its build script
-            // early, so that it can gate the macOS one (see `skip_macos_if_runner_offline`).
+            // Keep a job that is already there: workflows that gate their macOS jobs share their
+            // build script early, so the gate covers it (see `skip_macos_if_runner_offline`).
             let (id, job) = job::BuildScript.entry(target_for(os));
             workflow.jobs.entry(id.clone()).or_insert(job);
             ids.push((os, id));
@@ -691,12 +691,11 @@ fn add_release_steps(workflow: &mut Workflow) -> Result {
         [&prepare_job_id, &publish_job_id],
     );
     workflow.env("RUST_BACKTRACE", "full");
-    share_build_script(workflow);
     skip_macos_if_runner_offline(workflow);
     Ok(())
 }
 
-/// How long a release waits for the self-hosted macOS runner before going ahead without it.
+/// How long a workflow waits for the self-hosted macOS runner before going ahead without it.
 const MACOS_RUNNER_WAIT_MINUTES: u32 = 1;
 
 /// Secret holding a token that may list the repository's self-hosted runners.
@@ -709,12 +708,15 @@ const RUNNER_STATUS_TOKEN_SECRET: &str = "RUNNER_STATUS_TOKEN";
 /// [`MACOS_RUNNER_WAIT_MINUTES`].
 ///
 /// GitHub has no queue timeout: a job for a runner that is offline waits a day before failing,
-/// and would hold up the release jobs that need it. A GitHub-hosted job checks instead.
+/// and holds up the jobs that need it. A GitHub-hosted job checks instead.
+///
+/// Shares the build script first, so that the macOS Build Script job is gated too.
 fn skip_macos_if_runner_offline(workflow: &mut Workflow) {
+    share_build_script(workflow);
     const OUTPUT: &str = "online";
     let script = format!(
         r#"if [ -z "$RUNNER_STATUS_TOKEN" ]; then
-  echo "::warning::The {RUNNER_STATUS_TOKEN_SECRET} secret is not set; releasing without macOS."
+  echo "::warning::The {RUNNER_STATUS_TOKEN_SECRET} secret is not set; skipping the macOS jobs."
   echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT"
   exit 0
 fi
@@ -728,7 +730,7 @@ for minute in $(seq 0 {MACOS_RUNNER_WAIT_MINUTES}); do
   fi
   if [ "$minute" -lt {MACOS_RUNNER_WAIT_MINUTES} ]; then sleep 60; fi
 done
-echo "::warning::No self-hosted macOS runner came online within {MACOS_RUNNER_WAIT_MINUTES} min; releasing without macOS."
+echo "::warning::No self-hosted macOS runner came online within {MACOS_RUNNER_WAIT_MINUTES} min; skipping the macOS jobs."
 echo "{OUTPUT}=false" >> "$GITHUB_OUTPUT""#
     );
     let step = Step {
@@ -981,6 +983,7 @@ pub fn engine_checks_nightly() -> Result<Workflow> {
         graalvm::Edition::Community,
         engine_launcher,
     );
+    skip_macos_if_runner_offline(&mut workflow);
     Ok(workflow)
 }
 
@@ -1278,6 +1281,21 @@ mod tests {
         assert!(!condition.contains("macos"), "{condition}");
         for required in ["upload-ide-linux-amd64", "upload-ide-windows-amd64", "draft-release"] {
             assert!(condition.contains(required), "{required} missing from {condition}");
+        }
+    }
+
+    #[test]
+    fn nightly_skips_macos_jobs_when_runner_offline() {
+        let workflow = engine_checks_nightly().unwrap();
+        let macos: Vec<_> = workflow
+            .jobs
+            .iter()
+            .filter(|(_, job)| job.runs_on.iter().any(|label| matches!(label, RunnerLabel::MacOS)))
+            .collect();
+        assert!(macos.iter().any(|(id, _)| id.as_str() == "build-script-macos-aarch64"));
+        for (id, job) in macos {
+            assert!(job.needs.contains("check-the-mac-os-runner"), "{id}: {:?}", job.needs);
+            assert!(job.r#if.as_deref().unwrap_or_default().contains("outputs.online"), "{id}");
         }
     }
 
