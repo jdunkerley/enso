@@ -151,9 +151,13 @@ export class EngineLogModel {
   private sessionRowsDropped = false
   private readonly classifier = new LineClassifier()
 
-  /** Whether the rows hold the current session from its start, so that it has nothing older to load. */
+  /**
+   * Whether the current session has nothing older to load: the rows hold it from its start, or its
+   * history has been loaded (the whole session, so a later drop at the cap loses nothing that a
+   * reload could put back).
+   */
   get sessionStartHeld(): boolean {
-    return this.sessionBeganInView && !this.sessionRowsDropped
+    return this.historyLoaded || (this.sessionBeganInView && !this.sessionRowsDropped)
   }
 
   /** Where a dropped stream resumes; `undefined` before the first event of a channel. */

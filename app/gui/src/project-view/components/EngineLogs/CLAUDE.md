@@ -41,6 +41,10 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   (`../BottomPanel.vue`). Both tabs stay mounted and are switched with `v-show`,
   so the code editor keeps its cursor and undo history and the log keeps its
   scroll position and filters; only closing the dock unmounts them.
+- The code editor takes focus when the dock opens on Code (it mounts) and when
+  the user picks the Code tab while Logs shows (`useCodeTabFocus` in
+  `../BottomPanel/dockTab.ts`). Never on merely becoming visible: a kept-alive
+  project tab re-activated or a resize would take the keyboard from the graph.
 - The stream is owned by `GraphEditor.vue`, not the panel, so the Logs tab's
   error badge counts while the dock is closed. `markSeen()` runs while the dock
   is open on the Logs tab.

@@ -61,23 +61,33 @@ const shownRows = computed(() =>
   }),
 )
 
+/** The latest history or session request; only it may set `loading` and `loadError`. */
+let latestRequest = 0
+
 async function withBackend(task: (backend: LocalBackend) => Promise<void>) {
   const backend = backends.localBackend
   if (backend == null) return
+  const request = ++latestRequest
   loading.value = true
   loadError.value = undefined
   try {
     await task(backend)
   } catch (error) {
-    loadError.value = error instanceof Error ? error.message : String(error)
+    if (request === latestRequest) {
+      loadError.value = error instanceof Error ? error.message : String(error)
+    }
   } finally {
-    loading.value = false
+    if (request === latestRequest) loading.value = false
   }
 }
 
 watch(selectedSession, (sessionId) => {
   sessionRows.value = []
   follow.value = true
+  // A request still running belongs to the view being left: it no longer sets the notices.
+  latestRequest += 1
+  loading.value = false
+  loadError.value = undefined
   if (sessionId === '') return
   void withBackend(async (backend) => {
     const lines = await fetchSessionLines(backend, ProjectSessionId(sessionId))

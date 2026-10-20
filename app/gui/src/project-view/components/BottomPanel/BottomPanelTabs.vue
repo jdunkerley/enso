@@ -11,7 +11,17 @@ const { logsBadge = 0, idBase = useId() } = defineProps<{
   /** Prefix of the element ids that link each tab to its panel (`<idBase>-tab-code`, `<idBase>-panel-code`). */
   idBase?: string
 }>()
+const emit = defineEmits<{
+  /** The user picked a different tab, by a click (or Enter/Space); arrow keys only move between them. */
+  picked: [tab: DockTab]
+}>()
 const { getText } = useText()
+
+function pick(name: DockTab) {
+  if (tab.value === name) return
+  tab.value = name
+  emit('picked', name)
+}
 
 const buttons: (HTMLButtonElement | undefined)[] = []
 function setButton(index: number, element: unknown) {
@@ -63,7 +73,7 @@ function onKeydown(event: KeyboardEvent) {
       :aria-selected="tab === name"
       :tabindex="tab === name ? 0 : -1"
       :data-testid="`dock-tab-${name}`"
-      @click="tab = name"
+      @click="pick(name)"
     >
       {{ getText(name === 'code' ? 'bottomDockCodeTab' : 'bottomDockLogsTab') }}
       <span

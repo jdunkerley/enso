@@ -1,10 +1,12 @@
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { flushPromises } from '@vue/test-utils'
 import { ProjectId, ProjectSessionId } from 'enso-common/src/services/Backend'
+import { createDeferred } from 'enso-common/src/utilities/async'
 import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { effectScope, type EffectScope } from 'vue'
 import EngineLogPanel from '../EngineLogPanel.vue'
+import { LIVE_ROW_CAP } from '../engineLogModel'
 import { useEngineLogStream } from '../engineLogStream'
 import { FakeEventSource } from './fakeEventSource'
 
@@ -201,4 +203,78 @@ test('shows an earlier session, read-only', async () => {
   expect(lineTexts()).toEqual(['from yesterday'])
   // Read-only: no live notices.
   expect(wrapper.text()).not.toContain('Waiting for the engine…')
+})
+
+test('once the history has loaded, reaching the cap does not reload it at the top', async () => {
+  const { source, wrapper, flush } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 5, nextSeq: 6, sessionId: 's1', logFile: null })
+  source.emit('line', { seq: 5, source: 'file', sessionId: 's1', text: 'L3' })
+  await flush()
+  mocks.getProjectSessionLogs.mockResolvedValueOnce({ scrollId: 'done', hits: ['L1', 'L2', 'L3'] })
+  const list = wrapper.find('[role="log"]')
+  await list.trigger('wheel', { deltaY: -100 })
+  await flush()
+  expect(mocks.getProjectSessionLogs).toHaveBeenCalledTimes(1)
+  // Enough new lines to push the loaded history out at the cap.
+  for (let n = 0; n < LIVE_ROW_CAP; n++) {
+    source.emit('line', { seq: 6 + n, source: 'file', sessionId: 's1', text: `more ${n}` })
+  }
+  await flush()
+  stubScroller(list.element, 0)
+  await list.trigger('scroll')
+  await list.trigger('wheel', { deltaY: -100 })
+  await flush()
+  expect(mocks.getProjectSessionLogs).toHaveBeenCalledTimes(1)
+})
+
+const OLD_SESSION = {
+  projectId: PROJECT,
+  projectSessionId: ProjectSessionId('old'),
+  createdAt: Rfc3339DateTime('2026-10-19T09:00:00'),
+}
+
+test("going back to this session clears an earlier session's load error", async () => {
+  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
+  mocks.getProjectSessionLogs.mockRejectedValue(new Error('unreadable'))
+  const { source, wrapper, flush } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  await flush()
+  const picker = wrapper.find('select[aria-label="Session"]')
+  await picker.setValue('old')
+  await flush()
+  expect(wrapper.find('[role="alert"]').text()).toContain('unreadable')
+  await picker.setValue('')
+  await flush()
+  expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+})
+
+test('only the latest request sets the loading and error notices', async () => {
+  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
+  const history = createDeferred<{ scrollId: string; hits: string[] }>()
+  const earlier = createDeferred<{ scrollId: string; hits: string[] }>()
+  mocks.getProjectSessionLogs.mockImplementation((sessionId: string) =>
+    sessionId === 'old' ? earlier.promise : history.promise,
+  )
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 5, nextSeq: 6, sessionId: 's1', logFile: null })
+  source.emit('line', { seq: 5, source: 'file', sessionId: 's1', text: 'live' })
+  await flush()
+  const loadingNotice = () =>
+    wrapper.findAll('[role="status"]').some((n) => n.text().includes('Loading'))
+  await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
+  await flush()
+  expect(loadingNotice()).toBe(true)
+  // The earlier session is asked for while the history is still being read.
+  await wrapper.find('select[aria-label="Session"]').setValue('old')
+  await flush()
+  expect(loadingNotice()).toBe(true)
+  // The stale history request fails: it neither ends the loading nor reports an error.
+  history.reject(new Error('stale failure'))
+  await flush()
+  expect(loadingNotice()).toBe(true)
+  expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  earlier.resolve({ scrollId: 'done', hits: ['from yesterday'] })
+  await flush()
+  expect(loadingNotice()).toBe(false)
+  expect(lineTexts()).toEqual(['from yesterday'])
 })

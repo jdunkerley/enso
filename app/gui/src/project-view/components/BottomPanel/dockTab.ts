@@ -1,6 +1,7 @@
 /** @file Which tab of the bottom dock shows: remembered across reloads, shared by every project tab. */
+import { createContextStore } from '@/providers'
 import { useLocalStorage } from '@vueuse/core'
-import type { Ref } from 'vue'
+import { readonly, ref, type Ref } from 'vue'
 
 /** The bottom dock's tabs. */
 export type DockTab = 'code' | 'logs'
@@ -27,3 +28,22 @@ export function toggleDockTab(show: Ref<boolean>, tab: Ref<DockTab>, target: Doc
     show.value = true
   }
 }
+
+/**
+ * Asks the Code tab's content (the code editor) to take keyboard focus. The dock requests it when
+ * the user picks the Code tab while Logs shows; nothing else does, so re-activating a kept-alive
+ * project tab or resizing the dock never takes focus from the graph.
+ */
+function codeTabFocus() {
+  const requests = ref(0)
+  return {
+    /** Counts the requests: watch it (`flush: 'post'`, once the Code tab is shown) to take focus. */
+    requests: readonly(requests),
+    request: () => void (requests.value += 1),
+  }
+}
+
+export const [provideCodeTabFocus, useCodeTabFocus] = createContextStore(
+  'Code tab focus',
+  codeTabFocus,
+)

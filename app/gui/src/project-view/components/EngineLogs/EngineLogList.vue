@@ -147,6 +147,12 @@ watch(follow, (following) => {
   outline: none;
 }
 
+/* The list is focusable (to scroll it with the keyboard): show where keyboard focus is. */
+.EngineLogList:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
 .content {
   position: relative;
   width: 100%;

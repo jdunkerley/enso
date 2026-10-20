@@ -184,6 +184,21 @@ describe('EngineLogModel', () => {
     expect(f.model.sessionStartHeld).toBe(true)
   })
 
+  test('after its history has loaded, a drop at the cap leaves nothing older to load', () => {
+    const f = feed()
+    f.hello({ sessionId: 's1' })
+    f.line('L3')
+    f.model.prependHistory(['L1', 'L2', 'L3'])
+    expect(f.model.sessionStartHeld).toBe(true)
+    for (let n = 0; n < LIVE_ROW_CAP; n++) f.line(`more ${n}`)
+    f.model.commit()
+    expect(texts(f.model.rows)).not.toContain('L1')
+    expect(f.model.sessionStartHeld).toBe(true)
+    // A new session starts out of view again: its earlier lines can be loaded.
+    f.hello({ channel: 'c2', sessionId: 's2' })
+    expect(f.model.sessionStartHeld).toBe(false)
+  })
+
   test('prepends history at the current session after a channel change', () => {
     const f = feed()
     f.hello({ sessionId: 's1' })

@@ -2,7 +2,7 @@
 /** @file The bottom dock: a resizable panel with a Code tab and a Logs tab. */
 import ActionButton from '@/components/ActionButton.vue'
 import BottomPanelTabs from '@/components/BottomPanel/BottomPanelTabs.vue'
-import type { DockTab } from '@/components/BottomPanel/dockTab'
+import { provideCodeTabFocus, type DockTab } from '@/components/BottomPanel/dockTab'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import WithFullscreenMode from '@/components/WithFullscreenMode.vue'
@@ -28,6 +28,13 @@ const rootElement = ref<HTMLElement>()
 
 const show = defineModel<boolean>('show', { required: true })
 const tab = defineModel<DockTab>('tab', { required: true })
+
+const codeTabFocus = provideCodeTabFocus()
+
+/** Picking the Code tab while Logs shows hands the keyboard to the code editor. */
+function onPicked(picked: DockTab) {
+  if (picked === 'code') codeTabFocus.request()
+}
 
 const savedSize = useLocalStorage<{ height: number | null }>('code-editor-size', { height: null })
 
@@ -76,7 +83,13 @@ const style = computed(() =>
           :class="{ aboveFullscreen: fullscreen || fullscreenAnimating }"
         />
         <div class="dockLayout">
-          <BottomPanelTabs v-model:tab="tab" class="tabs" :logsBadge="logsBadge" :idBase="idBase" />
+          <BottomPanelTabs
+            v-model:tab="tab"
+            class="tabs"
+            :logsBadge="logsBadge"
+            :idBase="idBase"
+            @picked="onPicked"
+          />
           <div class="dockBody">
             <!-- Both stay mounted: switching tabs keeps the editor's cursor and the log's scroll. -->
             <div
