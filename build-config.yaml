@@ -15,3 +15,17 @@ required-versions:
   # NB. The Rust version is pinned in rust-toolchain.toml.
   # NB. The Node version is pinned in .node-version.
   # We no longer need cargo-watch: ^8.1.1
+
+# The JVM toolchain that CI's `.github/actions/setup-jvm` installs. The build keeps its own copies,
+# and `tools/ci/check-workflows.mjs` fails if these drift from them:
+# - graalvm: `graalVersion` in `project/Dependencies.scala` (sbt refuses any other JDK), and
+#   `graalMavenPackagesVersion` there (the GraalVM / Truffle Maven packages);
+# - sbt: `sbt.version` in `project/build.properties` (HELD there, see its note);
+# - flatc: `flatbuffersVersion` in `project/Dependencies.scala` (checked when the language server
+#   compiles).
+# One flat `key: value` per line, the value a bare (unquoted) version: `setup-jvm` reads them
+# with awk.
+toolchain:
+  graalvm: 25.0.1
+  sbt: 1.10.6
+  flatc: 24.3.25

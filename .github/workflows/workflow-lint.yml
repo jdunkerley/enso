@@ -9,11 +9,19 @@ on:
     paths:
       - ".github/**"
       - "tools/ci/**"
+      # `tools/ci/check-workflows.mjs` checks the toolchain pins against these.
+      - "build-config.yaml"
+      - "project/Dependencies.scala"
+      - "project/build.properties"
   pull_request:
     # A whitelist: specs and plans (`docs/superpowers/**`) never match it.
     paths:
       - ".github/**"
       - "tools/ci/**"
+      # `tools/ci/check-workflows.mjs` checks the toolchain pins against these.
+      - "build-config.yaml"
+      - "project/Dependencies.scala"
+      - "project/build.properties"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-workflow-lint
