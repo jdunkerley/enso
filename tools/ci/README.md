@@ -8,19 +8,6 @@ Scripts that the GitHub workflows run:
 - `wait-for-macos-runner.sh` — gates jobs on the self-hosted Mac being online
   (#288).
 
-# Workflow comparison
-
-`compare-workflows.mjs` is a temporary script for reviewing the Phase 1 workflow
-rewrites. It compares two versions of the workflows job by job (commands,
-`needs`, `runs-on`, secrets, artifacts) and prints a Markdown report:
-
-```bash
-node tools/ci/compare-workflows.mjs --base <git-ref> [--head <git-ref> | --head-dir <dir>] [--rename "<base job>=<head job>"]... <workflow file>...
-```
-
-Without `--head`/`--head-dir` the head is the working tree. Test it with
-`node --test tools/ci/compare-workflows.test.mjs`.
-
 # Workflow policy
 
 `check-workflows.mjs` checks the hand-written workflows and composite actions

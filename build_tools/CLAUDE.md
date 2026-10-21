@@ -16,12 +16,10 @@ that can be built from sources or downloaded).
   archive handling, GitHub via `octocrab`, S3/ECR uploads, path utilities,
   logging. Most of the build logic's raw "do a thing on the OS" code lives here.
 - `build/` — `enso-build`. Domain-specific build logic on top of `ide-ci`
-  (engine, GUI, IDE, backend, release, changelog, CI YAML generation inputs).
-  Large — probably the biggest Rust crate in the repo.
+  (engine, GUI, IDE, backend, release, changelog). Large — probably the biggest
+  Rust crate in the repo.
 - `cli/` — `enso-build-cli`. The `clap`-driven entry point. Thin layer on top of
   `enso-build`.
-- `ci-gen/` — `enso-build-ci-gen`. Generates the GitHub Actions YAML files under
-  `.github/workflows/`. Run when the CI matrix changes.
 - `enso-formatter/` — Small tool enforcing the import-grouping / section-header
   style from `docs/style-guide/rust.md` across our Rust sources.
 - `macros/lib/` — `enso-build-macros-lib`. Proc-macro helpers consumed by

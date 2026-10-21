@@ -15,7 +15,6 @@ pub mod prelude {
 
 pub mod changelog;
 pub mod ci;
-pub mod ci_gen;
 pub mod cloud_tests;
 pub mod config;
 pub mod context;

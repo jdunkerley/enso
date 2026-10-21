@@ -134,7 +134,7 @@ pub async fn publish_release(context: &BuildContext) -> Result {
     ensure!(release.draft, "Release has been already published!");
 
     // macOS does not block publishing, and is skipped when its runner is offline (see
-    // `add_release_steps`), so its installer may be absent.
+    // `.github/workflows/release.yml`), so its installer may be absent.
     let uploaded: Vec<String> = release.assets.iter().map(|asset| asset.name.clone()).collect();
     let (manifest, missing) =
         manifest::Assets::new_uploaded(&remote_repo, &triple.versions.version, &uploaded);
