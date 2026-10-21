@@ -14,6 +14,7 @@ import {
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
   checkRepo,
+  checkSbtRunsAfterSetupJvm,
   checkSetupNodeCache,
   checkToolchainPins,
   checkWindowsInstallerSmokeTest,
@@ -390,6 +391,48 @@ describe('checkToolchainPins', () => {
     )
     assert.deepEqual(checkToolchainPins(repo), ['project/build.properties: no sbt version found'])
     assert.deepEqual(checkToolchainPins(fixture({})), ['build-config.yaml: missing'])
+  })
+})
+
+describe('checkSbtRunsAfterSetupJvm', () => {
+  test('accepts sbt after setup-jvm, and `./run backend sbt` without it', () => {
+    const repo = fixture({
+      'workflows/a.yml': `
+on: push
+jobs:
+  direct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ./.github/actions/setup-jvm
+        with: { cache-key: a }
+      - run: |
+          task=lintEnso
+          sbt "$task"
+  wrapped:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./run backend sbt '--' verifyLicensePackages
+`,
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
+  })
+  test('rejects sbt with no setup-jvm before it', () => {
+    const repo = fixture({
+      'workflows/a.yml': `
+on: push
+jobs:
+  late:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint
+        run: sbt lintEnso
+      - uses: ./.github/actions/setup-jvm
+        with: { cache-key: a }
+`,
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+      'a.yml › late: `Lint` runs sbt before `./.github/actions/setup-jvm`',
+    ])
   })
 })
 

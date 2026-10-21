@@ -387,6 +387,32 @@ export function checkToolchainPins({ files }) {
   return problems
 }
 
+/** A step whose script calls `sbt` itself. `./run backend sbt` does not: `./run` provisions sbt. */
+const runsSbt = (step) => /^\s*sbt(\s|$)/m.test(String(step?.run ?? ''))
+
+/**
+ * A job that calls `sbt` directly sets up GraalVM and sbt with `.github/actions/setup-jvm` in an
+ * earlier step: the hosted images have no sbt, and their default JDK fails the build's GraalVM
+ * check.
+ */
+export function checkSbtRunsAfterSetupJvm({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      let ready = false
+      for (const step of job?.steps ?? []) {
+        if (String(step?.uses ?? '') === './.github/actions/setup-jvm') ready = true
+        if (runsSbt(step) && !ready) {
+          problems.push(
+            `${file} › ${id}: \`${step.name ?? step.run}\` runs sbt before \`./.github/actions/setup-jvm\``,
+          )
+        }
+      }
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -397,6 +423,7 @@ export const CHECKS = [
   checkIdePackagingNeedsNoCloudAccount,
   checkWindowsInstallerSmokeTest,
   checkToolchainPins,
+  checkSbtRunsAfterSetupJvm,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

@@ -36,6 +36,7 @@ jobs:
             std-bits/**
             test/**
             build.sbt
+            build-config.yaml
             .cargo/**
             Cargo.lock
             Cargo.toml

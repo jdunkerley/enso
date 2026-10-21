@@ -1,0 +1,123 @@
+name: Set up the JVM toolchain
+description: >-
+  GraalVM CE and the sbt launcher at the versions pinned under `toolchain:` in `build-config.yaml`,
+  `flatc` too when asked, and the sbt / Coursier download cache (saved only on `develop`). What
+  `./run` provisioned before an sbt call, minus GraalPy and the MSVC environment, which no job
+  that calls sbt directly needs yet. Expects the repository to be checked out.
+inputs:
+  cache-key:
+    description: >-
+      Names this job's dependency cache, `sbt-deps-<cache-key>-<OS>-<hash>`. Jobs that resolve
+      different dependency sets need different keys: a cache entry is never overwritten, so the
+      first job to save one decides its contents.
+    required: true
+  flatc:
+    description: Also install `flatc`, which compiling the language server needs.
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Read the pinned versions
+      id: pins
+      shell: bash
+      run: |-
+        pin() {
+          local value
+          value=$(awk -v key="$1" '{ sub(/\r$/, "") } /^toolchain:/ { t = 1; next } /^[^ #]/ { t = 0 } t && $1 == key ":" { print $2; exit }' build-config.yaml)
+          if [ -z "$value" ]; then
+            echo "::error file=build-config.yaml::No \`toolchain.$1\` pin."
+            exit 1
+          fi
+          echo "$1=$value" >> "$GITHUB_OUTPUT"
+        }
+        pin graalvm
+        pin sbt
+        pin flatc
+    - name: Set up GraalVM
+      uses: graalvm/setup-graalvm@v1
+      with:
+        java-version: ${{ steps.pins.outputs.graalvm }}
+        distribution: graalvm-community
+        github-token: ${{ github.token }}
+    # The launcher from the release tarball, as `formatting.yml` always used, unpacked outside the
+    # working tree. Git Bash's `tar` reads `D:\...` as a remote host, hence the POSIX path.
+    - name: Set up sbt
+      shell: bash
+      env:
+        SBT_VERSION: ${{ steps.pins.outputs.sbt }}
+      run: |-
+        dir=$RUNNER_TEMP
+        if [ "$RUNNER_OS" = "Windows" ]; then dir=$(cygpath -u "$RUNNER_TEMP"); fi
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/sbt.tgz" \
+          "https://github.com/sbt/sbt/releases/download/v$SBT_VERSION/sbt-$SBT_VERSION.tgz"
+        tar -xzf "$dir/sbt.tgz" -C "$dir"
+        rm "$dir/sbt.tgz"
+        echo "SBT_HOME=$RUNNER_TEMP/sbt" >> "$GITHUB_ENV"
+        echo "$RUNNER_TEMP/sbt/bin" >> "$GITHUB_PATH"
+    # The release assets `ide_ci::cache::goodie::flatc` downloaded; a flatc bump may rename them.
+    - if: inputs.flatc == 'true'
+      name: Set up flatc
+      shell: bash
+      env:
+        FLATC_VERSION: ${{ steps.pins.outputs.flatc }}
+      run: |-
+        case "$RUNNER_OS" in
+          Linux) asset=Linux.flatc.binary.clang++-15.zip ;;
+          Windows) asset=Windows.flatc.binary.zip ;;
+          macOS) asset=Mac.flatc.binary.zip ;;
+        esac
+        dir=$RUNNER_TEMP
+        if [ "$RUNNER_OS" = "Windows" ]; then dir=$(cygpath -u "$RUNNER_TEMP"); fi
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/flatc.zip" \
+          "https://github.com/google/flatbuffers/releases/download/v$FLATC_VERSION/$asset"
+        if command -v unzip > /dev/null; then
+          unzip -o -q "$dir/flatc.zip" -d "$dir/flatc"
+        else
+          # A native program: it takes the Windows path.
+          7z x -y -o"$RUNNER_TEMP/flatc" "$RUNNER_TEMP/flatc.zip"
+        fi
+        rm "$dir/flatc.zip"
+        chmod +x "$dir/flatc/flatc" 2>/dev/null || true
+        echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
+    - name: Check the toolchain
+      shell: bash
+      env:
+        GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        FLATC_VERSION: ${{ steps.pins.outputs.flatc }}
+        WITH_FLATC: ${{ inputs.flatc }}
+      run: |-
+        # Captured first: `grep -q` stops reading early, which `pipefail` would report.
+        java=$(java -version 2>&1)
+        echo "$java"
+        grep -qF "GraalVM CE $GRAALVM_VERSION" <<< "$java"
+        command -v sbt
+        if [ "$WITH_FLATC" = "true" ]; then
+          flatc=$(flatc --version)
+          echo "$flatc"
+          grep -qF "flatc version $FLATC_VERSION" <<< "$flatc"
+        fi
+    - if: github.ref == 'refs/heads/develop'
+      name: Cache sbt / Coursier downloads
+      uses: actions/cache@v4
+      with:
+        key: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
+        restore-keys: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-
+        path: |-
+          ~/.sbt
+          ~/.ivy2/cache
+          ~/.cache/coursier
+          ~/AppData/Local/Coursier/Cache
+          ~/Library/Caches/Coursier
+    - if: github.ref != 'refs/heads/develop'
+      name: Restore sbt / Coursier downloads
+      uses: actions/cache/restore@v4
+      with:
+        key: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
+        restore-keys: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-
+        path: |-
+          ~/.sbt
+          ~/.ivy2/cache
+          ~/.cache/coursier
+          ~/AppData/Local/Coursier/Cache
+          ~/Library/Caches/Coursier

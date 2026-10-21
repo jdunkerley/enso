@@ -1,0 +1,40 @@
+# TEMPORARY: PR 2a only, deleted before it merges (build simplification, Phase 2). Proves
+# `.github/actions/setup-jvm` on Windows as well as Linux: no job that uses it in PR 2a runs on
+# Windows.
+
+name: setup-jvm smoke
+on:
+  pull_request:
+    # A whitelist: specs and plans (`docs/superpowers/**`) never match it.
+    paths:
+      - ".github/actions/setup-jvm/**"
+      - ".github/workflows/setup-jvm-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: setup-jvm (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: setup-jvm-smoke
+          flatc: "true"
+      # Loading the build runs its GraalVM version check; the setting names the distribution
+      # directory that the engine checks' lint job will look for.
+      - name: Load the build
+        run: sbt "-Dsbt.server.autostart=false" "show engineDistributionRoot"
+        env:
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
