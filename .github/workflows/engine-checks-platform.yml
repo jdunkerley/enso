@@ -1,0 +1,234 @@
+# Hand-written. One platform's engine checks: the engine distribution, then the tests and checks
+# that use it. `engine-checks.yml` calls it once per platform. It has no `concurrency:` of its own:
+# the platforms' calls would share the group and cancel each other.
+
+name: Engine Checks (platform)
+on:
+  workflow_call:
+    inputs:
+      os:
+        description: "`linux` or `windows`: names the jobs and artifacts; `linux` adds the Linux-only checks."
+        required: true
+        type: string
+      runner:
+        description: The runner label for every job.
+        required: true
+        type: string
+      stdlib-suites:
+        description: >-
+          JSON list of the Standard Library test suites to run, each
+          `{"suite": "<./run backend test argument>", "title": "<job title>"}`.
+        required: true
+        type: string
+      clean_build_required:
+        description: Clean before and after each job.
+        required: false
+        type: boolean
+        default: false
+
+env:
+  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
+  # Read by `.github/actions/git-clean`.
+  ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required }}"
+
+jobs:
+  build-script:
+    name: Build Script (${{ inputs.os }}, amd64)
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Compile the build script
+        uses: ./.github/actions/build-script
+
+  build-engine-distribution:
+    name: Build Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+    needs: [build-script]
+    runs-on: ${{ inputs.runner }}
+    env:
+      ENSO_LAUNCHER: native,test
+      GRAAL_EDITION: GraalVM CE
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Set up the build script
+        uses: ./.github/actions/setup-build-script
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - run: ./run backend ci-build-engine-distribution
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Archive Engine Distribution
+        run: tar -cvf built-distribution.tar built-distribution test
+      - name: Upload Engine Distribution
+        uses: actions/upload-artifact@v5
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          path: built-distribution.tar
+      - name: Cleanup Archive
+        run: rm built-distribution.tar
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  enso-code-lint:
+    name: Enso Code Lint (linux, amd64)
+    if: inputs.os == 'linux'
+    needs: [build-script, build-engine-distribution]
+    runs-on: ${{ inputs.runner }}
+    env:
+      ENSO_LINT_ENABLE_GITHUB_ANNOTATIONS: "true"
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Set up the build script
+        uses: ./.github/actions/setup-build-script
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Check syntax
+        run: ./run libraries check-syntax
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      - run: ./run libraries lint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  jvm-tests:
+    name: JVM Tests (GraalVM CE) (${{ inputs.os }}, amd64)
+    needs: [build-script, build-engine-distribution]
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      checks: write
+    env:
+      GRAAL_EDITION: GraalVM CE
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Set up the build script
+        uses: ./.github/actions/setup-build-script
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      - run: ./run backend test jvm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (JVM Tests, ${{ inputs.os }}, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Engine Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          max-annotations: 50
+          name: Engine Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  standard-library-api-check:
+    name: Standard Library API check (linux, amd64)
+    if: inputs.os == 'linux'
+    needs: [build-script, build-engine-distribution]
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Set up the build script
+        uses: ./.github/actions/setup-build-script
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      - run: ./run backend stdlib-api-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  stdlib-tests:
+    name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
+    needs: [build-script, build-engine-distribution]
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      checks: write
+    env:
+      GRAAL_EDITION: GraalVM CE
+    strategy:
+      # Each suite reports on its own, as when they were separate jobs.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.stdlib-suites) }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - name: Set up the build script
+        uses: ./.github/actions/setup-build-script
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      - run: ./run backend test ${{ matrix.suite }}
+        env:
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          # Only the AWS suite may report no tests, as before.
+          fail-on-empty: ${{ matrix.suite != 'std-aws' }}
+          max-annotations: 50
+          name: Standard Library Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
