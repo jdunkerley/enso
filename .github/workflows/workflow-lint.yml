@@ -1,0 +1,49 @@
+# Hand-written. Lints the workflows and composite actions with actionlint, then checks the rules
+# that the CI generator's unit tests used to enforce (`tools/ci/check-workflows.mjs`).
+
+name: Workflow Lint
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - ".github/**"
+      - "tools/ci/**"
+  pull_request:
+    # A whitelist: specs and plans (`docs/superpowers/**`) never match it.
+    paths:
+      - ".github/**"
+      - "tools/ci/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-workflow-lint
+  cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
+
+permissions:
+  contents: read
+
+jobs:
+  workflow-lint:
+    name: Workflow Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # The image (actionlint 1.7.12, released 2026-03-30) bundles shellcheck, so `run:` scripts are
+      # checked too. It reads `.github/actionlint.yaml`.
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        name: ⎔ Setup Node
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Workflow policy
+        run: node tools/ci/check-workflows.mjs
+      - name: Workflow policy tests
+        run: node --test tools/ci/*.test.mjs

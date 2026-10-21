@@ -1,0 +1,21 @@
+# actionlint configuration: https://github.com/rhysd/actionlint/blob/v1.7.12/docs/config.md
+# Every ignore names one finding exactly and says why it stays.
+paths:
+  # The release workflows keep the CI generator's last output until Phase 4 of the build
+  # simplification rewrites them (docs/superpowers/specs/2026-10-20-build-simplification-design.md),
+  # proven by an rc prerelease. Their clean-up steps read an input they do not declare, which
+  # evaluates to null: harmless, and not worth an unproven change to a release workflow.
+  .github/workflows/release.yml:
+    ignore:
+      - 'property "clean_build_required" is not defined in object type \{version: string\}'
+  .github/workflows/promote.yml:
+    ignore:
+      - 'property "clean_build_required" is not defined in object type \{designator: string\}'
+  # Generated; rewritten by PR 1b of the build simplification, which removes this entry.
+  .github/workflows/changelog.yml:
+    ignore:
+      - 'property "clean_build_required" is not defined in object type \{\}'
+  # Generated; rewritten by PR 1c of the build simplification, which removes this entry.
+  .github/workflows/std-libs-labels.yml:
+    ignore:
+      - 'unexpected key "description" for "workflow" section'

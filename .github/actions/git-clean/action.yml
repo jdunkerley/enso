@@ -1,0 +1,20 @@
+name: Clean the working tree
+description: >-
+  Runs `corepack pnpm run git-clean --verbose` when `ENSO_CI_CLEAN_BUILD` is `true`. Each workflow
+  sets that variable at its top, from the `CI: Clean build required` label, a run on `develop`, or
+  the `clean_build_required` input. Use it twice per job: before the work, and after it with
+  `if: always()`.
+runs:
+  using: composite
+  steps:
+    # `always()`: the "after" call runs when the job has failed, and its steps must run too.
+    - if: always() && env.ENSO_CI_CLEAN_BUILD == 'true' && runner.os == 'Windows'
+      shell: pwsh
+      run: corepack pnpm run git-clean --verbose
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - if: always() && env.ENSO_CI_CLEAN_BUILD == 'true' && runner.os != 'Windows'
+      shell: bash
+      run: corepack pnpm run git-clean --verbose
+      env:
+        GITHUB_TOKEN: ${{ github.token }}

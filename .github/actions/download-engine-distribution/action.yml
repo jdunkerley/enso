@@ -1,0 +1,33 @@
+name: Download the engine distribution
+description: >-
+  Replaces `built-distribution/` and `test/` with the ones packed by this run's engine
+  distribution job, from its artifact.
+inputs:
+  name:
+    description: The artifact's name, e.g. `Engine Distribution (GraalVM CE) (native,test) (linux, amd64)`.
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: rm -rf built-distribution test
+    - name: Download Engine Distribution
+      uses: actions/download-artifact@v5
+      with:
+        name: ${{ inputs.name }}
+    - shell: bash
+      run: ls -l built-distribution.tar
+    # Windows' own `tar` (from PowerShell) unpacks what Windows' own `tar` packed; Git Bash's would
+    # be a different program.
+    - if: runner.os == 'Windows'
+      name: Unpack Engine Distribution
+      shell: pwsh
+      run: |-
+        tar -xvf built-distribution.tar -C .
+        rm built-distribution.tar
+    - if: runner.os != 'Windows'
+      name: Unpack Engine Distribution
+      shell: bash
+      run: |-
+        tar -xvf built-distribution.tar -C .
+        rm built-distribution.tar
