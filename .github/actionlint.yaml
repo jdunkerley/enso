@@ -11,7 +11,3 @@ paths:
   .github/workflows/promote.yml:
     ignore:
       - 'property "clean_build_required" is not defined in object type \{designator: string\}'
-  # Generated; rewritten by PR 1b of the build simplification, which removes this entry.
-  .github/workflows/changelog.yml:
-    ignore:
-      - 'property "clean_build_required" is not defined in object type \{\}'
