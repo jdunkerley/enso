@@ -60,11 +60,13 @@ Enso build CLI (in `build_tools/cli/`) — the end-to-end orchestrator. It runs
 the CLI via `cargo run -p enso-build-cli`.
 
 CI is moving off `./run` (the build-simplification spec,
-`docs/superpowers/specs/2026-10-20-build-simplification-design.md`). Where
-`./run` only wrapped one sbt call, the workflows now call sbt directly, with
-`.github/actions/setup-jvm` providing GraalVM and sbt. `.github/CLAUDE.md`
-("What still goes through `./run`") lists each CI step and when it moves.
-Locally, `./run` keeps working until Phase 5.
+`docs/superpowers/specs/2026-10-20-build-simplification-design.md`). Steps where
+`./run` only wraps one sbt call are moving to direct sbt calls, with
+`.github/actions/setup-jvm` providing GraalVM and sbt. So far only the
+formatting and enso4igv jobs use it, and they never went through `./run`; the
+benchmarks and the engine checks' Enso lint still do. `.github/CLAUDE.md` ("What
+still goes through `./run`") lists each CI step and when it moves. Locally,
+`./run` keeps working until Phase 5.
 
 ## Languages and toolchains
 
@@ -210,10 +212,11 @@ has silently produced a wrong result here:
   moves. `git grep` the _old_ version before pushing — it is the only reliable
   check. Known sites:
   - `build-config.yaml` `toolchain:` — the GraalVM, sbt and flatc versions CI
-    installs (`.github/actions/setup-jvm`, used by the formatting, enso4igv,
-    lint and benchmark jobs). This one _is_ enforced: Workflow Lint
+    installs (`.github/actions/setup-jvm`, used by the formatting and enso4igv
+    jobs). This one _is_ enforced: Workflow Lint
     (`tools/ci/check-workflows.mjs`) fails when it differs from `graalVersion`,
-    `flatbuffersVersion` or `sbt.version`, so bump it in the same commit.
+    `graalMavenPackagesVersion`, `flatbuffersVersion` or `sbt.version`, so bump
+    it in the same commit.
   - `test/Base_Tests/data/native_libs.json` and
     `test/Cloud_Tests/data/native_libs.json` — fixtures keyed by
     `component/truffle-api-<graalVersion>.jar`. These fail only in the Standard

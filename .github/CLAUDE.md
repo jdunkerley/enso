@@ -70,16 +70,20 @@ settings. Every workflow is hand-written YAML: the Rust generator
   Windows, PowerShell splits an unquoted one at its first dot.
   `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
   and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
-  `flatbuffersVersion` (`project/Dependencies.scala`) or `sbt.version`
-  (`project/build.properties`).
+  `graalMavenPackagesVersion`, `flatbuffersVersion`
+  (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
+  It counts `sbt` after inline `VAR=value` assignments, `&&` or `;`, and inside
+  local composite actions.
 
 ## What still goes through `./run`
 
-Build simplification Phase 2 moved the steps where `./run` only wrapped one sbt
-call. The rest need logic that is still in `./run`, and move in Phase 3 or 4.
-`./run` computes the version on every call. A job that runs a distribution built
-by another job must therefore use that job's version, not sbt's default
-`0.0.0-dev`.
+Build simplification Phase 2 moves the steps where `./run` only wraps one sbt
+call: the benchmarks (PR 2b) and the engine checks' Enso lint (PR 2c). None has
+moved yet; the formatting and enso4igv jobs, which never went through `./run`,
+already use `setup-jvm`. The rest need logic that is still in `./run`, and move
+in Phase 3 or 4. `./run` computes the version on every call. A job that runs a
+distribution built by another job must therefore use that job's version, not
+sbt's default `0.0.0-dev`.
 
 | Workflow › job                                           | Step                                                     | Goes through `./run`?                               |
 | -------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
