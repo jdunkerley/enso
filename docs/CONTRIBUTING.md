@@ -246,16 +246,14 @@ the IntelliJ with the official
 
 ### Getting Set Up (Rust)
 
-The Rust code in this repository requires a specific nightly rust toolchain, as
-defined by [rust-toolchain](../rust-toolchain.toml) override file. The `rustup`
-will automatically download the appropriate compiler version along with the
-necessary components.
+The Rust code in this repository (the parser, and the `./run` build CLI) builds
+with the stable toolchain pinned in
+[`rust-toolchain.toml`](../rust-toolchain.toml), with its `clippy` and `rustfmt`
+components and the `wasm32-unknown-unknown` target. Installing
+[Rustup](https://rustup.rs) is all you need: it installs that toolchain the
+first time `cargo` runs in the repository.
 
-```bash
-enso$ rustup toolchain install stable   # Stable toolchain required for the following tools.
-```
-
-The previous three steps shall be enough to build the IDE via `./run ide build`.
+With the tools listed above in place, `./run ide build` builds the IDE.
 
 ### Getting Set Up (Documentation)
 
@@ -267,13 +265,11 @@ can install prettier for our project by running the following command:
 enso$ corepack pnpm install
 ```
 
-This does, however, mean that you have to have node installed on your system.
-Please follow the guidelines [above](#getting-set-up-rust) to install node if
-you have not already done so.
+This needs Node and corepack, set up as described under
+[System Requirements](#system-requirements).
 
-The version if prettier is forced by our
-[`package-lock.json`](../package-lock.json) in order for us to make formatting
-bumps all at once.
+The version of prettier is pinned by our [`pnpm-lock.yaml`](../pnpm-lock.yaml),
+so that formatting changes arrive all at once.
 
 You can format all of our documentation and configuration as follows:
 

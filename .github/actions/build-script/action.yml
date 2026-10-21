@@ -1,0 +1,33 @@
+name: Compile the build script
+description: >-
+  Compiles `enso-build-cli`, the binary behind `./run`, and uploads it as
+  `enso-build-cli-<runner OS>` for the jobs of this run that use it (see `setup-build-script`).
+  Each workflow builds it once per platform, in a job of its own: those jobs never clean the
+  working tree, so the Cargo cache they save on `develop` stays whole. Expects the repository to
+  be checked out.
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-rust
+      with:
+        shared-key: build-script
+    # PowerShell on Windows, bash elsewhere: the shells the job used before.
+    - if: runner.os == 'Windows'
+      name: Compile
+      shell: pwsh
+      run: cargo build -p enso-build-cli
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - if: runner.os != 'Windows'
+      name: Compile
+      shell: bash
+      run: cargo build -p enso-build-cli
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - name: Upload
+      uses: actions/upload-artifact@v5
+      with:
+        if-no-files-found: error
+        name: enso-build-cli-${{ runner.os }}
+        path: target/rust/debug/enso-build-cli${{ runner.os == 'Windows' && '.exe' || '' }}
+        retention-days: 1

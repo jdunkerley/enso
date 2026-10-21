@@ -1,5 +1,9 @@
-# This file is auto-generated. Do not edit it manually!
-# Edit the enso_build::ci_gen module instead and run `cargo run --package enso-build-ci-gen`.
+# Hand-maintained. This is the last output of the CI generator (`build_tools/ci-gen`), which is
+# retired in Phase 1 of the build simplification
+# (docs/superpowers/specs/2026-10-20-build-simplification-design.md). Its one-job-per-platform
+# layout stays until Phase 2 moves it onto `engine-checks-platform.yml`: only a full manual run can
+# validate a rewrite, and that needs the self-hosted Mac and the Oracle GraalVM jobs to run.
+# Edit this file directly.
 
 name: Engine Nightly Checks
 on:
@@ -38,8 +42,12 @@ jobs:
           retention-days: 1
   build-script-macos-aarch64:
     name: Build Script
+    needs:
+      - check-the-mac-os-runner
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -86,6 +94,24 @@ jobs:
           name: enso-build-cli-${{ runner.os }}
           path: target/rust/debug/enso-build-cli.exe
           retention-days: 1
+  check-the-mac-os-runner:
+    name: Check the macOS runner
+    runs-on:
+      - ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - id: wait
+        name: Wait for the macOS runner
+        run: ./tools/ci/wait-for-macos-runner.sh 1 skip
+        shell: bash
+        env:
+          RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+    outputs:
+      online: ${{ steps.wait.outputs.online }}
+    timeout-minutes: 6
   enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
     name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
     needs:
@@ -156,8 +182,11 @@ jobs:
     name: Build Engine Distribution (GraalVM CE) (native,test) (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -515,9 +544,12 @@ jobs:
     name: JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -945,9 +977,12 @@ jobs:
     name: Standard Library Native Tests (GraalVM CE) (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -1224,9 +1259,12 @@ jobs:
     name: Standard Library JVM Tests (GraalVM CE) (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8
@@ -1504,9 +1542,12 @@ jobs:
     name: Standard Library AWS Tests (GraalVM CE) (macos, aarch64)
     needs:
       - build-script-macos-aarch64
+      - check-the-mac-os-runner
       - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-macos-aarch64
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on:
-      - macos-latest
+      - self-hosted
+      - macOS
     steps:
       - name: Expose Artifact API and context information.
         uses: actions/github-script@v8

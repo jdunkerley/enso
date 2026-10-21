@@ -20,6 +20,16 @@ pub mod labels {
     /// `.github/workflows/ide-pull-request.yml` and `gui-pull-request.yml`, which decide whether
     /// those jobs run. It is listed here so that this module remains the catalogue of CI labels.
     pub const BUILD_IDE: &str = "CI: Build IDE";
+
+    /// Labels that run checks on the self-hosted macOS runner, as well as the usual Linux and
+    /// Windows ones, for one area each: the engine's JVM tests, the Standard Library tests, and the
+    /// GUI checks.
+    ///
+    /// Like [`BUILD_IDE`], they are matched only in a hand-written workflow,
+    /// `.github/workflows/macos-pull-request.yml`, which fails when the runner is offline.
+    pub const MACOS_ENGINE: &str = "CI: macOS Engine";
+    pub const MACOS_LIBRARIES: &str = "CI: macOS Libraries";
+    pub const MACOS_GUI: &str = "CI: macOS GUI";
 }
 
 /// Names used to represent common workflow dispatch events inputs.

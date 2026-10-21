@@ -43,7 +43,11 @@ object TestArchivePackager {
         "-czf",
         destination.toAbsolutePath.toString
       ) ++ files.map(_.getFileName.toString),
-      source.toFile
+      source.toFile,
+      // Without it, macOS `tar` adds `._` entries for files with extended attributes, and the
+      // archive gains a second root. See Note [Archives Without AppleDouble Entries] in
+      // `build_tools/ci_utils/src/programs/tar.rs`.
+      "COPYFILE_DISABLE" -> "1"
     ).!
     if (exitCode != 0) {
       throw new RuntimeException(

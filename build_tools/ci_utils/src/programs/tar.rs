@@ -169,6 +169,19 @@ impl Program for Tar {
 }
 
 impl Tar {
+    /// A `tar --create` command.
+    ///
+    /// Note [Archives Without AppleDouble Entries]: on macOS, bsdtar stores each file's extended
+    /// attributes as a separate `._<name>` entry. Files written on a self-hosted runner carry such
+    /// attributes, so an archive of one directory gains a second root entry (`._enso-0.0.1` next to
+    /// `enso-0.0.1`), which our extraction rejects ("Unexpected archive structure"). Setting
+    /// `COPYFILE_DISABLE` turns these entries off; other `tar`s ignore it.
+    fn create_cmd(&self) -> Result<crate::prelude::Command> {
+        let mut cmd = self.cmd()?;
+        cmd.env("COPYFILE_DISABLE", "1").arg(Command::Create);
+        Ok(cmd)
+    }
+
     pub async fn flavor(&self) -> Result<Flavor> {
         let text = self.version_string().await?;
         Flavor::from_version_text(&text)
@@ -180,8 +193,7 @@ impl Tar {
         output_archive: impl AsRef<Path>,
         paths_to_pack: impl IntoIterator<Item = P>,
     ) -> Result<crate::prelude::Command> {
-        let mut cmd = self.cmd()?;
-        cmd.arg(Command::Create);
+        let mut cmd = self.create_cmd()?;
 
         if let Ok(Format::Tar(Some(compression))) = Format::from_filename(&output_archive) {
             cmd.args(&Switch::UseFormat(compression));
@@ -242,9 +254,8 @@ impl Tar {
         root_directory: impl AsRef<Path>,
     ) -> Result {
         // See: https://stackoverflow.com/a/3035446
-        let mut cmd = self.cmd()?;
-        cmd.arg(Command::Create)
-            .args(compression)
+        let mut cmd = self.create_cmd()?;
+        cmd.args(compression)
             .args(&Switch::TargetFile(output_archive.as_ref()))
             .args(&Switch::WorkingDir(root_directory.as_ref()));
         if TARGET_OS == OS::Windows {

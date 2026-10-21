@@ -45,7 +45,6 @@ app/gui/src/project-view/assets/font-*.css
 Cargo.lock
 build.json
 app/gui/playwright-report/
-maven_install.json
 
 # Git-subtree, upstream doesn't use prettier
 app/lang-markdown

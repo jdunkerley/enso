@@ -24,9 +24,6 @@ that can be built from sources or downloaded).
   `.github/workflows/`. Run when the CI matrix changes.
 - `enso-formatter/` — Small tool enforcing the import-grouping / section-header
   style from `docs/style-guide/rust.md` across our Rust sources.
-- `install/` — Windows installer/uninstaller toolchain. Four crates: `install`
-  (shared library), `install/config`, `install/installer`,
-  `install/uninstaller`.
 - `macros/lib/` — `enso-build-macros-lib`. Proc-macro helpers consumed by
   `enso-build` at build time.
 
