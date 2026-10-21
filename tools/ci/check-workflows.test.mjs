@@ -15,6 +15,7 @@ import {
   checkReleaseIsIdeOnly,
   checkRepo,
   checkSetupNodeCache,
+  checkToolchainPins,
   checkWindowsInstallerSmokeTest,
   loadRepo,
 } from './check-workflows.mjs'
@@ -24,12 +25,20 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'check-workflows-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 let fixtureCount = 0
-/** A repository holding only the given `.github` files (paths relative to `.github`). */
-function fixture(files) {
+/**
+ * A repository holding only the given `.github` files (paths relative to `.github`), and the given
+ * files outside it (paths relative to the repository root).
+ */
+function fixture(files, rootFiles = {}) {
   const root = path.join(scratch, `repo-${fixtureCount++}`)
   mkdirSync(path.join(root, '.github', 'workflows'), { recursive: true })
   for (const [file, text] of Object.entries(files)) {
     const target = path.join(root, '.github', file)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(target, text)
+  }
+  for (const [file, text] of Object.entries(rootFiles)) {
+    const target = path.join(root, file)
     mkdirSync(path.dirname(target), { recursive: true })
     writeFileSync(target, text)
   }
@@ -348,6 +357,39 @@ ${steps}
   test('rejects packaging with no smoke test at all', () => {
     const repo = fixture({ 'workflows/ide-packaging.yml': windowsJob(upload) })
     assert.match(checkWindowsInstallerSmokeTest(repo)[0], /no step runs/)
+  })
+})
+
+describe('checkToolchainPins', () => {
+  const build = {
+    'project/Dependencies.scala':
+      'object Dependencies {\n  val graalVersion = "25.0.1"\n  val flatbuffersVersion      = "24.3.25"\n}\n',
+    'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
+  }
+  const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
+  const allPins = '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n'
+  test("accepts pins equal to the build's own copies", () => {
+    const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
+    assert.deepEqual(checkToolchainPins(repo), [])
+  })
+  test('rejects a pin that drifted, and a missing pin', () => {
+    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n'
+    const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
+    assert.deepEqual(problems.sort(), [
+      'build-config.yaml: `toolchain.graalvm` is 25.0.2, but project/Dependencies.scala has 25.0.1',
+      'build-config.yaml: no `toolchain.flatc` pin',
+    ])
+  })
+  test('rejects a build file without the version, and a missing build-config.yaml', () => {
+    const repo = fixture(
+      {},
+      {
+        'build-config.yaml': config(allPins),
+        'project/Dependencies.scala': build['project/Dependencies.scala'],
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), ['project/build.properties: no sbt version found'])
+    assert.deepEqual(checkToolchainPins(fixture({})), ['build-config.yaml: missing'])
   })
 })
 

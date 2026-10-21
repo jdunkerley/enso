@@ -16,7 +16,17 @@ import { parse } from 'yaml'
 /** Specs and plans: a pull request that changes only these starts no workflow. */
 export const SPEC_PATHS = 'docs/superpowers/**'
 
-/** Loads every workflow and every local composite action under `root/.github`. */
+/** Files outside `.github` that a rule reads: the toolchain pins, and the build's own copies. */
+export const ROOT_FILES = [
+  'build-config.yaml',
+  'project/Dependencies.scala',
+  'project/build.properties',
+]
+
+/**
+ * Loads every workflow and every local composite action under `root/.github`, and the
+ * `ROOT_FILES` (`null` when absent).
+ */
 export function loadRepo(root) {
   const read = (file) => {
     const text = readFileSync(file, 'utf8')
@@ -35,7 +45,12 @@ export function loadRepo(root) {
       if (existsSync(file)) actions[name] = read(file)
     }
   }
-  return { workflows, actions }
+  const files = {}
+  for (const file of ROOT_FILES) {
+    const target = path.join(root, file)
+    files[file] = existsSync(target) ? readFileSync(target, 'utf8') : null
+  }
+  return { workflows, actions, files }
 }
 
 function triggers(doc) {
@@ -329,6 +344,49 @@ export function checkWindowsInstallerSmokeTest({ workflows }) {
   return problems
 }
 
+/** Where the build keeps its own copy of each `toolchain:` pin in `build-config.yaml`. */
+const TOOLCHAIN_PINS = [
+  {
+    pin: 'graalvm',
+    file: 'project/Dependencies.scala',
+    pattern: /^\s*val graalVersion\s*=\s*"([^"]+)"/m,
+  },
+  {
+    pin: 'flatc',
+    file: 'project/Dependencies.scala',
+    pattern: /^\s*val flatbuffersVersion\s*=\s*"([^"]+)"/m,
+  },
+  { pin: 'sbt', file: 'project/build.properties', pattern: /^sbt\.version\s*=\s*(\S+)/m },
+]
+
+/**
+ * `.github/actions/setup-jvm` installs the versions pinned under `toolchain:` in
+ * `build-config.yaml`. sbt enforces its own copies (`Running on GraalVM version X. Expected GraalVM
+ * version Y.`, the `flatc` version check, `sbt.version`), so each pin must equal the build's.
+ */
+export function checkToolchainPins({ files }) {
+  const config = files?.['build-config.yaml']
+  if (config == null) return ['build-config.yaml: missing']
+  const toolchain = parse(config)?.toolchain ?? {}
+  const problems = []
+  for (const { pin, file, pattern } of TOOLCHAIN_PINS) {
+    const pinned = toolchain[pin]
+    if (pinned == null) {
+      problems.push(`build-config.yaml: no \`toolchain.${pin}\` pin`)
+      continue
+    }
+    const found = files[file]?.match(pattern)?.[1]
+    if (found == null) {
+      problems.push(`${file}: no ${pin} version found`)
+    } else if (String(pinned) !== found) {
+      problems.push(
+        `build-config.yaml: \`toolchain.${pin}\` is ${pinned}, but ${file} has ${found}`,
+      )
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -338,6 +396,7 @@ export const CHECKS = [
   checkMacosChecksRunWhatIsRequested,
   checkIdePackagingNeedsNoCloudAccount,
   checkWindowsInstallerSmokeTest,
+  checkToolchainPins,
 ]
 
 /** Every violation in the repository at `root`, one message each. */
