@@ -1027,7 +1027,11 @@ object DistributionPackage {
             target.toPath.toAbsolutePath.normalize.toString,
             rootDir
           ),
-          cwd = Some(root)
+          cwd = Some(root),
+          // Keeps macOS `tar` from adding `._` entries for files with extended attributes. See
+          // Note [Archives Without AppleDouble Entries] in
+          // `build_tools/ci_utils/src/programs/tar.rs`.
+          "COPYFILE_DISABLE" -> "1"
         ).!
       }
       if (exitCode != 0) {
