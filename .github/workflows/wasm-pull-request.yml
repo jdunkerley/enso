@@ -7,8 +7,8 @@ on:
     branches:
       - develop
   pull_request:
-    # Specs and plans alone start no checks; keep in step with `PR_IGNORED_PATHS` in
-    # `build_tools/build/src/ci_gen.rs`.
+    # Specs and plans alone start no checks; every `pull_request` workflow ignores them
+    # (`tools/ci/check-workflows.mjs` checks it).
     paths-ignore:
       - "docs/superpowers/**"
 

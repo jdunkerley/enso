@@ -14,7 +14,9 @@ import {
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
   checkRepo,
+  checkSbtRunsAfterSetupJvm,
   checkSetupNodeCache,
+  checkToolchainPins,
   checkWindowsInstallerSmokeTest,
   loadRepo,
 } from './check-workflows.mjs'
@@ -24,12 +26,20 @@ const scratch = mkdtempSync(path.join(tmpdir(), 'check-workflows-'))
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 let fixtureCount = 0
-/** A repository holding only the given `.github` files (paths relative to `.github`). */
-function fixture(files) {
+/**
+ * A repository holding only the given `.github` files (paths relative to `.github`), and the given
+ * files outside it (paths relative to the repository root).
+ */
+function fixture(files, rootFiles = {}) {
   const root = path.join(scratch, `repo-${fixtureCount++}`)
   mkdirSync(path.join(root, '.github', 'workflows'), { recursive: true })
   for (const [file, text] of Object.entries(files)) {
     const target = path.join(root, '.github', file)
+    mkdirSync(path.dirname(target), { recursive: true })
+    writeFileSync(target, text)
+  }
+  for (const [file, text] of Object.entries(rootFiles)) {
+    const target = path.join(root, file)
     mkdirSync(path.dirname(target), { recursive: true })
     writeFileSync(target, text)
   }
@@ -348,6 +358,179 @@ ${steps}
   test('rejects packaging with no smoke test at all', () => {
     const repo = fixture({ 'workflows/ide-packaging.yml': windowsJob(upload) })
     assert.match(checkWindowsInstallerSmokeTest(repo)[0], /no step runs/)
+  })
+})
+
+describe('checkToolchainPins', () => {
+  const build = {
+    'project/Dependencies.scala':
+      'object Dependencies {\n  val graalVersion = "25.0.1"\n  val graalMavenPackagesVersion = "25.0.1"\n  val flatbuffersVersion      = "24.3.25"\n}\n',
+    'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
+  }
+  const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
+  const allPins = '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n'
+  test("accepts pins equal to the build's own copies", () => {
+    const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
+    assert.deepEqual(checkToolchainPins(repo), [])
+  })
+  test('rejects a pin that drifted, and a missing pin', () => {
+    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n'
+    const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
+    assert.deepEqual(problems.sort(), [
+      'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
+      'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalVersion` in project/Dependencies.scala is 25.0.1',
+      'build-config.yaml: no `toolchain.flatc` pin',
+    ])
+  })
+  test('rejects a half-bumped GraalVM: the Maven packages behind the JDK', () => {
+    const scala = build['project/Dependencies.scala'].replace(
+      'graalMavenPackagesVersion = "25.0.1"',
+      'graalMavenPackagesVersion = "25.0.0"',
+    )
+    const repo = fixture(
+      {},
+      { ...build, 'build-config.yaml': config(allPins), 'project/Dependencies.scala': scala },
+    )
+    assert.deepEqual(checkToolchainPins(repo), [
+      'build-config.yaml: `toolchain.graalvm` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
+    ])
+  })
+  test('compares versions as text, as the awk reader does', () => {
+    const scala = build['project/Dependencies.scala'].replaceAll('"25.0.1"', '"25.0"')
+    const repo = fixture(
+      {},
+      {
+        ...build,
+        'build-config.yaml': config(allPins.replace('25.0.1', '25.0')),
+        'project/Dependencies.scala': scala,
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), [])
+  })
+  test('rejects a quoted pin, which the awk reader would pass on with its quotes', () => {
+    const pins = allPins.replace('25.0.1', '"25.0.1"')
+    const repo = fixture({}, { ...build, 'build-config.yaml': config(pins) })
+    assert.deepEqual(checkToolchainPins(repo), [
+      'build-config.yaml: `toolchain.graalvm` must be a bare version (setup-jvm reads it with awk), not "25.0.1"',
+    ])
+  })
+  test('rejects a build file without the version, and a missing build-config.yaml', () => {
+    const repo = fixture(
+      {},
+      {
+        'build-config.yaml': config(allPins),
+        'project/Dependencies.scala': build['project/Dependencies.scala'],
+      },
+    )
+    assert.deepEqual(checkToolchainPins(repo), ['project/build.properties: no `sbt.version` found'])
+    assert.deepEqual(checkToolchainPins(fixture({})), ['build-config.yaml: missing'])
+  })
+})
+
+describe('checkSbtRunsAfterSetupJvm', () => {
+  const SETUP = '      - uses: ./.github/actions/setup-jvm\n        with: { cache-key: a }\n'
+  /** One job running `script` (the body of a `run: |` block) after the steps in `before`. */
+  const job = (script, before = '') => {
+    const body = script
+      .split('\n')
+      .map((line) => `          ${line}`)
+      .join('\n')
+    return `
+on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+${before}      - name: Step
+        run: |
+${body}
+`
+  }
+  const SHAPES = {
+    'a line of its own': 'task=lintEnso\nsbt "$task"',
+    'inline env assignments':
+      'LC_ALL=C.UTF-8 SBT_SERVER_FORCESTART=true sbt "-Dbench.compileOnly=false" bench',
+    'a quoted inline assignment': 'JAVA_OPTS="-Xmx4g -Xss16M" sbt compile',
+    'after `cd x &&`': 'cd engine && sbt compile',
+    'after `;`': 'cd engine; sbt compile',
+    'after `then`': 'if true; then sbt compile; fi',
+    'a command substitution': 'root=$(sbt -batch "print engineDistributionRoot")',
+  }
+  for (const [shape, script] of Object.entries(SHAPES)) {
+    test(`accepts sbt after setup-jvm: ${shape}`, () => {
+      const repo = fixture({ 'workflows/a.yml': job(script, SETUP) })
+      assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
+    })
+    test(`rejects sbt with no setup-jvm before it: ${shape}`, () => {
+      const repo = fixture({ 'workflows/a.yml': job(script) })
+      assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+        'a.yml › j: `Step` runs sbt before `./.github/actions/setup-jvm`',
+      ])
+    })
+  }
+  test('accepts sbt as an argument rather than a command', () => {
+    const script = "./run backend sbt '--' verifyLicensePackages\ncommand -v sbt\necho sbt"
+    const repo = fixture({ 'workflows/a.yml': job(script) })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
+  })
+  test('rejects sbt with setup-jvm only after it', () => {
+    const repo = fixture({
+      'workflows/a.yml': `
+on: push
+jobs:
+  late:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lint
+        run: sbt lintEnso
+${SETUP}`,
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+      'a.yml › late: `Lint` runs sbt before `./.github/actions/setup-jvm`',
+    ])
+  })
+  const action = (steps) => `name: A\nruns:\n  using: composite\n  steps:\n${steps}`
+  const SBT_STEP = '    - name: Inner\n      shell: bash\n      run: LC_ALL=C.UTF-8 sbt compile\n'
+  const ACTION_SETUP = '    - uses: ./.github/actions/setup-jvm\n      with: { cache-key: a }\n'
+  const usesAction = (before = '') => `
+on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+${before}      - name: Build
+        uses: ./.github/actions/build-sbt
+`
+  test('accepts a composite action that calls sbt, used after setup-jvm', () => {
+    const repo = fixture({
+      'actions/build-sbt/action.yml': action(SBT_STEP),
+      'workflows/a.yml': usesAction(SETUP),
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
+  })
+  test('accepts a composite action that sets up the JVM itself before calling sbt', () => {
+    const repo = fixture({
+      'actions/build-sbt/action.yml': action(ACTION_SETUP + SBT_STEP),
+      'workflows/a.yml': usesAction(),
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
+  })
+  test('rejects a composite action that calls sbt, used with no setup-jvm before it', () => {
+    const repo = fixture({
+      'actions/build-sbt/action.yml': action(SBT_STEP),
+      'workflows/a.yml': usesAction(),
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+      'a.yml › j: `Build` runs sbt before `./.github/actions/setup-jvm`',
+    ])
+  })
+  test('rejects a composite action that calls sbt before its own setup-jvm', () => {
+    const repo = fixture({
+      'actions/build-sbt/action.yml': action(SBT_STEP + ACTION_SETUP),
+    })
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
+      'actions/build-sbt: `Inner` runs sbt before `./.github/actions/setup-jvm`',
+    ])
   })
 })
 

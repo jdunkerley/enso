@@ -1,9 +1,3 @@
-// ==============
-// === Export ===
-// ==============
-
-pub mod input;
-
 /// Labels used in the repositories where this library is used for CI.
 /// They should be defined in the `.github/settings.yml` file.
 pub mod labels {
@@ -16,9 +10,9 @@ pub mod labels {
     /// Name of the label that forces the GUI checks and the IDE packaging to run on a PR even when
     /// no file they depend on changed.
     ///
-    /// The generated workflows do not use it: it is matched in the hand-written
-    /// `.github/workflows/ide-pull-request.yml` and `gui-pull-request.yml`, which decide whether
-    /// those jobs run. It is listed here so that this module remains the catalogue of CI labels.
+    /// It is matched in the hand-written `.github/workflows/ide-pull-request.yml` and
+    /// `gui-pull-request.yml`, which decide whether those jobs run. It is listed here so that this
+    /// module remains the catalogue of CI labels.
     pub const BUILD_IDE: &str = "CI: Build IDE";
 
     /// Labels that run checks on the self-hosted macOS runner, as well as the usual Linux and

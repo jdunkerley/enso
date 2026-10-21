@@ -4,17 +4,11 @@ on:
   push:
     branches: [develop, "release/*"]
   pull_request:
-    # Specs and plans alone start no checks; keep in step with `PR_IGNORED_PATHS` in
-    # `build_tools/build/src/ci_gen.rs`.
+    # Specs and plans alone start no checks; every `pull_request` workflow ignores them
+    # (`tools/ci/check-workflows.mjs` checks it).
     paths-ignore:
       - "docs/superpowers/**"
     branches: ["*"]
-
-env:
-  # Please ensure that this is in sync with graalVersion in build.sbt
-  javaVersion: 25.0.1
-  # Please ensure that this is in sync with project/build.properties
-  sbtVersion: 1.10.6
 
 jobs:
   test_formatting:
@@ -26,18 +20,11 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v5
-      - name: Setup GraalVM Environment
-        uses: graalvm/setup-graalvm@v1
+      # GraalVM and sbt at the versions pinned in `build-config.yaml` (`toolchain:`).
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          java-version: ${{ env.javaVersion }}
-          distribution: graalvm-community
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set Up SBT
-        shell: bash
-        run: |
-          curl --retry 4 --retry-connrefused -fsSL -o sbt.tgz https://github.com/sbt/sbt/releases/download/v${{env.sbtVersion}}/sbt-${{env.sbtVersion}}.tgz
-          tar -xzf sbt.tgz
-          echo "$GITHUB_WORKSPACE/sbt/bin/" >> "$GITHUB_PATH"
+          cache-key: formatting
       - name: Check Code Formatting
         run: |
           sbt "scalafmtCheckAll; javafmtCheckAll; scalafmtSbtCheck"

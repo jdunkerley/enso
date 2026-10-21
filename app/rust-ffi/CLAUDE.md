@@ -13,14 +13,12 @@ break the GUI build, so keep the two in lockstep and **never bump this with `~`
 or `^`**.
 
 CI installs the same CLI from a prebuilt binary, so the version is also written
-in `build_tools/build/src/ci_gen/step.rs` (`install_wasm_bindgen`; regenerate
-`.github/workflows/ide-packaging.yml` with `cargo run -p enso-build-ci-gen`) and
-in the hand-maintained `.github/workflows/gui-checks.yml`. `git grep` the old
-version before pushing a bump. The pin also constrains every other crate in the
-workspace that depends on `wasm-bindgen`, including wasm32-only dependencies of
-native crates (`reqwest` → `wasm-streams`), because Cargo resolves
-target-specific dependencies for all targets — a stale pin blocks unrelated
-upgrades.
+in the `wasm-bindgen-cli@…` steps of `.github/workflows/ide-packaging.yml` and
+`.github/workflows/gui-checks.yml`. `git grep` the old version before pushing a
+bump. The pin also constrains every other crate in the workspace that depends on
+`wasm-bindgen`, including wasm32-only dependencies of native crates (`reqwest` →
+`wasm-streams`), because Cargo resolves target-specific dependencies for all
+targets — a stale pin blocks unrelated upgrades.
 
 ## Build
 

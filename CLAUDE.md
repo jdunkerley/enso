@@ -59,6 +59,15 @@ The `./run` (or `run.cmd` / `run.ps1`) script at the repo root dispatches to the
 Enso build CLI (in `build_tools/cli/`) — the end-to-end orchestrator. It runs
 the CLI via `cargo run -p enso-build-cli`.
 
+CI is moving off `./run` (the build-simplification spec,
+`docs/superpowers/specs/2026-10-20-build-simplification-design.md`). Steps where
+`./run` only wraps one sbt call are moving to direct sbt calls, with
+`.github/actions/setup-jvm` providing GraalVM and sbt. The benchmarks and the
+engine checks' Enso lint use it, as do the formatting and enso4igv jobs, which
+never went through `./run`. `.github/CLAUDE.md` ("What still goes through
+`./run`") lists each CI step and when it moves. Locally, `./run` keeps working
+until Phase 5.
+
 ## Languages and toolchains
 
 - Rust: stable channel pinned in `rust-toolchain.toml` (currently 1.98.1) with
@@ -138,10 +147,14 @@ has silently produced a wrong result here:
   GUI tests or their configuration run the GUI checks but skip packaging. Add
   the `CI: Build IDE` label to force both. A PR that changes only
   `docs/superpowers/**` (specs and plans) starts no PR workflow at all, not even
-  Changelog: `paths-ignore` lists it in each `pull_request` trigger, generated
-  from `PR_IGNORED_PATHS` in `build_tools/build/src/ci_gen.rs` and copied by
-  hand into the hand-written workflows. No check is required by the ruleset, so
-  nothing is left waiting.
+  Changelog: `paths-ignore` lists it in each `pull_request` trigger, and
+  `tools/ci/check-workflows.mjs` (run by the Workflow Lint check) fails a
+  workflow that forgets it. No check is required by the ruleset, so nothing is
+  left waiting.
+- **The GitHub workflows are hand-written YAML** (the Rust generator was removed
+  in Phase 1 of the build simplification). Shared steps live in
+  `.github/actions/`, and the Workflow Lint check runs actionlint and the
+  workflow policy on any change under `.github/`. See `.github/CLAUDE.md`.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules
@@ -198,11 +211,12 @@ has silently produced a wrong result here:
   Bumping `graalVersion` or `sbt.version` is not finished until every copy
   moves. `git grep` the _old_ version before pushing — it is the only reliable
   check. Known sites:
-  - `.github/workflows/formatting.yml` — `javaVersion` and `sbtVersion` (with
-    "please ensure this is in sync" comments); `enso4igv.yml` — its own
-    `java-version`. sbt fails hard on a mismatch
-    (`Running on GraalVM version X. Expected GraalVM version Y.`), so this
-    surfaces as the _formatting_ job failing, not a build.
+  - `build-config.yaml` `toolchain:` — the GraalVM, sbt and flatc versions CI
+    installs (`.github/actions/setup-jvm`, used by the formatting and enso4igv
+    jobs). This one _is_ enforced: Workflow Lint
+    (`tools/ci/check-workflows.mjs`) fails when it differs from `graalVersion`,
+    `graalMavenPackagesVersion`, `flatbuffersVersion` or `sbt.version`, so bump
+    it in the same commit.
   - `test/Base_Tests/data/native_libs.json` and
     `test/Cloud_Tests/data/native_libs.json` — fixtures keyed by
     `component/truffle-api-<graalVersion>.jar`. These fail only in the Standard

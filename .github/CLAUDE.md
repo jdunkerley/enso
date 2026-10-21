@@ -5,10 +5,6 @@ settings. Every workflow is hand-written YAML: the Rust generator
 (`build_tools/ci-gen`) is retired (build simplification, Phase 1;
 `docs/superpowers/specs/2026-10-20-build-simplification-design.md`).
 
-**Status:** Phase 1 converts the generated workflows one pull request at a time.
-A workflow whose first line still reads `# This file is auto-generated` has not
-been converted yet, and some files named below may not exist yet.
-
 ## Layout
 
 - `workflows/*-pull-request.yml` — the entry points for pull requests and
@@ -25,14 +21,16 @@ been converted yet, and some files named below may not exist yet.
 - `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases. They are the
   generator's last output, kept unchanged until Phase 4 rewrites them; change
   them only together with an rc release test. `engine-checks-nightly.yml`,
-  `extra-nightly-tests.yml` and `macos-checks.yml` are likewise kept as
-  generated until Phase 2.
+  `extra-nightly-tests.yml` and `macos-checks.yml` are likewise kept in the
+  generator's layout until Phase 4 (edit directly).
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
   — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
   their `name:`; keep those names.
 - `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
   platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
-  `git-clean`, `download-engine-distribution`.
+  `setup-jvm` (GraalVM, sbt and optionally `flatc` at the `toolchain:` pins in
+  `build-config.yaml`, plus the sbt dependency cache), `git-clean`,
+  `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -67,6 +65,44 @@ been converted yet, and some files named below may not exist yet.
 - **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
   third-party action or image must be at least two weeks old. The actionlint
   image is pinned to an exact version.
+- **A job that runs `sbt` itself uses `setup-jvm` first**, with a `cache-key` of
+  its own. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`): on
+  Windows, PowerShell splits an unquoted one at its first dot.
+  `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
+  and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
+  `graalMavenPackagesVersion`, `flatbuffersVersion`
+  (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
+  It counts `sbt` after inline `VAR=value` assignments, `&&` or `;`, and inside
+  local composite actions.
+
+## What still goes through `./run`
+
+Build simplification Phase 2 moves the steps where `./run` only wraps one sbt
+call: the benchmarks (PR 2b) and the engine checks' Enso lint (PR 2c), both
+done. The formatting and enso4igv jobs, which never went through `./run`, use
+`setup-jvm` too. A moved step sets every variable `./run` set for it: the
+Standard Library benchmarks keep `ENSO_LAUNCHER=native,-ls` (Note [Benchmarks
+Call sbt Directly] in `engine-benchmark.yml`). The rest need logic that is still
+in `./run`, and move in Phase 3 or 4. `./run` computes the version on every
+call. A job that runs a distribution built by another job must therefore use
+that job's version, not sbt's default `0.0.0-dev`: the Enso lint takes it from
+the build job's outputs (Note [Lint Reads The Distribution's Version] in
+`engine-checks-platform.yml`).
+
+| Workflow › job                                           | Step                                                     | Goes through `./run`?                               |
+| -------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                  | No: `setup-jvm`                                     |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)      | No: `setup-jvm`                                     |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)          | No: `setup-jvm`                                     |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)              | No: `setup-jvm`                                     |
+| `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries check-syntax`                           | Yes: Phase 3 (`checkEnsoSyntax`)                    |
+| `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`             | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
+| `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                 | Yes: Phase 3                                        |
+| `engine-checks-platform.yml` › API check, stdlib tests   | `./run backend stdlib-api-check`, `./run backend test …` | Yes: Phase 3 (`stdlib-api-check`, `stdlib-test`)    |
+| `changelog.yml`                                          | `./run changelog-check`                                  | Yes: Phase 3                                        |
+| `ide-packaging.yml` › Build Backend                      | `./run backend get`                                      | Yes: Phase 3 (`buildEngineBundle`, version)         |
+| `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                        | Yes: Phase 3 (version)                              |
+| release, promote, nightly, nightly checks, macOS         | various                                                  | Yes: Phase 4                                        |
 
 ## Checking a change
 

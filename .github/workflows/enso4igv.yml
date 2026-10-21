@@ -7,6 +7,8 @@ on:
     branches: [develop]
     paths:
       - ".github/workflows/enso4igv.yml"
+      - ".github/actions/setup-jvm/**"
+      - "build-config.yaml"
       - "tools/enso4igv/**/*"
       - "engine/**/*"
       - "lib/java/**/*"
@@ -102,10 +104,11 @@ jobs:
       - name: Set up Rustup
         run: rustup show
 
-      - uses: graalvm/setup-graalvm@v1
+      # GraalVM and sbt at the versions pinned in `build-config.yaml` (`toolchain:`).
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          java-version: "25.0.1"
-          distribution: "graalvm-community"
+          cache-key: enso4igv
 
       - name: Publish Enso Libraries to Local Maven Repository
         run: sbt publishM2

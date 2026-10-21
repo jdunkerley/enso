@@ -37,14 +37,8 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Rust Gen CI",
-      "cargo": ["run", "-p", "enso-build-ci-gen"],
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
       "name": "Rust ./run",
-      "cargo": ["run", "-p", "enso-build-ci"],
+      "cargo": ["run", "-p", "enso-build-cli"],
     },
     {
       "name": "Enso GUI",
