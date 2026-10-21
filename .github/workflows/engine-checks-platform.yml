@@ -83,18 +83,21 @@ jobs:
 
   # Note [Lint Reads The Distribution's Version]
   # =============================================
-  # `lintEnso` runs the downloaded distribution from `engineDistributionRoot`, which sbt names from
+  # `lintEnso` lints the distribution at `engineDistributionRoot`, which sbt names from
   # `ENSO_VERSION` (`built-distribution/enso-engine-<version>-<os>-<arch>/enso-<version>`), and
-  # sbt's default is 0.0.0-dev. `./run` computed the distribution's version (`<next stable>-dev`)
-  # and published it as step outputs, so the lint step takes it from there rather than computing
-  # its own (that logic moves out of `./run` in Phase 3). Otherwise the step runs what
+  # sbt's default is 0.0.0-dev. On CI `lintEnso` still evaluates `buildEngineDistributionNoIndex.value`
+  # (build.sbt), so the lint job rebuilds the package at that same versioned path and lints that;
+  # the downloaded distribution is not what it lints today. `./run` computed the version
+  # (`<next stable>-dev`) and published it as step outputs from the build job, so the lint step
+  # takes it from there rather than computing its own (that logic moves out of `./run` in Phase 3),
+  # which keeps the path identical to `./run`'s and stays correct once the lint really uses the
+  # download. Otherwise the step runs what
   # `./run libraries lint` ran once it had provisioned GraalVM and sbt: `sbt
   # -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with `LC_ALL=C.UTF-8`
   # and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory than
-  # `./run`'s single-batch threshold; for one task it changes nothing). `lintEnso` builds the
-  # engine first even on CI: sbt evaluates its `buildEngineDistributionNoIndex.value` although it
-  # sits under `if (sys.env.get("CI").isEmpty)`, so it compiles the language server and needs
-  # flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so the step does not pass it.
+  # `./run`'s single-batch threshold; for one task it changes nothing). The rebuild compiles the
+  # language server, so the job needs flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so
+  # the step does not pass it.
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux'
