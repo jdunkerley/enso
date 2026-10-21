@@ -1,6 +1,7 @@
 # Build simplification: pnpm + sbt, cargo only for the parser — design
 
-Status: approved in conversation 2026-10-20; this document records it.
+Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21. The
+corrections are factual (what the code does); the design's intent is unchanged.
 
 ## Goal
 
@@ -10,6 +11,9 @@ workflows with hand-written YAML built from GitHub's own mechanisms. Retire the
 Rust build tooling (`build_tools/`, `./run`), leaving Rust only for the parser.
 
 ## Current state
+
+_A snapshot from 2026-10-20, before Phase 1: for example "there are no composite
+actions" and "11 generated files" describe that day, not today._
 
 ### Rust
 
@@ -43,17 +47,28 @@ directories. Its commands fall into:
 - **Thin wrappers:**
   - `gui build/check` (pnpm)
   - `backend sbt`
-  - `backend ci-build-engine-distribution` (sbt `buildEngineDistribution` plus
-    `checkIRCacheSizes` and `verifyGeneratedPackage`)
-  - `libraries lint` (sbt `lintEnso`)
   - `java-gen build` (cargo)
   - `fmt` (prettier plus the Rust `enso-formatter`)
-  - `ide build` (pnpm `build:ide`, `dist:ide`, wiring env vars)
+- **Not thin, despite first appearances:**
+  - `backend ci-build-engine-distribution` runs `clean`, then
+    `buildEngineDistribution`, `checkIRCacheSizes`, the Windows MSVC DLL copy
+    into the engine package, and versioned `verifyGeneratedPackage`.
+  - `ide build` needs the computed version and writes `.sha256`.
+  - `libraries lint` (sbt `lintEnso`) needs the build job's version (or a
+    rebuild of the engine) and `flatc`, because `lintEnso`'s `if (CI)` does not
+    stop sbt evaluating `buildEngineDistributionNoIndex.value`.
+  - `backend test jvm` is composite logic: parser self-tests, the ydoc native
+    image, benchmark compile and dry run, heap-dump options, `pnpm install` in
+    `simple-library-server`, and
+    `syntax-rust-definition/Runtime/managedClasspath`.
+  - `ENSO_LAUNCHER` is derived by `./run`, not only set in workflows: EnsoJMH
+    implies `native,-ls`, native test runs imply `native,test`.
 - **Real logic:**
   - Version computation from git tags: dev, nightly, rc, stable
     (`build_tools/build/src/version*.rs`). The result is published as
-    `ENSO_VERSION`, `ENSO_EDITION`, `ENSO_RELEASE_MODE`, `ENSO_IDE_VERSION` and
-    `ENSO_IDE_COMMIT_HASH`.
+    `ENSO_VERSION`, `ENSO_EDITION` and `ENSO_RELEASE_MODE` (environment and step
+    outputs). The IDE variables are set only on the child processes of
+    `ide build` / `gui build`.
   - Toolchain provisioning: sbt, GraalVM, GraalPy and flatc, plus the MSVC dev
     environment on Windows.
   - Engine bundle assembly: engine plus small JDK plus marker file, and the MSVC
@@ -115,8 +130,10 @@ directories. Its commands fall into:
     builds the parser through cargo, as today.
   - `corepack pnpm` for the GUI, the IDE, packaging and `tools/build-scripts`.
   - `cargo` only for the parser, invoked by sbt and the pnpm `postinstall`.
-- **Removed:** `build_tools/`, `run`, `run.cmd`, `run.ps1`, and the provisioning
-  role of `build-config.yaml`.
+- **Removed:** `build_tools/`, `run`, `run.cmd`, `run.ps1`, and `./run`'s
+  provisioning code. `build-config.yaml` survives Phase 5, reduced to the
+  `toolchain:` block (added in Phase 2) that `setup-jvm` and `toolchain-check`
+  read; it is the checked copy, not a provisioning tool.
 - **Workflows:** hand-written, linted with `actionlint` in CI.
 
 ## Components
@@ -129,8 +146,9 @@ exposed through root scripts. Each command is a small module with vitest tests.
 - **`version`:** computes the dev, nightly, rc or stable version.
   - It reads git tags and `ENSO_VERSION` with the same priority and rules as
     `version*.rs`.
-  - It writes the existing environment contract: `ENSO_VERSION`, `ENSO_EDITION`,
-    `ENSO_RELEASE_MODE`, `ENSO_IDE_VERSION` and `ENSO_IDE_COMMIT_HASH`.
+  - It publishes the existing contract: `ENSO_VERSION`, `ENSO_EDITION` and
+    `ENSO_RELEASE_MODE`. `ENSO_IDE_VERSION` and `ENSO_IDE_COMMIT_HASH` stay on
+    the `ide build` / `gui build` child processes only.
   - In CI it emits them to `GITHUB_ENV` and `GITHUB_OUTPUT`; locally it prints
     `export` lines.
   - The consumers stay as they are: `project/Dependencies.scala`,
@@ -143,6 +161,10 @@ exposed through root scripts. Each command is a small module with vitest tests.
 - **`stdlib-test`:** runs `enso --run` over the selected `test/*` projects.
   - It handles `ENSO_META_TEST_ARGS`, the JUnit output directory, time factors,
     test selection, and the clean-up of IR caches and bench reports.
+  - The caller supplies `ENSO_LAUNCHER`.
+  - It installs GraalPy at `graalMavenPackagesVersion` (or `setup-jvm` gains an
+    input for it): `test/Examples_Tests` `Python_Examples_Spec` probes for
+    `graalpy` on `PATH` and silently skips without it.
   - Services (Postgres, SQL Server, httpbin, library server) are supplied by the
     caller: service containers in CI, `docker compose` locally. The runner only
     reads their connection variables.
@@ -159,18 +181,23 @@ exposed through root scripts. Each command is a small module with vitest tests.
 
 ### Pinned versions
 
-One file, `build-config.yaml` reduced to versions, is the single source for:
+`build-config.yaml`, reduced to versions (its `toolchain:` block), is a
+policy-checked copy rather than the single source: sbt keeps `graalVersion`,
+`graalMavenPackagesVersion`, `flatbuffersVersion` and `sbt.version`, and a
+Workflow Lint rule fails when the copy differs. It feeds:
 
 - `toolchain-check`;
-- the CI composite actions;
-- the copies CLAUDE.md lists today (formatting workflow, Dockerfile, fixtures),
-  which the composite actions replace where they can.
+- the CI composite actions (`setup-jvm`).
+
+The copies replaced were those in `formatting.yml` and `enso4igv.yml`.
+`tools/ci/docker` no longer exists, and the `native_libs.json` fixtures and
+NOTICE are derived from the build, so they are not replaceable copies.
 
 ### sbt additions
 
 - **`buildEngineBundle`:** engine plus small JDK (`buildSmallJdkForRelease`)
   plus marker file, plus the MSVC runtime DLLs next to native images on Windows.
-  This replaces `engine/bundle.rs`.
+  This replaces `engine/bundle.rs`. The caller supplies `ENSO_LAUNCHER`.
 - **`checkEnsoSyntax`:** parses `.enso` files through the JNI parser. This
   replaces `libraries check-syntax`.
 - `buildEngineDistribution` gains the `checkIRCacheSizes` and
@@ -180,8 +207,11 @@ One file, `build-config.yaml` reduced to versions, is the single source for:
 
 - **Composite actions** in `.github/actions/`:
   - `setup-node`: `.node-version`, corepack, pnpm store cache.
-  - `setup-jvm`: GraalVM at the pinned version via `graalvm/setup-graalvm`, sbt,
-    ivy/coursier cache.
+  - `setup-jvm`: GraalVM at the pinned version, the sbt launcher at
+    `sbt.version` (`./run` installed launcher 1.5.5; the project version is
+    decided by `build.properties` either way), `flatc` (any job that compiles
+    the language server needs it, the lint included), and the sbt / Coursier
+    cache. GraalPy is provisioned in the `stdlib-test` job or by a new input.
   - `setup-rust`: the toolchain from `rust-toolchain.toml`, plus
     `Swatinem/rust-cache`; parser jobs only.
   - `setup-msvc`: `ilammy/msvc-dev-cmd`, for Windows native-image jobs.
@@ -199,14 +229,43 @@ One file, `build-config.yaml` reduced to versions, is the single source for:
 
 ## Phases
 
-| Phase | Content                                                                                                                                                                                                     | Gate                                                        |
-| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| 0     | Tidy-up. Delete `maven_install.json`, `stage-bazel-app.sh`, the unreferenced `tools/ci` JS and the Bazel mentions. Fix `CONTRIBUTING.md` and `build_tools/CLAUDE.md`. Correct CLAUDE.md's Bazel note.       | Merge on green                                              |
-| 1     | Hand-written workflows replace the 11 generated ones. They still call `./run`, built by `setup-rust`. Add composite actions, matrices and actionlint; delete `build_tools/ci-gen` and `enso_build::ci_gen`. | Merge on green, after a job-by-job comparison               |
-| 2     | Workflows call pnpm and sbt directly where `./run` was a thin wrapper.                                                                                                                                      | Merge on green                                              |
-| 3     | Move the real logic, one PR each: `version`, `changelog-check`, `stdlib-api-check`, `buildEngineBundle`, `checkEnsoSyntax`, `stdlib-test` with service containers.                                          | Merge on green; `stdlib-test` after a side-by-side run      |
-| 4     | Release, promote, nightly and `ide upload` on `tools/build-scripts`.                                                                                                                                        | Proven by an rc prerelease. Ask the user before publishing. |
-| 5     | Delete `build_tools/`, `run*` and the provisioning code. Decide `launcher-shims`. Update the docs and every CLAUDE.md that mentions `./run`.                                                                | Merge on green                                              |
+| Phase | Content                                                                                                                                                                                                                             | Gate                                                        |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| 0     | Tidy-up. Delete `maven_install.json`, `stage-bazel-app.sh`, the unreferenced `tools/ci` JS and the Bazel mentions. Fix `CONTRIBUTING.md` and `build_tools/CLAUDE.md`. Correct CLAUDE.md's Bazel note.                               | Merge on green                                              |
+| 1     | Hand-written workflows replace the 11 generated ones. They still call `./run`, built by `setup-rust`. Add composite actions, matrices and actionlint; delete `build_tools/ci-gen` and `enso_build::ci_gen`.                         | Merge on green, after a job-by-job comparison               |
+| 2     | Workflows call sbt directly where `./run` was a thin wrapper. No pnpm call site was thin (`gui build/check`, `fmt` and `java-gen build` have no workflow call site), so Phase 2 moved only sbt.                                     | Merge on green                                              |
+| 3     | Move the real logic, one PR each: `version`, `changelog-check`, `stdlib-api-check`, `buildEngineBundle`, `checkEnsoSyntax`, `backend test jvm`, `ci-build-engine-distribution`, `ide build`, `stdlib-test` with service containers. | Merge on green; `stdlib-test` after a side-by-side run      |
+| 4     | Release, promote, nightly and `ide upload` on `tools/build-scripts`.                                                                                                                                                                | Proven by an rc prerelease. Ask the user before publishing. |
+| 5     | Delete `build_tools/`, `run*` and the provisioning code. Decide `launcher-shims`. Update the docs and every CLAUDE.md that mentions `./run`.                                                                                        | Merge on green                                              |
+
+### Phase 3 must carry
+
+From the Phase 2 final review:
+
+1. **GraalPy** for `Python_Examples_Spec`; diff the side-by-side test counts for
+   `Examples_Tests` specifically.
+2. **`setup-msvc`** for the first Windows native-image job that leaves `./run`,
+   plus the MSVC CRT DLL copy into the engine package (not only the bundle).
+3. **`ci-build-engine-distribution`** (`clean`, `buildEngineDistribution`,
+   `checkIRCacheSizes`, the DLL copy, versioned `verifyGeneratedPackage`), the
+   **`backend test jvm`** composite, and **`ide build`** after `version`.
+4. **The version hand-off:** the lint reads `steps.build.outputs.ENSO_VERSION`,
+   `ENSO_EDITION` and `ENSO_RELEASE_MODE` from the Build Engine Distribution
+   job; the replacement step keeps `id: build` and publishes the same three.
+5. **Per-command environment `./run` derived:** `ENSO_LAUNCHER` (`native,test`;
+   `native,-ls` for EnsoJMH), Windows `CI_TEST_TIMEFACTOR=2` and
+   `CI_TEST_FLAKY_ENABLE=true`, `ENSO_TEST_JUNIT_DIR` and its reset, the
+   `all`/`;` batching on big-memory runners, and quoted `-D` arguments under
+   PowerShell.
+6. **The `SBT_CALL` blind spot** in `tools/ci/check-workflows.mjs`: wrapper
+   prefixes (`timeout`, `time`, `env`, `nice`, `xvfb-run`, `bash -c`, `sbt.bat`)
+   and sbt spawned from `tools/build-scripts`.
+7. **Cleanups** (IR cache, `bench-report.xml`, `engine/runtime/target`) if
+   self-hosted runners (#258) arrive first.
+8. **`toolchain-check`** compares against the same text the awk reader and the
+   policy rule use: one parser contract.
+9. **`check-syntax` becomes `checkEnsoSyntax`**; then the lint job can drop
+   `setup-build-script`.
 
 Phases 1 and 2 may land together where a workflow is rewritten anyway. Each PR
 is reversible on its own.
