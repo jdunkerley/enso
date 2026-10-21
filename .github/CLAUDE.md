@@ -28,7 +28,9 @@ settings. Every workflow is hand-written YAML: the Rust generator
   their `name:`; keep those names.
 - `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
   platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
-  `git-clean`, `download-engine-distribution`.
+  `setup-jvm` (GraalVM, sbt and optionally `flatc` at the `toolchain:` pins in
+  `build-config.yaml`, plus the sbt dependency cache), `git-clean`,
+  `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -63,6 +65,36 @@ settings. Every workflow is hand-written YAML: the Rust generator
 - **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
   third-party action or image must be at least two weeks old. The actionlint
   image is pinned to an exact version.
+- **A job that runs `sbt` itself uses `setup-jvm` first**, with a `cache-key` of
+  its own. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`): on
+  Windows, PowerShell splits an unquoted one at its first dot.
+  `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
+  and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
+  `flatbuffersVersion` (`project/Dependencies.scala`) or `sbt.version`
+  (`project/build.properties`).
+
+## What still goes through `./run`
+
+Build simplification Phase 2 moved the steps where `./run` only wrapped one sbt
+call. The rest need logic that is still in `./run`, and move in Phase 3 or 4.
+`./run` computes the version on every call. A job that runs a distribution built
+by another job must therefore use that job's version, not sbt's default
+`0.0.0-dev`.
+
+| Workflow › job                                           | Step                                                     | Goes through `./run`?                               |
+| -------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                  | No: `setup-jvm`                                     |
+| `engine-benchmark.yml`                                   | `./run backend benchmark runtime`                        | Yes, until PR 2b                                    |
+| `std-libs-benchmark.yml`                                 | `./run backend benchmark enso-jmh`                       | Yes, until PR 2b                                    |
+| `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries lint`                                   | Yes, until PR 2c                                    |
+| `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries check-syntax`                           | Yes: Phase 3 (`checkEnsoSyntax`)                    |
+| `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`             | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
+| `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                 | Yes: Phase 3                                        |
+| `engine-checks-platform.yml` › API check, stdlib tests   | `./run backend stdlib-api-check`, `./run backend test …` | Yes: Phase 3 (`stdlib-api-check`, `stdlib-test`)    |
+| `changelog.yml`                                          | `./run changelog-check`                                  | Yes: Phase 3                                        |
+| `ide-packaging.yml` › Build Backend                      | `./run backend get`                                      | Yes: Phase 3 (`buildEngineBundle`, version)         |
+| `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                        | Yes: Phase 3 (version)                              |
+| release, promote, nightly, nightly checks, macOS         | various                                                  | Yes: Phase 4                                        |
 
 ## Checking a change
 

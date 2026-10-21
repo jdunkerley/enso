@@ -50,3 +50,9 @@ that can be built from sources or downloaded).
 
 `run.cmd` / `run.ps1` are the Windows equivalents. See `README.md` for the
 target/subcommand catalog.
+
+CI no longer calls `./run` for every step: where it only wrapped one sbt call,
+the workflows call sbt directly (`.github/CLAUDE.md`, "What still goes through
+`./run`"). The build-simplification spec retires this CLI in Phase 5. Until
+then, keep `./run`'s behaviour for the call sites that still use it, and when a
+call site moves, mirror exactly what `./run` did around the command.
