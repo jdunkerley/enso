@@ -78,19 +78,20 @@ settings. Every workflow is hand-written YAML: the Rust generator
 ## What still goes through `./run`
 
 Build simplification Phase 2 moves the steps where `./run` only wraps one sbt
-call: the benchmarks (PR 2b) and the engine checks' Enso lint (PR 2c). None has
-moved yet; the formatting and enso4igv jobs, which never went through `./run`,
-already use `setup-jvm`. The rest need logic that is still in `./run`, and move
-in Phase 3 or 4. `./run` computes the version on every call. A job that runs a
-distribution built by another job must therefore use that job's version, not
-sbt's default `0.0.0-dev`.
+call: the benchmarks (PR 2b) and the engine checks' Enso lint (PR 2c, done). The
+formatting and enso4igv jobs, which never went through `./run`, use `setup-jvm`
+too. The rest need logic that is still in `./run`, and move in Phase 3 or 4.
+`./run` computes the version on every call. A job that runs a distribution built
+by another job must therefore use that job's version, not sbt's default
+`0.0.0-dev`: the Enso lint takes it from the build job's outputs (Note [Lint
+Reads The Distribution's Version] in `engine-checks-platform.yml`).
 
 | Workflow › job                                           | Step                                                     | Goes through `./run`?                               |
 | -------------------------------------------------------- | -------------------------------------------------------- | --------------------------------------------------- |
 | `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                  | No: `setup-jvm`                                     |
 | `engine-benchmark.yml`                                   | `./run backend benchmark runtime`                        | Yes, until PR 2b                                    |
 | `std-libs-benchmark.yml`                                 | `./run backend benchmark enso-jmh`                       | Yes, until PR 2b                                    |
-| `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries lint`                                   | Yes, until PR 2c                                    |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)              | No: `setup-jvm`                                     |
 | `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries check-syntax`                           | Yes: Phase 3 (`checkEnsoSyntax`)                    |
 | `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`             | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
 | `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                 | Yes: Phase 3                                        |

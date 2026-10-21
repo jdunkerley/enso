@@ -50,6 +50,11 @@ jobs:
     env:
       ENSO_LAUNCHER: native,test
       GRAAL_EDITION: GraalVM CE
+    # The version `./run` gave the distribution. See Note [Lint Reads The Distribution's Version].
+    outputs:
+      ENSO_VERSION: ${{ steps.build.outputs.ENSO_VERSION }}
+      ENSO_EDITION: ${{ steps.build.outputs.ENSO_EDITION }}
+      ENSO_RELEASE_MODE: ${{ steps.build.outputs.ENSO_RELEASE_MODE }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -59,7 +64,8 @@ jobs:
         uses: ./.github/actions/setup-build-script
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - run: ./run backend ci-build-engine-distribution
+      - id: build
+        run: ./run backend ci-build-engine-distribution
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Archive Engine Distribution
@@ -75,6 +81,19 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
+  # Note [Lint Reads The Distribution's Version]
+  # =============================================
+  # `lintEnso` runs the downloaded distribution from `engineDistributionRoot`, which sbt names from
+  # `ENSO_VERSION` (`built-distribution/enso-engine-<version>-<os>-<arch>/enso-<version>`), and
+  # sbt's default is 0.0.0-dev. `./run` computed the distribution's version (`<next stable>-dev`)
+  # and published it as step outputs, so the lint step takes it from there rather than computing
+  # its own (that logic moves out of `./run` in Phase 3). Otherwise the step runs what
+  # `./run libraries lint` ran once it had provisioned GraalVM and sbt: `sbt
+  # -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with `LC_ALL=C.UTF-8`
+  # and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory than
+  # `./run`'s single-batch threshold; for one task it changes nothing). `lintEnso` compiles
+  # nothing on CI (`CI` is set), so it needs no flatc. Nothing in sbt or the engine reads
+  # `GITHUB_TOKEN`, so the step does not pass it.
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux'
@@ -97,9 +116,27 @@ jobs:
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-      - run: ./run libraries lint
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: enso-code-lint
+      - name: Check the distribution's version
+        run: |-
+          if [ -z "$ENSO_VERSION" ]; then
+            echo "::error::build-engine-distribution published no ENSO_VERSION."
+            exit 1
+          fi
+          ls -d built-distribution/enso-engine-"$ENSO_VERSION"-*/enso-"$ENSO_VERSION"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+      - name: Lint
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "all lintEnso"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean
