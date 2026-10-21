@@ -91,9 +91,10 @@ jobs:
   # `./run libraries lint` ran once it had provisioned GraalVM and sbt: `sbt
   # -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with `LC_ALL=C.UTF-8`
   # and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory than
-  # `./run`'s single-batch threshold; for one task it changes nothing). `lintEnso` compiles
-  # nothing on CI (`CI` is set), so it needs no flatc. Nothing in sbt or the engine reads
-  # `GITHUB_TOKEN`, so the step does not pass it.
+  # `./run`'s single-batch threshold; for one task it changes nothing). `lintEnso` builds the
+  # engine first even on CI: sbt evaluates its `buildEngineDistributionNoIndex.value` although it
+  # sits under `if (sys.env.get("CI").isEmpty)`, so it compiles the language server and needs
+  # flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so the step does not pass it.
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux'
@@ -120,6 +121,7 @@ jobs:
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: enso-code-lint
+          flatc: "true"
       - name: Check the distribution's version
         run: |-
           if [ -z "$ENSO_VERSION" ]; then
