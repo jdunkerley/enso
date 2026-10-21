@@ -18,7 +18,8 @@ Each module handles one artifact family or one integration:
 - `changelog/` + `changelog.rs` — Parses + validates `CHANGELOG.md` entries
   (one-per-PR rule).
 - `rust/` — Rust workspace helpers (running cargo across members, WASM builds).
-- `ci.rs` — CI label names and the big-memory runner check.
+- `ci.rs` — CI label names, its `inputs` module (the workflow input names), and
+  the big-memory runner check.
 - `aws/` + `aws.rs` — S3/ECR uploads of artifacts and container images.
 - `cloud_tests/` — Harness for running tests against the Enso Cloud.
 - `libraries_tests.rs` — Runs the per-library test projects in `test/` against a
