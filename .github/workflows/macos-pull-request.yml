@@ -22,8 +22,8 @@ on:
 #
 # The Mac is asked for explicitly here, so its absence is an error: `macos-runner` waits for it for
 # 1 minute (keep in step with the `wait-for-macos-runner.sh` calls in `release.yml` and
-# `engine-checks-nightly.yml`) and fails if it does not appear, which skips the checks. Pull requests from forks get no
-# secrets, so they fail here too and never reach the machine.
+# `engine-checks-nightly.yml`) and fails if it does not appear, which skips the checks. Pull
+# requests from forks get no secrets, so they fail here too and never reach the machine.
 #
 # A label other than these starts an inert run, as in Note [Ignoring Unrelated Label Events] in
 # `ide-pull-request.yml`: it gets a concurrency group of its own, so it does not cancel the checks,

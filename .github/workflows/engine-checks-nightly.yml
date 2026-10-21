@@ -1,7 +1,7 @@
 # Hand-maintained. This is the last output of the CI generator (`build_tools/ci-gen`), which is
 # retired in Phase 1 of the build simplification
 # (docs/superpowers/specs/2026-10-20-build-simplification-design.md). Its one-job-per-platform
-# layout stays until Phase 2 moves it onto `engine-checks-platform.yml`: only a full manual run can
+# layout stays until Phase 4 moves it onto `engine-checks-platform.yml`: only a full manual run can
 # validate a rewrite, and that needs the self-hosted Mac and the Oracle GraalVM jobs to run.
 # Edit this file directly.
 

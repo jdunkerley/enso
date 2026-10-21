@@ -21,8 +21,8 @@ settings. Every workflow is hand-written YAML: the Rust generator
 - `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases. They are the
   generator's last output, kept unchanged until Phase 4 rewrites them; change
   them only together with an rc release test. `engine-checks-nightly.yml`,
-  `extra-nightly-tests.yml` and `macos-checks.yml` are likewise kept as
-  generated until Phase 2.
+  `extra-nightly-tests.yml` and `macos-checks.yml` are likewise kept in the
+  generator's layout until Phase 4 (edit directly).
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
   — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
   their `name:`; keep those names.
