@@ -5,10 +5,6 @@ settings. Every workflow is hand-written YAML: the Rust generator
 (`build_tools/ci-gen`) is retired (build simplification, Phase 1;
 `docs/superpowers/specs/2026-10-20-build-simplification-design.md`).
 
-**Status:** Phase 1 converts the generated workflows one pull request at a time.
-A workflow whose first line still reads `# This file is auto-generated` has not
-been converted yet, and some files named below may not exist yet.
-
 ## Layout
 
 - `workflows/*-pull-request.yml` — the entry points for pull requests and

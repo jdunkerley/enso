@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Workflow policy: the rules that the CI generator's unit tests enforced
-// (`build_tools/build/src/ci_gen.rs` and `ci_gen/job.rs`, removed in Phase 1 of the build
-// simplification), checked against the hand-written workflows and composite actions instead.
+// Workflow policy: the rules that the retired Rust CI generator's unit tests enforced (the
+// generator was removed in Phase 1 of the build simplification), checked against the hand-written
+// workflows and composite actions instead.
 // `.github/workflows/workflow-lint.yml` runs it after actionlint:
 //
 //     node tools/ci/check-workflows.mjs [repo-root]

@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
 	"app/rust-ffi",
-	"build_tools/ci-gen",
 	"build_tools/cli",
 	"build_tools/macros/lib",
 	"lib/rust/launcher-shims",

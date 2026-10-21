@@ -138,10 +138,14 @@ has silently produced a wrong result here:
   GUI tests or their configuration run the GUI checks but skip packaging. Add
   the `CI: Build IDE` label to force both. A PR that changes only
   `docs/superpowers/**` (specs and plans) starts no PR workflow at all, not even
-  Changelog: `paths-ignore` lists it in each `pull_request` trigger, generated
-  from `PR_IGNORED_PATHS` in `build_tools/build/src/ci_gen.rs` and copied by
-  hand into the hand-written workflows. No check is required by the ruleset, so
-  nothing is left waiting.
+  Changelog: `paths-ignore` lists it in each `pull_request` trigger, and
+  `tools/ci/check-workflows.mjs` (run by the Workflow Lint check) fails a
+  workflow that forgets it. No check is required by the ruleset, so nothing is
+  left waiting.
+- **The GitHub workflows are hand-written YAML** (the Rust generator was removed
+  in Phase 1 of the build simplification). Shared steps live in
+  `.github/actions/`, and the Workflow Lint check runs actionlint and the
+  workflow policy on any change under `.github/`. See `.github/CLAUDE.md`.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
 - The Rust workspace follows `docs/style-guide/rust.md`; additional house rules
