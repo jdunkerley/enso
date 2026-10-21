@@ -1,27 +1,7 @@
 # CI Tools
 
-This folder contains miscellaneous utilities for CI.
+Scripts that the GitHub workflows run:
 
-# Docker
-
-## Running
-
-Both images `ydoc-server-nodejs` and `ydoc-server-polyglot` are started the same
-way:
-
-- PORT - the port number under which Ydoc will be available
-- HOSTNAME - the hostname under which Ydoc will be available
-- LANGUAGE_SERVER_URL - the full url (with port number) of the language server
-  to connect to
-
-```bash
-docker run -it -e PORT=1234 -e HOSTNAME='0.0.0.0' -e LANGUAGE_SERVER_URL=ws://localhost:59876 ydoc-server-nodejs:latest
-```
-
-When correctly setup the network layer one can also hit Ydoc's healthcheck
-endpoint:
-
-```bash
-> curl http://${HOSTNAME}:${PORT}/_health
-OK
-```
+- `windows-installer-smoke.ps1` — installs the Windows installer silently,
+  checks it is registered and starts, then uninstalls it (IDE packaging, #251).
+  It refuses to run where an Enso is already installed.
