@@ -62,9 +62,9 @@ the CLI via `cargo run -p enso-build-cli`.
 CI is moving off `./run` (the build-simplification spec,
 `docs/superpowers/specs/2026-10-20-build-simplification-design.md`). Steps where
 `./run` only wraps one sbt call are moving to direct sbt calls, with
-`.github/actions/setup-jvm` providing GraalVM and sbt. So far only the
-formatting and enso4igv jobs use it, and they never went through `./run`; the
-benchmarks and the engine checks' Enso lint still do. `.github/CLAUDE.md` ("What
+`.github/actions/setup-jvm` providing GraalVM and sbt. The benchmarks use it, as
+do the formatting and enso4igv jobs, which never went through `./run`; the
+engine checks' Enso lint still goes through `./run`. `.github/CLAUDE.md` ("What
 still goes through `./run`") lists each CI step and when it moves. Locally,
 `./run` keeps working until Phase 5.
 

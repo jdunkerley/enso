@@ -1,5 +1,6 @@
 # Hand-written. Runs the engine's runtime benchmarks when started by hand; `bench-upload.yml`
-# publishes the results when a run completes (it keys on this workflow's name).
+# publishes the results when a run completes (it keys on this workflow's name). Calls sbt directly:
+# see Note [Benchmarks Call sbt Directly].
 
 name: Benchmark Engine
 on:
@@ -16,43 +17,56 @@ on:
         default: false
 
 env:
-  ENSO_BUILD_BENCH_NAME: ${{ inputs.bench-name }}
-  ENSO_BUILD_MINIMAL_RUN: ${{ true == inputs.just-check }}
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
   # Benchmarks always start and end with a clean working tree. Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "true"
 
-jobs:
-  build-script:
-    name: Build Script (linux, amd64)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Compile the build script
-        uses: ./.github/actions/build-script
+# Note [Benchmarks Call sbt Directly]
+# ===================================
+# `./run backend benchmark runtime` ran `sbt -Dbench.compileOnly=<just-check>
+# -Dsbt.server.autostart=false <task>` (with `LC_ALL=C.UTF-8` and `SBT_SERVER_FORCESTART=true`),
+# where <task> is `runtime-benchmarks/benchOnly <bench-name>`, or `runtime-benchmarks/bench` when
+# no name is given, after provisioning GraalVM, sbt and flatc (now `setup-jvm`). Its other work was
+# either for its own later steps (GraalPy, which nothing in sbt calls) or a no-op on a fresh hosted
+# runner after `git-clean` (deleting the IR cache directory, `**/bench-report.xml` and
+# `engine/runtime/target`). The engine builds at sbt's default version, 0.0.0-dev, instead of
+# `./run`'s `<next>-dev`: nothing outside this job sees that distribution, and the report does not
+# record the version.
+#
+# `./run backend benchmark enso-jmh` (`std-libs-benchmark.yml`) did the same with
+# `std-benchmarks/bench`, and also set `ENSO_LAUNCHER=native,-ls`: running the JMH benchmarks turns
+# on the native runner (`BuildConfigurationResolved::new` in `build_tools/build/src/engine.rs`), so
+# the distribution they run is built with a native-image runner without the language server. The
+# runtime benchmarks leave `ENSO_LAUNCHER` unset (the build's default, `shell`).
 
+jobs:
   benchmark-engine-graal-vm-ce:
     name: Benchmark Engine (GraalVM CE)
-    needs: [build-script]
     runs-on: ubuntu-latest
     timeout-minutes: 240
-    env:
-      GRAAL_EDITION: GraalVM CE
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      # Corepack, for `git-clean` and for the build's own `corepack pnpm` calls.
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - run: ./run backend benchmark runtime
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: benchmark-engine
+          flatc: "true"
+      - name: Run the benchmarks
+        run: |-
+          task="runtime-benchmarks/bench"
+          if [ -n "$BENCH_NAME" ]; then task="runtime-benchmarks/benchOnly $BENCH_NAME"; fi
+          sbt "-Dbench.compileOnly=$JUST_CHECK" "-Dsbt.server.autostart=false" "$task"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCH_NAME: ${{ inputs.bench-name }}
+          JUST_CHECK: ${{ inputs.just-check }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Upload benchmark results
         uses: actions/upload-artifact@v5
         with:
