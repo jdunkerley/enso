@@ -22,8 +22,7 @@ This document describes the infrastructure for Enso's automated nightly builds.
 
 The build can be triggered by two possible events:
 
-- automatically, at 5am UTC after each working day (that is, on Tuesday to
-  Saturday),
+- automatically, every day at 2am UTC (the `schedule` in `nightly.yml`),
 - manually, dispatching the
   [nightly.yml](https://github.com/enso-org/enso/actions/workflows/nightly.yml)
   workflow.

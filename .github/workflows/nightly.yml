@@ -2,10 +2,15 @@
 # retired in Phase 1 of the build simplification
 # (docs/superpowers/specs/2026-10-20-build-simplification-design.md). It is kept unchanged on
 # purpose: Phase 4 rewrites the release workflows and proves them with an rc prerelease, so change
-# this file only together with such a release test.
+# this file only together with such a release test. (The schedule below was restored together with
+# a nightly started by hand.)
 
 name: Nightly Release
 on:
+  # Every day at 02:00 UTC. The macOS installer is built on the self-hosted Mac when it is online;
+  # otherwise the release goes out without it (see `wait-for-macos-runner.sh` in `release.yml`).
+  schedule:
+    - cron: "0 2 * * *"
   workflow_dispatch: {}
 jobs:
   promote-nightly:
