@@ -1,0 +1,23 @@
+{
+  "name": "build-scripts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The build logic that leaves ./run: version, toolchain-check and the CI commands.",
+  "type": "module",
+  "scripts": {
+    "version": "node src/commands/version.ts",
+    "test:unit": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --cache --max-warnings=0"
+  },
+  "dependencies": {
+    "semver": "^7.8.5",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/semver": "^7.5.8",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -13,6 +13,7 @@ packages:
   - app/ydoc-server-polyglot
   - app/ydoc-shared
   - lib/js/runner
+  - tools/build-scripts
   - tools/simple-library-server
 catalog:
   # Pinned exactly, and overridden below, so the tree holds one TypeScript: `@marijn/buildtool`

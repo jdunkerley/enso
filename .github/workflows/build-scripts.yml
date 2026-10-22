@@ -1,0 +1,67 @@
+# Hand-written. Type-checks, lints and unit-tests `tools/build-scripts`, the TypeScript package that
+# takes over `./run`'s logic (build simplification, Phase 3). The GUI checks also run these scripts
+# (`ci:typecheck`, `ci:lint`, `ci:unit-test` cover every workspace package), but only when GUI files
+# change; this workflow runs them when the package or what it reads changes.
+
+name: Build Scripts
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "tools/build-scripts/**"
+      - "tools/ci/toolchain-pins.mjs"
+      - "build-config.yaml"
+      - ".node-version"
+      - "rust-toolchain.toml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+      - "eslint.config.mjs"
+      - ".github/workflows/build-scripts.yml"
+  pull_request:
+    # A whitelist: specs and plans (`docs/superpowers/**`) never match it.
+    paths:
+      - "tools/build-scripts/**"
+      - "tools/ci/toolchain-pins.mjs"
+      - "build-config.yaml"
+      - ".node-version"
+      - "rust-toolchain.toml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig.json"
+      - "eslint.config.mjs"
+      - ".github/workflows/build-scripts.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-build-scripts
+  cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build-scripts:
+    name: Build Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: 📦 Setup pnpm
+        uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        name: ⎔ Setup Node
+        with:
+          node-version-file: .node-version
+          cache: "pnpm"
+      # The root's lint configuration needs the root's dependencies; nothing here needs the
+      # lifecycle scripts (the Rust parser build).
+      - name: 📦 Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Typecheck
+        run: pnpm --filter build-scripts run typecheck
+      - name: Lint
+        run: pnpm --filter build-scripts run lint
+      - name: Unit tests
+        run: pnpm --filter build-scripts run test:unit

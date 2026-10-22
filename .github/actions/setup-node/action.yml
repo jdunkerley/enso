@@ -1,13 +1,13 @@
 name: Set up Node and corepack
 description: >-
-  Node from `.node-version` on macOS, whose runner image lacks a suitable one, and corepack 0.36.0
-  everywhere but Linux, whose image already has a recent one. The jobs that call `./run` use it;
-  the GUI checks set up pnpm their own way (`pnpm/action-setup`).
+  Node from `.node-version` and corepack 0.36.0, on every OS, and a check that `node` is that
+  version. The runner images carry an older Node (22 on Linux and Windows); `tools/build-scripts`
+  runs its TypeScript with the pinned one. The GUI checks set up pnpm their own way
+  (`pnpm/action-setup`).
 runs:
   using: composite
   steps:
-    - if: runner.os == 'macOS'
-      name: Setup nodejs version
+    - name: Setup nodejs version
       uses: actions/setup-node@v5
       with:
         node-version-file: .node-version
@@ -17,7 +17,14 @@ runs:
       name: Install corepack
       shell: pwsh
       run: npm install -g --force corepack@0.36.0 && corepack --version
-    - if: runner.os == 'macOS'
+    - if: runner.os != 'Windows'
       name: Install corepack
       shell: bash
       run: npm install -g --force corepack@0.36.0 && corepack --version
+    - name: Check the Node version
+      shell: bash
+      run: |-
+        expected=$(tr -d ' \r\n' < .node-version)
+        actual=$(node --version)
+        echo "node $actual, .node-version $expected"
+        [ "$actual" = "v$expected" ]
