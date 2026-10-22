@@ -368,13 +368,14 @@ describe('checkToolchainPins', () => {
     'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
   }
   const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
-  const allPins = '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n'
+  const allPins =
+    '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n  graalpy: 25.0.1\n'
   test("accepts pins equal to the build's own copies", () => {
     const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
     assert.deepEqual(checkToolchainPins(repo), [])
   })
   test('rejects a pin that drifted, and a missing pin', () => {
-    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n'
+    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n  graalpy: 25.0.1\n'
     const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
     assert.deepEqual(problems.sort(), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
@@ -393,6 +394,7 @@ describe('checkToolchainPins', () => {
     )
     assert.deepEqual(checkToolchainPins(repo), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
+      'build-config.yaml: `toolchain.graalpy` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
     ])
   })
   test('compares versions as text, as the awk reader does', () => {
@@ -401,7 +403,7 @@ describe('checkToolchainPins', () => {
       {},
       {
         ...build,
-        'build-config.yaml': config(allPins.replace('25.0.1', '25.0')),
+        'build-config.yaml': config(allPins.replaceAll('25.0.1', '25.0')),
         'project/Dependencies.scala': scala,
       },
     )
