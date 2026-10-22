@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /** @file Provides a fullscreen mode to its slot, based on conditional teleport and conditional styling. */
 
-import { useFullscreenAnimation } from '@/components/WithFullScreenMode/fullscreenAnimation'
+import {
+  fullscreenBox,
+  useFullscreenAnimation,
+} from '@/components/WithFullScreenMode/fullscreenAnimation'
 import { registerHandlers, toggledAction } from '@/providers/action'
 import { useFullscreenRoot } from '@/providers/fullscreenRoot'
 import { providePopoverRoot, usePopoverRoot } from '@/providers/popoverRoot'
@@ -11,8 +14,14 @@ export type SavedSize = Keyframe
 
 const fullscreen = defineModel<boolean>({ required: true })
 
-const { enabled = true } = defineProps<{
+const { enabled = true, insetTop } = defineProps<{
   enabled?: boolean
+  /**
+   * Space to leave free above the content in fullscreen mode, as a CSS length: the content then
+   * fills the fullscreen root below it (for example `var(--top-bar-height)`, to keep the app's top
+   * bar in view). By default it fills the whole fullscreen root.
+   */
+  insetTop?: string | undefined
 }>()
 
 /**
@@ -54,6 +63,7 @@ const { animating } = useFullscreenAnimation({
   emit,
   fullscreenRoot,
   fullscreen,
+  insetTop: () => insetTop,
 })
 const active = computed(() => fullscreen.value || animating.value > 0)
 
@@ -77,7 +87,12 @@ or used with `unrefElement`. -->
 <template>
   <div class="WithFullscreenMode fullsize">
     <Teleport :disabled="!active" :to="fullscreenRoot">
-      <div ref="content" class="fullsize" :class="{ active }">
+      <div
+        ref="content"
+        class="fullsize"
+        :class="{ active }"
+        :style="active ? fullscreenBox(insetTop) : undefined"
+      >
         <slot />
       </div>
     </Teleport>

@@ -125,6 +125,7 @@ function clampSize(size: number) {
 }
 
 const fullscreen = ref(false)
+const fullscreenAnimating = ref(false)
 
 watch(show, (show) => {
   if (!show) fullscreen.value = false
@@ -155,8 +156,17 @@ const style = computed(() =>
       data-testid="bottomDock"
       v-bind="$attrs"
     >
-      <WithFullscreenMode v-model="fullscreen">
-        <div ref="dockLayout" class="dockLayout">
+      <!-- Fullscreen fills the window below the app's top bar, which stays in view and usable. -->
+      <WithFullscreenMode
+        v-model="fullscreen"
+        insetTop="var(--top-bar-height)"
+        @update:animating="fullscreenAnimating = $event"
+      >
+        <div
+          ref="dockLayout"
+          class="dockLayout"
+          :class="{ fullscreen: fullscreen || fullscreenAnimating }"
+        >
           <div class="dockHeader">
             <BottomPanelTabs
               v-model:tab="tab"
@@ -232,6 +242,15 @@ const style = computed(() =>
   height: 100%;
 }
 
+/*
+ * Docked, the header's strip is see-through, so the tabs sit on the graph. Fullscreen, the dock is
+ * above the whole project view instead: it needs a surface of its own, or the graph's top bar shows
+ * through around the tabs and the buttons.
+ */
+.dockLayout.fullscreen {
+  background-color: var(--color-dashboard-background);
+}
+
 .dockHeader {
   flex: none;
   display: flex;
@@ -244,7 +263,8 @@ const style = computed(() =>
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 28px;
+  /* The tabs' height, so that the buttons centre on the tabs' labels. */
+  height: 24px;
   padding-right: 4px;
 }
 
@@ -265,7 +285,8 @@ const style = computed(() =>
   left: 12px;
   bottom: 12px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 16px;
 }
 

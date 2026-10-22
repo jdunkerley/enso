@@ -209,6 +209,21 @@ describe('BottomPanel', () => {
     expect(wrapper.find('[data-testid="bottomDock"]').exists()).toBe(false)
   })
 
+  test('fullscreen fills the window below the app’s top bar, on a surface of its own', async () => {
+    const { wrapper } = await mountDock({ show: true, tab: 'code' })
+    expect(wrapper.find('.dockLayout').classes()).not.toContain('fullscreen')
+    await wrapper.find('[data-testid="action:panel.fullscreen"]').trigger('click')
+    const layer = wrapper.find('.fullscreenRoot > .active')
+    expect(layer.exists()).toBe(true)
+    const style = (layer.element as HTMLElement).style
+    expect(style.top).toBe('var(--top-bar-height)')
+    expect(style.height).toBe('calc(100% - var(--top-bar-height))')
+    // Without its own background, the graph's top bar shows through around the tabs.
+    expect(layer.find('.dockLayout').classes()).toContain('fullscreen')
+    await wrapper.find('[data-testid="action:panel.fullscreen"]').trigger('click')
+    expect(wrapper.find('.dockLayout').classes()).not.toContain('fullscreen')
+  })
+
   test('closing the dock in fullscreen leaves fullscreen', async () => {
     const { wrapper, show, setProps } = await mountDock({ show: true, tab: 'logs' })
     await wrapper.find('[data-testid="action:panel.fullscreen"]').trigger('click')

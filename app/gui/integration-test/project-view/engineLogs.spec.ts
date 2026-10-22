@@ -1,6 +1,12 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
-import { expect, test } from 'integration-test/base'
+import { expect, test, type Locator } from 'integration-test/base'
 import * as locate from './locate'
+
+async function box(locator: Locator) {
+  const rect = await locator.boundingBox()
+  expect(rect).not.toBeNull()
+  return { ...rect!, bottom: rect!.y + rect!.height, right: rect!.x + rect!.width }
+}
 
 const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Language server started'
 const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [org.enso.interpreter] Something failed'
@@ -104,6 +110,11 @@ test('while the dock is closed, a Code and a Logs button open it on their tab', 
     await expect(buttons.getByTestId('logs-error-dot')).toBeVisible()
     // The dot is decorative; the count is in the button's name.
     await expect(logsButton).toHaveAccessibleName(/^Engine Logs, 2 new errors \(.+L\)$/)
+    // Side by side in a row, Code first.
+    const codeBox = await box(codeButton)
+    const logsBox = await box(logsButton)
+    expect(logsBox.y).toBe(codeBox.y)
+    expect(logsBox.x).toBeGreaterThanOrEqual(codeBox.right)
 
     await logsButton.click()
     await expect(dock.getByRole('tab', { name: /Logs/ })).toHaveAttribute('aria-selected', 'true')
@@ -167,6 +178,11 @@ test('the dock header’s fullscreen and close buttons', async ({ editorPage }) 
     const dock = locate.bottomDock(page)
     await expect(dock).toBeVisible()
     const heightBefore = (await dock.boundingBox())!.height
+    const viewportHeight = page.viewportSize()!.height
+    const tabs = page.getByRole('tablist', { name: 'Bottom panel' })
+    // Docked, nothing sits below the dock: it ends at the bottom of the graph editor and window.
+    expect((await box(dock)).bottom).toBe((await box(locate.graphEditor(page))).bottom)
+    expect((await box(dock)).bottom).toBe(viewportHeight)
 
     await locate.enterFullscreenButton(dock).click()
     await expect(locate.exitFullscreenButton(page)).toBeVisible()
@@ -175,6 +191,15 @@ test('the dock header’s fullscreen and close buttons', async ({ editorPage }) 
       .poll(async () => (await page.getByRole('log').boundingBox())?.height ?? 0)
       .toBeGreaterThan(heightBefore)
     await expect(page.getByRole('log').getByText('Something failed')).toBeVisible()
+    // ...below the app's top bar, which stays in view: the header is not underneath it.
+    const appBar = await box(page.locator('.TabBar'))
+    await expect.poll(async () => (await box(tabs)).y).toBe((await box(locate.graphEditor(page))).y)
+    expect((await box(tabs)).y).toBeGreaterThanOrEqual(appBar.bottom)
+    expect((await box(locate.exitFullscreenButton(page))).y).toBeGreaterThanOrEqual(appBar.bottom)
+    await expect(page.locator('.TabBar')).toBeVisible()
+    // ...and down to the bottom of the window.
+    expect((await box(page.getByRole('log'))).bottom).toBeLessThanOrEqual(viewportHeight)
+    expect((await box(page.locator('.dockLayout'))).bottom).toBe(viewportHeight)
 
     await locate.exitFullscreenButton(page).click()
     await expect(locate.enterFullscreenButton(dock)).toBeVisible()

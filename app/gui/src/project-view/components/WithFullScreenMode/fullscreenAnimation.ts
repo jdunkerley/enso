@@ -1,6 +1,6 @@
 import { unrefElement } from '@/composables/events'
 import { Rect } from '@/util/data/rect'
-import { ref, watch, type Ref, type WatchSource } from 'vue'
+import { ref, toValue, watch, type MaybeRefOrGetter, type Ref, type WatchSource } from 'vue'
 
 interface Emit {
   (event: 'update:animating', animating: boolean): void
@@ -12,13 +12,18 @@ interface FullscreenAnimationOptions {
   fullscreenRoot: Parameters<typeof unrefElement>[0]
   fullscreen: WatchSource<boolean>
   emit: Emit
+  /** Space left free above the fullscreen content, as a CSS length; see {@link fullscreenBox}. */
+  insetTop?: MaybeRefOrGetter<string | undefined>
 }
 
-const fullscreenSize: Keyframe = {
-  top: 0,
-  left: 0,
-  height: '100%',
-  width: '100%',
+/**
+ * The box the content fills in fullscreen mode, within the fullscreen root: all of it, or all of it
+ * below `insetTop`.
+ */
+export function fullscreenBox(insetTop: string | undefined) {
+  return insetTop ?
+      { top: insetTop, left: '0px', height: `calc(100% - ${insetTop})`, width: '100%' }
+    : { top: '0px', left: '0px', height: '100%', width: '100%' }
 }
 
 /**
@@ -31,6 +36,7 @@ export function useFullscreenAnimation({
   emit,
   fullscreenRoot,
   fullscreen,
+  insetTop,
 }: FullscreenAnimationOptions) {
   const animating = ref(0)
 
@@ -61,10 +67,10 @@ export function useFullscreenAnimation({
         height: `${inner.height}px`,
         width: `${inner.width}px`,
       }
-      animate(startSize, fullscreenSize)
+      animate(startSize, fullscreenBox(toValue(insetTop)))
       savedSize.value = startSize
     } else if (!fullscreen && savedSize.value) {
-      animate(fullscreenSize, savedSize.value)
+      animate(fullscreenBox(toValue(insetTop)), savedSize.value)
       savedSize.value = undefined
     }
   })
