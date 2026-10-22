@@ -99,7 +99,7 @@ the build job's outputs (Note [Lint Reads The Distribution's Version] in
 | `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`             | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
 | `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                 | Yes: Phase 3                                        |
 | `engine-checks-platform.yml` › API check, stdlib tests   | `./run backend stdlib-api-check`, `./run backend test …` | Yes: Phase 3 (`stdlib-api-check`, `stdlib-test`)    |
-| `changelog.yml`                                          | `./run changelog-check`                                  | Yes: Phase 3                                        |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)              | No                                                  |
 | `ide-packaging.yml` › Build Backend                      | `./run backend get`                                      | Yes: Phase 3 (`buildEngineBundle`, version)         |
 | `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                        | Yes: Phase 3 (version)                              |
 | release, promote, nightly, nightly checks, macOS         | various                                                  | Yes: Phase 4                                        |
