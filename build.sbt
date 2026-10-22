@@ -6544,6 +6544,13 @@ lintEnso := {
   linter.check(whatToLint)
 }
 
+lazy val checkEnsoSyntax = taskKey[Unit](
+  "Parses every .enso file under distribution/lib and test with the Rust parser's check_syntax " +
+  "tool (through cargo) and fails on any syntax error or warning. Replaces " +
+  "`./run libraries check-syntax`; see project/EnsoSyntaxCheck.scala."
+)
+checkEnsoSyntax := EnsoSyntaxCheck.run(baseDirectory.value, streams.value.log)
+
 lazy val `http-test-helper` = project
   .in(file("tools") / "http-test-helper")
   .settings(

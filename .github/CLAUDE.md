@@ -95,7 +95,7 @@ the build job's outputs (Note [Lint Reads The Distribution's Version] in
 | `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)      | No: `setup-jvm`                                     |
 | `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)          | No: `setup-jvm`                                     |
 | `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)              | No: `setup-jvm`                                     |
-| `engine-checks-platform.yml` › Enso Code Lint            | `./run libraries check-syntax`                           | Yes: Phase 3 (`checkEnsoSyntax`)                    |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                    | No: `setup-jvm`                                     |
 | `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`             | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
 | `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                 | Yes: Phase 3                                        |
 | `engine-checks-platform.yml` › API check, stdlib tests   | `./run backend stdlib-api-check`, `./run backend test …` | Yes: Phase 3 (`stdlib-api-check`, `stdlib-test`)    |
