@@ -1435,3 +1435,4 @@ method 'foo' does not exist on Number". The following data will be collected:
 - Project management events (project open, close, rename).
 - Errors (IDE crashes, Project Manager errors, Language Server errors, Compiler
   errors).
+
