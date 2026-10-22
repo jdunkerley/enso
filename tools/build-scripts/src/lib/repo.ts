@@ -29,7 +29,8 @@ const WINDOWS_SHIMS = new Set(['corepack', 'npm', 'npx', 'pnpm', 'sbt'])
 
 /**
  * A command line for `cmd.exe`. An argument with blanks or `cmd` syntax is double-quoted; one with
- * a double quote is refused rather than escaped, since no caller needs it.
+ * a double quote is refused rather than escaped, since no caller needs it. Double quotes do not
+ * neutralise `%` or `!` for `cmd.exe` (they are still expanded); no caller passes them.
  */
 export function windowsCommandLine(program: string, args: readonly string[]): string {
   const quote = (arg: string) => {
@@ -64,11 +65,17 @@ export function capture(
     encoding: 'utf8',
     shell: how.shell,
     stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 64 * 1024 * 1024,
   })
+  const failure =
+    result.error != null ?
+      `${String(result.error)}
+`
+    : ''
   return {
     status: result.error != null ? -1 : (result.status ?? -1),
     stdout: result.stdout ?? '',
-    stderr: result.stderr ?? '',
+    stderr: failure + (result.stderr ?? ''),
   }
 }
 

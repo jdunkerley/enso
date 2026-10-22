@@ -1,8 +1,8 @@
 /** @file Publishing to GitHub Actions' files, and locally as `export` lines. */
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { expect, test } from 'vitest'
+import { afterEach, expect, test } from 'vitest'
 import { envFileEntry, exportLine, publish } from './github.ts'
 
 test('an env-file entry uses the delimiter form', () => {
@@ -15,8 +15,14 @@ test('an export line quotes the value', () => {
   expect(exportLine('A', "it's")).toBe("export A='it'\\''s'")
 })
 
+const dirs: string[] = []
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
 test('in GitHub Actions, every value goes to GITHUB_OUTPUT and GITHUB_ENV', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'publish-'))
+  dirs.push(dir)
   const output = path.join(dir, 'output')
   const env = path.join(dir, 'env')
   writeFileSync(output, '')
@@ -39,4 +45,8 @@ test('outside GitHub Actions, it prints export lines and writes nothing', () => 
   const printed: string[] = []
   publish({ ENSO_VERSION: '2026.1.1-dev' }, {}, (line) => printed.push(line))
   expect(printed).toEqual(["export ENSO_VERSION='2026.1.1-dev'"])
+})
+
+test('in GitHub Actions, a missing GITHUB_OUTPUT or GITHUB_ENV is an error', () => {
+  expect(() => publish({ A: '1' }, { GITHUB_ACTIONS: 'true' }, () => {})).toThrow(/GITHUB_OUTPUT/)
 })

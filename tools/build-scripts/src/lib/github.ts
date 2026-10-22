@@ -18,7 +18,8 @@ export function exportLine(name: string, value: string): string {
 /**
  * Publishes `values`. In GitHub Actions (`GITHUB_ACTIONS=true`) each one is appended to
  * `GITHUB_OUTPUT` (the step's outputs) and to `GITHUB_ENV` (the job's later steps), and logged.
- * Elsewhere it prints `export` lines, for `eval "$(…)"`.
+ * A missing file there is an error, as it was for `./run`. Elsewhere it prints `export` lines, for
+ * `eval "$(…)"`.
  */
 export function publish(
   values: Readonly<Record<string, string>>,
@@ -32,8 +33,12 @@ export function publish(
       continue
     }
     print(`${name}=${value}`)
-    for (const file of [env.GITHUB_OUTPUT, env.GITHUB_ENV]) {
-      if (file) appendFileSync(file, envFileEntry(name, value, `ghadelimiter_${randomUUID()}`))
+    for (const [variable, file] of [
+      ['GITHUB_OUTPUT', env.GITHUB_OUTPUT],
+      ['GITHUB_ENV', env.GITHUB_ENV],
+    ] as const) {
+      if (!file) throw new Error(`${variable} is not set, but GITHUB_ACTIONS is true`)
+      appendFileSync(file, envFileEntry(name, value, `ghadelimiter_${randomUUID()}`))
     }
   }
 }
