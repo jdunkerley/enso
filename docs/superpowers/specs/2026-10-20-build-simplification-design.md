@@ -59,17 +59,20 @@ directories. Its commands fall into:
     rebuild of the engine) and `flatc`, because `lintEnso`'s `if (CI)` does not
     stop sbt evaluating `buildEngineDistributionNoIndex.value`.
   - `backend test jvm` is composite logic: parser self-tests, the ydoc native
-    image, benchmark compile and dry run, heap-dump options, `pnpm install` in
-    `simple-library-server`, and
-    `syntax-rust-definition/Runtime/managedClasspath`.
+    image, benchmark compile and a compile-only runtime benchmark run,
+    `pnpm install` in `simple-library-server`, and
+    `syntax-rust-definition/Runtime/managedClasspath`. (It also configures an
+    Enso benchmark dry run and heap-dump options, but neither takes effect for
+    `test jvm`.)
   - `ENSO_LAUNCHER` is derived by `./run`, not only set in workflows: EnsoJMH
     implies `native,-ls`, native test runs imply `native,test`.
 - **Real logic:**
-  - Version computation from git tags: dev, nightly, rc, stable
-    (`build_tools/build/src/version*.rs`). The result is published as
-    `ENSO_VERSION`, `ENSO_EDITION` and `ENSO_RELEASE_MODE` (environment and step
-    outputs). The IDE variables are set only on the child processes of
-    `ide build` / `gui build`.
+  - Version computation: dev, nightly, rc, stable
+    (`build_tools/build/src/version*.rs`), from `ENSO_VERSION`, else
+    `latest-release` in `build-config.yaml`, else the remote git tags. The
+    result is published as `ENSO_VERSION`, `ENSO_EDITION` and
+    `ENSO_RELEASE_MODE` (environment and step outputs). The IDE variables are
+    set only on the child processes of `ide build` / `gui build`.
   - Toolchain provisioning: sbt, GraalVM, GraalPy and flatc, plus the MSVC dev
     environment on Windows.
   - Engine bundle assembly: engine plus small JDK plus marker file, and the MSVC

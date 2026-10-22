@@ -8,7 +8,8 @@
 **Goal:** Move the real logic out of `./run` for every pull-request check: the
 version, the changelog check, the API check, the syntax check, the engine
 distribution and bundle builds, the JVM tests, the IDE packaging and the
-standard-library tests, so that no pull-request workflow calls `./run` any more.
+standard-library tests, so that no default pull-request check calls `./run` any
+more (the label-gated macOS checks keep it until Phase 4).
 
 **Architecture:** Ten pull requests, one per item, in dependency order.
 
@@ -159,7 +160,7 @@ All worktrees are created from `origin/develop` under `C:\Repos\Enso\`, with
 | 3g  | `ci/engine-bundle-sbt`       | `ide-bs-3g` | 11    | 3f                 | ✨ IDE; the bundle tree byte by byte against develop's, Linux and Windows                                          |
 | 3h  | `ci/jvm-tests-direct`        | `ide-bs-3h` | 12    | 3f                 | ✨ Engine; the JVM test report counts against develop's, both platforms                                            |
 | 3i  | `ci/ide-build`               | `ide-bs-3i` | 13    | 3g                 | ✨ IDE; installer names, package tests and the Windows smoke test as on develop                                    |
-| 3j  | `ci/stdlib-test`             | `ide-bs-3j` | 14–15 | 3b, 3d, 3h         | the side-by-side: pass, fail **and skip** counts per project, `./run` against the runner, twice, Linux and Windows |
+| 3j  | `ci/stdlib-test`             | `ide-bs-3j` | 14–15 | 3b, 3d, 3e, 3h     | the side-by-side: pass, fail **and skip** counts per project, `./run` against the runner, twice, Linux and Windows |
 
 - 3c and 3e need nothing and can start at once. Work on the next PR while one is
   in CI (memory: work while CI runs); several may be open together.
@@ -257,7 +258,6 @@ Phase 4.
 | `.github/actions/setup-msvc/action.yml`                                                                            | 3f                 | Create                                                                                  |
 | `project/EngineBundle.scala`, `project/DistributionPackage.scala`, `build.sbt` (`buildEngineBundle`)               | 3g                 | Create; `localPlatform`; the task                                                       |
 | `.github/workflows/ide-packaging.yml`                                                                              | 3g, 3i             | Build Backend; Package New IDE                                                          |
-| `.github/workflows/ide-changed-files.yml`                                                                          | 3g                 | `tools/build-scripts/**` and the two new Scala files                                    |
 | `tools/build-scripts/src/ide-build/ideBuild.ts` (+ test), `src/commands/ide-build.ts`                              | 3i                 | Create                                                                                  |
 | `tools/build-scripts/src/lib/sbt.ts`, `src/stdlib-test/*` (+ tests), `src/commands/{stdlib-test,junit-compare}.ts` | 3j                 | Create                                                                                  |
 | `.github/actions/setup-jvm/action.yml`                                                                             | 3j                 | `graalpy` input                                                                         |
@@ -270,18 +270,19 @@ Phase 4.
 `compare.sh` (Task 0) prints these for a correct change. A PR lists each one it
 shows, with the reason given here. Anything not listed is a mistake.
 
-| #   | PR  | Difference                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Reason                                                                                         |
-| --- | --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| D1  | 3a  | New workflow `build-scripts.yml`, job "Build Scripts".                                                                                                                                                                                                                                                                                                                                                                                                                                  | R3: CI must run the package's typecheck, lint and tests; the GUI gate does not cover `tools/`. |
-| D2  | 3b  | `workflow-lint.yml`: both path lists gain `tools/build-scripts/**`.                                                                                                                                                                                                                                                                                                                                                                                                                     | The policy now reads the package (`buildScriptsSbtCommands`).                                  |
-| D3  | 3c  | `changelog.yml`: the "Build Script (linux, amd64)" job, the workflow `env` and the Changelog job's checkout, `setup-build-script`, `git-clean` and `./run` steps are gone; one `actions/github-script` step; `permissions: contents: read, pull-requests: read`.                                                                                                                                                                                                                        | R-user-1.                                                                                      |
-| D4  | 3d  | API check: `needs` loses `build-script`; `setup-build-script` becomes `setup-node` (before Clean) and `setup-build-scripts` (after); `./run backend stdlib-api-check` becomes "Check the Standard Library API" with `ENSO_VERSION` from the build job; no `GITHUB_TOKEN`. `engine-changed-files.yml` lists `tools/build-scripts/**`.                                                                                                                                                    | The move; the API check now runs code from that package.                                       |
-| D5  | 3e  | Enso Code Lint: `needs` loses `build-script`; `setup-build-script` becomes `setup-node`; `setup-jvm` moves before "Check syntax", which runs `sbt "-Dsbt.server.autostart=false" checkEnsoSyntax`.                                                                                                                                                                                                                                                                                      | R-user-2; must-carry 9.                                                                        |
-| D6  | 3f  | Build Engine Distribution: `needs` and `GRAAL_EDITION` gone; steps `setup-node`, `setup-build-scripts`, `setup-jvm` (`build-engine-distribution`, flatc), `setup-msvc`, "Compute the version" (`id: build`), "Build the engine distribution"; no `GITHUB_TOKEN`. Outputs unchanged.                                                                                                                                                                                                     | R5, R6, R7.                                                                                    |
-| D7  | 3g  | Build Backend: `needs: [build-script]` and its `if` gone; the hand-written sbt cache steps become `setup-jvm`'s (`build-backend`); `setup-build-script` becomes `setup-node` + `setup-build-scripts`; `setup-msvc`; "Compute the version" (`id: version`); "Build the engine bundle"; the archive is taken from the bundle directory. `ide-changed-files.yml` gains three paths.                                                                                                        | The move. `setup-jvm`'s cache is per job (Phase 2 Ruling 8).                                   |
-| D8  | 3h  | JVM Tests: `needs` and `GRAAL_EDITION` gone; `./run backend test jvm` becomes the steps of Note [JVM Tests Without ./run]; the reporter's path is `target/test-results/*.xml`.                                                                                                                                                                                                                                                                                                          | R8.                                                                                            |
-| D9  | 3i  | `ide-packaging.yml`: "Build Script (linux/windows, amd64)" jobs and `ENSO_BUILD_SKIP_VERSION_CHECK` gone; Package New IDE `needs`/`if` lose `build-script`; `setup-build-script` becomes `setup-node` + `setup-build-scripts`; the two `./run ide build` steps become "Package the IDE" (`ide-build`) with the same `env`.                                                                                                                                                              | R11.                                                                                           |
-| D10 | 3j  | Standard Library tests: one Linux job (`stdlib-tests`, with `services:` postgres and sqlserver) and one Windows job (`stdlib-tests-windows`), same display names; new steps (setup-build-scripts, setup-jvm with GraalPy, small JDK, SQL Server wait, `stdlib-test`); job `env` gains `ENSO_TEST_JUNIT_DIR`. "Build Script (…)" jobs and `ENSO_BUILD_SKIP_VERSION_CHECK` gone. `engine-checks.yml`: matrix entries gain `small-jdk`, `postgres`, `mssql`. `setup-jvm`: `graalpy` input. | R9, R10.                                                                                       |
+| #   | PR  | Difference                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Reason                                                                                                   |
+| --- | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| D11 | 3a  | Every job that uses `setup-node`: "Setup nodejs version" and "Install corepack" now on every OS, and a new "Check the Node version" step.                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | I1 of the plan review: the images carry Node 22; `tools/build-scripts` runs on the pinned 24 everywhere. |
+| D1  | 3a  | New workflow `build-scripts.yml`, job "Build Scripts".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | R3: CI must run the package's typecheck, lint and tests; the GUI gate does not cover `tools/`.           |
+| D2  | 3b  | `workflow-lint.yml`: both path lists gain `tools/build-scripts/**`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | The policy now reads the package (`buildScriptsSbtCommands`).                                            |
+| D3  | 3c  | `changelog.yml`: the "Build Script (linux, amd64)" job, the workflow `env` and the Changelog job's checkout, `setup-build-script`, `git-clean` and `./run` steps are gone; one `actions/github-script` step; `permissions: contents: read, pull-requests: read`.                                                                                                                                                                                                                                                                                                                                                   | R-user-1.                                                                                                |
+| D4  | 3d  | API check: `needs` loses `build-script`; `setup-build-script` becomes `setup-node` (before Clean) and `setup-build-scripts` (after); `./run backend stdlib-api-check` becomes "Check the Standard Library API" with `ENSO_VERSION` from the build job; no `GITHUB_TOKEN`. `engine-changed-files.yml` lists `tools/build-scripts/**`.                                                                                                                                                                                                                                                                               | The move; the API check now runs code from that package.                                                 |
+| D5  | 3e  | Enso Code Lint: `needs` loses `build-script`; `setup-build-script` becomes `setup-node`; `setup-jvm` moves before "Check syntax", which runs `sbt "-Dsbt.server.autostart=false" checkEnsoSyntax`.                                                                                                                                                                                                                                                                                                                                                                                                                 | R-user-2; must-carry 9.                                                                                  |
+| D6  | 3f  | Build Engine Distribution: `needs` and `GRAAL_EDITION` gone; steps `setup-node`, `setup-build-scripts`, `setup-jvm` (`build-engine-distribution`, flatc), `setup-msvc`, "Compute the version" (`id: build`), "Build the engine distribution"; no `GITHUB_TOKEN`. Outputs unchanged.                                                                                                                                                                                                                                                                                                                                | R5, R6, R7.                                                                                              |
+| D7  | 3g  | Build Backend: `needs: [build-script]` and its `if` gone; the hand-written sbt cache steps become `setup-jvm`'s (`build-backend`); `setup-build-script` becomes `setup-node` + `setup-build-scripts`; `setup-msvc`; "Compute the version" (`id: version`); "Build the engine bundle"; the archive is taken from the bundle directory.                                                                                                                                                                                                                                                                              | The move. `setup-jvm`'s cache is per job (Phase 2 Ruling 8).                                             |
+| D8  | 3h  | JVM Tests: `needs` and `GRAAL_EDITION` gone; `./run backend test jvm` becomes the steps of Note [JVM Tests Without ./run]; the reporter's path is `target/test-results/*.xml`.                                                                                                                                                                                                                                                                                                                                                                                                                                     | R8.                                                                                                      |
+| D9  | 3i  | `ide-packaging.yml`: "Build Script (linux/windows, amd64)" jobs and `ENSO_BUILD_SKIP_VERSION_CHECK` gone; Package New IDE `needs`/`if` lose `build-script`; `setup-build-script` becomes `setup-node` + `setup-build-scripts`; the two `./run ide build` steps become "Package the IDE" (`ide-build`) with the same `env`.                                                                                                                                                                                                                                                                                         | R11.                                                                                                     |
+| D10 | 3j  | Standard Library tests: one Linux job (`stdlib-tests`, with `services:` postgres and sqlserver) and one Windows job (`stdlib-tests-windows`), same display names; new steps (setup-build-scripts, setup-jvm with GraalPy, small JDK, SQL Server wait, `stdlib-test`); job `env` gains `ENSO_TEST_JUNIT_DIR`. "Build Script (…)" jobs and `ENSO_BUILD_SKIP_VERSION_CHECK` gone. `engine-checks.yml`: matrix entries gain `small-jdk`, `postgres`, `mssql`. `setup-jvm`: `graalpy` input. Each platform's call also shows the other OS's job as one skipped check (its `if:` is false, so its matrix never expands). | R9, R10.                                                                                                 |
 
 ---
 
@@ -310,14 +311,18 @@ shows, with the reason given here. Anything not listed is a mistake.
 ```bash
 git -C /c/Repos/Enso/ide fetch origin
 git -C /c/Repos/Enso/ide log --oneline -1 origin/develop
-git -C /c/Repos/Enso/ide grep -n "\./run" origin/develop -- .github/workflows/changelog.yml .github/workflows/engine-checks-platform.yml .github/workflows/ide-packaging.yml
+for wf in changelog engine-checks-platform ide-packaging; do
+  echo "$wf: $(git -C /c/Repos/Enso/ide grep -nE '^\s*(- )?run: .*\./run( |$)' origin/develop -- .github/workflows/$wf.yml | wc -l)"
+done
 gh pr list --state open --search "build simplification" --json number,title --jq '.[] | "\(.number)\t\(.title)"'
 ```
 
-Expected: develop at or after `2e89229ef6` ("Phase 2 review tidy-up"). The grep
-lists exactly the call sites of "Each `./run` call site" (changelog: 1; engine
-checks: 5; IDE packaging: 3). No Phase 3 PR is open yet. If the grep differs,
-stop and report: develop moved under this plan.
+Expected: develop at or after `2e89229ef6` ("Phase 2 review tidy-up"). The
+counts are `changelog: 1`, `engine-checks-platform: 5`, `ide-packaging: 3`: the
+`run:` lines of "Each `./run` call site" (the pattern counts only steps that
+execute `./run`, not the Notes and descriptions that mention it). No Phase 3 PR
+is open yet. If the grep differs, stop and report: develop moved under this
+plan.
 
 - [ ] **Step 2: Check the tools**
 
@@ -1607,6 +1612,8 @@ git commit -m "Add tools/build-scripts with the version command, ported from ./r
 **Files:**
 
 - Create: `.github/workflows/build-scripts.yml`
+- Modify: `.github/actions/setup-node/action.yml` (Node from `.node-version` on
+  every OS)
 - Modify: `tools/CLAUDE.md` (Subdirs), `.github/CLAUDE.md` (Layout)
 
 **Interfaces:**
@@ -1690,7 +1697,54 @@ jobs:
         run: pnpm --filter build-scripts run test:unit
 ```
 
-- [ ] **Step 2: Update the docs**
+- [ ] **Step 2: Node 24 in every job that runs the package**
+
+The runner images carry Node 22 (develop's logs: `Found node: v22.23.3` on Linux
+and Windows), and `setup-node` installed Node only on macOS. Every later PR runs
+`tools/build-scripts` in jobs that use `setup-node`, so it must give them the
+pinned Node, or CI would run the TypeScript under a different Node than
+`Build Scripts` and every local check. Replace
+`.github/actions/setup-node/action.yml` with:
+
+<!-- prettier-ignore -->
+```yaml
+name: Set up Node and corepack
+description: >-
+  Node from `.node-version` and corepack 0.36.0, on every OS, and a check that `node` is that
+  version. The runner images carry an older Node (22 on Linux and Windows); `tools/build-scripts`
+  runs its TypeScript with the pinned one. The GUI checks set up pnpm their own way
+  (`pnpm/action-setup`).
+runs:
+  using: composite
+  steps:
+    - name: Setup nodejs version
+      uses: actions/setup-node@v5
+      with:
+        node-version-file: .node-version
+        # The store cache needs pnpm on the PATH, which the next step provides.
+        package-manager-cache: false
+    - if: runner.os == 'Windows'
+      name: Install corepack
+      shell: pwsh
+      run: npm install -g --force corepack@0.36.0 && corepack --version
+    - if: runner.os != 'Windows'
+      name: Install corepack
+      shell: bash
+      run: npm install -g --force corepack@0.36.0 && corepack --version
+    - name: Check the Node version
+      shell: bash
+      run: |-
+        expected=$(tr -d ' \r\n' < .node-version)
+        actual=$(node --version)
+        echo "node $actual, .node-version $expected"
+        [ "$actual" = "v$expected" ]
+```
+
+The check step fails a job whose Node is not the pin, so every job that uses the
+action proves it. (The `./run` jobs now run on Node 24 too; they only use
+`corepack pnpm`.)
+
+- [ ] **Step 3: Update the docs**
 
 In `tools/CLAUDE.md`, under `## Subdirs`, after the bullet that starts
 ``- `ci/` —``, add:
@@ -1724,30 +1778,32 @@ Run
 `corepack pnpm exec prettier --write .github/workflows/build-scripts.yml tools/CLAUDE.md .github/CLAUDE.md`,
 then `--check` on the same files.
 
-- [ ] **Step 3: Check the workflow, on both hosts**
+- [ ] **Step 4: Check the workflows, on both hosts**
 
 ```bash
 cd /c/Repos/Enso/ide-bs-3a
 node tools/ci/check-workflows.mjs && node --test tools/ci/*.test.mjs 2>&1 | grep -E "ℹ (pass|fail)"
 wsl -e bash -lc '. ~/.enso-toolchain.sh && cd /mnt/c/Repos/Enso/ide-bs-3a && node tools/ci/check-workflows.mjs && ~/tools/actionlint-1.7.12/actionlint -shellcheck ~/tools/shellcheck-v0.11.0/shellcheck && echo actionlint-ok'
-"$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-3a .github/workflows/build-scripts.yml > "$SCRATCH/compare-3a.md"
+"$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-3a .github/workflows/build-scripts.yml .github/workflows/ide-packaging.yml .github/workflows/engine-checks.yml > "$SCRATCH/compare-3a.md"
 ```
 
-Expected: `Workflow policy: OK` on both hosts, `ℹ fail 0`, `actionlint-ok`;
-`compare-3a.md` shows only D1 (a new workflow).
+Expected: `Workflow policy: OK` on both hosts (`checkSetupNodeCache` still finds
+`package-manager-cache: false`), `ℹ fail 0`, `actionlint-ok`; `compare-3a.md`
+shows only D1 and D11.
 
-- [ ] **Step 4: Commit, push, open the PR**
+- [ ] **Step 5: Commit, push, open the PR**
 
 ```bash
-git add .github/workflows/build-scripts.yml tools/CLAUDE.md .github/CLAUDE.md
+git add .github/workflows/build-scripts.yml .github/actions/setup-node/action.yml tools/CLAUDE.md .github/CLAUDE.md
 git commit -m "Run tools/build-scripts' typecheck, lint and tests in a Build Scripts workflow"
 git push -u origin ci/build-scripts-version
 ```
 
 Write `$SCRATCH/pr-3a.md`: what the PR adds (the package, Node's type stripping
-rather than `tsx` (R3), `version`, the workflow); that no workflow uses
-`version` yet (3f is the first); the intended difference D1; `compare-3a.md` in
-`<details>`; "Part of #289's Phase 3."; the attribution lines. Then:
+rather than `tsx` (R3), `version`, the workflow, Node 24 in `setup-node`); that
+no workflow uses `version` yet (3f is the first); the intended differences D1
+and D11; `compare-3a.md` in `<details>`; "Part of #289's Phase 3."; the
+attribution lines. Then:
 
 ```bash
 gh pr create --base develop --head ci/build-scripts-version --label "CI: No changelog needed" \
@@ -1755,7 +1811,8 @@ gh pr create --base develop --head ci/build-scripts-version --label "CI: No chan
   --body-file "$SCRATCH/pr-3a.md"
 ```
 
-- [ ] **Step 5: Wait, prove the version against `./run`'s, merge**
+- [ ] **Step 6: Wait, prove the version against `./run`'s and the Node version,
+      merge**
 
 Run `"$SCRATCH/wait-pr.sh" <N> 120` in the background. Meanwhile, read the
 version develop's `./run` gave its distribution, from the lint job's "Check the
@@ -1772,8 +1829,15 @@ same version `corepack pnpm --silent --filter build-scripts run version` printed
 in Task 1 Step 6. When the watcher exits:
 
 - the checks are "Build Scripts" (green, about 2 minutes: typecheck, lint, 57
-  tests on Linux), Workflow Lint, Changelog, and the GUI checks (the root
-  manifests changed);
+  tests on Linux), Workflow Lint, Changelog, the GUI checks (the root manifests
+  changed), and ✨ IDE packaging (about 45 minutes: `pnpm-lock.yaml`,
+  `pnpm-workspace.yaml` and `.github/**` are in its change list); because
+  `setup-node` changed, ✨ Engine runs as well;
+- every job that uses `setup-node` (Build Backend, GUI build, Package New IDE,
+  and the engine jobs, Linux and Windows) logs
+  `node v24.21.0, .node-version 24.21.0` in "Check the Node version":
+  `gh run view <id> --log | grep -c "node v24.21.0, .node-version 24.21.0"` is
+  non-zero for each of the IDE and Engine runs, and no job failed there;
 - "Build Scripts" ran the tests on Linux: its log shows `Tests  57 passed`.
 
 When every check is green: `gh pr merge <N> --squash`.
@@ -2066,9 +2130,11 @@ In `tools/ci/check-workflows.mjs`:
    (`'build-config.yaml', 'project/Dependencies.scala', 'project/build.properties'`)
    with
    `export const ROOT_FILES = ['build-config.yaml', ...TOOLCHAIN_PIN_FILES]`.
-3. Delete the block from
-   `/**\n * Where the build keeps its own copy of each \`toolchain:\`
-   pin`down to, not including, the doc comment that begins `` *`.github/actions/setup-jvm`installs the versions pinned `` (that is, the local`TOOLCHAIN_PINS`and the function`toolchainPins`).
+3. Delete the local `TOOLCHAIN_PINS` and the function `toolchainPins` (develop's
+   lines 347–404): from the line holding `/**` that opens the comment "Where the
+   build keeps its own copy of each `toolchain:` pin", down to, not including,
+   the `/**` that opens the comment of `checkToolchainPins`, whose next line is
+   ``* `.github/actions/setup-jvm` installs the versions pinned under `toolchain:` in``.
 4. In `checkToolchainPins`, replace `const toolchain = toolchainPins(config)`
    with `const toolchain = readToolchainPins(config)`, and replace its doc
    comment's second to fourth lines with:
@@ -2297,9 +2363,12 @@ Replace the doc comment above `loadRepo` with:
 and its last line, `  return { workflows, actions, files }`, with
 `  return { workflows, actions, files, buildScripts: loadBuildScripts(root) }`.
 
-Replace the block from `/**\n * A script that calls \`sbt\` itself, as a
-command:`down to, not including,`/** The local composite action a step
-uses`(the old doc comment and`const SBT_CALL = …`) with:
+Replace the old doc comment and `const SBT_CALL = …` (develop's lines 443–451):
+from the `/**` whose next line begins
+``* A script that calls `sbt` itself, as a command:``, down to, not including,
+the line
+``/** The local composite action a step uses (`./.github/actions/<name>`), or `null`. */``.
+Put in its place:
 
 <!-- prettier-ignore -->
 ```js
@@ -2905,10 +2974,12 @@ and under `## Conventions`, add:
 
 <!-- prettier-ignore -->
 ```markdown
-- **Only `src/lib/sbt.ts` starts sbt** (it arrives with the first command that
-  needs sbt). The workflow policy (`tools/ci/check-workflows.mjs`) fails any
-  other module that does, and treats every command whose entry point imports
-  that module as an sbt call, which must come after `setup-jvm`.
+- **Only `src/lib/sbt.ts` runs sbt tasks** (it arrives with the first command
+  that needs one). The workflow policy (`tools/ci/check-workflows.mjs`) fails
+  any other module that starts sbt by name, and treats every command whose entry
+  point imports that module as an sbt call, which must come after `setup-jvm`.
+  The one exception is `toolchain-check`'s `sbt --script-version`, which asks
+  the launcher its version and loads no build (Ruling R-plan-10).
 ```
 
 In `CLAUDE.md`, in the bullet that begins
@@ -2960,7 +3031,9 @@ Expected: `actionlint-ok`; `compare-3b.md` shows only D2.
 disagreed on a glued comment and on duplicates — the table in Task 3's test);
 the GraalPy pin; the `SBT_CALL` fix (spec must-carry 6) with the new shapes; the
 build-scripts rule; `toolchain-check` and its local output; D2; `compare-3b.md`
-in `<details>`; "Part of #289's Phase 3."; the attribution lines.
+in `<details>`; "Part of #289's Phase 3. Part of #313 (its first bullet; the
+conditional `setup-jvm` and the unique cache keys remain)."; the attribution
+lines.
 
 ```bash
 gh pr create --base develop --head ci/toolchain-check --label "CI: No changelog needed" \
@@ -2981,7 +3054,7 @@ prove nothing broke). When every check is green: `gh pr merge <N> --squash`.
 **Files:**
 
 - Modify: `.github/workflows/changelog.yml` (whole file)
-- Modify: `.github/CLAUDE.md` (one row)
+- Modify: `.github/CLAUDE.md` (one row), `CLAUDE.md` (the changelog convention)
 
 **Interfaces:** none. The check keeps its workflow name and job name,
 "Changelog", the label `CI: No changelog needed`, and `./run`'s messages
@@ -3056,20 +3129,27 @@ jobs:
             }
 ```
 
-- [ ] **Step 2: Flip the row**
+- [ ] **Step 2: Flip the row, and correct CLAUDE.md**
 
 In `.github/CLAUDE.md`, "What still goes through `./run`", the row whose cells
 are `` `changelog.yml` `` and `` `./run changelog-check` `` gets the cells
 `` `actions/github-script` (`pulls.listFiles`) `` and `No`.
 
+In `CLAUDE.md` ("A `CHANGELOG.md` entry is for features …"), the sentence says
+labelling re-runs only the `Changelog` workflow "(a two-minute build-script job,
+then the check)" — the parenthesis is wrapped over two lines there. Replace that
+parenthesis with `(a GitHub script of a few seconds)`.
+`docs/distribution/nightly.md`, which CLAUDE.md keeps in step, does not describe
+the job, so it needs no change.
+
 - [ ] **Step 3: Check, compare, commit, open the PR**
 
 ```bash
-corepack pnpm exec prettier --write .github/workflows/changelog.yml .github/CLAUDE.md
+corepack pnpm exec prettier --write .github/workflows/changelog.yml .github/CLAUDE.md CLAUDE.md
 node tools/ci/check-workflows.mjs
 wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide-bs-3c && ~/tools/actionlint-1.7.12/actionlint -shellcheck ~/tools/shellcheck-v0.11.0/shellcheck && echo actionlint-ok'
 "$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-3c .github/workflows/changelog.yml > "$SCRATCH/compare-3c.md"
-git add .github/workflows/changelog.yml .github/CLAUDE.md
+git add .github/workflows/changelog.yml .github/CLAUDE.md CLAUDE.md
 git commit -m "Changelog check: an inline GitHub script over the pull request's own files"
 git push -u origin ci/changelog-github-script
 ```
@@ -3682,8 +3762,8 @@ In `.github/workflows/engine-changed-files.yml`, after the line
             tools/build-scripts/**
 ```
 
-(the engine checks now run code from that package; `ide-changed-files.yml` gains
-it in 3g).
+(the engine checks now run code from that package; IDE packaging follows, since
+`ide-pull-request.yml` packages whenever the engine list fires).
 
 - [ ] **Step 4: Update `.github/CLAUDE.md`**
 
@@ -4563,7 +4643,7 @@ When every check is green: `gh pr merge <N> --squash`.
 - Modify: `project/DistributionPackage.scala` (`Builder.localPlatform`)
 - Modify: `build.sbt` (after `ciBuildEngineDistribution`)
 - Modify: `.github/workflows/ide-packaging.yml` (`build-backend`)
-- Modify: `.github/workflows/ide-changed-files.yml` (`files`)
+
 - Modify: `.github/CLAUDE.md` (one row)
 
 **Interfaces:**
@@ -4834,18 +4914,9 @@ In `.github/workflows/ide-packaging.yml`, replace the whole `build-backend:` job
 The `build-script` job, the workflow `env` and `package-ide` stay as they are
 until 3i: `package-ide` still runs `./run ide build`.
 
-In `.github/workflows/ide-changed-files.yml`, after the line
-`            build.sbt`, add:
-
-<!-- prettier-ignore -->
-```yaml
-            project/EngineBundle.scala
-            project/MsvcRuntime.scala
-            tools/build-scripts/**
-```
-
-(the gate does not list `project/**`; these are the two Scala files the bundle
-depends on beyond `build.sbt`, and `version` comes from the package).
+`ide-changed-files.yml` needs nothing: `ide-pull-request.yml` packages whenever
+`engine-changed-files` fires, and that list covers `project/**` and (since 3d)
+`tools/build-scripts/**`.
 
 In `.github/CLAUDE.md`, the row whose cells are
 `` `ide-packaging.yml` › Build Backend `` and `` `./run backend get` `` gets the
@@ -4859,14 +4930,14 @@ cd /c/Repos/Enso/ide-bs-3g
 corepack pnpm exec prettier --write .github
 node tools/ci/check-workflows.mjs && node --test tools/ci/*.test.mjs 2>&1 | grep -E "ℹ (pass|fail)"
 wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide-bs-3g && ~/tools/actionlint-1.7.12/actionlint -shellcheck ~/tools/shellcheck-v0.11.0/shellcheck && echo actionlint-ok'
-"$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-3g .github/workflows/ide-packaging.yml .github/workflows/ide-changed-files.yml > "$SCRATCH/compare-3g.md"
+"$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-3g .github/workflows/ide-packaging.yml > "$SCRATCH/compare-3g.md"
 git add project/EngineBundle.scala project/DistributionPackage.scala build.sbt .github
 git commit -m "buildEngineBundle: the IDE's engine bundle in sbt; Build Backend without ./run"
 git push -u origin ci/engine-bundle-sbt
 ```
 
 Expected: `Workflow policy: OK`, `actionlint-ok`; `compare-3g.md` shows D7 under
-"Build Backend (linux, amd64)" and "(windows, amd64)", and the gate's paths.
+"Build Backend (linux, amd64)" and "(windows, amd64)", nothing else.
 
 `$SCRATCH/pr-3g.md`: the move; the layout (`EngineBundle.scala`'s comment); that
 CI archives the bundle directly instead of `./run`'s `dist/backend` mirror; D7;
@@ -5044,6 +5115,8 @@ run 39666057183 (the `./run` command lines) and the research notes:
       - name: Generate the parser's Java sources
         shell: bash
         run: |-
+          # `./run` reset the JUnit directory before the tests; stale reports would be published.
+          rm -rf target/test-results
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
           cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
@@ -5116,12 +5189,12 @@ run 39666057183 (the `./run` command lines) and the research notes:
 ```
 
 The steps keep `./run`'s order: library-server install and class-path
-resolution, Java sources generated, the ydoc native image (Linux), `sbt test`,
-the parser self-tests, then the benchmarks (Linux). The `if:` conditions keep
-its failure semantics: a failed `sbt test` lets the self-tests and benchmarks
-run (deferred, as `./run` deferred it), and the job still fails; a failure of
-any other step skips the rest. The benchmarks run only after the self-tests
-succeeded, since `./run` stopped at their failure.
+resolution, the JUnit directory reset and the Java sources generated, the ydoc
+native image (Linux), `sbt test`, the parser self-tests, then the benchmarks
+(Linux). The `if:` conditions keep its failure semantics: a failed `sbt test`
+lets the self-tests and benchmarks run (deferred, as `./run` deferred it), and
+the job still fails; a failure of any other step skips the rest. The benchmarks
+run only after the self-tests succeeded, since `./run` stopped at their failure.
 
 In `.github/CLAUDE.md`, the row whose cells are
 `` `engine-checks-platform.yml` › JVM Tests `` and
@@ -5961,10 +6034,10 @@ When every check is green: `gh pr merge <N> --squash`.
 git -C /c/Repos/Enso/ide fetch origin
 git -C /c/Repos/Enso/ide worktree add /c/Repos/Enso/ide-bs-3j -b ci/stdlib-test origin/develop
 cd /c/Repos/Enso/ide-bs-3j && corepack pnpm install --frozen-lockfile --ignore-scripts
-test -f tools/build-scripts/src/lib/engine.ts && grep -q "graalpy:" build-config.yaml && ! grep -q "\./run backend test jvm" .github/workflows/engine-checks-platform.yml && echo "3b, 3d and 3h are in"
+test -f tools/build-scripts/src/lib/engine.ts && grep -q "graalpy:" build-config.yaml && grep -q "checkEnsoSyntax" build.sbt && ! grep -q "\./run backend test jvm" .github/workflows/engine-checks-platform.yml && echo "3b, 3d, 3e and 3h are in"
 ```
 
-Expected: `3b, 3d and 3h are in`.
+Expected: `3b, 3d, 3e and 3h are in`.
 
 `tools/build-scripts/src/stdlib-test/suites.test.ts`:
 
@@ -7644,13 +7717,17 @@ The databases follow `./run`'s rule: Postgres on Linux when the suite runs
 Check that only the standard-library jobs still use `./run`:
 
 ```bash
-grep -n "\./run\|build-script\|ENSO_BUILD_SKIP" .github/workflows/engine-checks-platform.yml
+grep -nE '^\s*(- )?run: .*\./run( |$)' .github/workflows/engine-checks-platform.yml
+grep -nE 'uses: \./\.github/actions/(setup-)?build-script$|ENSO_BUILD_SKIP|needs: \[build-script' .github/workflows/engine-checks-platform.yml
 ```
 
-Expected: the workflow `env`'s `ENSO_BUILD_SKIP_VERSION_CHECK`, the
-`build-script` job, and the `stdlib-tests` job's `needs`, `setup-build-script`
-and `./run backend test` lines — nothing in any other job. Then replace the
-whole file with:
+Expected: the first grep prints one line,
+`run: ./run backend test ${{ matrix.suite }}`; the second prints four: the
+workflow `env`'s `ENSO_BUILD_SKIP_VERSION_CHECK`, the `build-script` job's
+`uses: ./.github/actions/build-script`, and the `stdlib-tests` job's
+`needs: [build-script, …]` and `uses: ./.github/actions/setup-build-script`.
+(`setup-build-scripts`, with an `s`, does not match: the pattern ends at `$`.)
+Then replace the whole file with:
 
 <!-- prettier-ignore -->
 ```yaml
@@ -7880,6 +7957,8 @@ jobs:
       - name: Generate the parser's Java sources
         shell: bash
         run: |-
+          # `./run` reset the JUnit directory before the tests; stale reports would be published.
+          rm -rf target/test-results
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
           cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
@@ -8321,6 +8400,7 @@ node tools/ci/check-workflows.mjs
 wsl -e bash -lc 'cd /mnt/c/Repos/Enso/ide-bs-3j && ~/tools/actionlint-1.7.12/actionlint -shellcheck ~/tools/shellcheck-v0.11.0/shellcheck && echo actionlint-ok'
 git add .github/workflows/engine-checks-platform.yml
 git commit -m "TEMPORARY: run the Standard Library suites through ./run too, for the side-by-side"
+git rev-parse HEAD > "$SCRATCH/3j-temporary-sha"
 git push -u origin ci/stdlib-test
 ```
 
@@ -8355,7 +8435,9 @@ gh run view "$pr" --log | sed 's/\x1b\[[0-9;]*m//g' | grep -E "Starting postgres
 
 Expected:
 
-- 14 Standard Library jobs (7 new, 7 "(old ./run)"), all green;
+- 16 Standard Library entries: 14 completed and green (7 new, 7 "(old ./run)"),
+  and 2 skipped — `stdlib-tests-windows` in the Linux call and `stdlib-tests` in
+  the Windows call, unexpanded because their `if:` is false;
 - Postgres started for the Linux Native and JVM jobs only, SQL Server for
   Microsoft only (the empty `image` started nothing elsewhere — see Ruling
   R-plan-7 for the fallback if GitHub rejects an empty image);
@@ -8401,7 +8483,9 @@ Expected, for every suite and both runs: `exit 0`, every project `same`, and:
 A project that differs in one run only, by a test or two, is a flake: re-run
 that pair once more (`gh workflow run engine-checks.yml --ref ci/stdlib-test`)
 and compare again; if it still differs, read the changed cases `junit-compare`
-lists. A project that differs in both runs is a wiring fault: fix it, push, and
+lists. A project that differs in both runs is a wiring fault: fix it in the
+final-state code (the `stdlib-tests` or `stdlib-tests-windows` job, the runner,
+or `setup-jvm`), never only in the temporary pieces, commit on top, push, and
 repeat the whole step. Only a difference proven flaky on develop too (it changes
 between two develop runs) may be `--allow`ed, and the PR body says which and
 why.
@@ -8413,16 +8497,30 @@ the PR body.
 
 ```bash
 cd /c/Repos/Enso/ide-bs-3j
-git revert --no-edit HEAD
-git diff HEAD~2 --stat
+git revert --no-edit "$(cat "$SCRATCH/3j-temporary-sha")"
+! grep -nE 'stdlib-tests-old|^  build-script:|ENSO_BUILD_SKIP|JUnit (old|new)' .github/workflows/engine-checks-platform.yml && echo "side-by-side removed"
 ```
 
-Expected: the revert removes exactly the temporary commit; the diff against the
-final-state commit is empty for `engine-checks-platform.yml`.
+Expected: the revert applies cleanly (it undoes the temporary commit by its SHA,
+whatever fixes came after it) and prints `side-by-side removed`.
 
-In `.github/CLAUDE.md`, replace the section's introduction — from
-`Build simplification Phase 2 moves the steps where \`./run\` only wraps one
-sbt` down to `` `engine-checks-platform.yml`). `` before the table — with:
+In `.github/CLAUDE.md`, under `## What still goes through \`./run\``, replace
+the paragraph before the table (develop's lines 80–90; earlier PRs shift them).
+It starts with the line
+
+<!-- prettier-ignore -->
+```markdown
+Build simplification Phase 2 moves the steps where `./run` only wraps one sbt
+```
+
+and ends with the line
+
+<!-- prettier-ignore -->
+```markdown
+`engine-checks-platform.yml`).
+```
+
+Replace it with:
 
 <!-- prettier-ignore -->
 ```markdown
@@ -8444,26 +8542,39 @@ and `` `./run backend test …` `` gets the cells
 `` `corepack pnpm --filter build-scripts run stdlib-test <suite>` `` and
 `` No: `setup-jvm` (GraalPy), `setup-build-scripts` ``.
 
-In `CLAUDE.md`, replace the paragraph that begins `CI is moving off \`./run\`
-(the build-simplification spec,`(it ends`until Phase 5.`) with:
+In `CLAUDE.md`, replace the paragraph of develop's lines 62–69. It starts with
+the line
 
 <!-- prettier-ignore -->
 ```markdown
-CI runs no pull-request check through `./run` any more (the
+CI is moving off `./run` (the build-simplification spec,
+```
+
+and ends with the line `until Phase 5.`. Replace it with:
+
+<!-- prettier-ignore -->
+```markdown
+CI runs no default pull-request check through `./run` any more (the
 build-simplification spec,
 `docs/superpowers/specs/2026-10-20-build-simplification-design.md`, Phases 2
 and 3): the workflows call sbt directly, with `.github/actions/setup-jvm`
 providing GraalVM, sbt, flatc and GraalPy, and run the logic that left `./run`
 from `tools/build-scripts` (`corepack pnpm --filter build-scripts run <command>`;
 `toolchain-check` compares a local toolchain with the pins). `.github/CLAUDE.md`
-("What still goes through `./run`") lists each step. Release, promote and the
-nightly checks still use `./run` until Phase 4; locally, `./run` keeps working
-until Phase 5.
+("What still goes through `./run`") lists each step. Release, promote, the
+nightly checks and the label-gated macOS checks still use `./run` until Phase
+4; locally, `./run` keeps working until Phase 5.
 ```
 
-In `build_tools/CLAUDE.md`, replace the paragraph that begins
-`CI is moving the steps where \`./run\` only wraps one sbt
-call`(it ends`command.`) with:
+In `build_tools/CLAUDE.md`, replace the paragraph of develop's lines 54–59. It
+starts with the line
+
+<!-- prettier-ignore -->
+```markdown
+CI is moving the steps where `./run` only wraps one sbt call to direct sbt
+```
+
+and ends with the line `command.`. Replace it with:
 
 <!-- prettier-ignore -->
 ```markdown
@@ -8500,18 +8611,25 @@ check is green, and the side-by-side in the PR body passed:
 
 ```bash
 git -C /c/Repos/Enso/ide fetch origin
-git -C /c/Repos/Enso/ide grep -n "\./run" origin/develop -- .github/workflows/changelog.yml .github/workflows/engine-checks-platform.yml .github/workflows/ide-packaging.yml .github/workflows/engine-checks.yml
-git -C /c/Repos/Enso/ide grep -n "setup-build-script\|build-script$" origin/develop -- .github/workflows | grep -v -E "nightly|release|promote|macos"
+git -C /c/Repos/Enso/ide grep -nE '^\s*(- )?run: .*\./run( |$)' origin/develop -- .github/workflows/changelog.yml .github/workflows/engine-checks-platform.yml .github/workflows/ide-packaging.yml .github/workflows/engine-checks.yml
+git -C /c/Repos/Enso/ide grep -nE 'uses: \./\.github/actions/(setup-)?build-script$' origin/develop -- .github/workflows | grep -vE "nightly|release|promote|macos"
 ```
 
-Expected: both print nothing. (The `build-script` and `setup-build-script`
-composite actions remain for the generator-era workflows' own copies of those
-steps and for Phase 4; Phase 5 deletes them with `build_tools/`.)
+Expected: both print nothing. (The Notes still mention `./run`, to say what each
+step replaced; the patterns count only steps that run it or use its actions.)
+(The `build-script` and `setup-build-script` composite actions remain for the
+generator-era workflows' own copies of those steps and for Phase 4; Phase 5
+deletes them with `build_tools/`.)
 
 - [ ] **Step 2: Record and tidy**
 
 - Comment on #289: the ten PR links, "Phase 3 complete", and the "Tickets to
   raise" list below (for the user to file; do not file them).
+- Comment on #313: its first bullet (sbt detection) is done by 3b; what remains
+  is a `setup-jvm` step with an `if:` counted as always run, and nothing
+  enforcing unique `cache-key`s (3j's two standard-library jobs share
+  `stdlib-tests` across their matrix legs, which the key's OS part separates
+  only by platform). Leave #313 open.
 - Remove the worktrees `ide-bs-3a` … `ide-bs-3j` and `ide-bs-p3base` with
   `git -C /c/Repos/Enso/ide worktree remove <dir>` once their branches have
   merged.
@@ -8683,7 +8801,9 @@ the exact text to insert.
    extensions) and is tested with vitest; no `tsx`. `.prettierignore` un-ignores
    it (`tools/*` + `!tools/build-scripts`), and a dedicated `Build Scripts`
    workflow runs its typecheck, lint and tests on changes to it or to what it
-   reads; the GUI checks also run them, through `-r`, when GUI files change.
+   reads; the GUI checks also run them, through `-r`, when GUI files change. CI
+   jobs run it on Node 24 too: `setup-node` installs `.node-version` on every OS
+   and checks it (Task 2), since the images carry Node 22.
    - **Why:** no new dependency (the two-week rule), nothing to compile. The GUI
      gate does not cover `tools/`, and widening it would run 30 minutes of GUI
      checks for a script change.
@@ -8837,3 +8957,11 @@ the exact text to insert.
     - **Why:** no pull-request job uses those suites; Phase 4 ports the sign-in
       with the nightly.
     - **Cost if wrong:** none for pull requests.
+23. **R-plan-10:** `toolchain-check` runs `sbt --script-version` through
+    `capture`, not `src/lib/sbt.ts`, and the convention reads "only
+    `src/lib/sbt.ts` runs sbt tasks".
+    - **Why:** it asks the launcher for its version and loads no build, so it
+      needs no `setup-jvm`; no workflow runs `toolchain-check`, and routing it
+      through the helper would make the policy demand `setup-jvm` for it.
+    - **Cost if wrong:** if a workflow ever runs `toolchain-check` without a
+      JDK, the sbt line only warns (the launcher check is not strict).
