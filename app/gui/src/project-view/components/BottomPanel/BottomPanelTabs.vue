@@ -1,5 +1,6 @@
 <script setup lang="ts">
-/** @file The bottom dock's tab strip: Code and Logs, with the count of unseen errors on Logs. */
+/** @file The bottom dock's tab strip: Code and Logs with their icons, and Logs' unseen errors. */
+import SvgIcon from '@/components/SvgIcon.vue'
 import { useText } from '$/providers/text'
 import { nextTick, useId } from 'vue'
 import { DOCK_TABS, type DockTab } from './dockTab'
@@ -75,6 +76,7 @@ function onKeydown(event: KeyboardEvent) {
       :data-testid="`dock-tab-${name}`"
       @click="pick(name)"
     >
+      <SvgIcon :name="name === 'code' ? 'code' : 'log'" class="tabIcon" />
       {{ getText(name === 'code' ? 'bottomDockCodeTab' : 'bottomDockLogsTab') }}
       <span
         v-if="name === 'logs' && logsBadge > 0 && tab !== 'logs'"
@@ -110,6 +112,15 @@ function onKeydown(event: KeyboardEvent) {
   background-color: rgba(255, 255, 255, 0.5);
   color: var(--color-text);
   font-size: 13px;
+}
+
+.tabIcon {
+  flex: none;
+  opacity: 0.7;
+}
+
+.tab[aria-selected='true'] .tabIcon {
+  opacity: 1;
 }
 
 .tab[aria-selected='true'] {

@@ -1,6 +1,12 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
-import { expect, test } from 'integration-test/base'
+import { expect, test, type Locator } from 'integration-test/base'
 import * as locate from './locate'
+
+async function box(locator: Locator) {
+  const rect = await locator.boundingBox()
+  expect(rect).not.toBeNull()
+  return { ...rect!, bottom: rect!.y + rect!.height, right: rect!.x + rect!.width }
+}
 
 const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Language server started'
 const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [org.enso.interpreter] Something failed'
@@ -78,6 +84,8 @@ test('the code editor still works after the Logs tab has shown', async ({ editor
 
     await dock.getByRole('tab', { name: 'Code' }).click()
     await expect(codeEditor).toBeVisible()
+    // Picking the tab hands the keyboard to the code editor.
+    await expect(codeEditor.locator('.cm-content')).toBeFocused()
     await expect(codeEditor.locator('.cm-line', { hasText: 'The main method' })).toBeVisible()
     await codeEditor.locator('.cm-content').click()
     await page.evaluate(() => {
@@ -86,5 +94,118 @@ test('the code editor still works after the Logs tab has shown', async ({ editor
     })
     await page.keyboard.type(' TEST')
     await expect(codeEditor.locator('.cm-content')).toContainText('The main TEST method')
+  })
+})
+
+test('while the dock is closed, a Code and a Logs button open it on their tab', async ({
+  editorPage,
+}) => {
+  await editorPage.do(async (page) => {
+    const buttons = page.getByTestId('bottomDockButtons')
+    const dock = locate.bottomDock(page)
+    const codeButton = buttons.getByTestId('action:graph.toggleCodeEditor')
+    const logsButton = buttons.getByTestId('action:graph.toggleLogs')
+    await expect(codeButton).toHaveAccessibleName(/^Code Editor \(.+`\)$/)
+    // The ERROR entry and the stderr line have not been seen.
+    await expect(buttons.getByTestId('logs-error-dot')).toBeVisible()
+    // The dot is decorative; the count is in the button's name.
+    await expect(logsButton).toHaveAccessibleName(/^Engine Logs, 2 new errors \(.+L\)$/)
+    // Side by side in a row, Code first.
+    const codeBox = await box(codeButton)
+    const logsBox = await box(logsButton)
+    expect(logsBox.y).toBe(codeBox.y)
+    expect(logsBox.x).toBeGreaterThanOrEqual(codeBox.right)
+
+    await logsButton.click()
+    await expect(dock.getByRole('tab', { name: /Logs/ })).toHaveAttribute('aria-selected', 'true')
+    await expect(buttons).toBeHidden()
+    // The keyboard goes to the tab the button opened...
+    await expect(dock.getByRole('tab', { name: /Logs/ })).toBeFocused()
+
+    await dock.getByTestId('action:panel.close').click()
+    await expect(dock).toBeHidden()
+    // ...and back to the button when the dock closes.
+    await expect(logsButton).toBeFocused()
+    // Seen while the Logs tab showed.
+    await expect(buttons.getByTestId('logs-error-dot')).toBeHidden()
+
+    await codeButton.click()
+    await expect(dock.getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true')
+    await expect(locate.codeEditor(page)).toBeVisible()
+  })
+})
+
+test('each tab’s shortcut opens the dock there, switches to it, or closes the dock', async ({
+  editorPage,
+}) => {
+  await editorPage.do(async (page) => {
+    const dock = locate.bottomDock(page)
+    const codeEditor = locate.codeEditor(page)
+    const selected = (name: string | RegExp) =>
+      expect(dock.getByRole('tab', { name })).toHaveAttribute('aria-selected', 'true')
+
+    await page.keyboard.press('ControlOrMeta+L')
+    await selected(/Logs/)
+    await expect(dock.getByRole('log').getByText('Something failed')).toBeVisible()
+
+    // Switching to Code gives the code editor the keyboard, as a click on its tab does.
+    await page.keyboard.press('ControlOrMeta+`')
+    await selected('Code')
+    await expect(codeEditor.locator('.cm-content')).toBeFocused()
+
+    await page.keyboard.press('ControlOrMeta+L')
+    await selected(/Logs/)
+    await page.keyboard.press('ControlOrMeta+L')
+    await expect(dock).toBeHidden()
+
+    // The Code shortcut opens on Code, though Logs showed last.
+    await page.keyboard.press('ControlOrMeta+`')
+    await selected('Code')
+    // Opening on Code mounts the editor, which takes the keyboard.
+    await expect(codeEditor.locator('.cm-content')).toBeFocused()
+    await page.keyboard.press('ControlOrMeta+`')
+    await expect(dock).toBeHidden()
+    // The keyboard was in the code editor: it goes to the Code button, not the page.
+    await expect(
+      page.getByTestId('bottomDockButtons').getByTestId('action:graph.toggleCodeEditor'),
+    ).toBeFocused()
+  })
+})
+
+test('the dock header’s fullscreen and close buttons', async ({ editorPage }) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    await expect(dock).toBeVisible()
+    const heightBefore = (await dock.boundingBox())!.height
+    const viewportHeight = page.viewportSize()!.height
+    const tabs = page.getByRole('tablist', { name: 'Bottom panel' })
+    // Docked, nothing sits below the dock: it ends at the bottom of the graph editor and window.
+    expect((await box(dock)).bottom).toBe((await box(locate.graphEditor(page))).bottom)
+    expect((await box(dock)).bottom).toBe(viewportHeight)
+
+    await locate.enterFullscreenButton(dock).click()
+    await expect(locate.exitFullscreenButton(page)).toBeVisible()
+    // The whole dock, header and all, fills the editor area.
+    await expect
+      .poll(async () => (await page.getByRole('log').boundingBox())?.height ?? 0)
+      .toBeGreaterThan(heightBefore)
+    await expect(page.getByRole('log').getByText('Something failed')).toBeVisible()
+    // ...below the app's top bar, which stays in view: the header is not underneath it.
+    const appBar = await box(page.locator('.TabBar'))
+    await expect.poll(async () => (await box(tabs)).y).toBe((await box(locate.graphEditor(page))).y)
+    expect((await box(tabs)).y).toBeGreaterThanOrEqual(appBar.bottom)
+    expect((await box(locate.exitFullscreenButton(page))).y).toBeGreaterThanOrEqual(appBar.bottom)
+    await expect(page.locator('.TabBar')).toBeVisible()
+    // ...and down to the bottom of the window.
+    expect((await box(page.getByRole('log'))).bottom).toBeLessThanOrEqual(viewportHeight)
+    expect((await box(page.locator('.dockLayout'))).bottom).toBe(viewportHeight)
+
+    await locate.exitFullscreenButton(page).click()
+    await expect(locate.enterFullscreenButton(dock)).toBeVisible()
+
+    await dock.getByTestId('action:panel.close').click()
+    await expect(dock).toBeHidden()
+    await expect(page.getByTestId('bottomDockButtons')).toBeVisible()
   })
 })

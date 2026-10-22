@@ -9,7 +9,7 @@ import { expect, test } from 'integration-test/base'
 import { TEXT } from '../actions'
 import * as locate from './locate'
 
-/** The new key for "Show/Hide Code Editor" (default `Mod+\``), which nothing else has. */
+/** The new key for the Code Editor shortcut (default `Mod+\``), which nothing else has. */
 const NEW_KEY = 'ControlOrMeta+Shift+U'
 const OLD_KEY = 'ControlOrMeta+`'
 

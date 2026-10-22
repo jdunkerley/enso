@@ -202,7 +202,7 @@ const displayableActions = {
     shortcut: () => graphBindings.bindings['graph.openComponentBrowser'],
   },
   'graph.toggleCodeEditor': {
-    icon: 'bottom_panel',
+    icon: 'code',
     description: 'Code Editor',
     shortcut: () => graphBindings.bindings['graph.toggleCodeEditor'],
   },

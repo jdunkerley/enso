@@ -19,7 +19,7 @@ import { useRightPanelData } from '$/providers/rightPanel'
 import { useText } from '$/providers/text'
 import { graphBindings } from '@/bindings'
 import BottomPanel from '@/components/BottomPanel.vue'
-import { toggleDockTab, useDockTab } from '@/components/BottomPanel/dockTab'
+import { dockTabActions, provideCodeTabFocus, useDockTab } from '@/components/BottomPanel/dockTab'
 import CodeEditor from '@/components/CodeEditor.vue'
 import EngineLogPanel from '@/components/EngineLogs/EngineLogPanel.vue'
 import { useEngineLogStream } from '@/components/EngineLogs/engineLogStream'
@@ -238,6 +238,7 @@ const { copyNodesToClipboard, createNodesFromClipboard } = useGraphEditorClipboa
 
 const showCodeEditor = ref(false)
 const dockTab = useDockTab()
+const codeTabFocus = provideCodeTabFocus()
 const graphTidy = useGraphTidy(graphStore, module)
 
 const localVersioning = useLocalVersioning()
@@ -268,11 +269,7 @@ const actionHandlers = registerHandlers({
       createWithComponentBrowser({ placement })
     },
   },
-  'graph.toggleCodeEditor': toggledAction(showCodeEditor),
-  'graph.toggleLogs': {
-    action: () => toggleDockTab(showCodeEditor, dockTab, 'logs'),
-    toggled: () => showCodeEditor.value && dockTab.value === 'logs',
-  },
+  ...dockTabActions(showCodeEditor, dockTab, codeTabFocus),
   'graph.toggleDocumentationEditor': {
     action: () => rightPanel.toggleTab('documentation'),
     toggled: () => rightPanel.tab === 'documentation',

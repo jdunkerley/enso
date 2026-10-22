@@ -19,20 +19,59 @@ export function useDockTab(): Ref<DockTab> {
   return tab
 }
 
-/** Open the dock on `target`; close it if `target` is already showing. */
-export function toggleDockTab(show: Ref<boolean>, tab: Ref<DockTab>, target: DockTab): void {
+/** What {@link toggleDockTab} did. */
+export type DockToggleResult = 'opened' | 'switched' | 'closed'
+
+/**
+ * A tab's shortcut (`Mod+\`` for Code, `Mod+L` for Logs): open the closed dock on `target`, switch
+ * the open dock to `target`, or close the dock if `target` already shows.
+ */
+export function toggleDockTab(
+  show: Ref<boolean>,
+  tab: Ref<DockTab>,
+  target: DockTab,
+): DockToggleResult {
   if (show.value && tab.value === target) {
     show.value = false
-  } else {
-    tab.value = target
-    show.value = true
+    return 'closed'
+  }
+  const result = show.value ? 'switched' : 'opened'
+  tab.value = target
+  show.value = true
+  return result
+}
+
+/**
+ * The handlers of the tabs' shortcuts, `graph.toggleCodeEditor` and `graph.toggleLogs` (see
+ * {@link toggleDockTab}). Switching the open dock from Logs to Code also asks the code editor to take
+ * focus, as a click on the Code tab does; opening the dock on Code mounts the editor, which takes
+ * focus by itself.
+ */
+export function dockTabActions(
+  show: Ref<boolean>,
+  tab: Ref<DockTab>,
+  codeTabFocus: { request: () => void },
+) {
+  return {
+    'graph.toggleCodeEditor': {
+      action: () => {
+        if (toggleDockTab(show, tab, 'code') === 'switched') codeTabFocus.request()
+      },
+      toggled: () => show.value && tab.value === 'code',
+    },
+    'graph.toggleLogs': {
+      action: () => void toggleDockTab(show, tab, 'logs'),
+      toggled: () => show.value && tab.value === 'logs',
+    },
   }
 }
 
 /**
- * Asks the Code tab's content (the code editor) to take keyboard focus. The dock requests it when
- * the user picks the Code tab while Logs shows; nothing else does, so re-activating a kept-alive
- * project tab or resizing the dock never takes focus from the graph.
+ * Asks the Code tab's content (the code editor) to take keyboard focus. It is requested when the
+ * user switches the open dock from Logs to Code (a click on the tab, or the Code shortcut); nothing
+ * else does, so re-activating a kept-alive project tab or resizing the dock never takes focus from
+ * the graph. `GraphEditor.vue` provides it (its shortcut handler requests it); a dock with no
+ * provider above it provides its own.
  */
 function codeTabFocus() {
   const requests = ref(0)

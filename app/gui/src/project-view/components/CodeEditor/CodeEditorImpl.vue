@@ -21,7 +21,7 @@ import {
 import { lintGutter } from '@codemirror/lint'
 import { highlightSelectionMatches } from '@codemirror/search'
 import { drawSelection, keymap } from '@codemirror/view'
-import { onMounted, toRef, useTemplateRef, watch, type ComponentInstance } from 'vue'
+import { nextTick, onMounted, toRef, useTemplateRef, watch, type ComponentInstance } from 'vue'
 
 const { store: project, module, graph } = useCurrentProject()
 
@@ -63,9 +63,11 @@ onMounted(() => {
 // The dock keeps this editor mounted while its Logs tab shows: when the user picks the Code tab
 // again, take focus as a remount would have. Only then — not when the editor merely becomes visible
 // (a kept-alive project tab re-activated, a resize), which would take the keyboard from the graph.
+// A `post` watcher alone runs before the dock's `v-show` has shown the Code panel, and a hidden
+// element cannot take focus: wait for the end of that flush.
 const codeTabFocus = useCodeTabFocus(true)
 if (codeTabFocus != null) {
-  watch(codeTabFocus.requests, () => editorView.focus(), { flush: 'post' })
+  watch(codeTabFocus.requests, () => void nextTick(() => editorView.focus()), { flush: 'post' })
 }
 </script>
 

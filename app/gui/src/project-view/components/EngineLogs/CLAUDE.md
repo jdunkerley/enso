@@ -42,19 +42,29 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   so the code editor keeps its cursor and undo history and the log keeps its
   scroll position and filters; only closing the dock unmounts them.
 - The code editor takes focus when the dock opens on Code (it mounts) and when
-  the user picks the Code tab while Logs shows (`useCodeTabFocus` in
-  `../BottomPanel/dockTab.ts`). Never on merely becoming visible: a kept-alive
-  project tab re-activated or a resize would take the keyboard from the graph.
+  the user switches the open dock from Logs to Code, by the tab or by
+  `` Mod+` `` (`useCodeTabFocus` in `../BottomPanel/dockTab.ts`, provided by
+  `GraphEditor.vue`). Never on merely becoming visible: a kept-alive project tab
+  re-activated or a resize would take the keyboard from the graph. The editor
+  focuses on the `nextTick` after the request: a `post` watcher alone runs
+  before `v-show` has shown the panel, and a hidden element cannot take focus.
 - The stream is owned by `GraphEditor.vue`, not the panel, so the Logs tab's
   error badge counts while the dock is closed. `markSeen()` runs while the dock
   is open on the Logs tab.
-- `graph.toggleLogs` is `Mod+L`. The graph's key handler is a capture-phase
-  window listener, so it runs before CodeMirror and works with the code editor
-  focused (as `Mod+D` does). Our CodeMirror keymap (`util/codemirror/keymap.ts`)
-  does not include CodeMirror's default keymap, so nothing binds `Mod-l`
-  (`selectLine`) there and the shortcut cannot double-fire. If a binding for
-  `Mod-l` is ever added to that keymap, CodeMirror must keep it inside the
-  editor and the graph handler must be told to skip it, or both would run.
+- `graph.toggleLogs` is `Mod+L`: it opens the closed dock on Logs, switches the
+  open dock to Logs, or closes the dock while Logs shows (`` Mod+` `` does the
+  same for Code). While the dock is closed, the Logs button in the graph's
+  gutter shows a dot for unseen errors, from the same count as the tab's badge.
+  The dot is `aria-hidden`; the count is in the button's name. A collapsed
+  button moves the keyboard to the tab it opened, and closing the dock while the
+  keyboard is in it returns the keyboard to the matching collapsed button. The
+  graph's key handler is a capture-phase window listener, so it runs before
+  CodeMirror and works with the code editor focused (as `Mod+D` does). Our
+  CodeMirror keymap (`util/codemirror/keymap.ts`) does not include CodeMirror's
+  default keymap, so nothing binds `Mod-l` (`selectLine`) there and the shortcut
+  cannot double-fire. If a binding for `Mod-l` is ever added to that keymap,
+  CodeMirror must keep it inside the editor and the graph handler must be told
+  to skip it, or both would run.
 - The dock's tabs are `@/components/BottomPanel/` (`dockTab.ts`,
   `BottomPanelTabs.vue`); `GraphEditor.vue` creates the stream and passes it to
   `EngineLogPanel`.

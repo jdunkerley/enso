@@ -52,7 +52,7 @@ const GRAPH_BINDINGS_AND_CATEGORIES = inputBindings.defineBindings(
   {
     'graph.toggleCodeEditor': {
       bindings: ['Mod+`'],
-      icon: 'bottom_panel',
+      icon: 'code',
       category: 'graphEditor',
     },
     'graph.toggleLogs': {

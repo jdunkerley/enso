@@ -21,16 +21,16 @@ Shortcuts are designed to work well with both the mouse and the touchpad.
 
 #### General Shortcuts
 
-| Shortcut                                                                          | Action                         |
-| --------------------------------------------------------------------------------- | ------------------------------ |
-| <kbd>Escape</kbd>                                                                 | Cancel current interaction     |
-| <kbd>Meta</kbd>+<kbd>`</kbd>                                                      | Show/hide Code Editor          |
-| <kbd>Meta</kbd>+<kbd>L</kbd>                                                      | Show/hide Engine Logs          |
-| <kbd>Meta</kbd>+<kbd>D</kbd>                                                      | Show/hide Documentation Editor |
-| <kbd>Meta</kbd>+<kbd>,</kbd>                                                      | Show Settings                  |
-| <kbd>Meta</kbd>+<kbd>/</kbd>                                                      | Show About Window              |
-| <kbd>Meta</kbd>+<kbd>Z</kbd>                                                      | Undo last action               |
-| <kbd>Meta</kbd>+<kbd>Y</kbd> or <kbd>Meta</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Redo last undone action        |
+| Shortcut                                                                          | Action                                           |
+| --------------------------------------------------------------------------------- | ------------------------------------------------ |
+| <kbd>Escape</kbd>                                                                 | Cancel current interaction                       |
+| <kbd>Meta</kbd>+<kbd>`</kbd>                                                      | Open Code Editor (switching tabs), or close it   |
+| <kbd>Meta</kbd>+<kbd>L</kbd>                                                      | Open Engine Logs (switching tabs), or close them |
+| <kbd>Meta</kbd>+<kbd>D</kbd>                                                      | Show/hide Documentation Editor                   |
+| <kbd>Meta</kbd>+<kbd>,</kbd>                                                      | Show Settings                                    |
+| <kbd>Meta</kbd>+<kbd>/</kbd>                                                      | Show About Window                                |
+| <kbd>Meta</kbd>+<kbd>Z</kbd>                                                      | Undo last action                                 |
+| <kbd>Meta</kbd>+<kbd>Y</kbd> or <kbd>Meta</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> | Redo last undone action                          |
 
 #### Navigation
 

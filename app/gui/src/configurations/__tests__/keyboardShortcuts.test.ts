@@ -300,6 +300,19 @@ test('saving a version conflicts with nothing in the defaults', () => {
   expect([...conflicts.keys()]).not.toContain('graph.saveVersionWithComment')
 })
 
+describe('the bottom dock’s tab shortcuts', () => {
+  test('Code is Mod+` and Logs is Mod+L, both rebindable graph shortcuts with their tab’s icon', () => {
+    const shortcuts = defaultShortcuts()
+    const code = byId(shortcuts, 'graph.toggleCodeEditor')
+    const logs = byId(shortcuts, 'graph.toggleLogs')
+    expect([code.defaults, logs.defaults]).toEqual([['Mod+`'], ['Mod+L']])
+    expect([code.scope, logs.scope]).toEqual(['graph', 'graph'])
+    expect([code.rebindable, logs.rebindable]).toEqual([true, true])
+    expect([code.icon, logs.icon]).toEqual(['code', 'log'])
+    expect(conflictsFor(shortcuts, code, 'Mod+`')).toEqual([])
+  })
+})
+
 describe('graph.toggleLogs', () => {
   test('defaults to Mod+L, which nothing active over the graph has (the drive Label is drive-only)', () => {
     const shortcuts = defaultShortcuts()
