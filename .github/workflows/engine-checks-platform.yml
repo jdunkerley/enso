@@ -53,7 +53,13 @@ jobs:
   # keeps `id: build`, so the job's outputs are what they were, and it exports the version to the
   # later steps, which is how sbt names the package. `ENSO_LAUNCHER` stays `native,test`, the value
   # `./run` forced. `setup-msvc` replaces `./run`'s MSVC environment on Windows: the native images
-  # link with it, and the runtime DLL copy reads `VCToolsRedistDir`. Gone, because only `./run`
+  # link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build compiles the Rust
+  # parser, and with `all` several of its tasks start `cargo`/`rustup` at once; with the
+  # `rust-toolchain.toml` toolchain missing, each auto-installs it and they collide ("could not
+  # rename 'component' file", then "Cargo isn't installed!"). `./run`'s full `pnpm install` had
+  # compiled the parser first, installing the toolchain; `setup-build-scripts` runs no scripts, so
+  # "Install the Rust toolchain" installs it (rustup 1.28+ reads `rust-toolchain.toml`) before sbt
+  # starts. Gone, because only `./run`
   # read them or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy
   # of `ENSO_TEST_JUNIT_DIR`.
   build-engine-distribution:
@@ -84,6 +90,9 @@ jobs:
           flatc: "true"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
+      # See Note [Engine Distribution Without ./run]: one install before sbt starts several cargo calls.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
       - id: build
         name: Compute the version
         run: corepack pnpm --filter build-scripts run version
