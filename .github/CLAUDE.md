@@ -31,9 +31,10 @@ settings. Every workflow is hand-written YAML: the Rust generator
 - `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
   platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
   `setup-jvm` (GraalVM, sbt and optionally `flatc` at the `toolchain:` pins in
-  `build-config.yaml`, plus the sbt dependency cache), `git-clean`,
-  `setup-build-scripts` (install `tools/build-scripts`' dependencies only),
-  `download-engine-distribution`.
+  `build-config.yaml`, plus the sbt dependency cache), `setup-msvc` (the MSVC
+  developer environment on Windows, for native images and the runtime DLL copy),
+  `git-clean`, `setup-build-scripts` (install `tools/build-scripts`'
+  dependencies only), `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -95,21 +96,21 @@ that job's version, not sbt's default `0.0.0-dev`: the Enso lint takes it from
 the build job's outputs (Note [Lint Reads The Distribution's Version] in
 `engine-checks-platform.yml`).
 
-| Workflow › job                                           | Step                                                        | Goes through `./run`?                               |
-| -------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                     | No: `setup-jvm`                                     |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)         | No: `setup-jvm`                                     |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)             | No: `setup-jvm`                                     |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                 | No: `setup-jvm`                                     |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                       | No: `setup-jvm`                                     |
-| `engine-checks-platform.yml` › Build Engine Distribution | `./run backend ci-build-engine-distribution`                | Yes: Phase 3 (version, MSVC DLLs, CI checks in sbt) |
-| `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                    | Yes: Phase 3                                        |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check` | No: `setup-build-scripts`                           |
-| `engine-checks-platform.yml` › stdlib tests              | `./run backend test …`                                      | Yes: Phase 3 (`stdlib-test`)                        |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                 | No                                                  |
-| `ide-packaging.yml` › Build Backend                      | `./run backend get`                                         | Yes: Phase 3 (`buildEngineBundle`, version)         |
-| `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                           | Yes: Phase 3 (version)                              |
-| release, promote, nightly, nightly checks, macOS         | various                                                     | Yes: Phase 4                                        |
+| Workflow › job                                           | Step                                                         | Goes through `./run`?                       |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------- |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                      | No: `setup-jvm`                             |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)          | No: `setup-jvm`                             |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)              | No: `setup-jvm`                             |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                  | No: `setup-jvm`                             |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                        | No: `setup-jvm`                             |
+| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"` | No: `setup-jvm`, `setup-msvc`               |
+| `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                     | Yes: Phase 3                                |
+| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`  | No: `setup-build-scripts`                   |
+| `engine-checks-platform.yml` › stdlib tests              | `./run backend test …`                                       | Yes: Phase 3 (`stdlib-test`)                |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                  | No                                          |
+| `ide-packaging.yml` › Build Backend                      | `./run backend get`                                          | Yes: Phase 3 (`buildEngineBundle`, version) |
+| `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                            | Yes: Phase 3 (version)                      |
+| release, promote, nightly, nightly checks, macOS         | various                                                      | Yes: Phase 4                                |
 
 ## Checking a change
 
