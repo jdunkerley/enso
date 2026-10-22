@@ -37,6 +37,7 @@ jobs:
             test/**
             build.sbt
             build-config.yaml
+            tools/build-scripts/**
             .cargo/**
             Cargo.lock
             Cargo.toml

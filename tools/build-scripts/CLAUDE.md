@@ -17,6 +17,12 @@ that Node runs as it is (type stripping): each command is
   `.node-version`, `packageManager`, `rust-toolchain.toml`), with an install
   hint for each that differs. A wrong sbt launcher or a missing GraalPy only
   warns.
+- `stdlib-api-check` — what `./run backend stdlib-api-check` did: for each
+  standard library with a `docs/api` directory, regenerate the API docs with the
+  built engine (`enso --docs api --in-project`) and `git diff --no-index` them
+  against the committed ones; the first that differs fails, with `./run`'s
+  message. CI passes the build job's `ENSO_VERSION`; locally the only package in
+  `built-distribution/` is used.
 
 ## Layout
 
@@ -25,7 +31,8 @@ that Node runs as it is (type stripping): each command is
 - `src/<command>/` — the logic, as functions with vitest tests beside them
   (`*.test.ts`).
 - `src/lib/` — shared helpers: the repository root and running programs
-  (`repo.ts`), publishing to GitHub Actions (`github.ts`).
+  (`repo.ts`), publishing to GitHub Actions (`github.ts`), finding the engine
+  package (`engine.ts`).
 
 ## Conventions
 
