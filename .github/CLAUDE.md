@@ -17,7 +17,9 @@ settings. Every workflow is hand-written YAML: the Rust generator
   the checks, callable (`workflow_call`) and mostly startable by hand
   (`workflow_dispatch`).
 - `workflows/changelog.yml`, `std-libs-labels.yml`, `formatting.yml`,
-  `enso4igv.yml`, `workflow-lint.yml` — single-purpose pull-request workflows.
+  `enso4igv.yml`, `workflow-lint.yml`, `build-scripts.yml` — single-purpose
+  pull-request workflows. `build-scripts.yml` type-checks, lints and tests
+  `tools/build-scripts`.
 - `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases. They are the
   generator's last output, kept unchanged until Phase 4 rewrites them; change
   them only together with an rc release test. `engine-checks-nightly.yml`,
