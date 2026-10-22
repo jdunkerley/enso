@@ -482,6 +482,10 @@ export function buildScriptsSbtCommands(buildScripts) {
 /**
  * Whether a `run:` script calls sbt: directly (`SBT_CALL`), inside a `bash -c`/`pwsh -Command`
  * script, or through a `tools/build-scripts` command in `sbtCommands`.
+ *
+ * The recognised wrappers are a closed list (see `SBT_CALL`). Shapes it does not see: sbt behind a
+ * variable used as the command (`$SBT_CALL compile`), a line continuation after an assignment or
+ * wrapper, `xargs sbt`, and `/usr/bin/env sbt`.
  */
 export function callsSbt(script, sbtCommands = new Set()) {
   if (SBT_CALL.test(script)) return true
