@@ -295,6 +295,15 @@ object GatherLicenses {
     )
   }
 
+  /** `verifyGeneratedPackage` for one package, for tasks that verify several
+    * (`ciBuildEngineDistribution` in build.sbt).
+    */
+  def verifyPackageAt(
+    log: Logger,
+    distributionConfig: File,
+    packageDestination: File
+  ): Unit = verifyPackage(log, distributionConfig, packageDestination)
+
   case class LegalReviewException(string: String)
       extends RuntimeException(string)
 
