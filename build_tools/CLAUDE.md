@@ -16,17 +16,12 @@ that can be built from sources or downloaded).
   archive handling, GitHub via `octocrab`, S3/ECR uploads, path utilities,
   logging. Most of the build logic's raw "do a thing on the OS" code lives here.
 - `build/` — `enso-build`. Domain-specific build logic on top of `ide-ci`
-  (engine, GUI, IDE, backend, release, changelog, CI YAML generation inputs).
-  Large — probably the biggest Rust crate in the repo.
+  (engine, GUI, IDE, backend, release, changelog). Large — probably the biggest
+  Rust crate in the repo.
 - `cli/` — `enso-build-cli`. The `clap`-driven entry point. Thin layer on top of
   `enso-build`.
-- `ci-gen/` — `enso-build-ci-gen`. Generates the GitHub Actions YAML files under
-  `.github/workflows/`. Run when the CI matrix changes.
 - `enso-formatter/` — Small tool enforcing the import-grouping / section-header
   style from `docs/style-guide/rust.md` across our Rust sources.
-- `install/` — Windows installer/uninstaller toolchain. Four crates: `install`
-  (shared library), `install/config`, `install/installer`,
-  `install/uninstaller`.
 - `macros/lib/` — `enso-build-macros-lib`. Proc-macro helpers consumed by
   `enso-build` at build time.
 
@@ -55,3 +50,10 @@ that can be built from sources or downloaded).
 
 `run.cmd` / `run.ps1` are the Windows equivalents. See `README.md` for the
 target/subcommand catalog.
+
+CI is moving the steps where `./run` only wraps one sbt call to direct sbt
+calls; `.github/CLAUDE.md` ("What still goes through `./run`") says which have
+moved and when the rest follow. The build-simplification spec retires this CLI
+in Phase 5. Until then, keep `./run`'s behaviour for the call sites that still
+use it, and when a call site moves, mirror exactly what `./run` did around the
+command.

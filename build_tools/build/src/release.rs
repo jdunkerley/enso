@@ -133,7 +133,8 @@ pub async fn publish_release(context: &BuildContext) -> Result {
     let release = release_handle.get().await?;
     ensure!(release.draft, "Release has been already published!");
 
-    // macOS does not block publishing (see `add_release_steps`), so its installer may be absent.
+    // macOS does not block publishing, and is skipped when its runner is offline (see
+    // `.github/workflows/release.yml`), so its installer may be absent.
     let uploaded: Vec<String> = release.assets.iter().map(|asset| asset.name.clone()).collect();
     let (manifest, missing) =
         manifest::Assets::new_uploaded(&remote_repo, &triple.versions.version, &uploaded);
@@ -141,8 +142,8 @@ pub async fn publish_release(context: &BuildContext) -> Result {
         let platforms = missing.iter().map(|asset| asset.target_pretty.as_str()).join(", ");
         warn!("Publishing without installers for: {platforms}.");
         let note = format!(
-            "\n\n> [!NOTE]\n> This release has no installer for {platforms}: that build failed. \
-             Re-run its jobs in the release workflow to add it."
+            "\n\n> [!NOTE]\n> This release has no installer for {platforms}: that build failed or \
+             was skipped. Re-run its jobs in the release workflow to add it."
         );
         let body = format!("{}{note}", release.body.as_deref().unwrap_or_default());
         // A draft's tag does not exist yet; editing the draft without restating the tag turns it

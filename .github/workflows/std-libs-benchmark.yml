@@ -1,5 +1,6 @@
-# This file is auto-generated. Do not edit it manually!
-# Edit the enso_build::ci_gen module instead and run `cargo run --package enso-build-ci-gen`.
+# Hand-written. Runs the Standard Library benchmarks when started by hand; `bench-upload.yml`
+# publishes the results when a run completes (it keys on this workflow's name). Calls sbt directly:
+# see Note [Benchmarks Call sbt Directly] in `engine-benchmark.yml`.
 
 name: Benchmark Standard Libraries
 on:
@@ -14,95 +15,48 @@ on:
         required: true
         type: boolean
         default: false
+
+env:
+  # Benchmarks always start and end with a clean working tree. Read by `.github/actions/git-clean`.
+  ENSO_CI_CLEAN_BUILD: "true"
+
 jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
+      # Corepack, for `git-clean` and for the build's own `corepack pnpm` calls.
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
+          cache-key: benchmark-standard-libraries
+          flatc: "true"
+      # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
+      # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
+      - name: Run the benchmarks
         run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
+          task="std-benchmarks/bench"
+          if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
+          sbt "-Dbench.compileOnly=$JUST_CHECK" "-Dsbt.server.autostart=false" "$task"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: ${{ (always()) }}
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: ./run backend benchmark enso-jmh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BENCH_NAME: ${{ inputs.bench-name }}
+          JUST_CHECK: ${{ inputs.just-check }}
+          ENSO_LAUNCHER: native,-ls
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Upload benchmark results
         uses: actions/upload-artifact@v5
         with:
           name: benchmark-results.xml
           path: std-bits/benchmarks/bench-report.xml
-      - if: ${{ (always()) }}
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      GRAAL_EDITION: GraalVM CE
-    timeout-minutes: 240
-  build-script-linux-amd64:
-    name: Build Script
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli
-          retention-days: 1
-env:
-  ENSO_BUILD_BENCH_NAME: ${{ inputs.bench-name }}
-  ENSO_BUILD_MINIMAL_RUN: ${{ true == inputs.just-check }}
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean

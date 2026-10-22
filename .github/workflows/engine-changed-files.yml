@@ -36,12 +36,14 @@ jobs:
             std-bits/**
             test/**
             build.sbt
+            build-config.yaml
             .cargo/**
             Cargo.lock
             Cargo.toml
             rust-toolchain.toml
             .github/workflows/engine-changed-files.yml
-            .github/workflows/engine-checks-optional.yml
+            .github/workflows/engine-checks-platform.yml
+            .github/actions/**
             .github/workflows/engine-checks.yml
             .github/workflows/engine-pull-request.yml
           # Agent notes are never read by the build or the tests. Those under `distribution/` are

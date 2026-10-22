@@ -150,7 +150,7 @@ productivity for data-intensive teams. Learn more at
 ## Fork Details
 
 This repository is a fork of the original Enso Analytics repository. The forked
-version adjusts the build process to not depend on Bazel or the services of Enso
+version adjusts the build process and does not depend on the services of Enso
 Analytics.
 
 It is adjusted so that it can run without the need for Enso Analytics' cloud

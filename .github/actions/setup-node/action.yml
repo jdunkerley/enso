@@ -1,0 +1,23 @@
+name: Set up Node and corepack
+description: >-
+  Node from `.node-version` on macOS, whose runner image lacks a suitable one, and corepack 0.36.0
+  everywhere but Linux, whose image already has a recent one. The jobs that call `./run` use it;
+  the GUI checks set up pnpm their own way (`pnpm/action-setup`).
+runs:
+  using: composite
+  steps:
+    - if: runner.os == 'macOS'
+      name: Setup nodejs version
+      uses: actions/setup-node@v5
+      with:
+        node-version-file: .node-version
+        # The store cache needs pnpm on the PATH, which the next step provides.
+        package-manager-cache: false
+    - if: runner.os == 'Windows'
+      name: Install corepack
+      shell: pwsh
+      run: npm install -g --force corepack@0.36.0 && corepack --version
+    - if: runner.os == 'macOS'
+      name: Install corepack
+      shell: bash
+      run: npm install -g --force corepack@0.36.0 && corepack --version

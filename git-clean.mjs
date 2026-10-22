@@ -39,7 +39,15 @@ async function runCommand(command, args) {
 }
 
 async function runGitClean() {
-  return runCommand('git', ['clean', '-xdf', ...EXCLUSIONS.flatMap((e) => ['--exclude', e])])
+  // `core.longpaths`: Windows runners fail with "Filename too long" on deep `target` trees (e.g.
+  // `engine/language-server/target`) otherwise. Harmless on other platforms.
+  return runCommand('git', [
+    '-c',
+    'core.longpaths=true',
+    'clean',
+    '-xdf',
+    ...EXCLUSIONS.flatMap((e) => ['--exclude', e]),
+  ])
 }
 
 async function removeIfExists(path) {

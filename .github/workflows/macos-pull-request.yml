@@ -1,0 +1,83 @@
+# This file is not auto-generated. Feel free to edit it.
+
+name: 🍎 macOS
+
+on:
+  pull_request:
+    # Specs and plans alone start no checks; every `pull_request` workflow ignores them
+    # (`tools/ci/check-workflows.mjs` checks it).
+    paths-ignore:
+      - "docs/superpowers/**"
+    # `labeled` so that adding a `CI: macOS …` label starts the checks it asks for.
+    types: [opened, synchronize, reopened, labeled]
+
+# Note [macOS Checks On Request]
+# ==============================
+# The usual PR checks run on Linux and Windows only. Each of these labels adds one area's checks on
+# the self-hosted macOS runner, for as long as the PR carries it:
+# - `CI: macOS Engine` — the engine's JVM tests;
+# - `CI: macOS Libraries` — the Standard Library tests;
+# - `CI: macOS GUI` — the GUI lint, typecheck, unit and Playwright tests.
+# The labels are catalogued in `build_tools/build/src/ci.rs` and `.github/settings.yml`.
+#
+# The Mac is asked for explicitly here, so its absence is an error: `macos-runner` waits for it for
+# 1 minute (keep in step with the `wait-for-macos-runner.sh` calls in `release.yml` and
+# `engine-checks-nightly.yml`) and fails if it does not appear, which skips the checks. Pull
+# requests from forks get no secrets, so they fail here too and never reach the machine.
+#
+# A label other than these starts an inert run, as in Note [Ignoring Unrelated Label Events] in
+# `ide-pull-request.yml`: it gets a concurrency group of its own, so it does not cancel the checks,
+# and its jobs are skipped under a different name, so that a skipped job does not hide the result
+# of the real one. The test is repeated in each job; keep the copies in sync.
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}-macos-pull-request${{ (github.event.action == 'labeled' && !startsWith(github.event.label.name, 'CI: macOS ')) && format('-unrelated-label-{0}', github.run_id) || '' }}"
+  cancel-in-progress: true
+
+# The union of what the called workflows need: a called workflow cannot have more than its caller.
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  statuses: write
+  checks: write
+  id-token: write
+  pages: write
+
+jobs:
+  macos-runner:
+    name: "${{ (github.event.action == 'labeled' && !startsWith(github.event.label.name, 'CI: macOS ')) && '🍎 Wait for the Mac (unrelated label change, ignored)' || '🍎 Wait for the Mac' }}"
+    if: >-
+      !(github.event.action == 'labeled' && !startsWith(github.event.label.name, 'CI: macOS '))
+      && (contains(github.event.pull_request.labels.*.name, 'CI: macOS Engine')
+      || contains(github.event.pull_request.labels.*.name, 'CI: macOS Libraries')
+      || contains(github.event.pull_request.labels.*.name, 'CI: macOS GUI'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+      - name: Wait for the macOS runner
+        run: ./tools/ci/wait-for-macos-runner.sh 1 fail
+        env:
+          RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+
+  engine:
+    name: "${{ (github.event.action == 'labeled' && !startsWith(github.event.label.name, 'CI: macOS ')) && '⚙️ Engine and Libraries (unrelated label change, ignored)' || '⚙️ Engine and Libraries' }}"
+    needs: [macos-runner]
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'CI: macOS Engine')
+      || contains(github.event.pull_request.labels.*.name, 'CI: macOS Libraries')
+    uses: ./.github/workflows/macos-checks.yml
+    with:
+      engine: "${{ contains(github.event.pull_request.labels.*.name, 'CI: macOS Engine') }}"
+      libraries: "${{ contains(github.event.pull_request.labels.*.name, 'CI: macOS Libraries') }}"
+    secrets: inherit
+
+  gui:
+    name: "${{ (github.event.action == 'labeled' && !startsWith(github.event.label.name, 'CI: macOS ')) && '🧰 GUI (unrelated label change, ignored)' || '🧰 GUI' }}"
+    needs: [macos-runner]
+    if: "${{ contains(github.event.pull_request.labels.*.name, 'CI: macOS GUI') }}"
+    uses: ./.github/workflows/gui-checks.yml
+    with:
+      runs-on: '["self-hosted", "macOS"]'
+    secrets: inherit

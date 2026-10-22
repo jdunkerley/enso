@@ -13,6 +13,11 @@ use crate::version::Versions;
 /// The website uses this name to find the assets manifest, so it should be kept in sync.
 pub const ASSETS_MANIFEST_FILENAME: &str = "assets.json";
 
+/// The platforms a release ships an IDE installer for. `.github/workflows/release.yml` builds and
+/// uploads one for each; keep the two in step.
+pub const RELEASE_TARGETS: [(OS, Arch); 3] =
+    [(OS::Windows, Arch::X86_64), (OS::Linux, Arch::X86_64), (OS::MacOS, Arch::AArch64)];
+
 /// A platform-specific asset being part of the release, see [Assets] for the purpose.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Asset {
@@ -66,7 +71,7 @@ pub struct Assets {
 impl Assets {
     pub fn new(repo: &impl IsRepo, version: &Version) -> Self {
         let mut ret = Self { ide: vec![], version: version.clone() };
-        for (os, arch) in crate::ci_gen::RELEASE_TARGETS {
+        for (os, arch) in RELEASE_TARGETS {
             let triple = TargetTriple { os, arch, versions: Versions::new(version.clone()) };
             ret.ide.push(Asset::new_ide(repo, &triple));
         }
@@ -76,7 +81,7 @@ impl Assets {
     /// Like [`Assets::new`], but only with the installers named in `uploaded`; the installers left
     /// out are returned alongside.
     ///
-    /// The macOS release jobs do not block publishing (see `add_release_steps` in `ci_gen`), so a
+    /// The macOS release jobs do not block publishing (see `.github/workflows/release.yml`), so a
     /// release can go out without its `.dmg`; the manifest must not advertise it then.
     pub fn new_uploaded(
         repo: &impl IsRepo,

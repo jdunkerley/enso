@@ -68,4 +68,3 @@ For DMG versioning:
   bundle.
 - `notarize-app.mjs`: internal module that notarizes and staples the app bundle.
 - `electron-builder-dmg-only.cjs`: minimal DMG-only electron-builder config.
-- `stage-bazel-app.sh`: Bazel helper target used to stage the built app.
