@@ -1,7 +1,8 @@
 # Build simplification: pnpm + sbt, cargo only for the parser — design
 
-Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21. The
-corrections are factual (what the code does); the design's intent is unchanged.
+Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21, and for
+the Phase 3 plan on 2026-10-22. The corrections are factual (what the code does)
+or record the user's decisions of 2026-10-22; the design's intent is unchanged.
 
 ## Goal
 
@@ -113,7 +114,7 @@ directories. Its commands fall into:
 
 | Question                                   | Decision                                                                                                                                                 |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language for the logic that leaves `./run` | TypeScript in a pnpm workspace package, run with tsx and tested with vitest. Engine-side assembly goes to sbt.                                           |
+| Language for the logic that leaves `./run` | TypeScript in a pnpm workspace package, run by Node's own type stripping (`node src/….ts`) and tested with vitest. Engine-side assembly goes to sbt.     |
 | Toolchain provisioning                     | Documented prerequisites: one pinned-versions file, a `toolchain-check` script with clear errors, and the standard `setup-*` actions in CI. No new tool. |
 | CI generation                              | Hand-written YAML: composite actions, `strategy.matrix`, reusable workflows, `actionlint`. No generator.                                                 |
 | Delivery                                   | This spec plus phased PRs; an implementation plan per phase, written when the phase starts.                                                              |
@@ -131,43 +132,60 @@ directories. Its commands fall into:
   - `corepack pnpm` for the GUI, the IDE, packaging and `tools/build-scripts`.
   - `cargo` only for the parser, invoked by sbt and the pnpm `postinstall`.
 - **Removed:** `build_tools/`, `run`, `run.cmd`, `run.ps1`, and `./run`'s
-  provisioning code. `build-config.yaml` survives Phase 5, reduced to the
-  `toolchain:` block (added in Phase 2) that `setup-jvm` and `toolchain-check`
-  read; it is the checked copy, not a provisioning tool.
+  provisioning code. `build-config.yaml` survives Phase 5, reduced to
+  `latest-release`, which `version` reads, and the `toolchain:` block (added in
+  Phase 2) that `setup-jvm`, the workflow policy and `toolchain-check` read; it
+  is the checked copy, not a provisioning tool.
 - **Workflows:** hand-written, linted with `actionlint` in CI.
 
 ## Components
 
 ### `tools/build-scripts` (new pnpm package)
 
-TypeScript, run as `corepack pnpm --filter build-scripts run <command>` and
-exposed through root scripts. Each command is a small module with vitest tests.
+TypeScript, run as `corepack pnpm --filter build-scripts run <command>` (each
+script is `node src/commands/<command>.ts`: Node 24 strips the types, so the
+code keeps to erasable syntax). Each command is a small module with vitest
+tests.
 
 - **`version`:** computes the dev, nightly, rc or stable version.
-  - It reads git tags and `ENSO_VERSION` with the same priority and rules as
-    `version*.rs`.
+  - It reads `ENSO_VERSION`, then `latest-release` in `build-config.yaml`, and
+    only without that key the remote tags (`git ls-remote --tags origin`), with
+    the same priority and rules as `version*.rs`: an empty or invalid
+    `ENSO_VERSION` is ignored, and a set `ENSO_EDITION` must equal it.
   - It publishes the existing contract: `ENSO_VERSION`, `ENSO_EDITION` and
     `ENSO_RELEASE_MODE`. `ENSO_IDE_VERSION` and `ENSO_IDE_COMMIT_HASH` stay on
     the `ide build` / `gui build` child processes only.
-  - In CI it emits them to `GITHUB_ENV` and `GITHUB_OUTPUT`; locally it prints
-    `export` lines.
+  - In CI it emits them to `GITHUB_OUTPUT`, under the same names, and to
+    `GITHUB_ENV` (new: `./run` set them only on its own child processes);
+    locally it prints `export` lines.
   - The consumers stay as they are: `project/Dependencies.scala`,
     `project/BuildInfo.scala`, `electron-client/buildInfo.ts` and
     `electron-builder-config.ts`.
 - **`changelog-check`:** a `CHANGELOG.md` change, or the
-  `CI: No changelog needed` label.
+  `CI: No changelog needed` label. Decided 2026-10-22: an inline
+  `actions/github-script` step in `changelog.yml`, not a `tools/build-scripts`
+  command. It lists the pull request's own files (`pulls.listFiles`), so a
+  stacked pull request no longer passes on its parent's entry; the label and the
+  error text are unchanged.
 - **`stdlib-api-check`:** runs `enso --docs api --in-project` per library and
   diffs `docs/api`. Same failure message as today.
 - **`stdlib-test`:** runs `enso --run` over the selected `test/*` projects.
   - It handles `ENSO_META_TEST_ARGS`, the JUnit output directory, time factors,
     test selection, and the clean-up of IR caches and bench reports.
-  - The caller supplies `ENSO_LAUNCHER`.
-  - It installs GraalPy at `graalMavenPackagesVersion` (or `setup-jvm` gains an
-    input for it): `test/Examples_Tests` `Python_Examples_Spec` probes for
-    `graalpy` on `PATH` and silently skips without it.
-  - Services (Postgres, SQL Server, httpbin, library server) are supplied by the
-    caller: service containers in CI, `docker compose` locally. The runner only
-    reads their connection variables.
+  - `ENSO_LAUNCHER` plays no part: nothing is built, and the launcher reads it
+    only at build time.
+  - GraalPy comes from `setup-jvm`'s `graalpy` input, pinned by
+    `toolchain.graalpy` in `build-config.yaml` (equal to
+    `graalMavenPackagesVersion`, which Workflow Lint checks):
+    `test/Examples_Tests` `Python_Examples_Spec` probes for `graalpy` on `PATH`
+    and silently skips without it.
+  - Postgres and SQL Server are supplied by the caller: Linux service containers
+    in CI (Windows runners have none, as `./run` had none there either). The
+    runner reads their connection variables and removes those that are empty:
+    Enso reads an empty variable as `""`, not as unset.
+  - The runner starts the HTTP test helper itself (`sbt http-test-helper/run`),
+    as `./run` did: it is our own server, with no container image. The library
+    server (`tools/simple-library-server`) belongs to the JVM tests, not here.
 - **`release`:**
   - `create-draft`: tag-collision check, release body template, notes from
     `CHANGELOG.md`.
@@ -176,8 +194,10 @@ exposed through root scripts. Each command is a small module with vitest tests.
   - `update-latest-version`.
   - `upload-ide`: installers, `.sha256`, `.blockmap`, `latest*.yml`.
   - All of these use the `gh` CLI or Octokit.
-- **`toolchain-check`:** compares installed GraalVM, sbt, Node, pnpm, Rust and
-  flatc against the pinned versions, with install hints.
+- **`toolchain-check`:** compares installed GraalVM, sbt, Node, pnpm, Rust,
+  flatc and GraalPy against the pinned versions, with install hints. It reads
+  the `toolchain:` pins with `tools/ci/toolchain-pins.mjs`, the parser the
+  workflow policy uses, which a test holds equal to `setup-jvm`'s awk.
 
 ### Pinned versions
 
@@ -198,10 +218,19 @@ NOTICE are derived from the build, so they are not replaceable copies.
 - **`buildEngineBundle`:** engine plus small JDK (`buildSmallJdkForRelease`)
   plus marker file, plus the MSVC runtime DLLs next to native images on Windows.
   This replaces `engine/bundle.rs`. The caller supplies `ENSO_LAUNCHER`.
-- **`checkEnsoSyntax`:** parses `.enso` files through the JNI parser. This
-  replaces `libraries check-syntax`.
-- `buildEngineDistribution` gains the `checkIRCacheSizes` and
-  `verifyGeneratedPackage` steps behind a CI flag, so CI calls one task.
+- **`checkEnsoSyntax`:** runs the Rust parser's `check_syntax` tool
+  (`cargo run -p enso-parser-debug --bin check_syntax --release`) over the same
+  files as `libraries check-syntax`, in batches that fit Windows' command line,
+  checking the exit code (`Cargo.run` ignores it). Errors and warnings both
+  fail. Decided 2026-10-22: not through the JNI parser, which has no tree walker
+  for the checks.
+- **`ciBuildEngineDistribution`:** a task of its own, not a CI flag on
+  `buildEngineDistribution` (`checkIRCacheSizes` depends on that task, and `CI`
+  is set in every job that reaches it): `buildEngineDistribution`, then
+  `checkIRCacheSizes`, the MSVC runtime DLL copy into the engine package on
+  Windows, and the versioned `verifyGeneratedPackage` checks elsewhere. CI calls
+  `sbt "clean; all ciBuildEngineDistribution"`. The DLL copy
+  (`project/MsvcRuntime.scala`) is shared with `buildEngineBundle`.
 
 ### CI structure
 
@@ -210,14 +239,16 @@ NOTICE are derived from the build, so they are not replaceable copies.
   - `setup-jvm`: GraalVM at the pinned version, the sbt launcher at
     `sbt.version` (`./run` installed launcher 1.5.5; the project version is
     decided by `build.properties` either way), `flatc` (any job that compiles
-    the language server needs it, the lint included), and the sbt / Coursier
-    cache. GraalPy is provisioned in the `stdlib-test` job or by a new input.
+    the language server needs it, the lint included), the standalone GraalPy
+    when asked (`graalpy` input, `toolchain.graalpy`), and the sbt / Coursier
+    cache.
   - `setup-rust`: the toolchain from `rust-toolchain.toml`, plus
     `Swatinem/rust-cache`; parser jobs only.
   - `setup-msvc`: `ilammy/msvc-dev-cmd`, for Windows native-image jobs.
 - **Reusable workflows:** engine checks, GUI checks (already), IDE packaging,
   release and promote. Each OS/arch set becomes `strategy.matrix`.
-- **Services:** Postgres and SQL Server as job `services:` on Linux.
+- **Services:** Postgres and SQL Server as job `services:` on Linux. The
+  standard-library runner starts the HTTP test helper itself.
 - **Required checks:**
   - The aggregator jobs keep their exact names ("Engine Required Checks", "GUI
     Required Checks", "IDE Required Checks", "WASM Required Checks"), so branch
