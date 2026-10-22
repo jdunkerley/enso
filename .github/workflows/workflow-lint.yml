@@ -9,6 +9,8 @@ on:
     paths:
       - ".github/**"
       - "tools/ci/**"
+      # `tools/ci/check-workflows.mjs` reads it: which commands start sbt.
+      - "tools/build-scripts/**"
       # `tools/ci/check-workflows.mjs` checks the toolchain pins against these.
       - "build-config.yaml"
       - "project/Dependencies.scala"
@@ -18,6 +20,8 @@ on:
     paths:
       - ".github/**"
       - "tools/ci/**"
+      # `tools/ci/check-workflows.mjs` reads it: which commands start sbt.
+      - "tools/build-scripts/**"
       # `tools/ci/check-workflows.mjs` checks the toolchain pins against these.
       - "build-config.yaml"
       - "project/Dependencies.scala"
