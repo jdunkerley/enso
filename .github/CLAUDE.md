@@ -74,8 +74,11 @@ settings. Every workflow is hand-written YAML: the Rust generator
   and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
   `graalMavenPackagesVersion`, `flatbuffersVersion`
   (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
-  It counts `sbt` after inline `VAR=value` assignments, `&&` or `;`, and inside
-  local composite actions.
+  It counts `sbt` (and `sbt.bat`) as a command after inline `VAR=value`
+  assignments and wrappers (`timeout`, `time`, `env`, `nice`, `xvfb-run`,
+  `cmd /c`), inside `bash -c` and `pwsh -Command` scripts and local composite
+  actions, and behind any `tools/build-scripts` command that starts sbt (one
+  whose entry point imports `src/lib/sbt.ts`).
 
 ## What still goes through `./run`
 

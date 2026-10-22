@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "version": "node src/commands/version.ts",
+    "toolchain-check": "node src/commands/toolchain-check.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --cache --max-warnings=0"
