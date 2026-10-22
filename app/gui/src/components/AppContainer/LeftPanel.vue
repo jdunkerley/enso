@@ -223,8 +223,15 @@ registerHandlers({
   width: 100%;
   background-color: var(--panel-background);
   padding-left: 48px;
+  /*
+   * Below the top bar, down to the bottom and no further: `height: 100%` from this offset reached
+   * past the window, and anything below it lets `#enso-app` be scrolled (CodeMirror scrolls every
+   * ancestor that overflows), shifting the whole app up (#318).
+   */
   & > .shadow {
     top: var(--top-bar-height);
+    bottom: 0;
+    height: auto;
   }
 }
 
