@@ -11,7 +11,8 @@ build_tools/build/release-body.md
 distribution/launcher/THIRD-PARTY
 distribution/engine/THIRD-PARTY
 distribution/edition.template.yaml
-tools
+tools/*
+!tools/build-scripts
 distribution/lib/Standard/*/*/manifest.yaml
 distribution/lib/Standard/*/*/polyglot
 distribution/lib/Standard/*/*/docs/api
