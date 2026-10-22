@@ -13,8 +13,16 @@ import scala.sys.process._
   * (listed before anything is copied), and each binary gets the CRT DLLs it imports copied into
   * its own directory. Imports are read with `dumpbin /dependents`, which `setup-msvc` (CI) or a
   * Developer Prompt (locally) puts on the PATH together with `VCToolsRedistDir`. The CRT DLLs
-  * that a copied DLL imports in turn are copied too (`msvcp140.dll` imports `vcruntime140.dll`),
-  * which adds nothing today but keeps the closure complete.
+  * that a copied DLL imports in turn are copied too (`msvcp140.dll` imports `vcruntime140.dll`).
+  *
+  * Unlike `./run`, this does not walk the full import tree: it follows each binary's direct
+  * imports, and the CRT DLLs' own imports, but not the imports of a non-CRT DLL that a binary
+  * imports (`./run`'s `dependency_runner` resolved the whole tree). The two agree while every
+  * non-CRT intermediate DLL a binary loads sits in the package itself, since that DLL is then a
+  * binary of its own here and gets its CRT imports copied next to it.
+  *
+  * Copying nothing at all fails the build: `bin/` always needs some, so an empty result means
+  * the imports were not read (for example, a change in `dumpbin`'s output format).
   *
   * On the 2026-10 runner image this copies 7 files: `bin/` msvcp140, vcruntime140,
   * vcruntime140_1; `component/` vcruntime140, vcruntime140_1;
@@ -76,6 +84,12 @@ object MsvcRuntime {
       )
       target
     }
+    if (copied.isEmpty)
+      throw new MessageOnlyException(
+        s"No MSVC runtime DLL was copied into $packageRoot: no binary in the package imports one " +
+        "according to `dumpbin /dependents`. The engine's binaries always need some, so the " +
+        "imports were probably not read (has dumpbin's output format changed?)."
+      )
     copied.distinct
   }
 
