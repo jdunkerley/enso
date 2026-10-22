@@ -25,12 +25,15 @@ const SAMPLE_COMMENT = '# Code font sample: mlmlml iiii -> >= |>'
 const SAMPLE_CODE = 'mlmlml iiii = iiii.map (x -> x >= 1) |> mlmlml'
 
 /**
- * Hide what blinks or depends on focus, and what shows the graph through the editor's backdrop.
- * Injected with `addStyleTag`: this Playwright version has no `style` option for `toHaveScreenshot`.
+ * Hide what blinks or depends on focus, what shows the graph through the editor's backdrop, and the
+ * Drive panel's shadow: it is blurred across the docked code editor, so its shape (where the panel
+ * ends) changed the grey behind the text by a level (#318). Injected with `addStyleTag`: this
+ * Playwright version has no `style` option for `toHaveScreenshot`.
  */
 const SCREENSHOT_STYLE = `
   .cm-cursorLayer, .cm-selectionLayer { visibility: hidden !important; }
   .CodeEditor .cm-editor { backdrop-filter: none !important; background-color: white !important; }
+  .LeftPanel .shadow { visibility: hidden !important; }
 `
 
 async function expectMonaspaceLoaded(page: Page, families = ['Monaspace Neon']) {
