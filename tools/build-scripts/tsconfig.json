@@ -6,7 +6,8 @@
     "noEmit": true,
     "composite": false,
     "allowImportingTsExtensions": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "allowJs": true
   },
   "include": ["./src", "./vitest.config.ts"]
 }

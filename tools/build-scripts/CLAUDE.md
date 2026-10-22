@@ -12,6 +12,11 @@ that Node runs as it is (type stripping): each command is
   `ENSO_RELEASE_MODE`), as `./run` computed it before every command. In GitHub
   Actions it writes them to `GITHUB_OUTPUT` and `GITHUB_ENV`; locally,
   `eval "$(corepack pnpm --silent --filter build-scripts run version)"`.
+- `toolchain-check` — compares the installed GraalVM, sbt launcher, flatc, Node,
+  pnpm, Rust and GraalPy with the pins (`build-config.yaml` `toolchain:`,
+  `.node-version`, `packageManager`, `rust-toolchain.toml`), with an install
+  hint for each that differs. A wrong sbt launcher or a missing GraalPy only
+  warns.
 
 ## Layout
 
@@ -35,6 +40,12 @@ that Node runs as it is (type stripping): each command is
 - **Start programs with `capture` or `runInherited`** (`src/lib/repo.ts`). They
   go through the shell only for the Windows `.cmd`/`.bat` shims (`corepack`,
   `sbt`, …), which only the shell finds.
+- **Only `src/lib/sbt.ts` runs sbt tasks** (it arrives with the first command
+  that needs one). The workflow policy (`tools/ci/check-workflows.mjs`) fails
+  any other module that starts sbt by name, and treats every command whose entry
+  point imports that module as an sbt call, which must come after `setup-jvm`.
+  The one exception is `toolchain-check`'s `sbt --script-version`, which asks
+  the launcher its version and loads no build (Ruling R-plan-10).
 - **Checks:** `corepack pnpm --filter build-scripts run typecheck`, `lint` and
   `test:unit`. CI runs them in `.github/workflows/build-scripts.yml`; the GUI
   checks run them too when GUI files change.

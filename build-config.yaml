@@ -22,10 +22,14 @@ required-versions:
 #   `graalMavenPackagesVersion` there (the GraalVM / Truffle Maven packages);
 # - sbt: `sbt.version` in `project/build.properties` (HELD there, see its note);
 # - flatc: `flatbuffersVersion` in `project/Dependencies.scala` (checked when the language server
-#   compiles).
+#   compiles);
+# - graalpy: `graalMavenPackagesVersion` in `project/Dependencies.scala` (the standalone GraalPy
+#   that `test/Examples_Tests` runs; `setup-jvm` installs it when asked).
+# `tools/build-scripts`' `toolchain-check` compares an installed toolchain against them.
 # One flat `key: value` per line, the value a bare (unquoted) version: `setup-jvm` reads them
-# with awk.
+# with awk, and `tools/ci/toolchain-pins.mjs` reads them the same way.
 toolchain:
   graalvm: 25.0.1
   sbt: 1.10.6
   flatc: 24.3.25
+  graalpy: 25.0.1

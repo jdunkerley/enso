@@ -16,8 +16,15 @@ request triggers ignore specs and plans, `setup-node` disables the package
 manager cache before pnpm is set up, releases are IDE-only and read only
 allow-listed secrets, only macOS release jobs may fail, macOS jobs are gated on
 the self-hosted Mac, `macos-checks.yml` runs only what is requested, IDE
-packaging needs no cloud account, and Windows packaging smoke-tests the
-installer. It prints one line per violation and exits 1 if there is any:
+packaging needs no cloud account, Windows packaging smoke-tests the installer,
+the toolchain pins in `build-config.yaml` equal the build's own copies, no job
+runs sbt before `setup-jvm`, and in `tools/build-scripts` only `src/lib/sbt.ts`
+starts sbt. "Runs sbt" covers wrappers (`timeout`, `env`, `xvfb-run`, `cmd /c`,
+…), `bash -c`/`pwsh -Command` scripts, local composite actions, and any
+`tools/build-scripts` command whose entry point imports `src/lib/sbt.ts`. It
+prints one line per violation and exits 1 if there is any. The wrappers are a closed list, so
+some shapes go unseen: sbt behind a variable used as the command (`$SBT_CALL compile`), a line
+continuation after an assignment or wrapper, `xargs sbt`, and `/usr/bin/env sbt`:
 
 ```bash
 node tools/ci/check-workflows.mjs [repo-root]
@@ -25,3 +32,10 @@ node tools/ci/check-workflows.mjs [repo-root]
 
 Test it with `node --test tools/ci/check-workflows.test.mjs`. Each rule has a
 passing and a failing fixture there; adding a rule means adding both.
+
+# Toolchain pins
+
+`toolchain-pins.mjs` reads the `toolchain:` block of `build-config.yaml` exactly
+as `setup-jvm`'s awk does; the policy and `tools/build-scripts`'
+`toolchain-check` use it. `toolchain-pins.test.mjs` runs that awk program over
+the same fixtures and requires the same answers, so the readers cannot drift.

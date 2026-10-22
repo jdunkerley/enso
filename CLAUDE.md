@@ -211,10 +211,10 @@ has silently produced a wrong result here:
   enforced.** Bumping `graalVersion` or `sbt.version` is not finished until
   every copy moves. `git grep` the _old_ version before pushing — it is the only
   reliable check for the unenforced copies. Known sites:
-  - `build-config.yaml` `toolchain:` — the GraalVM, sbt and flatc versions CI
-    installs (`.github/actions/setup-jvm`, used by the formatting and enso4igv
-    workflows, both benchmark workflows and the engine-checks lint job).
-    Enforced (`checkToolchainPins`): Workflow Lint
+  - `build-config.yaml` `toolchain:` — the GraalVM, sbt, flatc and GraalPy
+    versions CI installs (`.github/actions/setup-jvm`) and
+    `corepack pnpm --filter build-scripts run toolchain-check` compares a local
+    toolchain against. Enforced (`checkToolchainPins`): Workflow Lint
     (`tools/ci/check-workflows.mjs`) fails when it differs from `graalVersion`,
     `graalMavenPackagesVersion`, `flatbuffersVersion` or `sbt.version`, so bump
     it in the same commit.

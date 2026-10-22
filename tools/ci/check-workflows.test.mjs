@@ -7,6 +7,9 @@ import path from 'node:path'
 import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
+  buildScriptsSbtCommands,
+  callsSbt,
+  checkBuildScriptsSpawnSbtThroughHelper,
   checkIdePackagingNeedsNoCloudAccount,
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
@@ -368,13 +371,14 @@ describe('checkToolchainPins', () => {
     'project/build.properties': '# HELD at 1.10.6.\r\nsbt.version=1.10.6\r\n',
   }
   const config = (pins) => `latest-release: 2025.3.4\ntoolchain:\n${pins}`
-  const allPins = '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n'
+  const allPins =
+    '  graalvm: 25.0.1\n  sbt: 1.10.6 # held\n  flatc: 24.3.25\n  graalpy: 25.0.1\n'
   test("accepts pins equal to the build's own copies", () => {
     const repo = fixture({}, { 'build-config.yaml': config(allPins), ...build })
     assert.deepEqual(checkToolchainPins(repo), [])
   })
   test('rejects a pin that drifted, and a missing pin', () => {
-    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n'
+    const pins = '  graalvm: 25.0.2\n  sbt: 1.10.6\n  graalpy: 25.0.1\n'
     const problems = checkToolchainPins(fixture({}, { 'build-config.yaml': config(pins), ...build }))
     assert.deepEqual(problems.sort(), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.2, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.1',
@@ -393,6 +397,7 @@ describe('checkToolchainPins', () => {
     )
     assert.deepEqual(checkToolchainPins(repo), [
       'build-config.yaml: `toolchain.graalvm` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
+      'build-config.yaml: `toolchain.graalpy` is 25.0.1, but `graalMavenPackagesVersion` in project/Dependencies.scala is 25.0.0',
     ])
   })
   test('compares versions as text, as the awk reader does', () => {
@@ -401,7 +406,7 @@ describe('checkToolchainPins', () => {
       {},
       {
         ...build,
-        'build-config.yaml': config(allPins.replace('25.0.1', '25.0')),
+        'build-config.yaml': config(allPins.replaceAll('25.0.1', '25.0')),
         'project/Dependencies.scala': scala,
       },
     )
@@ -455,6 +460,19 @@ ${body}
     'after `;`': 'cd engine; sbt compile',
     'after `then`': 'if true; then sbt compile; fi',
     'a command substitution': 'root=$(sbt -batch "print engineDistributionRoot")',
+    'behind `timeout`': 'timeout -k 5 90m sbt compile',
+    'behind `time` and `timeout`': 'time timeout 90m sbt compile',
+    'behind `nice`': 'nice -n 10 sbt compile',
+    'behind `env`': 'env -i PATH="$PATH" JAVA_OPTS=-Xmx4g sbt compile',
+    'behind `xvfb-run`': 'xvfb-run -a -s "-screen 0 1280x1024x24" sbt test',
+    'inside `bash -c`': "bash -lc 'cd engine && sbt compile'",
+    'inside `pwsh -Command`': 'pwsh -Command "sbt compile"',
+    '`sbt.bat` from PowerShell': '& sbt.bat "-Dsbt.server.autostart=false" compile',
+    'behind `cmd /c`': 'cmd /c sbt compile',
+    'by path': '"$SBT_HOME/bin/sbt" compile',
+    'in backquotes': 'x=`sbt -batch about`',
+    'in a group': '{ sbt compile; }',
+    'as a condition': 'if sbt compile; then :; fi',
   }
   for (const [shape, script] of Object.entries(SHAPES)) {
     test(`accepts sbt after setup-jvm: ${shape}`, () => {
@@ -469,7 +487,16 @@ ${body}
     })
   }
   test('accepts sbt as an argument rather than a command', () => {
-    const script = "./run backend sbt '--' verifyLicensePackages\ncommand -v sbt\necho sbt"
+    const script = [
+      "./run backend sbt '--' verifyLicensePackages",
+      'command -v sbt',
+      'echo sbt',
+      'env | grep sbt',
+      'echo "use sbt.bat"',
+      'curl -fsSL -o "$dir/sbt.tgz" "https://github.com/sbt/sbt/releases/download/v1/sbt-1.tgz"',
+      'echo "$RUNNER_TEMP/sbt/bin" >> "$GITHUB_PATH"',
+      'time ./run backend get',
+    ].join('\n')
     const repo = fixture({ 'workflows/a.yml': job(script) })
     assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])
   })
@@ -531,6 +558,67 @@ ${before}      - name: Build
     assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [
       'actions/build-sbt: `Inner` runs sbt before `./.github/actions/setup-jvm`',
     ])
+  })
+})
+
+describe('tools/build-scripts commands that start sbt', () => {
+  /** A `tools/build-scripts` with one command that reaches `src/lib/sbt.ts` and one that does not. */
+  const PACKAGE = {
+    'tools/build-scripts/package.json': JSON.stringify({
+      scripts: {
+        'stdlib-test': 'node src/commands/stdlib-test.ts',
+        version: 'node src/commands/version.ts',
+        'test:unit': 'vitest run',
+      },
+    }),
+    'tools/build-scripts/src/commands/stdlib-test.ts': "import { run } from '../stdlib-test/run.ts'\nrun()\n",
+    'tools/build-scripts/src/stdlib-test/run.ts':
+      "export { startHttpbin as run } from './services.ts'\n",
+    'tools/build-scripts/src/stdlib-test/services.ts':
+      "import { spawnSbt } from '../lib/sbt.ts'\nexport const startHttpbin = () => spawnSbt([])\n",
+    'tools/build-scripts/src/lib/sbt.ts':
+      "import { spawn } from 'node:child_process'\nexport const spawnSbt = (a) => spawn('sbt', a)\n",
+    'tools/build-scripts/src/commands/version.ts': "import { x } from '../version/version.ts'\n",
+    'tools/build-scripts/src/version/version.ts': 'export const x = 1\n',
+  }
+  const workflow = (before) => `
+on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+${before}      - name: Tests
+        run: corepack pnpm --filter build-scripts run stdlib-test -- standard-library
+      - name: Version
+        run: corepack pnpm --silent --filter build-scripts run version
+`
+  test('a command that imports src/lib/sbt.ts, however indirectly, starts sbt', () => {
+    const repo = fixture({}, PACKAGE)
+    assert.deepEqual([...buildScriptsSbtCommands(repo.buildScripts)], ['stdlib-test'])
+    assert.equal(callsSbt('corepack pnpm --filter=build-scripts run stdlib-test', new Set(['stdlib-test'])), true)
+    assert.equal(callsSbt('corepack pnpm -F build-scripts run version', new Set(['stdlib-test'])), false)
+  })
+  test('rejects such a command with no setup-jvm before it, accepts it after', () => {
+    const late = fixture({ 'workflows/a.yml': workflow('') }, PACKAGE)
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(late), [
+      'a.yml › j: `Tests` runs sbt before `./.github/actions/setup-jvm`',
+    ])
+    const setup = '      - uses: ./.github/actions/setup-jvm\n        with: { cache-key: a }\n'
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(fixture({ 'workflows/a.yml': workflow(setup) }, PACKAGE)), [])
+  })
+  test('only src/lib/sbt.ts may start sbt', () => {
+    assert.deepEqual(checkBuildScriptsSpawnSbtThroughHelper(fixture({}, PACKAGE)), [])
+    const rogue = {
+      ...PACKAGE,
+      'tools/build-scripts/src/version/version.ts':
+        "import { spawnSync } from 'node:child_process'\nspawnSync('sbt.bat', ['about'])\n",
+    }
+    assert.deepEqual(checkBuildScriptsSpawnSbtThroughHelper(fixture({}, rogue)), [
+      'tools/build-scripts/src/version/version.ts: starts sbt itself; use `src/lib/sbt.ts`, so the workflow policy sees it',
+    ])
+  })
+  test('a repository without the package has no such commands', () => {
+    assert.deepEqual([...buildScriptsSbtCommands(fixture({}).buildScripts)], [])
   })
 })
 
