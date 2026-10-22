@@ -97,11 +97,12 @@ jobs:
   # and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory than
   # `./run`'s single-batch threshold; for one task it changes nothing). The rebuild compiles the
   # language server, so the job needs flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so
-  # the step does not pass it.
+  # the step does not pass it. The syntax check (`checkEnsoSyntax`, which replaced
+  # `./run libraries check-syntax`) runs the Rust parser's `check_syntax` through cargo.
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux'
-    needs: [build-script, build-engine-distribution]
+    needs: [build-engine-distribution]
     runs-on: ${{ inputs.runner }}
     env:
       ENSO_LINT_ENABLE_GITHUB_ANNOTATIONS: "true"
@@ -110,21 +111,23 @@ jobs:
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - name: Check syntax
-        run: ./run libraries check-syntax
-      - name: Download the engine distribution
-        uses: ./.github/actions/download-engine-distribution
-        with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: enso-code-lint
           flatc: "true"
+      - name: Check syntax
+        run: sbt "-Dsbt.server.autostart=false" checkEnsoSyntax
+        env:
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
       - name: Check the distribution's version
         run: |-
           if [ -z "$ENSO_VERSION" ]; then
