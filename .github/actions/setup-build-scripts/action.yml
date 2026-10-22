@@ -1,0 +1,17 @@
+name: Set up the build scripts
+description: >-
+  Installs `tools/build-scripts`' dependencies, and only those (no lifecycle scripts, so no Rust
+  parser build), so that a later step can run `corepack pnpm --filter build-scripts run <command>`.
+  Node runs the TypeScript directly (type stripping), so there is nothing to compile. Use it after
+  `setup-node` and after "Clean before": `git-clean` deletes `node_modules`.
+runs:
+  using: composite
+  steps:
+    - if: runner.os == 'Windows'
+      name: Install the build scripts' dependencies
+      shell: pwsh
+      run: corepack pnpm install --frozen-lockfile --ignore-scripts --filter build-scripts
+    - if: runner.os != 'Windows'
+      name: Install the build scripts' dependencies
+      shell: bash
+      run: corepack pnpm install --frozen-lockfile --ignore-scripts --filter build-scripts

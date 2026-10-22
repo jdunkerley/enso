@@ -196,27 +196,31 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
+  # `tools/build-scripts`' `stdlib-api-check` runs what `./run backend stdlib-api-check` ran, against
+  # the downloaded distribution at the build job's version.
   standard-library-api-check:
     name: Standard Library API check (linux, amd64)
     if: inputs.os == 'linux'
-    needs: [build-script, build-engine-distribution]
+    needs: [build-engine-distribution]
     runs-on: ${{ inputs.runner }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-      - run: ./run backend stdlib-api-check
+      - name: Check the Standard Library API
+        run: corepack pnpm --filter build-scripts run stdlib-api-check
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean
