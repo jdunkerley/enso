@@ -29,24 +29,10 @@ on:
         default: false
 
 env:
-  # TEMPORARY (PR 3j's side-by-side): `./run` in `stdlib-tests-old` reads it.
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
   # Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required }}"
 
 jobs:
-  # TEMPORARY (PR 3j's side-by-side): compiles `./run` for `stdlib-tests-old`.
-  build-script:
-    name: Build Script (${{ inputs.os }}, amd64)
-    runs-on: ${{ inputs.runner }}
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Compile the build script
-        uses: ./.github/actions/build-script
-
   # Note [Engine Distribution Without ./run]
   # ========================================
   # `./run backend ci-build-engine-distribution` is the sbt task `ciBuildEngineDistribution` (Note
@@ -456,10 +442,6 @@ jobs:
           exit 1
         env:
           ID: ${{ job.services.sqlserver.id }}
-      # TEMPORARY (PR 3j): CPU samples, to explain the Linux slowdown of the new jobs.
-      - if: runner.os == 'Linux'
-        name: Sample CPU
-        run: nohup bash -c 'while sleep 45; do date -u +%T; top -b -n1 -w 250 -o %CPU | sed -n "1,5p;7,16p"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
       - name: Run the Standard Library tests
         run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }}
         env:
@@ -478,10 +460,6 @@ jobs:
           ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
           ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
           ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
-      # TEMPORARY (PR 3j): CPU samples.
-      - if: always() && runner.os == 'Linux'
-        name: Show CPU samples
-        run: cat "$RUNNER_TEMP/cpu.log" || true
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
@@ -502,16 +480,6 @@ jobs:
           path: |-
             test/**/*.hprof
             engine/**/*.hprof
-          retention-days: 3
-      # TEMPORARY (PR 3j's side-by-side): the reports, for `junit-compare`.
-      - if: success() || failure()
-        name: Upload JUnit results
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: ignore
-          name: JUnit new (${{ matrix.suite }}, ${{ inputs.os }})
-          overwrite: true
-          path: target/test-results
           retention-days: 3
       - name: Clean after
         if: always()
@@ -593,68 +561,6 @@ jobs:
           path: |-
             test/**/*.hprof
             engine/**/*.hprof
-          retention-days: 3
-      # TEMPORARY (PR 3j's side-by-side): the reports, for `junit-compare`.
-      - if: success() || failure()
-        name: Upload JUnit results
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: ignore
-          name: JUnit new (${{ matrix.suite }}, ${{ inputs.os }})
-          overwrite: true
-          path: target/test-results
-          retention-days: 3
-      - name: Clean after
-        if: always()
-        uses: ./.github/actions/git-clean
-
-  # TEMPORARY (PR 3j's side-by-side): the same suites through `./run`, as on develop, with their
-  # JUnit reports uploaded for `junit-compare`.
-  stdlib-tests-old:
-    name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64) (old ./run)
-    needs: [build-script, build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
-    env:
-      GRAAL_EDITION: GraalVM CE
-    strategy:
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(inputs.stdlib-suites) }}
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
-      - name: Clean before
-        uses: ./.github/actions/git-clean
-      - name: Download the engine distribution
-        uses: ./.github/actions/download-engine-distribution
-        with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-      # TEMPORARY (PR 3j): CPU samples, to explain the Linux slowdown of the new jobs.
-      - if: runner.os == 'Linux'
-        name: Sample CPU
-        run: nohup bash -c 'while sleep 45; do date -u +%T; top -b -n1 -w 250 -o %CPU | sed -n "1,5p;7,16p"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
-      - run: ./run backend test ${{ matrix.suite }}
-        env:
-          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
-          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
-          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # TEMPORARY (PR 3j): CPU samples.
-      - if: always() && runner.os == 'Linux'
-        name: Show CPU samples
-        run: cat "$RUNNER_TEMP/cpu.log" || true
-      - if: success() || failure()
-        name: Upload JUnit results
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: ignore
-          name: JUnit old (${{ matrix.suite }}, ${{ inputs.os }})
-          overwrite: true
-          path: target/test-results
           retention-days: 3
       - name: Clean after
         if: always()
