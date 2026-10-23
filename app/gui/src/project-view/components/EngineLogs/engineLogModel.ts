@@ -4,13 +4,15 @@
  * makes it reactive.
  */
 import { LOG_LEVELS, parseEntry } from '$/components/ProjectLog/projectLogData'
-import type {
-  EngineLogEndReason,
-  EngineLogHelloData,
-  EngineLogLineData,
-  EngineLogSessionData,
-  EngineLogSource,
-  EngineLogWaitingData,
+import {
+  PERFORMANCE_LOGGER,
+  SQL_QUERY_LOGGER,
+  type EngineLogEndReason,
+  type EngineLogHelloData,
+  type EngineLogLineData,
+  type EngineLogSessionData,
+  type EngineLogSource,
+  type EngineLogWaitingData,
 } from 'enso-common/src/services/engineLogs'
 
 /** The most rows the view keeps; older ones remain in the session's history. */
@@ -53,28 +55,43 @@ export interface LogDivider {
 /** A row of the Logs tab. */
 export type LogRow = LogLine | LogDivider
 
-/** The level filter: ERROR only, WARN and above, or INFO and above. */
-export type LevelFilter = 'error' | 'warn' | 'info'
+/**
+ * The level filter: ERROR only, WARN and above, or every level. The log file holds nothing below
+ * INFO unless a logger was turned up for the engine (the performance timings are DEBUG), so the
+ * most verbose choice shows those lines too.
+ */
+export type LevelFilter = 'error' | 'warn' | 'all'
 
 const MAX_LEVEL: Readonly<Record<LevelFilter, number>> = {
   error: ERROR_LEVEL,
   warn: WARN_LEVEL,
-  info: INFO_LEVEL,
+  all: LOG_LEVELS.length - 1,
 }
 
 /**
  * Who wrote a line:
  * - `user` — the user's own log messages (`log_message`, which logs under `User.<type name>`);
- * - `library` — the libraries: the standard library, user projects' libraries, their Java;
+ * - `sql` — the SQL queries of local database connections ({@link SQL_QUERY_LOGGER});
+ * - `performance` — the timings of `Progress.run` ({@link PERFORMANCE_LOGGER} and its children);
+ * - `library` — the rest of the libraries: the standard library, user projects' libraries, their Java;
  * - `engine` — the engine itself, and its stderr.
+ *
+ * SQL queries and timings are logged only when their setting is on (Settings → Local → Engine
+ * logs); the panel shows their tickboxes only then.
  */
-export type LogOrigin = 'engine' | 'library' | 'user'
+export type LogOrigin = 'engine' | 'library' | 'user' | 'sql' | 'performance'
 
 /** Which origins the Logs tab shows. */
 export type OriginFilter = Readonly<Record<LogOrigin, boolean>>
 
 /** The origins shown at first: everything but the engine's internals. */
-export const DEFAULT_ORIGINS: OriginFilter = { engine: false, library: true, user: true }
+export const DEFAULT_ORIGINS: OriginFilter = {
+  engine: false,
+  library: true,
+  user: true,
+  sql: true,
+  performance: true,
+}
 
 /**
  * The first segment of the logger name `log_message` logs under (`User.<qualified type name>`,
@@ -140,9 +157,11 @@ function underRoot(name: string, root: string): boolean {
 }
 
 /**
- * Who wrote an entry, from its logger name: the user for a name under {@link USER_LOGGER_ROOT}; the
- * engine for a name under {@link ENGINE_LOGGER_ROOTS} and not under {@link STD_BITS_PACKAGE_ROOTS};
- * a library for anything else.
+ * Who wrote an entry, from its logger name: the user for a name under {@link USER_LOGGER_ROOT}; SQL
+ * for {@link SQL_QUERY_LOGGER} itself (Enso modules under `Standard.Database.Connection` log under
+ * their own type names, which are a library's); performance for a name under
+ * {@link PERFORMANCE_LOGGER}; the engine for a name under {@link ENGINE_LOGGER_ROOTS} and not under
+ * {@link STD_BITS_PACKAGE_ROOTS}; a library for anything else.
  *
  * The default is Library on purpose. The engine's names are few and known; the libraries' are open:
  * Enso modules (`Standard.*`, every user project and library), the std-bits helpers, and whatever
@@ -152,6 +171,8 @@ function underRoot(name: string, root: string): boolean {
  */
 export function logOrigin(loggerName: string): LogOrigin {
   if (underRoot(loggerName, USER_LOGGER_ROOT)) return 'user'
+  if (loggerName === SQL_QUERY_LOGGER) return 'sql'
+  if (underRoot(loggerName, PERFORMANCE_LOGGER)) return 'performance'
   if (STD_BITS_PACKAGE_ROOTS.some((root) => underRoot(loggerName, root))) return 'library'
   return ENGINE_LOGGER_ROOTS.some((root) => underRoot(loggerName, root)) ? 'engine' : 'library'
 }
@@ -230,7 +251,7 @@ export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
   const origins = filter.origins
-  if (needle === '' && origins.engine && origins.library && origins.user) {
+  if (needle === '' && Object.values(origins).every((shown) => shown)) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(

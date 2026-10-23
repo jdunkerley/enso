@@ -75,3 +75,35 @@ export function engineLogStreamUrl(
   }
   return `${ENGINE_LOG_STREAM_PATH}?${params.toString()}`
 }
+
+/** The logger every local SQL query is logged under, at INFO (`LocalAuditedConnection`). */
+export const SQL_QUERY_LOGGER = 'Standard.Database.Connection'
+/**
+ * The logger of `Progress.run`'s timings (DEBUG, `ADVANCE <handle>+<count>~<ms>ms`), and the root
+ * of each handle's own logger, `Standard.Base.Logging.Progress.<handle>`.
+ */
+export const PERFORMANCE_LOGGER = 'Standard.Base.Logging.Progress'
+
+/**
+ * Extra logging an engine is started with (Settings → Local → Engine logs). The engine's configs
+ * keep both off; each option turns one logger up for the engines started while it is on.
+ */
+export interface EngineLoggingOptions {
+  /** Log every SQL query a local connection runs. */
+  readonly sqlQueries?: boolean
+  /** Log how long each `Progress.run` took (database queries among them). */
+  readonly performanceTimings?: boolean
+}
+
+/**
+ * The engine arguments for `options`: a `--vm.D <logger>.Logger.level=<level>` per option that is
+ * on. The runner sets each as a system property before logging is set up, and `LoggersLevels`
+ * (`lib/scala/logging-config`) puts such an override before the config's own level for that logger
+ * (and so its children).
+ */
+export function engineLoggingArgs(options: EngineLoggingOptions | undefined): string[] {
+  const levels: [string, string][] = []
+  if (options?.sqlQueries === true) levels.push([SQL_QUERY_LOGGER, 'info'])
+  if (options?.performanceTimings === true) levels.push([PERFORMANCE_LOGGER, 'debug'])
+  return levels.flatMap(([logger, level]) => ['--vm.D', `${logger}.Logger.level=${level}`])
+}

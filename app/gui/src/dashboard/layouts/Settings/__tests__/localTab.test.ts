@@ -201,6 +201,29 @@ describe('the Local settings tab', () => {
     vi.unstubAllGlobals()
   })
 
+  test('the Engine logs section has both logging switches, off by default', async () => {
+    const { engineLoggingOptions, setEngineLogSettings } =
+      await import('$/providers/engineLogSettings')
+    await openLocalTab()
+    expect(document.body.textContent).toContain(getText('engineLogsSettingsSection'))
+    expect(document.body.textContent).toContain(getText('engineLogsSettingsNextStart'))
+    expect(engineLoggingOptions()).toEqual({ sqlQueries: false, performanceTimings: false })
+    const switchFor = (labelId: 'logPerformanceTimingsSetting' | 'logSqlQueriesSetting') =>
+      required(
+        [...document.querySelectorAll<HTMLElement>('[role="switch"], input[type="checkbox"]')].find(
+          (element) => element.closest('label')?.textContent.includes(getText(labelId)),
+        ),
+      )
+    const user = userEvent.setup()
+    await user.click(switchFor('logSqlQueriesSetting'))
+    await flushPromises()
+    expect(engineLoggingOptions()).toEqual({ sqlQueries: true, performanceTimings: false })
+    await user.click(switchFor('logPerformanceTimingsSetting'))
+    await flushPromises()
+    expect(engineLoggingOptions()).toEqual({ sqlQueries: true, performanceTimings: true })
+    setEngineLogSettings({ sqlQueries: false, performanceTimings: false })
+  })
+
   test('a typed directory, once saved, reaches the local paths', async () => {
     await openLocalTab()
     expect(shownPaths()).toBe(`${DEFAULT_ROOT}|${DEFAULT_DOWNLOADS}`)

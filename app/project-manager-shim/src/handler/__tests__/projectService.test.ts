@@ -395,7 +395,14 @@ describe('project/open', () => {
       projectsDirectory: root,
       cloud: { cloudProjectId: 'x', cloudApiUrl: 'https://example.com' },
     })
-    expect(open).toHaveBeenCalledExactlyOnceWith('id-1', root)
+    expect(open).toHaveBeenCalledExactlyOnceWith('id-1', root, undefined)
+  })
+
+  test("passes the engine's logging options on", async () => {
+    const open = vi.spyOn(projectService, 'openProject').mockResolvedValue({} as never)
+    const engineLogging = { sqlQueries: true, performanceTimings: true }
+    await call('project/open', { projectId: 'id-1', projectsDirectory: root, engineLogging })
+    expect(open).toHaveBeenCalledExactlyOnceWith('id-1', root, engineLogging)
   })
 })
 

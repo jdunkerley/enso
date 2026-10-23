@@ -49,9 +49,27 @@ describe('logOrigin', () => {
   })
 
   test.each([
-    // The standard library's Enso modules (`log_internal`), and a project's other loggers.
-    'Standard.Base.Logging.Progress',
+    // The local connections' SQL queries (`LocalAuditedConnection`).
     'Standard.Database.Connection',
+  ])('%s is an SQL query', (name) => {
+    expect(logOrigin(name)).toBe('sql')
+  })
+
+  test.each([
+    // `Progress.run`'s timings, under the logger and its handles' children.
+    'Standard.Base.Logging.Progress',
+    'Standard.Base.Logging.Progress.JDBC_Connection.[SQLite] SELECT 1 AS x',
+    'Standard.Base.Logging.Progress.My_Handle',
+  ])('%s is performance', (name) => {
+    expect(logOrigin(name)).toBe('performance')
+  })
+
+  test.each([
+    // The standard library's Enso modules (`log_internal`), and a project's other loggers.
+    'Standard.Base.Logging',
+    'Standard.Base.Logging.Progresses',
+    // A module under the SQL logger's name logs under its own type: a library's.
+    'Standard.Database.Connection.Connection.Connection',
     'Standard.Table.In_Memory_Table.In_Memory_Table',
     'local.My_Project.Main.Report',
     // The std-bits helpers, under `org.enso` but the libraries'.
@@ -162,7 +180,7 @@ describe('LineClassifier origin', () => {
 
 describe('filterRows by origin', () => {
   const ENGINE_INFO = entry('INFO', 'org.enso.languageserver.Boot', 'server started')
-  const LIBRARY_WARN = entry('WARN', 'Standard.Database.Connection', 'slow query')
+  const LIBRARY_WARN = entry('WARN', 'Standard.Table.Table.Table', 'slow query')
   const LIBRARY_ERROR = entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed')
   const TRACE = '  at org.enso.database.JDBCProxy.run'
   const ENGINE_ERROR = entry('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed')
@@ -187,9 +205,22 @@ describe('filterRows by origin', () => {
       origin: 'engine',
     },
   ]
-  const ALL: OriginFilter = { engine: true, library: true, user: true }
+  const ALL: OriginFilter = {
+    engine: true,
+    library: true,
+    user: true,
+    sql: true,
+    performance: true,
+  }
+  const NONE: OriginFilter = {
+    engine: false,
+    library: false,
+    user: false,
+    sql: false,
+    performance: false,
+  }
   const texts = (filter: Partial<RowFilter>) =>
-    filterRows(rows, { level: 'info', text: '', origins: ALL, ...filter }).map((row) =>
+    filterRows(rows, { level: 'all', text: '', origins: ALL, ...filter }).map((row) =>
       row.kind === 'line' ? row.text : `--${row.divider}--`,
     )
 
@@ -208,14 +239,11 @@ describe('filterRows by origin', () => {
   })
 
   test('each origin keeps its own lines, and every divider', () => {
-    const only = (origin: keyof OriginFilter) =>
-      texts({ origins: { engine: false, library: false, user: false, [origin]: true } })
+    const only = (origin: keyof OriginFilter) => texts({ origins: { ...NONE, [origin]: true } })
     expect(only('engine')).toEqual(['--restarted--', ENGINE_INFO, ENGINE_ERROR, 'boom'])
     expect(only('library')).toEqual(['--restarted--', LIBRARY_WARN, LIBRARY_ERROR, TRACE])
     expect(only('user')).toEqual(['--restarted--', USER_INFO])
-    expect(texts({ origins: { engine: false, library: false, user: false } })).toEqual([
-      '--restarted--',
-    ])
+    expect(texts({ origins: NONE })).toEqual(['--restarted--'])
   })
 
   test('combines with the level and the text', () => {
@@ -231,8 +259,48 @@ describe('filterRows by origin', () => {
       LIBRARY_ERROR,
       USER_INFO,
     ])
-    expect(
-      texts({ origins: { engine: true, library: false, user: false }, text: 'query' }),
-    ).toEqual(['--restarted--'])
+    expect(texts({ origins: { ...NONE, engine: true }, text: 'query' })).toEqual(['--restarted--'])
+  })
+})
+
+describe('SQL queries and performance timings', () => {
+  const SQL = entry(
+    'INFO',
+    'Standard.Database.Connection',
+    'jdbc:sqlite::memory: - query: SELECT 1',
+  )
+  const TIMING = entry(
+    'DEBUG',
+    'Standard.Base.Logging.Progress.JDBC_Connection.[SQLite] SELECT 1',
+    'ADVANCE JDBC_Connection.[SQLite] SELECT 1+1~33ms',
+  )
+  const LIBRARY = entry('INFO', 'Standard.Table.Table.Table', 'read')
+  const rows = rowsFromLines([SQL, '  continued', TIMING, LIBRARY])
+  const shown = (origins: Partial<OriginFilter>, level: RowFilter['level'] = 'all') =>
+    filterRows(rows, { level, text: '', origins: { ...DEFAULT_ORIGINS, ...origins } }).map((row) =>
+      row.kind === 'line' ? row.text : '',
+    )
+
+  test('are their own origins, out of Libraries, with their continuation lines', () => {
+    expect(rows.map((row) => (row.kind === 'line' ? row.origin : ''))).toEqual([
+      'sql',
+      'sql',
+      'performance',
+      'library',
+    ])
+    expect(shown({ library: false })).toEqual([SQL, '  continued', TIMING])
+    expect(shown({ sql: false })).toEqual([TIMING, LIBRARY])
+    expect(shown({ performance: false })).toEqual([SQL, '  continued', LIBRARY])
+  })
+
+  test('are shown by default', () => {
+    expect(DEFAULT_ORIGINS.sql).toBe(true)
+    expect(DEFAULT_ORIGINS.performance).toBe(true)
+    expect(shown({})).toHaveLength(4)
+  })
+
+  test('timings are DEBUG: All levels shows them, Warn and above does not', () => {
+    expect(shown({}, 'all')).toContain(TIMING)
+    expect(shown({}, 'warn')).toEqual([])
   })
 })

@@ -6,6 +6,7 @@
 import type * as dateTime from '../../utilities/data/dateTime.js'
 import * as newtype from '../../utilities/data/newtype.js'
 import type * as backend from '../Backend.js'
+import type { EngineLoggingOptions } from '../engineLogs.js'
 
 /** Possible actions to take when a component is missing. */
 export enum MissingComponentAction {
@@ -197,6 +198,8 @@ export interface OpenProjectParams {
   readonly projectId: UUID
   readonly missingComponentAction: MissingComponentAction
   readonly projectsDirectory: Path
+  /** Extra logging for the engine this open starts. */
+  readonly engineLogging?: EngineLoggingOptions
 }
 
 /** Parameters for the "close project" endpoint. */

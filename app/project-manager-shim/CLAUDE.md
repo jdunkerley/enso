@@ -332,6 +332,16 @@ stays staged).
 
 ## Engine logs (`src/engineLogs/`)
 
+`project/open` may carry `engineLogging`
+(`{ sqlQueries?, performanceTimings? }`, from the GUI's Settings → Local →
+Engine logs). `openProject` adds `engineLoggingArgs(engineLogging)`
+(`enso-common/src/services/engineLogs.ts`) to the engine's arguments, after
+`ENSO_ENGINE_ARGS` and the service's own: a
+`--vm.D <logger>.Logger.level=<level>` per option that is on, nothing otherwise.
+The engine keeps them across restarts until the project closes; a project
+already open keeps the ones it was opened with. Test:
+`projectService/__tests__/engineLogging.test.ts`.
+
 `ProjectService.engineLogs` (an `EngineLogHub`) holds one `EngineLogChannel` per
 open project, keyed by its directory (resolved, lower case on Windows).
 `openProject` opens it before the engine starts, so start-up lands in the replay

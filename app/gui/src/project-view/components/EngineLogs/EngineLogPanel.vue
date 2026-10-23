@@ -4,6 +4,7 @@
  * earlier lines and sessions (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
  */
 import { useBackends } from '$/providers/backends'
+import { useEngineLogSettings } from '$/providers/engineLogSettings'
 import { useText } from '$/providers/text'
 import { useQuery } from '@tanstack/vue-query'
 import {
@@ -35,15 +36,57 @@ const { getText } = useText()
 const backends = useBackends()
 const systemApi = window.api?.system
 
-const level = ref<LevelFilter>('info')
+const engineLogSettings = useEngineLogSettings()
+
+const level = ref<LevelFilter>('all')
 /** Which origins show; the engine's internals are hidden at first. */
 const origins = ref<Record<LogOrigin, boolean>>({ ...DEFAULT_ORIGINS })
-/** The origin tickboxes, in toolbar order. */
-const originBoxes = [
-  { origin: 'engine', label: 'engineLogsOriginEngine' },
-  { origin: 'library', label: 'engineLogsOriginLibraries' },
-  { origin: 'user', label: 'engineLogsOriginUser' },
-] as const
+/**
+ * The origin tickboxes, in toolbar order. SQL queries and Performance show only while their setting
+ * (Settings → Local → Engine logs) is on.
+ */
+const originBoxes = computed(() =>
+  (
+    [
+      { origin: 'engine', label: 'engineLogsOriginEngine', shown: true },
+      { origin: 'library', label: 'engineLogsOriginLibraries', shown: true },
+      { origin: 'user', label: 'engineLogsOriginUser', shown: true },
+      {
+        origin: 'sql',
+        label: 'engineLogsOriginSql',
+        shown: engineLogSettings.value.sqlQueries,
+      },
+      {
+        origin: 'performance',
+        label: 'engineLogsOriginPerformance',
+        shown: engineLogSettings.value.performanceTimings,
+      },
+    ] as const
+  ).filter((box) => box.shown),
+)
+/**
+ * The origins the rows are filtered by. An origin without a tickbox is not filtered out: its lines
+ * (from before its setting was turned off, or an earlier session's) stay in view rather than being
+ * hidden by a box the user cannot see.
+ */
+const originFilter = computed(() => ({
+  ...origins.value,
+  sql: origins.value.sql || !engineLogSettings.value.sqlQueries,
+  performance: origins.value.performance || !engineLogSettings.value.performanceTimings,
+}))
+// A box checked by default whenever it appears.
+watch(
+  () => engineLogSettings.value.sqlQueries,
+  (on) => {
+    if (on) origins.value.sql = true
+  },
+)
+watch(
+  () => engineLogSettings.value.performanceTimings,
+  (on) => {
+    if (on) origins.value.performance = true
+  },
+)
 const filterText = ref('')
 const follow = ref(true)
 /** The earlier session shown, read-only; `''` for the live one. */
@@ -73,7 +116,7 @@ const shownRows = computed(() =>
   filterRows(live.value ? toValue(stream.rows) : sessionRows.value, {
     level: level.value,
     text: filterText.value,
-    origins: origins.value,
+    origins: originFilter.value,
   }),
 )
 
@@ -138,7 +181,7 @@ function sessionLabel(session: ProjectSession, number: number) {
       <select v-model="level" :aria-label="getText('engineLogsLevel')">
         <option value="error">{{ getText('engineLogsLevelError') }}</option>
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
-        <option value="info">{{ getText('engineLogsLevelInfo') }}</option>
+        <option value="all">{{ getText('engineLogsLevelAll') }}</option>
       </select>
       <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
         <label v-for="box in originBoxes" :key="box.origin" class="origin">

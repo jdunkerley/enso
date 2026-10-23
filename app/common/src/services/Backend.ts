@@ -37,6 +37,7 @@ import {
   type UnzipAssetsJobId,
   type UserId,
 } from './Backend/types.js'
+import type { EngineLoggingOptions } from './engineLogs.js'
 import { HttpClient, type HttpClientPostOptions, type ResponseWithTypedJson } from './HttpClient.js'
 export { prettifyError } from 'zod/v4'
 
@@ -675,6 +676,8 @@ export interface UpdateProjectRequestBody {
 /** HTTP request body for the "open project" endpoint. */
 export interface OpenProjectRequestBody {
   readonly executeAsync: boolean
+  /** Extra logging for the engine, if this open starts one (a project already open keeps its own). */
+  readonly engineLogging?: EngineLoggingOptions
 }
 
 /** HTTP request body for the "create secret or credential" endpoint. */

@@ -183,6 +183,15 @@ describe('LocalBackend: the local Recent list', () => {
       expect(projectManager.recordRecentProject).toHaveBeenCalledOnce()
     })
 
+    it("passes the engine's logging options to the project manager", async () => {
+      const open = vi
+        .spyOn(projectManager, 'openProject')
+        .mockResolvedValue({} as Awaited<ReturnType<ProjectManager['openProject']>>)
+      const engineLogging = { sqlQueries: true, performanceTimings: false }
+      await makeBackend().openProject(PROJECT_ID, { executeAsync: false, engineLogging }, 'P1')
+      expect(open).toHaveBeenCalledWith(expect.objectContaining({ engineLogging }))
+    })
+
     it('a failed record does not fail the open', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => {})
       vi.spyOn(projectManager, 'openProject').mockResolvedValue(
