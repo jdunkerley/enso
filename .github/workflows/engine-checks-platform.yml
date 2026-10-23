@@ -1,25 +1,50 @@
 # Hand-written. One platform's engine checks: the engine distribution, then the tests and checks
-# that use it. `engine-checks.yml` calls it once per platform. It has no `concurrency:` of its own:
-# the platforms' calls would share the group and cancel each other.
+# that use it. `engine-checks.yml` calls it once per platform; `engine-checks-nightly.yml` also for
+# macOS and for Oracle GraalVM, `macos-checks.yml` for the self-hosted Mac, and
+# `extra-nightly-tests.yml` for the distribution alone. It has no `concurrency:` of its own: the
+# platforms' calls would share the group and cancel each other.
 
 name: Engine Checks (platform)
 on:
   workflow_call:
     inputs:
       os:
-        description: "`linux` or `windows`: names the jobs and artifacts; `linux` adds the Linux-only checks."
+        description: "`linux`, `windows` or `macos`: names the jobs and artifacts; `linux` adds the Linux-only checks and the databases."
         required: true
         type: string
+      arch:
+        description: "`amd64`, or `aarch64` for the self-hosted Mac: names the jobs and artifacts."
+        required: false
+        type: string
+        default: amd64
       runner:
-        description: The runner label for every job.
+        description: >-
+          The runner for every job: a label (`ubuntu-latest`), or a JSON list of labels
+          (`["self-hosted", "macOS"]`).
         required: true
         type: string
+      edition:
+        description: "`GraalVM CE` or `Oracle GraalVM`: the JDK every job builds and runs with; part of the names."
+        required: false
+        type: string
+        default: GraalVM CE
+      jvm-tests:
+        description: Run the JVM tests.
+        required: false
+        type: boolean
+        default: true
+      linux-checks:
+        description: On Linux, also run the Enso lint and the Standard Library API check.
+        required: false
+        type: boolean
+        default: true
       stdlib-suites:
         description: >-
           JSON list of the Standard Library test suites to run, each `{"suite": "<stdlib-test
           suite>", "title": "<job title>", "small-jdk": <bool>, "postgres": <bool>, "mssql":
-          <bool>}`: the JVM suite needs the small JDK; `postgres` and `mssql` (Linux only) start that
-          database for the suite.
+          <bool>}`: the JVM suite needs the small JDK (not built for Oracle GraalVM, which
+          `stdlib-test` runs without it); `postgres` and `mssql` (Linux only) start that database for
+          the suite. `[]` runs none.
         required: true
         type: string
       clean_build_required:
@@ -27,6 +52,16 @@ on:
         required: false
         type: boolean
         default: false
+    outputs:
+      ENSO_VERSION:
+        description: The engine distribution's version, for a caller's own jobs that download it.
+        value: ${{ jobs.build-engine-distribution.outputs.ENSO_VERSION }}
+      ENSO_EDITION:
+        description: The engine distribution's edition.
+        value: ${{ jobs.build-engine-distribution.outputs.ENSO_EDITION }}
+      ENSO_RELEASE_MODE:
+        description: Whether the distribution was built in release mode.
+        value: ${{ jobs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
 
 env:
   # Read by `.github/actions/git-clean`.
@@ -50,8 +85,8 @@ jobs:
   # `GITHUB_TOKEN` and the `GITHUB_ENV` copy of `ENSO_TEST_JUNIT_DIR`. (The standard library jobs
   # still use GraalPy and `GRAAL_EDITION`.)
   build-engine-distribution:
-    name: Build Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-    runs-on: ${{ inputs.runner }}
+    name: Build Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     env:
       ENSO_LAUNCHER: native,test
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
@@ -74,6 +109,7 @@ jobs:
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: engine
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
       - name: Set up MSVC
@@ -91,7 +127,7 @@ jobs:
       - name: Upload Engine Distribution
         uses: actions/upload-artifact@v5
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
           path: built-distribution.tar
       - name: Cleanup Archive
         run: rm built-distribution.tar
@@ -121,9 +157,9 @@ jobs:
   # (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
-    if: inputs.os == 'linux'
+    if: inputs.os == 'linux' && inputs.linux-checks
     needs: [build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     env:
       ENSO_LINT_ENABLE_GITHUB_ANNOTATIONS: "true"
     steps:
@@ -138,6 +174,7 @@ jobs:
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: engine
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
       - name: Check syntax
@@ -148,7 +185,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Check the distribution's version
         run: |-
           if [ -z "$ENSO_VERSION" ]; then
@@ -190,9 +227,10 @@ jobs:
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
   jvm-tests:
-    name: JVM Tests (GraalVM CE) (${{ inputs.os }}, amd64)
+    name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    if: inputs.jvm-tests
     needs: [build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     permissions:
       checks: write
     steps:
@@ -206,11 +244,12 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: engine
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
       # `sbt test` builds native images on Windows too (the launcher's and os-environment's tests).
@@ -290,7 +329,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           if-no-files-found: ignore
-          name: Heap dumps (JVM Tests, ${{ inputs.os }}, amd64)
+          name: Heap dumps (JVM Tests, ${{ inputs.os }}, ${{ inputs.arch }})
           path: |-
             test/**/*.hprof
             engine/**/*.hprof
@@ -300,7 +339,7 @@ jobs:
         uses: dorny/test-reporter@v1
         with:
           max-annotations: 50
-          name: Engine Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          name: Engine Tests Report (${{ inputs.edition }}, ${{ inputs.os }}, ${{ inputs.arch }})
           path: target/test-results/*.xml
           path-replace-backslashes: true
           reporter: java-junit
@@ -312,9 +351,9 @@ jobs:
   # the downloaded distribution at the build job's version.
   standard-library-api-check:
     name: Standard Library API check (linux, amd64)
-    if: inputs.os == 'linux'
+    if: inputs.os == 'linux' && inputs.linux-checks
     needs: [build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -328,7 +367,7 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Check the Standard Library API
         run: corepack pnpm --filter build-scripts run stdlib-api-check
         env:
@@ -343,9 +382,10 @@ jobs:
   # `src/stdlib-test/run.ts`), and starts the HTTP test helper itself, with sbt (hence `setup-jvm`).
   # What moved out of `./run` into this file:
   # - Postgres and SQL Server are service containers, on Linux only as before (Windows runners have
-  #   none, so Windows is a job of its own, under the same name). One job with
-  #   OS-conditional `services:` is not possible: a Windows runner cannot start the Linux
-  #   containers, so the Windows job is the same steps without them. A suite gets a database when its
+  #   none, and the self-hosted Mac has no Docker, so they share a job of their own,
+  #   `stdlib-tests-without-services`, under the same name). One job with OS-conditional
+  #   `services:` is not possible: a Windows runner cannot start the Linux containers, so that job
+  #   is the same steps without them. A suite gets a database when its
   #   matrix entry asks (`postgres`, `mssql`); an empty image starts no container, and the runner
   #   drops the connection variables that are empty, since Enso reads an empty variable as "".
   #   Images: `postgres:18` (`./run` took `latest`, 18.6 when this moved) and SQL Server
@@ -359,14 +399,14 @@ jobs:
   #   `.github/actions/setup-jvm`.
   # The engine package is the build job's, at the build job's version.
   stdlib-tests:
-    name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
-    if: inputs.os == 'linux'
+    name: Standard Library ${{ matrix.title }} Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    if: inputs.os == 'linux' && inputs.stdlib-suites != '[]'
     needs: [build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     permissions:
       checks: write
     env:
-      GRAAL_EDITION: GraalVM CE
+      GRAAL_EDITION: ${{ inputs.edition }}
       ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
     strategy:
       # Each suite reports on its own, as when they were separate jobs.
@@ -407,14 +447,15 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: stdlib-tests
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           graalpy: "true"
           rust: "true"
-      - if: matrix.small-jdk
+      - if: matrix.small-jdk && inputs.edition != 'Oracle GraalVM'
         name: Build the small JDK
         run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
         env:
@@ -463,7 +504,7 @@ jobs:
           # Only the AWS suite may report no tests, as before.
           fail-on-empty: ${{ matrix.suite != 'std-aws' }}
           max-annotations: 50
-          name: Standard Library Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          name: Standard Library Tests Report (${{ inputs.edition }}, ${{ inputs.os }}, ${{ inputs.arch }})
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
           path-replace-backslashes: true
           reporter: java-junit
@@ -472,7 +513,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           if-no-files-found: ignore
-          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, amd64)
+          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, ${{ inputs.arch }})
           path: |-
             test/**/*.hprof
             engine/**/*.hprof
@@ -481,16 +522,17 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # The same as `stdlib-tests`, without the databases: Windows runners have no service containers.
-  stdlib-tests-windows:
-    name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
-    if: inputs.os == 'windows'
+  # The same as `stdlib-tests`, without the databases: Windows runners have no service containers,
+  # and the self-hosted Mac has no Docker (`./run` started the databases on Linux only).
+  stdlib-tests-without-services:
+    name: Standard Library ${{ matrix.title }} Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    if: inputs.os != 'linux' && inputs.stdlib-suites != '[]'
     needs: [build-engine-distribution]
-    runs-on: ${{ inputs.runner }}
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     permissions:
       checks: write
     env:
-      GRAAL_EDITION: GraalVM CE
+      GRAAL_EDITION: ${{ inputs.edition }}
       ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
     strategy:
       # Each suite reports on its own, as when they were separate jobs.
@@ -510,14 +552,15 @@ jobs:
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
-          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: stdlib-tests
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           graalpy: "true"
           rust: "true"
-      - if: matrix.small-jdk
+      - if: matrix.small-jdk && inputs.edition != 'Oracle GraalVM'
         name: Build the small JDK
         run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
         env:
@@ -542,7 +585,7 @@ jobs:
           # Only the AWS suite may report no tests, as before.
           fail-on-empty: ${{ matrix.suite != 'std-aws' }}
           max-annotations: 50
-          name: Standard Library Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          name: Standard Library Tests Report (${{ inputs.edition }}, ${{ inputs.os }}, ${{ inputs.arch }})
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
           path-replace-backslashes: true
           reporter: java-junit
@@ -551,7 +594,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           if-no-files-found: ignore
-          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, amd64)
+          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, ${{ inputs.arch }})
           path: |-
             test/**/*.hprof
             engine/**/*.hprof

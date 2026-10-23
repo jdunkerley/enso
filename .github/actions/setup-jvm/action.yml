@@ -13,6 +13,12 @@ inputs:
       dependencies: a cache entry is never overwritten, so the first job to save one decides its
       contents.
     required: true
+  edition:
+    description: >-
+      `community` (GraalVM CE, the default) or `oracle` (Oracle GraalVM, at the same version), which
+      the nightly checks also build and test with. `./run` chose it by `GRAAL_EDITION`.
+    required: false
+    default: community
   flatc:
     description: Also install `flatc`, which compiling the language server needs.
     required: false
@@ -35,7 +41,17 @@ runs:
     - name: Read the pinned versions
       id: pins
       shell: bash
+      env:
+        EDITION: ${{ inputs.edition }}
       run: |-
+        case "$EDITION" in
+          community) echo "vendor=GraalVM CE" >> "$GITHUB_OUTPUT" ;;
+          oracle) echo "vendor=Oracle GraalVM" >> "$GITHUB_OUTPUT" ;;
+          *)
+            echo "::error::setup-jvm: unknown edition \`$EDITION\` (community or oracle)."
+            exit 1
+            ;;
+        esac
         pin() {
           local value
           value=$(awk -v key="$1" '{ sub(/\r$/, "") } /^toolchain:/ { t = 1; next } /^[^ #]/ { t = 0 } t && $1 == key ":" { print $2; exit }' build-config.yaml)
@@ -53,7 +69,7 @@ runs:
       uses: graalvm/setup-graalvm@v1
       with:
         java-version: ${{ steps.pins.outputs.graalvm }}
-        distribution: graalvm-community
+        distribution: ${{ inputs.edition == 'oracle' && 'graalvm' || 'graalvm-community' }}
         github-token: ${{ github.token }}
     # The launcher from the release tarball, as `formatting.yml` always used, unpacked outside the
     # working tree. Git Bash's `tar` reads `D:\...` as a remote host, hence the POSIX path.
@@ -144,6 +160,7 @@ runs:
       shell: bash
       env:
         GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        GRAALVM_VENDOR: ${{ steps.pins.outputs.vendor }}
         FLATC_VERSION: ${{ steps.pins.outputs.flatc }}
         GRAALPY_VERSION: ${{ steps.pins.outputs.graalpy }}
         WITH_FLATC: ${{ inputs.flatc }}
@@ -152,7 +169,7 @@ runs:
         # Captured first: `grep -q` stops reading early, which `pipefail` would report.
         java=$(java -version 2>&1)
         echo "$java"
-        grep -qF "GraalVM CE $GRAALVM_VERSION" <<< "$java"
+        grep -qF "$GRAALVM_VENDOR $GRAALVM_VERSION" <<< "$java"
         command -v sbt
         if [ "$WITH_FLATC" = "true" ]; then
           flatc=$(flatc --version)
