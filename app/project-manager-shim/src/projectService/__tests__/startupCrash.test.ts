@@ -15,9 +15,17 @@ import { EnsoRunner } from '../ensoRunner.js'
 import { Path } from '../types.js'
 import { STARTUP_CRASH_PORT } from './testPorts.js'
 
-const STARTUP_TIMEOUT_MS = 500
+/**
+ * The startup timeout of every engine whose startup is not the subject of a test. It must be far
+ * beyond the time a loaded machine needs to start a Node process (a `.bat` launching Node, on
+ * Windows): the clock starts at the spawn, so a short one fails a healthy open, or an engine that
+ * is about to exit, with a timeout instead.
+ */
+const STARTUP_TIMEOUT_MS = 30_000
+/** The startup timeout of the `Hang` engine, the subject of its test. */
+const HANG_STARTUP_TIMEOUT_MS = 2_000
 /** How long a `Hang` engine lives: past the startup timeout, so it is killed first. */
-const HANG_EXIT_MS = 2_500
+const HANG_EXIT_MS = 6_000
 /** Several load health-check intervals (250 ms each). */
 const LINGER_MS = 1_500
 
@@ -66,6 +74,8 @@ async function fakeEnso(directory: string): Promise<Path> {
   return Path(launcher)
 }
 
+const launcherName = () => (process.platform === 'win32' ? 'enso.bat' : 'enso')
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
@@ -73,7 +83,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  * count the requests: a health check still polling for the failed open would reach it.
  */
 async function requestsToPortAfterwards(project: Path): Promise<number> {
-  const port = Number(await fs.readFile(`${project}.port`, 'utf8'))
+  // An engine killed before Node ran its script wrote no port: it got the first one.
+  const port = Number(await fs.readFile(`${project}.port`, 'utf8').catch(() => STARTUP_CRASH_PORT))
   let requests = 0
   const server = http.createServer((_request, response) => {
     requests += 1
@@ -115,14 +126,19 @@ test('an engine that exits while loading fails the open and leaves nothing behin
 
 test('an engine that does not start in time fails the open and leaves nothing behind', async () => {
   const project = Path(path.join(root, 'Hang'))
+  runner = new EnsoRunner(Path(path.join(root, launcherName())), {
+    firstPort: STARTUP_CRASH_PORT,
+    startupTimeoutMs: HANG_STARTUP_TIMEOUT_MS,
+  })
   await expect(runner.openProject(project, 'id')).rejects.toThrow('Language server startup timeout')
   expect(await requestsToPortAfterwards(project)).toBe(0)
   // Past the time the engine would have exited by itself, had it not been killed.
   await sleep(HANG_EXIT_MS)
-  expect(await fs.readFile(`${project}.starts`, 'utf8')).toBe('1')
+  // Never more than one start (none, if the kill came before Node ran the script): no respawn.
+  expect(Number(await fs.readFile(`${project}.starts`, 'utf8').catch(() => '0'))).toBeLessThan(2)
   expect(await runner.hasRunningProjects()).toBe(false)
   expect(unhandled).toEqual([])
-}, 30_000)
+}, 60_000)
 
 test('a failed open fails neither an open nor a close waiting for it', async () => {
   const crash = Path(path.join(root, 'Crash'))
