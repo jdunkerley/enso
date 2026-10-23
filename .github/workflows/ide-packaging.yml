@@ -41,9 +41,9 @@ jobs:
   # environment), the small JDK, and the bundle in
   # `built-distribution/engine-bundle-<version>-<os>-amd64/enso`, which is archived as it is
   # (`./run` mirrored it to `dist/backend` first). sbt is called as `./run` called it; the version
-  # comes from `tools/build-scripts` (`version`), and `ENSO_LAUNCHER` stays `native`. As in Note
-  # [Engine Distribution Without ./run] (`engine-checks-platform.yml`), "Install the Rust toolchain"
-  # installs the `rust-toolchain.toml` toolchain before sbt starts several `cargo` calls at once.
+  # comes from `tools/build-scripts` (`version`), and `ENSO_LAUNCHER` stays `native`. `setup-jvm`
+  # installs the Rust toolchain (`rust`) before sbt starts several `cargo` calls at once (Note
+  # [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   build-backend:
     name: Build Backend (${{ matrix.os }}, amd64)
     runs-on: ${{ matrix.runner }}
@@ -70,13 +70,11 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: build-backend
+          cache-key: engine
           flatc: "true"
+          rust: "true"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
-      # See Note [Engine Bundle Without ./run]: one install before sbt starts several cargo calls.
-      - name: Install the Rust toolchain
-        run: rustup toolchain install --no-self-update
       - id: version
         name: Compute the version
         run: corepack pnpm --filter build-scripts run version

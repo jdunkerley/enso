@@ -1,15 +1,17 @@
 name: Set up the JVM toolchain
 description: >-
   GraalVM CE and the sbt launcher at the versions pinned under `toolchain:` in `build-config.yaml`,
-  `flatc` and the standalone GraalPy too when asked, and the sbt / Coursier download cache (saved
-  only on `develop`). What `./run` provisioned before an sbt call, minus the MSVC environment
+  `flatc`, the standalone GraalPy and the `rust-toolchain.toml` Rust toolchain too when asked, and
+  the sbt / Coursier download cache (saved only on `develop`). What `./run` provisioned before an sbt call, minus the MSVC environment
   (`setup-msvc`). Expects the repository to be checked out.
 inputs:
   cache-key:
     description: >-
-      Names this job's dependency cache, `sbt-deps-<cache-key>-<OS>-<hash>`. Jobs that resolve
-      different dependency sets need different keys: a cache entry is never overwritten, so the
-      first job to save one decides its contents.
+      Names this job's dependency cache, `sbt-deps-<cache-key>-<OS>-<hash>`. Jobs that resolve the
+      same build share a key, so that one entry serves them all (each is ~830 MB, against the
+      repository's 10 GB cap). Give a distinct key only to jobs that resolve different
+      dependencies: a cache entry is never overwritten, so the first job to save one decides its
+      contents.
     required: true
   flatc:
     description: Also install `flatc`, which compiling the language server needs.
@@ -19,6 +21,12 @@ inputs:
     description: >-
       Also put the standalone GraalPy on the PATH: `test/Examples_Tests`' Python spec runs it, and
       is skipped without it.
+    required: false
+    default: "false"
+  rust:
+    description: >-
+      Also install the `rust-toolchain.toml` Rust toolchain, before any sbt call. A job whose sbt
+      tasks compile the Rust parser needs it; see Note [Install The Rust Toolchain Before sbt].
     required: false
     default: "false"
 runs:
@@ -119,6 +127,19 @@ runs:
         fi
         rm "$dir/graalpy.$ext"
         echo "$RUNNER_TEMP/$name/bin" >> "$GITHUB_PATH"
+    # Note [Install The Rust Toolchain Before sbt]
+    # =============================================
+    # sbt compiles the Rust parser (and `checkEnsoSyntax` runs it) with `cargo`, and under `all`
+    # several tasks start `cargo`/`rustup` at once. With the `rust-toolchain.toml` toolchain
+    # missing, each of them auto-installs it and they collide ("could not rename 'component' file",
+    # then "Cargo isn't installed!"). `./run`'s full `pnpm install` had compiled the parser first,
+    # which installed the toolchain; `setup-build-scripts` runs no scripts, so this step installs it
+    # once (rustup 1.28+ reads `rust-toolchain.toml`) before the job's first sbt call. It leaves
+    # rustup itself as the runner image has it (`--no-self-update`).
+    - if: inputs.rust == 'true'
+      name: Install the Rust toolchain
+      shell: bash
+      run: rustup toolchain install --no-self-update
     - name: Check the toolchain
       shell: bash
       env:
