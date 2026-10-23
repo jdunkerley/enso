@@ -235,6 +235,47 @@ checkIRCacheSizes := Def
   .dependsOn(buildEngineDistribution)
   .value
 
+/* Note [CI Engine Distribution Build]
+ * ===================================
+ * What `./run backend ci-build-engine-distribution` ran after `clean`, in one sbt session:
+ * `buildEngineDistribution`; then `checkIRCacheSizes`; then, on Windows, the MSVC runtime DLL
+ * copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
+ * then, not on Windows, `verifyGeneratedPackage` for the engine and for Base, Table, Image and
+ * Database at the package's versioned paths (`./run` skipped it on Windows: "FIXME ... CRLF
+ * issues?"). CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its own, not a
+ * CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and `CI` is
+ * set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
+ */
+lazy val ciBuildEngineDistribution = taskKey[Unit](
+  "CI's engine distribution build: buildEngineDistribution, checkIRCacheSizes, the MSVC runtime " +
+  "DLL copy (Windows) and verifyGeneratedPackage (not Windows). See Note [CI Engine Distribution Build]."
+)
+ciBuildEngineDistribution := Def
+  .sequential(
+    buildEngineDistribution,
+    Def.task {
+      val log  = streams.value.log
+      val root = engineDistributionRoot.value
+      EngineDistributionChecks.afterBuild(root, ensoVersion, log)
+      if (!Platform.isWindows) {
+        val configRoot = GatherLicenses.configurationRoot.value
+        GatherLicenses.verifyPackageAt(
+          log,
+          configRoot / "engine",
+          root / "THIRD-PARTY"
+        )
+        for (lib <- Seq("Base", "Table", "Image", "Database")) {
+          GatherLicenses.verifyPackageAt(
+            log,
+            configRoot / lib,
+            root / "lib" / "Standard" / lib / ensoVersion / "THIRD-PARTY"
+          )
+        }
+      }
+    }
+  )
+  .value
+
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += logManager
 
