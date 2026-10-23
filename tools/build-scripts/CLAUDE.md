@@ -40,6 +40,17 @@ that Node runs as it is (type stripping): each command is
   whose environment holds real credentials.
 - `junit-compare <old> <new>` — compares two JUnit directories project by
   project (pass, fail, skip); the gate for moving the tests off `./run`.
+- `release <action>` — the release workflow's steps (`release.yml`,
+  `promote.yml`), as `./run release …` and `./run ide upload` ran them:
+  `create-draft` drafts release `ENSO_VERSION` at `GITHUB_SHA` with the top
+  section of `CHANGELOG.md`; `upload-ide` uploads this platform's installer, its
+  `.sha256` and the update feeds from `dist/ide` to the draft `ENSO_RELEASE_ID`;
+  `publish` publishes it, noting missing installers, and checks that the
+  installers download; `promote <stable|patch|rc|nightly>` computes the next
+  version from `origin`'s tags; `update-latest-version` records a stable version
+  as `latest-release` in `build-config.yaml`. They need `GITHUB_TOKEN` and
+  `GITHUB_REPOSITORY` (except `promote` and `update-latest-version`). Run only
+  `promote` locally: the others change the real repository's releases.
 
 ## Layout
 
@@ -48,8 +59,9 @@ that Node runs as it is (type stripping): each command is
 - `src/<command>/` — the logic, as functions with vitest tests beside them
   (`*.test.ts`).
 - `src/lib/` — shared helpers: the repository root and running programs
-  (`repo.ts`), publishing to GitHub Actions (`github.ts`), finding the engine
-  package (`engine.ts`), starting sbt (`sbt.ts`, the only module that may).
+  (`repo.ts`), publishing to GitHub Actions (`github.ts`), GitHub's REST API
+  (`githubApi.ts`), finding the engine package (`engine.ts`), starting sbt
+  (`sbt.ts`, the only module that may).
 
 ## Conventions
 
