@@ -1046,8 +1046,8 @@ object DistributionPackage {
       architecture: Architecture
     ): File = artifactRoot / artifactName(component, os, architecture)
 
-    /** Path to the artifact that is built on this local machine. */
-    def localArtifact(component: String): File = {
+    /** The OS and architecture of this machine, as the artifact names spell them. */
+    def localPlatform: (OS, Architecture) = {
       val os =
         if (Platform.isWindows) OS.Windows
         else if (Platform.isLinux) OS.Linux
@@ -1060,7 +1060,13 @@ object DistributionPackage {
             )
         } else
           throw new IllegalStateException("Unknown OS: " + sys.props("os.name"))
-      artifactRoot / artifactName(component, os, os.archs.head)
+      (os, os.archs.head)
+    }
+
+    /** Path to the artifact that is built on this local machine. */
+    def localArtifact(component: String): File = {
+      val (os, architecture) = localPlatform
+      artifactRoot / artifactName(component, os, architecture)
     }
 
     /** Path to a built archive.

@@ -1,0 +1,94 @@
+import sbt._
+
+import java.nio.file.{
+  FileVisitResult,
+  Files,
+  LinkOption,
+  Path,
+  SimpleFileVisitor,
+  StandardCopyOption
+}
+import java.nio.file.attribute.BasicFileAttributes
+
+/** The engine bundle that the IDE ships: the engine package, a small JDK to run it with, and an
+  * empty `.enso.bundle` marker, laid out as `./run backend get` laid it out
+  * (`build_tools/build/src/engine/bundle.rs`, `paths.yaml`):
+  *
+  * {{{
+  * built-distribution/engine-bundle-<version>-<os>-<arch>/enso/
+  *   .enso.bundle
+  *   dist/<version>/                                     the engine package
+  *   runtime/graalvm-ce-java<graalVersion>-<graalMavenPackagesVersion>/   the small JDK
+  * }}}
+  */
+object EngineBundle {
+
+  /** The bundle's root directory for this platform. */
+  def root(
+    artifactRoot: File,
+    ensoVersion: String,
+    os: DistributionPackage.OS,
+    arch: DistributionPackage.Architecture
+  ): File =
+    artifactRoot / s"engine-bundle-$ensoVersion-${os.name}-${arch.name}" / "enso"
+
+  /** The runtime directory's name, as `./run` named it. */
+  def runtimeDirName(
+    graalVersion: String,
+    graalMavenPackagesVersion: String
+  ): String =
+    s"graalvm-ce-java$graalVersion-$graalMavenPackagesVersion"
+
+  /** Recreates the bundle at `bundleRoot` from `enginePackage` and `smallJdk`; returns its root. */
+  def create(
+    bundleRoot: File,
+    enginePackage: File,
+    smallJdk: File,
+    ensoVersion: String,
+    runtimeDir: String,
+    log: Logger
+  ): File = {
+    IO.delete(bundleRoot)
+    IO.createDirectory(bundleRoot)
+    copyTree(enginePackage, bundleRoot / "dist" / ensoVersion)
+    copyTree(smallJdk, bundleRoot / "runtime" / runtimeDir)
+    IO.touch(bundleRoot / ".enso.bundle")
+    log.info(s"Engine bundle created at $bundleRoot.")
+    bundleRoot
+  }
+
+  /** Copies the tree at `source` to `target` as `./run`'s `mirror_directory` did: symbolic links
+    * stay links (jlink's `legal/<module>/LICENSE` and friends point at `../java.base/...`), and files
+    * keep their permissions and modification times. sbt's `IO.copyDirectory` follows links, so it
+    * would turn each into a copy of its target.
+    */
+  private def copyTree(source: File, target: File): Unit = {
+    val from = source.toPath
+    val to   = target.toPath
+    Files.walkFileTree(
+      from,
+      new SimpleFileVisitor[Path] {
+        override def preVisitDirectory(
+          dir: Path,
+          attrs: BasicFileAttributes
+        ): FileVisitResult = {
+          Files.createDirectories(to.resolve(from.relativize(dir)))
+          FileVisitResult.CONTINUE
+        }
+
+        override def visitFile(
+          file: Path,
+          attrs: BasicFileAttributes
+        ): FileVisitResult = {
+          Files.copy(
+            file,
+            to.resolve(from.relativize(file)),
+            StandardCopyOption.COPY_ATTRIBUTES,
+            LinkOption.NOFOLLOW_LINKS
+          )
+          FileVisitResult.CONTINUE
+        }
+      }
+    )
+  }
+}

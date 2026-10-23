@@ -276,6 +276,35 @@ ciBuildEngineDistribution := Def
   )
   .value
 
+lazy val buildEngineBundle = taskKey[File](
+  "Builds the engine bundle the IDE ships (the engine package, a small JDK and `.enso.bundle`) " +
+  "in built-distribution/engine-bundle-<version>-<os>-<arch>/enso, as `./run backend get` did. " +
+  "ENSO_LAUNCHER is the caller's: the IDE's CI passes `native`. See project/EngineBundle.scala."
+)
+buildEngineBundle := Def
+  .sequential(
+    buildEngineDistribution,
+    Def.task {
+      val log  = streams.value.log
+      val root = engineDistributionRoot.value
+      EngineDistributionChecks.afterBuild(root, ensoVersion, log)
+      val smallJdk = baseDirectory.value / "target" / "small-jdk"
+      SmallJDK.buildSmallJDKForRelease(smallJdk)
+      val (os, arch) = packageBuilder.value.localPlatform
+      EngineBundle.create(
+        bundleRoot = EngineBundle
+          .root(distributionArtifactRoot.value, ensoVersion, os, arch),
+        enginePackage = root,
+        smallJdk      = smallJdk,
+        ensoVersion   = ensoVersion,
+        runtimeDir =
+          EngineBundle.runtimeDirName(graalVersion, graalMavenPackagesVersion),
+        log = log
+      )
+    }
+  )
+  .value
+
 Global / onChangedBuildSource := ReloadOnSourceChanges
 Global / excludeLintKeys += logManager
 
