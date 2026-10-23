@@ -43,6 +43,7 @@ test('settings open on the offline user', async ({ drivePage, page }) => {
   await expect(sectionHeadings(page)).toHaveText([
     TEXT.localSettingsSection,
     TEXT.localVersionsSettingsSection,
+    TEXT.engineLogsSettingsSection,
     TEXT.mapsSettingsSection,
   ])
   await expect(
