@@ -22,6 +22,7 @@ import {
   selectProjects,
   skipsForMissingAwsCredentials,
   suiteNamed,
+  unselectedNames,
 } from './suites.ts'
 
 /** The cloud credentials with which `./run` logged in to Enso Cloud (`cloud_tests/env.rs`). */
@@ -72,6 +73,14 @@ export async function runStdlibTests(
   context: StdlibTestContext,
 ): Promise<number> {
   const { name, suite } = suiteNamed(options.suite)
+  const testDir = path.join(context.repoRoot, 'test')
+  if (options.only != null) {
+    const unselected = unselectedNames(discoverProjects(testDir), suite, options.only)
+    if (unselected.length > 0) {
+      const names = unselected.map((entry) => JSON.stringify(entry)).join(', ')
+      throw new Error(`--only names projects that suite ${name} does not run: ${names}.`)
+    }
+  }
   const env = context.env
   if (CLOUD_VARIABLES.every((variable) => (env[variable] ?? '') !== '')) {
     throw new Error(
@@ -86,7 +95,6 @@ export async function runStdlibTests(
     )
     return 0
   }
-  const testDir = path.join(context.repoRoot, 'test')
   const projects = selectProjects(discoverProjects(testDir), suite, options.only)
   if (projects.length === 0) throw new Error(`Suite ${name} selects no test project.`)
   const smallJdk = path.join(context.repoRoot, 'target', 'small-jdk')

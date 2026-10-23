@@ -14,6 +14,7 @@ import { findEnginePackage } from '../lib/engine.ts'
 import { commandArguments, REPO_ROOT, runInherited } from '../lib/repo.ts'
 import { startHttpbin } from '../stdlib-test/httpbin.ts'
 import { runStdlibTests } from '../stdlib-test/run.ts'
+import { parseOnly } from '../stdlib-test/suites.ts'
 
 /** Every `bench-report.xml` under `dir`, skipping dependencies and VCS data. */
 function benchReports(dir: string): string[] {
@@ -47,7 +48,7 @@ try {
   process.exitCode = await runStdlibTests(
     {
       suite,
-      ...(values.only != null ? { only: values.only.split(',') } : {}),
+      ...(values.only != null ? { only: parseOnly(values.only) } : {}),
       clean: !values['no-clean'],
       dryRun: values['dry-run'],
     },

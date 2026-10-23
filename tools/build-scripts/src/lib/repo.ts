@@ -67,11 +67,7 @@ export function capture(
     stdio: ['ignore', 'pipe', 'pipe'],
     maxBuffer: 64 * 1024 * 1024,
   })
-  const failure =
-    result.error != null ?
-      `${String(result.error)}
-`
-    : ''
+  const failure = result.error != null ? `${String(result.error)}\n` : ''
   return {
     status: result.error != null ? -1 : (result.status ?? -1),
     stdout: result.stdout ?? '',

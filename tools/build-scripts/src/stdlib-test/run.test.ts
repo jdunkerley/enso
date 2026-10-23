@@ -112,4 +112,25 @@ describe('runStdlibTests', () => {
     expect(calls).toEqual([])
     expect(logged.at(-1)).toContain('--no-ir-caches --run')
   })
+  test('--only runs just those projects', async () => {
+    const root = repository(['Base_Tests', 'Table_Tests', 'Image_Tests'])
+    const { calls, context: c } = context(root)
+    const only = ['Table_Tests', 'Base_Tests']
+    expect(await runStdlibTests({ suite: 'stdlib', only, clean: false, dryRun: false }, c)).toBe(0)
+    expect(calls.filter((call) => call.includes('_Tests'))).toEqual([
+      expect.stringContaining(path.join(root, 'test', 'Base_Tests')),
+      expect.stringContaining(path.join(root, 'test', 'Table_Tests')),
+    ])
+  })
+  test('--only with a name the suite does not run is an error, before anything starts', async () => {
+    const root = repository(['Base_Tests', 'AWS_Tests'])
+    const { calls, context: c } = context(root)
+    const only = ['Base_Tests', 'Base_Test', 'AWS_Tests']
+    await expect(
+      runStdlibTests({ suite: 'stdlib', only, clean: true, dryRun: false }, c),
+    ).rejects.toThrow(
+      '--only names projects that suite standard-library does not run: "Base_Test", "AWS_Tests".',
+    )
+    expect(calls).toEqual([])
+  })
 })
