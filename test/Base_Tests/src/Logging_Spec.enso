@@ -57,6 +57,7 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
                 log Log_Level.Info
                 log Log_Level.Warning
                 log Log_Level.Severe
+                Typ.log_internal ("Internal:" + msg.to_text) Log_Level.Warning
 
     enso_logging_prj -> File =
         enso_logging_prj_lazy.get
@@ -167,6 +168,17 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         console_log . not_contains_line "INFO.*Info:Ahoj"
         console_log . contains_line "WARN.*Warning:Ahoj"
         console_log . contains_line "ERROR.*Severe:Ahoj"
+
+    group_builder.specify "log_message logs under a User. logger name, log_internal under the type's name" <|
+        pair = perform_logging enso_logging_prj ["Hallo"]
+        log = pair.first
+
+        # `log_message`: `User.` and the qualified name of the type.
+        log . contains_line "\[User\.[A-Za-z_]+\.logging_demo\.Main\.Typ\] Warning:Hallo"
+        log . contains_line "\[User\.[A-Za-z_]+\.logging_demo\.Main\.Typ\] Severe:Hallo"
+        # `log_internal`: the qualified name of the type alone.
+        log . contains_line "\[[A-Za-z_]+\.logging_demo\.Main\.Typ\] Internal:Hallo"
+        log . not_contains_line "\[User\.[^\]]*\] Internal:Hallo"
 
     group_builder.specify "log level info via enso" <|
         pair = perform_logging enso_logging_prj ["--log-level", "info", "Ciao"]

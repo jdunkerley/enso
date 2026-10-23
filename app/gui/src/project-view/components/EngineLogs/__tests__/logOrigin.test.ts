@@ -2,6 +2,7 @@ import * as fs from 'node:fs'
 import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
+  DEFAULT_ORIGINS,
   ENGINE_LOGGER_ROOTS,
   filterRows,
   LineClassifier,
@@ -9,6 +10,7 @@ import {
   rowsFromLines,
   STD_BITS_PACKAGE_ROOTS,
   type LogRow,
+  type OriginFilter,
   type RowFilter,
 } from '../engineLogModel'
 
@@ -38,9 +40,19 @@ describe('logOrigin', () => {
   })
 
   test.each([
-    // The standard library's Enso modules, and a user's project.
+    // `log_message` logs under `User.` and the qualified type name.
+    'User.local.My_Project.Main.My_Type',
+    'User.Standard.Table.Table.Table',
+    'User',
+  ])('%s is a user log message', (name) => {
+    expect(logOrigin(name)).toBe('user')
+  })
+
+  test.each([
+    // The standard library's Enso modules (`log_internal`), and a project's other loggers.
     'Standard.Base.Logging.Progress',
     'Standard.Database.Connection',
+    'Standard.Table.In_Memory_Table.In_Memory_Table',
     'local.My_Project.Main.Report',
     // The std-bits helpers, under `org.enso` but the libraries'.
     'org.enso.table',
@@ -71,6 +83,9 @@ describe('logOrigin', () => {
     expect(logOrigin('akkadia.Thing')).toBe('library')
     expect(logOrigin('ensoUser.Main')).toBe('library')
     expect(logOrigin('engineer.Main')).toBe('library')
+    // `User` is a whole segment too.
+    expect(logOrigin('Users.Main')).toBe('library')
+    expect(logOrigin('UserData.Main')).toBe('library')
   })
 
   test('the two root lists do not shadow each other', () => {
@@ -118,6 +133,8 @@ describe('LineClassifier origin', () => {
       classifier.classify('  at org.enso.compiler.Compiler.run', 'file'),
       classifier.classify(entry('ERROR', 'Standard.Base.Data', 'oops'), 'file'),
       classifier.classify('  at Standard.Base.Data.read', 'file'),
+      classifier.classify(entry('INFO', 'User.local.My_Project.Main.Report', 'hello'), 'file'),
+      classifier.classify('  a second line of the message', 'file'),
       classifier.classify('Picked up JAVA_TOOL_OPTIONS', 'stderr'),
       classifier.classify('  after stderr, the last entry still holds', 'file'),
     ].map((line) => line.origin)
@@ -127,8 +144,10 @@ describe('LineClassifier origin', () => {
       'engine',
       'library',
       'library',
+      'user',
+      'user',
       'engine',
-      'library',
+      'user',
     ])
   })
 
@@ -142,54 +161,78 @@ describe('LineClassifier origin', () => {
 })
 
 describe('filterRows by origin', () => {
+  const ENGINE_INFO = entry('INFO', 'org.enso.languageserver.Boot', 'server started')
+  const LIBRARY_WARN = entry('WARN', 'Standard.Database.Connection', 'slow query')
+  const LIBRARY_ERROR = entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed')
+  const TRACE = '  at org.enso.database.JDBCProxy.run'
+  const ENGINE_ERROR = entry('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed')
+  const USER_INFO = entry('INFO', 'User.local.My_Project.Main.Report', 'query written')
   const rows: LogRow[] = [
     { kind: 'divider', key: 0, divider: 'restarted' },
     ...rowsFromLines([
-      entry('INFO', 'org.enso.languageserver.Boot', 'server started'),
-      entry('WARN', 'Standard.Database.Connection', 'slow query'),
-      entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed'),
-      '  at org.enso.database.JDBCProxy.run',
-      entry('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed'),
+      ENGINE_INFO,
+      LIBRARY_WARN,
+      LIBRARY_ERROR,
+      TRACE,
+      ENGINE_ERROR,
+      USER_INFO,
     ]).map((row) => ({ ...row, key: row.key + 10 })),
+    {
+      kind: 'line',
+      key: 50,
+      source: 'stderr',
+      text: 'boom',
+      level: 0,
+      entryStart: true,
+      origin: 'engine',
+    },
   ]
+  const ALL: OriginFilter = { engine: true, library: true, user: true }
   const texts = (filter: Partial<RowFilter>) =>
-    filterRows(rows, { level: 'info', text: '', origin: 'all', ...filter }).map((row) =>
+    filterRows(rows, { level: 'info', text: '', origins: ALL, ...filter }).map((row) =>
       row.kind === 'line' ? row.text : `--${row.divider}--`,
     )
 
-  test('All keeps every line', () => {
-    expect(texts({})).toHaveLength(6)
+  test('every origin shown keeps every line', () => {
+    expect(texts({})).toHaveLength(8)
   })
 
-  test('Libraries and Engine keep their own lines, and every divider', () => {
-    expect(texts({ origin: 'library' })).toEqual([
+  test('by default the engine, and its stderr, are hidden', () => {
+    expect(texts({ origins: DEFAULT_ORIGINS })).toEqual([
       '--restarted--',
-      entry('WARN', 'Standard.Database.Connection', 'slow query'),
-      entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed'),
-      '  at org.enso.database.JDBCProxy.run',
+      LIBRARY_WARN,
+      LIBRARY_ERROR,
+      TRACE,
+      USER_INFO,
     ])
-    expect(texts({ origin: 'engine' })).toEqual([
+  })
+
+  test('each origin keeps its own lines, and every divider', () => {
+    const only = (origin: keyof OriginFilter) =>
+      texts({ origins: { engine: false, library: false, user: false, [origin]: true } })
+    expect(only('engine')).toEqual(['--restarted--', ENGINE_INFO, ENGINE_ERROR, 'boom'])
+    expect(only('library')).toEqual(['--restarted--', LIBRARY_WARN, LIBRARY_ERROR, TRACE])
+    expect(only('user')).toEqual(['--restarted--', USER_INFO])
+    expect(texts({ origins: { engine: false, library: false, user: false } })).toEqual([
       '--restarted--',
-      entry('INFO', 'org.enso.languageserver.Boot', 'server started'),
-      entry('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed'),
     ])
   })
 
   test('combines with the level and the text', () => {
-    expect(texts({ origin: 'library', level: 'error' })).toEqual([
+    expect(texts({ origins: DEFAULT_ORIGINS, level: 'error' })).toEqual([
       '--restarted--',
-      entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed'),
-      '  at org.enso.database.JDBCProxy.run',
+      LIBRARY_ERROR,
+      TRACE,
     ])
-    expect(texts({ origin: 'engine', level: 'error', text: 'CONTEXT' })).toEqual([
+    expect(texts({ level: 'error', text: 'CONTEXT' })).toEqual(['--restarted--', ENGINE_ERROR])
+    expect(texts({ origins: DEFAULT_ORIGINS, text: 'query' })).toEqual([
       '--restarted--',
-      entry('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed'),
+      LIBRARY_WARN,
+      LIBRARY_ERROR,
+      USER_INFO,
     ])
-    expect(texts({ origin: 'engine', text: 'query' })).toEqual(['--restarted--'])
-    expect(texts({ origin: 'all', level: 'warn', text: 'query' })).toEqual([
-      '--restarted--',
-      entry('WARN', 'Standard.Database.Connection', 'slow query'),
-      entry('ERROR', 'org.enso.database.JDBCProxy', 'query failed'),
-    ])
+    expect(
+      texts({ origins: { engine: true, library: false, user: false }, text: 'query' }),
+    ).toEqual(['--restarted--'])
   })
 })

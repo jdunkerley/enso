@@ -7,7 +7,7 @@ import { DOCK_TABS, type DockTab } from './dockTab'
 
 const tab = defineModel<DockTab>('tab', { required: true })
 const { logsBadge = 0, idBase = useId() } = defineProps<{
-  /** ERROR and stderr lines the Logs tab has not shown yet. */
+  /** ERROR entries of the log the Logs tab has not shown yet (stderr is not counted). */
   logsBadge?: number
   /** Prefix of the element ids that link each tab to its panel (`<idBase>-tab-code`, `<idBase>-panel-code`). */
   idBase?: string

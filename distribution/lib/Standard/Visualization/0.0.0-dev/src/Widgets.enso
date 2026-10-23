@@ -24,7 +24,7 @@ get_widget_json value call_name argument_names uuids="{}" = time_visualization W
             _ -> Nothing
 
     log_panic argument err =
-        Widget.log_message "Failed for "+argument+": "+err.payload.to_display_text ..Warning
+        Widget.log_internal "Failed for "+argument+": "+err.payload.to_display_text ..Warning
         Nothing
 
     # We need to clear the warnings, otherwise the Not_Invokable panic will not have the cause

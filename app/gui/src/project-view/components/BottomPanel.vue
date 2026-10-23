@@ -18,7 +18,7 @@ defineOptions({
 })
 
 const { logsBadge = 0 } = defineProps<{
-  /** ERROR and stderr lines the Logs tab has not shown yet. */
+  /** ERROR entries of the log the Logs tab has not shown yet (stderr is not counted). */
   logsBadge?: number
 }>()
 defineSlots<{ code(): unknown; logs(): unknown }>()

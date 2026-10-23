@@ -9,9 +9,11 @@ async function box(locator: Locator) {
 }
 
 const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Language server started'
-const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [org.enso.interpreter] Something failed'
+// A library's ERROR: shown by default (Libraries is ticked), and counted by the badge.
+const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [Standard.Base.Data] Something failed'
 const STDERR = 'Exception in thread "main" java.lang.IllegalStateException'
 const LIBRARY = '[WARN] [2026-10-20T10:00:01.500Z] [Standard.Database.Connection] Slow query'
+const USER = '[INFO] [2026-10-20T10:00:01.700Z] [User.local.Mock.Main.Report] Report written'
 
 test.use({
   setupApi: {
@@ -24,6 +26,7 @@ test.use({
       api.addEngineLogLine(INFO)
       api.addEngineLogLine(ERROR)
       api.addEngineLogLine(LIBRARY)
+      api.addEngineLogLine(USER)
       api.addEngineLogLine(STDERR, 'stderr')
     },
   },
@@ -38,8 +41,11 @@ test('the Logs tab follows the engine log and filters by level', async ({
     const dock = locate.bottomDock(page)
     await expect(dock.getByRole('tab', { name: /Logs/ })).toHaveAttribute('aria-selected', 'true')
     const log = dock.getByRole('log')
-    await expect(log.getByText('Language server started')).toBeVisible()
+    // The engine's lines, its stderr among them, show once Engine is ticked.
     await expect(log.getByText('Something failed')).toBeVisible()
+    await expect(log.getByText('Language server started')).toBeHidden()
+    await dock.getByRole('checkbox', { name: 'Engine' }).check()
+    await expect(log.getByText('Language server started')).toBeVisible()
     await expect(log.getByText(STDERR)).toBeVisible()
 
     // A line written later arrives without reopening anything.
@@ -59,27 +65,35 @@ test('the Logs tab follows the engine log and filters by level', async ({
   })
 })
 
-test('the Logs tab filters by source: the libraries or the engine', async ({ editorPage }) => {
+test('the Logs tab filters by source: engine, libraries, user log messages', async ({
+  editorPage,
+}) => {
   await editorPage.do(async (page) => {
     await page.keyboard.press('ControlOrMeta+L')
     const dock = locate.bottomDock(page)
     const log = dock.getByRole('log')
+    const engine = dock.getByRole('checkbox', { name: 'Engine' })
+    const libraries = dock.getByRole('checkbox', { name: 'Libraries' })
+    const user = dock.getByRole('checkbox', { name: 'User log messages' })
+    // By default: the libraries and the user's messages, not the engine or its stderr.
+    await expect(engine).not.toBeChecked()
+    await expect(libraries).toBeChecked()
+    await expect(user).toBeChecked()
     await expect(log.getByText('Slow query')).toBeVisible()
-    await expect(log.getByText('Language server started')).toBeVisible()
-    const source = dock.getByRole('combobox', { name: 'Source' })
-    await expect(source).toHaveValue('all')
-
-    await source.selectOption('library')
-    await expect(log.getByText('Slow query')).toBeVisible()
+    await expect(log.getByText('Report written')).toBeVisible()
     await expect(log.getByText('Language server started')).toBeHidden()
-    await expect(log.getByText('Something failed')).toBeHidden()
     await expect(log.getByText(STDERR)).toBeHidden()
 
-    await source.selectOption('engine')
-    await expect(log.getByText('Slow query')).toBeHidden()
+    await user.uncheck()
+    await expect(log.getByText('Report written')).toBeHidden()
+    await expect(log.getByText('Slow query')).toBeVisible()
+
+    await engine.check()
+    await libraries.uncheck()
     await expect(log.getByText('Language server started')).toBeVisible()
-    await expect(log.getByText('Something failed')).toBeVisible()
     await expect(log.getByText(STDERR)).toBeVisible()
+    await expect(log.getByText('Slow query')).toBeHidden()
+    await expect(log.getByText('Something failed')).toBeHidden()
   })
 })
 
@@ -89,8 +103,8 @@ test('the Logs tab counts unseen errors while the Code tab shows', async ({ edit
     const dock = locate.bottomDock(page)
     await expect(dock.getByRole('tab', { name: 'Code' })).toHaveAttribute('aria-selected', 'true')
     const logsTab = dock.getByRole('tab', { name: /Logs/ })
-    // The ERROR entry and the stderr line.
-    await expect(logsTab.getByTestId('logs-badge')).toHaveText('2')
+    // The ERROR entry; the stderr line is not counted.
+    await expect(logsTab.getByTestId('logs-badge')).toHaveText('1')
     await logsTab.click()
     await expect(logsTab.getByTestId('logs-badge')).toBeHidden()
   })
@@ -132,10 +146,10 @@ test('while the dock is closed, a Code and a Logs button open it on their tab', 
     const codeButton = buttons.getByTestId('action:graph.toggleCodeEditor')
     const logsButton = buttons.getByTestId('action:graph.toggleLogs')
     await expect(codeButton).toHaveAccessibleName(/^Code Editor \(.+`\)$/)
-    // The ERROR entry and the stderr line have not been seen.
+    // The ERROR entry has not been seen (stderr is not counted).
     await expect(buttons.getByTestId('logs-error-dot')).toBeVisible()
     // The dot is decorative; the count is in the button's name.
-    await expect(logsButton).toHaveAccessibleName(/^Engine Logs, 2 new errors \(.+L\)$/)
+    await expect(logsButton).toHaveAccessibleName(/^Engine Logs, 1 new error \(.+L\)$/)
     // Side by side in a row, Code first.
     const codeBox = await box(codeButton)
     const logsBox = await box(logsButton)

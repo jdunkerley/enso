@@ -8,14 +8,18 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 - `engineLogModel.ts` — framework-free rows built from the stream's events.
   - Level rules: stderr is ERROR; a line that starts no entry takes its entry's
     level.
-  - Origin (the Source filter, #285): `logOrigin` classifies an entry's logger
-    name as `engine` (`ENGINE_LOGGER_ROOTS`: `org.enso`, the Truffle language
-    and instrument ids that Truffle prefixes to its loggers' names, `akka`,
-    `org.graalvm`, …) or `library` (everything else, on purpose), matching whole
-    name segments. The std-bits package roots (`STD_BITS_PACKAGE_ROOTS`) are
+  - Origin (the source tickboxes, #285): `logOrigin` classifies an entry's
+    logger name, by whole name segments, as `user` (under `User`: Enso's
+    `log_message` logs under `User.<qualified type name>`; the libraries use
+    `log_internal`, under the type name alone), `engine` (`ENGINE_LOGGER_ROOTS`:
+    `org.enso`, the Truffle language and instrument ids that Truffle prefixes to
+    its loggers' names, `akka`, `org.graalvm`, …) or `library` (everything else,
+    on purpose). The std-bits package roots (`STD_BITS_PACKAGE_ROOTS`) are
     libraries though under `org.enso`; `__tests__/logOrigin.test.ts` reads
     `std-bits/*/src/main/java/org/enso/*` and fails when one is missing. stderr
     is the engine's; a continuation line takes its entry's origin.
+  - The error badge (`unseenErrors`) counts ERROR entries of the log file,
+    whatever their origin and the filters; stderr lines are not counted.
   - Dividers: `restarted` at a new engine's `waiting` (not at `session`, which
     also fires for the first session), `skipped` after a gap or on a new
     channel, `truncated` above capped lines.
@@ -31,8 +35,8 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 - `engineLogHistory.ts` — `fetchSessionLines`: a whole session through the
   existing session-log query (no history API of its own).
 - `EngineLogPanel.vue` — the tab's content:
-  - level, source (All / Libraries / Engine), text and session filters; the
-    error badge counts every error whatever the filters;
+  - level, source (Engine, off by default; Libraries; User log messages), text
+    and session filters;
   - "Show in folder" (Electron only; it reveals the current session's file,
     whose folder holds every session);
   - the waiting and ended notices, and Jump to latest;

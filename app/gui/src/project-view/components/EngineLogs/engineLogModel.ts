@@ -39,7 +39,7 @@ export interface LogLine {
   readonly level: number
   /** Whether the line starts a log entry (rather than continuing one, as a stack trace does). */
   readonly entryStart: boolean
-  /** Who wrote the line: the engine itself or a library (see {@link logOrigin}). */
+  /** Who wrote the line: the engine, a library or the user's own code (see {@link logOrigin}). */
   readonly origin: LogOrigin
 }
 
@@ -62,11 +62,26 @@ const MAX_LEVEL: Readonly<Record<LevelFilter, number>> = {
   info: INFO_LEVEL,
 }
 
-/** Who wrote a line: the engine itself, or a library (the standard library, a user's project). */
-export type LogOrigin = 'engine' | 'library'
+/**
+ * Who wrote a line:
+ * - `user` — the user's own log messages (`log_message`, which logs under `User.<type name>`);
+ * - `library` — the libraries: the standard library, user projects' libraries, their Java;
+ * - `engine` — the engine itself, and its stderr.
+ */
+export type LogOrigin = 'engine' | 'library' | 'user'
 
-/** The origin filter: every line, or only the libraries' or the engine's. */
-export type OriginFilter = 'all' | LogOrigin
+/** Which origins the Logs tab shows. */
+export type OriginFilter = Readonly<Record<LogOrigin, boolean>>
+
+/** The origins shown at first: everything but the engine's internals. */
+export const DEFAULT_ORIGINS: OriginFilter = { engine: false, library: true, user: true }
+
+/**
+ * The first segment of the logger name `log_message` logs under (`User.<qualified type name>`,
+ * `distribution/lib/Standard/Base/0.0.0-dev/src/Logging.enso`). The libraries log with
+ * `log_internal`, under the type name alone.
+ */
+export const USER_LOGGER_ROOT = 'User'
 
 /**
  * The logger names the engine itself logs under. A name is the engine's when it is one of these or
@@ -125,8 +140,9 @@ function underRoot(name: string, root: string): boolean {
 }
 
 /**
- * Who wrote an entry, from its logger name: the engine for a name under {@link ENGINE_LOGGER_ROOTS}
- * and not under {@link STD_BITS_PACKAGE_ROOTS}; a library for anything else.
+ * Who wrote an entry, from its logger name: the user for a name under {@link USER_LOGGER_ROOT}; the
+ * engine for a name under {@link ENGINE_LOGGER_ROOTS} and not under {@link STD_BITS_PACKAGE_ROOTS};
+ * a library for anything else.
  *
  * The default is Library on purpose. The engine's names are few and known; the libraries' are open:
  * Enso modules (`Standard.*`, every user project and library), the std-bits helpers, and whatever
@@ -135,6 +151,7 @@ function underRoot(name: string, root: string): boolean {
  * user's own logs from hiding under Engine.
  */
 export function logOrigin(loggerName: string): LogOrigin {
+  if (underRoot(loggerName, USER_LOGGER_ROOT)) return 'user'
   if (STD_BITS_PACKAGE_ROOTS.some((root) => underRoot(loggerName, root))) return 'library'
   return ENGINE_LOGGER_ROOTS.some((root) => underRoot(loggerName, root)) ? 'engine' : 'library'
 }
@@ -202,25 +219,25 @@ export function rowsFromLines(lines: readonly string[]): LogRow[] {
 export interface RowFilter {
   readonly level: LevelFilter
   readonly text: string
-  readonly origin: OriginFilter
+  readonly origins: OriginFilter
 }
 
 /**
- * The rows a filter shows: every divider, and the lines of the origin, at or above the level, that
- * contain the text.
+ * The rows a filter shows: every divider, and the lines of a shown origin, at or above the level,
+ * that contain the text.
  */
 export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
-  const origin = filter.origin
-  if (needle === '' && origin === 'all') {
+  const origins = filter.origins
+  if (needle === '' && origins.engine && origins.library && origins.user) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
     (row) =>
       row.kind === 'divider' ||
       (row.level <= maxLevel &&
-        (origin === 'all' || row.origin === origin) &&
+        origins[row.origin] &&
         (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
@@ -234,7 +251,7 @@ export class EngineLogModel {
   /** The current session, as `listProjectSessions` names it; `null` while it has no file. */
   sessionId: string | null = null
   logFile: string | null = null
-  /** ERROR entries and stderr lines not yet seen. */
+  /** ERROR entries of the log file not yet seen, whatever their origin; stderr is not counted. */
   unseenErrors = 0
 
   private pending: LogRow[] = []
@@ -302,7 +319,7 @@ export class EngineLogModel {
       entryStart,
       origin,
     })
-    if (entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
+    if (data.source === 'file' && entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }
 
   /** An engine started; a restart when one ran before. */
