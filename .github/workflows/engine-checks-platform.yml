@@ -456,6 +456,10 @@ jobs:
           exit 1
         env:
           ID: ${{ job.services.sqlserver.id }}
+      # TEMPORARY (PR 3j): CPU samples, to explain the Linux slowdown of the new jobs.
+      - if: runner.os == 'Linux'
+        name: Sample CPU
+        run: nohup bash -c 'while sleep 45; do date -u +%T; top -b -n1 -w 250 -o %CPU | sed -n "1,5p;7,16p"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
       - name: Run the Standard Library tests
         run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }}
         env:
@@ -474,6 +478,10 @@ jobs:
           ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
           ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
           ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
+      # TEMPORARY (PR 3j): CPU samples.
+      - if: always() && runner.os == 'Linux'
+        name: Show CPU samples
+        run: cat "$RUNNER_TEMP/cpu.log" || true
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
@@ -625,12 +633,20 @@ jobs:
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      # TEMPORARY (PR 3j): CPU samples, to explain the Linux slowdown of the new jobs.
+      - if: runner.os == 'Linux'
+        name: Sample CPU
+        run: nohup bash -c 'while sleep 45; do date -u +%T; top -b -n1 -w 250 -o %CPU | sed -n "1,5p;7,16p"; done' > "$RUNNER_TEMP/cpu.log" 2>&1 &
       - run: ./run backend test ${{ matrix.suite }}
         env:
           ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
           ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
           ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # TEMPORARY (PR 3j): CPU samples.
+      - if: always() && runner.os == 'Linux'
+        name: Show CPU samples
+        run: cat "$RUNNER_TEMP/cpu.log" || true
       - if: success() || failure()
         name: Upload JUnit results
         uses: actions/upload-artifact@v5
