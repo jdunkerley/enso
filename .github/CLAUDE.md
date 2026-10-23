@@ -109,7 +109,7 @@ the build job's outputs (Note [Lint Reads The Distribution's Version] in
 | `engine-checks-platform.yml` › stdlib tests              | `./run backend test …`                                       | Yes: Phase 3 (`stdlib-test`)  |
 | `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                  | No                            |
 | `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`         | No: `setup-jvm`, `setup-msvc` |
-| `ide-packaging.yml` › Package New IDE                    | `./run ide build`                                            | Yes: Phase 3 (version)        |
+| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`         | No: `setup-build-scripts`     |
 | release, promote, nightly, nightly checks, macOS         | various                                                      | Yes: Phase 4                  |
 
 ## Checking a change

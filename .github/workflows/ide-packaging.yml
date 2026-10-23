@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
 env:
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
   # Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required == true }}"
 
@@ -26,35 +25,15 @@ env:
 # ============================================================
 # A job that needs a matrix job needs every leg of it, and sees one result for all of them. By
 # default a Windows backend that fails would therefore skip the Linux packaging too. So:
-# - `package-ide` runs unless the run is cancelled or `build-script` or `gui-build` failed. A failed
-#   backend leaves the other platform's packaging running; the failed platform's own packaging leg
-#   then fails at "Download backend".
-# - A failed `build-script` or `gui-build` skips its dependents (both platforms), rather than
-#   letting them run and fail at their download steps, which would show one root failure as
-#   several red jobs.
+# - `package-ide` runs unless the run is cancelled or `gui-build` failed. A failed backend leaves
+#   the other platform's packaging running; the failed platform's own packaging leg then fails at
+#   "Download backend".
+# - A failed `gui-build` skips its dependents (both platforms), rather than letting them run and
+#   fail at their download steps, which would show one root failure as several red jobs.
 # The Linux legs wait for the slower Windows ones, which does not lengthen the run: the Windows legs
 # are its longest path.
 
 jobs:
-  build-script:
-    name: Build Script (${{ matrix.os }}, amd64)
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: linux
-            runner: ubuntu-latest
-          - os: windows
-            runner: windows-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Compile the build script
-        uses: ./.github/actions/build-script
-
   # Note [Engine Bundle Without ./run]
   # ==================================
   # `./run backend get` is the sbt task `buildEngineBundle` (project/EngineBundle.scala): the engine
@@ -191,11 +170,15 @@ jobs:
             app/ydoc-shared/src/ast/generated
           retention-days: 1
 
+  # `tools/build-scripts`' `ide-build` packages the IDE as `./run ide build --backend-source local
+  # --gui-source local` did: the version, `pnpm install`, then `build:ide` and `dist:ide` with the
+  # variables electron-builder reads, and without the empty code-signing variables (a fork has no
+  # certificate). electron-builder writes the installer's `.sha256` itself.
   package-ide:
     name: Package New IDE (${{ matrix.os }}, amd64)
-    needs: [build-script, build-backend, gui-build]
+    needs: [build-backend, gui-build]
     # See Note [Platform Legs Run Despite The Other Platform's Failure].
-    if: ${{ !cancelled() && needs.build-script.result == 'success' && needs.gui-build.result == 'success' }}
+    if: ${{ !cancelled() && needs.gui-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -213,10 +196,11 @@ jobs:
         with:
           clean: false
           fetch-depth: 2
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
       - name: Download backend
         uses: actions/download-artifact@v5
         with:
@@ -236,7 +220,8 @@ jobs:
           name: wasm-artifacts
           path: app
       - if: matrix.os == 'linux'
-        run: ./run ide build --backend-source local --gui-source local --gui-upload-artifact false
+        name: Package the IDE
+        run: corepack pnpm --filter build-scripts run ide-build
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
@@ -244,7 +229,8 @@ jobs:
           ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: matrix.os == 'windows'
-        run: ./run ide build --backend-source local --gui-source local --gui-upload-artifact false
+        name: Package the IDE
+        run: corepack pnpm --filter build-scripts run ide-build
         env:
           ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
           ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}

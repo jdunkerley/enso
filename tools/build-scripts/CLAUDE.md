@@ -23,6 +23,12 @@ that Node runs as it is (type stripping): each command is
   against the committed ones; the first that differs fails, with `./run`'s
   message. CI passes the build job's `ENSO_VERSION`; locally the only package in
   `built-distribution/` is used.
+- `ide-build` — what `./run ide build --backend-source local --gui-source local`
+  did: from `dist/gui` and `dist/backend`, `pnpm install`, then `build:ide` and
+  `dist:ide` with the variables electron-builder reads (and without the empty
+  code-signing ones), into `dist/ide`. `--sign` signs (release only). Locally:
+  build the GUI into `dist/gui`, the bundle with `sbt buildEngineBundle` and
+  copy `built-distribution/engine-bundle-*/enso` to `dist/backend` first.
 
 ## Layout
 
