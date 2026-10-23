@@ -1,5 +1,14 @@
 import sbt._
-import sbt.internal.util.ManagedLogger
+
+import java.nio.file.{
+  FileVisitResult,
+  Files,
+  LinkOption,
+  Path,
+  SimpleFileVisitor,
+  StandardCopyOption
+}
+import java.nio.file.attribute.BasicFileAttributes
 
 /** The engine bundle that the IDE ships: the engine package, a small JDK to run it with, and an
   * empty `.enso.bundle` marker, laid out as `./run backend get` laid it out
@@ -37,26 +46,49 @@ object EngineBundle {
     smallJdk: File,
     ensoVersion: String,
     runtimeDir: String,
-    log: ManagedLogger
+    log: Logger
   ): File = {
     IO.delete(bundleRoot)
     IO.createDirectory(bundleRoot)
-    IO.copyDirectory(
-      enginePackage,
-      bundleRoot / "dist" / ensoVersion,
-      overwrite            = true,
-      preserveLastModified = true,
-      preserveExecutable   = true
-    )
-    IO.copyDirectory(
-      smallJdk,
-      bundleRoot / "runtime" / runtimeDir,
-      overwrite            = true,
-      preserveLastModified = true,
-      preserveExecutable   = true
-    )
+    copyTree(enginePackage, bundleRoot / "dist" / ensoVersion)
+    copyTree(smallJdk, bundleRoot / "runtime" / runtimeDir)
     IO.touch(bundleRoot / ".enso.bundle")
     log.info(s"Engine bundle created at $bundleRoot.")
     bundleRoot
+  }
+
+  /** Copies the tree at `source` to `target` as `./run`'s `mirror_directory` did: symbolic links
+    * stay links (jlink's `legal/<module>/LICENSE` and friends point at `../java.base/...`), and files
+    * keep their permissions and modification times. sbt's `IO.copyDirectory` follows links, so it
+    * would turn each into a copy of its target.
+    */
+  private def copyTree(source: File, target: File): Unit = {
+    val from = source.toPath
+    val to   = target.toPath
+    Files.walkFileTree(
+      from,
+      new SimpleFileVisitor[Path] {
+        override def preVisitDirectory(
+          dir: Path,
+          attrs: BasicFileAttributes
+        ): FileVisitResult = {
+          Files.createDirectories(to.resolve(from.relativize(dir)))
+          FileVisitResult.CONTINUE
+        }
+
+        override def visitFile(
+          file: Path,
+          attrs: BasicFileAttributes
+        ): FileVisitResult = {
+          Files.copy(
+            file,
+            to.resolve(from.relativize(file)),
+            StandardCopyOption.COPY_ATTRIBUTES,
+            LinkOption.NOFOLLOW_LINKS
+          )
+          FileVisitResult.CONTINUE
+        }
+      }
+    )
   }
 }
