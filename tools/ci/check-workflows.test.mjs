@@ -8,6 +8,7 @@ import { after, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
   buildScriptsSbtCommands,
+  buildScriptsSbtEntries,
   callsSbt,
   checkBuildScriptsSpawnSbtThroughHelper,
   checkIdePackagingNeedsNoCloudAccount,
@@ -577,7 +578,8 @@ describe('tools/build-scripts commands that start sbt', () => {
     'tools/build-scripts/src/stdlib-test/services.ts':
       "import { spawnSbt } from '../lib/sbt.ts'\nexport const startHttpbin = () => spawnSbt([])\n",
     'tools/build-scripts/src/lib/sbt.ts':
-      "import { spawn } from 'node:child_process'\nexport const spawnSbt = (a) => spawn('sbt', a)\n",
+      "import { spawn } from 'node:child_process'\nimport { invocation } from './repo.ts'\n" +
+      "export const spawnSbt = (a) => spawn('sbt', a)\nexport const how = (a) => invocation('sbt', a)\n",
     'tools/build-scripts/src/commands/version.ts': "import { x } from '../version/version.ts'\n",
     'tools/build-scripts/src/version/version.ts': 'export const x = 1\n',
   }
@@ -617,8 +619,52 @@ ${before}      - name: Tests
       'tools/build-scripts/src/version/version.ts: starts sbt itself; use `src/lib/sbt.ts`, so the workflow policy sees it',
     ])
   })
+  test("only src/lib/sbt.ts may start sbt through repo.ts' invocation", () => {
+    const rogue = {
+      ...PACKAGE,
+      'tools/build-scripts/src/version/version.ts':
+        "import { invocation } from '../lib/repo.ts'\nexport const how = invocation('sbt', ['about'])\n",
+    }
+    assert.deepEqual(checkBuildScriptsSpawnSbtThroughHelper(fixture({}, rogue)), [
+      'tools/build-scripts/src/version/version.ts: starts sbt itself; use `src/lib/sbt.ts`, so the workflow policy sees it',
+    ])
+    const unitTest = {
+      ...PACKAGE,
+      'tools/build-scripts/src/lib/repo.test.ts':
+        "import { invocation } from './repo.ts'\ninvocation('sbt', ['about'])\n",
+    }
+    assert.deepEqual(checkBuildScriptsSpawnSbtThroughHelper(fixture({}, unitTest)), [])
+  })
+  test('an entry point run with plain node starts sbt when it reaches src/lib/sbt.ts', () => {
+    const entries = buildScriptsSbtEntries(fixture({}, PACKAGE).buildScripts)
+    assert.equal(entries.has('src/commands/stdlib-test.ts'), true)
+    assert.equal(entries.has('src/commands/version.ts'), false)
+    const node = 'node tools/build-scripts/src/commands/stdlib-test.ts standard-library'
+    assert.equal(callsSbt(node, new Set(), entries), true)
+    assert.equal(callsSbt(`node --no-warnings ./${node}`, new Set(), entries), true)
+    assert.equal(callsSbt('node tools/build-scripts/src/commands/version.ts', new Set(), entries), false)
+  })
+  test('rejects such a node step with no setup-jvm before it, accepts it after', () => {
+    const plain = (before) => `
+on: push
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+${before}      - name: Tests
+        run: node tools/build-scripts/src/commands/stdlib-test.ts standard-library
+      - name: Version
+        run: node tools/build-scripts/src/commands/version.ts
+`
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(fixture({ 'workflows/a.yml': plain('') }, PACKAGE)), [
+      'a.yml › j: `Tests` runs sbt before `./.github/actions/setup-jvm`',
+    ])
+    const setup = '      - uses: ./.github/actions/setup-jvm\n        with: { cache-key: a }\n'
+    assert.deepEqual(checkSbtRunsAfterSetupJvm(fixture({ 'workflows/a.yml': plain(setup) }, PACKAGE)), [])
+  })
   test('a repository without the package has no such commands', () => {
     assert.deepEqual([...buildScriptsSbtCommands(fixture({}).buildScripts)], [])
+    assert.deepEqual([...buildScriptsSbtEntries(fixture({}).buildScripts)], [])
   })
 })
 

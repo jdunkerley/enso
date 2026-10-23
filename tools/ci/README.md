@@ -19,12 +19,15 @@ the self-hosted Mac, `macos-checks.yml` runs only what is requested, IDE
 packaging needs no cloud account, Windows packaging smoke-tests the installer,
 the toolchain pins in `build-config.yaml` equal the build's own copies, no job
 runs sbt before `setup-jvm`, and in `tools/build-scripts` only `src/lib/sbt.ts`
-starts sbt. "Runs sbt" covers wrappers (`timeout`, `env`, `xvfb-run`, `cmd /c`,
-…), `bash -c`/`pwsh -Command` scripts, local composite actions, and any
-`tools/build-scripts` command whose entry point imports `src/lib/sbt.ts`. It
-prints one line per violation and exits 1 if there is any. The wrappers are a closed list, so
-some shapes go unseen: sbt behind a variable used as the command (`$SBT_CALL compile`), a line
-continuation after an assignment or wrapper, `xargs sbt`, and `/usr/bin/env sbt`:
+starts sbt (its unit tests aside). "Runs sbt" covers wrappers (`timeout`, `env`,
+`xvfb-run`, `cmd /c`, …), `bash -c`/`pwsh -Command` scripts, local composite
+actions, and any `tools/build-scripts` command whose entry point imports
+`src/lib/sbt.ts`, whether run as a package script or with plain node
+(`node tools/build-scripts/src/commands/<x>.ts`). It prints one line per
+violation and exits 1 if there is any. The wrappers are a closed list, so some
+shapes go unseen: sbt behind a variable used as the command
+(`$SBT_CALL compile`), a line continuation after an assignment or wrapper,
+`xargs sbt`, and `/usr/bin/env sbt`:
 
 ```bash
 node tools/ci/check-workflows.mjs [repo-root]
