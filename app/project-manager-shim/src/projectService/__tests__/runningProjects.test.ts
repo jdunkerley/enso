@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path } from '../types.js'
+import { RUNNING_PROJECTS_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
@@ -54,7 +55,7 @@ async function fakeEnso(directory: string): Promise<Path> {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'running-projects-'))
-  runner = new EnsoRunner(await fakeEnso(root))
+  runner = new EnsoRunner(await fakeEnso(root), { firstPort: RUNNING_PROJECTS_PORT })
 })
 
 afterEach(async () => {

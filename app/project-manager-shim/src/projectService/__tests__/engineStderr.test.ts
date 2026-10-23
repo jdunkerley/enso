@@ -11,6 +11,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner, type EngineLogSink } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { ENGINE_STDERR_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
@@ -71,7 +72,7 @@ function recordingSink() {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'engine-stderr-'))
-  runner = new EnsoRunner(await fakeEnso(root))
+  runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_STDERR_PORT })
 })
 
 afterEach(async () => {

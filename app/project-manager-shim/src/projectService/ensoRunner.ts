@@ -135,6 +135,8 @@ class OpenedProject {
   loaded: Promise<void>
   shutdownHooks: Map<ShutdownHookType, () => void | Promise<void>> = new Map()
   private closed = false
+  /** Whether an engine has passed its health check: until then, an exit fails the open. */
+  private started = false
   private nextWatchdogCheck: ReturnType<typeof setTimeout> | undefined
   private readonly watcher: WatchedChildProcess
   private loadedDeferred: Deferred<void> = createDeferred()
@@ -144,6 +146,7 @@ class OpenedProject {
     public sockets: LanguageServerSockets,
     spawner: () => Promise<childProcess.ChildProcess>,
     private readonly logSink: EngineLogSink | undefined,
+    private readonly startupTimeoutMs: number,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
@@ -165,13 +168,14 @@ class OpenedProject {
     jsonPort: number,
     ydocPort: number,
     spawner: () => Promise<childProcess.ChildProcess>,
-    logSink?: EngineLogSink,
+    logSink: EngineLogSink | undefined,
+    startupTimeoutMs: number,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
       ydocSocket: { host: '127.0.0.1', port: ydocPort },
     }
-    const project = new OpenedProject(path, sockets, spawner, logSink)
+    const project = new OpenedProject(path, sockets, spawner, logSink, startupTimeoutMs)
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
     return project
@@ -224,10 +228,16 @@ class OpenedProject {
     const handle = this.watcher.current
     let resolved = false
 
+    // Over once this attempt has an answer, or its engine is gone: a health check of the port after
+    // that could be answered by another engine, and must not count as this one starting.
+    const over = () => this.closed || resolved || !handle?.alive || this.watcher.current !== handle
     const healthCheck = async () => {
-      if (this.closed || resolved) return
-      if (await this.checkServerHealth()) {
+      if (over()) return
+      const healthy = await this.checkServerHealth()
+      if (over()) return
+      if (healthy) {
         resolved = true
+        this.started = true
         this.startWatchdog()
         deferred.resolve()
         return
@@ -243,11 +253,12 @@ class OpenedProject {
     if (!isDebugMode) {
       setTimeout(() => {
         if (resolved || this.closed) return
-        // SIGKILL the *specific* child this routine was waiting on. The watcher's
-        // onUnexpectedExit decides whether to respawn (which it does by default).
+        resolved = true
+        // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
+        // whether to respawn: not while the project is still opening, by default after.
         handle?.child.kill('SIGKILL')
         deferred.reject(new Error('Language server startup timeout'))
-      }, LANGUAGE_SERVER_STARTUP_TIMEOUT)
+      }, this.startupTimeoutMs)
     }
   }
 
@@ -258,6 +269,13 @@ class OpenedProject {
       return false
     }
     this.loadedDeferred.reject(new Error(reason))
+    if (!this.started) {
+      // The open has failed, and is not retried: nothing could close an engine started now. Nor
+      // is anything else of this project's ever started again.
+      this.closed = true
+      console.error(`Language Server for project ${this.path} exited while starting (${reason}).`)
+      return false
+    }
     if (info.exceedsCrashLimit) {
       console.error(
         `Language Server for project ${this.path} crashed ${LANGUAGE_SERVER_CRASH_LOOP_MAX} times within ${LANGUAGE_SERVER_CRASH_LOOP_WINDOW_MS}ms (${reason}); auto-respawn suspended.`,
@@ -344,8 +362,18 @@ export class EnsoRunner implements Runner {
   /** The `--run` processes that have not exited yet. */
   private activeRuns = 0
 
-  /** Creates a new EnsoRunner with the path to the Enso executable. */
-  constructor(private ensoPath: Path) {}
+  /**
+   * Creates a new EnsoRunner with the path to the Enso executable. `firstPort` is where the search
+   * for an engine's free ports starts; `startupTimeoutMs` is how long an engine has to pass its
+   * first health check before it is killed.
+   */
+  constructor(
+    private ensoPath: Path,
+    private readonly options: {
+      readonly firstPort?: number
+      readonly startupTimeoutMs?: number
+    } = {},
+  ) {}
 
   private resolveCommandAndArgs(args: readonly string[]): [string, readonly string[]] {
     const [cmd, cmdArgs] =
@@ -455,9 +483,13 @@ export class EnsoRunner implements Runner {
 
     // Finding server ports is not reliable if another project is opening.
     while (this.loadingProjects.size > 0) {
-      await this.loadingProjects.values().next().value
+      // Only waited for: that open's failure is its own caller's.
+      await this.loadingProjects
+        .values()
+        .next()
+        .value?.catch(() => undefined)
     }
-    const openedProject = this.findServerPorts(DEFAULT_JSONRPC_PORT).then(
+    const openedProject = this.findServerPorts(this.options.firstPort ?? DEFAULT_JSONRPC_PORT).then(
       async ([jsonPort, ydocPort]) => {
         const rootId = crypto.randomUUID()
         const args: readonly string[] = [
@@ -497,6 +529,7 @@ export class EnsoRunner implements Runner {
               }),
             ),
           logSink,
+          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT,
         )
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)
@@ -507,19 +540,21 @@ export class EnsoRunner implements Runner {
     )
 
     this.loadingProjects.set(projectPath, openedProject)
-    openedProject.then((project) => {
-      this.runningProjects.set(projectPath, project)
-    })
-    openedProject.finally(() => {
-      this.loadingProjects.delete(projectPath)
-    })
+    // The caller gets the failure, from the promise returned below.
+    void openedProject
+      .then(
+        (project) => void this.runningProjects.set(projectPath, project),
+        () => undefined,
+      )
+      .finally(() => this.loadingProjects.delete(projectPath))
     return openedProject.then((project) => project.sockets)
   }
 
   /** Closes a project and stops its language server. */
   async closeProject(projectPath: Path): Promise<void> {
     // First wait for potential initialization end.
-    await this.loadingProjects.get(projectPath)
+    // A failed open has nothing to close.
+    await this.loadingProjects.get(projectPath)?.catch(() => undefined)
     const runningProject = this.runningProjects.get(projectPath)
 
     if (!runningProject) {
