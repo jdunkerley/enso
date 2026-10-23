@@ -4,6 +4,10 @@
  * the API docs in the engine package (`enso --docs api --in-project <lib>`), and `git diff
  * --no-index` compares them with the committed ones. The first library that differs fails the
  * check, with `./run`'s messages.
+ *
+ * One deliberate difference: `./run` read any non-zero `git diff` status as "the API changed". Here
+ * only status 1 is; any other (128 for a bad path, -1 when git cannot start) is an error that
+ * carries git's stderr, rather than an "API changed" report with an empty diff.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -51,11 +55,14 @@ export interface ApiCheckContext {
   readonly enso: string
   /** Runs `enso` with the given arguments, output inherited; returns the exit status. */
   readonly runEnso: (args: readonly string[]) => number
-  /** `git diff --no-index <old> <new> --exit-code --no-ext-diff`: its status and stdout. */
+  /**
+   * `git diff --no-index <old> <new> --exit-code --no-ext-diff`: its status (0 same, 1 different,
+   * anything else a failure; -1 when it cannot start), stdout and stderr.
+   */
   readonly diff: (
     oldDir: string,
     newDir: string,
-  ) => { readonly status: number; readonly stdout: string }
+  ) => { readonly status: number; readonly stdout: string; readonly stderr: string }
   readonly log: (line: string) => void
   readonly error: (line: string) => void
 }
@@ -82,8 +89,14 @@ export function runApiCheck(context: ApiCheckContext): boolean {
         `\`${context.enso} --docs api --in-project ${builtDir}\` exited with ${status}.`,
       )
     }
-    const diff = context.diff(oldApiDir, path.join(builtDir, 'docs', 'api'))
-    if (diff.status !== 0) {
+    const newApiDir = path.join(builtDir, 'docs', 'api')
+    const diff = context.diff(oldApiDir, newApiDir)
+    if (diff.status !== 0 && diff.status !== 1) {
+      throw new Error(
+        `\`git diff --no-index ${oldApiDir} ${newApiDir}\` exited with ${diff.status}: ${diff.stderr.trim()}`,
+      )
+    }
+    if (diff.status === 1) {
       for (const line of failureLines(
         library,
         diff.stdout,

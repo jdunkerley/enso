@@ -443,15 +443,26 @@ const SHELL_C =
 const BUILD_SCRIPTS_RUN =
   /\bpnpm\b[^\n;&|]*?(?:--filter[= ]|-F\s*)build-scripts\b[^\n;&|]*?\brun\s+([\w:-]+)/g
 
+/**
+ * A `tools/build-scripts` source run with plain node, as its package scripts run it:
+ * `node tools/build-scripts/src/commands/<command>.ts`, after any node options. Captures the path
+ * within the package (`src/commands/<command>.ts`).
+ */
+const BUILD_SCRIPTS_NODE =
+  /\bnode(?:\.exe)?\s+(?:-[-\w]+(?:=\S+)?\s+)*(?:\S*\/)?tools\/build-scripts\/(src\/[^\s'"`;&|]+\.ts)\b/g
+
 /** The one module in `tools/build-scripts` that may start sbt. */
 export const BUILD_SCRIPTS_SBT_HELPER = 'src/lib/sbt.ts'
 
 /** A relative import or re-export in a TypeScript source: `from './x.ts'`, `import('./x.ts')`. */
 const RELATIVE_IMPORT = /\bfrom\s+['"](\.{1,2}\/[^'"]+)['"]|\bimport\s*\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g
 
-/** A direct spawn of sbt: `spawn('sbt', …)`, `execFileSync("sbt.bat", …)` and the like. */
+/**
+ * A direct spawn of sbt: `spawn('sbt', …)`, `execFileSync("sbt.bat", …)`, `invocation('sbt', …)`
+ * (`src/lib/repo.ts`' shell decision, which `src/lib/sbt.ts` itself uses) and the like.
+ */
 const SPAWNS_SBT =
-  /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|capture|runInherited)\s*\(\s*['"`]sbt(?:\.bat|\.cmd)?['"`]/
+  /\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|capture|runInherited|invocation)\s*\(\s*['"`]sbt(?:\.bat|\.cmd)?['"`]/
 
 /**
  * The `tools/build-scripts` commands that start sbt: those whose script (`node src/….ts`) reaches
@@ -461,7 +472,27 @@ const SPAWNS_SBT =
 export function buildScriptsSbtCommands(buildScripts) {
   const commands = new Set()
   if (buildScripts == null) return commands
-  const { scripts, sources } = buildScripts
+  const reachesSbt = sbtReacher(buildScripts.sources)
+  for (const [name, command] of Object.entries(buildScripts.scripts)) {
+    const entry = String(command).match(/\bnode\s+(src\/\S+\.ts)\b/)?.[1]
+    if (entry != null && reachesSbt(entry)) commands.add(name)
+  }
+  return commands
+}
+
+/**
+ * The `tools/build-scripts` sources (`src/….ts`) that reach `src/lib/sbt.ts` through relative
+ * imports: a step that runs one with plain node (`node tools/build-scripts/src/commands/<x>.ts`)
+ * starts sbt, as the package script for it would.
+ */
+export function buildScriptsSbtEntries(buildScripts) {
+  if (buildScripts == null) return new Set()
+  const reachesSbt = sbtReacher(buildScripts.sources)
+  return new Set(Object.keys(buildScripts.sources).filter((file) => reachesSbt(file)))
+}
+
+/** Whether a source in `sources` reaches `src/lib/sbt.ts` through relative imports. */
+function sbtReacher(sources) {
   const reachesSbt = (file, seen) => {
     if (file === BUILD_SCRIPTS_SBT_HELPER) return true
     if (seen.has(file) || sources[file] == null) return false
@@ -472,41 +503,46 @@ export function buildScriptsSbtCommands(buildScripts) {
     }
     return false
   }
-  for (const [name, command] of Object.entries(scripts)) {
-    const entry = String(command).match(/\bnode\s+(src\/\S+\.ts)\b/)?.[1]
-    if (entry != null && reachesSbt(entry, new Set())) commands.add(name)
-  }
-  return commands
+  return (file) => reachesSbt(file, new Set())
 }
 
 /**
  * Whether a `run:` script calls sbt: directly (`SBT_CALL`), inside a `bash -c`/`pwsh -Command`
- * script, or through a `tools/build-scripts` command in `sbtCommands`.
+ * script, through a `tools/build-scripts` command in `sbtCommands`, or by running one of the
+ * package's sources in `sbtEntries` with plain node.
  *
  * The recognised wrappers are a closed list (see `SBT_CALL`). Shapes it does not see: sbt behind a
  * variable used as the command (`$SBT_CALL compile`), a line continuation after an assignment or
  * wrapper, `xargs sbt`, and `/usr/bin/env sbt`.
  */
-export function callsSbt(script, sbtCommands = new Set()) {
+export function callsSbt(script, sbtCommands = new Set(), sbtEntries = new Set()) {
   if (SBT_CALL.test(script)) return true
   for (const match of script.matchAll(SHELL_C)) {
     const inner = match[1] ?? match[2] ?? match[3] ?? match[4]
-    if (inner != null && callsSbt(inner, sbtCommands)) return true
+    if (inner != null && callsSbt(inner, sbtCommands, sbtEntries)) return true
   }
   for (const match of script.matchAll(BUILD_SCRIPTS_RUN)) {
     if (sbtCommands.has(match[1])) return true
+  }
+  for (const match of script.matchAll(BUILD_SCRIPTS_NODE)) {
+    if (sbtEntries.has(match[1])) return true
   }
   return false
 }
 
 /**
  * In `tools/build-scripts`, only `src/lib/sbt.ts` starts sbt. That is what lets the workflow
- * policy see which commands need `setup-jvm` (`buildScriptsSbtCommands`).
+ * policy see which commands need `setup-jvm` (`buildScriptsSbtCommands`). Unit tests
+ * (`*.test.ts`) are exempt: no command imports them, and `src/lib/repo.test.ts` checks the command
+ * line `invocation('sbt', …)` builds without starting it.
  */
 export function checkBuildScriptsSpawnSbtThroughHelper({ buildScripts = null }) {
   if (buildScripts == null) return []
   return Object.entries(buildScripts.sources)
-    .filter(([file, text]) => file !== BUILD_SCRIPTS_SBT_HELPER && SPAWNS_SBT.test(text))
+    .filter(
+      ([file, text]) =>
+        file !== BUILD_SCRIPTS_SBT_HELPER && !file.endsWith('.test.ts') && SPAWNS_SBT.test(text),
+    )
     .map(
       ([file]) =>
         `${BUILD_SCRIPTS}/${file}: starts sbt itself; use \`${BUILD_SCRIPTS_SBT_HELPER}\`, so the workflow policy sees it`,
@@ -521,7 +557,7 @@ const localAction = (step) =>
  * Whether running `steps` calls sbt before `setup-jvm`: directly, or through a local composite
  * action that itself does. `seen` guards against an action that uses itself.
  */
-function sbtBeforeSetupJvm(steps, actions, sbtCommands, seen = new Set()) {
+function sbtBeforeSetupJvm(steps, actions, sbt, seen = new Set()) {
   const late = []
   let ready = false
   for (const step of steps ?? []) {
@@ -530,12 +566,12 @@ function sbtBeforeSetupJvm(steps, actions, sbtCommands, seen = new Set()) {
       ready = true
       continue
     }
-    let runs = callsSbt(String(step?.run ?? ''), sbtCommands)
+    let runs = callsSbt(String(step?.run ?? ''), sbt.commands, sbt.entries)
     if (!runs && action && !seen.has(action) && actions[action]) {
       const inner = sbtBeforeSetupJvm(
         actions[action].doc?.runs?.steps,
         actions,
-        sbtCommands,
+        sbt,
         new Set([...seen, action]),
       )
       runs = inner.length > 0
@@ -550,15 +586,19 @@ function sbtBeforeSetupJvm(steps, actions, sbtCommands, seen = new Set()) {
  * earlier step: the hosted images have no sbt, and their default JDK fails the build's GraalVM
  * check. A job that uses a local composite action calling sbt counts as calling sbt, unless the
  * action sets up the JVM first; an action that uses setup-jvm must do so before its own sbt calls.
- * A `tools/build-scripts` command that starts sbt (`buildScriptsSbtCommands`) counts as calling it.
+ * A `tools/build-scripts` command that starts sbt (`buildScriptsSbtCommands`), or one of its
+ * sources that does, run with plain node (`buildScriptsSbtEntries`), counts as calling it.
  */
 export function checkSbtRunsAfterSetupJvm({ workflows, actions = {}, buildScripts = null }) {
   const problems = []
-  const sbtCommands = buildScriptsSbtCommands(buildScripts)
+  const sbt = {
+    commands: buildScriptsSbtCommands(buildScripts),
+    entries: buildScriptsSbtEntries(buildScripts),
+  }
   const describe = (step) => step.name ?? step.uses ?? step.run
   for (const [file, { doc }] of Object.entries(workflows)) {
     for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
-      for (const step of sbtBeforeSetupJvm(job?.steps, actions, sbtCommands)) {
+      for (const step of sbtBeforeSetupJvm(job?.steps, actions, sbt)) {
         problems.push(
           `${file} › ${id}: \`${describe(step)}\` runs sbt before \`./.github/actions/setup-jvm\``,
         )
@@ -568,7 +608,7 @@ export function checkSbtRunsAfterSetupJvm({ workflows, actions = {}, buildScript
   for (const [name, { doc }] of Object.entries(actions)) {
     // An action without setup-jvm leaves it to its callers, which the loop above checks.
     if (!(doc?.runs?.steps ?? []).some((step) => localAction(step) === 'setup-jvm')) continue
-    for (const step of sbtBeforeSetupJvm(doc?.runs?.steps, actions, sbtCommands, new Set([name]))) {
+    for (const step of sbtBeforeSetupJvm(doc?.runs?.steps, actions, sbt, new Set([name]))) {
       if (localAction(step)) continue // Reported where that action's own steps run sbt.
       problems.push(
         `actions/${name}: \`${describe(step)}\` runs sbt before \`./.github/actions/setup-jvm\``,

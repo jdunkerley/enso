@@ -44,14 +44,11 @@ jobs:
   # later steps, which is how sbt names the package. `ENSO_LAUNCHER` stays `native,test`, the value
   # `./run` forced. `setup-msvc` replaces `./run`'s MSVC environment on Windows: the native images
   # link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build compiles the Rust
-  # parser, and with `all` several of its tasks start `cargo`/`rustup` at once; with the
-  # `rust-toolchain.toml` toolchain missing, each auto-installs it and they collide ("could not
-  # rename 'component' file", then "Cargo isn't installed!"). `./run`'s full `pnpm install` had
-  # compiled the parser first, installing the toolchain; `setup-build-scripts` runs no scripts, so
-  # "Install the Rust toolchain" installs it (rustup 1.28+ reads `rust-toolchain.toml`) before sbt
-  # starts. Gone, because only `./run`
-  # read them or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy
-  # of `ENSO_TEST_JUNIT_DIR`.
+  # parser with several `cargo` calls at once, so `setup-jvm` installs the Rust toolchain first
+  # (`rust`; Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`). Gone
+  # from this job, because only `./run` read them here or nothing did: GraalPy, `GRAAL_EDITION`,
+  # `GITHUB_TOKEN` and the `GITHUB_ENV` copy of `ENSO_TEST_JUNIT_DIR`. (The standard library jobs
+  # still use GraalPy and `GRAAL_EDITION`.)
   build-engine-distribution:
     name: Build Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
     runs-on: ${{ inputs.runner }}
@@ -76,13 +73,11 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: build-engine-distribution
+          cache-key: engine
           flatc: "true"
+          rust: "true"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
-      # See Note [Engine Distribution Without ./run]: one install before sbt starts several cargo calls.
-      - name: Install the Rust toolchain
-        run: rustup toolchain install --no-self-update
       - id: build
         name: Compute the version
         run: corepack pnpm --filter build-scripts run version
@@ -120,7 +115,10 @@ jobs:
   # `./run`'s single-batch threshold; for one task it changes nothing). The rebuild compiles the
   # language server, so the job needs flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so
   # the step does not pass it. The syntax check (`checkEnsoSyntax`, which replaced
-  # `./run libraries check-syntax`) runs the Rust parser's `check_syntax` through cargo.
+  # `./run libraries check-syntax`) runs the Rust parser's `check_syntax` through cargo, so
+  # `setup-jvm` installs the Rust toolchain (`rust`) first: today that one cargo call runs before
+  # `all lintEnso` and would install it alone, but tasks run in parallel under `all` would race
+  # (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux'
@@ -139,8 +137,9 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: enso-code-lint
+          cache-key: engine
           flatc: "true"
+          rust: "true"
       - name: Check syntax
         run: sbt "-Dsbt.server.autostart=false" checkEnsoSyntax
         env:
@@ -187,8 +186,9 @@ jobs:
   # - Two things `./run` appeared to do never took effect, and are not added: the Enso benchmark
   #   dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones) and the
   #   heap-dump `JAVA_TOOL_OPTIONS` (`./run` passed them to the standard-library tests only).
-  # - "Install the Rust toolchain" runs before the first sbt call for the reason given in Note
-  #   [Engine Distribution Without ./run]: sbt starts several `cargo` calls at once.
+  # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call: sbt starts
+  #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
+  #   `.github/actions/setup-jvm`).
   jvm-tests:
     name: JVM Tests (GraalVM CE) (${{ inputs.os }}, amd64)
     needs: [build-engine-distribution]
@@ -210,14 +210,12 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: jvm-tests
+          cache-key: engine
           flatc: "true"
+          rust: "true"
       # `sbt test` builds native images on Windows too (the launcher's and os-environment's tests).
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
-      # See Note [JVM Tests Without ./run].
-      - name: Install the Rust toolchain
-        run: rustup toolchain install --no-self-update
       - if: runner.os == 'Windows'
         name: Windows test settings
         shell: pwsh
@@ -356,9 +354,9 @@ jobs:
   # - The JVM suite's small JDK has its own step (`small-jdk`), at `target/small-jdk` as before.
   # - GraalPy comes from `setup-jvm` (`graalpy`), for `Examples_Tests`' Python spec.
   # - `ENSO_TEST_JUNIT_DIR` is set here; `./run` wrote it to `GITHUB_ENV` for the reporter.
-  # - "Install the Rust toolchain" runs before the first sbt call (the small JDK or the HTTP test
-  #   helper), as in Note [Engine Distribution Without ./run]: `./run`'s `pnpm install` had
-  #   installed the `rust-toolchain.toml` toolchain, and `setup-build-scripts` does not.
+  # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call (the small JDK or
+  #   the HTTP test helper): see Note [Install The Rust Toolchain Before sbt] in
+  #   `.github/actions/setup-jvm`.
   # The engine package is the build job's, at the build job's version.
   stdlib-tests:
     name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
@@ -415,9 +413,7 @@ jobs:
         with:
           cache-key: stdlib-tests
           graalpy: "true"
-      # See Note [Standard Library Tests Without ./run].
-      - name: Install the Rust toolchain
-        run: rustup toolchain install --no-self-update
+          rust: "true"
       - if: matrix.small-jdk
         name: Build the small JDK
         run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
@@ -520,9 +516,7 @@ jobs:
         with:
           cache-key: stdlib-tests
           graalpy: "true"
-      # See Note [Standard Library Tests Without ./run].
-      - name: Install the Rust toolchain
-        run: rustup toolchain install --no-self-update
+          rust: "true"
       - if: matrix.small-jdk
         name: Build the small JDK
         run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"

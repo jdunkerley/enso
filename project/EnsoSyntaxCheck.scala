@@ -63,6 +63,11 @@ object EnsoSyntaxCheck {
         "checkEnsoSyntax needs `cargo` on the PATH."
       )
     val all = files(repoRoot).map(_.getAbsolutePath)
+    // Otherwise the check makes one empty batch and passes having checked nothing.
+    if (all.isEmpty)
+      throw new MessageOnlyException(
+        s"checkEnsoSyntax found no `.enso` files under `distribution/lib` or `test` in $repoRoot."
+      )
     log.info(s"Checking the syntax of ${all.size} Enso files.")
     var failedFiles = 0
     for (batch <- batches(all, MaxArgumentChars)) {

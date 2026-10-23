@@ -64,7 +64,7 @@ describe('runApiCheck', () => {
       diff: (oldDir) => {
         const library = path.basename(path.dirname(path.dirname(path.dirname(oldDir))))
         calls.push(`diff ${library}`)
-        return { status: diffs[library] ?? 0, stdout: `diff of ${library}` }
+        return { status: diffs[library] ?? 0, stdout: `diff of ${library}`, stderr: '' }
       },
       log: () => {},
       error: (line) => errors.push(line),
@@ -92,6 +92,18 @@ describe('runApiCheck', () => {
     expect(errors[0]).toBe('API check failed for library Standard.Image')
     expect(errors[1]).toBe('Current API vs Old API: diff of Image')
     expect(errors.at(-1)).toBe('Error: API check failed for library Standard.Image')
+  })
+  test("a git failure is an error with git's stderr, not a changed API", () => {
+    const { errors, context } = setup({})
+    const failing = (status: number, stderr: string) => () =>
+      runApiCheck({ ...context, diff: () => ({ status, stdout: '', stderr }) })
+    expect(failing(128, 'fatal: not a git repository\n')).toThrow(
+      /exited with 128: fatal: not a git repository$/,
+    )
+    expect(failing(-1, 'Error: spawnSync git ENOENT\n')).toThrow(
+      /exited with -1: Error: spawnSync git ENOENT$/,
+    )
+    expect(errors).toEqual([])
   })
   test('a failing enso is an error', () => {
     const { context } = setup({})

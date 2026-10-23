@@ -86,6 +86,23 @@ export function selects(suite: Suite, project: string): boolean {
   return !(suite.deny ?? []).includes(project)
 }
 
+/** `--only`'s value: project names separated by commas, each trimmed (`A_Tests, B_Tests`). */
+export function parseOnly(value: string): string[] {
+  return value.split(',').map((name) => name.trim())
+}
+
+/**
+ * The names in `only` that `suite` does not run among `projects`: a typo, an empty name, or a
+ * project of another suite. `selectProjects` would drop them silently.
+ */
+export function unselectedNames(
+  projects: readonly string[],
+  suite: Suite,
+  only: readonly string[],
+): string[] {
+  return only.filter((name) => !(projects.includes(name) && selects(suite, name)))
+}
+
 /** The projects `suite` runs, optionally narrowed to `only`. */
 export function selectProjects(
   projects: readonly string[],

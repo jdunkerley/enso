@@ -4,10 +4,12 @@ import { describe, expect, test } from 'vitest'
 import { REPO_ROOT } from '../lib/repo.ts'
 import {
   discoverProjects,
+  parseOnly,
   selectProjects,
   skipsForMissingAwsCredentials,
   suiteNamed,
   SUITES,
+  unselectedNames,
 } from './suites.ts'
 
 /** The projects on 2026-10-22; `Google_Test` and `Benchmarks` are not `*_Tests`. */
@@ -67,6 +69,19 @@ describe('selection, as ./run selected', () => {
     expect(
       selectProjects(PROJECTS, suiteNamed('stdlib').suite, ['Examples_Tests', 'AWS_Tests']),
     ).toEqual(['Examples_Tests'])
+  })
+  test('--only names are trimmed, and those the suite does not run are reported', () => {
+    expect(parseOnly('Base_Tests, Table_Tests ,Image_Tests')).toEqual([
+      'Base_Tests',
+      'Table_Tests',
+      'Image_Tests',
+    ])
+    expect(parseOnly('Base_Tests,')).toEqual(['Base_Tests', ''])
+    const stdlib = suiteNamed('stdlib').suite
+    expect(unselectedNames(PROJECTS, stdlib, parseOnly('Base_Tests, Table_Tests'))).toEqual([])
+    expect(
+      unselectedNames(PROJECTS, stdlib, ['Base_Tests', 'Base_Test', 'AWS_Tests', '', 'Nope']),
+    ).toEqual(['Base_Test', 'AWS_Tests', '', 'Nope'])
   })
   test('aliases, and an unknown suite', () => {
     expect(suiteNamed('stdlib-native').name).toBe('standard-library-in-native')

@@ -35,8 +35,9 @@ that Node runs as it is (type stripping): each command is
   `::error` naming the failures. It starts the HTTP test helper itself (sbt);
   the caller provides the engine package, the small JDK for the JVM suite, and
   the databases (`ENSO_POSTGRES_*`, `ENSO_SQLSERVER_*`; empty ones are dropped).
-  `--dry-run` prints the commands. Do not run it for real on a machine whose
-  environment holds real credentials.
+  `--only A_Tests,B_Tests` narrows the suite (a name it does not run is a usage
+  error); `--dry-run` prints the commands. Do not run it for real on a machine
+  whose environment holds real credentials.
 - `junit-compare <old> <new>` — compares two JUnit directories project by
   project (pass, fail, skip); the gate for moving the tests off `./run`.
 
