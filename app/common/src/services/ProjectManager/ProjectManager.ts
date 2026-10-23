@@ -391,7 +391,7 @@ export class ProjectManager {
   /** List project sessions by scanning engine log files for the given local project key. */
   async listProjectSessions(localProjectKey: string) {
     return this.runStandaloneCommandJson<{
-      sessions: readonly { projectSessionId: string; createdAt: string }[]
+      sessions: readonly { projectSessionId: string; createdAt: string; logFile?: string }[]
     }>(null, 'list-project-sessions', localProjectKey)
   }
 

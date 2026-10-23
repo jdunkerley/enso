@@ -1,5 +1,6 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
 import { expect, test, type Locator } from 'integration-test/base'
+import * as fs from 'node:fs/promises'
 import * as locate from './locate'
 
 async function box(locator: Locator) {
@@ -157,6 +158,23 @@ test('the SQL queries and Performance sources are not offered while their settin
     await expect(dock.getByRole('checkbox', { name: 'User log messages' })).toBeVisible()
     await expect(dock.getByRole('checkbox', { name: 'SQL queries' })).toHaveCount(0)
     await expect(dock.getByRole('checkbox', { name: 'Performance' })).toHaveCount(0)
+  })
+})
+
+test("the Logs tab downloads the session's log file", async ({ editorPage }) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    await expect(dock.getByRole('log').getByText('Something failed')).toBeVisible()
+    // The browser build has no file manager to reveal the file in.
+    await expect(dock.getByTestId('engine-logs-reveal')).toHaveCount(0)
+    const downloading = page.waitForEvent('download')
+    await dock.getByRole('button', { name: 'Download log file' }).click()
+    const download = await downloading
+    expect(download.suggestedFilename()).toBe('mock-session.log')
+    const content = await fs.readFile(await download.path(), 'utf8')
+    expect(content).toContain('Something failed')
+    expect(content).not.toContain(STDERR)
   })
 })
 

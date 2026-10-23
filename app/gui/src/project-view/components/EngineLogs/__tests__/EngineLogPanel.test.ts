@@ -4,7 +4,7 @@ import { flushPromises } from '@vue/test-utils'
 import { ProjectId, ProjectSessionId } from 'enso-common/src/services/Backend'
 import { createDeferred } from 'enso-common/src/utilities/async'
 import { Rfc3339DateTime } from 'enso-common/src/utilities/data/dateTime'
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { effectScope, type EffectScope } from 'vue'
 import EngineLogPanel from '../EngineLogPanel.vue'
 import { LIVE_ROW_CAP } from '../engineLogModel'
@@ -14,11 +14,18 @@ import { FakeEventSource } from './fakeEventSource'
 const mocks = vi.hoisted(() => ({
   listProjectSessions: vi.fn(),
   getProjectSessionLogs: vi.fn(),
+  downloadProjectSessionLogs: vi.fn(),
+  os: 'linux' as 'linux' | 'macos' | 'windows',
 }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
   return { useBackends: () => mockBackends({ localBackend: mocks }) }
 })
+vi.mock('enso-common/src/utilities/detect', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('enso-common/src/utilities/detect')>()),
+  isOnWindows: () => mocks.os === 'windows',
+  isOnMacOS: () => mocks.os === 'macos',
+}))
 
 const PROJECT = ProjectId('project-%2Fprojects%2FMock')
 // A library's logger: the Libraries tickbox, shown by default.
@@ -33,9 +40,12 @@ beforeEach(() => {
   frames = []
   mocks.listProjectSessions.mockResolvedValue([])
   mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: [] })
+  mocks.downloadProjectSessionLogs.mockReset().mockResolvedValue(undefined)
+  mocks.os = 'linux'
 })
 
 afterEach(() => {
+  Reflect.deleteProperty(window, 'api')
   scope.stop()
   FakeEventSource.reset()
   setEngineLogSettings({ sqlQueries: false, performanceTimings: false })
@@ -414,4 +424,108 @@ test('SQL queries and Performance tickboxes show only while their setting is on,
   setEngineLogSettings({ sqlQueries: true })
   await flush()
   expect((tickbox(wrapper, 'SQL queries').element as HTMLInputElement).checked).toBe(true)
+})
+
+describe('download and reveal', () => {
+  const OLD_WITH_FILE = { ...OLD_SESSION, logFile: '/logs/enso-language-server-old.log' }
+  const download = (wrapper: Awaited<ReturnType<typeof mountPanel>>['wrapper']) =>
+    wrapper.find<HTMLButtonElement>('[data-testid="engine-logs-download"]')
+  const reveal = (wrapper: Awaited<ReturnType<typeof mountPanel>>['wrapper']) =>
+    wrapper.find<HTMLButtonElement>('[data-testid="engine-logs-reveal"]')
+  const showItemInFolder = vi.fn()
+  const withSystemApi = () =>
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: { system: { showItemInFolder } },
+    })
+
+  beforeEach(() => showItemInFolder.mockReset())
+
+  test("downloads the shown session's log file: the live one, then an earlier one", async () => {
+    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE])
+    const { source, wrapper, flush } = await mountPanel()
+    expect(download(wrapper).attributes('aria-label')).toBe('Download log file')
+    // No session yet: nothing to download.
+    expect(download(wrapper).element.disabled).toBe(true)
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: null,
+      logFile: null,
+    })
+    source.emit('session', { seq: 1, sessionId: 's1', logFile: '/logs/live.log' })
+    await flush()
+    expect(download(wrapper).element.disabled).toBe(false)
+    await download(wrapper).trigger('click')
+    expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('s1')
+    await wrapper.find('select[aria-label="Session"]').setValue('old')
+    await flush()
+    await download(wrapper).trigger('click')
+    expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('old')
+  })
+
+  test('says when a download fails', async () => {
+    mocks.downloadProjectSessionLogs.mockRejectedValue(new Error('disk full'))
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    await flush()
+    await download(wrapper).trigger('click')
+    await flush()
+    expect(wrapper.find('[role="alert"]').text()).toContain('disk full')
+  })
+
+  test('has no reveal button without the desktop API', async () => {
+    const { wrapper } = await mountPanel()
+    expect(reveal(wrapper).exists()).toBe(false)
+  })
+
+  test("reveals the shown session's file, and is disabled while it has none", async () => {
+    withSystemApi()
+    mocks.listProjectSessions.mockResolvedValue([
+      OLD_WITH_FILE,
+      { ...OLD_SESSION, projectSessionId: ProjectSessionId('older') },
+    ])
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: null,
+      logFile: null,
+    })
+    source.emit('waiting', { seq: 1 })
+    await flush()
+    expect(reveal(wrapper).element.disabled).toBe(true)
+    source.emit('session', { seq: 2, sessionId: 's1', logFile: '/logs/live.log' })
+    await flush()
+    await reveal(wrapper).trigger('click')
+    expect(showItemInFolder).toHaveBeenLastCalledWith('/logs/live.log')
+    const picker = wrapper.find('select[aria-label="Session"]')
+    await picker.setValue('old')
+    await flush()
+    await reveal(wrapper).trigger('click')
+    expect(showItemInFolder).toHaveBeenLastCalledWith('/logs/enso-language-server-old.log')
+    // A session listed without its file cannot be revealed.
+    await picker.setValue('older')
+    await flush()
+    expect(reveal(wrapper).element.disabled).toBe(true)
+  })
+
+  test.each([
+    ['windows', 'Reveal in Explorer'],
+    ['macos', 'Show in Finder'],
+    ['linux', 'Show in folder'],
+  ] as const)('on %s the reveal button is "%s"', async (os, label) => {
+    mocks.os = os
+    withSystemApi()
+    const { wrapper } = await mountPanel()
+    expect(reveal(wrapper).attributes('aria-label')).toBe(label)
+  })
 })

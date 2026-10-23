@@ -1065,6 +1065,7 @@ export class LocalBackend extends backend.Backend {
       projectId,
       projectSessionId: backend.ProjectSessionId(s.projectSessionId),
       createdAt: s.createdAt as backend.ProjectSession['createdAt'],
+      ...(s.logFile != null && { logFile: s.logFile }),
     }))
   }
 
