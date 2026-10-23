@@ -254,8 +254,10 @@ function sessionLabel(session: ProjectSession, number: number) {
 .toolbar {
   flex: none;
   display: flex;
+  /* A narrow dock wraps the filters rather than pushing the session picker out of view. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 4px 8px;
   font-size: 12px;
 }
