@@ -181,30 +181,122 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
+  # Note [JVM Tests Without ./run]
+  # ==============================
+  # The steps are what `./run backend test jvm` ran (`build_tools/build/src/engine/context.rs`), in
+  # its order, each sbt call as `./run` made it (`LC_ALL=C.UTF-8 SBT_SERVER_FORCESTART=true sbt
+  # -Dbench.compileOnly=<…> -Dsbt.server.autostart=false "<tasks>"`), at the build job's version,
+  # from which sbt names the downloaded distribution. Its traps, kept on purpose:
+  # - `ENSO_TEST_JUNIT_DIR` is set on the `sbt test` step only. `./run` removed it for the
+  #   benchmark step, and an empty value is not "unset": ScalaTest would get `-u ""`.
+  # - `CI_TEST_TIMEFACTOR=2` and `CI_TEST_FLAKY_ENABLE=true` are written to `GITHUB_ENV` on Windows
+  #   only, so that on Linux they are absent rather than empty: an empty time factor breaks the
+  #   language server's test configuration, and `FlakySpec` only asks whether the variable exists.
+  # - A failing `sbt test` does not stop the parser self-tests or the benchmark step: `./run`
+  #   deferred that failure. A failure of any other step stops the job, as it stopped `./run`.
+  # - Two things `./run` appeared to do never took effect, and are not added: the Enso benchmark
+  #   dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones) and the
+  #   heap-dump `JAVA_TOOL_OPTIONS` (`./run` passed them to the standard-library tests only).
+  # - "Install the Rust toolchain" runs before the first sbt call for the reason given in Note
+  #   [Engine Distribution Without ./run]: sbt starts several `cargo` calls at once.
   jvm-tests:
     name: JVM Tests (GraalVM CE) (${{ inputs.os }}, amd64)
-    needs: [build-script, build-engine-distribution]
+    needs: [build-engine-distribution]
     runs-on: ${{ inputs.runner }}
     permissions:
       checks: write
-    env:
-      GRAAL_EDITION: GraalVM CE
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-      - run: ./run backend test jvm
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: jvm-tests
+          flatc: "true"
+      # `sbt test` builds native images on Windows too (the launcher's and os-environment's tests).
+      - name: Set up MSVC
+        uses: ./.github/actions/setup-msvc
+      # See Note [JVM Tests Without ./run].
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
+      - if: runner.os == 'Windows'
+        name: Windows test settings
+        shell: pwsh
+        run: |-
+          "CI_TEST_TIMEFACTOR=2" >> $env:GITHUB_ENV
+          "CI_TEST_FLAKY_ENABLE=true" >> $env:GITHUB_ENV
+      - name: Install the library server's dependencies
+        working-directory: tools/simple-library-server
+        run: corepack pnpm install
+      - name: Resolve the parser's Java class path
+        run: sbt "-Dsbt.server.autostart=false" "syntax-rust-definition/Runtime/managedClasspath"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - name: Generate the parser's Java sources
+        shell: bash
+        run: |-
+          # `./run` reset the JUnit directory before the tests; stale reports would be published.
+          rm -rf target/test-results
+          rm -rf target/generated-java/org/enso/syntax2
+          mkdir -p target/generated-java/org/enso/syntax2
+          cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
+      - if: runner.os == 'Linux'
+        name: Build the ydoc native image
+        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all ydoc-server/buildNativeImage"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - id: tests
+        name: JVM tests
+        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - id: parser-self-tests
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        name: Parser self-tests
+        shell: bash
+        env:
+          # Git Bash would otherwise rewrite the `;`-separated class path on Windows.
+          MSYS_NO_PATHCONV: "1"
+        run: |-
+          gen=target/generated-java
+          pkg=$gen/org/enso/syntax2
+          cargo run --package enso-parser-generate-java --bin java-tests > "$pkg/GeneratedFormatTests.java"
+          sep=:
+          if [ "$RUNNER_OS" = "Windows" ]; then sep=';'; fi
+          deps=$(tr -d '\r\n' < lib/rust/parser/target/streams/runtime/managedClasspath/_global/streams/export)
+          javac --class-path "lib/rust/parser/generate-java/java$sep$gen$sep$deps" -d "$gen" "$pkg/GeneratedFormatTests.java"
+          java --class-path "$gen" org.enso.syntax2.GeneratedFormatTests
+      - if: ${{ runner.os == 'Linux' && !cancelled() && steps.parser-self-tests.outcome == 'success' }}
+        name: Compile the benchmarks, and run the runtime ones once
+        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Upload Heap Dumps
         uses: actions/upload-artifact@v5
@@ -221,7 +313,7 @@ jobs:
         with:
           max-annotations: 50
           name: Engine Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
-          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*.xml
+          path: target/test-results/*.xml
           path-replace-backslashes: true
           reporter: java-junit
       - name: Clean after

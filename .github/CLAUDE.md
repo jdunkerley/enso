@@ -104,7 +104,7 @@ the build job's outputs (Note [Lint Reads The Distribution's Version] in
 | `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                  | No: `setup-jvm`                             |
 | `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                        | No: `setup-jvm`                             |
 | `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"` | No: `setup-jvm`, `setup-msvc`               |
-| `engine-checks-platform.yml` › JVM Tests                 | `./run backend test jvm`                                     | Yes: Phase 3                                |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])               | No: `setup-jvm`, `setup-msvc`               |
 | `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`  | No: `setup-build-scripts`                   |
 | `engine-checks-platform.yml` › stdlib tests              | `./run backend test …`                                       | Yes: Phase 3 (`stdlib-test`)                |
 | `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                  | No                                          |
