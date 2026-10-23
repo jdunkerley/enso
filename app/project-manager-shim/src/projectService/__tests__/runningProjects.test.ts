@@ -34,6 +34,12 @@ if (args.includes('--server')) {
 }
 `
 
+/**
+ * Clear of the ports other test files' engines use, real or fake: they run in other processes, so
+ * a port both find free goes to whichever binds it first, and the other engine exits with code 1.
+ */
+const FIRST_PORT = 42_616
+
 let root: string
 let runner: EnsoRunner
 
@@ -54,7 +60,7 @@ async function fakeEnso(directory: string): Promise<Path> {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'running-projects-'))
-  runner = new EnsoRunner(await fakeEnso(root))
+  runner = new EnsoRunner(await fakeEnso(root), { firstPort: FIRST_PORT })
 })
 
 afterEach(async () => {
