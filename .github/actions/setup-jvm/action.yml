@@ -1,9 +1,9 @@
 name: Set up the JVM toolchain
 description: >-
   GraalVM CE and the sbt launcher at the versions pinned under `toolchain:` in `build-config.yaml`,
-  `flatc` too when asked, and the sbt / Coursier download cache (saved only on `develop`). What
-  `./run` provisioned before an sbt call, minus GraalPy and the MSVC environment, which no job
-  that calls sbt directly needs yet. Expects the repository to be checked out.
+  `flatc` and the standalone GraalPy too when asked, and the sbt / Coursier download cache (saved
+  only on `develop`). What `./run` provisioned before an sbt call, minus the MSVC environment
+  (`setup-msvc`). Expects the repository to be checked out.
 inputs:
   cache-key:
     description: >-
@@ -13,6 +13,12 @@ inputs:
     required: true
   flatc:
     description: Also install `flatc`, which compiling the language server needs.
+    required: false
+    default: "false"
+  graalpy:
+    description: >-
+      Also put the standalone GraalPy on the PATH: `test/Examples_Tests`' Python spec runs it, and
+      is skipped without it.
     required: false
     default: "false"
 runs:
@@ -34,6 +40,7 @@ runs:
         pin graalvm
         pin sbt
         pin flatc
+        pin graalpy
     - name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1
       with:
@@ -80,12 +87,46 @@ runs:
         rm "$dir/flatc.zip"
         chmod +x "$dir/flatc/flatc" 2>/dev/null || true
         echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
+    # The release asset `ide_ci::cache::goodie::graalpy` downloaded; it unpacks to one directory
+    # of the same name.
+    - if: inputs.graalpy == 'true'
+      name: Set up GraalPy
+      shell: bash
+      env:
+        GRAALPY_VERSION: ${{ steps.pins.outputs.graalpy }}
+      run: |-
+        case "$RUNNER_OS" in
+          Linux) os=linux; ext=tar.gz ;;
+          Windows) os=windows; ext=zip ;;
+          macOS) os=macos; ext=tar.gz ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;;
+          ARM64) arch=aarch64 ;;
+        esac
+        name="graalpy-community-$GRAALPY_VERSION-$os-$arch"
+        dir=$RUNNER_TEMP
+        if [ "$RUNNER_OS" = "Windows" ]; then dir=$(cygpath -u "$RUNNER_TEMP"); fi
+        curl --retry 4 --retry-connrefused -fsSL -o "$dir/graalpy.$ext" \
+          "https://github.com/oracle/graalpython/releases/download/graal-$GRAALPY_VERSION/$name.$ext"
+        if [ "$ext" = "tar.gz" ]; then
+          tar -xzf "$dir/graalpy.$ext" -C "$dir"
+        elif command -v unzip > /dev/null; then
+          unzip -o -q "$dir/graalpy.zip" -d "$dir"
+        else
+          # A native program: it takes the Windows path.
+          7z x -y -o"$RUNNER_TEMP" "$RUNNER_TEMP/graalpy.zip" > /dev/null
+        fi
+        rm "$dir/graalpy.$ext"
+        echo "$RUNNER_TEMP/$name/bin" >> "$GITHUB_PATH"
     - name: Check the toolchain
       shell: bash
       env:
         GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
         FLATC_VERSION: ${{ steps.pins.outputs.flatc }}
+        GRAALPY_VERSION: ${{ steps.pins.outputs.graalpy }}
         WITH_FLATC: ${{ inputs.flatc }}
+        WITH_GRAALPY: ${{ inputs.graalpy }}
       run: |-
         # Captured first: `grep -q` stops reading early, which `pipefail` would report.
         java=$(java -version 2>&1)
@@ -96,6 +137,11 @@ runs:
           flatc=$(flatc --version)
           echo "$flatc"
           grep -qF "flatc version $FLATC_VERSION" <<< "$flatc"
+        fi
+        if [ "$WITH_GRAALPY" = "true" ]; then
+          graalpy=$(graalpy --version)
+          echo "$graalpy"
+          grep -qF "$GRAALPY_VERSION" <<< "$graalpy"
         fi
     - if: github.ref == 'refs/heads/develop'
       name: Cache sbt / Coursier downloads
