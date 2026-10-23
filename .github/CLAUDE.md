@@ -31,10 +31,11 @@ settings. Every workflow is hand-written YAML: the Rust generator
 - `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
   platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
   `setup-jvm` (GraalVM, sbt, optionally `flatc` and GraalPy at the `toolchain:`
-  pins in `build-config.yaml`, plus the sbt dependency cache), `setup-msvc` (the
-  MSVC developer environment on Windows, for native images and the runtime DLL
-  copy), `git-clean`, `setup-build-scripts` (install `tools/build-scripts`'
-  dependencies only), `download-engine-distribution`.
+  pins in `build-config.yaml` and the `rust-toolchain.toml` Rust toolchain, plus
+  the sbt dependency cache), `setup-msvc` (the MSVC developer environment on
+  Windows, for native images and the runtime DLL copy), `git-clean`,
+  `setup-build-scripts` (install `tools/build-scripts`' dependencies only),
+  `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -69,48 +70,53 @@ settings. Every workflow is hand-written YAML: the Rust generator
 - **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
   third-party action or image must be at least two weeks old. The actionlint
   image is pinned to an exact version.
-- **A job that runs `sbt` itself uses `setup-jvm` first**, with a `cache-key` of
-  its own. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`): on
-  Windows, PowerShell splits an unquoted one at its first dot.
-  `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
-  and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
-  `graalMavenPackagesVersion`, `flatbuffersVersion`
+- **A job that runs `sbt` itself uses `setup-jvm` first.** Jobs that resolve the
+  same build share a `cache-key` (`engine` for the engine build, JVM tests, lint
+  and the IDE's backend), so that one ~830 MB entry per OS serves them all: the
+  repository's Actions cache is capped at 10 GB. Give a distinct key only to
+  jobs that resolve different dependencies. A job whose sbt tasks compile the
+  Rust parser passes `rust: "true"`. Quote `-D` arguments
+  (`sbt "-Dsbt.server.autostart=false" …`): on Windows, PowerShell splits an
+  unquoted one at its first dot. `tools/ci/check-workflows.mjs` fails a job that
+  runs `sbt` before `setup-jvm`, and fails `build-config.yaml`'s pins if they
+  drift from `graalVersion`, `graalMavenPackagesVersion`, `flatbuffersVersion`
   (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
   It counts `sbt` (and `sbt.bat`) as a command after inline `VAR=value`
   assignments and wrappers (`timeout`, `time`, `env`, `nice`, `xvfb-run`,
   `cmd /c`), inside `bash -c` and `pwsh -Command` scripts and local composite
   actions, and behind any `tools/build-scripts` command that starts sbt (one
-  whose entry point imports `src/lib/sbt.ts`).
+  whose entry point imports `src/lib/sbt.ts`), run as a package script or with
+  plain node.
 
 ## What still goes through `./run`
 
-Build simplification Phases 2 and 3 moved every pull-request check off `./run`.
-Where it only wrapped one sbt call, the workflows call sbt (Phase 2). Its real
-logic went to sbt tasks (`checkEnsoSyntax`, `ciBuildEngineDistribution`,
-`buildEngineBundle`), to `tools/build-scripts` (`version`, `stdlib-api-check`,
-`ide-build`, `stdlib-test`), or to plain workflow steps (the JVM tests) (Phase
-3). A moved step sets every variable `./run` set for it; the Notes in each
-workflow say which. A job that runs a distribution built by another job uses
-that job's version, from its outputs, not sbt's default `0.0.0-dev`: see Note
-[Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
-Release, promote, the nightly checks and the macOS checks still call `./run`
-until Phase 4.
+Build simplification Phases 2 and 3 moved every default pull-request check off
+`./run`. Where it only wrapped one sbt call, the workflows call sbt (Phase 2).
+Its real logic went to sbt tasks (`checkEnsoSyntax`,
+`ciBuildEngineDistribution`, `buildEngineBundle`), to `tools/build-scripts`
+(`version`, `stdlib-api-check`, `ide-build`, `stdlib-test`), or to plain
+workflow steps (the JVM tests) (Phase 3). A moved step sets every variable
+`./run` set for it; the Notes in each workflow say which. A job that runs a
+distribution built by another job uses that job's version, from its outputs, not
+sbt's default `0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
+`engine-checks-platform.yml`. Release, promote, the nightly checks and the macOS
+checks (label-gated) still call `./run` until Phase 4.
 
-| Workflow › job                                           | Step                                                           | Goes through `./run`?                            |
-| -------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                        | No: `setup-jvm`                                  |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)            | No: `setup-jvm`                                  |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                | No: `setup-jvm`                                  |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                    | No: `setup-jvm`                                  |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                          | No: `setup-jvm`                                  |
-| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`   | No: `setup-jvm`, `setup-msvc`                    |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                 | No: `setup-jvm`, `setup-msvc`                    |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`    | No: `setup-build-scripts`                        |
-| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>` | No: `setup-jvm` (GraalPy), `setup-build-scripts` |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                    | No                                               |
-| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`           | No: `setup-jvm`, `setup-msvc`                    |
-| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`           | No: `setup-build-scripts`                        |
-| release, promote, nightly, nightly checks, macOS         | various                                                        | Yes: Phase 4                                     |
+| Workflow › job                                           | Step                                                           | Goes through `./run`?                                |
+| -------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                        | No: `setup-jvm`                                      |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)            | No: `setup-jvm`                                      |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                    | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                          | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`   | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                 | No: `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`    | No: `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>` | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                    | No                                                   |
+| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`           | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`           | No: `setup-build-scripts`                            |
+| release, promote, nightly, nightly checks, macOS         | various                                                        | Yes: Phase 4                                         |
 
 ## Checking a change
 

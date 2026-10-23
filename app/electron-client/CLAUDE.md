@@ -94,7 +94,10 @@ the bundle as runtime requires inside `try`, which is harmless.
 Currently driven by `./run ide build` (the legacy Enso build CLI). Don't call
 `electron-builder` or `pnpm run dist` manually unless you're debugging packaging
 — the build CLI wires the engine bundle, GUI, and Electron together with the
-right env vars.
+right env vars. CI packaging no longer uses `./run`: it builds the bundle with
+`sbt buildEngineBundle` and packages with `tools/build-scripts`' `ide-build`
+(see its CLAUDE.md); `./run ide build` stays the local route until build
+simplification Phase 5.
 
 ### Windows installer
 
@@ -144,7 +147,9 @@ once `./run ide build` has produced the engine bundle.
 ## Env vars of note
 
 - `ENSO_BUILD_IDE`, `ENSO_BUILD_BACKEND` — output locations.
-- `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — which engine to bundle.
+- `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — nothing reads it: `./run` and the
+  `watch:*` scripts still set it, but the bundled engine is whatever is in
+  `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by

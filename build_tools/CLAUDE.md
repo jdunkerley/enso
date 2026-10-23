@@ -51,10 +51,10 @@ that can be built from sources or downloaded).
 `run.cmd` / `run.ps1` are the Windows equivalents. See `README.md` for the
 target/subcommand catalog.
 
-CI's pull-request checks no longer call `./run` (build simplification Phases 2
-and 3; `.github/CLAUDE.md`, "What still goes through `./run`"). Release,
-promote, the nightly checks and the macOS checks still do, until Phase 4, and
-the build-simplification spec retires this CLI in Phase 5. Until then, keep
-`./run`'s behaviour for the call sites that still use it; `tools/build-scripts`
-and the sbt tasks that replaced the rest mirror what `./run` did, so a fix to
-one belongs in the other too.
+CI runs no default pull-request check through `./run` any more (build
+simplification Phases 2 and 3; `.github/CLAUDE.md`, "What still goes through
+`./run`"). Release, promote, the nightly checks and the label-gated macOS checks
+still do, until Phase 4, and the build-simplification spec retires this CLI in
+Phase 5. Until then, keep `./run`'s behaviour for the call sites that still use
+it; `tools/build-scripts` and the sbt tasks that replaced the rest mirror what
+`./run` did, so a fix to one belongs in the other too.
