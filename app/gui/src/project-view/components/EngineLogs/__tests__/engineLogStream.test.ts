@@ -60,11 +60,17 @@ test("connects to the project's stream and applies events once per frame", () =>
   source.emit('waiting', { seq: 1 })
   source.emit('line', line(2, 'first'))
   source.emit('line', line(3, 'oops', 'stderr'))
+  source.emit('line', line(4, '[ERROR] [2026-10-20T10:00:00.000Z] [org.enso.Test] failed'))
   expect(stream.rows.value).toEqual([])
   expect(frames).toHaveLength(1)
   runFrames()
-  expect(texts(stream)).toEqual(['first', 'oops'])
+  expect(texts(stream)).toEqual([
+    'first',
+    'oops',
+    '[ERROR] [2026-10-20T10:00:00.000Z] [org.enso.Test] failed',
+  ])
   expect(stream.state.waiting).toBe(true)
+  // The ERROR entry; stderr is not counted.
   expect(stream.state.unseenErrors).toBe(1)
   stream.markSeen()
   expect(stream.state.unseenErrors).toBe(0)

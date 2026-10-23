@@ -20,8 +20,9 @@ vi.mock('$/providers/backends', async () => {
 })
 
 const PROJECT = ProjectId('project-%2Fprojects%2FMock')
+// A library's logger: the Libraries tickbox, shown by default.
 const entry = (level: string, message: string) =>
-  `[${level}] [2026-10-20T10:00:00.000Z] [org.enso.Test] ${message}`
+  `[${level}] [2026-10-20T10:00:00.000Z] [Standard.Base.Test] ${message}`
 
 let scope: EffectScope
 let frames: (() => void)[]
@@ -80,6 +81,9 @@ test('shows live lines, marks stderr, and says while it waits for the engine', a
     text: 'Picked up JAVA_TOOL_OPTIONS',
   })
   await flush()
+  // stderr is the engine's: hidden until Engine is ticked.
+  expect(lineTexts()).toEqual([])
+  await wrapper.find('input[type="checkbox"][aria-label="Engine"]').setValue(true)
   expect(lineTexts()).toEqual(['Picked up JAVA_TOOL_OPTIONS'])
   expect(wrapper.find('.row.stderr .marker').text()).toBe('stderr')
   expect(wrapper.text()).toContain('Waiting for the engine…')
@@ -277,4 +281,81 @@ test('only the latest request sets the loading and error notices', async () => {
   await flush()
   expect(loadingNotice()).toBe(false)
   expect(lineTexts()).toEqual(['from yesterday'])
+})
+
+const loggedBy = (level: string, logger: string, message: string) =>
+  `[${level}] [2026-10-20T10:00:00.000Z] [${logger}] ${message}`
+
+const ENGINE_INFO = loggedBy('INFO', 'org.enso.languageserver.Boot', 'server started')
+const LIBRARY_ERROR = loggedBy('ERROR', 'Standard.Database.Connection', 'query failed')
+const STD_BITS_INFO = loggedBy('INFO', 'org.enso.table.Reader', 'read 10 rows')
+const USER_WARN = loggedBy('WARN', 'User.local.My_Project.Main.Report', 'rows look odd')
+const ENGINE_ERROR = loggedBy('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed')
+
+function tickbox(wrapper: Awaited<ReturnType<typeof mountPanel>>['wrapper'], name: string) {
+  return wrapper.find(`fieldset[aria-label="Sources"] input[type="checkbox"][aria-label="${name}"]`)
+}
+
+test('the source tickboxes: Engine off, Libraries and User log messages on', async () => {
+  const { wrapper } = await mountPanel()
+  const boxes = wrapper.findAll('fieldset[aria-label="Sources"] label')
+  expect(boxes.map((box) => box.text())).toEqual(['Engine', 'Libraries', 'User log messages'])
+  expect((tickbox(wrapper, 'Engine').element as HTMLInputElement).checked).toBe(false)
+  expect((tickbox(wrapper, 'Libraries').element as HTMLInputElement).checked).toBe(true)
+  expect((tickbox(wrapper, 'User log messages').element as HTMLInputElement).checked).toBe(true)
+})
+
+test('filters by source, with the level and text; the badge counts every ERROR entry but not stderr', async () => {
+  const { stream, source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  const lines = [ENGINE_INFO, LIBRARY_ERROR, STD_BITS_INFO, USER_WARN]
+  lines.forEach((text, n) =>
+    source.emit('line', { seq: n + 1, source: 'file', sessionId: 's1', text }),
+  )
+  await flush()
+  // By default, everything but the engine.
+  expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO, USER_WARN])
+  await tickbox(wrapper, 'Engine').setValue(true)
+  expect(lineTexts()).toEqual(lines)
+  await tickbox(wrapper, 'Libraries').setValue(false)
+  expect(lineTexts()).toEqual([ENGINE_INFO, USER_WARN])
+  await tickbox(wrapper, 'User log messages').setValue(false)
+  expect(lineTexts()).toEqual([ENGINE_INFO])
+  await tickbox(wrapper, 'Engine').setValue(false)
+  await tickbox(wrapper, 'Libraries').setValue(true)
+  expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO])
+  await wrapper.find('select[aria-label="Level"]').setValue('error')
+  expect(lineTexts()).toEqual([LIBRARY_ERROR])
+  await wrapper.find('select[aria-label="Level"]').setValue('info')
+  await wrapper.find('input[aria-label="Filter logs"]').setValue('rows')
+  expect(lineTexts()).toEqual([STD_BITS_INFO])
+  await wrapper.find('input[aria-label="Filter logs"]').setValue('')
+  // An engine ERROR entry, hidden by the tickboxes, still counts; stderr does not.
+  source.emit('line', { seq: 5, source: 'file', sessionId: 's1', text: ENGINE_ERROR })
+  source.emit('line', { seq: 6, source: 'stderr', sessionId: 's1', text: 'boom' })
+  await flush()
+  expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO])
+  expect(stream.state.unseenErrors).toBe(2)
+  await tickbox(wrapper, 'Engine').setValue(true)
+  await tickbox(wrapper, 'Libraries').setValue(false)
+  expect(lineTexts()).toEqual([ENGINE_INFO, ENGINE_ERROR, 'boom'])
+})
+
+test('filters an earlier session by source', async () => {
+  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
+  mocks.getProjectSessionLogs.mockResolvedValue({
+    scrollId: 'done',
+    hits: [
+      loggedBy('INFO', 'akka.actor.ActorSystem', 'started'),
+      loggedBy('WARN', 'local.My_Project.Main', 'from a library'),
+      USER_WARN,
+    ],
+  })
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  await flush()
+  await tickbox(wrapper, 'Libraries').setValue(false)
+  await wrapper.find('select[aria-label="Session"]').setValue('old')
+  await flush()
+  expect(lineTexts()).toEqual([USER_WARN])
 })

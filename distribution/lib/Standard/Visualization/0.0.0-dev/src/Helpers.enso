@@ -257,9 +257,9 @@ private short_display value = if value.is_error then "<ERROR>" else
 private time_visualization module ~name ~action =
     wrapped =
         result = Panic.catch Any action handler=caught_panic->
-            module.log_message ("Visualization "+name+" failed (panic): " + caught_panic.payload.to_text) ..Severe
+            module.log_internal ("Visualization "+name+" failed (panic): " + caught_panic.payload.to_text) ..Severe
             Panic.throw caught_panic
-        if result.is_error then module.log_message ("Visualization "+name+" failed (error): " + result.catch.to_text) ..Warning
+        if result.is_error then module.log_internal ("Visualization "+name+" failed (error): " + result.catch.to_text) ..Warning
         result
     # TBD: also need to replace this usage of Logging.Profile
     _time_execution _profile_level label=name module=module suffix_callback=_profile_suffix wrapped
@@ -299,5 +299,5 @@ private _time_execution level:(Log_Level | Nothing) ~label:Text ~function suffix
 
         duration = pair.first
         suffix = if suffix_callback == Nothing then "" else suffix_callback pair.second
-        module.log_message ("Execution time for " + label + ": " + duration.to_text + suffix) level
+        module.log_internal ("Execution time for " + label + ": " + duration.to_text + suffix) level
         pair.second

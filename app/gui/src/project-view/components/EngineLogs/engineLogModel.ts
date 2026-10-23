@@ -39,6 +39,8 @@ export interface LogLine {
   readonly level: number
   /** Whether the line starts a log entry (rather than continuing one, as a stack trace does). */
   readonly entryStart: boolean
+  /** Who wrote the line: the engine, a library or the user's own code (see {@link logOrigin}). */
+  readonly origin: LogOrigin
 }
 
 /** A marker between lines. */
@@ -61,24 +63,129 @@ const MAX_LEVEL: Readonly<Record<LevelFilter, number>> = {
 }
 
 /**
- * Gives lines their level. An entry has its own; a line that starts no entry continues the
- * previous entry and takes its level (INFO before any); stderr is ERROR.
+ * Who wrote a line:
+ * - `user` — the user's own log messages (`log_message`, which logs under `User.<type name>`);
+ * - `library` — the libraries: the standard library, user projects' libraries, their Java;
+ * - `engine` — the engine itself, and its stderr.
+ */
+export type LogOrigin = 'engine' | 'library' | 'user'
+
+/** Which origins the Logs tab shows. */
+export type OriginFilter = Readonly<Record<LogOrigin, boolean>>
+
+/** The origins shown at first: everything but the engine's internals. */
+export const DEFAULT_ORIGINS: OriginFilter = { engine: false, library: true, user: true }
+
+/**
+ * The first segment of the logger name `log_message` logs under (`User.<qualified type name>`,
+ * `distribution/lib/Standard/Base/0.0.0-dev/src/Logging.enso`). The libraries log with
+ * `log_internal`, under the type name alone.
+ */
+export const USER_LOGGER_ROOT = 'User'
+
+/**
+ * The logger names the engine itself logs under. A name is the engine's when it is one of these or
+ * starts with one followed by a dot (whole segments: `akka` does not cover `akkadia`).
+ *
+ * - `org.enso`: the runtime, compiler, language server, logging, ydoc server and the rest, except
+ *   the standard library's Java helpers ({@link STD_BITS_PACKAGE_ROOTS}).
+ * - `enso`, `epb`, `arrow`, `enso-runtime-server`, `enso-debug-server`, `id-value-extractor` and
+ *   `engine`: the Truffle languages and instruments, and the polyglot engine. Truffle prefixes a
+ *   logger's name with its language or instrument id (`enso.org.enso.interpreter.runtime.EnsoContext`),
+ *   and `JulHandler` (`lib/scala/logging-utils`) forwards the record under that name.
+ * - The engine's own third-party stack: `akka`, `org.graalvm`, `com.oracle.truffle`, `io.helidon`,
+ *   `org.eclipse.jetty`.
+ */
+export const ENGINE_LOGGER_ROOTS: readonly string[] = [
+  'org.enso',
+  'enso',
+  'epb',
+  'arrow',
+  'enso-runtime-server',
+  'enso-debug-server',
+  'id-value-extractor',
+  'engine',
+  'akka',
+  'org.graalvm',
+  'com.oracle.truffle',
+  'io.helidon',
+  'org.eclipse.jetty',
+]
+
+/**
+ * The package roots of the standard library's Java helpers, `std-bits/<lib>/src/main/java/org/enso/<root>`.
+ * They sit under `org.enso`, but their logs are the libraries'. `nativeimage` is in `std-bits/table`
+ * and `benchmarks` in `std-bits/benchmarks`; `Generic_JDBC` has no Java of its own (it builds on
+ * `database`). A test fails when a root on disk is missing here.
+ */
+export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
+  'org.enso.aws',
+  'org.enso.base',
+  'org.enso.benchmarks',
+  'org.enso.database',
+  'org.enso.duckdb',
+  'org.enso.google',
+  'org.enso.image',
+  'org.enso.microsoft',
+  'org.enso.nativeimage',
+  'org.enso.saas',
+  'org.enso.snowflake',
+  'org.enso.table',
+  'org.enso.tableau',
+]
+
+/** Whether `name` is `root` or lies under it, by whole dot-separated segments. */
+function underRoot(name: string, root: string): boolean {
+  return name === root || (name.startsWith(root) && name.charAt(root.length) === '.')
+}
+
+/**
+ * Who wrote an entry, from its logger name: the user for a name under {@link USER_LOGGER_ROOT}; the
+ * engine for a name under {@link ENGINE_LOGGER_ROOTS} and not under {@link STD_BITS_PACKAGE_ROOTS};
+ * a library for anything else.
+ *
+ * The default is Library on purpose. The engine's names are few and known; the libraries' are open:
+ * Enso modules (`Standard.*`, every user project and library), the std-bits helpers, and whatever
+ * third-party Java they pull in (JDBC drivers, cloud SDKs, …), which any new library adds to. A name
+ * nobody foresaw is far more likely to be a library's, and listing it with the libraries keeps a
+ * user's own logs from hiding under Engine.
+ */
+export function logOrigin(loggerName: string): LogOrigin {
+  if (underRoot(loggerName, USER_LOGGER_ROOT)) return 'user'
+  if (STD_BITS_PACKAGE_ROOTS.some((root) => underRoot(loggerName, root))) return 'library'
+  return ENGINE_LOGGER_ROOTS.some((root) => underRoot(loggerName, root)) ? 'engine' : 'library'
+}
+
+/** What {@link LineClassifier} says of a line. */
+export interface LineClass {
+  readonly level: number
+  readonly entryStart: boolean
+  readonly origin: LogOrigin
+}
+
+/**
+ * Gives lines their level and origin. An entry has its own; a line that starts no entry continues
+ * the previous entry and takes its level and origin (INFO and library before any); stderr is the
+ * engine's, and ERROR.
  */
 export class LineClassifier {
   private level = INFO_LEVEL
+  private origin: LogOrigin = 'library'
 
-  /** The level of `text`, and whether it starts an entry. */
-  classify(text: string, source: EngineLogSource): { level: number; entryStart: boolean } {
-    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true }
+  /** The level and origin of `text`, and whether it starts an entry. */
+  classify(text: string, source: EngineLogSource): LineClass {
+    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true, origin: 'engine' }
     const entry = parseEntry(text)
-    if (entry == null) return { level: this.level, entryStart: false }
+    if (entry == null) return { level: this.level, entryStart: false, origin: this.origin }
     this.level = entry.level
-    return { level: entry.level, entryStart: true }
+    this.origin = logOrigin(entry.module)
+    return { level: entry.level, entryStart: true, origin: this.origin }
   }
 
   /** Forget the current entry (a new session starts). */
   reset(): void {
     this.level = INFO_LEVEL
+    this.origin = 'library'
   }
 }
 
@@ -108,20 +215,30 @@ export function rowsFromLines(lines: readonly string[]): LogRow[] {
   return rows
 }
 
-/** The rows a filter shows: every divider, and the lines at or above the level that contain the text. */
-export function filterRows(
-  rows: readonly LogRow[],
-  filter: { readonly level: LevelFilter; readonly text: string },
-): readonly LogRow[] {
+/** What the Logs tab filters on. */
+export interface RowFilter {
+  readonly level: LevelFilter
+  readonly text: string
+  readonly origins: OriginFilter
+}
+
+/**
+ * The rows a filter shows: every divider, and the lines of a shown origin, at or above the level,
+ * that contain the text.
+ */
+export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
-  if (needle === '' && filter.level === 'info') {
+  const origins = filter.origins
+  if (needle === '' && origins.engine && origins.library && origins.user) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
     (row) =>
       row.kind === 'divider' ||
-      (row.level <= maxLevel && (needle === '' || row.text.toLowerCase().includes(needle))),
+      (row.level <= maxLevel &&
+        origins[row.origin] &&
+        (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
 
@@ -134,7 +251,7 @@ export class EngineLogModel {
   /** The current session, as `listProjectSessions` names it; `null` while it has no file. */
   sessionId: string | null = null
   logFile: string | null = null
-  /** ERROR entries and stderr lines not yet seen. */
+  /** ERROR entries of the log file not yet seen, whatever their origin; stderr is not counted. */
   unseenErrors = 0
 
   private pending: LogRow[] = []
@@ -192,7 +309,7 @@ export class EngineLogModel {
   onLine(data: EngineLogLineData): void {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
-    const { level, entryStart } = this.classifier.classify(data.text, data.source)
+    const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
     this.pending.push({
       kind: 'line',
       key: this.nextKey++,
@@ -200,8 +317,9 @@ export class EngineLogModel {
       text: data.text,
       level,
       entryStart,
+      origin,
     })
-    if (entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
+    if (data.source === 'file' && entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }
 
   /** An engine started; a restart when one ran before. */
