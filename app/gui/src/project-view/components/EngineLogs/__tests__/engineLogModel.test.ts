@@ -263,15 +263,14 @@ describe('helpers', () => {
       '  at Query.run',
     ])
     const withDivider: LogRow[] = [{ kind: 'divider', key: 99, divider: 'restarted' }, ...rows]
-    expect(texts(filterRows(withDivider, { level: 'error', text: '' }))).toEqual([
+    expect(texts(filterRows(withDivider, { level: 'error', text: '', origin: 'all' }))).toEqual([
       '--restarted--',
       entry('ERROR', 'query failed'),
       '  at Query.run',
     ])
-    expect(texts(filterRows(withDivider, { level: 'warn', text: ' SLOW ' }))).toEqual([
-      '--restarted--',
-      entry('WARN', 'slow query'),
-    ])
-    expect(filterRows(withDivider, { level: 'info', text: '' })).toHaveLength(5)
+    expect(
+      texts(filterRows(withDivider, { level: 'warn', text: ' SLOW ', origin: 'all' })),
+    ).toEqual(['--restarted--', entry('WARN', 'slow query')])
+    expect(filterRows(withDivider, { level: 'info', text: '', origin: 'all' })).toHaveLength(5)
   })
 })

@@ -16,7 +16,13 @@ import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
 import { fetchSessionLines } from './engineLogHistory'
-import { filterRows, rowsFromLines, type LevelFilter, type LogRow } from './engineLogModel'
+import {
+  filterRows,
+  rowsFromLines,
+  type LevelFilter,
+  type LogRow,
+  type OriginFilter,
+} from './engineLogModel'
 import type { EngineLogStream } from './engineLogStream'
 
 const { stream, projectId } = defineProps<{
@@ -29,6 +35,7 @@ const backends = useBackends()
 const systemApi = window.api?.system
 
 const level = ref<LevelFilter>('info')
+const origin = ref<OriginFilter>('all')
 const filterText = ref('')
 const follow = ref(true)
 /** The earlier session shown, read-only; `''` for the live one. */
@@ -58,6 +65,7 @@ const shownRows = computed(() =>
   filterRows(live.value ? toValue(stream.rows) : sessionRows.value, {
     level: level.value,
     text: filterText.value,
+    origin: origin.value,
   }),
 )
 
@@ -123,6 +131,11 @@ function sessionLabel(session: ProjectSession, number: number) {
         <option value="error">{{ getText('engineLogsLevelError') }}</option>
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
         <option value="info">{{ getText('engineLogsLevelInfo') }}</option>
+      </select>
+      <select v-model="origin" :aria-label="getText('engineLogsOrigin')">
+        <option value="all">{{ getText('engineLogsOriginAll') }}</option>
+        <option value="library">{{ getText('engineLogsOriginLibraries') }}</option>
+        <option value="engine">{{ getText('engineLogsOriginEngine') }}</option>
       </select>
       <input
         v-model="filterText"

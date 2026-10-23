@@ -39,6 +39,8 @@ export interface LogLine {
   readonly level: number
   /** Whether the line starts a log entry (rather than continuing one, as a stack trace does). */
   readonly entryStart: boolean
+  /** Who wrote the line: the engine itself or a library (see {@link logOrigin}). */
+  readonly origin: LogOrigin
 }
 
 /** A marker between lines. */
@@ -60,25 +62,113 @@ const MAX_LEVEL: Readonly<Record<LevelFilter, number>> = {
   info: INFO_LEVEL,
 }
 
+/** Who wrote a line: the engine itself, or a library (the standard library, a user's project). */
+export type LogOrigin = 'engine' | 'library'
+
+/** The origin filter: every line, or only the libraries' or the engine's. */
+export type OriginFilter = 'all' | LogOrigin
+
 /**
- * Gives lines their level. An entry has its own; a line that starts no entry continues the
- * previous entry and takes its level (INFO before any); stderr is ERROR.
+ * The logger names the engine itself logs under. A name is the engine's when it is one of these or
+ * starts with one followed by a dot (whole segments: `akka` does not cover `akkadia`).
+ *
+ * - `org.enso`: the runtime, compiler, language server, logging, ydoc server and the rest, except
+ *   the standard library's Java helpers ({@link STD_BITS_PACKAGE_ROOTS}).
+ * - `enso`, `epb`, `arrow`, `enso-runtime-server`, `enso-debug-server`, `id-value-extractor` and
+ *   `engine`: the Truffle languages and instruments, and the polyglot engine. Truffle prefixes a
+ *   logger's name with its language or instrument id (`enso.org.enso.interpreter.runtime.EnsoContext`),
+ *   and `JulHandler` (`lib/scala/logging-utils`) forwards the record under that name.
+ * - The engine's own third-party stack: `akka`, `org.graalvm`, `com.oracle.truffle`, `io.helidon`,
+ *   `org.eclipse.jetty`.
+ */
+export const ENGINE_LOGGER_ROOTS: readonly string[] = [
+  'org.enso',
+  'enso',
+  'epb',
+  'arrow',
+  'enso-runtime-server',
+  'enso-debug-server',
+  'id-value-extractor',
+  'engine',
+  'akka',
+  'org.graalvm',
+  'com.oracle.truffle',
+  'io.helidon',
+  'org.eclipse.jetty',
+]
+
+/**
+ * The package roots of the standard library's Java helpers, `std-bits/<lib>/src/main/java/org/enso/<root>`.
+ * They sit under `org.enso`, but their logs are the libraries'. `nativeimage` is in `std-bits/table`
+ * and `benchmarks` in `std-bits/benchmarks`; `Generic_JDBC` has no Java of its own (it builds on
+ * `database`). A test fails when a root on disk is missing here.
+ */
+export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
+  'org.enso.aws',
+  'org.enso.base',
+  'org.enso.benchmarks',
+  'org.enso.database',
+  'org.enso.duckdb',
+  'org.enso.google',
+  'org.enso.image',
+  'org.enso.microsoft',
+  'org.enso.nativeimage',
+  'org.enso.saas',
+  'org.enso.snowflake',
+  'org.enso.table',
+  'org.enso.tableau',
+]
+
+/** Whether `name` is `root` or lies under it, by whole dot-separated segments. */
+function underRoot(name: string, root: string): boolean {
+  return name === root || (name.startsWith(root) && name.charAt(root.length) === '.')
+}
+
+/**
+ * Who wrote an entry, from its logger name: the engine for a name under {@link ENGINE_LOGGER_ROOTS}
+ * and not under {@link STD_BITS_PACKAGE_ROOTS}; a library for anything else.
+ *
+ * The default is Library on purpose. The engine's names are few and known; the libraries' are open:
+ * Enso modules (`Standard.*`, every user project and library), the std-bits helpers, and whatever
+ * third-party Java they pull in (JDBC drivers, cloud SDKs, …), which any new library adds to. A name
+ * nobody foresaw is far more likely to be a library's, and listing it with the libraries keeps a
+ * user's own logs from hiding under Engine.
+ */
+export function logOrigin(loggerName: string): LogOrigin {
+  if (STD_BITS_PACKAGE_ROOTS.some((root) => underRoot(loggerName, root))) return 'library'
+  return ENGINE_LOGGER_ROOTS.some((root) => underRoot(loggerName, root)) ? 'engine' : 'library'
+}
+
+/** What {@link LineClassifier} says of a line. */
+export interface LineClass {
+  readonly level: number
+  readonly entryStart: boolean
+  readonly origin: LogOrigin
+}
+
+/**
+ * Gives lines their level and origin. An entry has its own; a line that starts no entry continues
+ * the previous entry and takes its level and origin (INFO and library before any); stderr is the
+ * engine's, and ERROR.
  */
 export class LineClassifier {
   private level = INFO_LEVEL
+  private origin: LogOrigin = 'library'
 
-  /** The level of `text`, and whether it starts an entry. */
-  classify(text: string, source: EngineLogSource): { level: number; entryStart: boolean } {
-    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true }
+  /** The level and origin of `text`, and whether it starts an entry. */
+  classify(text: string, source: EngineLogSource): LineClass {
+    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true, origin: 'engine' }
     const entry = parseEntry(text)
-    if (entry == null) return { level: this.level, entryStart: false }
+    if (entry == null) return { level: this.level, entryStart: false, origin: this.origin }
     this.level = entry.level
-    return { level: entry.level, entryStart: true }
+    this.origin = logOrigin(entry.module)
+    return { level: entry.level, entryStart: true, origin: this.origin }
   }
 
   /** Forget the current entry (a new session starts). */
   reset(): void {
     this.level = INFO_LEVEL
+    this.origin = 'library'
   }
 }
 
@@ -108,20 +198,30 @@ export function rowsFromLines(lines: readonly string[]): LogRow[] {
   return rows
 }
 
-/** The rows a filter shows: every divider, and the lines at or above the level that contain the text. */
-export function filterRows(
-  rows: readonly LogRow[],
-  filter: { readonly level: LevelFilter; readonly text: string },
-): readonly LogRow[] {
+/** What the Logs tab filters on. */
+export interface RowFilter {
+  readonly level: LevelFilter
+  readonly text: string
+  readonly origin: OriginFilter
+}
+
+/**
+ * The rows a filter shows: every divider, and the lines of the origin, at or above the level, that
+ * contain the text.
+ */
+export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
-  if (needle === '' && filter.level === 'info') {
+  const origin = filter.origin
+  if (needle === '' && origin === 'all') {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
     (row) =>
       row.kind === 'divider' ||
-      (row.level <= maxLevel && (needle === '' || row.text.toLowerCase().includes(needle))),
+      (row.level <= maxLevel &&
+        (origin === 'all' || row.origin === origin) &&
+        (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
 
@@ -192,7 +292,7 @@ export class EngineLogModel {
   onLine(data: EngineLogLineData): void {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
-    const { level, entryStart } = this.classifier.classify(data.text, data.source)
+    const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
     this.pending.push({
       kind: 'line',
       key: this.nextKey++,
@@ -200,6 +300,7 @@ export class EngineLogModel {
       text: data.text,
       level,
       entryStart,
+      origin,
     })
     if (entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }

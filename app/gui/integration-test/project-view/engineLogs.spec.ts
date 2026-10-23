@@ -11,6 +11,7 @@ async function box(locator: Locator) {
 const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Language server started'
 const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [org.enso.interpreter] Something failed'
 const STDERR = 'Exception in thread "main" java.lang.IllegalStateException'
+const LIBRARY = '[WARN] [2026-10-20T10:00:01.500Z] [Standard.Database.Connection] Slow query'
 
 test.use({
   setupApi: {
@@ -22,6 +23,7 @@ test.use({
       })
       api.addEngineLogLine(INFO)
       api.addEngineLogLine(ERROR)
+      api.addEngineLogLine(LIBRARY)
       api.addEngineLogLine(STDERR, 'stderr')
     },
   },
@@ -54,6 +56,30 @@ test('the Logs tab follows the engine log and filters by level', async ({
     // The shortcut closes the dock again while Logs shows.
     await page.keyboard.press('ControlOrMeta+L')
     await expect(dock).toBeHidden()
+  })
+})
+
+test('the Logs tab filters by source: the libraries or the engine', async ({ editorPage }) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    const log = dock.getByRole('log')
+    await expect(log.getByText('Slow query')).toBeVisible()
+    await expect(log.getByText('Language server started')).toBeVisible()
+    const source = dock.getByRole('combobox', { name: 'Source' })
+    await expect(source).toHaveValue('all')
+
+    await source.selectOption('library')
+    await expect(log.getByText('Slow query')).toBeVisible()
+    await expect(log.getByText('Language server started')).toBeHidden()
+    await expect(log.getByText('Something failed')).toBeHidden()
+    await expect(log.getByText(STDERR)).toBeHidden()
+
+    await source.selectOption('engine')
+    await expect(log.getByText('Slow query')).toBeHidden()
+    await expect(log.getByText('Language server started')).toBeVisible()
+    await expect(log.getByText('Something failed')).toBeVisible()
+    await expect(log.getByText(STDERR)).toBeVisible()
   })
 })
 

@@ -278,3 +278,70 @@ test('only the latest request sets the loading and error notices', async () => {
   expect(loadingNotice()).toBe(false)
   expect(lineTexts()).toEqual(['from yesterday'])
 })
+
+const loggedBy = (level: string, logger: string, message: string) =>
+  `[${level}] [2026-10-20T10:00:00.000Z] [${logger}] ${message}`
+
+test('filters by source, with the level and text, and the badge still counts every error', async () => {
+  const { stream, source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  const lines = [
+    loggedBy('INFO', 'org.enso.languageserver.Boot', 'server started'),
+    loggedBy('ERROR', 'Standard.Database.Connection', 'query failed'),
+    loggedBy('INFO', 'org.enso.table.Reader', 'read 10 rows'),
+  ]
+  lines.forEach((text, n) =>
+    source.emit('line', { seq: n + 1, source: 'file', sessionId: 's1', text }),
+  )
+  await flush()
+  const picker = wrapper.find('select[aria-label="Source"]')
+  expect(picker.findAll('option').map((option) => option.text())).toEqual([
+    'All sources',
+    'Libraries',
+    'Engine',
+  ])
+  expect(lineTexts()).toEqual(lines)
+  await picker.setValue('library')
+  expect(lineTexts()).toEqual([lines[1], lines[2]])
+  await wrapper.find('select[aria-label="Level"]').setValue('error')
+  expect(lineTexts()).toEqual([lines[1]])
+  await wrapper.find('select[aria-label="Level"]').setValue('info')
+  await wrapper.find('input[aria-label="Filter logs"]').setValue('rows')
+  expect(lineTexts()).toEqual([lines[2]])
+  await wrapper.find('input[aria-label="Filter logs"]').setValue('')
+  // An engine error and stderr, hidden by the Libraries filter, still count as unseen.
+  source.emit('line', {
+    seq: 4,
+    source: 'file',
+    sessionId: 's1',
+    text: loggedBy('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed'),
+  })
+  source.emit('line', { seq: 5, source: 'stderr', sessionId: 's1', text: 'boom' })
+  await flush()
+  expect(lineTexts()).toEqual([lines[1], lines[2]])
+  expect(stream.state.unseenErrors).toBe(3)
+  await picker.setValue('engine')
+  expect(lineTexts()).toEqual([
+    lines[0],
+    loggedBy('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed'),
+    'boom',
+  ])
+})
+
+test('filters an earlier session by source', async () => {
+  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
+  mocks.getProjectSessionLogs.mockResolvedValue({
+    scrollId: 'done',
+    hits: [
+      loggedBy('INFO', 'akka.actor.ActorSystem', 'started'),
+      loggedBy('WARN', 'local.My_Project.Main', 'from my project'),
+    ],
+  })
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  await flush()
+  await wrapper.find('select[aria-label="Source"]').setValue('library')
+  await wrapper.find('select[aria-label="Session"]').setValue('old')
+  await flush()
+  expect(lineTexts()).toEqual([loggedBy('WARN', 'local.My_Project.Main', 'from my project')])
+})
