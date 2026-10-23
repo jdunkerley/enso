@@ -16,8 +16,10 @@ on:
         type: string
       stdlib-suites:
         description: >-
-          JSON list of the Standard Library test suites to run, each
-          `{"suite": "<./run backend test argument>", "title": "<job title>"}`.
+          JSON list of the Standard Library test suites to run, each `{"suite": "<stdlib-test
+          suite>", "title": "<job title>", "small-jdk": <bool>, "postgres": <bool>, "mssql":
+          <bool>}`: the JVM suite needs the small JDK; `postgres` and `mssql` (Linux only) start that
+          database for the suite.
         required: true
         type: string
       clean_build_required:
@@ -27,22 +29,10 @@ on:
         default: false
 
 env:
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
   # Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required }}"
 
 jobs:
-  build-script:
-    name: Build Script (${{ inputs.os }}, amd64)
-    runs-on: ${{ inputs.runner }}
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Compile the build script
-        uses: ./.github/actions/build-script
-
   # Note [Engine Distribution Without ./run]
   # ========================================
   # `./run backend ci-build-engine-distribution` is the sbt task `ciBuildEngineDistribution` (Note
@@ -349,14 +339,163 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
+  # Note [Standard Library Tests Without ./run]
+  # ===========================================
+  # `tools/build-scripts`' `stdlib-test` runs a suite as `./run backend test <suite>` did (see its
+  # `src/stdlib-test/run.ts`), and starts the HTTP test helper itself, with sbt (hence `setup-jvm`).
+  # What moved out of `./run` into this file:
+  # - Postgres and SQL Server are service containers, on Linux only as before (Windows runners have
+  #   none, so Windows is a job of its own, under the same name). One job with
+  #   OS-conditional `services:` is not possible: a Windows runner cannot start the Linux
+  #   containers, so the Windows job is the same steps without them. A suite gets a database when its
+  #   matrix entry asks (`postgres`, `mssql`); an empty image starts no container, and the runner
+  #   drops the connection variables that are empty, since Enso reads an empty variable as "".
+  #   Images: `postgres:18` (`./run` took `latest`, 18.6 when this moved) and SQL Server
+  #   `2022-latest`, as before. Postgres must be on localhost:5432: `Generic_JDBC_Tests` connects
+  #   to `jdbc:postgresql:<db>`.
+  # - The JVM suite's small JDK has its own step (`small-jdk`), at `target/small-jdk` as before.
+  # - GraalPy comes from `setup-jvm` (`graalpy`), for `Examples_Tests`' Python spec.
+  # - `ENSO_TEST_JUNIT_DIR` is set here; `./run` wrote it to `GITHUB_ENV` for the reporter.
+  # - "Install the Rust toolchain" runs before the first sbt call (the small JDK or the HTTP test
+  #   helper), as in Note [Engine Distribution Without ./run]: `./run`'s `pnpm install` had
+  #   installed the `rust-toolchain.toml` toolchain, and `setup-build-scripts` does not.
+  # The engine package is the build job's, at the build job's version.
   stdlib-tests:
     name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
-    needs: [build-script, build-engine-distribution]
+    if: inputs.os == 'linux'
+    needs: [build-engine-distribution]
     runs-on: ${{ inputs.runner }}
     permissions:
       checks: write
     env:
       GRAAL_EDITION: GraalVM CE
+      ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
+    strategy:
+      # Each suite reports on its own, as when they were separate jobs.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.stdlib-suites) }}
+    services:
+      postgres:
+        image: ${{ matrix.postgres && 'postgres:18' || '' }}
+        env:
+          POSTGRES_DB: enso_test_db
+          POSTGRES_USER: enso_test_user
+          POSTGRES_PASSWORD: enso_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --shm-size 1gb
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U enso_test_user -d enso_test_db"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+      sqlserver:
+        image: ${{ matrix.mssql && 'mcr.microsoft.com/mssql/server:2022-latest' || '' }}
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "enso_test_password_<YourStrong@Passw0rd>"
+        ports:
+          - 1433:1433
+        options: --shm-size 1gb
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: stdlib-tests
+          graalpy: "true"
+      # See Note [Standard Library Tests Without ./run].
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
+      - if: matrix.small-jdk
+        name: Build the small JDK
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      # The line `./run` waited for (`sqlserver.rs`).
+      - if: matrix.mssql
+        name: Wait for SQL Server
+        run: |-
+          for _ in $(seq 150); do
+            # Captured first: `grep -q` stops reading early, which `pipefail` would report.
+            logs=$(docker logs "$ID" 2>&1)
+            if grep -qF "SQL Server is now ready for client connections" <<< "$logs"; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::SQL Server did not start within 300 s."
+          docker logs "$ID"
+          exit 1
+        env:
+          ID: ${{ job.services.sqlserver.id }}
+      - name: Run the Standard Library tests
+        run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }}
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
+          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          ENSO_POSTGRES_DATABASE: ${{ matrix.postgres && 'enso_test_db' || '' }}
+          ENSO_POSTGRES_HOST: ${{ matrix.postgres && 'localhost:5432' || '' }}
+          ENSO_POSTGRES_USER: ${{ matrix.postgres && 'enso_test_user' || '' }}
+          ENSO_POSTGRES_PASSWORD: ${{ matrix.postgres && 'enso_test_password' || '' }}
+          ENSO_SQLSERVER_DATABASE: ${{ matrix.mssql && 'tempdb' || '' }}
+          ENSO_SQLSERVER_HOST: ${{ matrix.mssql && 'localhost' || '' }}
+          ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
+          ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
+          ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Standard Library Test Reporter
+        uses: dorny/test-reporter@v1
+        with:
+          # Only the AWS suite may report no tests, as before.
+          fail-on-empty: ${{ matrix.suite != 'std-aws' }}
+          max-annotations: 50
+          name: Standard Library Tests Report (GraalVM CE, ${{ inputs.os }}, amd64)
+          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
+          path-replace-backslashes: true
+          reporter: java-junit
+      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        name: Upload Heap Dumps
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: ignore
+          name: Heap dumps (Standard Library ${{ matrix.title }} Tests, ${{ inputs.os }}, amd64)
+          path: |-
+            test/**/*.hprof
+            engine/**/*.hprof
+          retention-days: 3
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  # The same as `stdlib-tests`, without the databases: Windows runners have no service containers.
+  stdlib-tests-windows:
+    name: Standard Library ${{ matrix.title }} Tests (GraalVM CE) (${{ inputs.os }}, amd64)
+    if: inputs.os == 'windows'
+    needs: [build-engine-distribution]
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      checks: write
+    env:
+      GRAAL_EDITION: GraalVM CE
+      ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
     strategy:
       # Each suite reports on its own, as when they were separate jobs.
       fail-fast: false
@@ -367,20 +506,41 @@ jobs:
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
       - name: Download the engine distribution
         uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (${{ inputs.os }}, amd64)
-      - run: ./run backend test ${{ matrix.suite }}
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: stdlib-tests
+          graalpy: "true"
+      # See Note [Standard Library Tests Without ./run].
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
+      - if: matrix.small-jdk
+        name: Build the small JDK
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
         env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - name: Run the Standard Library tests
+        run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }}
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
           ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
           ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1

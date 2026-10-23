@@ -9,6 +9,8 @@
     "toolchain-check": "node src/commands/toolchain-check.ts",
     "stdlib-api-check": "node src/commands/stdlib-api-check.ts",
     "ide-build": "node src/commands/ide-build.ts",
+    "stdlib-test": "node src/commands/stdlib-test.ts",
+    "junit-compare": "node src/commands/junit-compare.ts",
     "test:unit": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --cache --max-warnings=0"

@@ -59,14 +59,16 @@ The `./run` (or `run.cmd` / `run.ps1`) script at the repo root dispatches to the
 Enso build CLI (in `build_tools/cli/`) — the end-to-end orchestrator. It runs
 the CLI via `cargo run -p enso-build-cli`.
 
-CI is moving off `./run` (the build-simplification spec,
-`docs/superpowers/specs/2026-10-20-build-simplification-design.md`). Steps where
-`./run` only wraps one sbt call are moving to direct sbt calls, with
-`.github/actions/setup-jvm` providing GraalVM and sbt. The benchmarks and the
-engine checks' Enso lint use it, as do the formatting and enso4igv jobs, which
-never went through `./run`. `.github/CLAUDE.md` ("What still goes through
-`./run`") lists each CI step and when it moves. Locally, `./run` keeps working
-until Phase 5.
+CI runs no default pull-request check through `./run` any more (the
+build-simplification spec,
+`docs/superpowers/specs/2026-10-20-build-simplification-design.md`, Phases 2 and
+3): the workflows call sbt directly, with `.github/actions/setup-jvm` providing
+GraalVM, sbt, flatc and GraalPy, and run the logic that left `./run` from
+`tools/build-scripts` (`corepack pnpm --filter build-scripts run <command>`;
+`toolchain-check` compares a local toolchain with the pins). `.github/CLAUDE.md`
+("What still goes through `./run`") lists each step. Release, promote, the
+nightly checks and the label-gated macOS checks still use `./run` until Phase 4;
+locally, `./run` keeps working until Phase 5.
 
 ## Languages and toolchains
 

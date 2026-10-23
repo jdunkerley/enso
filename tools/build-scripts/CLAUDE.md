@@ -29,6 +29,16 @@ that Node runs as it is (type stripping): each command is
   code-signing ones), into `dist/ide`. `--sign` signs (release only). Locally:
   build the GUI into `dist/gui`, the bundle with `sbt buildEngineBundle` and
   copy `built-distribution/engine-bundle-*/enso` to `dist/backend` first.
+- `stdlib-test <suite>` — what `./run backend test <suite>` did: each selected
+  `test/*_Tests` project in turn, `enso --no-ir-caches --run`, with `./run`'s
+  arguments and environment (`src/stdlib-test/invocation.ts`), then one
+  `::error` naming the failures. It starts the HTTP test helper itself (sbt);
+  the caller provides the engine package, the small JDK for the JVM suite, and
+  the databases (`ENSO_POSTGRES_*`, `ENSO_SQLSERVER_*`; empty ones are dropped).
+  `--dry-run` prints the commands. Do not run it for real on a machine whose
+  environment holds real credentials.
+- `junit-compare <old> <new>` — compares two JUnit directories project by
+  project (pass, fail, skip); the gate for moving the tests off `./run`.
 
 ## Layout
 
@@ -38,7 +48,7 @@ that Node runs as it is (type stripping): each command is
   (`*.test.ts`).
 - `src/lib/` — shared helpers: the repository root and running programs
   (`repo.ts`), publishing to GitHub Actions (`github.ts`), finding the engine
-  package (`engine.ts`).
+  package (`engine.ts`), starting sbt (`sbt.ts`, the only module that may).
 
 ## Conventions
 
@@ -53,7 +63,7 @@ that Node runs as it is (type stripping): each command is
 - **Start programs with `capture` or `runInherited`** (`src/lib/repo.ts`). They
   go through the shell only for the Windows `.cmd`/`.bat` shims (`corepack`,
   `sbt`, …), which only the shell finds.
-- **Only `src/lib/sbt.ts` runs sbt tasks** (it arrives with the first command
+- **Only `src/lib/sbt.ts` runs sbt tasks** (`stdlib-test` is the first command
   that needs one). The workflow policy (`tools/ci/check-workflows.mjs`) fails
   any other module that starts sbt by name, and treats every command whose entry
   point imports that module as an sbt call, which must come after `setup-jvm`.
