@@ -30,10 +30,10 @@ settings. Every workflow is hand-written YAML: the Rust generator
   their `name:`; keep those names.
 - `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
   platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
-  `setup-jvm` (GraalVM, sbt and optionally `flatc` at the `toolchain:` pins in
-  `build-config.yaml`, plus the sbt dependency cache), `setup-msvc` (the MSVC
-  developer environment on Windows, for native images and the runtime DLL copy),
-  `git-clean`, `setup-build-scripts` (install `tools/build-scripts`'
+  `setup-jvm` (GraalVM, sbt, optionally `flatc` and GraalPy at the `toolchain:`
+  pins in `build-config.yaml`, plus the sbt dependency cache), `setup-msvc` (the
+  MSVC developer environment on Windows, for native images and the runtime DLL
+  copy), `git-clean`, `setup-build-scripts` (install `tools/build-scripts`'
   dependencies only), `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
@@ -84,33 +84,33 @@ settings. Every workflow is hand-written YAML: the Rust generator
 
 ## What still goes through `./run`
 
-Build simplification Phase 2 moves the steps where `./run` only wraps one sbt
-call: the benchmarks (PR 2b) and the engine checks' Enso lint (PR 2c), both
-done. The formatting and enso4igv jobs, which never went through `./run`, use
-`setup-jvm` too. A moved step sets every variable `./run` set for it: the
-Standard Library benchmarks keep `ENSO_LAUNCHER=native,-ls` (Note [Benchmarks
-Call sbt Directly] in `engine-benchmark.yml`). The rest need logic that is still
-in `./run`, and move in Phase 3 or 4. `./run` computes the version on every
-call. A job that runs a distribution built by another job must therefore use
-that job's version, not sbt's default `0.0.0-dev`: the Enso lint takes it from
-the build job's outputs (Note [Lint Reads The Distribution's Version] in
-`engine-checks-platform.yml`).
+Build simplification Phases 2 and 3 moved every pull-request check off `./run`.
+Where it only wrapped one sbt call, the workflows call sbt (Phase 2). Its real
+logic went to sbt tasks (`checkEnsoSyntax`, `ciBuildEngineDistribution`,
+`buildEngineBundle`), to `tools/build-scripts` (`version`, `stdlib-api-check`,
+`ide-build`, `stdlib-test`), or to plain workflow steps (the JVM tests) (Phase
+3). A moved step sets every variable `./run` set for it; the Notes in each
+workflow say which. A job that runs a distribution built by another job uses
+that job's version, from its outputs, not sbt's default `0.0.0-dev`: see Note
+[Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
+Release, promote, the nightly checks and the macOS checks still call `./run`
+until Phase 4.
 
-| Workflow › job                                           | Step                                                         | Goes through `./run`?         |
-| -------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------- |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                      | No: `setup-jvm`               |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)          | No: `setup-jvm`               |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)              | No: `setup-jvm`               |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                  | No: `setup-jvm`               |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                        | No: `setup-jvm`               |
-| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"` | No: `setup-jvm`, `setup-msvc` |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])               | No: `setup-jvm`, `setup-msvc` |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`  | No: `setup-build-scripts`     |
-| `engine-checks-platform.yml` › stdlib tests              | `./run backend test …`                                       | Yes: Phase 3 (`stdlib-test`)  |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                  | No                            |
-| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`         | No: `setup-jvm`, `setup-msvc` |
-| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`         | No: `setup-build-scripts`     |
-| release, promote, nightly, nightly checks, macOS         | various                                                      | Yes: Phase 4                  |
+| Workflow › job                                           | Step                                                           | Goes through `./run`?                            |
+| -------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------ |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                        | No: `setup-jvm`                                  |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)            | No: `setup-jvm`                                  |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                | No: `setup-jvm`                                  |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                    | No: `setup-jvm`                                  |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                          | No: `setup-jvm`                                  |
+| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`   | No: `setup-jvm`, `setup-msvc`                    |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                 | No: `setup-jvm`, `setup-msvc`                    |
+| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`    | No: `setup-build-scripts`                        |
+| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>` | No: `setup-jvm` (GraalPy), `setup-build-scripts` |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                    | No                                               |
+| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`           | No: `setup-jvm`, `setup-msvc`                    |
+| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`           | No: `setup-build-scripts`                        |
+| release, promote, nightly, nightly checks, macOS         | various                                                        | Yes: Phase 4                                     |
 
 ## Checking a change
 
