@@ -55,11 +55,18 @@ jobs:
       - name: Compile the build script
         uses: ./.github/actions/build-script
 
+  # Note [Engine Bundle Without ./run]
+  # ==================================
+  # `./run backend get` is the sbt task `buildEngineBundle` (project/EngineBundle.scala): the engine
+  # distribution, the IR cache check, the MSVC runtime DLLs on Windows (`setup-msvc` provides the
+  # environment), the small JDK, and the bundle in
+  # `built-distribution/engine-bundle-<version>-<os>-amd64/enso`, which is archived as it is
+  # (`./run` mirrored it to `dist/backend` first). sbt is called as `./run` called it; the version
+  # comes from `tools/build-scripts` (`version`), and `ENSO_LAUNCHER` stays `native`. As in Note
+  # [Engine Distribution Without ./run] (`engine-checks-platform.yml`), "Install the Rust toolchain"
+  # installs the `rust-toolchain.toml` toolchain before sbt starts several `cargo` calls at once.
   build-backend:
     name: Build Backend (${{ matrix.os }}, amd64)
-    needs: [build-script]
-    # See Note [Platform Legs Run Despite The Other Platform's Failure].
-    if: ${{ !cancelled() && needs.build-script.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -76,35 +83,29 @@ jobs:
         uses: actions/checkout@v5
         with:
           clean: false
-      - name: Set up the build script
-        uses: ./.github/actions/setup-build-script
+      - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - name: Restore sbt / Coursier downloads
-        uses: actions/cache/restore@v4
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-          restore-keys: sbt-deps-${{ runner.os }}-
-      - run: ./run backend get
+          cache-key: build-backend
+          flatc: "true"
+      - name: Set up MSVC
+        uses: ./.github/actions/setup-msvc
+      # See Note [Engine Bundle Without ./run]: one install before sbt starts several cargo calls.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install --no-self-update
+      - id: version
+        name: Compute the version
+        run: corepack pnpm --filter build-scripts run version
+      - name: Build the engine bundle
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "clean; all buildEngineBundle"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
-        name: Save sbt / Coursier downloads
-        uses: actions/cache/save@v4
-        with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - if: matrix.os == 'linux'
         name: Upload Edition File
         uses: actions/upload-artifact@v5
@@ -118,7 +119,7 @@ jobs:
           name: fbs-schema
           path: engine/language-server/src/main/schema/
       - name: Archive backend
-        run: tar -cvf backend.tar -C dist/backend .
+        run: tar -cvf backend.tar -C built-distribution/engine-bundle-${{ steps.version.outputs.ENSO_VERSION }}-${{ matrix.os }}-amd64/enso .
       - name: Upload backend
         uses: actions/upload-artifact@v5
         with:
