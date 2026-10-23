@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { EnsoRunner } from '../ensoRunner.js'
 import { ProjectService } from '../index.js'
 import { Path } from '../types.js'
+import { RUNNING_PROJECTS_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
@@ -34,12 +35,6 @@ if (args.includes('--server')) {
 }
 `
 
-/**
- * Clear of the ports other test files' engines use, real or fake: they run in other processes, so
- * a port both find free goes to whichever binds it first, and the other engine exits with code 1.
- */
-const FIRST_PORT = 42_616
-
 let root: string
 let runner: EnsoRunner
 
@@ -60,7 +55,7 @@ async function fakeEnso(directory: string): Promise<Path> {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'running-projects-'))
-  runner = new EnsoRunner(await fakeEnso(root), { firstPort: FIRST_PORT })
+  runner = new EnsoRunner(await fakeEnso(root), { firstPort: RUNNING_PROJECTS_PORT })
 })
 
 afterEach(async () => {

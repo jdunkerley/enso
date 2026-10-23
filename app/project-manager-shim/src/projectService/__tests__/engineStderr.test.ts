@@ -11,6 +11,7 @@ import * as path from 'node:path'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { EnsoRunner, type EngineLogSink } from '../ensoRunner.js'
 import { Path } from '../types.js'
+import { ENGINE_STDERR_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
@@ -36,12 +37,6 @@ const crash = setInterval(() => {
   }
 }, 20)
 `
-
-/**
- * Clear of the ports other test files' engines use, real or fake: they run in other processes, so
- * a port both find free goes to whichever binds it first, and the other engine exits with code 1.
- */
-const FIRST_PORT = 41_616
 
 let root: string
 let runner: EnsoRunner
@@ -77,7 +72,7 @@ function recordingSink() {
 
 beforeEach(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), 'engine-stderr-'))
-  runner = new EnsoRunner(await fakeEnso(root), { firstPort: FIRST_PORT })
+  runner = new EnsoRunner(await fakeEnso(root), { firstPort: ENGINE_STDERR_PORT })
 })
 
 afterEach(async () => {
