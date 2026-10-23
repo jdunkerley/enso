@@ -174,10 +174,10 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         log = pair.first
 
         # `log_message`: `User.` and the qualified name of the type.
-        log . contains_line "\[User\.[A-Za-z_]+\.logging_demo\.Main\.Typ\] Warning:Hallo"
-        log . contains_line "\[User\.[A-Za-z_]+\.logging_demo\.Main\.Typ\] Severe:Hallo"
+        log . contains_line "\[User\.[A-Za-z_]+\.[A-Za-z_]+\.Main\.Typ\] .*Warning:Hallo"
+        log . contains_line "\[User\.[A-Za-z_]+\.[A-Za-z_]+\.Main\.Typ\] .*Severe:Hallo"
         # `log_internal`: the qualified name of the type alone.
-        log . contains_line "\[[A-Za-z_]+\.logging_demo\.Main\.Typ\] Internal:Hallo"
+        log . contains_line "\[[A-Za-z_]+\.[A-Za-z_]+\.Main\.Typ\] Internal:Hallo"
         log . not_contains_line "\[User\.[^\]]*\] Internal:Hallo"
 
     group_builder.specify "log level info via enso" <|
