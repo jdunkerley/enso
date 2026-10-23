@@ -20,9 +20,12 @@ onto the Phase 3 reusable workflow, so that Phase 5 can delete `build_tools/`.
 - **4b** rewrites `release.yml`, `promote.yml` and `nightly.yml` by hand on that
   command, sbt `buildEngineBundle` and `ide-build`, in the matrix style of
   `ide-packaging.yml`, and moves the workflow policy's release rules with them.
-  It merges only after the user has started an rc release from the branch, the
-  controller has compared it with rc.4, and the user has updated rc.4 → rc.5 in
-  the app. Then the nightly release is re-enabled.
+  `release.yml` gains a `publish` input (default `true`) and a `release-id`
+  mode, so that a release can stop at a filled draft and be published later. 4b
+  merges only after the user has started rc.5 from the branch as a draft, the
+  controller has checked the draft against rc.4, the user has had it published
+  and has updated rc.4 → rc.5 in the app. Then the nightly release is
+  re-enabled.
 - **4c** generalises `engine-checks-platform.yml` (macOS, `aarch64`, Oracle
   GraalVM, optional JVM tests and Linux checks, a JSON runner) and adds an
   `edition` to `setup-jvm`; `engine-checks-nightly.yml`,
@@ -74,22 +77,38 @@ overturn any of them at plan review; each says what changes if they do.
 3. **Installers: electron-builder builds with `publish: 'never'` (it already
    does), and `release upload-ide` uploads the installer, its `.sha256`, the
    `.blockmap` and the `latest*.yml` feed to the draft by its release id.** The
-   client is plain `fetch` over the REST API, not `gh` (which addresses a
-   release by tag and cannot pick a draft by id) and not Octokit (a new
-   dependency). File names are unchanged, so `electron-updater` keeps working:
-   it reads `latest.yml` / `latest-linux.yml` from the release whose tag shares
-   the installed version's prerelease channel (`rc` → `rc`), exactly as
-   rc.1–rc.4 did. _If overturned (Octokit):_ swap `src/lib/githubApi.ts`' body;
-   its interface stays.
-4. **Gate for 4b: an rc prerelease, then the user's in-app update, before
-   merging.** The user dispatches `promote.yml` with `designator=rc` from the 4b
-   branch (2026.1.1-rc.5), or explicitly authorises the controller to make that
-   one dispatch. The controller compares rc.5 with rc.4 (`release-parity.sh`:
-   assets, content types, feeds, checksums, body, flags, the latest-version
-   step). The user then updates an installed rc.4 to rc.5 from the app. Only
-   then does 4b merge, and only after that, with the user's go-ahead, is
-   `nightly.yml` re-enabled (`gh workflow enable nightly.yml`). Every one of
-   these is a STOP step in Task 7.
+   client is plain `fetch` over the REST API, not Octokit (a new dependency) and
+   not `gh`: `gh release upload` finds a draft by its tag, but after a re-run
+   two drafts can share a tag, and the upload needs its own content types, retry
+   and replacement rules (R1, R3). File names are unchanged, so
+   `electron-updater` keeps working: it reads `latest.yml` / `latest-linux.yml`
+   from the release whose tag shares the installed version's prerelease channel
+   (`rc` → `rc`), exactly as rc.1–rc.4 did. _If overturned (Octokit):_ swap
+   `src/lib/githubApi.ts`' body; its interface stays.
+4. **Gate for 4b: rc.5 as a checked draft, then published, then the user's
+   in-app update, before merging.** Nothing the new pipeline produces is public
+   before it has been checked (a public prerelease is offered at once to every
+   installed rc that includes prereleases). In order, each a STOP step in Task
+   7:
+   1. with the Mac online, the user dispatches `promote.yml` with
+      `designator=rc` and `publish=false` from the 4b branch (or authorises the
+      controller to make that one dispatch): it builds 2026.1.1-rc.5 and stops
+      at the filled draft;
+   2. the controller checks the draft against rc.4 (`release-parity.sh` with the
+      draft's id: assets, content types, states, both feeds' versions, sizes and
+      sha512s against the downloaded installers, the `.sha256` files, the body);
+   3. the user OKs publishing;
+   4. the user dispatches (or authorises) `release.yml` with `release-id` = the
+      draft's id and `version=2026.1.1-rc.5`, which publishes that draft and
+      runs the latest-version step;
+   5. the user updates an installed rc.4 to rc.5 from the app;
+   6. 4b merges;
+   7. with the user's go-ahead, `nightly.yml` is re-enabled
+      (`gh workflow enable nightly.yml`).
+
+   No GitHub environment with required reviewers: it needs a settings change and
+   would hold the unattended nightlies.
+
 5. **The macOS release stays, gated as today.** `check-the-mac-os-runner` waits
    one minute for the self-hosted Mac (`wait-for-macos-runner.sh 1 skip`); when
    it is offline the macOS jobs are skipped, `continue-on-error` keeps a failing
@@ -200,9 +219,10 @@ overturn any of them at plan review; each says what changes if they do.
   `gui-checks.yml`'s dead variables (Ticket 1), Sentry in the GUI build (Ticket
   2).
 
-`$SCRATCH` is the executing session's scratchpad directory. All `gh` commands
-assume `GH_REPO=jdunkerley/enso` (export it, or run them inside a checkout of
-the fork).
+`$SCRATCH` is the executing session's scratchpad directory. Every helper script
+sets `GH_REPO=jdunkerley/enso` unless it is already set; the `gh` commands in
+the steps assume it too (export it in each shell, or run them inside a checkout
+of the fork).
 
 ---
 
@@ -212,11 +232,11 @@ Worktrees are created from `origin/develop` under `C:\Repos\Enso\`, with
 `git -C /c/Repos/Enso/ide worktree add <dir> -b <branch> origin/develop`, then
 `corepack pnpm install --frozen-lockfile --ignore-scripts` inside it.
 
-| PR  | Branch                     | Worktree    | Tasks | Needs merged first | Validated by                                                                                                                 |
-| --- | -------------------------- | ----------- | ----- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| 4a  | `ci/release-build-scripts` | `ide-bs-4a` | 1–4   | —                  | "Build Scripts" CI (typecheck, lint, 168 tests on Linux); `release promote rc` prints `2026.1.1-rc.5` locally                |
-| 4b  | `ci/release-workflows`     | `ide-bs-4b` | 5–7   | 4a                 | Workflow Lint and ✨ IDE; then rc.5 from the branch, `release-parity.sh` against rc.4, and the user's in-app update (Task 7) |
-| 4c  | `ci/nightly-checks`        | `ide-bs-4c` | 8–9   | 4b                 | ✨ Engine (the comparison shows only D9–D10); `CI: macOS …` labels on the PR; the user's dispatch of each nightly workflow   |
+| PR  | Branch                     | Worktree    | Tasks | Needs merged first | Validated by                                                                                                                                            |
+| --- | -------------------------- | ----------- | ----- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4a  | `ci/release-build-scripts` | `ide-bs-4a` | 1–4   | —                  | "Build Scripts" CI (typecheck, lint, 176 tests on Linux); `release promote rc` prints `2026.1.1-rc.5` locally                                           |
+| 4b  | `ci/release-workflows`     | `ide-bs-4b` | 5–7   | 4a                 | Workflow Lint and ✨ IDE; then rc.5 as a draft from the branch, checked against rc.4, published on the user's OK, and the user's in-app update (Task 7) |
+| 4c  | `ci/nightly-checks`        | `ide-bs-4c` | 8–9   | 4b                 | ✨ Engine (the comparison shows only D9–D10); `CI: macOS …` labels on the PR; the user's dispatch of each nightly workflow                              |
 
 - 4c's Task 8 touches no file 4b touches and may start while 4b waits for its
   gate; Task 9 edits the policy and `.github/CLAUDE.md` after 4b's changes, so
@@ -253,17 +273,17 @@ Counts are `run:` steps that execute `./run`
 
 ### What the release did besides the commands, and where it goes
 
-| `./run` behaviour                                                                                                           | Phase 4                                                                                                                          |
-| --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Version from `ENSO_VERSION`/`ENSO_EDITION` (the workflow `env`), published before every command                             | `releaseVersion` (strict, Decision 7); `create-draft` and `promote` publish the triple under the same names                      |
-| Tag-collision checks (`releases/tags/<tag>` published → error; `git/ref/tags/<tag>` exists → error; HEAD = `GITHUB_SHA`)    | `createDraft`, same order and messages                                                                                           |
-| Body: Handlebars template, download links for all three targets, top section of `CHANGELOG.md`                              | `releaseBody` (Decision 6)                                                                                                       |
-| `publish`: note for missing installers (restating tag and target), publish, upload `assets.json`, check every download      | `publishRelease`: note, one PATCH that restates tag and target and sets `draft: false`, no `assets.json` (Decision 2), the check |
-| `ide upload`: image, `.sha256`, then the update files that exist (Windows/Linux blockmap + feed; macOS feed, zip, blockmap) | `ideUploadFiles` + `uploadIdeAssets`, same order and names, retried as `ide_ci::io::retry` (5 more, 0.5 s × 1.5)                 |
-| Upload content type from the extension (`mime_guess`)                                                                       | `contentType`: `.exe`, `.yml`, `.json`, `.zip`, else `application/octet-stream` (what rc.4's assets show)                        |
-| `ENSO_BUILD_UPDATE_INFO=true` on the IDE jobs (blockmaps)                                                                   | Same, job `env`                                                                                                                  |
-| `ENSO_BUILD_SKIP_VERSION_CHECK`, `RUST_BACKTRACE`, the "Expose Artifact API" step, `GITHUB_TOKEN` on every step             | Gone: only `./run` read them; `GITHUB_TOKEN` stays on the steps that call GitHub                                                 |
-| Clean before/after on `develop` (always, in the IDE jobs)                                                                   | Always, every job (`ENSO_CI_CLEAN_BUILD: "true"`, Decision 8)                                                                    |
+| `./run` behaviour                                                                                                                                            | Phase 4                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Version from `ENSO_VERSION`/`ENSO_EDITION` (the workflow `env`), published before every command                                                              | `releaseVersion` (strict, Decision 7); `create-draft` and `promote` publish the triple under the same names                                                                                                              |
+| Tag-collision checks (`releases/tags/<tag>` published → error; `git/ref/tags/<tag>` exists → error; HEAD = `GITHUB_SHA`)                                     | `createDraft`, same order and messages                                                                                                                                                                                   |
+| Body: Handlebars template, download links for all three targets, top section of `CHANGELOG.md`                                                               | `releaseBody` (Decision 6)                                                                                                                                                                                               |
+| `publish`: note for missing installers (restating tag and target), publish, upload `assets.json`, check every download                                       | `publishRelease`: refuses a draft whose tag is not the version or that has an asset not fully `uploaded`; note; one PATCH that restates tag and target and sets `draft: false`; no `assets.json` (Decision 2); the check |
+| `ide upload`: image, `.sha256`, then the update files that exist (Windows/Linux blockmap + feed; macOS feed, zip, blockmap), to the release id, draft or not | `ideUploadFiles` + `uploadIdeAssets`, same order and names, retried as `ide_ci::io::retry` (5 more, 0.5 s × 1.5); a draft's same-named assets are replaced, a published release's never are (R3)                         |
+| Upload content type from the extension (`mime_guess`)                                                                                                        | `contentType`: `.exe`, `.yml`, `.json`, `.zip`, else `application/octet-stream` (what rc.4's assets show)                                                                                                                |
+| `ENSO_BUILD_UPDATE_INFO=true` on the IDE jobs (blockmaps)                                                                                                    | Same, job `env`                                                                                                                                                                                                          |
+| `ENSO_BUILD_SKIP_VERSION_CHECK`, `RUST_BACKTRACE`, the "Expose Artifact API" step, `GITHUB_TOKEN` on every step                                              | Gone: only `./run` read them; `GITHUB_TOKEN` stays on the steps that call GitHub                                                                                                                                         |
+| Clean before/after on `develop` (always, in the IDE jobs)                                                                                                    | Always, every job (`ENSO_CI_CLEAN_BUILD: "true"`, Decision 8)                                                                                                                                                            |
 
 ## File map
 
@@ -298,7 +318,8 @@ mistake.
 | D5  | 4b  | `release.yml`: "Update the latest release version" has `if: "!cancelled() && needs.publish-release.result == 'success'"`; the sbt cache comes from `setup-jvm` (`cache-key: engine`) instead of hand-written steps keyed `sbt-deps-<OS>`                                                                                                                                                             | Decision 5; Decision 10                                                          |
 | D6  | 4b  | `promote.yml`: one job "Promote release (linux, amd64)" with three outputs, then `release.yml`; no "Build Script" job or clean steps. `nightly.yml`: no `env`                                                                                                                                                                                                                                        | The move                                                                         |
 | D7  | 4b  | The release's body: no "Anonymous Data Collection" section, no HTML entities, no leading blank lines                                                                                                                                                                                                                                                                                                 | Decision 6                                                                       |
-| D8  | 4b  | The policy's release rules name the new job ids and steps; `RELEASE_SECRETS` is `GITHUB_TOKEN` and `RUNNER_STATUS_TOKEN`; a new rule for the latest-version job's `if`                                                                                                                                                                                                                               | The rules follow the workflow                                                    |
+| D13 | 4b  | `release.yml`: inputs `publish` (boolean, default `true`) and `release-id` (default `""`); the five root build jobs run only when `release-id` is empty; "Publish release" runs when `release-id` is set, or when `publish` and the results allow, with `ENSO_RELEASE_ID` from the input or the draft job. `promote.yml`: input `publish`, passed on. The nightly uses the defaults                  | Decision 4 (Note [Publishing Later])                                             |
+| D8  | 4b  | The policy's release rules name the new job ids and steps; `RELEASE_SECRETS` is `GITHUB_TOKEN` and `RUNNER_STATUS_TOKEN`; a new rule for the latest-version job's `if`; the publish job's `if` must test `inputs.publish`                                                                                                                                                                            | The rules follow the workflow                                                    |
 | D9  | 4c  | Every job that uses `setup-jvm` (engine, IDE backend, formatting, enso4igv, release): "Read the pinned versions" starts with the `EDITION` check (`env: EDITION=community`), and "Check the toolchain" greps `$GRAALVM_VENDOR $GRAALVM_VERSION` (`GRAALVM_VENDOR` in its `env`)                                                                                                                      | `setup-jvm`'s `edition` input; `compare.sh` inlines composite actions            |
 | D10 | 4c  | `engine-checks-platform.yml`: every job's `runs-on` is `${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) \|\| inputs.runner }}` (`compare.sh` prints it with the runner substituted); the Windows standard-library job's id is `stdlib-tests-without-services`. Names, artifacts and steps are unchanged for the pull-request callers (the new inputs' defaults reproduce them)         | The JSON runner for the Mac; the job also serves macOS                           |
 | D11 | 4c  | `engine-checks-nightly.yml`, `macos-checks.yml`, `extra-nightly-tests.yml`: rewritten as calls; their job names gain the caller's prefix (`linux / …`, `macos / …`, `linux (Oracle GraalVM) / …`)                                                                                                                                                                                                    | The move                                                                         |
@@ -324,8 +345,9 @@ mistake.
   - `compare.sh <worktree> <workflow file>…` — the job-by-job comparison against
     `origin/develop`, as Markdown;
   - `report-titles.sh <sha>` — the test reporters' check runs on a commit;
-  - `release-parity.sh <old tag> <new tag> <work dir>` — the read-only
-    comparison of two published releases (Task 7);
+  - `release-parity.sh <old tag> <new tag | draft id> <work dir>` — the
+    read-only comparison of a new release, published or still a draft, with an
+    older published one, down to the installers' sha512s (Task 7);
   - `edit-github-claude.py <file> 4b|4c` — the `.github/CLAUDE.md` edits of
     Tasks 5 and 9;
   - `baseline.md` — the reference runs.
@@ -352,7 +374,9 @@ Expected: develop at or after `c848ae9746`; the counts `release: 20`,
 are `active`; the newest releases are `2026.1.1-nightly.2026.10.23`,
 `…nightly.2026.10.22` and `2026.1.1-rc.4` … `rc.1`, all prereleases; no draft
 release; no Phase 4 PR open. If a count differs, stop and report: develop moved
-under this plan.
+under this plan. **If `nightly.yml` is not `disabled_manually`, stop and ask the
+user**: with the nightly enabled, 4b's merge would let the next 02:00 run take
+the new pipeline before Task 7's go-ahead.
 
 - [ ] **Step 2: Check the tools**
 
@@ -374,6 +398,7 @@ launcher (memory: `python` is the Store stub).
 # Usage: wait-pr.sh <pr-number> [max-minutes]
 # Waits until no check on the PR is pending (or the time cap), then prints every
 # check that did not pass. Exit 0 = all passed, 1 = some failed, 2 = timed out.
+export GH_REPO=${GH_REPO:-jdunkerley/enso}
 pr=$1
 deadline=$(( $(date +%s) + ${2:-240} * 60 ))
 while :; do
@@ -395,6 +420,7 @@ exit 0
 # Usage: wait-run.sh <run-id> [max-minutes]
 # Waits for one workflow run to complete (or the time cap) and prints its conclusion.
 # Exit 0 = success, 1 = any other conclusion, 2 = timed out.
+export GH_REPO=${GH_REPO:-jdunkerley/enso}
 run=$1
 deadline=$(( $(date +%s) + ${2:-300} * 60 ))
 while :; do
@@ -415,6 +441,7 @@ echo "$conclusion"
 #!/usr/bin/env bash
 # Usage: job-times.sh <run-id>
 # One line per job: conclusion, wall-clock minutes, display name.
+export GH_REPO=${GH_REPO:-jdunkerley/enso}
 gh run view "$1" --json jobs \
   --jq '.jobs[] | "\(.conclusion)\t\((((.completedAt // .startedAt | fromdateiso8601) - (.startedAt | fromdateiso8601)) / 60) | floor)m\t\(.name)"'
 ```
@@ -444,6 +471,7 @@ node "$script" --base origin/develop "$@"
 # Usage: report-titles.sh <commit-sha>
 # The test reporters' check runs on a commit (dorny/test-reporter): name and title, which holds
 # the passed, failed and skipped counts.
+export GH_REPO=${GH_REPO:-jdunkerley/enso}
 gh api "repos/{owner}/{repo}/commits/$1/check-runs?per_page=100" --paginate \
   --jq '.check_runs[] | select(.name | test("Tests Report")) | "\(.name)\t\(.output.title)"' | sort
 ```
@@ -454,68 +482,111 @@ two nightlies):
 <!-- prettier-ignore -->
 ```bash
 #!/usr/bin/env bash
-# Usage: release-parity.sh <old tag> <new tag> <work dir>
-# Compares two published releases of this repository (read-only): their flags, their assets (names
-# with the version replaced, content types, and sizes against each `latest*.yml` feed), the
-# checksums' form, and the bodies (the new one's download links and changelog section). Prints a
-# report; exits 1 when something that must match does not.
+# Usage: release-parity.sh <old tag> <new tag | new draft's release id> <work dir>
+# Compares a new release with an older published one, read-only. A numeric second argument is a
+# draft (by id, as a release test leaves it before publishing); otherwise a published tag.
+# - flags: the new release is a draft (by id) or published (by tag), named "Enso <version>";
+# - assets: names (version replaced by VERSION) and content types equal the old release's, apart
+#   from `assets.json`; every asset's state is `uploaded`;
+# - feeds: each `latest*.yml` names the version, and the installer it points at has the feed's
+#   size and sha512, and the `.sha256` beside it matches (the installers are downloaded, ~1.7 GB;
+#   PARITY_INSTALLERS=0 skips that and checks only sizes);
+# - body: a "# Changelog" section, no HTML entities, and download links to uploaded installers.
+# Prints a report; exits 1 when something that must match does not.
 set -euo pipefail
+export GH_REPO=${GH_REPO:-jdunkerley/enso}
 old=$1 new=$2 work=$3
 mkdir -p "$work/old" "$work/new"
 status=0
 fail() { echo "MISMATCH: $*"; status=1; }
 
-echo "== flags (draft, prerelease, name, tag)"
-for tag in "$old" "$new"; do
-  gh release view "$tag" --json isDraft,isPrerelease,name,tagName \
-    --jq '"\(.tagName)\tdraft=\(.isDraft)\tprerelease=\(.isPrerelease)\t\(.name)"'
-done
-[ "$(gh release view "$new" --json isDraft --jq .isDraft)" = false ] || fail "$new is still a draft"
-[ "$(gh release view "$new" --json name --jq .name)" = "Enso $new" ] || fail "$new is not named Enso $new"
-
-echo "== assets (name with the version as VERSION, content type)"
-assets() {
-  gh release view "$1" --json assets --jq '.assets[] | "\(.name)\t\(.contentType)"' |
-    sed "s/$(printf '%s' "$1" | sed 's/[.]/[.]/g')/VERSION/g" | LC_ALL=C sort
-}
-assets "$old" > "$work/old/assets.tsv"
-assets "$new" > "$work/new/assets.tsv"
-cat "$work/new/assets.tsv"
-# `assets.json` is gone on purpose (Decision 2); every other asset must match.
-if ! diff <(grep -v '^assets.json' "$work/old/assets.tsv") "$work/new/assets.tsv"; then
-  fail "asset names or content types differ (beyond assets.json)"
+gh api "repos/$GH_REPO/releases/tags/$old" > "$work/old/release.json"
+if [[ $new =~ ^[0-9]+$ ]]; then
+  mode=draft
+  gh api "repos/$GH_REPO/releases/$new" > "$work/new/release.json"
+else
+  mode=published
+  gh api "repos/$GH_REPO/releases/tags/$new" > "$work/new/release.json"
 fi
+jsonf() { node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const v=process.argv[2].split(".").reduce((a,k)=>a?.[k],r);console.log(typeof v==="object"?JSON.stringify(v):v)' "$work/$1/release.json" "$2"; }
+tag=$(jsonf new tag_name)
+
+echo "== flags ($mode)"
+for side in old new; do
+  echo "$side: $(jsonf $side tag_name) draft=$(jsonf $side draft) prerelease=$(jsonf $side prerelease) name=$(jsonf $side name)"
+done
+[ "$(jsonf new draft)" = "$([ $mode = draft ] && echo true || echo false)" ] || fail "draft flag is $(jsonf new draft) for a $mode release"
+[ "$(jsonf new name)" = "Enso $tag" ] || fail "the release is not named Enso $tag"
+
+echo "== assets (name with the version as VERSION, content type, state)"
+assets() {
+  # shellcheck disable=SC2016 # JavaScript, not shell
+  node -e 'const r=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));for(const a of r.assets)console.log(`${a.name}\t${a.content_type}\t${a.state}\t${a.size}\t${a.id}`)' "$work/$1/release.json"
+}
+assets old > "$work/old/assets-full.tsv"
+assets new > "$work/new/assets-full.tsv"
+shape() {
+  local version
+  version=$(jsonf "$1" tag_name | sed 's/[.]/[.]/g')
+  cut -f1,2 "$work/$1/assets-full.tsv" | sed "s/$version/VERSION/g" | grep -v '^assets.json' | LC_ALL=C sort
+}
+shape old > "$work/old/assets.tsv"
+shape new > "$work/new/assets.tsv"
+cat "$work/new/assets.tsv"
+# `assets.json` is gone on purpose (Decision 2), so it is left out on both sides.
+diff "$work/old/assets.tsv" "$work/new/assets.tsv" || fail "asset names or content types differ"
+awk -F'\t' '$3 != "uploaded" { print "MISMATCH: " $1 " is " $3 }' "$work/new/assets-full.tsv" | grep . && status=1
+
+download() { # <asset name> <file>
+  local id
+  id=$(awk -F'\t' -v n="$1" '$1 == n { print $5 }' "$work/new/assets-full.tsv")
+  [ -n "$id" ] || { fail "$1 is not uploaded"; return 1; }
+  gh api -H 'Accept: application/octet-stream' "repos/$GH_REPO/releases/assets/$id" > "$2"
+}
 
 echo "== feeds and checksums"
-gh release download "$new" -D "$work/new" -p 'latest*.yml' -p '*.sha256' --clobber
-for feed in "$work"/new/latest*.yml; do
-  file=$(awk '/^path:/ { print $2 }' "$feed")
-  size=$(awk '/^ *size:/ { print $2; exit }' "$feed")
-  version=$(awk '/^version:/ { print $2 }' "$feed")
-  actual=$(gh release view "$new" --json assets --jq ".assets[] | select(.name == \"$file\") | .size")
-  echo "$(basename "$feed"): version $version, $file, feed size $size, asset size ${actual:-missing}"
-  [ "$version" = "$new" ] || fail "$(basename "$feed") names version $version"
-  [ "$size" = "$actual" ] || fail "$(basename "$feed") size $size differs from $file's $actual"
-done
-for sum in "$work"/new/*.sha256; do
-  grep -qxE '[0-9a-f]{64}' "$sum" || fail "$(basename "$sum") is not one sha256 digest"
-done
+while IFS= read -r feed; do
+  download "$feed" "$work/new/$feed"
+  file=$(awk '/^path:/ { print $2 }' "$work/new/$feed")
+  size=$(awk '/^ *size:/ { print $2; exit }' "$work/new/$feed")
+  sha512=$(awk '/^sha512:/ { print $2 }' "$work/new/$feed")
+  version=$(awk '/^version:/ { print $2 }' "$work/new/$feed")
+  actual=$(awk -F'\t' -v n="$file" '$1 == n { print $4 }' "$work/new/assets-full.tsv")
+  echo "$feed: version $version, $file, feed size $size, asset size ${actual:-missing}"
+  [ "$version" = "$tag" ] || fail "$feed names version $version"
+  [ "$size" = "$actual" ] || fail "$feed size $size differs from $file's ${actual:-missing}"
+  if [ "${PARITY_INSTALLERS:-1}" != 0 ]; then
+    download "$file" "$work/new/$file"
+    got=$(openssl dgst -sha512 -binary "$work/new/$file" | openssl base64 -A)
+    [ "$got" = "$sha512" ] || fail "$file's sha512 is not the one $feed names"
+    sum=${file%.*}.sha256
+    download "$sum" "$work/new/$sum"
+    [ "$(tr -d '\r\n' < "$work/new/$sum")" = "$(sha256sum "$work/new/$file" | cut -d' ' -f1)" ] ||
+      fail "$sum does not match $file"
+    echo "$file: sha512 and $sum match"
+    rm -f "$work/new/$file"
+  fi
+done < <(cut -f1 "$work/new/assets-full.tsv" | grep -E '^latest.*[.]yml$')
+while IFS= read -r sum; do
+  download "$sum" "$work/new/$sum"
+  grep -qxE '[0-9a-f]{64}' "$work/new/$sum" || fail "$sum is not one sha256 digest"
+done < <(cut -f1 "$work/new/assets-full.tsv" | grep '[.]sha256$')
 
 echo "== bodies"
-gh release view "$old" --json body --jq .body > "$work/old/body.md"
-gh release view "$new" --json body --jq .body > "$work/new/body.md"
+jsonf old body > "$work/old/body.md"
+jsonf new body > "$work/new/body.md"
 grep -oE 'https://github\.com/[^)]+/releases/download/[^)]+' "$work/new/body.md" |
   while IFS= read -r link; do
     name=${link##*/}
-    gh release view "$new" --json assets --jq '.assets[].name' | grep -qxF "$name" ||
+    grep -q "^$name	" "$work/new/assets-full.tsv" ||
       echo "note: the body links $name, which is not uploaded (a skipped platform; publish adds a note)"
   done
 grep -q '^# Changelog$' "$work/new/body.md" || fail "the body has no Changelog section"
 if grep -qE '&#x[0-9A-F]+;|&quot;|&amp;' "$work/new/body.md"; then
-  fail "the body still has HTML entities"
+  fail "the body has HTML entities"
 fi
-echo "Body diff (old to new) is in $work/body.diff"
 diff "$work/old/body.md" "$work/new/body.md" > "$work/body.diff" || true
+echo "Body diff (old to new) is in $work/body.diff"
 exit $status
 ```
 
@@ -618,14 +689,17 @@ Make them executable (`chmod +x "$SCRATCH"/*.sh`) and try the parity script on
 two existing releases:
 
 ```bash
-"$SCRATCH/release-parity.sh" 2026.1.1-rc.3 2026.1.1-rc.4 "$SCRATCH/parity-selftest"; echo "exit $?"
+PARITY_INSTALLERS=0 "$SCRATCH/release-parity.sh" 2026.1.1-rc.3 2026.1.1-rc.4 "$SCRATCH/parity-selftest"; echo "exit $?"
 ```
 
 Expected: exit 1, with exactly two mismatches, both genuine: rc.3 had no macOS
-installer (the asset diff shows the two `enso-mac-arm64-VERSION` lines), and
-rc.4's body has HTML entities (Decision 6). The feeds line up:
+installer (the asset diff shows the two `enso-mac-arm64-VERSION` lines;
+`assets.json` is left out on both sides), and rc.4's body has HTML entities
+(Decision 6). The feeds line up:
 `latest-linux.yml: version 2026.1.1-rc.4, … feed size 916435254, asset size 916435254`
-and the same for `latest.yml` (756943715).
+and the same for `latest.yml` (756943715). (`PARITY_INSTALLERS=0` skips
+downloading the installers; Task 7 runs it in full, which downloads about 1.7 GB
+and checks each feed's sha512 and each `.sha256`.)
 
 - [ ] **Step 4: Record the baseline**
 
@@ -668,7 +742,11 @@ Nothing is committed in this task.
   - `interface ReleaseAsset { id: number; name: string; state: string }`;
   - `interface Release { id; tag_name; target_commitish; name: string | null; draft; prerelease; body: string | null; html_url; assets: readonly ReleaseAsset[] }`;
   - `interface GitHub { repository: string; json<T>(method, route, body?): Promise<T | null>; upload(releaseId, name, file, contentType): Promise<void>; status(url): Promise<number> }`
-    — `json` answers `null` on 404 and on 204, throws on any other non-2xx;
+    — `json` answers `null` for a 204, and for a 404 on `GET` (the thing does
+    not exist) or `DELETE` (absence is the goal); a 404 on `PATCH` or `POST`,
+    and any other non-2xx, throws (R12); `upload` aborts after
+    `uploadTimeoutMs(bytes)` (R11);
+  - `uploadTimeoutMs(bytes): number` — ten minutes plus a second per megabyte;
   - `gitHub(options: { token; repository; fetch?; apiUrl?; uploadUrl? }): GitHub`;
   - `gitHubFromEnv(env): GitHub` (needs `GITHUB_TOKEN` and an `owner/name`
     `GITHUB_REPOSITORY`); `apiHeaders(token)`.
@@ -692,7 +770,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { gitHub, gitHubFromEnv, type FetchLike } from './githubApi.ts'
+import { gitHub, gitHubFromEnv, uploadTimeoutMs, type FetchLike } from './githubApi.ts'
 
 interface Call {
   readonly url: string
@@ -737,16 +815,30 @@ describe('json', () => {
     expect(calls[0]?.init?.body).toBe('{"draft":true}')
     expect(calls[0]?.init?.headers).toMatchObject({ 'Content-Type': 'application/json' })
   })
-  test('404 is null; another failure throws with the message', async () => {
+  test('404 is null for GET and DELETE; another failure throws with the message', async () => {
     const { fetch } = fakeFetch([
+      json(404, { message: 'Not Found' }),
       json(404, { message: 'Not Found' }),
       json(422, { message: 'Validation Failed' }),
     ])
     const api = gitHub({ token: 't', repository: 'o/r', fetch })
     expect(await api.json('GET', '/a')).toBeNull()
+    expect(await api.json('DELETE', '/a')).toBeNull()
     await expect(api.json('POST', '/b', {})).rejects.toThrow(
       /POST https:\/\/api\.github\.com\/b failed: 422 .*Validation Failed/,
     )
+  })
+  test('404 on PATCH or POST is an error: what was to change has gone', async () => {
+    const { fetch } = fakeFetch([json(404, { message: 'Not Found' }), json(404, {})])
+    const api = gitHub({ token: 't', repository: 'o/r', fetch })
+    await expect(api.json('PATCH', '/releases/9', { draft: false })).rejects.toThrow(
+      /PATCH .*releases\/9 failed: 404/,
+    )
+    await expect(api.json('POST', '/releases', {})).rejects.toThrow(/failed: 404/)
+  })
+  test('204 is null', async () => {
+    const { fetch } = fakeFetch([new Response(null, { status: 204 })])
+    expect(await gitHub({ token: 't', repository: 'o/r', fetch }).json('DELETE', '/x')).toBeNull()
   })
 })
 
@@ -768,6 +860,12 @@ describe('upload', () => {
     expect(calls[0]?.init?.method).toBe('POST')
     expect(calls[0]?.init?.headers).toMatchObject({ 'Content-Type': 'text/yaml' })
     expect(Buffer.from(calls[0]?.init?.body as Uint8Array).toString()).toBe('version: 1\n')
+    expect(calls[0]?.init?.signal).toBeInstanceOf(AbortSignal)
+  })
+  test('an upload may take ten minutes plus a second per megabyte', () => {
+    expect(uploadTimeoutMs(0)).toBe(600_000)
+    expect(uploadTimeoutMs(1)).toBe(601_000)
+    expect(uploadTimeoutMs(840_000_000)).toBe(1_440_000)
   })
   test('an empty file is refused before any call', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'upload-'))
@@ -814,8 +912,9 @@ Expected: FAIL, `Failed to load url ./githubApi.ts` (the module does not exist).
  * @file A small client for GitHub's REST API over `fetch`, for the release commands. It does what
  * `./run`'s octocrab calls did and no more: JSON requests against one repository, release-asset
  * uploads (`uploads.github.com`), and checking that a download URL answers. Plain `fetch` rather
- * than Octokit or `gh`: no new dependency, and an asset is addressed by the release's id, which
- * `gh release upload` cannot do for a draft.
+ * than Octokit (a new dependency) or `gh`: `gh release upload` finds a release by its tag, and
+ * after a re-run two drafts can share one, so the upload must name the draft by id; and the
+ * commands need the content type, the retry and the replacement rules in their own hands.
  */
 import { readFileSync } from 'node:fs'
 
@@ -847,7 +946,11 @@ export interface Release {
 export interface GitHub {
   /** `owner/name`. */
   readonly repository: string
-  /** A JSON request to `https://api.github.com<route>`: the parsed body, or `null` on 404. */
+  /**
+   * A JSON request to `https://api.github.com<route>`: the parsed body, or `null` for a 204. A 404
+   * is `null` for `GET` (the thing does not exist) and `DELETE` (absence is the goal); for any
+   * other method it is an error, like every other status that is not 2xx.
+   */
   json<T>(method: string, route: string, body?: unknown): Promise<T | null>
   /**
    * Uploads `file` as the asset `name` of release `releaseId`. The file is read whole: an installer
@@ -885,6 +988,16 @@ async function failure(method: string, url: string, response: Response): Promise
   )
 }
 
+/**
+ * How long one upload of `bytes` may take: ten minutes, plus a second per megabyte (1 MB/s, a
+ * slow home uplink; an 840 MB `.dmg` gets 24 minutes). Without it a stalled upload would hang
+ * until the job's timeout. `fetch`'s own timeouts (undici's `headersTimeout` and
+ * `bodyTimeout`, 300 s each) cover only the wait for the response, not sending the body.
+ */
+export function uploadTimeoutMs(bytes: number): number {
+  return 600_000 + Math.ceil(bytes / 1_000_000) * 1000
+}
+
 /** A client for `options.repository`. */
 export function gitHub(options: GitHubOptions): GitHub {
   const doFetch = options.fetch ?? fetch
@@ -900,7 +1013,7 @@ export function gitHub(options: GitHubOptions): GitHub {
         headers: body === undefined ? headers : { ...headers, 'Content-Type': 'application/json' },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
-      if (response.status === 404) return null
+      if (response.status === 404 && (method === 'GET' || method === 'DELETE')) return null
       if (!response.ok) throw await failure(method, url, response)
       if (response.status === 204) return null
       return (await response.json()) as T
@@ -915,6 +1028,7 @@ export function gitHub(options: GitHubOptions): GitHub {
         method: 'POST',
         headers: { ...headers, 'Content-Type': contentType },
         body: content,
+        signal: AbortSignal.timeout(uploadTimeoutMs(content.length)),
       })
       if (!response.ok) throw await failure('POST', url, response)
     },
@@ -942,7 +1056,7 @@ export function gitHubFromEnv(env: Readonly<Record<string, string | undefined>>)
 
 Run:
 `corepack pnpm --filter build-scripts exec vitest run src/lib/githubApi.test.ts`
-Expected: PASS, 7 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -960,7 +1074,8 @@ git commit -m "tools/build-scripts: a small fetch client for GitHub's REST API"
 **Files:**
 
 - Create: `tools/build-scripts/src/release/assets.ts`, `notes.ts`,
-  `latestRelease.ts`
+  `latestRelease.ts` (one deliberate difference from `config.rs`: a CRLF
+  `build-config.yaml` keeps its CRLF, where Rust rewrote it with LF; R14)
 - Test: `tools/build-scripts/src/release/assets.test.ts`, `notes.test.ts`,
   `latestRelease.test.ts`
 
@@ -1052,8 +1167,9 @@ describe('splitUploaded (uploaded_manifest_leaves_out_missing_installers)', () =
   test('the note names the missing platforms', () => {
     const { missing } = splitUploaded('2026.2.0', [])
     expect(missingInstallersNote(missing)).toBe(
-      '\n\n> [!NOTE]\n> This release has no installer for Windows, Linux, macOS (Apple silicon): ' +
-        'that build failed or was skipped. Re-run its jobs in the release workflow to add it.',
+      '\n\n> [!NOTE]\n> This release was published without an installer for Windows, Linux, ' +
+        'macOS (Apple silicon): that build failed or was skipped. Re-running its jobs in the ' +
+        'release workflow uploads it here.',
     )
   })
 })
@@ -1362,8 +1478,8 @@ export function splitUploaded(
 export function missingInstallersNote(missing: readonly ReleaseTarget[]): string {
   const platforms = missing.map((target) => target.pretty).join(', ')
   return (
-    `\n\n> [!NOTE]\n> This release has no installer for ${platforms}: that build failed or was ` +
-    'skipped. Re-run its jobs in the release workflow to add it.'
+    `\n\n> [!NOTE]\n> This release was published without an installer for ${platforms}: that ` +
+    'build failed or was skipped. Re-running its jobs in the release workflow uploads it here.'
   )
 }
 
@@ -1532,7 +1648,8 @@ export const LATEST_RELEASE_KEY = 'latest-release'
 /**
  * `configText` with its `latest-release` entry set to `version`. Line by line rather than through
  * a YAML round trip, so that the comments and layout survive. A missing key is an error: adding it
- * silently would hide a renamed or removed entry.
+ * silently would hide a renamed or removed entry. One deliberate difference from the Rust: a CRLF
+ * file keeps its CRLF line endings (`with_latest_release` rewrote every line ending as LF).
  */
 export function withLatestRelease(configText: string, version: string): string {
   const prefix = `${LATEST_RELEASE_KEY}:`
@@ -1585,8 +1702,14 @@ git commit -m "tools/build-scripts: release installers, notes and latest-release
   - `DraftInputs { version; commit; head: string | null; changelog; log }`;
     `createDraft(api, inputs): Promise<Release>`;
   - `publishRelease(api, id, version, log): Promise<ReleaseTarget[]>` (the
-    missing targets); `validateRelease(api, id, installers)`;
-  - `uploadIdeAssets(api, id, files, log, wait?)`; `sleep(ms)`.
+    missing targets) — refuses a published release, a draft whose tag is not
+    `version`, and a draft with an asset whose `state` is not `uploaded`;
+    `validateRelease(api, id, installers)`;
+  - `uploadIdeAssets(api, id, files, log, wait?)` — uploads to the release `id`,
+    draft or published: on a draft a same-named asset (from an earlier run, or a
+    failed attempt) is deleted and replaced; on a published release nothing is
+    ever deleted, and a same-named asset, or one a failed attempt left, is an
+    error (R3); `sleep(ms)`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1598,7 +1721,7 @@ git commit -m "tools/build-scripts: release installers, notes and latest-release
 /** @file The release operations, against an in-memory GitHub. */
 /* eslint-disable camelcase -- GitHub's REST API names its fields in snake_case. */
 import { describe, expect, test } from 'vitest'
-import type { GitHub, Release } from '../lib/githubApi.ts'
+import type { GitHub, Release, ReleaseAsset } from '../lib/githubApi.ts'
 import { version } from '../version/version.ts'
 import {
   createDraft,
@@ -1787,8 +1910,9 @@ describe('publishRelease', () => {
     const missing = await publishRelease(api, 9, version('2026.1.1-rc.5'), (l) => logged.push(l))
     expect(missing.map((target) => target.os)).toEqual(['macos'])
     expect((calls[1]?.body as { body: string }).body).toBe(
-      'notes\n\n> [!NOTE]\n> This release has no installer for macOS (Apple silicon): that build ' +
-        'failed or was skipped. Re-run its jobs in the release workflow to add it.',
+      'notes\n\n> [!NOTE]\n> This release was published without an installer for macOS (Apple ' +
+        'silicon): that build failed or was skipped. Re-running its jobs in the release workflow ' +
+        'uploads it here.',
     )
     expect(logged[0]).toBe('::warning::Publishing without installers for: macOS (Apple silicon).')
   })
@@ -1800,6 +1924,23 @@ describe('publishRelease', () => {
     await expect(
       publishRelease(fakeGitHub({}).api, 9, version('2026.1.1'), () => {}),
     ).rejects.toThrow('Release 9 does not exist.')
+  })
+  test('refuses a draft of another version, and one with a half-written asset', async () => {
+    const other = fakeGitHub({ 'GET /repos/o/r/releases/9': release() })
+    await expect(publishRelease(other.api, 9, version('2026.1.1-rc.6'), () => {})).rejects.toThrow(
+      'Release 9 is 2026.1.1-rc.5, not 2026.1.1-rc.6: check the release id and version.',
+    )
+    const partial = fakeGitHub({
+      'GET /repos/o/r/releases/9': release({
+        assets: [...all.slice(0, 2), { id: 3, name: all[2]?.name ?? '', state: 'starter' }],
+      }),
+    })
+    await expect(
+      publishRelease(partial.api, 9, version('2026.1.1-rc.5'), () => {}),
+    ).rejects.toThrow(
+      'Not publishing: assets not fully uploaded: enso-mac-arm64-2026.1.1-rc.5.dmg (starter).',
+    )
+    expect(partial.calls.some((call) => call.method === 'PATCH')).toBe(false)
   })
   test('an installer that does not download fails the validation', async () => {
     let first = true
@@ -1822,26 +1963,66 @@ describe('publishRelease', () => {
 })
 
 describe('uploadIdeAssets', () => {
+  const exe = 'enso-win-x64-2026.1.1-rc.5.exe'
   const files = [
-    { file: '/d/enso-win-x64-2026.1.1-rc.5.exe', name: 'enso-win-x64-2026.1.1-rc.5.exe' },
+    { file: `/d/${exe}`, name: exe },
     { file: '/d/latest.yml', name: 'latest.yml' },
   ]
+
+  /**
+   * A GitHub holding one release whose assets change as the client acts: a successful upload
+   * adds an `uploaded` asset, a failed one (the first `failures`) a `starter` one, a DELETE removes.
+   */
+  function statefulGitHub(
+    draft: boolean,
+    assets: ReleaseAsset[],
+    failures = 0,
+  ): { api: GitHub; log: string[]; current: () => ReleaseAsset[] } {
+    const log: string[] = []
+    let left = failures
+    let nextId = 100
+    let held = [...assets]
+    const api: GitHub = {
+      repository: 'o/r',
+      async json<T>(method: string, route: string): Promise<T | null> {
+        log.push(`${method} ${route}`)
+        if (method === 'GET' && route === '/repos/o/r/releases/9') {
+          return release({ draft, assets: held }) as T
+        }
+        const deleted = /^\/repos\/o\/r\/releases\/assets\/(\d+)$/.exec(route)
+        if (method === 'DELETE' && deleted != null) {
+          held = held.filter((asset) => asset.id !== Number(deleted[1]))
+          return null
+        }
+        throw new Error(`unexpected ${method} ${route}`)
+      },
+      async upload(_id: number, name: string) {
+        log.push(`upload ${name}`)
+        if (left > 0) {
+          left--
+          held = [...held, { id: nextId++, name, state: 'starter' }]
+          throw new Error('connection reset')
+        }
+        held = [...held, { id: nextId++, name, state: 'uploaded' }]
+      },
+      async status() {
+        return 200
+      },
+    }
+    return { api, log, current: () => held }
+  }
+  const noWait = async () => {}
+
   test('uploads each file to the draft, typed by its name', async () => {
     const { api, uploads } = fakeGitHub({ 'GET /repos/o/r/releases/9': release() })
     await uploadIdeAssets(api, 9, files, () => {})
     expect(uploads).toEqual([
-      '9 enso-win-x64-2026.1.1-rc.5.exe application/vnd.microsoft.portable-executable',
+      `9 ${exe} application/vnd.microsoft.portable-executable`,
       '9 latest.yml text/yaml',
     ])
   })
-  test('a failed upload deletes its half-written asset and retries', async () => {
-    const stale = release({
-      assets: [{ id: 77, name: 'enso-win-x64-2026.1.1-rc.5.exe', state: 'starter' }],
-    })
-    const { api, calls, uploads } = fakeGitHub(
-      { 'GET /repos/o/r/releases/9': stale },
-      { uploadFailures: 1 },
-    )
+  test('on a draft, a failed upload deletes its half-written asset and retries', async () => {
+    const { api, log, current } = statefulGitHub(true, [], 1)
     const waits: number[] = []
     await uploadIdeAssets(
       api,
@@ -1853,25 +2034,53 @@ describe('uploadIdeAssets', () => {
       },
     )
     expect(waits).toEqual([500])
-    expect(calls.some((c) => c.method === 'DELETE' && c.route.endsWith('/assets/77'))).toBe(true)
-    expect(uploads).toHaveLength(2)
+    expect(log.filter((line) => line.startsWith('DELETE'))).toEqual([
+      'DELETE /repos/o/r/releases/assets/100',
+    ])
+    expect(current().map((asset) => `${asset.name} ${asset.state}`)).toEqual([
+      `${exe} uploaded`,
+      'latest.yml uploaded',
+    ])
   })
-  test('gives up after five retries', async () => {
-    const { api } = fakeGitHub({ 'GET /repos/o/r/releases/9': release() }, { uploadFailures: 6 })
-    await expect(
-      uploadIdeAssets(
-        api,
-        9,
-        files,
-        () => {},
-        async () => {},
-      ),
-    ).rejects.toThrow('connection reset')
+  test('on a draft, an asset an earlier run uploaded is replaced', async () => {
+    const { api, current } = statefulGitHub(true, [{ id: 7, name: exe, state: 'uploaded' }])
+    const logged: string[] = []
+    await uploadIdeAssets(api, 9, files, (line) => logged.push(line), noWait)
+    expect(logged[0]).toBe(`Replacing ${exe}, left on the draft by an earlier run.`)
+    expect(current().map((asset) => asset.id)).toEqual([100, 101])
   })
-  test('refuses a published release', async () => {
-    const { api } = fakeGitHub({ 'GET /repos/o/r/releases/9': release({ draft: false }) })
-    await expect(uploadIdeAssets(api, 9, files, () => {})).rejects.toThrow(
-      'Release has been already published!',
+  test('on a draft, the last failed attempt is cleaned up too, then the error stands', async () => {
+    const { api, current } = statefulGitHub(true, [], 6)
+    await expect(uploadIdeAssets(api, 9, files, () => {}, noWait)).rejects.toThrow(
+      'connection reset',
+    )
+    expect(current()).toEqual([])
+  })
+  test('on a published release, a missing installer is added', async () => {
+    const { api, current } = statefulGitHub(false, [
+      { id: 1, name: 'latest.yml', state: 'uploaded' },
+    ])
+    await uploadIdeAssets(api, 9, [files[0] ?? { file: '', name: '' }], () => {}, noWait)
+    expect(current().map((asset) => asset.name)).toEqual(['latest.yml', exe])
+  })
+  test('on a published release, an existing asset is never replaced', async () => {
+    const { api, log } = statefulGitHub(false, [{ id: 1, name: 'latest.yml', state: 'uploaded' }])
+    await expect(uploadIdeAssets(api, 9, files, () => {}, noWait)).rejects.toThrow(
+      "Release 2026.1.1-rc.5 is published and already has latest.yml; a published release's " +
+        'assets are never replaced. Delete the asset by hand first if it must change.',
+    )
+    expect(log.some((line) => line.startsWith('DELETE'))).toBe(false)
+  })
+  test('on a published release, a failed upload is not cleaned up: it stops', async () => {
+    const { api, log } = statefulGitHub(false, [], 1)
+    await expect(uploadIdeAssets(api, 9, files, () => {}, noWait)).rejects.toThrow(
+      `Uploading ${exe} to the published release 2026.1.1-rc.5 failed and left a partial asset`,
+    )
+    expect(log.some((line) => line.startsWith('DELETE'))).toBe(false)
+  })
+  test('a release that does not exist is an error', async () => {
+    await expect(uploadIdeAssets(fakeGitHub({}).api, 9, files, () => {})).rejects.toThrow(
+      'Release 9 does not exist.',
     )
   })
 })
@@ -1895,8 +2104,8 @@ Expected: FAIL, `Failed to load url ./release.ts`.
  * `resolve_version_designation`) and of `./run ide upload`'s upload half
  * (`build_tools/cli/src/lib.rs` `upload_ide_assets`). Deliberate differences, each named where it
  * happens: the release version must be given (no silent `-dev` fallback), no `assets.json`, the
- * draft is edited and published in one call, and a failed upload removes its half-written asset
- * before retrying.
+ * draft is edited and published in one call, a draft with a half-written asset is not published,
+ * and an upload replaces same-named assets on a draft but never touches a published release's.
  */
 /* eslint-disable camelcase -- GitHub's REST API names its fields in snake_case. */
 import { retryDelays } from '../ide-build/ideBuild.ts'
@@ -2004,19 +2213,20 @@ export async function createDraft(api: GitHub, inputs: DraftInputs): Promise<Rel
   return release
 }
 
-/** The draft `id`; an error when it does not exist or is already published. */
-async function draftRelease(api: GitHub, id: number): Promise<Release> {
+/** Release `id`; an error when it does not exist. */
+async function getRelease(api: GitHub, id: number): Promise<Release> {
   const release = await api.json<Release>('GET', `/repos/${api.repository}/releases/${id}`)
   if (release == null) throw new Error(`Release ${id} does not exist.`)
-  if (!release.draft) throw new Error('Release has been already published!')
   return release
 }
 
 /**
- * Publishes the draft `id`. Installers that were not uploaded (a skipped or failed macOS build)
- * are named in a note appended to the body. The tag and target are restated in the same call:
- * editing a draft without them turns it into `untagged-…`, and it would publish without a tag.
- * Then checks that every uploaded installer downloads. Returns the targets left out.
+ * Publishes the draft `id`, which must be release `version` (its tag) and hold only fully
+ * uploaded assets: a `starter` asset is an upload that died part-way, and would be published
+ * broken. Installers that were not uploaded (a skipped or failed macOS build) are named in a note
+ * appended to the body. The tag and target are restated in the same call: editing a draft
+ * without them turns it into `untagged-…`, and it would publish without a tag. Then checks that
+ * every uploaded installer downloads. Returns the targets left out.
  */
 export async function publishRelease(
   api: GitHub,
@@ -2024,7 +2234,18 @@ export async function publishRelease(
   version: Version,
   log: (line: string) => void,
 ): Promise<ReleaseTarget[]> {
-  const release = await draftRelease(api, id)
+  const release = await getRelease(api, id)
+  if (!release.draft) throw new Error('Release has been already published!')
+  if (release.tag_name !== version.text) {
+    throw new Error(
+      `Release ${id} is ${release.tag_name}, not ${version.text}: check the release id and version.`,
+    )
+  }
+  const partial = release.assets.filter((asset) => asset.state !== 'uploaded')
+  if (partial.length > 0) {
+    const names = partial.map((asset) => `${asset.name} (${asset.state})`).join(', ')
+    throw new Error(`Not publishing: assets not fully uploaded: ${names}. Re-run their uploads.`)
+  }
   const { present, missing } = splitUploaded(
     version.text,
     release.assets.map((asset) => asset.name),
@@ -2055,8 +2276,8 @@ export async function validateRelease(
   id: number,
   installers: readonly ReleaseTarget[],
 ): Promise<void> {
-  const release = await api.json<Release>('GET', `/repos/${api.repository}/releases/${id}`)
-  if (release == null || release.draft) throw new Error(`Release ${id} is not published.`)
+  const release = await getRelease(api, id)
+  if (release.draft) throw new Error(`Release ${id} is not published.`)
   for (const target of installers) {
     const url = downloadUrl(
       api.repository,
@@ -2075,10 +2296,24 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+/** Deletes release `id`'s asset `name`, if it has one. */
+async function deleteAssetNamed(api: GitHub, id: number, name: string): Promise<void> {
+  const stale = (await getRelease(api, id)).assets.find((asset) => asset.name === name)
+  if (stale != null) {
+    await api.json('DELETE', `/repos/${api.repository}/releases/assets/${stale.id}`)
+  }
+}
+
 /**
- * Uploads `files` to the draft `id`, each retried as `./run` retried it (five more times, 0.5 s
- * growing by half). Before a retry, an asset of the same name left by the failed attempt is
- * deleted: GitHub refuses a second asset with that name.
+ * Uploads `files` to release `id`, each retried as `./run` retried it (five more times, 0.5 s
+ * growing by half).
+ *
+ * - On a draft, an asset of the same name is replaced: one left by an earlier run of the job
+ *   before the upload, and the half-written one a failed attempt leaves before each retry and
+ *   after the last (GitHub refuses a second asset of a name).
+ * - On a published release (re-running a skipped platform's jobs adds its installer, as with
+ *   `./run`), nothing is ever deleted or replaced: an asset of the same name, or one a failed
+ *   attempt left, stops the upload with an error.
  */
 export async function uploadIdeAssets(
   api: GitHub,
@@ -2087,24 +2322,40 @@ export async function uploadIdeAssets(
   log: (line: string) => void,
   wait: (ms: number) => Promise<void> = sleep,
 ): Promise<void> {
-  await draftRelease(api, id)
+  const release = await getRelease(api, id)
+  const tag = release.tag_name
   const delays = retryDelays(5)
   for (const { file, name } of files) {
+    if (release.assets.some((asset) => asset.name === name)) {
+      if (!release.draft) {
+        throw new Error(
+          `Release ${tag} is published and already has ${name}; a published release's assets ` +
+            'are never replaced. Delete the asset by hand first if it must change.',
+        )
+      }
+      log(`Replacing ${name}, left on the draft by an earlier run.`)
+      await deleteAssetNamed(api, id, name)
+    }
     for (let attempt = 0; ; attempt++) {
       try {
         log(`Uploading ${name}.`)
         await api.upload(id, name, file, contentType(name))
         break
       } catch (error) {
+        const leftover = (await getRelease(api, id)).assets.some((asset) => asset.name === name)
+        if (leftover && !release.draft) {
+          throw new Error(
+            `Uploading ${name} to the published release ${tag} failed and left a partial ` +
+              `asset, which is never deleted automatically; delete it by hand and re-run. ` +
+              `(${String(error)})`,
+            { cause: error },
+          )
+        }
+        if (leftover) await deleteAssetNamed(api, id, name)
         const delay = delays[attempt]
         if (delay == null) throw error
         log(`Uploading ${name} failed (${String(error)}); retrying in ${delay} ms.`)
         await wait(delay)
-        const release = await api.json<Release>('GET', `/repos/${api.repository}/releases/${id}`)
-        const stale = release?.assets.find((asset) => asset.name === name)
-        if (stale != null) {
-          await api.json('DELETE', `/repos/${api.repository}/releases/assets/${stale.id}`)
-        }
       }
     }
   }
@@ -2115,7 +2366,7 @@ export async function uploadIdeAssets(
 
 Run:
 `corepack pnpm --filter build-scripts exec vitest run src/release/release.test.ts`
-Expected: PASS, 17 tests.
+Expected: PASS, 22 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -2346,7 +2597,7 @@ corepack pnpm exec prettier --check tools/build-scripts
 
 Expected: no type errors; ESLint clean with `--max-warnings=0` (the two release
 modules disable `camelcase` for the API's field names, as the GUI's tests do);
-`Test Files  17 passed`, `Tests  168 passed` (122 before, 46 new); Prettier
+`Test Files  17 passed`, `Tests  176 passed` (122 before, 54 new); Prettier
 clean.
 
 - [ ] **Step 4: Try the safe actions locally**
@@ -2387,9 +2638,10 @@ git push -u origin ci/release-build-scripts
 
 Write `$SCRATCH/pr-4a.md`: what the PR adds (the five actions, ported from
 `release.rs`, `manifest.rs`, `changelog.rs`, `config.rs` and `ide upload`); the
-deliberate differences (Decisions 2, 3, 6, 7, and the retry that deletes a
-half-written asset, R4); that no workflow uses it yet (4b does); the test count;
-"Part of #289's Phase 4."; the attribution lines. Then:
+deliberate differences (Decisions 2, 3, 6, 7; R3's replacement rules, R4's
+single PATCH, R11's upload timeout, R12's 404 rule, R14's CRLF); that no
+workflow uses it yet (4b does); the test count; "Part of #289's Phase 4."; the
+attribution lines. Then:
 
 ```bash
 gh pr create --base develop --head ci/release-build-scripts --label "CI: No changelog needed" \
@@ -2401,7 +2653,7 @@ gh pr create --base develop --head ci/release-build-scripts --label "CI: No chan
 
 Run `"$SCRATCH/wait-pr.sh" <N> 150` in the background and start Task 5's reading
 meanwhile. Expected checks: "Build Scripts" (green, about 2 minutes; its log
-shows `Tests  168 passed` on Linux), Changelog (green by its label), Workflow
+shows `Tests  176 passed` on Linux), Changelog (green by its label), Workflow
 Lint (it runs on `tools/build-scripts/**`), and ✨ Engine
 (`engine-changed-files.yml` lists `tools/build-scripts/**`; about an hour). When
 every check is green: `gh pr merge <N> --squash`.
@@ -2425,17 +2677,18 @@ every check is green: `gh pr merge <N> --squash`.
   `ide-build` (Phase 3); sbt `buildEngineBundle`; the composite actions
   `setup-node`, `setup-build-scripts`, `setup-jvm`, `setup-msvc`, `setup-rust`,
   `git-clean`; `tools/ci/wait-for-macos-runner.sh`.
-- Produces: `release.yml` (`workflow_dispatch`/`workflow_call`, input `version`)
-  with the job ids `check-the-mac-os-runner`, `draft-release` (outputs
-  `ENSO_RELEASE_ID`, `ENSO_VERSION`), `license-check`, `gui-build`,
-  `build-backend` (matrix linux/windows), `build-backend-macos`, `upload-ide`
-  (matrix), `upload-ide-macos`, `publish-release`,
-  `update-latest-release-version`; `promote.yml` (input `designator`, job
-  `promote` with outputs `ENSO_VERSION`, `ENSO_EDITION`, `ENSO_RELEASE_MODE`,
-  then `release`); the policy functions `checkReleaseIsIdeOnly`,
-  `checkOnlyMacosReleaseJobsMayFail`, `checkMacosJobsAreGated` (same names, new
-  rules) and the private helpers `isMacosCaller`, `ungatedMacosJobs` that Task 9
-  reuses.
+- Produces: `release.yml` (`workflow_dispatch`/`workflow_call`, inputs
+  `version`, `publish` (default `true`) and `release-id` (default `""`); see
+  Note [Publishing Later] in it) with the job ids `check-the-mac-os-runner`,
+  `draft-release` (outputs `ENSO_RELEASE_ID`, `ENSO_VERSION`), `license-check`,
+  `gui-build`, `build-backend` (matrix linux/windows), `build-backend-macos`,
+  `upload-ide` (matrix), `upload-ide-macos`, `publish-release`,
+  `update-latest-release-version`; `promote.yml` (inputs `designator` and
+  `publish`, job `promote` with outputs `ENSO_VERSION`, `ENSO_EDITION`,
+  `ENSO_RELEASE_MODE`, then `release`); the policy functions
+  `checkReleaseIsIdeOnly`, `checkOnlyMacosReleaseJobsMayFail`,
+  `checkMacosJobsAreGated` (same names, new rules) and the private helpers
+  `isMacosCaller`, `ungatedMacosJobs` that Task 9 reuses.
 
 - [ ] **Step 1: Create the worktree, once 4a has merged**
 
@@ -2460,10 +2713,17 @@ its tests with the blocks it carries (and adds one clause to the README):
 
 Usage: py -3 edit-policy-4b.py <repository root>
 
-Replaces, in tools/ci/check-workflows.mjs, everything from `const RELEASE_FORBIDDEN = [` up to the
-comment before `checkMacosChecksRunWhatIsRequested`; in tools/ci/check-workflows.test.mjs,
-everything from `const RELEASE_OK = ` up to `describe('checkMacosChecksRunWhatIsRequested'`; and
-one sentence of tools/ci/README.md. Nothing is written unless every marker is found once.
+Three targeted replacements, each between two markers that must occur exactly once:
+
+- tools/ci/check-workflows.mjs: from `const RELEASE_FORBIDDEN = [` up to the comment before
+  `checkMacosChecksRunWhatIsRequested` (the release rules);
+- tools/ci/check-workflows.test.mjs: from `const RELEASE_OK = ` up to
+  `describe('checkPullRequestsIgnoreSpecs'` (the release fixture), and from
+  `describe('checkReleaseIsIdeOnly'` up to `describe('checkMacosChecksRunWhatIsRequested'` (the
+  release tests; this drops the old `MACOS_UPLOAD`, `PUBLISH` and `GATE_IF`). The tests of
+  `checkPullRequestsIgnoreSpecs` and `checkSetupNodeCache`, between the two, are kept.
+
+It also adds one clause to tools/ci/README.md. Nothing is written unless every marker is found.
 """
 import sys
 
@@ -2566,8 +2826,12 @@ function ungatedMacosJobs(file, jobs) {
   return problems
 }
 
-/** What `publish-release`'s `if` must test: everything but macOS. */
+/**
+ * What `publish-release`'s `if` must test: the `publish` input (a release can stop at a checked
+ * draft), and every job's result but macOS's.
+ */
 const PUBLISH_REQUIRES = [
+  'inputs.publish',
   "needs.draft-release.result == 'success'",
   "needs.license-check.result == 'success'",
   "needs.upload-ide.result == 'success'",
@@ -2618,7 +2882,7 @@ export function checkMacosJobsAreGated({ workflows }) {
 
 '''
 
-TESTS = r'''const GATE_IF = "if: needs.check-the-mac-os-runner.outputs.online == 'true'"
+FIXTURE = r'''const GATE_IF = "if: needs.check-the-mac-os-runner.outputs.online == 'true'"
 
 const RELEASE_OK = `
 name: Release
@@ -2655,7 +2919,7 @@ jobs:
   publish-release:
     runs-on: ubuntu-latest
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
-    if: "!cancelled() && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'"
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
     steps:
       - run: corepack pnpm --filter build-scripts run release publish
   update-latest-release-version:
@@ -2666,7 +2930,9 @@ jobs:
       - run: corepack pnpm --filter build-scripts run release update-latest-version
 `
 
-describe('checkReleaseIsIdeOnly', () => {
+'''
+
+RELEASE_TESTS = r'''describe('checkReleaseIsIdeOnly', () => {
   test('accepts an IDE-only release', () => {
     assert.deepEqual(checkReleaseIsIdeOnly(fixture({ 'workflows/release.yml': RELEASE_OK })), [])
   })
@@ -2772,13 +3038,15 @@ jobs:
   test('rejects a publish job that waits on macOS, and one that drops a required result', () => {
     const waits = problems(
       RELEASE_OK.replace(
-        '!cancelled() && needs.draft-release',
-        "!cancelled() && needs.upload-ide-macos.result == 'success' && needs.draft-release",
+        'inputs.publish && needs.draft-release',
+        "inputs.publish && needs.upload-ide-macos.result == 'success' && needs.draft-release",
       ),
     )
     assert.ok(waits.some((p) => p.includes('must not wait on a macOS job')))
     const drops = problems(RELEASE_OK.replace(" && needs.license-check.result == 'success'", ''))
     assert.ok(drops.some((p) => p.includes("lacks `needs.license-check.result == 'success'`")))
+    const unheld = problems(RELEASE_OK.replace('inputs.publish && ', ''))
+    assert.ok(unheld.some((p) => p.includes('lacks `inputs.publish`')))
   })
   test('rejects a latest-version update that a failed macOS job would skip', () => {
     const text = RELEASE_OK.replace(
@@ -2816,7 +3084,13 @@ new_mjs = between(
     POLICY,
 )
 new_test = between(
-    read(test), 'const RELEASE_OK = `', "describe('checkMacosChecksRunWhatIsRequested', () => {", TESTS
+    read(test), 'const RELEASE_OK = `', "describe('checkPullRequestsIgnoreSpecs', () => {", FIXTURE
+)
+new_test = between(
+    new_test,
+    "describe('checkReleaseIsIdeOnly', () => {",
+    "describe('checkMacosChecksRunWhatIsRequested', () => {",
+    RELEASE_TESTS,
 )
 old_sentence = 'macOS jobs are gated on' + NL + 'the self-hosted Mac,'
 readme_text = read(readme)
@@ -2844,7 +3118,10 @@ Expected: 9 failing tests, in `checkReleaseIsIdeOnly` (2),
 `checkOnlyMacosReleaseJobsMayFail` (3) and `checkMacosJobsAreGated` (4: "accepts
 a gated release …", "rejects a release with no publish job", "… waits on macOS,
 and one that drops a required result", "rejects a latest-version update …");
-"the repository follows the policy" still passes (old rules, old workflows).
+"the repository follows the policy" still passes (old rules, old workflows):
+`# pass 79`, `# fail 9`. The tests of `checkPullRequestsIgnoreSpecs` and
+`checkSetupNodeCache`, which sit between the release fixture and the release
+tests, are untouched and pass.
 
 - [ ] **Step 3: Put the new rules back**
 
@@ -2853,12 +3130,12 @@ cp "$SCRATCH/check-workflows-4b.mjs" tools/ci/check-workflows.mjs
 node --test --test-reporter=tap tools/ci/check-workflows.test.mjs 2>&1 | grep -E "not ok|^# (pass|fail)"
 ```
 
-Expected: only "the repository follows the policy" fails, listing the old
-`release.yml`'s problems: it lacks the `run release upload-ide` step; it reads
-the Sentry, Apple and Microsoft secrets (eight lines); it has no macOS jobs
-`build-backend-macos` and `upload-ide-macos`; its three old macOS job ids are
-"unexpected"; and it has no `publish-release` job. The next step fixes the
-workflow.
+Expected: `# pass 87`, `# fail 1`: only "the repository follows the policy"
+fails, listing the old `release.yml`'s problems: it lacks the
+`run release upload-ide` step; it reads the Sentry, Apple and Microsoft secrets
+(eight lines); it has no macOS jobs `build-backend-macos` and
+`upload-ide-macos`; its three old macOS job ids are "unexpected"; and it has no
+`publish-release` job. The next step fixes the workflow.
 
 - [ ] **Step 4: Write the three workflows**
 
@@ -2882,12 +3159,42 @@ on:
         description: What version number this release should get.
         required: true
         type: string
+      publish:
+        description: >-
+          Publish the release when its installers are uploaded. False stops at the draft, for a
+          release test to check before anyone can download it; publish it later with
+          `release-id`.
+        required: false
+        type: boolean
+        default: true
+      release-id:
+        description: >-
+          Publish this existing draft (its id, from the run that made it) and record its version,
+          instead of building a release. `version` must be the draft's version.
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       version:
         description: What version number this release should get.
         required: true
         type: string
+      publish:
+        description: >-
+          Publish the release when its installers are uploaded. False stops at the draft, for a
+          release test to check before anyone can download it; publish it later with
+          `release-id`.
+        required: false
+        type: boolean
+        default: true
+      release-id:
+        description: >-
+          Publish this existing draft (its id, from the run that made it) and record its version,
+          instead of building a release. `version` must be the draft's version.
+        required: false
+        type: string
+        default: ""
 
 concurrency: release
 
@@ -2921,6 +3228,15 @@ env:
 #   Analytics tag; the IDE is local-only), the AG Grid licence key (the grid runs without one), the
 #   Apple and Microsoft signing secrets, and `assets.json` (only upstream's website read it).
 #
+# Note [Publishing Later]
+# ========================
+# A release test must not publish what it has not checked: as soon as a prerelease is public, the
+# installed apps that include prereleases are offered it. So `publish: false` stops a run at the
+# filled draft (the publish and latest-version jobs are skipped), and a second run with
+# `release-id: <the draft's id>` and the same `version` skips every build job and runs only those
+# two. `release publish` checks that the draft's tag is `version`. The nightly calls this workflow
+# through `promote.yml` with the defaults, and so publishes at once.
+#
 # Note [Signing The Installers]
 # =============================
 # The fork ships unsigned. To sign later, configure electron-builder, not this workflow's logic:
@@ -2938,6 +3254,7 @@ jobs:
   # `engine-checks-nightly.yml` and `macos-pull-request.yml`.
   check-the-mac-os-runner:
     name: Check the macOS runner
+    if: inputs.release-id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 6
     outputs:
@@ -2953,6 +3270,7 @@ jobs:
 
   draft-release:
     name: Create a release draft.
+    if: inputs.release-id == ''
     runs-on: ubuntu-latest
     outputs:
       ENSO_RELEASE_ID: ${{ steps.prepare.outputs.ENSO_RELEASE_ID }}
@@ -2971,6 +3289,7 @@ jobs:
 
   license-check:
     name: Verify License Packages (linux, amd64)
+    if: inputs.release-id == ''
     runs-on: ubuntu-latest
     steps:
       - name: Checking out the repository
@@ -2995,6 +3314,7 @@ jobs:
 
   gui-build:
     name: GUI build (linux, amd64)
+    if: inputs.release-id == ''
     runs-on: ubuntu-latest
     steps:
       - name: Checking out the repository
@@ -3044,6 +3364,7 @@ jobs:
 
   build-backend:
     name: Build Backend (${{ matrix.os }}, amd64)
+    if: inputs.release-id == ''
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -3268,15 +3589,16 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # Publishes when the draft, the license check and both hosted platforms succeeded; macOS may have
-  # failed or been skipped, and the notes then say so.
+  # Publishes when asked to (`publish`) and the draft, the license check and both hosted platforms
+  # succeeded; macOS may have failed or been skipped, and the notes then say so. With `release-id`
+  # it publishes that draft alone (Note [Publishing Later]).
   publish-release:
     name: Publish release (linux, amd64)
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
-    if: "!cancelled() && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'"
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
     runs-on: ubuntu-latest
     env:
-      ENSO_RELEASE_ID: ${{ needs.draft-release.outputs.ENSO_RELEASE_ID }}
+      ENSO_RELEASE_ID: ${{ inputs.release-id != '' && inputs.release-id || needs.draft-release.outputs.ENSO_RELEASE_ID }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -3346,12 +3668,22 @@ on:
           - patch
           - rc
           - nightly
+      publish:
+        description: Publish the release (false stops at a draft; see Note [Publishing Later] in `release.yml`).
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       designator:
         description: What kind of release should be promoted.
         required: true
         type: string
+      publish:
+        description: Publish the release (false stops at a draft; see Note [Publishing Later] in `release.yml`).
+        required: false
+        type: boolean
+        default: true
 
 jobs:
   promote:
@@ -3379,6 +3711,7 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ needs.promote.outputs.ENSO_VERSION }}
+      publish: ${{ inputs.publish }}
     secrets: inherit
 ```
 
@@ -3451,7 +3784,7 @@ corepack pnpm exec prettier --check .github docs/distribution/nightly.md
 git grep -nE '^\s*(- )?run: .*\./run( |$)' -- .github/workflows/release.yml .github/workflows/promote.yml .github/workflows/nightly.yml
 ```
 
-Expected: `Workflow policy: OK` and `ℹ tests 94`, `ℹ pass 94`, `ℹ fail 0` on
+Expected: `Workflow policy: OK` and `ℹ tests 97`, `ℹ pass 97`, `ℹ fail 0` on
 both hosts; `actionlint-ok`; Prettier clean; the last command prints nothing.
 
 - [ ] **Step 7: Commit**
@@ -3474,12 +3807,12 @@ git push -u origin ci/release-workflows
 ```
 
 Write `$SCRATCH/pr-4b.md`: the job mapping ("Each `./run` call site" and "What
-the release did besides the commands"); the intended differences D1–D8 with
-their reasons; Decisions 2, 4, 5, 6, 8 and 10 in one line each; that **this PR
-is merged only after the rc gate** (Task 7: rc.5 from this branch, the parity
-check against rc.4, the user's in-app update) and that `nightly.yml` is
-re-enabled only after it merges; "Part of #289's Phase 4."; the attribution
-lines. Then:
+the release did besides the commands"); the intended differences D1–D8 and D13
+with their reasons; Decisions 2, 4, 5, 6, 8 and 10 in one line each; that **this
+PR is merged only after the rc gate** (Task 7: rc.5 from this branch as a draft,
+checked against rc.4, published on the user's OK, then the user's in-app update)
+and that `nightly.yml` is re-enabled only after it merges; "Part of #289's Phase
+4."; the attribution lines. Then:
 
 ```bash
 gh pr create --base develop --head ci/release-workflows --label "CI: No changelog needed" \
@@ -3507,28 +3840,42 @@ it is green.
 
 Every step marked **STOP** waits for the user. Do not dispatch, enable, publish,
 delete or merge anything without their explicit go-ahead in this conversation.
+Nothing becomes public before Step 5: until then rc.5 is a draft, which only the
+repository's owner can see.
 
-- [ ] **Step 1: STOP — ask the user to start rc.5 from the branch**
+- [ ] **Step 1: STOP — ask the user to start rc.5 as a draft, with the Mac
+      online**
 
-Tell the user, in one message:
+First check the Mac (read-only):
 
-- PR 4b is green and needs its rc test; it will publish **2026.1.1-rc.5** (a
-  prerelease) from the head of `ci/release-workflows`, with the Windows and
-  Linux installers and, if the Mac is online, the macOS one;
+```bash
+gh api repos/jdunkerley/enso/actions/runners --jq '.runners[] | "\(.name)\t\(.status)\t\([.labels[].name] | join(","))"'
+```
+
+Expected: `Jamess-Mac-mini	online	self-hosted,macOS,ARM64,enso-mac`. If it is
+offline, stop and ask the user to bring it online: the rc test is the first run
+of `buildEngineBundle` and `ide-build` on the Mac, and must not be left to an
+unattended nightly.
+
+Then tell the user, in one message:
+
+- PR 4b is green and needs its rc test. This first run builds **2026.1.1-rc.5**
+  from the head of `ci/release-workflows` and **stops at a draft**: nothing is
+  published, and no installed app sees it;
 - the command, for them to run (or to authorise you to run, once):
 
   ```bash
-  gh workflow run promote.yml --repo jdunkerley/enso --ref ci/release-workflows -f designator=rc
+  gh workflow run promote.yml --repo jdunkerley/enso --ref ci/release-workflows -f designator=rc -f publish=false
   ```
 
-- that the run takes about an hour (the backend builds dominate: rc.4's took 24
-  and 30 minutes on Linux and Windows, and the Mac up to two and a half hours
-  cold).
+- that the run takes about an hour, longer if the Mac is cold (rc.4's backends
+  took 24 and 30 minutes on Linux and Windows, and up to two and a half hours on
+  a cold Mac).
 
 Wait for their answer. If they decline or postpone, stop here; 4c's Task 8 can
 continue meanwhile.
 
-- [ ] **Step 2: Watch the run**
+- [ ] **Step 2: Watch the run, and find the draft**
 
 ```bash
 id=$(gh run list --workflow promote.yml --branch ci/release-workflows -L 1 --json databaseId --jq '.[0].databaseId')
@@ -3536,83 +3883,121 @@ echo "$id"
 "$SCRATCH/wait-run.sh" "$id" 300
 ```
 
-(run the wait in the background). When it ends, `"$SCRATCH/job-times.sh" "$id"`
-and save the output to `$SCRATCH/rc5-jobs.md`.
+(run the wait in the background). When it ends:
 
-Expected jobs, all green (each prefixed `Release / ` except the first): "Promote
-release (linux, amd64)", "Check the macOS runner", "Create a release draft.",
-"Verify License Packages (linux, amd64)", "GUI build (linux, amd64)", "Build
-Backend (linux, amd64)", "Build Backend (windows, amd64)", "Build Backend
-(macos, aarch64)" (skipped if the Mac was offline), "Build IDE (linux, amd64)",
-"Build IDE (windows, amd64)", "Build IDE (macos, aarch64)" (skipped if offline),
-"Publish release (linux, amd64)", "Update the latest release version (linux,
-amd64)". The promote job's log shows `Promoting rc: 2026.1.1-rc.5`.
+```bash
+"$SCRATCH/job-times.sh" "$id" | tee "$SCRATCH/rc5-jobs.md"
+draft=$(gh run view "$id" --log | grep -oE 'ENSO_RELEASE_ID=[0-9]+' | head -1 | cut -d= -f2)
+gh api "repos/jdunkerley/enso/releases/$draft" --jq '"\(.id)\t\(.tag_name)\tdraft=\(.draft)\tprerelease=\(.prerelease)\t\(.target_commitish)"'
+git -C /c/Repos/Enso/ide-bs-4b rev-parse HEAD
+```
+
+Expected: green, with "Promote release (linux, amd64)", then under `Release / `:
+"Check the macOS runner", "Create a release draft.", "Verify License Packages
+(linux, amd64)", "GUI build (linux, amd64)", "Build Backend (linux, amd64)",
+"Build Backend (windows, amd64)", "Build Backend (macos, aarch64)", "Build IDE
+(linux, amd64)", "Build IDE (windows, amd64)", "Build IDE (macos, aarch64)" all
+green, and "Publish release (linux, amd64)" and "Update the latest release
+version (linux, amd64)" **skipped** (`publish=false`). The promote job's log
+shows `Promoting rc: 2026.1.1-rc.5`. The draft is `2026.1.1-rc.5`, `draft=true`,
+`prerelease=true`, targeting the branch head.
+
+If the macOS jobs were skipped or failed although the Mac was online, stop and
+report: with the user's go-ahead, delete the draft
+(`gh api -X DELETE "repos/jdunkerley/enso/releases/$draft"`), fix, and return to
+Step 1.
 
 - [ ] **Step 3: If the run failed — STOP**
 
 Do not dispatch again. Collect the failing job's log tail
-(`gh run view "$id" --log-failed | tail -80`) and the drafts it left
+(`gh run view "$id" --log-failed | tail -80`) and the drafts left
 (`gh api repos/jdunkerley/enso/releases --paginate --jq '.[] | select(.draft) | "\(.id)\t\(.name)"'`),
 fix the cause on the branch (a new commit, pushed; wait for the PR checks
 again), and report to the user: the failure, the fix, and the leftover draft's
 id. Delete a leftover draft only with their go-ahead
 (`gh api -X DELETE repos/jdunkerley/enso/releases/<id>`). Then return to Step 1.
-If the publish job had already published rc.5 before a later step failed, say so
-plainly: the next rc test is rc.6.
+Nothing was published: the next try is rc.5 again.
 
-- [ ] **Step 4: Compare rc.5 with rc.4**
+- [ ] **Step 4: Check the draft against rc.4**
 
 ```bash
-"$SCRATCH/release-parity.sh" 2026.1.1-rc.4 2026.1.1-rc.5 "$SCRATCH/parity-rc5"; echo "exit $?"
-cat "$SCRATCH/parity-rc5/body.diff" | head -60
-gh release view 2026.1.1-rc.5 --json tagName,targetCommitish,isPrerelease,isDraft --jq '"\(.tagName)\t\(.targetCommitish)\tprerelease=\(.isPrerelease)\tdraft=\(.isDraft)"'
-git -C /c/Repos/Enso/ide-bs-4b rev-parse HEAD
-gh run view "$id" --log | grep -E "ENSO_LATEST_RELEASE_UPDATED|is a prerelease; leaving" | head -3
+"$SCRATCH/release-parity.sh" 2026.1.1-rc.4 "$draft" "$SCRATCH/parity-rc5-draft"; echo "exit $?"
+head -60 "$SCRATCH/parity-rc5-draft/body.diff"
+gh api repos/jdunkerley/enso/releases/tags/2026.1.1-rc.5 2>&1 | head -1
+```
+
+The parity script downloads the two installers named by the feeds (about 1.7 GB)
+through the API, as a draft's public URLs do not work yet.
+
+Expected:
+
+- exit 0: `draft=true` and the name `Enso 2026.1.1-rc.5`; the same assets as
+  rc.4 apart from `assets.json` (the `.exe`, its `.blockmap`, the `.AppImage`,
+  the `.dmg`, three `.sha256` files, `latest.yml`, `latest-linux.yml`), with
+  rc.4's content types, every one `uploaded`; each feed names `2026.1.1-rc.5`,
+  the size of its installer, and the sha512 of the installer as downloaded; each
+  `.sha256` matches its installer; the body has a "# Changelog" section and no
+  HTML entities;
+- the body diff shows only Decision 6 (no data-collection section, no entities),
+  the new download links, and the changelog entries merged since rc.4
+  (`git log 931935f7a7..HEAD -- CHANGELOG.md` lists their PRs);
+- `releases/tags/2026.1.1-rc.5` is still `Not Found`: nothing is public.
+
+Record anything else as a finding for the user.
+
+- [ ] **Step 5: STOP — the user OKs publishing, and publishes the draft**
+
+Report Step 4 (the parity output, the body diff summary, the job times against
+rc.4's) and ask whether to publish. On their OK, give them the command to run
+(or to authorise you to run, once):
+
+```bash
+gh workflow run release.yml --repo jdunkerley/enso --ref ci/release-workflows -f version=2026.1.1-rc.5 -f release-id=<draft id>
+```
+
+Tell them that once it finishes, every installed rc with prereleases enabled is
+offered rc.5.
+
+- [ ] **Step 6: Watch the publish run, and check the published release**
+
+```bash
+pid=$(gh run list --workflow release.yml --branch ci/release-workflows -L 1 --json databaseId --jq '.[0].databaseId')
+"$SCRATCH/wait-run.sh" "$pid" 60
+"$SCRATCH/job-times.sh" "$pid"
+PARITY_INSTALLERS=0 "$SCRATCH/release-parity.sh" 2026.1.1-rc.4 2026.1.1-rc.5 "$SCRATCH/parity-rc5"; echo "exit $?"
+gh run view "$pid" --log | grep -E "ENSO_LATEST_RELEASE_UPDATED|is a prerelease; leaving|Published 2026" | head -4
 gh pr list --state all --head bump-latest-release-2026.1.1-rc.5 --json number --jq length
 gh api repos/jdunkerley/enso/releases --paginate --jq '[.[] | select(.draft)] | length'
 gh api repos/jdunkerley/enso/releases/latest --jq .tag_name 2>&1 | head -1
 ```
 
-Expected:
+Expected: the run is green with only "Publish release (linux, amd64)" and
+"Update the latest release version (linux, amd64)" run, every build job skipped;
+the parity script exits 0 in published mode (the installers were already checked
+byte by byte in Step 4); the log shows `Published 2026.1.1-rc.5`, then
+`2026.1.1-rc.5 is a prerelease; leaving the latest-release entry untouched.` and
+`ENSO_LATEST_RELEASE_UPDATED=false`; no bump PR (`0`); no draft left (`0`);
+`releases/latest` still 404 (only prereleases exist).
 
-- `release-parity.sh` exits 0: the same assets as rc.4 apart from `assets.json`
-  (with the Mac online: the `.exe`, its `.blockmap`, the `.AppImage`, the
-  `.dmg`, three `.sha256` files, `latest.yml`, `latest-linux.yml`), with rc.4's
-  content types; each feed names `2026.1.1-rc.5` and the size of the installer
-  it points at; every `.sha256` is one digest; the body has a "# Changelog"
-  section and no HTML entities;
-- the body diff shows only Decision 6 (no data-collection section, no entities),
-  the new download links, and the changelog entries merged since rc.4
-  (`git log 931935f7a7..HEAD -- CHANGELOG.md` lists their PRs). With the Mac
-  offline, the body ends with the `> [!NOTE]` naming "macOS (Apple silicon)",
-  the parity script notes the unlinked `.dmg`, and the asset diff shows the two
-  missing `enso-mac-arm64-VERSION` lines (the only mismatch it may report);
-- the tag's commit is the branch head; prerelease, not a draft;
-- the latest-version step logged
-  `2026.1.1-rc.5 is a prerelease; leaving the latest-release entry untouched.`
-  and `ENSO_LATEST_RELEASE_UPDATED=false`; no bump PR (`0`); no draft left
-  (`0`); `releases/latest` is still 404 (only prereleases exist).
+If the publish job fails, stop and report; the draft is still a draft unless the
+log shows `Published`, in which case say so plainly (the next rc test is rc.6).
 
-Record anything else as a finding for the user.
+- [ ] **Step 7: STOP — ask the user to update rc.4 → rc.5 in the app**
 
-- [ ] **Step 5: STOP — ask the user to update rc.4 → rc.5 in the app**
-
-Report the comparison (the parity output, the body diff summary, the job times
-against rc.4's) and ask the user to test the in-app update, on the machine where
-rc.4 is installed: Settings → Local → include prerelease versions on; the app
-offers 2026.1.1-rc.5; download, restart; Help → About (or the window title)
-shows rc.5 and a project opens. On Linux the AppImage updates the same way if
-they want to try it; macOS builds are unsigned, so they update by hand
-(`ENSO_IDE_UPDATES=manual`), as rc.4 did. Do not install or update anything
-yourself.
+Ask the user to test the in-app update, on the machine where rc.4 is installed:
+Settings → Local → include prerelease versions on; the app offers 2026.1.1-rc.5;
+download, restart; Help → About (or the window title) shows rc.5 and a project
+opens. On Linux the AppImage updates the same way if they want to try it; macOS
+builds are unsigned, so they update by hand (`ENSO_IDE_UPDATES=manual`), as rc.4
+did. Do not install or update anything yourself.
 
 Wait for their result. If the update fails, collect what they report (the
 updater's log is in the app's log), compare `latest.yml` with rc.4's
-(`$SCRATCH/parity-rc5/new/latest.yml` against
+(`$SCRATCH/parity-rc5-draft/new/latest.yml` against
 `gh release download 2026.1.1-rc.4 -p latest.yml`), fix on the branch, and
 return to Step 1 for rc.6.
 
-- [ ] **Step 6: STOP — merge on the user's go-ahead**
+- [ ] **Step 8: STOP — merge on the user's go-ahead**
 
 When the user confirms the update worked and says to merge:
 
@@ -3621,11 +4006,11 @@ gh pr merge <N> --squash
 git -C /c/Repos/Enso/ide fetch origin && git -C /c/Repos/Enso/ide log --oneline -1 origin/develop
 ```
 
-- [ ] **Step 7: STOP — re-enable the nightly release on the user's go-ahead**
+- [ ] **Step 9: STOP — re-enable the nightly release on the user's go-ahead**
 
 Ask the user whether to re-enable the nightly release now (it then publishes
-`2026.1.1-nightly.<date>` every day at 02:00 UTC from `develop`). On their
-go-ahead:
+`2026.1.1-nightly.<date>` every day at 02:00 UTC from `develop`, with `publish`
+at its default, `true`). On their go-ahead:
 
 ```bash
 gh workflow enable nightly.yml --repo jdunkerley/enso
@@ -3634,7 +4019,7 @@ gh workflow list --all --json path,state --jq '.[] | select(.path == ".github/wo
 
 Expected: `active`.
 
-- [ ] **Step 8: Check the first nightly**
+- [ ] **Step 10: Check the first nightly**
 
 After the next 02:00 UTC run:
 
@@ -3643,15 +4028,16 @@ nid=$(gh run list --workflow nightly.yml -L 1 --json databaseId --jq '.[0].datab
 "$SCRATCH/wait-run.sh" "$nid" 300
 "$SCRATCH/job-times.sh" "$nid"
 new=$(gh release list -L 1 --json tagName --jq '.[0].tagName')
-"$SCRATCH/release-parity.sh" 2026.1.1-nightly.2026.10.23 "$new" "$SCRATCH/parity-nightly"; echo "exit $?"
+"$SCRATCH/release-parity.sh" 2026.1.1-nightly.2026.10.22 "$new" "$SCRATCH/parity-nightly"; echo "exit $?"
 ```
 
-Expected: the run is green with the jobs of Step 2 under `Promote nightly / `;
-the parity script's only mismatches are the ones it explains (the Mac's two
-assets if the Mac was online for one and not the other; the old nightly's HTML
-entities are in the old body, which it does not check). If the nightly fails,
-tell the user, and with their go-ahead disable it again
-(`gh workflow disable nightly.yml`) while the cause is fixed in a new PR.
+Expected: the run is green with the jobs of Step 2 under `Promote nightly / `,
+publish and latest-version included. Against nightly.2026.10.22 (which had the
+Mac's installer) the parity script exits 0 when the Mac was online; when it was
+offline, its one mismatch is the asset diff's two `enso-mac-arm64-VERSION`
+lines, and the body ends with the note. If the nightly fails, tell the user, and
+with their go-ahead disable it again (`gh workflow disable nightly.yml`) while
+the cause is fixed in a new PR.
 
 ---
 
@@ -3687,25 +4073,49 @@ corepack pnpm install --frozen-lockfile --ignore-scripts
 
 - [ ] **Step 2: Add the edition to `setup-jvm`**
 
-In `.github/actions/setup-jvm/action.yml`, make four changes.
-
-After the `cache-key` input (after its `    required: true` line), add:
+`$SCRATCH/edit-setup-jvm.py` makes the four changes (the input; the edition
+check at the start of "Read the pinned versions", which also gives the vendor
+string; the `setup-graalvm` distribution; and the vendor in "Check the
+toolchain": Oracle GraalVM prints
+`Java(TM) SE Runtime Environment Oracle GraalVM 25.0.1+…`, CE prints
+`… GraalVM CE 25.0.1+…`):
 
 <!-- prettier-ignore -->
-```yaml
+```python
+"""Adds the `edition` input to .github/actions/setup-jvm/action.yml (Phase 4, PR 4c).
+
+Usage: py -3 edit-setup-jvm.py <path to setup-jvm's action.yml>
+
+Four replacements; each must match exactly once, or nothing is written.
+"""
+import sys
+
+path = sys.argv[1]
+s = open(path, encoding='utf-8').read()
+
+
+def rep(old, new):
+    global s
+    assert s.count(old) == 1, f'found {s.count(old)}: {old[:70]!r}'
+    s = s.replace(old, new)
+
+
+rep('''    required: true
+  flatc:''', '''    required: true
   edition:
     description: >-
       `community` (GraalVM CE, the default) or `oracle` (Oracle GraalVM, at the same version), which
       the nightly checks also build and test with. `./run` chose it by `GRAAL_EDITION`.
     required: false
     default: community
-```
-
-In the step "Read the pinned versions", between `shell: bash` and `run: |-`, add
-the `env`, and start the script with the edition check:
-
-<!-- prettier-ignore -->
-```yaml
+  flatc:''')
+rep('''    - name: Read the pinned versions
+      id: pins
+      shell: bash
+      run: |-
+        pin() {''', '''    - name: Read the pinned versions
+      id: pins
+      shell: bash
       env:
         EDITION: ${{ inputs.edition }}
       run: |-
@@ -3713,29 +4123,28 @@ the `env`, and start the script with the edition check:
           community) echo "vendor=GraalVM CE" >> "$GITHUB_OUTPUT" ;;
           oracle) echo "vendor=Oracle GraalVM" >> "$GITHUB_OUTPUT" ;;
           *)
-            echo "::error::setup-jvm: unknown edition \`$EDITION\` (community or oracle)."
+            echo "::error::setup-jvm: unknown edition \\`$EDITION\\` (community or oracle)."
             exit 1
             ;;
         esac
-        pin() {
+        pin() {''')
+rep('''        distribution: graalvm-community''',
+    '''        distribution: ${{ inputs.edition == 'oracle' && 'graalvm' || 'graalvm-community' }}''')
+rep('''        GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        FLATC_VERSION''', '''        GRAALVM_VERSION: ${{ steps.pins.outputs.graalvm }}
+        GRAALVM_VENDOR: ${{ steps.pins.outputs.vendor }}
+        FLATC_VERSION''')
+rep('''grep -qF "GraalVM CE $GRAALVM_VERSION" <<< "$java"''',
+    '''grep -qF "$GRAALVM_VENDOR $GRAALVM_VERSION" <<< "$java"''')
+open(path, 'w', encoding='utf-8', newline=chr(10)).write(s)
+print('setup-jvm: edited')
 ```
 
-(the `pin() {` line and everything after it stay as they are).
-
-In "Set up GraalVM", replace `distribution: graalvm-community` with:
-
-<!-- prettier-ignore -->
-```yaml
-        distribution: ${{ inputs.edition == 'oracle' && 'graalvm' || 'graalvm-community' }}
+```bash
+py -3 "$SCRATCH/edit-setup-jvm.py" .github/actions/setup-jvm/action.yml
 ```
 
-In "Check the toolchain", add
-`        GRAALVM_VENDOR: ${{ steps.pins.outputs.vendor }}` after the
-`GRAALVM_VERSION` line of its `env`, and replace
-`grep -qF "GraalVM CE $GRAALVM_VERSION" <<< "$java"` with
-`grep -qF "$GRAALVM_VENDOR $GRAALVM_VERSION" <<< "$java"` (Oracle GraalVM prints
-`Java(TM) SE Runtime Environment Oracle GraalVM 25.0.1+…`, CE prints
-`… GraalVM CE 25.0.1+…`).
+Expected: `setup-jvm: edited`.
 
 - [ ] **Step 3: Generalise the platform workflow**
 
@@ -4597,10 +5006,14 @@ git grep -nE '^\s*(- )?run: .*\./run( |$)' -- .github
 "$SCRATCH/compare.sh" /c/Repos/Enso/ide-bs-4c .github/workflows/engine-checks.yml .github/workflows/release.yml > "$SCRATCH/compare-4c-final.md"
 ```
 
-Expected: `Workflow policy: OK`, `ℹ tests 95`, `ℹ pass 95`, `ℹ fail 0` on both
+Expected: `Workflow policy: OK`, `ℹ tests 98`, `ℹ pass 98`, `ℹ fail 0` on both
 hosts; `actionlint-ok`; Prettier clean; **no `./run` step in any workflow**; the
-comparison shows D9 and D10 for the engine checks, and D9 for `release.yml`'s
-`setup-jvm` jobs.
+comparison shows D9 and D10 for the engine checks, and **only D9** for
+`release.yml` (its four `setup-jvm` jobs, the license check and the three
+backends, pass no `edition`, so they get `community`: the same GraalVM CE as
+before, now checked through `$GRAALVM_VENDOR`). That and actionlint are this
+PR's release-path check; the release itself first runs the change in the next
+nightly after the merge, which Task 10 Step 2 watches. Say so in the PR body.
 
 - [ ] **Step 6: Commit, push, open the PR with the macOS labels**
 
@@ -4666,12 +5079,24 @@ diff <(cut -f2 "$SCRATCH/nightly-old.tsv") <(cut -f2 "$SCRATCH/nightly-new.tsv")
 gh run view "$nid" --log | grep -m2 -E "Oracle GraalVM 25\.0\.1"
 ```
 
-Expected: the same 25 job names as the baseline (each now under its caller:
-`linux / `, `windows / `, `linux (Oracle GraalVM) / `, `macos / `); green
-wherever the baseline was green, and the Windows build green too unless
-develop's PR checks show the same failure; one "Engine Tests Report" and one
-"Standard Library Tests Report" per platform and edition, with counts within the
-tests added on develop since the baseline's commit; the Oracle legs log
+Expected, **with the Mac online**
+(`gh run view "$nid" --json jobs --jq '.jobs[] | select(.name == "Check the macOS runner") | .conclusion'`
+is `success` and a `macos / …` job ran): the same 25 job names as the baseline
+(each now under its caller: `linux / `, `windows / `,
+`linux (Oracle GraalVM) / `, `macos / `). **With the Mac offline**, the skipped
+`macos` call shows as one skipped job named `macos` instead of the five
+`(macos, aarch64)` jobs; compare the rest:
+
+```bash
+diff <(cut -f2 "$SCRATCH/nightly-old.tsv" | grep -v 'macos, aarch64') <(cut -f2 "$SCRATCH/nightly-new.tsv" | grep -vx macos) && echo "same 20 jobs"
+```
+
+and ask the user whether to dispatch again with the Mac online before merging
+(the Mac's legs were proven on the PR's `CI: macOS …` run, Step 7). In both
+cases: green wherever the baseline was green, and the Windows build green too
+unless develop's PR checks show the same failure; one "Engine Tests Report" and
+one "Standard Library Tests Report" per platform and edition, with counts within
+the tests added on develop since the baseline's commit; the Oracle legs log
 `Oracle GraalVM 25.0.1` in "Check the toolchain", and their JVM suite skipped
 "Build the small JDK". A count that differs beyond added tests: ask the user to
 dispatch develop's `engine-checks-nightly.yml` (still `./run`, until this
@@ -4721,7 +5146,23 @@ gh workflow list --all --json path,state --jq '.[] | select(.path | test("nightl
 Expected: the two greps print nothing; `nightly.yml` is `active` (Task 7).
 `build_tools/`, `run`, `run.cmd` and `run.ps1` remain for Phase 5, unused by CI.
 
-- [ ] **Step 2: Record and tidy**
+- [ ] **Step 2: Watch the first nightly after 4c**
+
+4c changed `setup-jvm`, which the release's sbt jobs use (D9). After the next
+02:00 UTC nightly:
+
+```bash
+nid=$(gh run list --workflow nightly.yml -L 1 --json databaseId --jq '.[0].databaseId')
+"$SCRATCH/wait-run.sh" "$nid" 300
+"$SCRATCH/job-times.sh" "$nid"
+gh run view "$nid" --log | grep -m4 -E "GraalVM CE 25\.0\.1"
+```
+
+Expected: green, as Task 7 Step 10's run; the release's `setup-jvm` steps log
+`GraalVM CE 25.0.1` in "Check the toolchain". If it fails in `setup-jvm`, tell
+the user and, with their go-ahead, disable the nightly while it is fixed.
+
+- [ ] **Step 3: Record and tidy**
 
 - Comment on #289: the three PR links, rc.5's link and the parity summary, the
   first nightly's run, "Phase 4 complete", and the "Tickets to raise" list below
@@ -4773,13 +5214,19 @@ the close-out comment for the user.
 8. **`enso-remove-draft-releases`** (`build_tools/cli/src/bin/`) deletes drafts
    in `enso-org/enso`, hard-coded. Phase 5 deletes it with `build_tools/`;
    `gh api -X DELETE repos/jdunkerley/enso/releases/<id>` replaces it.
+9. **Re-running a platform's release jobs after a day fails.** The
+   `wasm-artifacts` artifact is kept for one day (`retention-days: 1`, as in
+   `ide-packaging.yml`), so re-running "Build IDE" days after a release, to add
+   a missing installer as the publish note suggests, fails at its download. Keep
+   it for the release as long as the `gui` artifact, or document re-running the
+   whole platform chain.
 
 ## Self-review against the spec
 
 | Spec section / requirement                                                                                                       | Where                                                                                                                            |
 | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | Phase 4: release, promote, nightly and `ide upload` on `tools/build-scripts`                                                     | Tasks 1–4 (the command), 5–7 (the workflows)                                                                                     |
-| Phase 4 gate: proven by an rc prerelease; ask the user before publishing                                                         | Task 7: STOP steps 1, 5, 6, 7; the user's dispatch is the publish go-ahead                                                       |
+| Phase 4 gate: proven by an rc prerelease; ask the user before publishing                                                         | Task 7: STOP steps 1, 5, 7, 8, 9; rc.5 stops at a draft that is checked before the user OKs and starts its publishing (R13)      |
 | Components, `release`: `create-draft` (tag collision, body template, notes from `CHANGELOG.md`)                                  | `createDraft`, `releaseBody`, `topReleaseNotes` (Tasks 2–3), with the Rust messages                                              |
 | `publish` (asset manifest, missing-platform note, asset validation)                                                              | `publishRelease`, `validateRelease`; the manifest is dropped (Decision 2) and the validation checks the installers directly (R5) |
 | `promote <designator>` (next version from tags)                                                                                  | `release promote` over 3a's `generateVersion` and `git ls-remote --tags origin` (Task 4; rc.5 checked locally)                   |
@@ -4824,24 +5271,30 @@ workflows and edit scripts.
 **Tested before writing** (2026-10-23, on scratch worktrees of develop at
 `c848ae9746` with every change of this plan applied, in order):
 
-- `tools/build-scripts`: 168 vitest tests pass on Windows (46 new);
-  `tsc --noEmit`, ESLint `--max-warnings=0` and Prettier clean.
+- `tools/build-scripts`: 176 vitest tests pass on Windows (54 new: githubApi 10,
+  assets 11, notes 7, latestRelease 4, release 22); `tsc --noEmit`, ESLint
+  `--max-warnings=0` and Prettier clean.
 - `release promote rc` printed `2026.1.1-rc.5` against the fork's tags;
   `promote nightly` printed `2026.1.1-nightly.2026.10.23.1`;
   `update-latest-version` with `2026.1.1-rc.5` left `build-config.yaml` alone;
   `publish` without a token stopped at `GITHUB_TOKEN is not set.`.
 - The policy: with 4b applied to develop (the old nightly and macOS workflows),
-  94 `node:test` tests pass on Windows and WSL and the policy is OK; the new
-  release tests fail as Task 5 Step 2 says against the old rules; with 4c
-  applied, 95 pass on both hosts. `edit-policy-4b.py`, `edit-policy-4c.py`,
-  `edit-platform.py` and `edit-github-claude.py` reproduce, byte for byte, the
-  files they were derived from.
+  97 `node:test` tests pass on Windows and WSL and the policy is OK, with the
+  tests of `checkPullRequestsIgnoreSpecs` and `checkSetupNodeCache` kept; the
+  new release tests fail as Task 5 Step 2 says against the old rules (79 pass, 9
+  fail), and the old `release.yml` fails the new rules as Step 3 says; with 4c
+  applied, 98 pass on both hosts. Each edit script ran on develop's files in the
+  plan's order (4b, then 4c) and produced the files the checks ran on.
 - actionlint 1.7.12 with shellcheck 0.11.0 is clean on every final workflow (4b
   alone, and 4b + 4c); Prettier is clean on `.github`, the docs and the package;
-  `release-parity.sh` is shellcheck-clean and ran on rc.3 → rc.4 and the two
-  nightlies with the expected mismatches.
+  `release-parity.sh` is shellcheck-clean, and ran on rc.3 → rc.4 (without
+  installers) and, in full, on the two nightlies: it downloaded both installers
+  through the API, and each matched its feed's sha512 and its `.sha256`; the
+  expected mismatches only. The runner listing of Task 7 Step 1 works with the
+  user's token (`Jamess-Mac-mini online …`).
 - `compare.sh` on the 4c engine checks shows only D9 and D10.
-- Not run: any workflow (no dispatch, upload or publish), `ide-build` on macOS,
+- Not run: any workflow (no dispatch, upload or publish; so neither
+  `publish: false` nor the `release-id` mode has run), `ide-build` on macOS,
   `buildEngineBundle` on the Mac (both first run in Task 7), Oracle GraalVM
   through `setup-graalvm` (first run in Task 9), and the package's tests on
   Linux (its CI job runs them).
@@ -4849,20 +5302,33 @@ workflows and edit scripts.
 ## Rulings
 
 1. **R1:** the REST client is plain `fetch` (Node 24's), not Octokit or `gh`.
-   - **Why:** `gh release upload` addresses a release by tag, and a draft has no
-     tag yet (and two drafts may share a name); Octokit is a new dependency for
-     five endpoints.
+   - **Why:** `gh release upload <tag>` does find a draft by its tag, but after
+     a re-run two drafts can share one, so the upload must name the draft by id;
+     and the commands need the content type, the retry and R3's replacement
+     rules in their own hands. Octokit is a new dependency for five endpoints.
    - **Cost if wrong:** a hand-written client to maintain (100 lines, tested).
 2. **R2:** an upload reads the whole file into memory and posts a buffer.
    - **Why:** the upload API wants a `Content-Length`, which a buffer gives
      without any streaming setup; the installers are under 1 GB and the runners
      have 7 GB or more.
    - **Cost if wrong:** an installer near 2 GB would need a streamed body.
-3. **R3:** before retrying a failed upload, an asset of the same name is
-   deleted.
-   - **Why:** GitHub keeps a half-written asset (`state: starter`) and refuses a
-     second of that name, so `./run`'s plain retry could not succeed.
-   - **Cost if wrong:** none known; only this run's own asset can match.
+3. **R3:** `upload-ide` uploads to the release by id, draft or published, as
+   `./run` did; a draft's assets may be replaced, a published release's never.
+   - On a draft, a same-named asset is deleted and replaced: one an earlier run
+     of the job uploaded (a re-run replaces its own installer), and the
+     half-written one (`state: starter`) a failed attempt leaves, before each
+     retry and after the last. GitHub refuses a second asset of a name, so
+     `./run`'s plain retry could not succeed.
+   - On a published release (re-running a skipped platform's jobs adds its
+     installer, as the note says), nothing is ever deleted: a same-named asset,
+     or a partial one a failed attempt left, stops the upload with an error that
+     says to delete it by hand.
+   - `publish` refuses a draft with any asset not `uploaded`, so a half-written
+     installer is never published.
+   - **Why:** a published release's files are what users download; replacing one
+     silently would change a published version. A draft is private.
+   - **Cost if wrong:** a broken upload to a published release needs a hand
+     deletion before the re-run.
 4. **R4:** `publish` sends one PATCH with the note, the tag, the target and
    `draft: false`.
    - **Why:** `./run` made two calls (edit, then publish); one call cannot leave
@@ -4905,3 +5371,35 @@ workflows and edit scripts.
     - **Why:** nothing uses them since Phase 3 (the generator-era files inline
       their steps, and those are rewritten here).
     - **Cost if wrong:** none; Phase 5 would have deleted them.
+11. **R11:** an upload aborts after ten minutes plus a second per megabyte
+    (`uploadTimeoutMs`; 24 minutes for an 840 MB `.dmg`), through an
+    `AbortSignal` on the request.
+    - **Why:** a stalled upload would otherwise hang until the job's timeout.
+      undici's own `headersTimeout` and `bodyTimeout` (300 s) cover only the
+      wait for the response, not sending the body, so they do not cut a slow
+      upload short; the signal bounds the whole request. No `undici` import is
+      needed (it is not a dependency here).
+    - **Cost if wrong:** an uplink under 1 MB/s would fail the Mac's upload;
+      raise the rate in `uploadTimeoutMs`.
+12. **R12:** a 404 is `null` only for `GET` (the thing does not exist) and
+    `DELETE` (absence is the goal); on `PATCH` or `POST` it is an error.
+    - **Why:** a `PATCH` to a release someone deleted meanwhile must fail, not
+      pass silently and leave `publish` to report a confusing "not published".
+    - **Cost if wrong:** none.
+13. **R13:** the publish hold is a `publish` input (default `true`) on
+    `release.yml` and `promote.yml`, and a `release-id` mode of `release.yml`
+    that runs only the publish and latest-version jobs for an existing draft.
+    - **Why:** the rc test must stop at a draft that can be checked. A separate
+      publish workflow would be simpler, but `workflow_dispatch` needs the
+      workflow file on the default branch, so a new file could not be dispatched
+      from the 4b branch before it merges; `release.yml` already exists there. A
+      GitHub environment with required reviewers would need a settings change
+      and would hold the unattended nightlies. `release publish` checks that the
+      draft's tag is the given version, so a wrong `release-id` cannot publish
+      another release.
+    - **Cost if wrong:** five root jobs carry `if: inputs.release-id == ''`.
+14. **R14:** `withLatestRelease` keeps a CRLF `build-config.yaml` CRLF.
+    - **Why:** Rust's `lines()` and `"\n"` rewrote every line ending as LF,
+      which on a CRLF checkout would turn the bump PR into a whole-file diff. CI
+      checks out LF, so the release workflow sees no difference.
+    - **Cost if wrong:** none.
