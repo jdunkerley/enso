@@ -6,8 +6,8 @@ description: >-
 inputs:
   shared-key:
     description: >-
-      `Swatinem/rust-cache` key shared by the jobs that build the same crates (`build-script` for
-      the `./run` CLI, `wasm-parser` for the GUI's parser).
+      `Swatinem/rust-cache` key shared by the jobs that build the same crates (`wasm-parser` for
+      the GUI's parser).
     required: true
 runs:
   using: composite

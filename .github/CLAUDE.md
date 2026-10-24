@@ -25,20 +25,21 @@ settings. Every workflow is hand-written YAML: the Rust generator
   version and calls `release.yml`, which drafts the release, builds and uploads
   the installers and publishes it with `tools/build-scripts`' `release` command
   (Note [Release Without ./run] in `release.yml`). Change them only together
-  with an rc release test. `engine-checks-nightly.yml`,
-  `extra-nightly-tests.yml` and `macos-checks.yml` stay in the generator's
-  layout until PR 4c (edit directly).
+  with an rc release test. `engine-checks-nightly.yml` (by hand) adds macOS and
+  Oracle GraalVM to the engine checks, `extra-nightly-tests.yml` (by hand) the
+  suites that need the Snowflake and Enso Cloud secrets, and `macos-checks.yml`
+  the self-hosted Mac's checks for `macos-pull-request.yml`; all three call
+  `engine-checks-platform.yml`.
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
   — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
   their `name:`; keep those names.
-- `actions/` — composite actions: `build-script` (compile `./run`'s CLI once per
-  platform), `setup-build-script` (use it in a job), `setup-node`, `setup-rust`,
-  `setup-jvm` (GraalVM, sbt, optionally `flatc` and GraalPy at the `toolchain:`
-  pins in `build-config.yaml` and the `rust-toolchain.toml` Rust toolchain, plus
-  the sbt dependency cache), `setup-msvc` (the MSVC developer environment on
-  Windows, for native images and the runtime DLL copy), `git-clean`,
-  `setup-build-scripts` (install `tools/build-scripts`' dependencies only),
-  `download-engine-distribution`.
+- `actions/` — composite actions: `setup-node`, `setup-rust`, `setup-jvm`
+  (GraalVM CE, or Oracle GraalVM with `edition: oracle`, sbt, optionally `flatc`
+  and GraalPy at the `toolchain:` pins in `build-config.yaml` and the
+  `rust-toolchain.toml` Rust toolchain, plus the sbt dependency cache),
+  `setup-msvc` (the MSVC developer environment on Windows, for native images and
+  the runtime DLL copy), `git-clean`, `setup-build-scripts` (install
+  `tools/build-scripts`' dependencies only), `download-engine-distribution`.
 - `actionlint.yaml` — actionlint's configuration; each ignore says why it stays.
 - `settings.yml`, `mergify.yml` — inherited from upstream. Neither is live on
   this fork: the branch rules are a repository ruleset, which requires no status
@@ -103,8 +104,9 @@ workflow steps (the JVM tests) (Phase 3). A moved step sets every variable
 distribution built by another job uses that job's version, from its outputs, not
 sbt's default `0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
 `engine-checks-platform.yml`. Phase 4 moved the releases to
-`tools/build-scripts`' `release` command (PR 4b); the nightly checks and the
-macOS checks (label-gated) still call `./run` until PR 4c.
+`tools/build-scripts`' `release` command, and the nightly and macOS checks to
+calls of `engine-checks-platform.yml`. No workflow calls `./run` any more;
+`build_tools/` and `run*` stay, unused by CI, until Phase 5 deletes them.
 
 | Workflow › job                                           | Step                                                                                                       | Goes through `./run`?                                |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
@@ -122,7 +124,8 @@ macOS checks (label-gated) still call `./run` until PR 4c.
 | `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | No: `setup-build-scripts`                            |
 | `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `promote.yml`                                            | `release promote <designator>`                                                                             | No: `setup-build-scripts`                            |
-| nightly checks, extra nightly tests, macOS               | various                                                                                                    | Yes: PR 4c                                           |
+| `engine-checks-nightly.yml`, `macos-checks.yml`          | calls of `engine-checks-platform.yml`                                                                      | No                                                   |
+| `extra-nightly-tests.yml`                                | `engine-checks-platform.yml`, then `stdlib-test <suite>`                                                   | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
 
 ## Checking a change
 

@@ -204,24 +204,34 @@ describe('checkMacosJobsAreGated', () => {
 on: workflow_dispatch
 jobs:
   check-the-mac-os-runner: { runs-on: ubuntu-latest, steps: [] }
-  build-script-macos-aarch64: { needs: [check-the-mac-os-runner], ${GATE_IF}, runs-on: [self-hosted, macOS], steps: [] }
+  macos: { needs: [check-the-mac-os-runner], ${GATE_IF}, uses: ./.github/workflows/engine-checks-platform.yml, with: { os: macos } }
 `,
     })
     assert.deepEqual(checkMacosJobsAreGated(repo), [])
   })
-  test('rejects an ungated macOS job in the nightly, and a nightly without its macOS script job', () => {
-    const repo = fixture({
+  test('rejects an ungated macOS call in the nightly, and a nightly with no macOS call', () => {
+    const ungated = fixture({
       'workflows/engine-checks-nightly.yml': `
 on: workflow_dispatch
 jobs:
   check-the-mac-os-runner: { runs-on: ubuntu-latest, steps: [] }
-  tests-macos: { runs-on: [self-hosted, macOS], steps: [] }
+  macos: { uses: ./.github/workflows/engine-checks-platform.yml, with: { os: macos } }
 `,
     })
-    const found = checkMacosJobsAreGated(repo)
-    assert.equal(found.length, 2)
-    assert.ok(found.some((p) => p.includes('tests-macos')))
-    assert.ok(found.some((p) => p.includes('build-script-macos-aarch64')))
+    const found = checkMacosJobsAreGated(ungated)
+    assert.equal(found.length, 1)
+    assert.match(found[0], /macos: a macOS job must need/)
+    const none = fixture({
+      'workflows/engine-checks-nightly.yml': `
+on: workflow_dispatch
+jobs:
+  check-the-mac-os-runner: { runs-on: ubuntu-latest, steps: [] }
+  linux: { uses: ./.github/workflows/engine-checks-platform.yml, with: { os: linux } }
+`,
+    })
+    assert.deepEqual(checkMacosJobsAreGated(none), [
+      'engine-checks-nightly.yml: has no job that runs the platform checks on macOS',
+    ])
   })
   test('rejects macOS jobs when the gate job is missing', () => {
     const text = RELEASE_OK.replace(
@@ -272,51 +282,67 @@ jobs:
   })
 })
 
-describe('checkMacosChecksRunWhatIsRequested', () => {
-  const job = (condition) =>
-    `{ runs-on: [self-hosted, macOS], ${condition ? `if: ${condition}, ` : ''}steps: [] }`
-  const checks = (engineIf, libraries) => `
+const MACOS_CHECKS_OK = `
 on: workflow_call
 jobs:
-  build-engine-distribution: ${job()}
-  jvm-tests: ${job(engineIf)}
-${libraries.map((id) => `  ${id}: ${job('inputs.libraries')}`).join('\n')}
+  macos:
+    uses: ./.github/workflows/engine-checks-platform.yml
+    with:
+      os: macos
+      arch: aarch64
+      runner: '["self-hosted", "macOS"]'
+      jvm-tests: \${{ inputs.engine }}
+      stdlib-suites: >-
+        \${{ inputs.libraries && '[{"suite": "standard-library-in-native"},
+        {"suite": "standard-library"}, {"suite": "std-aws"}]' || '[]' }}
 `
-  test('accepts one engine job and three library jobs', () => {
-    const repo = fixture({ 'workflows/macos-checks.yml': checks('inputs.engine', ['a', 'b', 'c']) })
-    assert.deepEqual(checkMacosChecksRunWhatIsRequested(repo), [])
+
+describe('checkMacosChecksRunWhatIsRequested', () => {
+  const problems = (text) =>
+    checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': text }))
+  test('accepts one call that runs the JVM tests on engine and three suites on libraries', () => {
+    assert.deepEqual(problems(MACOS_CHECKS_OK), [])
   })
   test('applies only once macos-checks.yml exists', () => {
     assert.deepEqual(checkMacosChecksRunWhatIsRequested(fixture({})), [])
   })
-  test('rejects a missing library job and an unrelated engine condition', () => {
-    const repo = fixture({ 'workflows/macos-checks.yml': checks('inputs.other', ['a', 'b']) })
-    assert.equal(checkMacosChecksRunWhatIsRequested(repo).length, 2)
+  test('rejects a missing library suite and an unrelated engine condition', () => {
+    const text = MACOS_CHECKS_OK.replace(', {"suite": "std-aws"}', '').replace(
+      'inputs.engine',
+      'inputs.other',
+    )
+    const found = problems(text)
+    assert.equal(found.length, 2)
+    assert.ok(found.some((p) => p.includes('`jvm-tests` must be `inputs.engine`')))
+    assert.ok(found.some((p) => p.includes('`stdlib-suites` must be')))
   })
-  test('rejects a gated engine distribution, and one that is missing', () => {
-    const good = checks('inputs.engine', ['a', 'b', 'c'])
-    const gated = good.replace(
-      'build-engine-distribution: { runs-on',
-      'build-engine-distribution: { if: inputs.engine, runs-on',
+  test('rejects suites that run without inputs.libraries', () => {
+    const text = MACOS_CHECKS_OK.replace("inputs.libraries && '", "true && '")
+    assert.ok(problems(text).some((p) => p.includes('`stdlib-suites` must be')))
+  })
+  test('rejects a gated call, a second job, and another workflow', () => {
+    assert.ok(
+      problems(MACOS_CHECKS_OK.replace('    uses:', '    if: inputs.engine\n    uses:')).some((p) =>
+        p.includes('must always be built'),
+      ),
     )
-    const found = checkMacosChecksRunWhatIsRequested(
-      fixture({ 'workflows/macos-checks.yml': gated }),
-    )
-    assert.ok(found.some((p) => p.includes('must always be built')))
-    const missing = good.replace('build-engine-distribution:', 'build-something:')
-    assert.deepEqual(
-      checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': missing })),
-      ['macos-checks.yml: has no engine distribution job'],
+    assert.deepEqual(problems(`${MACOS_CHECKS_OK}  other: { runs-on: ubuntu-latest, steps: [] }\n`), [
+      'macos-checks.yml: must be one call of `engine-checks-platform.yml`',
+    ])
+    assert.ok(
+      problems(MACOS_CHECKS_OK.replace('engine-checks-platform.yml', 'engine-checks.yml')).some(
+        (p) => p.includes('must call `engine-checks-platform.yml`'),
+      ),
     )
   })
-  test('rejects a job that does not run on macOS', () => {
-    const text = checks('inputs.engine', ['a', 'b', 'c']).replace(
-      'a: { runs-on: [self-hosted, macOS]',
-      'a: { runs-on: ubuntu-latest',
+  test('rejects a call that does not run on the self-hosted Mac', () => {
+    const found = problems(
+      MACOS_CHECKS_OK.replace(`'["self-hosted", "macOS"]'`, 'ubuntu-latest').replace(
+        'os: macos',
+        'os: linux',
+      ),
     )
-    const found = checkMacosChecksRunWhatIsRequested(fixture({ 'workflows/macos-checks.yml': text }))
-    assert.equal(found.length, 1)
-    assert.match(found[0], /a: must run on macOS/)
+    assert.deepEqual(found, ['macos-checks.yml › macos: must run on the self-hosted Mac'])
   })
 })
 

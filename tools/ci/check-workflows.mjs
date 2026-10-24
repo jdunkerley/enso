@@ -263,8 +263,8 @@ export function checkMacosJobsAreGated({ workflows }) {
   const problems = []
   const nightly = workflows['engine-checks-nightly.yml']?.doc?.jobs
   if (nightly) {
-    if (!('build-script-macos-aarch64' in nightly)) {
-      problems.push('engine-checks-nightly.yml: has no macOS job `build-script-macos-aarch64`')
+    if (!Object.values(nightly).some(isMacosCaller)) {
+      problems.push('engine-checks-nightly.yml: has no job that runs the platform checks on macOS')
     }
     problems.push(...ungatedMacosJobs('engine-checks-nightly.yml', nightly))
   }
@@ -295,29 +295,49 @@ export function checkMacosJobsAreGated({ workflows }) {
   return problems
 }
 
-/** `macos-checks.yml` (#288) runs only what its inputs ask for (`macos_checks_run_only_...`). */
+/** The suites `macos-checks.yml` runs on `inputs.libraries`, as `./run` did on the Mac. */
+const MACOS_LIBRARY_SUITES = ['standard-library-in-native', 'standard-library', 'std-aws']
+
+/**
+ * `macos-checks.yml` (#288) runs only what its inputs ask for (`macos_checks_run_only_...`): it is
+ * one call of `engine-checks-platform.yml` on the self-hosted Mac, which always builds the engine
+ * distribution, runs the JVM tests on `inputs.engine`, and the three library suites on
+ * `inputs.libraries` (else none, `[]`).
+ */
 export function checkMacosChecksRunWhatIsRequested({ workflows }) {
   const jobs = workflows['macos-checks.yml']?.doc?.jobs
   if (!jobs) return []
+  const entries = Object.entries(jobs)
+  if (entries.length !== 1) {
+    return ['macos-checks.yml: must be one call of `engine-checks-platform.yml`']
+  }
+  const [[id, job]] = entries
+  const where = `macos-checks.yml › ${id}`
   const problems = []
-  const conditions = Object.entries(jobs).map(([id, job]) => [id, job?.if])
-  if (!conditions.some(([id]) => /build-engine-distribution/.test(id))) {
-    problems.push('macos-checks.yml: has no engine distribution job')
+  if (job?.uses !== './.github/workflows/engine-checks-platform.yml') {
+    problems.push(`${where}: must call \`engine-checks-platform.yml\``)
   }
-  for (const [id, condition] of conditions) {
-    if (/build-engine-distribution/.test(id) && condition !== undefined) {
-      problems.push(`macos-checks.yml › ${id}: the engine distribution must always be built`)
-    }
+  if (job?.if !== undefined) {
+    problems.push(`${where}: the engine distribution must always be built`)
   }
-  const count = (input) => conditions.filter(([, condition]) => condition === input).length
-  if (count('inputs.engine') !== 1) {
-    problems.push('macos-checks.yml: exactly one job must run on `inputs.engine`')
+  const inputs = job?.with ?? {}
+  const runner = String(inputs.runner ?? '')
+  if (!isMacosCaller(job) || !runner.includes('self-hosted') || !runner.includes('macOS')) {
+    problems.push(`${where}: must run on the self-hosted Mac`)
   }
-  if (count('inputs.libraries') !== 3) {
-    problems.push('macos-checks.yml: exactly three jobs must run on `inputs.libraries`')
+  if (String(inputs['jvm-tests'] ?? '').replace(/\s/g, '') !== '${{inputs.engine}}') {
+    problems.push(`${where}: \`jvm-tests\` must be \`inputs.engine\``)
   }
-  for (const [id, job] of Object.entries(jobs)) {
-    if (!isMacos(job)) problems.push(`macos-checks.yml › ${id}: must run on macOS`)
+  const suites = String(inputs['stdlib-suites'] ?? '').trim()
+  const named = [...suites.matchAll(/"suite":\s*"([^"]+)"/g)].map((match) => match[1])
+  if (
+    !/^\$\{\{\s*inputs\.libraries\s*&&/.test(suites) ||
+    !/\|\|\s*'\[\]'\s*\}\}$/.test(suites) ||
+    named.join() !== MACOS_LIBRARY_SUITES.join()
+  ) {
+    problems.push(
+      `${where}: \`stdlib-suites\` must be ${MACOS_LIBRARY_SUITES.join(', ')} on \`inputs.libraries\`, else \`[]\``,
+    )
   }
   return problems
 }

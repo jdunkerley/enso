@@ -1,8 +1,16 @@
-# Hand-maintained. This is the last output of the CI generator (`build_tools/ci-gen`), which is
-# retired in Phase 1 of the build simplification
-# (docs/superpowers/specs/2026-10-20-build-simplification-design.md). Its layout stays until
-# Phase 4: its jobs need the Snowflake and Enso Cloud test secrets, which this repository does not
-# have, so no run can validate a rewrite. Edit this file directly.
+# Hand-written. The Standard Library suites that need outside services: Snowflake (on the JVM and
+# native) and the cloud-related projects. The Linux engine distribution comes from
+# `engine-checks-platform.yml`, called with no checks of its own; the suites are this file's job.
+# Started by hand.
+#
+# Note [Extra Tests Without Their Secrets]
+# ========================================
+# The suites read the Snowflake and Enso Cloud secrets and variables, which this repository does
+# not have. `stdlib-test` passes them on as `./run` did, empty ones included, so a run without them
+# behaves as `./run`'s did: the Snowflake suites fail (`Snowflake_Spec` refuses an
+# `ENSO_SNOWFLAKE_ACCOUNT` that is set but empty), and the cloud suite skips its real-cloud tests
+# (no credentials file is made). Signing in to Enso Cloud did not move off `./run`: `stdlib-test`
+# refuses to run when all five cloud credentials are set.
 
 name: Extra Nightly Tests
 on:
@@ -13,362 +21,153 @@ on:
         required: false
         type: boolean
         default: false
+
+env:
+  # Read by `.github/actions/git-clean`.
+  ENSO_CI_CLEAN_BUILD: "${{ github.ref == 'refs/heads/develop' || inputs.clean_build_required == true }}"
+
 jobs:
-  build-script-linux-amd64:
-    name: Build Script
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli
-          retention-days: 1
-  enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64:
-    name: Build Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: ./run backend ci-build-engine-distribution
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Archive Engine Distribution
-        run: tar -cvf built-distribution.tar built-distribution test
-      - name: Upload Engine Distribution
-        uses: actions/upload-artifact@v5
-        with:
-          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
-          path: built-distribution.tar
-      - name: Cleanup Archive
-        run: rm built-distribution.tar
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_LAUNCHER: native,test
-      GRAAL_EDITION: GraalVM CE
-  enso-build-ci-gen-job-snowflake-tests-jvm-linux-amd64:
-    name: Snowflake Tests (JVM) (LinuxLatest)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: rm -rf built-distribution test
-        shell: bash
-      - name: Download Engine Distribution
-        uses: actions/download-artifact@v5
-        with:
-          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
-      - run: ls -l built-distribution.tar
-        shell: bash
-      - name: Unpack Engine Distribution
-        run: |-
-          tar -xvf built-distribution.tar -C .
-          rm built-distribution.tar
-      - run: ./run backend test std-snowflake-jvm
-        env:
-          ENSO_CLOUD_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_CLOUD_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
-          ENSO_CLOUD_TEST_ACCOUNT_PASSWORD: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_PASS }}
-          ENSO_CLOUD_TEST_ACCOUNT_USERNAME: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_USERNAME }}
-          ENSO_SNOWFLAKE_ACCOUNT: ${{ secrets.ENSO_SNOWFLAKE_ACCOUNT }}
-          ENSO_SNOWFLAKE_DATABASE: ${{ secrets.ENSO_SNOWFLAKE_DATABASE }}
-          ENSO_SNOWFLAKE_PASSWORD: ${{ secrets.ENSO_SNOWFLAKE_PASSWORD }}
-          ENSO_SNOWFLAKE_SCHEMA: ${{ secrets.ENSO_SNOWFLAKE_SCHEMA }}
-          ENSO_SNOWFLAKE_USER: ${{ secrets.ENSO_SNOWFLAKE_USER }}
-          ENSO_SNOWFLAKE_WAREHOUSE: ${{ secrets.ENSO_SNOWFLAKE_WAREHOUSE }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        name: Extra Library Test Reporter
-        uses: dorny/test-reporter@v1
-        with:
-          max-annotations: 50
-          name: Extra Library Tests Report (GraalVM CE, linux, amd64)
-          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
-          path-replace-backslashes: true
-          reporter: java-junit
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      GRAAL_EDITION: GraalVM CE
-      REPORT_ALL_TESTS: "1"
+  engine:
+    name: linux
+    uses: ./.github/workflows/engine-checks-platform.yml
+    with:
+      os: linux
+      runner: ubuntu-latest
+      jvm-tests: false
+      linux-checks: false
+      stdlib-suites: "[]"
+      clean_build_required: ${{ inputs.clean_build_required == true }}
+    secrets: inherit
+
+  # As `stdlib-tests` in `engine-checks-platform.yml` (Note [Standard Library Tests Without ./run]
+  # there), with these suites' secrets, `REPORT_ALL_TESTS`, and their job and report names.
+  extra-tests:
+    name: ${{ matrix.name }}
+    needs: [engine]
+    runs-on: ubuntu-latest
     permissions:
       checks: write
-  enso-build-ci-gen-job-snowflake-tests-native-linux-amd64:
-    name: Snowflake Tests (Native) (LinuxLatest)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: rm -rf built-distribution test
-        shell: bash
-      - name: Download Engine Distribution
-        uses: actions/download-artifact@v5
-        with:
-          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
-      - run: ls -l built-distribution.tar
-        shell: bash
-      - name: Unpack Engine Distribution
-        run: |-
-          tar -xvf built-distribution.tar -C .
-          rm built-distribution.tar
-      - run: ./run backend test std-snowflake
-        env:
-          ENSO_CLOUD_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
-          ENSO_CLOUD_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
-          ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
-          ENSO_CLOUD_TEST_ACCOUNT_PASSWORD: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_PASS }}
-          ENSO_CLOUD_TEST_ACCOUNT_USERNAME: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_USERNAME }}
-          ENSO_SNOWFLAKE_ACCOUNT: ${{ secrets.ENSO_SNOWFLAKE_ACCOUNT }}
-          ENSO_SNOWFLAKE_DATABASE: ${{ secrets.ENSO_SNOWFLAKE_DATABASE }}
-          ENSO_SNOWFLAKE_PASSWORD: ${{ secrets.ENSO_SNOWFLAKE_PASSWORD }}
-          ENSO_SNOWFLAKE_SCHEMA: ${{ secrets.ENSO_SNOWFLAKE_SCHEMA }}
-          ENSO_SNOWFLAKE_USER: ${{ secrets.ENSO_SNOWFLAKE_USER }}
-          ENSO_SNOWFLAKE_WAREHOUSE: ${{ secrets.ENSO_SNOWFLAKE_WAREHOUSE }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        name: Extra Library Test Reporter
-        uses: dorny/test-reporter@v1
-        with:
-          max-annotations: 50
-          name: Extra Library Tests Report (GraalVM CE, linux, amd64)
-          path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
-          path-replace-backslashes: true
-          reporter: java-junit
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     env:
       GRAAL_EDITION: GraalVM CE
+      ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
       REPORT_ALL_TESTS: "1"
-    permissions:
-      checks: write
-  stdlib-graal-vm-ce-std-cloud-related-linux-amd64:
-    name: Standard Library Cloud Tests (GraalVM CE) (LinuxLatest)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-job-build-engine-distribution-graal-vm-ce-linux-amd64
-    runs-on:
-      - ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Snowflake Tests (JVM) (LinuxLatest)
+            suite: std-snowflake-jvm
+            report: Extra Library Tests Report
+            postgres: false
+            mssql: false
+            heap-dumps: false
+          - name: Snowflake Tests (Native) (LinuxLatest)
+            suite: std-snowflake
+            report: Extra Library Tests Report
+            postgres: false
+            mssql: false
+            heap-dumps: false
+          - name: Standard Library Cloud Tests (GraalVM CE) (LinuxLatest)
+            suite: std-cloud-related
+            report: Standard Library Tests Report
+            postgres: true
+            mssql: true
+            heap-dumps: true
+    services:
+      postgres:
+        image: ${{ matrix.postgres && 'postgres:18' || '' }}
+        env:
+          POSTGRES_DB: enso_test_db
+          POSTGRES_USER: enso_test_user
+          POSTGRES_PASSWORD: enso_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --shm-size 1gb
+          --health-cmd "pg_isready -h 127.0.0.1 -p 5432 -U enso_test_user -d enso_test_db"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+      sqlserver:
+        image: ${{ matrix.mssql && 'mcr.microsoft.com/mssql/server:2022-latest' || '' }}
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "enso_test_password_<YourStrong@Passw0rd>"
+        ports:
+          - 1433:1433
+        options: --shm-size 1gb
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: rm -rf built-distribution test
-        shell: bash
-      - name: Download Engine Distribution
-        uses: actions/download-artifact@v5
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
         with:
           name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
-      - run: ls -l built-distribution.tar
-        shell: bash
-      - name: Unpack Engine Distribution
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: stdlib-tests
+          graalpy: "true"
+          rust: "true"
+      # The line `./run` waited for (`sqlserver.rs`).
+      - if: matrix.mssql
+        name: Wait for SQL Server
         run: |-
-          tar -xvf built-distribution.tar -C .
-          rm built-distribution.tar
-      - run: ./run backend test std-cloud-related
+          for _ in $(seq 150); do
+            # Captured first: `grep -q` stops reading early, which `pipefail` would report.
+            logs=$(docker logs "$ID" 2>&1)
+            if grep -qF "SQL Server is now ready for client connections" <<< "$logs"; then exit 0; fi
+            sleep 2
+          done
+          echo "::error::SQL Server did not start within 300 s."
+          docker logs "$ID"
+          exit 1
         env:
+          ID: ${{ job.services.sqlserver.id }}
+      - name: Run the Standard Library tests
+        run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }}
+        env:
+          ENSO_VERSION: ${{ needs.engine.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.engine.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.engine.outputs.ENSO_RELEASE_MODE }}
           ENSO_CLOUD_COGNITO_REGION: ${{ vars.ENSO_CLOUD_COGNITO_REGION }}
           ENSO_CLOUD_COGNITO_USER_POOL_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_ID }}
           ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID: ${{ vars.ENSO_CLOUD_COGNITO_USER_POOL_WEB_CLIENT_ID }}
           ENSO_CLOUD_TEST_ACCOUNT_PASSWORD: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_PASS }}
           ENSO_CLOUD_TEST_ACCOUNT_USERNAME: ${{ secrets.ENSO_CLOUD_TEST_ACCOUNT_USERNAME }}
-          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
-          ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
-          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ matrix.suite == 'std-cloud-related' && secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID || '' }}
+          ENSO_LIB_S3_AWS_REGION: ${{ matrix.suite == 'std-cloud-related' && secrets.ENSO_LIB_S3_AWS_REGION || '' }}
+          ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ matrix.suite == 'std-cloud-related' && secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY || '' }}
+          ENSO_SNOWFLAKE_ACCOUNT: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_ACCOUNT || '' }}
+          ENSO_SNOWFLAKE_DATABASE: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_DATABASE || '' }}
+          ENSO_SNOWFLAKE_PASSWORD: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_PASSWORD || '' }}
+          ENSO_SNOWFLAKE_SCHEMA: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_SCHEMA || '' }}
+          ENSO_SNOWFLAKE_USER: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_USER || '' }}
+          ENSO_SNOWFLAKE_WAREHOUSE: ${{ matrix.suite != 'std-cloud-related' && secrets.ENSO_SNOWFLAKE_WAREHOUSE || '' }}
+          ENSO_POSTGRES_DATABASE: ${{ matrix.postgres && 'enso_test_db' || '' }}
+          ENSO_POSTGRES_HOST: ${{ matrix.postgres && 'localhost:5432' || '' }}
+          ENSO_POSTGRES_USER: ${{ matrix.postgres && 'enso_test_user' || '' }}
+          ENSO_POSTGRES_PASSWORD: ${{ matrix.postgres && 'enso_test_password' || '' }}
+          ENSO_SQLSERVER_DATABASE: ${{ matrix.mssql && 'tempdb' || '' }}
+          ENSO_SQLSERVER_HOST: ${{ matrix.mssql && 'localhost' || '' }}
+          ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
+          ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
+          ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1
         with:
           max-annotations: 50
-          name: Standard Library Tests Report (GraalVM CE, linux, amd64)
+          name: ${{ matrix.report }} (GraalVM CE, linux, amd64)
           path: ${{ env.ENSO_TEST_JUNIT_DIR }}/*/*.xml
           path-replace-backslashes: true
           reporter: java-junit
-      - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+      - if: matrix.heap-dumps && (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Upload Heap Dumps
         uses: actions/upload-artifact@v5
         with:
@@ -378,15 +177,6 @@ jobs:
             test/**/*.hprof
             engine/**/*.hprof
           retention-days: 3
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      GRAAL_EDITION: GraalVM CE
-      REPORT_ALL_TESTS: "1"
-    permissions:
-      checks: write
-env:
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
