@@ -229,6 +229,8 @@ export interface ProjectSession {
   readonly userEmail?: EmailAddress
   readonly uptime?: number | null
   readonly project?: Asset
+  /** The session's log file on this machine (a local session's), to reveal it. */
+  readonly logFile?: string
 }
 
 export interface ProjectSessionLogs {

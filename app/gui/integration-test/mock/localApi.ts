@@ -1114,6 +1114,13 @@ data: ${JSON.stringify(data)}
           called('listProjectSessions', { localProjectKey })
           return succeed({ sessions: projectSessions })
         }
+        case 'download-project-session-logs': {
+          // Any session's file: the mock engine log's file lines.
+          const lines = engineLog.events.flatMap(({ event, data }) =>
+            event === 'line' && data['source'] === 'file' ? [String(data['text'])] : [],
+          )
+          return succeed(lines.join('\n'))
+        }
         case 'filesystem-delete': {
           const path = cliArguments[0]
           if (path == null) {

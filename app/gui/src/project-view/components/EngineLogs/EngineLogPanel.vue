@@ -3,6 +3,7 @@
  * @file The Logs tab of the bottom dock: the open project's engine log as it is written, with its
  * earlier lines and sessions (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
  */
+import SvgIcon from '@/components/SvgIcon.vue'
 import { useBackends } from '$/providers/backends'
 import { useEngineLogSettings } from '$/providers/engineLogSettings'
 import { useText } from '$/providers/text'
@@ -14,6 +15,7 @@ import {
 } from 'enso-common/src/services/Backend'
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
+import * as detect from 'enso-common/src/utilities/detect'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
 import { fetchSessionLines } from './engineLogHistory'
@@ -165,9 +167,45 @@ function onReachedTop() {
   })
 }
 
-function showInFolder() {
-  const file = stream.state.logFile
-  if (file != null) systemApi?.showItemInFolder(file)
+/** The session shown (live or earlier) and its log file; either is `null` while there is none. */
+const shownSession = computed(() => {
+  if (live.value) return { id: stream.state.sessionId, logFile: stream.state.logFile }
+  const session = sessions.data.value?.find((s) => s.projectSessionId === selectedSession.value)
+  return { id: selectedSession.value, logFile: session?.logFile ?? null }
+})
+
+/** The reveal button's name, as each OS calls its file manager. */
+const revealLabel = getText(
+  detect.isOnWindows() ? 'engineLogsRevealInExplorer'
+  : detect.isOnMacOS() ? 'engineLogsShowInFinder'
+  : 'engineLogsShowInFolder',
+)
+
+/** Why the last download failed; `undefined` unless it did, or once another session shows. */
+const downloadError = ref<string>()
+watch(
+  () => shownSession.value.id,
+  () => (downloadError.value = undefined),
+)
+
+/** Downloading needs a session and the local backend, which reads its files. */
+const canDownload = computed(() => shownSession.value.id != null && backends.localBackend != null)
+
+async function downloadLogFile() {
+  const id = shownSession.value.id
+  const backend = backends.localBackend
+  if (id == null || backend == null) return
+  downloadError.value = undefined
+  try {
+    await backend.downloadProjectSessionLogs(ProjectSessionId(id))
+  } catch (error) {
+    downloadError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
+function revealLogFile() {
+  const file = shownSession.value.logFile
+  if (file != null) systemApi?.showLogFileInFolder(file)
 }
 
 function sessionLabel(session: ProjectSession, number: number) {
@@ -207,12 +245,31 @@ function sessionLabel(session: ProjectSession, number: number) {
       </select>
       <span class="spacer" />
       <button
-        v-if="systemApi != null && stream.state.logFile != null"
         type="button"
-        @click="showInFolder"
+        class="iconButton"
+        :aria-label="getText('engineLogsDownload')"
+        :title="getText('engineLogsDownload')"
+        :disabled="!canDownload"
+        data-testid="engine-logs-download"
+        @click="downloadLogFile"
       >
-        {{ getText('engineLogsShowInFolder') }}
+        <SvgIcon name="data_download" />
       </button>
+      <button
+        v-if="systemApi != null"
+        type="button"
+        class="iconButton"
+        :aria-label="revealLabel"
+        :title="revealLabel"
+        :disabled="shownSession.logFile == null"
+        data-testid="engine-logs-reveal"
+        @click="revealLogFile"
+      >
+        <SvgIcon name="open_in_file_browser" />
+      </button>
+    </div>
+    <div v-if="downloadError != null" class="notice error" role="alert">
+      {{ getText('engineLogsDownloadFailed', downloadError) }}
     </div>
     <div v-if="loading" class="notice" role="status">
       {{ getText('engineLogsLoadingHistory') }}
@@ -302,6 +359,20 @@ function sessionLabel(session: ProjectSession, number: number) {
 
 .spacer {
   flex: 1;
+}
+
+.toolbar .iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.toolbar .iconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .list {

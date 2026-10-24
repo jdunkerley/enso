@@ -44,8 +44,14 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     shown only while their setting in Settings → Local → Engine logs is on,
     checked whenever they appear — an origin without a box is not filtered out),
     text and session filters;
-  - "Show in folder" (Electron only; it reveals the current session's file,
-    whose folder holds every session);
+  - at the toolbar's right, icon buttons for the log file of the session shown
+    (live or earlier): Download log file (`downloadProjectSessionLogs`, the
+    whole session, archives included; a failure is shown as an alert) and reveal
+    it, named as the OS names its file manager (Reveal in Explorer, Show in
+    Finder, Show in folder) and shown only in Electron
+    (`window.api.system.showItemInFolder`). The live session's file is the
+    stream's `logFile`, an earlier one's is `ProjectSession.logFile` from the
+    session listing. Each is disabled while its session has no id or file;
   - the waiting and ended notices, and Jump to latest;
   - an earlier session read whole and read-only (`rowsFromLines`);
   - history requests pass `{ project, sessionId }` to `loadHistory`, which drops
