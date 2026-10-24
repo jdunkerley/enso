@@ -25,6 +25,8 @@ export interface MenuApi {
 export interface SystemApi {
   readonly downloadURL: (options: DownloadUrlOptions) => Promise<void>
   readonly showItemInFolder: (fullPath: string) => void
+  /** Reveal an engine log file; main refuses anything but a file under the engine log directory. */
+  readonly showLogFileInFolder: (fullPath: string) => void
   readonly getFilePath: (item: File) => string
 }
 

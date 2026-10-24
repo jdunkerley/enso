@@ -436,7 +436,7 @@ describe('download and reveal', () => {
   const withSystemApi = () =>
     Object.defineProperty(window, 'api', {
       configurable: true,
-      value: { system: { showItemInFolder } },
+      value: { system: { showLogFileInFolder: showItemInFolder } },
     })
 
   beforeEach(() => showItemInFolder.mockReset())

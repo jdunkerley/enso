@@ -1,3 +1,4 @@
+export { getEngineLogDirectory } from './distributionManager.js'
 export * from './projectManagement.js'
 export {
   downloadEnsoEngine,

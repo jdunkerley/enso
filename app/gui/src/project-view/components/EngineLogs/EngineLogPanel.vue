@@ -198,7 +198,7 @@ async function downloadLogFile() {
 
 function revealLogFile() {
   const file = shownSession.value.logFile
-  if (file != null) systemApi?.showItemInFolder(file)
+  if (file != null) systemApi?.showLogFileInFolder(file)
 }
 
 function sessionLabel(session: ProjectSession, number: number) {

@@ -24,6 +24,8 @@ export enum Channel {
   openFileBrowser = 'open-file-browser',
   /** Show a file or folder in the system file browser. */
   showItemInFolder = 'show-item-in-folder',
+  /** Reveal an engine log file; main accepts only a file under the engine log directory. */
+  showLogFileInFolder = 'show-log-file-in-folder',
   /** Download a file using its URL. */
   downloadURL = 'download-url',
   handleMenuItem = 'handle-menu-item',
