@@ -369,6 +369,12 @@ export async function handleFilesystemCommand(
         result = toJSONRPCResult(getProjectSessionLogs(sessionId, scrollId))
         break
       }
+      case '--list-project-session-pages': {
+        const sessionId = cliArguments[1]
+        if (sessionId == null) break
+        result = toJSONRPCResult(listProjectSessionPages(sessionId))
+        break
+      }
       case '--download-project-session-logs': {
         const sessionId = cliArguments[1]
         if (sessionId == null) break
@@ -702,7 +708,10 @@ export function getProjectSessionLogs(
     if (pos >= 0) {
       return readArchive(projectLogDir, baseName, sortedArchiveIndices, pos)
     }
-    return readActiveLog(projectLogDir, baseName)
+    // An archive that is gone (deleted, or never there) has no lines: never another file's. Paging
+    // on goes to the next archive after it, or the active file.
+    const next = sortedArchiveIndices.find((index) => index > requestedIndex)
+    return { scrollId: next != null ? `archive:${next}` : 'active', hits: [] }
   }
 
   if (scrollId === 'active') {
@@ -710,6 +719,19 @@ export function getProjectSessionLogs(
   }
 
   return { scrollId: 'done', hits: [] }
+}
+
+/**
+ * The pages of a session, oldest first: one `scrollId` per rolled archive (`archive:N`), then
+ * `active` if the active file exists. Each is read whole by {@link getProjectSessionLogs}, so a client can read a session from
+ * its newest page backwards, one file at a time.
+ */
+export function listProjectSessionPages(sessionId: string): { pages: readonly string[] } {
+  const { projectLogDir, baseName } = decodeSessionId(sessionId)
+  const archives = collectArchiveIndices(projectLogDir, baseName).map((index) => `archive:${index}`)
+  const hasActive = fsSync.existsSync(path.join(projectLogDir, `${baseName}.log`))
+  // A session with no files at all (deleted, or never there) has no pages.
+  return { pages: hasActive ? [...archives, 'active'] : archives }
 }
 
 /** Collect sorted archive indices for a session base name. */

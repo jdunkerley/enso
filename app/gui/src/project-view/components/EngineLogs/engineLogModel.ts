@@ -3,7 +3,6 @@
  * level rules, dividers, the live cap and history splicing. Framework-free; `engineLogStream.ts`
  * makes it reactive.
  */
-import { LOG_LEVELS, parseEntry } from '$/components/ProjectLog/projectLogData'
 import {
   PERFORMANCE_LOGGER,
   SQL_QUERY_LOGGER,
@@ -14,6 +13,7 @@ import {
   type EngineLogSource,
   type EngineLogWaitingData,
 } from 'enso-common/src/services/engineLogs'
+import { LOG_LEVELS, parseEntry } from './logEntry'
 
 /** The most rows the view keeps; older ones remain in the session's history. */
 export const LIVE_ROW_CAP = 20_000
@@ -27,9 +27,11 @@ const OVERLAP_CHECK = 3
 /**
  * - `restarted` — a new engine started.
  * - `skipped` — lines were lost while the stream was down.
- * - `truncated` — older lines are not shown.
+ * - `truncated` — older lines are not shown; the list offers to load them.
+ * - `newer` — newer lines are not shown (a window paged back through a session); the list offers to
+ *   load them.
  */
-export type DividerKind = 'restarted' | 'skipped' | 'truncated'
+export type DividerKind = 'restarted' | 'skipped' | 'truncated' | 'newer'
 
 /** One line of the log. */
 export interface LogLine {
@@ -43,6 +45,8 @@ export interface LogLine {
   readonly entryStart: boolean
   /** Who wrote the line: the engine, a library or the user's own code (see {@link logOrigin}). */
   readonly origin: LogOrigin
+  /** The logger of the line's entry; `null` for stderr and before the first entry. */
+  readonly logger: string | null
 }
 
 /** A marker between lines. */
@@ -50,6 +54,17 @@ export interface LogDivider {
   readonly kind: 'divider'
   readonly key: number
   readonly divider: DividerKind
+  /**
+   * For `truncated` and `newer`: the session whose lines it stands for, which its Load older / Load
+   * newer lines button pages through; `null` when that session is not known, and nothing is offered.
+   */
+  readonly sessionId?: string | null
+}
+
+/** The lines above the live view that are not in it: which session they belong to. */
+export interface OlderLines {
+  /** `null` while that session is not known (it has no file yet, or it scrolled away unnamed). */
+  readonly sessionId: string | null
 }
 
 /** A row of the Logs tab. */
@@ -182,6 +197,7 @@ export interface LineClass {
   readonly level: number
   readonly entryStart: boolean
   readonly origin: LogOrigin
+  readonly logger: string | null
 }
 
 /**
@@ -192,21 +208,28 @@ export interface LineClass {
 export class LineClassifier {
   private level = INFO_LEVEL
   private origin: LogOrigin = 'library'
+  private logger: string | null = null
 
-  /** The level and origin of `text`, and whether it starts an entry. */
+  /** The level, origin and logger of `text`, and whether it starts an entry. */
   classify(text: string, source: EngineLogSource): LineClass {
-    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true, origin: 'engine' }
+    if (source === 'stderr') {
+      return { level: ERROR_LEVEL, entryStart: true, origin: 'engine', logger: null }
+    }
     const entry = parseEntry(text)
-    if (entry == null) return { level: this.level, entryStart: false, origin: this.origin }
+    if (entry == null) {
+      return { level: this.level, entryStart: false, origin: this.origin, logger: this.logger }
+    }
     this.level = entry.level
     this.origin = logOrigin(entry.module)
-    return { level: entry.level, entryStart: true, origin: this.origin }
+    this.logger = entry.module
+    return { level: entry.level, entryStart: true, origin: this.origin, logger: this.logger }
   }
 
   /** Forget the current entry (a new session starts). */
   reset(): void {
     this.level = INFO_LEVEL
     this.origin = 'library'
+    this.logger = null
   }
 }
 
@@ -218,22 +241,96 @@ export function overlapStart(lines: readonly string[], head: readonly string[]):
   return lines.length
 }
 
-/** Rows for a session read whole (an earlier session): its newest {@link LIVE_ROW_CAP} lines. */
-export function rowsFromLines(lines: readonly string[]): LogRow[] {
+/** Whether a window of a session's lines has lines before or after it, and its first key. */
+export interface WindowEdges {
+  readonly older: boolean
+  readonly newer: boolean
+  /**
+   * The first line's key; the others follow it. A window passes its first line's number, so a line
+   * keeps its key while the window moves and the list keeps its place.
+   */
+  readonly firstKey: number
+  /** The session the lines are from, which the dividers' load buttons page through. */
+  readonly sessionId: string
+  /**
+   * The start of the entry the first line continues, if known: continuation lines at the top take
+   * its logger and level instead of an unknown library's.
+   */
+  readonly leadingEntry: string | null
+}
+
+/**
+ * Rows for lines of a file read (an earlier session, or a window of one): at most its newest
+ * {@link LIVE_ROW_CAP} lines, with a `truncated` divider above them when there are older lines and a
+ * `newer` one below them when there are newer ones. Lines above the first entry in view continue an
+ * entry out of view: they take `leadingEntry`'s level and logger when it is given, else they are an
+ * unknown library's, with no logger.
+ */
+export function rowsFromLines(
+  lines: readonly string[],
+  edges: Partial<WindowEdges> = {},
+): LogRow[] {
   const shown = lines.length > LIVE_ROW_CAP ? lines.slice(lines.length - LIVE_ROW_CAP) : lines
+  const firstKey = edges.firstKey ?? 1
   const classifier = new LineClassifier()
+  if (edges.leadingEntry != null) classifier.classify(edges.leadingEntry, 'file')
   const rows: LogRow[] = []
-  if (shown.length < lines.length) rows.push({ kind: 'divider', key: 0, divider: 'truncated' })
-  for (const text of shown) {
+  if (shown.length < lines.length || edges.older === true) {
+    rows.push({
+      kind: 'divider',
+      key: Number.MIN_SAFE_INTEGER,
+      divider: 'truncated',
+      sessionId: edges.sessionId ?? null,
+    })
+  }
+  for (const [index, text] of shown.entries()) {
     rows.push({
       kind: 'line',
-      key: rows.length + 1,
+      key: firstKey + index,
       source: 'file',
       text,
       ...classifier.classify(text, 'file'),
     })
   }
+  if (edges.newer === true) {
+    rows.push({
+      kind: 'divider',
+      key: Number.MAX_SAFE_INTEGER,
+      divider: 'newer',
+      sessionId: edges.sessionId ?? null,
+    })
+  }
   return rows
+}
+
+/**
+ * Whether `logger` is under `prefix`, by whole dot-separated segments (`Standard.Base` covers
+ * `Standard.Base.Data` but not `Standard.Baseline`). A prefix ending in a dot matches by text, so a
+ * prefix being typed out still matches its loggers.
+ */
+export function loggerMatches(logger: string, prefix: string): boolean {
+  if (prefix.endsWith('.')) return logger.startsWith(prefix)
+  return underRoot(logger, prefix)
+}
+
+/**
+ * Suggestions for the logger filter: every logger of `rows` and each of its dotted prefixes, sorted,
+ * at most `limit` of them (the shortest prefixes first, so the broad ones are always offered).
+ */
+export function loggerSuggestions(rows: readonly LogRow[], limit = 200): string[] {
+  const loggers = new Set<string>()
+  for (const row of rows) {
+    if (row.kind === 'line' && row.entryStart && row.logger != null) loggers.add(row.logger)
+  }
+  const names = new Set<string>()
+  for (const logger of loggers) {
+    const segments = logger.split('.')
+    for (let n = 1; n <= segments.length; n++) names.add(segments.slice(0, n).join('.'))
+  }
+  const byDepth = [...names].sort(
+    (a, b) => a.split('.').length - b.split('.').length || a.localeCompare(b),
+  )
+  return byDepth.slice(0, limit).sort((a, b) => a.localeCompare(b))
 }
 
 /** What the Logs tab filters on. */
@@ -241,17 +338,21 @@ export interface RowFilter {
   readonly level: LevelFilter
   readonly text: string
   readonly origins: OriginFilter
+  /** A dotted logger prefix (see {@link loggerMatches}); empty for every logger. */
+  readonly logger?: string
 }
 
 /**
  * The rows a filter shows: every divider, and the lines of a shown origin, at or above the level,
- * that contain the text.
+ * under the logger prefix (a continuation line by its entry's logger; stderr has none), that
+ * contain the text.
  */
 export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
   const origins = filter.origins
-  if (needle === '' && Object.values(origins).every((shown) => shown)) {
+  const prefix = (filter.logger ?? '').trim()
+  if (needle === '' && prefix === '' && Object.values(origins).every((shown) => shown)) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
@@ -259,6 +360,7 @@ export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly
       row.kind === 'divider' ||
       (row.level <= maxLevel &&
         origins[row.origin] &&
+        (prefix === '' || (row.logger != null && loggerMatches(row.logger, prefix))) &&
         (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
@@ -274,6 +376,12 @@ export class EngineLogModel {
   logFile: string | null = null
   /** ERROR entries of the log file not yet seen, whatever their origin; stderr is not counted. */
   unseenErrors = 0
+  /**
+   * Lines above the rows that are not in them (history that did not fit, or rows dropped at the
+   * cap); `null` when the rows begin where the log does. State, not a row: the cap trims rows, and
+   * must not trim away the offer to load them. The view shows it as a `truncated` divider.
+   */
+  olderLines: OlderLines | null = null
 
   private pending: LogRow[] = []
   private channel: string | undefined
@@ -285,17 +393,30 @@ export class EngineLogModel {
   private sessionFirstKey: number | undefined
   /** The key of the first live row of the current session; history goes in at or after it. */
   private sessionAnchorKey = 0
-  private historyLoaded = false
+  /** Whether the current session's history has been spliced in (it is never spliced twice). */
+  private historySpliced = false
+  /** Whether that history reached back to the session's first line. */
+  private historyFromStart = false
   private sessionRowsDropped = false
+  /** Whether {@link olderLines} is the current session's (and follows its id). */
+  private olderLinesCurrent = false
   private readonly classifier = new LineClassifier()
 
   /**
-   * Whether the current session has nothing older to load: the rows hold it from its start, or its
-   * history has been loaded (the whole session, so a later drop at the cap loses nothing that a
-   * reload could put back).
+   * Whether the current session's first line has been in the rows: they held it from its start, or
+   * its spliced history reached back to it. (A later drop at the cap may have removed it again;
+   * {@link olderLines} then offers it.)
    */
   get sessionStartHeld(): boolean {
-    return this.historyLoaded || (this.sessionBeganInView && !this.sessionRowsDropped)
+    return (
+      (this.historySpliced && this.historyFromStart) ||
+      (this.sessionBeganInView && !this.sessionRowsDropped)
+    )
+  }
+
+  /** Whether reaching the top of the live view should splice in the session's history. */
+  get canLoadHistory(): boolean {
+    return !this.historySpliced && !this.sessionStartHeld
   }
 
   /** Where a dropped stream resumes; `undefined` before the first event of a channel. */
@@ -322,6 +443,7 @@ export class EngineLogModel {
     }
     this.channel = data.channel
     this.sessionId = data.sessionId
+    this.bindOlderLines()
     this.logFile = data.logFile ?? this.logFile
     this.ended = undefined
   }
@@ -330,7 +452,7 @@ export class EngineLogModel {
   onLine(data: EngineLogLineData): void {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
-    const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
+    const { level, entryStart, origin, logger } = this.classifier.classify(data.text, data.source)
     this.pending.push({
       kind: 'line',
       key: this.nextKey++,
@@ -339,6 +461,7 @@ export class EngineLogModel {
       level,
       entryStart,
       origin,
+      logger,
     })
     if (data.source === 'file' && entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }
@@ -349,12 +472,15 @@ export class EngineLogModel {
     if (this.hadEngine) this.addDivider('restarted')
     this.hadEngine = true
     this.waiting = true
+    // Older lines above the view stay the previous session's.
+    this.olderLinesCurrent = false
     this.sessionId = null
     this.sessionBeganInView = true
     this.sessionRowsDropped = false
     this.sessionFirstKey = this.nextKey
     this.sessionAnchorKey = this.nextKey
-    this.historyLoaded = false
+    this.historySpliced = false
+    this.historyFromStart = false
     this.classifier.reset()
   }
 
@@ -365,6 +491,7 @@ export class EngineLogModel {
     this.waiting = false
     this.sessionId = data.sessionId
     this.logFile = data.logFile
+    this.bindOlderLines()
   }
 
   /** The stream ended. */
@@ -374,7 +501,9 @@ export class EngineLogModel {
   }
 
   /**
-   * Move new rows into {@link rows}, keeping the newest {@link LIVE_ROW_CAP}.
+   * Move new rows into {@link rows}, keeping the newest {@link LIVE_ROW_CAP}. Rows dropped at the cap
+   * become {@link olderLines}: the current session's when any of its rows went (its spliced
+   * history has negative keys), else lines of an earlier session, offered only if already named.
    * @returns Whether anything changed.
    */
   commit(): boolean {
@@ -385,7 +514,15 @@ export class EngineLogModel {
     if (excess > 0) {
       const dropped = this.rows.splice(0, excess)
       const first = this.sessionFirstKey
-      if (first != null && dropped.some((row) => row.key >= first)) this.sessionRowsDropped = true
+      const currentDropped =
+        first != null &&
+        dropped.some((row) => row.key >= first || (this.historySpliced && row.key < 0))
+      if (currentDropped) {
+        this.sessionRowsDropped = true
+        this.setOlderLinesOfCurrent()
+      } else if (this.olderLines == null) {
+        this.olderLines = { sessionId: null }
+      }
     }
     return true
   }
@@ -396,13 +533,15 @@ export class EngineLogModel {
   }
 
   /**
-   * Put the current session's earlier lines above the rows. `lines` is the session's whole file
-   * history, oldest first; the part before the first live file line goes in above that line (after
-   * any start-up stderr), at most as many as fit under {@link LIVE_ROW_CAP}.
+   * Put the current session's earlier lines above the rows. `lines` are the newest lines of its
+   * file, oldest first, and `hasOlder` whether the file has lines before them; the part before the
+   * first live file line goes in above that line (after any start-up stderr), at most as many as
+   * fit under {@link LIVE_ROW_CAP}. Lines left out (older in the file, or cut for room) become
+   * {@link olderLines}; only history that reached the session's first line holds its start.
    */
-  prependHistory(lines: readonly string[]): void {
+  prependHistory(lines: readonly string[], hasOlder = false): void {
     this.commit()
-    if (this.historyLoaded) return
+    if (this.historySpliced) return
     const firstFileIndex = this.rows.findIndex(
       (row) => row.kind === 'line' && row.source === 'file' && row.key >= this.sessionAnchorKey,
     )
@@ -425,7 +564,6 @@ export class EngineLogModel {
       text,
       ...classifier.classify(text, 'file'),
     }))
-    if (truncated) added.unshift({ kind: 'divider', key: 0, divider: 'truncated' })
     // Keys below every existing one, increasing downwards, so they stay unique.
     const keyed = added.map((row, index): LogRow => ({
       ...row,
@@ -433,19 +571,40 @@ export class EngineLogModel {
     }))
     this.previousKey -= added.length
     this.rows.splice(firstFileIndex < 0 ? this.rows.length : firstFileIndex, 0, ...keyed)
-    this.historyLoaded = true
-    this.sessionBeganInView = true
-    this.sessionRowsDropped = false
+    this.historySpliced = true
+    this.historyFromStart = !hasOlder && !truncated
+    if (this.historyFromStart) {
+      this.sessionBeganInView = true
+      this.sessionRowsDropped = false
+    } else {
+      this.setOlderLinesOfCurrent()
+    }
     this.sessionFirstKey = keyed[0]?.key ?? this.sessionFirstKey ?? this.nextKey
+  }
+
+  /** The current session has lines above the rows. */
+  private setOlderLinesOfCurrent(): void {
+    this.olderLines = { sessionId: this.sessionId }
+    this.olderLinesCurrent = true
+  }
+
+  /** The current session's older lines take its id once it has one. */
+  private bindOlderLines(): void {
+    if (this.olderLinesCurrent && this.olderLines?.sessionId !== this.sessionId) {
+      this.olderLines = { sessionId: this.sessionId }
+    }
   }
 
   /** The rows from here on belong to a session whose start is not in view. */
   private startSessionOutOfView(): void {
+    // Older lines above the view stay the previous session's.
+    this.olderLinesCurrent = false
     this.sessionBeganInView = false
     this.sessionRowsDropped = false
     this.sessionFirstKey = this.nextKey
     this.sessionAnchorKey = this.nextKey
-    this.historyLoaded = false
+    this.historySpliced = false
+    this.historyFromStart = false
   }
 
   private accept(seq: number): boolean {

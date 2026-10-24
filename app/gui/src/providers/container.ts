@@ -3,7 +3,11 @@ import * as analytics from '$/utils/analytics'
 import { proxyRefs } from '$/utils/reactivity'
 import type { Opt } from '@/util/data/opt'
 import { createGlobalState } from '@vueuse/core'
-import { BackendType, type ProjectSessionId } from 'enso-common/src/services/Backend'
+import {
+  BackendType,
+  type ProjectId,
+  type ProjectSessionId,
+} from 'enso-common/src/services/Backend'
 import { Err } from 'enso-common/src/utilities/data/result'
 import { computed, onScopeDispose, reactive, readonly, ref, watchEffect } from 'vue'
 import { useRoute, useRouter, type RouteLocation, type RouteLocationRaw } from 'vue-router'
@@ -19,10 +23,15 @@ import {
 } from './openedProjects/projectInfo'
 
 const PROJECT_TAB_SCHEMA = z.object({ type: z.literal('project'), id: PROJECT_ID_SCHEMA })
+/**
+ * A session log tab. `projectId` lets its session picker list the project's other sessions; tabs
+ * saved before it existed have none, and show their own session alone.
+ */
 const PROJECT_LOG_TAB_SCHEMA = z.object({
   type: z.literal('projectLog'),
   id: PROJECT_SESSION_ID_SCHEMA,
   title: z.string(),
+  projectId: PROJECT_ID_SCHEMA.optional(),
 })
 const SETTINGS_TAB_SCHEMA = z.object({ type: z.literal('settings') })
 const TAB_SCHEMA = z.discriminatedUnion('type', [
@@ -38,6 +47,11 @@ const DEFAULT_FOCUS: Panel = { type: 'drive' }
 const PROJECT_LOG_PARAMS_SCHEMA = z.object({
   id: PROJECT_SESSION_ID_SCHEMA,
   title: z.string(),
+  // An optional route parameter that is absent is `''`.
+  projectId: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    PROJECT_ID_SCHEMA.optional(),
+  ),
 })
 
 /** A structure identifying tab displayed in the TabView. */
@@ -76,8 +90,13 @@ export function tabFromRoute(route: RouteLocation): Tab | null {
     case 'projectLog': {
       const parsed = PROJECT_LOG_PARAMS_SCHEMA.safeParse(route.params)
       if (!parsed.success) return null
-      const { id, title } = parsed.data
-      return { type: 'projectLog' as const, id, title }
+      const { id, title, projectId } = parsed.data
+      return {
+        type: 'projectLog' as const,
+        id,
+        title,
+        ...(projectId != null && { projectId }),
+      }
     }
     case 'settings':
       return { type: 'settings' as const }
@@ -92,10 +111,10 @@ export function routeFromTab(tab: Opt<Tab>, from: RouteLocation): RouteLocationR
     case 'project':
       return { name: 'project', params: { id: tab.id }, query: from.query }
     case 'projectLog': {
-      const { id, title } = tab
+      const { id, title, projectId } = tab
       return {
         name: 'projectLog',
-        params: { id, title },
+        params: { id, title, projectId: projectId ?? '' },
         query: from.query,
       }
     }
@@ -105,6 +124,17 @@ export function routeFromTab(tab: Opt<Tab>, from: RouteLocation): RouteLocationR
     case null:
       return { name: 'dashboard', query: from.query }
   }
+}
+
+/**
+ * The session log tab to keep when Show Logs opens `tab`, given the tab saved for that session:
+ * `tab` when none is saved, or when the saved one (from before tabs had a project) lacks the
+ * project `tab` has; otherwise `null`, and the saved tab stays.
+ */
+export function sessionLogTabToSave(saved: Tab | undefined, tab: ProjectLogTab): Tab | null {
+  if (saved == null) return tab
+  const upgrade = saved.type === 'projectLog' && saved.projectId == null && tab.projectId != null
+  return upgrade ? tab : null
 }
 
 /** A key string of panel. May be used as Set element or Map key. */
@@ -196,11 +226,27 @@ function createContainerStore() {
     if (userAction) currentTab.value = tab
   }
 
-  /** Add project log tab to list. */
-  function openProjectLogTab(id: ProjectSessionId, title: string) {
-    const tab: Tab = { type: 'projectLog', id, title }
-    if (!isTabOpened(tab)) tabs.set(panelKey(tab), tab)
-    currentTab.value = tab
+  /**
+   * Add a session log tab to the list, and show it. A tab saved for the session before tabs had a
+   * project gets it now, so its session picker lists the project's sessions.
+   */
+  function openProjectLogTab(id: ProjectSessionId, title: string, projectId?: ProjectId) {
+    const tab: ProjectLogTab = {
+      type: 'projectLog',
+      id,
+      title,
+      ...(projectId != null && { projectId }),
+    }
+    const key = panelKey(tab)
+    const saved = tabs.get(key)
+    const toSave = sessionLogTabToSave(saved, tab)
+    if (toSave != null) tabs.set(key, toSave)
+    // Showing the same tab again changes no route; an upgraded one needs its project in the route.
+    if (saved != null && toSave != null && isCurrentTab(tab)) {
+      void router.replace(routeFromTab(toSave, route))
+    } else {
+      currentTab.value = toSave ?? saved ?? tab
+    }
   }
 
   /** Checks if project with given backend type may be opened locally. */

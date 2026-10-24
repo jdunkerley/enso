@@ -13,7 +13,7 @@ import {
   type EngineLogWaitingData,
 } from 'enso-common/src/services/engineLogs'
 import { onScopeDispose, reactive, shallowRef, toValue, watch, type ShallowRef } from 'vue'
-import { EngineLogModel, type LogRow } from './engineLogModel'
+import { EngineLogModel, type LogRow, type OlderLines } from './engineLogModel'
 
 /** The waits before each reconnection attempt; the last repeats. A `hello` starts over. */
 export const RECONNECT_DELAYS_MS = [500, 1_000, 2_000, 5_000, 10_000] as const
@@ -44,6 +44,10 @@ export interface EngineLogStreamState {
   logFile: string | null
   unseenErrors: number
   sessionStartHeld: boolean
+  /** Whether reaching the top should load the session's history ({@link EngineLogModel}). */
+  canLoadHistory: boolean
+  /** Lines above the rows that are not in them, and whose they are. */
+  olderLines: OlderLines | null
 }
 
 /**
@@ -66,6 +70,8 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
     logFile: null,
     unseenErrors: 0,
     sessionStartHeld: false,
+    canLoadHistory: false,
+    olderLines: null,
   })
   let source: EventSourceLike | undefined
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined
@@ -80,6 +86,8 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
     state.logFile = model.logFile
     state.unseenErrors = model.unseenErrors
     state.sessionStartHeld = model.sessionStartHeld
+    state.canLoadHistory = model.canLoadHistory
+    state.olderLines = model.olderLines
   }
 
   function schedulePublish() {
@@ -168,17 +176,19 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
       state.unseenErrors = 0
     },
     /**
-     * Put the earlier lines of `request.sessionId` (its whole history, oldest first) above the rows.
-     * Discarded unless the stream still shows that session of that project: the fetch is slow, and
-     * the session may have restarted or the project changed meanwhile.
+     * Put the earlier lines of `request.sessionId` (its newest lines, oldest first; `hasOlder` when
+     * its file has lines before them) above the rows. Discarded unless the stream still shows that
+     * session of that project: the fetch is slow, and the session may have restarted or the project
+     * changed meanwhile.
      */
     loadHistory(
       lines: readonly string[],
       request: { readonly project: string; readonly sessionId: string },
+      hasOlder = false,
     ) {
       if (request.project !== toValue(options.project) || request.sessionId !== model.sessionId)
         return
-      model.prependHistory(lines)
+      model.prependHistory(lines, hasOlder)
       rows.value = model.rows.slice()
       publish()
     },

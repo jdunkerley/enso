@@ -1081,6 +1081,16 @@ export class LocalBackend extends backend.Backend {
   }
 
   /**
+   * The pages of a local project session, oldest first, as `scrollId`s that
+   * {@link getProjectSessionLogs} reads one at a time: its rolled archives, then `active`.
+   */
+  async listProjectSessionPages(
+    projectSessionId: backend.ProjectSessionId,
+  ): Promise<readonly string[]> {
+    return (await this.projectManager.listProjectSessionPages(String(projectSessionId))).pages
+  }
+
+  /**
    * Create `<parent>/<name>.datalink`, or, with `body.datalinkId`, replace that datalink's content
    * (the cloud's "new version"; a local datalink has no versions).
    * @throws {Error} when the name contains a path separator, or the shim refuses the write.

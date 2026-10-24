@@ -1,10 +1,17 @@
 # src/project-view/components/EngineLogs/
 
-The Logs tab of the project view's bottom dock: the open project's engine log,
-live, with its earlier lines and sessions. The design is in
+The engine log viewer: the Logs tab of the project view's bottom dock (the open
+project's engine log, live, with its earlier lines and sessions), and the app's
+session log tab, opened from Activity → Show Logs
+(`$/components/SessionLogTab.vue`, route `projectLog/:id/:title/:projectId?`),
+which shows one session read from its files without a live stream. It replaced
+the dashboard's AG Grid session viewer (`components/ProjectLog*`), whose column
+sorting and one-row multi-line entries were dropped on purpose. The design is in
 `docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`; the shim side
 is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 
+- `logEntry.ts` — `parseEntry` and `LOG_LEVELS`: the start of an entry,
+  `[LEVEL] [time] [logger] message`.
 - `engineLogModel.ts` — framework-free rows built from the stream's events.
   - Level rules: stderr is ERROR; a line that starts no entry takes its entry's
     level.
@@ -21,11 +28,26 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     under `org.enso`; `__tests__/logOrigin.test.ts` reads
     `std-bits/*/src/main/java/org/enso/*` and fails when one is missing. stderr
     is the engine's; a continuation line takes its entry's origin.
+  - Logger: each line carries its entry's logger (`null` for stderr). The logger
+    filter (`RowFilter.logger`, `loggerMatches`) keeps the lines under a dotted
+    prefix by whole segments (a prefix ending in `.` by text);
+    `loggerSuggestions` offers the loggers seen and their prefixes.
   - The error badge (`unseenErrors`) counts ERROR entries of the log file,
     whatever their origin and the filters; stderr lines are not counted.
   - Dividers: `restarted` at a new engine's `waiting` (not at `session`, which
     also fires for the first session), `skipped` after a gap or on a new
-    channel, `truncated` above capped lines.
+    channel; `truncated` above a window with older lines and `newer` below one
+    paged back. Each of those two names its session (`sessionId`), and the list
+    gives it a Load older / Load newer lines button only when it does.
+  - Older lines of the live view are state, not a row (`olderLines`, published
+    by the stream): set when history did not reach the session's start (the file
+    had older lines, `hasOlder`, or they did not fit) or when rows are dropped
+    at the cap, so trimming can never remove the offer. The panel shows it as a
+    `truncated` divider bound to its session: it stays the previous session's
+    after a restart (and pages that session), and has no button while its
+    session has no id. `sessionStartHeld` is true only when the session's first
+    line really was in the rows; `canLoadHistory` (not spliced yet, start not
+    held) gates the top-of-view history load.
   - The 20,000-row cap, `prependHistory` (a session's history spliced above the
     first live file line), `filterRows` and `rowsFromLines`.
 - `engineLogStream.ts` — `useEngineLogStream`:
@@ -35,8 +57,21 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   - `end` with reason `closed` is terminal until the project or `active`
     changes; `not-open` retries with backoff (the project may still be opening);
   - events are batched into one update per animation frame.
-- `engineLogHistory.ts` — `fetchSessionLines`: a whole session through the
-  existing session-log query (no history API of its own).
+- `sessionLogWindow.ts` — `SessionLogWindow`: a bounded window onto a session. A
+  session is pages (`listProjectSessionPages`: its archives, then `active`),
+  each read whole by `getProjectSessionLogs`. The window reads from the newest
+  page backwards and keeps at most 20,000 lines (`LIVE_ROW_CAP`, what the live
+  view holds); older/newer move it by half a window and drop as many lines from
+  the other end, so memory stays at one window plus one cached page however long
+  the session. `firstLine` numbers its lines so row keys survive a move and the
+  list keeps its place. `latest()` (also Reload) is all or nothing. Rows at the
+  top that continue an entry take its logger and level (`leadingEntry`, found in
+  the page read or the lines dropped); one that starts on an earlier page stays
+  unknown. `noFiles` marks a session whose files are gone, which the panel says.
+  A rollover of the live file while paged back makes the listed `active` page
+  read the new file; Reload lists the pages again. `fetchNewestSessionLines` is
+  the live view's history: the newest lines only, never the whole session, and
+  whether the file has older ones (`hasOlder`).
 - `EngineLogPanel.vue` — the tab's content:
   - level (Error, Warn and above, All levels: the file holds nothing below INFO
     unless a logger was turned up, and the timings are DEBUG), source (Engine,
@@ -53,13 +88,22 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     stream's `logFile`, an earlier one's is `ProjectSession.logFile` from the
     session listing. Each is disabled while its session has no id or file;
   - the waiting and ended notices, and Jump to latest;
-  - an earlier session read whole and read-only (`rowsFromLines`);
+  - an earlier session, read-only, through a `SessionLogWindow`; Load older
+    lines on the live view's `truncated` divider pages back the same way through
+    the live session's file ("Showing earlier lines… Back to live");
+  - Reload (only off the live view, which is current anyway) reads the window's
+    session again from its newest lines;
+  - a logger filter (a search box with a `datalist` of the loggers seen);
+  - without a `stream` (the session log tab): no live view; the picker lists the
+    project's sessions (`projectId`), or the asked-for session alone for a tab
+    saved before tabs had a project;
   - history requests pass `{ project, sessionId }` to `loadHistory`, which drops
     a result whose project or session has moved on.
 - `EngineLogList.vue` + `engineLogView.ts` — a virtualised list (`role="log"`)
   with 18 px rows. It follows the newest row until the user scrolls up, keeps
-  its place when rows are added above or dropped, and emits `reachedTop` (on a
-  scroll, or a wheel at the top) to load history.
+  its place when rows are added above or dropped (anchored on a line, not a
+  divider), emits `reachedTop` (on a scroll, or a wheel at the top) to load
+  history, and `loadOlder`/`loadNewer` from its dividers' buttons.
 
 ## The dock and the shortcut
 

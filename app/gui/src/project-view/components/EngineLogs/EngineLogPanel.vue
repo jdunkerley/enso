@@ -1,7 +1,9 @@
 <script setup lang="ts">
 /**
- * @file The Logs tab of the bottom dock: the open project's engine log as it is written, with its
- * earlier lines and sessions (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
+ * @file An engine log viewer: the Logs tab of the bottom dock (the open project's log as it is
+ * written, with its earlier lines and sessions), and the app's session log tab, opened from
+ * Activity → Show Logs, which shows a session read-only without a live stream
+ * (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
  */
 import SvgIcon from '@/components/SvgIcon.vue'
 import { useBackends } from '$/providers/backends'
@@ -16,27 +18,34 @@ import {
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed, ref, shallowRef, toValue, watch } from 'vue'
+import { computed, ref, shallowRef, toValue, useId, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
-import { fetchSessionLines } from './engineLogHistory'
 import {
   DEFAULT_ORIGINS,
   filterRows,
+  LIVE_ROW_CAP,
+  loggerSuggestions,
   rowsFromLines,
   type LevelFilter,
   type LogOrigin,
   type LogRow,
 } from './engineLogModel'
 import type { EngineLogStream } from './engineLogStream'
+import { fetchNewestSessionLines, SessionLogWindow } from './sessionLogWindow'
 
-const { stream, projectId } = defineProps<{
-  stream: EngineLogStream
-  projectId: ProjectId
+const { stream, projectId, initialSession } = defineProps<{
+  /** The open project's live log; without it the panel shows sessions read from their files. */
+  stream?: EngineLogStream | undefined
+  /** The project whose sessions the session picker lists. */
+  projectId?: ProjectId | undefined
+  /** The session shown first, when there is no live stream. */
+  initialSession?: string | undefined
 }>()
 
 const { getText } = useText()
 const backends = useBackends()
 const systemApi = window.api?.system
+const loggerListId = useId()
 
 const engineLogSettings = useEngineLogSettings()
 
@@ -90,37 +99,96 @@ watch(
   },
 )
 const filterText = ref('')
+/** A dotted logger prefix: only the entries of loggers under it show. */
+const loggerFilter = ref('')
 const follow = ref(true)
-/** The earlier session shown, read-only; `''` for the live one. */
-const selectedSession = ref('')
-const sessionRows = shallowRef<readonly LogRow[]>([])
+/** The session picked; `''` for the live one (only with a live stream). */
+const selectedSession = ref(stream != null ? '' : (initialSession ?? ''))
+/**
+ * The live session, when it is shown from its file, paged back from the live view; fixed when
+ * paging back starts, so a restart meanwhile does not move the view to the new session.
+ */
+const liveSnapshotSession = ref<string | null>(null)
+const liveSnapshot = computed(() => liveSnapshotSession.value != null)
+/** Whether the next session opened from its file starts one step back from its newest lines. */
+let pageBackOnOpen = false
 const loading = ref(false)
 const loadError = ref<string>()
 
-const live = computed(() => selectedSession.value === '')
+const live = computed(() => stream != null && selectedSession.value === '' && !liveSnapshot.value)
 
 const sessions = useQuery({
-  queryKey: computed(() => ['engineLogSessions', projectId, stream.state.sessionId]),
+  queryKey: computed(() => ['engineLogSessions', projectId, stream?.state.sessionId]),
   queryFn: async (): Promise<readonly ProjectSession[]> =>
-    (await backends.localBackend?.listProjectSessions(projectId)) ?? [],
+    projectId == null ? [] : ((await backends.localBackend?.listProjectSessions(projectId)) ?? []),
 })
 
-/** The earlier sessions, newest first, numbered from the oldest as the Activity tab numbers them. */
-const earlierSessions = computed(() =>
-  (sessions.data.value ?? [])
-    .map((session, index) => ({ session, number: index + 1 }))
-    .filter(({ session }) => session.projectSessionId !== stream.state.sessionId)
-    .reverse(),
+/** A session the picker offers; `session` is missing for one asked for but not listed. */
+interface PickableSession {
+  readonly id: string
+  readonly number: number
+  readonly session: ProjectSession | undefined
+}
+
+/**
+ * The sessions the picker offers besides the live one, newest first, numbered from the oldest as
+ * the Activity tab numbers them. Without a live stream, the session asked for is always among them.
+ */
+const pickableSessions = computed<readonly PickableSession[]>(() => {
+  const listed: PickableSession[] = (sessions.data.value ?? [])
+    .map((session, index) => ({ id: String(session.projectSessionId), number: index + 1, session }))
+    .filter(({ id }) => stream == null || id !== stream.state.sessionId)
+    .reverse()
+  const initial = initialSession
+  if (stream == null && initial != null && !listed.some(({ id }) => id === initial)) {
+    listed.unshift({ id: initial, number: 0, session: undefined })
+  }
+  return listed
+})
+
+/** The session read from its files, if any: an earlier one picked, or the live one paged back. */
+const windowSessionId = computed(() =>
+  selectedSession.value !== '' ? selectedSession.value : liveSnapshotSession.value,
+)
+const logWindow = shallowRef<SessionLogWindow>()
+const windowRows = shallowRef<readonly LogRow[]>([])
+/** Whether the session shown from its files has none (it was deleted, or is unknown). */
+const windowHasNoFiles = ref(false)
+
+/**
+ * The live rows, under a `truncated` divider while there are lines above them (`olderLines`, bound
+ * to their session: its button pages through that session, and is not offered while it is unknown).
+ */
+const liveRows = computed<readonly LogRow[]>(() => {
+  if (stream == null) return []
+  // `toValue`: a test harness may hand the stream over reactive, which unwraps `rows`.
+  const rows = toValue(stream.rows)
+  const older = stream.state.olderLines
+  if (older == null) return rows
+  const divider: LogRow = {
+    kind: 'divider',
+    key: Number.MIN_SAFE_INTEGER,
+    divider: 'truncated',
+    sessionId: older.sessionId,
+  }
+  return [divider, ...rows]
+})
+
+/** The rows of the view, before the filters. */
+const sourceRows = computed<readonly LogRow[]>(() =>
+  live.value ? liveRows.value : windowRows.value,
 )
 
-// `toValue`: a test harness may hand the stream over reactive, which unwraps `rows`.
 const shownRows = computed(() =>
-  filterRows(live.value ? toValue(stream.rows) : sessionRows.value, {
+  filterRows(sourceRows.value, {
     level: level.value,
     text: filterText.value,
     origins: originFilter.value,
+    logger: loggerFilter.value,
   }),
 )
+
+const loggerOptions = computed(() => loggerSuggestions(sourceRows.value))
 
 /** The latest history or session request; only it may set `loading` and `loadError`. */
 let latestRequest = 0
@@ -142,36 +210,116 @@ async function withBackend(task: (backend: LocalBackend) => Promise<void>) {
   }
 }
 
-watch(selectedSession, (sessionId) => {
-  sessionRows.value = []
-  follow.value = true
-  // A request still running belongs to the view being left: it no longer sets the notices.
-  latestRequest += 1
-  loading.value = false
-  loadError.value = undefined
-  if (sessionId === '') return
-  void withBackend(async (backend) => {
-    const lines = await fetchSessionLines(backend, ProjectSessionId(sessionId))
-    if (selectedSession.value === sessionId) sessionRows.value = rowsFromLines(lines)
+/** Show the window's lines; their keys follow the window, so the list keeps its place. */
+function showWindow(window: SessionLogWindow) {
+  if (logWindow.value !== window) return
+  windowRows.value = rowsFromLines(window.lines, {
+    older: window.hasOlder,
+    newer: window.hasNewer,
+    firstKey: window.firstLine,
+    sessionId: window.sessionId,
+    leadingEntry: window.leadingEntry,
   })
+  windowHasNoFiles.value = window.noFiles
+}
+
+/** Run `move` on the window shown, and show its lines if it is still the one shown. */
+function moveWindow(move: (window: SessionLogWindow) => Promise<void>) {
+  const window = logWindow.value
+  if (window == null || loading.value) return
+  void withBackend(async () => {
+    await move(window)
+    showWindow(window)
+  })
+}
+
+watch(
+  windowSessionId,
+  (sessionId) => {
+    windowRows.value = []
+    windowHasNoFiles.value = false
+    follow.value = true
+    // A request still running belongs to the view being left: it no longer sets the notices.
+    latestRequest += 1
+    loading.value = false
+    loadError.value = undefined
+    const backend = backends.localBackend
+    if (sessionId == null || backend == null) {
+      logWindow.value = undefined
+      return
+    }
+    // Opened from a Load older lines in the live view: one step past its newest lines.
+    const pagedBack = pageBackOnOpen
+    pageBackOnOpen = false
+    logWindow.value = new SessionLogWindow(backend, ProjectSessionId(sessionId))
+    if (pagedBack) follow.value = false
+    moveWindow(async (window) => {
+      await window.latest()
+      if (pagedBack) await window.older()
+    })
+  },
+  { immediate: true },
+)
+
+/**
+ * A divider's Load older lines for `sessionId`: in a window, page it back; in the live view, open
+ * that session's file one step back: the live session in place (with Back to live), an earlier one
+ * (whose lines are still in view after a restart) as if it had been picked.
+ */
+function loadOlder(sessionId: string) {
+  if (!live.value) {
+    follow.value = false
+    moveWindow((window) => window.older())
+    return
+  }
+  pageBackOnOpen = true
+  if (sessionId === stream?.state.sessionId) liveSnapshotSession.value = sessionId
+  else selectedSession.value = sessionId
+}
+
+function loadNewer() {
+  follow.value = false
+  moveWindow((window) => window.newer())
+}
+
+/** Read the shown session's file again (not offered live: the live view is already current). */
+function reload() {
+  follow.value = true
+  moveWindow((window) => window.latest())
+}
+
+function backToLive() {
+  follow.value = true
+  liveSnapshotSession.value = null
+  selectedSession.value = ''
+}
+
+watch(selectedSession, () => {
+  liveSnapshotSession.value = null
 })
 
 /** At the top of the live view: load the current session's earlier lines, if it has any. */
 function onReachedTop() {
+  if (stream == null || !live.value || loading.value || !stream.state.canLoadHistory) return
   const sessionId = stream.state.sessionId
-  if (!live.value || loading.value || stream.state.sessionStartHeld || sessionId == null) return
-  const request = { project: projectId, sessionId }
+  if (sessionId == null) return
+  const request = { project: projectId ?? '', sessionId }
+  // Never more than the view can hold: the rows it has, and a full view's worth above them.
+  const wanted = LIVE_ROW_CAP + toValue(stream.rows).length
   void withBackend(async (backend) => {
+    const newest = await fetchNewestSessionLines(backend, ProjectSessionId(sessionId), wanted)
     // `loadHistory` drops the lines if the project or the session changed while they were fetched.
-    stream.loadHistory(await fetchSessionLines(backend, ProjectSessionId(sessionId)), request)
+    stream.loadHistory(newest.lines, request, newest.hasOlder)
   })
 }
 
-/** The session shown (live or earlier) and its log file; either is `null` while there is none. */
+/** The session shown and its log file; either is `null` while there is none. */
 const shownSession = computed(() => {
-  if (live.value) return { id: stream.state.sessionId, logFile: stream.state.logFile }
+  if (stream != null && selectedSession.value === '') {
+    return { id: stream.state.sessionId, logFile: stream.state.logFile }
+  }
   const session = sessions.data.value?.find((s) => s.projectSessionId === selectedSession.value)
-  return { id: selectedSession.value, logFile: session?.logFile ?? null }
+  return { id: selectedSession.value || null, logFile: session?.logFile ?? null }
 })
 
 /** The reveal button's name, as each OS calls its file manager. */
@@ -208,7 +356,8 @@ function revealLogFile() {
   if (file != null) systemApi?.showLogFileInFolder(file)
 }
 
-function sessionLabel(session: ProjectSession, number: number) {
+function sessionLabel({ id, number, session }: PickableSession) {
+  if (session == null) return getText('engineLogsSessionUnlisted', id.split('/').pop() ?? id)
   return `${getText('projectSessionX', number)} (${toReadableIsoString(new Date(session.createdAt))})`
 }
 </script>
@@ -228,22 +377,41 @@ function sessionLabel(session: ProjectSession, number: number) {
         </label>
       </fieldset>
       <input
+        v-model="loggerFilter"
+        type="search"
+        class="loggerFilter"
+        :list="loggerListId"
+        :aria-label="getText('engineLogsLogger')"
+        :placeholder="getText('engineLogsLogger')"
+      />
+      <datalist :id="loggerListId">
+        <option v-for="name in loggerOptions" :key="name" :value="name" />
+      </datalist>
+      <input
         v-model="filterText"
         type="search"
         :aria-label="getText('engineLogsFilter')"
         :placeholder="getText('engineLogsFilter')"
       />
       <select v-model="selectedSession" :aria-label="getText('engineLogsSession')">
-        <option value="">{{ getText('engineLogsThisSession') }}</option>
-        <option
-          v-for="{ session, number } in earlierSessions"
-          :key="session.projectSessionId"
-          :value="session.projectSessionId"
-        >
-          {{ sessionLabel(session, number) }}
+        <option v-if="stream != null" value="">{{ getText('engineLogsThisSession') }}</option>
+        <option v-for="option in pickableSessions" :key="option.id" :value="option.id">
+          {{ sessionLabel(option) }}
         </option>
       </select>
       <span class="spacer" />
+      <button
+        v-if="!live"
+        type="button"
+        class="iconButton"
+        :aria-label="getText('engineLogsReload')"
+        :title="getText('engineLogsReload')"
+        :disabled="logWindow == null || loading"
+        data-testid="engine-logs-reload"
+        @click="reload"
+      >
+        <SvgIcon name="refresh" />
+      </button>
       <button
         type="button"
         class="iconButton"
@@ -268,6 +436,12 @@ function sessionLabel(session: ProjectSession, number: number) {
         <SvgIcon name="open_in_file_browser" />
       </button>
     </div>
+    <div v-if="liveSnapshot" class="notice" role="status">
+      {{ getText('engineLogsPagedBack') }}
+      <button type="button" class="link" @click="backToLive">
+        {{ getText('engineLogsBackToLive') }}
+      </button>
+    </div>
     <div v-if="downloadError != null" class="notice error" role="alert">
       {{ getText('engineLogsDownloadFailed', downloadError) }}
     </div>
@@ -277,16 +451,22 @@ function sessionLabel(session: ProjectSession, number: number) {
     <div v-if="loadError != null" class="notice error" role="alert">
       {{ getText('engineLogsHistoryFailed', loadError) }}
     </div>
+    <div v-if="!live && windowHasNoFiles && !loading" class="notice" role="status">
+      {{ getText('engineLogsSessionMissing') }}
+    </div>
     <EngineLogList
       v-model:follow="follow"
       class="list"
       :rows="shownRows"
+      :canLoad="!loading"
       @reachedTop="onReachedTop"
+      @loadOlder="loadOlder"
+      @loadNewer="loadNewer"
     />
-    <div v-if="live && stream.state.waiting" class="notice" role="status">
+    <div v-if="live && stream?.state.waiting" class="notice" role="status">
       {{ getText('engineLogsWaiting') }}
     </div>
-    <div v-else-if="live && stream.state.ended != null" class="notice" role="status">
+    <div v-else-if="live && stream?.state.ended != null" class="notice" role="status">
       {{ getText('engineLogsEnded') }}
     </div>
     <button v-if="live && !follow" type="button" class="jump" @click="follow = true">
@@ -332,6 +512,20 @@ function sessionLabel(session: ProjectSession, number: number) {
 
 .toolbar input[type='search'] {
   width: 16em;
+}
+
+.toolbar .loggerFilter {
+  width: 12em;
+}
+
+.notice .link {
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .origins {
