@@ -333,8 +333,8 @@ stays staged).
 ## Engine logs (`src/engineLogs/`)
 
 `--list-project-sessions` (`handler/filesystem.ts`) names each session's file as
-`logFile`: its active `.log`, or its first archive when that is all there is.
-The Logs panel reveals an earlier session's file with it.
+`logFile`: its active `.log`, or its lowest-numbered archive when it has only
+archives. The Logs panel reveals an earlier session's file with it.
 
 `project/open` may carry `engineLogging`
 (`{ sqlQueries?, performanceTimings? }`, from the GUI's Settings → Local →
