@@ -252,21 +252,25 @@ describe('uploadIdeAssets', () => {
   /**
    * A GitHub holding one release whose assets change as the client acts: a successful upload
    * adds an `uploaded` asset, a failed one (the first `failures`) a `starter` one, a DELETE removes.
+   * The GETs of the release numbered in `failingGets` (from 0) fail, as a transient API error.
    */
   function statefulGitHub(
     draft: boolean,
     assets: ReleaseAsset[],
     failures = 0,
+    failingGets: readonly number[] = [],
   ): { api: GitHub; log: string[]; current: () => ReleaseAsset[] } {
     const log: string[] = []
     let left = failures
     let nextId = 100
+    let gets = 0
     let held = [...assets]
     const api: GitHub = {
       repository: 'o/r',
       async json<T>(method: string, route: string): Promise<T | null> {
         log.push(`${method} ${route}`)
         if (method === 'GET' && route === '/repos/o/r/releases/9') {
+          if (failingGets.includes(gets++)) throw new Error('bad gateway')
           return release({ draft, assets: held }) as T
         }
         const deleted = /^\/repos\/o\/r\/releases\/assets\/(\d+)$/.exec(route)
@@ -350,6 +354,20 @@ describe('uploadIdeAssets', () => {
         'assets are never replaced. Delete the asset by hand first if it must change.',
     )
     expect(log.some((line) => line.startsWith('DELETE'))).toBe(false)
+    // All or nothing: the installer before it in the list is not uploaded either.
+    expect(log.some((line) => line.startsWith('upload'))).toBe(false)
+  })
+  test('on a published release, every collision is found before the first upload', async () => {
+    const { api, log } = statefulGitHub(false, [
+      { id: 1, name: exe, state: 'starter' },
+      { id: 2, name: 'latest.yml', state: 'uploaded' },
+    ])
+    await expect(uploadIdeAssets(api, 9, files, () => {}, noWait)).rejects.toThrow(
+      `Release 2026.1.1-rc.5 is published and already has ${exe} (starter), latest.yml; a ` +
+        "published release's assets are never replaced. Delete the assets by hand first if they " +
+        'must change.',
+    )
+    expect(log).toEqual(['GET /repos/o/r/releases/9'])
   })
   test('on a published release, a failed upload is not cleaned up: it stops', async () => {
     const { api, log } = statefulGitHub(false, [], 1)
@@ -357,6 +375,36 @@ describe('uploadIdeAssets', () => {
       `Uploading ${exe} to the published release 2026.1.1-rc.5 failed and left a partial asset`,
     )
     expect(log.some((line) => line.startsWith('DELETE'))).toBe(false)
+  })
+  test('a failed check for a partial asset is logged, and the upload is retried', async () => {
+    // GET 0 is the first look at the release; GET 1 is the check after the failed upload.
+    const { api, current } = statefulGitHub(true, [], 1, [1])
+    const logged: string[] = []
+    await uploadIdeAssets(api, 9, files, (line) => logged.push(line), noWait)
+    expect(logged).toContain(`Could not check release 9 for a partial ${exe} (Error: bad gateway).`)
+    expect(logged).toContain(
+      `Uploading ${exe} failed (Error: connection reset); retrying in 500 ms.`,
+    )
+    // The partial asset it could not see is still there; a later failure would have removed it.
+    expect(current().map((asset) => `${asset.name} ${asset.state}`)).toEqual([
+      `${exe} starter`,
+      `${exe} uploaded`,
+      'latest.yml uploaded',
+    ])
+  })
+  test('when the last check fails too, the upload error is the cause of the failure', async () => {
+    // Six failed attempts; the check after the last one (GET 6) fails.
+    const { api } = statefulGitHub(true, [], 6, [6])
+    const failure = await uploadIdeAssets(api, 9, files, () => {}, noWait).then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect(failure).toBeInstanceOf(Error)
+    expect((failure as Error).message).toBe(
+      `Uploading ${exe} to release 2026.1.1-rc.5 failed (Error: connection reset), and a ` +
+        'partial asset it may have left could not be checked or deleted; check the release by hand.',
+    )
+    expect(((failure as Error).cause as Error).message).toBe('connection reset')
   })
   test('a release that does not exist is an error', async () => {
     await expect(uploadIdeAssets(fakeGitHub({}).api, 9, files, () => {})).rejects.toThrow(

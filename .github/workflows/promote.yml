@@ -1,8 +1,7 @@
-# Hand-maintained. This is the last output of the CI generator (`build_tools/ci-gen`), which is
-# retired in Phase 1 of the build simplification
-# (docs/superpowers/specs/2026-10-20-build-simplification-design.md). It is kept unchanged on
-# purpose: Phase 4 rewrites the release workflows and proves them with an rc prerelease, so change
-# this file only together with such a release test.
+# Hand-written. Computes the next version of the requested kind from the repository's tags
+# (`tools/build-scripts`' `release promote`), then releases it with `release.yml`. Started by hand
+# for a stable, patch or rc release, and by `nightly.yml` for the nightly. Change this file only
+# together with an rc release test.
 
 name: Generate a new version
 on:
@@ -17,104 +16,48 @@ on:
           - patch
           - rc
           - nightly
+      publish:
+        description: Publish the release (false stops at a draft; see Note [Publishing Later] in `release.yml`).
+        required: false
+        type: boolean
+        default: true
   workflow_call:
     inputs:
       designator:
         description: What kind of release should be promoted.
         required: true
         type: string
+      publish:
+        description: Publish the release (false stops at a draft; see Note [Publishing Later] in `release.yml`).
+        required: false
+        type: boolean
+        default: true
+
 jobs:
-  build-script-linux-amd64:
-    name: Build Script
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli
-          retention-days: 1
-  enso-build-ci-gen-promote-release-job-linux-amd64:
+  promote:
     name: Promote release (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - id: promote
-        run: ./run release promote ${{ inputs.designator }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
     outputs:
+      ENSO_VERSION: ${{ steps.promote.outputs.ENSO_VERSION }}
       ENSO_EDITION: ${{ steps.promote.outputs.ENSO_EDITION }}
       ENSO_RELEASE_MODE: ${{ steps.promote.outputs.ENSO_RELEASE_MODE }}
-      ENSO_VERSION: ${{ steps.promote.outputs.ENSO_VERSION }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - id: promote
+        name: Compute the next version
+        run: corepack pnpm --filter build-scripts run release promote "$DESIGNATOR"
+        env:
+          DESIGNATOR: ${{ inputs.designator }}
+
   release:
     name: Release
-    needs:
-      - enso-build-ci-gen-promote-release-job-linux-amd64
+    needs: [promote]
     uses: ./.github/workflows/release.yml
     with:
-      version: ${{ needs.enso-build-ci-gen-promote-release-job-linux-amd64.outputs.ENSO_VERSION }}
+      version: ${{ needs.promote.outputs.ENSO_VERSION }}
+      publish: ${{ inputs.publish }}
     secrets: inherit
-env:
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"

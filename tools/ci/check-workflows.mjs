@@ -156,25 +156,18 @@ const RELEASE_FORBIDDEN = [
   '--backend-source release',
 ]
 const RELEASE_REQUIRED = [
-  'release create-draft',
-  'release publish',
-  'update-latest-version',
-  'ide upload',
+  'run release create-draft',
+  'run release upload-ide',
+  'run release publish',
+  'run release update-latest-version',
   'ENSO_BUILD_UPDATE_INFO',
 ]
-/** The workflow token, code signing, Sentry source maps, and the self-hosted Mac's status check. */
-const RELEASE_SECRETS = new Set([
-  'GITHUB_TOKEN',
-  'APPLE_CODE_SIGNING_CERT',
-  'APPLE_CODE_SIGNING_CERT_PASSWORD',
-  'APPLE_NOTARIZATION_USERNAME',
-  'APPLE_NOTARIZATION_PASSWORD',
-  'APPLE_NOTARIZATION_TEAM_ID',
-  'MICROSOFT_CODE_SIGNING_CERT',
-  'MICROSOFT_CODE_SIGNING_CERT_PASSWORD',
-  'SENTRY_AUTH_TOKEN',
-  'RUNNER_STATUS_TOKEN',
-])
+/**
+ * The workflow token and the self-hosted Mac's status check. The fork ships unsigned and without
+ * Sentry (build simplification, Phase 4): signing comes back as electron-builder's own settings,
+ * with its secrets added here.
+ */
+const RELEASE_SECRETS = new Set(['GITHUB_TOKEN', 'RUNNER_STATUS_TOKEN'])
 
 /** Releases are IDE-only GitHub releases and need no cloud secrets (`release_is_ide_only_...`). */
 export function checkReleaseIsIdeOnly({ workflows }) {
@@ -195,11 +188,7 @@ export function checkReleaseIsIdeOnly({ workflows }) {
 }
 
 /** The macOS jobs of `release.yml`: the Mac builds the backend and the IDE, nothing else. */
-const MACOS_RELEASE_JOBS = [
-  'build-script-macos-aarch64',
-  'enso-build-ci-gen-job-build-backend-macos-aarch64',
-  'enso-build-ci-gen-upload-ide-macos-aarch64',
-]
+const MACOS_RELEASE_JOBS = ['build-backend-macos', 'upload-ide-macos']
 
 /** Only macOS jobs may fail without blocking publishing (`only_macos_release_jobs_may_fail_...`). */
 export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
@@ -221,64 +210,87 @@ export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
   for (const id of macosIds) {
     if (!MACOS_RELEASE_JOBS.includes(id)) problems.push(`release.yml › ${id}: unexpected macOS job`)
   }
-  if (!macosIds.some((id) => /upload-ide/.test(id))) {
-    problems.push('release.yml: has no macOS IDE upload job')
+  return problems
+}
+
+/** A job that calls a reusable workflow for macOS (`with: { os: macos }`). */
+const isMacosCaller = (job) => job?.with?.os === 'macos'
+
+/**
+ * The jobs of `file` that run on the Mac, or call a workflow for it, but do not wait for
+ * `check-the-mac-os-runner` and run only when it reports the Mac online.
+ */
+function ungatedMacosJobs(file, jobs) {
+  const problems = []
+  const macos = (job) => isMacos(job) || isMacosCaller(job)
+  if (!('check-the-mac-os-runner' in jobs) && Object.values(jobs).some(macos)) {
+    problems.push(`${file}: has macOS jobs but no \`check-the-mac-os-runner\` gate job`)
+  }
+  for (const [id, job] of Object.entries(jobs)) {
+    if (!macos(job)) continue
+    const needs = [job.needs ?? []].flat()
+    if (
+      !needs.includes('check-the-mac-os-runner') ||
+      !String(job.if ?? '').includes('outputs.online')
+    ) {
+      problems.push(
+        `${file} › ${id}: a macOS job must need \`check-the-mac-os-runner\` and run only when it reports the Mac online`,
+      )
+    }
   }
   return problems
 }
 
 /**
+ * What `publish-release`'s `if` must test: the `publish` input (a release can stop at a checked
+ * draft), and every job's result but macOS's.
+ */
+const PUBLISH_REQUIRES = [
+  'inputs.publish',
+  "needs.draft-release.result == 'success'",
+  "needs.license-check.result == 'success'",
+  "needs.upload-ide.result == 'success'",
+]
+
+/**
  * With the self-hosted Mac (#288), every macOS job waits for `check-the-mac-os-runner` and is
  * skipped while the Mac is offline, and publishing does not wait on macOS results
- * (`release_skips_macos_jobs_...`, `nightly_skips_macos_jobs_...`). Applies once a workflow has
- * that gate job.
+ * (`release_skips_macos_jobs_...`, `nightly_skips_macos_jobs_...`). The latest-version update
+ * tests the publish job's result itself: by default a job is skipped when any job before it
+ * failed, a macOS one included.
  */
 export function checkMacosJobsAreGated({ workflows }) {
   const problems = []
-  for (const file of ['release.yml', 'engine-checks-nightly.yml']) {
-    if (!workflows[file]) continue
-    const jobs = workflows[file].doc?.jobs ?? {}
-    if (file === 'engine-checks-nightly.yml' && !('build-script-macos-aarch64' in jobs)) {
-      problems.push(`${file}: has no macOS job \`build-script-macos-aarch64\``)
+  const nightly = workflows['engine-checks-nightly.yml']?.doc?.jobs
+  if (nightly) {
+    if (!('build-script-macos-aarch64' in nightly)) {
+      problems.push('engine-checks-nightly.yml: has no macOS job `build-script-macos-aarch64`')
     }
-    if (!('check-the-mac-os-runner' in jobs) && Object.values(jobs).some(isMacos)) {
-      problems.push(`${file}: has macOS jobs but no \`check-the-mac-os-runner\` gate job`)
-    }
-    for (const [id, job] of Object.entries(jobs)) {
-      if (!isMacos(job)) continue
-      const needs = [job.needs ?? []].flat()
-      if (
-        !needs.includes('check-the-mac-os-runner') ||
-        !String(job.if ?? '').includes('outputs.online')
-      ) {
-        problems.push(
-          `${file} › ${id}: a macOS job must need \`check-the-mac-os-runner\` and run only when it reports the Mac online`,
-        )
-      }
-    }
+    problems.push(...ungatedMacosJobs('engine-checks-nightly.yml', nightly))
   }
   const release = workflows['release.yml']?.doc?.jobs
-  if (release) {
-    const entry = Object.entries(release).find(([id]) => id.includes('publish-release'))
-    if (!entry) return [...problems, 'release.yml: has no publish job']
-    const [id, publish] = entry
-    const condition = String(publish.if ?? '')
-    const needs = [publish.needs ?? []].flat()
-    if (!needs.some((need) => /upload-ide-macos/.test(need))) {
-      problems.push(`release.yml › ${id}: must still need the macOS IDE upload`)
+  if (!release) return problems
+  problems.push(...ungatedMacosJobs('release.yml', release))
+  const publish = release['publish-release']
+  if (!publish) return [...problems, 'release.yml: has no `publish-release` job']
+  const condition = String(publish.if ?? '')
+  if (![publish.needs ?? []].flat().includes('upload-ide-macos')) {
+    problems.push('release.yml › publish-release: must still need the macOS IDE upload')
+  }
+  if (/macos/i.test(condition)) {
+    problems.push('release.yml › publish-release: its `if` must not wait on a macOS job')
+  }
+  for (const required of PUBLISH_REQUIRES) {
+    if (!condition.includes(required)) {
+      problems.push(`release.yml › publish-release: its \`if\` lacks \`${required}\``)
     }
-    if (/macos/i.test(condition)) {
-      problems.push(`release.yml › ${id}: its \`if\` must not wait on a macOS job`)
-    }
-    for (const required of [
-      'upload-ide-linux-amd64',
-      'upload-ide-windows-amd64',
-      'draft-release',
-    ]) {
-      if (!condition.includes(required)) {
-        problems.push(`release.yml › ${id}: its \`if\` lacks ${required}`)
-      }
-    }
+  }
+  const update = release['update-latest-release-version']
+  if (!update) return [...problems, 'release.yml: has no `update-latest-release-version` job']
+  if (!String(update.if ?? '').includes("needs.publish-release.result == 'success'")) {
+    problems.push(
+      "release.yml › update-latest-release-version: its `if` must test `needs.publish-release.result == 'success'`",
+    )
   }
   return problems
 }
