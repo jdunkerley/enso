@@ -53,7 +53,7 @@ test.describe('a session with two files', () => {
       await expect(tab.getByRole('button', { name: 'Download log file' })).toBeEnabled()
 
       // The logger filter, with the loggers seen as suggestions.
-      const logger = tab.getByRole('searchbox', { name: 'Logger' })
+      const logger = tab.getByRole('combobox', { name: 'Logger' })
       const listId = await logger.getAttribute('list')
       await expect(
         tab.locator(`datalist[id="${listId}"] option[value="Standard.Table"]`),
@@ -92,11 +92,11 @@ test.describe('a long session', () => {
       await expect(log.getByText('active line 14999')).toBeVisible()
       await log.evaluate((element) => (element.scrollTop = 0))
       // Only the newest 20,000 lines are read at first.
-      await expect(log.getByText('archived line 10000', { exact: true })).toBeVisible()
+      await expect(log.getByText(/ archived line 10000$/)).toBeVisible()
       await log.getByRole('button', { name: 'Load older lines' }).click()
-      await expect(log.getByText('archived line 9999', { exact: true })).toBeVisible()
+      await expect(log.getByText(/ archived line 9999$/)).toBeVisible()
       await log.evaluate((element) => (element.scrollTop = 0))
-      await expect(log.getByText('archived line 0', { exact: true })).toBeVisible()
+      await expect(log.getByText(/ archived line 0$/)).toBeVisible()
       await expect(log.getByRole('button', { name: 'Load older lines' })).toHaveCount(0)
     })
   })
