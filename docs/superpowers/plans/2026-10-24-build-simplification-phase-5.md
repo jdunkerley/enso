@@ -82,31 +82,43 @@ any of them; each says what changes if they do.
 2. **`ide-local` is a new command; `ide-build` keeps its CI role.** `ide-local`
    runs `sbt buildEngineBundle`, copies the bundle to `dist/backend`, builds the
    GUI into `dist/gui`, then packages, always replacing `dist/backend` and
-   `dist/gui`, so the stale-engine trap of `--backend-source local` cannot
-   happen. It imports `src/lib/sbt.ts`, so the workflow policy counts it as an
-   sbt call; it is never run in CI. `ide-build` stays sbt-free, because the
-   packaging job has no `setup-jvm`. _If overturned (a recipe instead):_ drop
-   Task 1's command and keep its four commands in `docs/CONTRIBUTING.md`.
+   `dist/gui` (and clearing `dist/ide`), so it never reuses an old
+   `dist/backend`: the stale-engine trap of `--backend-source local` cannot
+   happen. The engine itself builds incrementally, as `sbt buildEngineBundle`
+   always does; `sbt clean` first is the escape hatch. It imports
+   `src/lib/sbt.ts`, so the workflow policy counts it as an sbt call; it is
+   never run in CI. `ide-build` stays sbt-free, because the packaging job has no
+   `setup-jvm`. _If overturned (a recipe instead):_ drop Task 1's command and
+   keep its four commands in `docs/CONTRIBUTING.md`.
 3. **The Rust `enso-formatter` (`./run fmt`'s import grouper) is retired, not
    ported.** No CI job runs it; `cargo fmt` and Prettier remain.
 4. **`gui-changed-files.yml` gains `.cargo/**`, `Cargo.lock`, `Cargo.toml` and
-   `rust-toolchain.toml`.** The GUI build compiles the WASM parser through
-   cargo, but a lock or toolchain change does not start the GUI checks today.
-   With this, 5b's own lock change runs them. _If overturned:_ add the
+   `rust-toolchain.toml`, one glob per line, in both of its lists** (the full
+   list, and the "excluding GUI tests" list whose `any_changed_excluding_tests`
+   output `ide-pull-request.yml` reads). The GUI build compiles the WASM parser
+   through cargo, but a lock or toolchain change does not start the GUI checks
+   today. With this, 5b's own lock change runs them. _If overturned:_ add the
    `CI: Build IDE` label to 5b's PR instead.
 5. **`ide-changed-files.yml` gains `tools/build-scripts/**`** (5a). `ide-build`
    packages every installer, yet a change to it does not start IDE packaging;
    `build_tools/**` had that role for `./run`.
-6. **The history notes are rewritten, not kept.** After 5b they point at files
-   that do not exist. They become present-tense descriptions or say "the retired
-   build CLI"; one pointer, in `tools/build-scripts/CLAUDE.md`, names the last
-   commit that has the old code. Five Notes named "… Without ./run" are renamed.
-   _If overturned:_ skip Task 8; the final grep then allows every comment line.
-7. **Allowlist for the final grep:** `docs/superpowers/**` (specs and plans are
+6. **The history notes are rewritten mechanically, not restructured** (Ruling
+   R1). After 5b they point at files that do not exist. In full: the five Notes
+   named "… Without ./run" are renamed, every `build_tools/…` path becomes "the
+   retired build CLI's `x.rs`" with one pointer to the last commit that has the
+   old code (in `tools/build-scripts/CLAUDE.md`), and the test names and
+   descriptions are renamed. Elsewhere "`./run`" becomes "the retired build CLI"
+   in place; paragraphs and Note bullet lists keep their facts and shape. _If
+   overturned:_ skip Tasks 8–10; the final grep then allows every comment line.
+7. **Allowlist for the final greps:** `docs/superpowers/**` (specs and plans are
    history), `CHANGELOG.md` (released notes), `docs/libraries/sharing.md`'s
-   permalink to `enso-org/enso` at a fixed commit, and
+   permalink to `enso-org/enso` at a fixed commit,
    `app/gui/integration-test/mock/data/latestGithubReleases.json` (a recorded
-   GitHub API response that names upstream's `launcher-manifest.yaml` asset).
+   GitHub API response that names upstream's `launcher-manifest.yaml` asset),
+   and
+   `lib/scala/distribution-manager/src/main/scala/org/enso/distribution/DistributionManager.scala`'s
+   `OS.executableName("ensoup")`: the portable-mode detection that Decision 9
+   keeps (Ticket 4). **Do not touch that line** in any PR of this plan.
 8. **`build-config.yaml` keeps `latest-release` and `toolchain:` only.**
    `wasm-size-limit` and `required-versions` were read only by `build_tools`.
 9. **Launcher removal stops at code that becomes unreferenced.** Deleted from
@@ -204,7 +216,7 @@ Worktrees are created from `origin/develop` under `C:\Repos\Enso\` with
 | 5a  | `build/phase5-replacements` | `ide-bs-5a` | 1–3   | PR #346 (4c)       | Build Scripts CI (184 tests), ✨ IDE, ✨ Engine, ✨ WASM; `ide-local` producing an installer on Windows and on Linux                            |
 | 5b  | `build/phase5-delete`       | `ide-bs-5b` | 4–5   | 5a                 | `cargo test --workspace` on both hosts (55 suites, 172 tests); ✨ WASM, ✨ Engine, ✨ IDE, ✨ GUI; the reference grep                           |
 | 5c  | `build/phase5-launcher`     | `ide-bs-5c` | 6–7   | 5b                 | `sbt compile` and `Test/compile` of everything on both hosts; `verifyLicensePackages`; ✨ Engine (JVM tests), ✨ IDE; the user's engine nightly |
-| 5d  | `build/phase5-sweep`        | `ide-bs-5d` | 8–9   | 5c                 | `comment-only.py` and `yaml-same.mjs` show comments only; the final greps print nothing; full PR CI                                             |
+| 5d  | `build/phase5-sweep`        | `ide-bs-5d` | 8–11  | 5c                 | `comment-only.py` and `yaml-same.mjs` show comments only; the final greps print nothing; full PR CI                                             |
 
 The design branch `design/build-simplification` (worktree
 `C:\Repos\Enso\ide-build`, draft PR #289) carries only the spec and the plans.
@@ -259,7 +271,7 @@ its first column's `./run` spelling (Task 2 gives the exact text).
 | `lib/scala/runtime-version-manager/src/main/…` (`runner/`, `cli/`, `EngineRepository`, `Resources`, `module-info.java`)                                                                                                                                                        | 5c  | Code only the launcher used                                                                    |
 | `Cargo.toml`, `Cargo.lock`, `.gitignore`, `.prettierignore`, `tools/native-image-config-cleanup/index.js`, `.github/workflows/engine-checks-platform.yml` (one comment)                                                                                                        | 5c  | The launcher's entries                                                                         |
 | launcher docs and CLAUDE.md files (Task 6 Step 6)                                                                                                                                                                                                                              | 5c  | Edit                                                                                           |
-| ~50 files of history comments (Task 8)                                                                                                                                                                                                                                         | 5d  | Comments, five Note names, four test names, two sbt task descriptions, one package description |
+| ~50 files of history comments (Tasks 8–10)                                                                                                                                                                                                                                     | 5d  | Comments, five Note names, four test names, two sbt task descriptions, one package description |
 
 ## Reference: intended differences
 
@@ -289,11 +301,16 @@ its first column's `./run` spelling (Task 2 gives the exact text).
   - `wait-run.sh <run-id> [max-minutes]`: prints the run's conclusion; exit 0 on
     success, 1 otherwise, 2 on timeout;
   - `yaml-same.mjs` (run as
-    `node --input-type=module -e "$(cat "$SCRATCH/p5/yaml-same.mjs")" <base> <file>…`
-    from the repository root): exit 0 when every YAML file parses to the same
-    value at `<base>` and now;
-  - `comment-only.py <base> [allowed substring]…`: exit 0 when every changed
-    line of a code file is a comment;
+    `node --input-type=module -e "$(cat "$SCRATCH/p5/yaml-same.mjs")" <base> [--expect <file>:<path>]… <file>…`
+    from the repository root): lists every YAML value that differs between
+    `<base>` and the working tree as `<file>:<path>`; exit 0 only when each one
+    is named by an `--expect` and each `--expect` did change. Comments do not
+    survive parsing, so comment edits show nothing; a comment inside a `run:`
+    script or a `description:` is part of a value and must be expected;
+  - `comment-only.py <base> [--allow <substring>]… [-- <pathspec>…]`: exit 0
+    when every changed line, added or removed, of a non-YAML code file in the
+    pathspec is a comment or contains an `--allow` substring (pass both the old
+    and the new text of each string the sweep rewrites);
   - `rename-notes.py`: Task 8's Note renames;
   - `pattern.txt` (the build-CLI reference pattern) and `launcher-pattern.txt`
     (the standalone-launcher pattern), read by every grep below;
@@ -380,62 +397,102 @@ echo "$conclusion"
 <!-- prettier-ignore -->
 ```js
 // Usage (from the repository root, so that `yaml` resolves from its node_modules):
-//   node --input-type=module -e "$(cat yaml-same.mjs)" <base-ref> <file>...
-// Parses each YAML file at <base-ref> and in the working tree and fails if they differ: comments
-// do not survive parsing, so a comment-only change compares equal.
+//   node --input-type=module -e "$(cat yaml-same.mjs)" <base-ref> [--expect <file>:<path>]... <file>...
+// Parses each YAML file at <base-ref> and in the working tree and lists every value that differs,
+// as `<file>:<path>` (`jobs.jvm-tests.steps.9.run`). Comments do not survive parsing, so a
+// comment-only change shows nothing. A difference passes only when it is named by an `--expect`;
+// exit 1 when any other differs, or when an `--expect` names a value that did not change.
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { isDeepStrictEqual } from 'node:util'
 import { parse } from 'yaml'
 
-const [base, ...files] = process.argv.slice(1)
-let differing = 0
+const args = process.argv.slice(1)
+const base = args.shift()
+const expected = new Set()
+const files = []
+while (args.length > 0) {
+  const arg = args.shift()
+  if (arg === '--expect') expected.add(args.shift())
+  else files.push(arg)
+}
+
+/** The paths below `prefix` at which `a` and `b` differ. */
+function differences(a, b, prefix) {
+  if (isDeepStrictEqual(a, b)) return []
+  const objects = a != null && b != null && typeof a === 'object' && typeof b === 'object'
+  if (!objects || Array.isArray(a) !== Array.isArray(b)) return [prefix]
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+  return [...keys].flatMap((key) => differences(a[key], b[key], prefix === '' ? key : `${prefix}.${key}`))
+}
+
+const found = new Set()
 for (const file of files) {
   const before = parse(execFileSync('git', ['show', `${base}:${file}`], { encoding: 'utf8' }))
   const after = parse(readFileSync(file, 'utf8'))
-  if (!isDeepStrictEqual(before, after)) {
-    console.log(`differs beyond comments: ${file}`)
-    differing++
+  for (const path of differences(before, after, '')) found.add(`${file}:${path}`)
+}
+let failed = 0
+for (const entry of found) {
+  const ok = expected.has(entry)
+  console.log(`${ok ? 'expected' : 'UNEXPECTED'}: ${entry}`)
+  if (!ok) failed++
+}
+for (const entry of expected) {
+  if (!found.has(entry)) {
+    console.log(`MISSING (expected to change, did not): ${entry}`)
+    failed++
   }
 }
-console.log(`${files.length} files compared, ${differing} differ.`)
-process.exit(differing === 0 ? 0 : 1)
+console.log(`${files.length} files compared, ${found.size} values differ, ${failed} problems.`)
+process.exit(failed === 0 ? 0 : 1)
 ```
 
 `$SCRATCH/p5/comment-only.py`:
 
 <!-- prettier-ignore -->
 ```python
-"""Usage: py -3 comment-only.py <base-ref> [allowed-line-substring ...]
+"""Usage: py -3 comment-only.py <base-ref> [--allow <substring>]... [-- <pathspec>...]
 
-Fails when the working tree's change against <base-ref> touches a code line that is not a comment.
-Code files: .ts .mjs .js .scala .sbt .java .yml .yaml .rs .toml .ps1 .sh. A changed line passes when,
-stripped, it is empty or starts with //, /*, *, */ or #; or when it contains one of the
-allowed substrings (the few string literals the sweep rewrites on purpose). Markdown and JSON are
-not checked here. Prints every offending line; exit 1 if any.
+Fails when the working tree's change against <base-ref> (limited to <pathspec>, default the whole
+tree) touches a code line that is not a comment. Code files: .ts .mjs .js .scala .sbt .java .rs
+.toml .ps1 .sh (YAML is checked by yaml-same.mjs instead: there a comment can sit inside a value).
+A changed line, added or removed, passes when, stripped, it is empty or starts with //, /*, *, */ or
+#; or when it contains one of the --allow substrings. Pass the old text and the new text of each
+string literal the sweep rewrites on purpose. Prints every offending line; exit 1 if any.
 """
 import subprocess
 import sys
 
-CODE = ('.ts', '.mjs', '.js', '.scala', '.sbt', '.java', '.yml', '.yaml', '.rs', '.toml', '.ps1', '.sh')
+CODE = ('.ts', '.mjs', '.js', '.scala', '.sbt', '.java', '.rs', '.toml', '.ps1', '.sh')
 COMMENT = ('//', '/*', '*', '*/', '#')
 
-base, allowed = sys.argv[1], sys.argv[2:]
-diff = subprocess.run(['git', 'diff', '-U0', base, '--'], capture_output=True, text=True,
+args = sys.argv[1:]
+base = args.pop(0)
+allowed, paths = [], []
+while args:
+    arg = args.pop(0)
+    if arg == '--allow':
+        allowed.append(args.pop(0))
+    elif arg == '--':
+        paths, args = args, []
+    else:
+        sys.exit(f'unexpected argument: {arg}')
+diff = subprocess.run(['git', 'diff', '-U0', base, '--', *paths], capture_output=True, text=True,
                       encoding='utf-8', check=True).stdout
 bad = []
 current = None
 for line in diff.splitlines():
-    if line.startswith('+++ '):
-        current = line[6:] if line.startswith('+++ b/') else None
+    if line.startswith('+++ ') or line.startswith('--- '):
+        if line.startswith('+++ '):
+            current = line[6:] if line.startswith('+++ b/') else None
         continue
-    if line.startswith('--- ') or current is None or not current.endswith(CODE):
+    if current is None or not current.endswith(CODE) or line[:1] not in '+-':
         continue
-    if line[:1] in '+-' and not line.startswith(('+++', '---')):
-        text = line[1:].strip()
-        if text == '' or text.startswith(COMMENT) or any(a in text for a in allowed):
-            continue
-        bad.append(f'{current}: {line}')
+    text = line[1:].strip()
+    if text == '' or text.startswith(COMMENT) or any(a in text for a in allowed):
+        continue
+    bad.append(f'{current}: {line}')
 for entry in bad:
     print(entry)
 print(f'{len(bad)} changed code lines are not comments.')
@@ -570,11 +627,12 @@ Expected: `179 passed`.
 
 `tools/build-scripts/src/ide-build/ideLocal.test.ts`:
 
+<!-- prettier-ignore -->
 ```ts
 /** @file `ide-local`'s inputs: the bundle path, sbt's and the GUI's environments, the MSVC check. */
-import path from "node:path";
-import { expect, test } from "vitest";
-import { version } from "../version/version.ts";
+import path from 'node:path'
+import { expect, test } from 'vitest'
+import { version } from '../version/version.ts'
 import {
   ENGINE_BUNDLE_COMMAND,
   engineBuildEnv,
@@ -582,83 +640,54 @@ import {
   guiBuildArgs,
   guiBuildEnv,
   msvcProblem,
-} from "./ideLocal.ts";
+} from './ideLocal.ts'
 
-test("the bundle is where EngineBundle.root puts it", () => {
-  expect(engineBundleDir("/repo", "2026.1.1-dev", "linux", "x64")).toBe(
-    path.join(
-      "/repo",
-      "built-distribution",
-      "engine-bundle-2026.1.1-dev-linux-amd64",
-      "enso",
-    ),
-  );
-  expect(engineBundleDir("/repo", "2026.1.1-dev", "win32", "x64")).toBe(
-    path.join(
-      "/repo",
-      "built-distribution",
-      "engine-bundle-2026.1.1-dev-windows-amd64",
-      "enso",
-    ),
-  );
-  expect(engineBundleDir("/repo", "2026.1.1-dev", "darwin", "arm64")).toBe(
-    path.join(
-      "/repo",
-      "built-distribution",
-      "engine-bundle-2026.1.1-dev-macos-aarch64",
-      "enso",
-    ),
-  );
-});
+test('the bundle is where EngineBundle.root puts it', () => {
+  expect(engineBundleDir('/repo', '2026.1.1-dev', 'linux', 'x64')).toBe(
+    path.join('/repo', 'built-distribution', 'engine-bundle-2026.1.1-dev-linux-amd64', 'enso'),
+  )
+  expect(engineBundleDir('/repo', '2026.1.1-dev', 'win32', 'x64')).toBe(
+    path.join('/repo', 'built-distribution', 'engine-bundle-2026.1.1-dev-windows-amd64', 'enso'),
+  )
+  expect(engineBundleDir('/repo', '2026.1.1-dev', 'darwin', 'arm64')).toBe(
+    path.join('/repo', 'built-distribution', 'engine-bundle-2026.1.1-dev-macos-aarch64', 'enso'),
+  )
+})
 
-test("sbt builds the bundle incrementally", () => {
-  expect(ENGINE_BUNDLE_COMMAND).toBe("buildEngineBundle");
-});
+test('sbt builds the bundle incrementally', () => {
+  expect(ENGINE_BUNDLE_COMMAND).toBe('buildEngineBundle')
+})
 
-test("sbt gets the version triple and a native launcher, unless the caller chose one", () => {
-  const versions = { version: version("2026.1.1-dev"), releaseMode: false };
-  expect(engineBuildEnv({ PATH: "/bin" }, versions)).toEqual({
-    PATH: "/bin",
-    ENSO_VERSION: "2026.1.1-dev",
-    ENSO_EDITION: "2026.1.1-dev",
-    ENSO_RELEASE_MODE: "false",
-    ENSO_LAUNCHER: "native",
-  });
-  expect(engineBuildEnv({ ENSO_LAUNCHER: "" }, versions).ENSO_LAUNCHER).toBe(
-    "native",
-  );
-  expect(
-    engineBuildEnv({ ENSO_LAUNCHER: "shell" }, versions).ENSO_LAUNCHER,
-  ).toBe("shell");
-  expect(engineBuildEnv({ ENSO_VERSION: "stale" }, versions).ENSO_VERSION).toBe(
-    "2026.1.1-dev",
-  );
-});
+test('sbt gets the version triple and a native launcher, unless the caller chose one', () => {
+  const versions = { version: version('2026.1.1-dev'), releaseMode: false }
+  expect(engineBuildEnv({ PATH: '/bin' }, versions)).toEqual({
+    PATH: '/bin',
+    ENSO_VERSION: '2026.1.1-dev',
+    ENSO_EDITION: '2026.1.1-dev',
+    ENSO_RELEASE_MODE: 'false',
+    ENSO_LAUNCHER: 'native',
+  })
+  expect(engineBuildEnv({ ENSO_LAUNCHER: '' }, versions).ENSO_LAUNCHER).toBe('native')
+  expect(engineBuildEnv({ ENSO_LAUNCHER: 'shell' }, versions).ENSO_LAUNCHER).toBe('shell')
+  expect(engineBuildEnv({ ENSO_VERSION: 'stale' }, versions).ENSO_VERSION).toBe('2026.1.1-dev')
+})
 
-test("only Windows needs the MSVC developer environment", () => {
-  expect(msvcProblem("linux", {})).toBeNull();
-  expect(msvcProblem("darwin", {})).toBeNull();
-  expect(
-    msvcProblem("win32", { VCToolsRedistDir: "C:\\VS\\Redist\\MSVC\\14.44\\" }),
-  ).toBeNull();
-  expect(msvcProblem("win32", {})).toContain("VCToolsRedistDir is not set");
-  expect(msvcProblem("win32", { VCToolsRedistDir: "" })).toContain(
-    "vcvars64.bat",
-  );
-});
+test('only Windows needs the MSVC developer environment', () => {
+  expect(msvcProblem('linux', {})).toBeNull()
+  expect(msvcProblem('darwin', {})).toBeNull()
+  expect(msvcProblem('win32', { VCToolsRedistDir: 'C:\\VS\\Redist\\MSVC\\14.44\\' })).toBeNull()
+  expect(msvcProblem('win32', {})).toContain('VCToolsRedistDir is not set')
+  expect(msvcProblem('win32', { VCToolsRedistDir: '' })).toContain('vcvars64.bat')
+})
 
-test("the GUI is built in the requested mode, with the version and commit", () => {
-  expect(guiBuildArgs("production")).toEqual([
-    "run",
-    "build:gui",
-    "--mode=production",
-  ]);
-  expect(guiBuildEnv({ PATH: "/bin" }, "2026.1.1-dev", "abc123")).toEqual({
-    PATH: "/bin",
-    ENSO_IDE_VERSION: "2026.1.1-dev",
-    ENSO_IDE_COMMIT_HASH: "abc123",
-  });
-});
+test('the GUI is built in the requested mode, with the version and commit', () => {
+  expect(guiBuildArgs('production')).toEqual(['run', 'build:gui', '--mode=production'])
+  expect(guiBuildEnv({ PATH: '/bin' }, '2026.1.1-dev', 'abc123')).toEqual({
+    PATH: '/bin',
+    ENSO_IDE_VERSION: '2026.1.1-dev',
+    ENSO_IDE_COMMIT_HASH: 'abc123',
+  })
+})
 ```
 
 - [ ] **Step 3: Run it to see it fail**
@@ -669,6 +698,7 @@ Expected: FAIL, `Failed to resolve import "./ideLocal.ts"`.
 
 - [ ] **Step 4: Write `ideLocal.ts`**
 
+<!-- prettier-ignore -->
 ```ts
 /**
  * @file `ide-local`'s inputs: the IDE built from this checkout's sources, start to finish. The
@@ -676,12 +706,12 @@ Expected: FAIL, `Failed to resolve import "./ideLocal.ts"`.
  * into `dist/` afresh before the packaging, so an installer never carries an engine or a GUI left
  * over from an earlier build.
  */
-import path from "node:path";
-import { archName, osName } from "../lib/engine.ts";
-import type { Versions } from "../version/version.ts";
+import path from 'node:path'
+import { archName, osName } from '../lib/engine.ts'
+import type { Versions } from '../version/version.ts'
 
 /** The sbt command that builds the engine bundle. No `clean`: a local build is incremental. */
-export const ENGINE_BUNDLE_COMMAND = "buildEngineBundle";
+export const ENGINE_BUNDLE_COMMAND = 'buildEngineBundle'
 
 /**
  * The bundle `buildEngineBundle` leaves (`EngineBundle.root` in `project/EngineBundle.scala`):
@@ -693,31 +723,23 @@ export function engineBundleDir(
   platform: NodeJS.Platform,
   arch: string,
 ): string {
-  const triple = `${version}-${osName(platform)}-${archName(arch)}`;
-  return path.join(
-    repoRoot,
-    "built-distribution",
-    `engine-bundle-${triple}`,
-    "enso",
-  );
+  const triple = `${version}-${osName(platform)}-${archName(arch)}`
+  return path.join(repoRoot, 'built-distribution', `engine-bundle-${triple}`, 'enso')
 }
 
 /**
  * sbt's environment for the bundle: the version triple, as the `version` command publishes it, and
  * `ENSO_LAUNCHER=native` (what the IDE ships, and CI's packaging passes) unless the caller set one.
  */
-export function engineBuildEnv(
-  env: NodeJS.ProcessEnv,
-  versions: Versions,
-): NodeJS.ProcessEnv {
-  const launcher = env.ENSO_LAUNCHER ?? "";
+export function engineBuildEnv(env: NodeJS.ProcessEnv, versions: Versions): NodeJS.ProcessEnv {
+  const launcher = env.ENSO_LAUNCHER ?? ''
   return {
     ...env,
     ENSO_VERSION: versions.version.text,
     ENSO_EDITION: versions.version.text,
     ENSO_RELEASE_MODE: String(versions.releaseMode),
-    ENSO_LAUNCHER: launcher !== "" ? launcher : "native",
-  };
+    ENSO_LAUNCHER: launcher !== '' ? launcher : 'native',
+  }
 }
 
 /**
@@ -725,21 +747,18 @@ export function engineBuildEnv(
  * images link with MSVC, and `MsvcRuntime` copies the runtime DLLs from `VCToolsRedistDir`, which
  * only a Visual Studio developer environment sets.
  */
-export function msvcProblem(
-  platform: NodeJS.Platform,
-  env: NodeJS.ProcessEnv,
-): string | null {
-  if (platform !== "win32" || (env.VCToolsRedistDir ?? "") !== "") return null;
+export function msvcProblem(platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string | null {
+  if (platform !== 'win32' || (env.VCToolsRedistDir ?? '') !== '') return null
   return (
     'VCToolsRedistDir is not set. Run this from a Visual Studio "Developer PowerShell" or ' +
     '"x64 Native Tools Command Prompt" (or after vcvars64.bat): the engine bundle\'s native images ' +
-    "need the MSVC environment."
-  );
+    'need the MSVC environment.'
+  )
 }
 
 /** The GUI build: `build:gui` in a Vite mode (CI builds `production`). */
 export function guiBuildArgs(mode: string): string[] {
-  return ["run", "build:gui", `--mode=${mode}`];
+  return ['run', 'build:gui', `--mode=${mode}`]
 }
 
 /** The GUI build's environment: the version and commit it shows, as `ide-build` gives the IDE. */
@@ -752,7 +771,7 @@ export function guiBuildEnv(
     ...env,
     ENSO_IDE_VERSION: version,
     ENSO_IDE_COMMIT_HASH: commitHash,
-  };
+  }
 }
 ```
 
@@ -766,65 +785,62 @@ PASS, 5 tests.
 Create `tools/build-scripts/src/ide-build/packageIde.ts` (the body of today's
 `commands/ide-build.ts`, as functions):
 
+<!-- prettier-ignore -->
 ```ts
 /**
  * @file Packaging the IDE from `dist/gui` and `dist/backend` into `dist/ide`: the step that
  * `ide-build` (CI) and `ide-local` (a developer's whole build) share.
  */
-import path from "node:path";
-import { capture, REPO_ROOT, runInherited } from "../lib/repo.ts";
-import type { Version } from "../version/version.ts";
+import path from 'node:path'
+import { capture, REPO_ROOT, runInherited } from '../lib/repo.ts'
+import type { Version } from '../version/version.ts'
 import {
   ideBuildVariables,
   latestBundledEngine,
   packagingSteps,
   retryDelays,
   targetOs,
-} from "./ideBuild.ts";
+} from './ideBuild.ts'
 
 /** `dist/<name>` under the repository: the packaging's inputs (`gui`, `backend`) and output (`ide`). */
-export function distDir(name: "gui" | "backend" | "ide"): string {
-  return path.join(REPO_ROOT, "dist", name);
+export function distDir(name: 'gui' | 'backend' | 'ide'): string {
+  return path.join(REPO_ROOT, 'dist', name)
 }
 
 /** Blocks for `ms` milliseconds. */
 function sleep(ms: number): void {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 }
 
 /** `corepack pnpm install`, retried five times. */
 export function installWorkspace(): void {
-  const delays = retryDelays(5);
+  const delays = retryDelays(5)
   for (let attempt = 0; ; attempt++) {
-    const status = runInherited("corepack", ["pnpm", "install"]);
-    if (status === 0) return;
-    const delay = delays[attempt];
-    if (delay == null)
-      throw new Error(`\`corepack pnpm install\` failed (exit ${status}).`);
-    console.log(
-      `\`corepack pnpm install\` failed (exit ${status}); retrying in ${delay} ms.`,
-    );
-    sleep(delay);
+    const status = runInherited('corepack', ['pnpm', 'install'])
+    if (status === 0) return
+    const delay = delays[attempt]
+    if (delay == null) throw new Error(`\`corepack pnpm install\` failed (exit ${status}).`)
+    console.log(`\`corepack pnpm install\` failed (exit ${status}); retrying in ${delay} ms.`)
+    sleep(delay)
   }
 }
 
 /** `GITHUB_SHA` in CI, else `HEAD`. */
 export function commitHash(): string {
-  const fromCi = process.env.GITHUB_SHA ?? "";
-  if (fromCi !== "") return fromCi;
-  const head = capture("git", ["rev-parse", "--verify", "HEAD"]);
-  if (head.status !== 0)
-    throw new Error(`\`git rev-parse --verify HEAD\` failed: ${head.stderr}`);
-  return head.stdout.trim();
+  const fromCi = process.env.GITHUB_SHA ?? ''
+  if (fromCi !== '') return fromCi
+  const head = capture('git', ['rev-parse', '--verify', 'HEAD'])
+  if (head.status !== 0) throw new Error(`\`git rev-parse --verify HEAD\` failed: ${head.stderr}`)
+  return head.stdout.trim()
 }
 
 /** How {@link packageIde} runs. */
 export interface PackageOptions {
-  readonly version: Version;
+  readonly version: Version
   /** Sign the installer (release only). */
-  readonly sign: boolean;
+  readonly sign: boolean
   /** Run `corepack pnpm install` first; a caller that has just installed passes `false`. */
-  readonly install: boolean;
+  readonly install: boolean
 }
 
 /**
@@ -833,31 +849,29 @@ export interface PackageOptions {
  * fails, or when `dist/backend` holds no engine.
  */
 export function packageIde(options: PackageOptions): void {
-  const backendDir = distDir("backend");
+  const backendDir = distDir('backend')
   console.log(
     `Packaging IDE ${options.version.text} with engine ${latestBundledEngine(backendDir)}.`,
-  );
-  if (options.install) installWorkspace();
+  )
+  if (options.install) installWorkspace()
   const variables = ideBuildVariables(
     {
       version: options.version,
       commitHash: commitHash(),
       os: targetOs(process.platform),
       sign: options.sign,
-      guiDir: distDir("gui"),
-      ideDir: distDir("ide"),
+      guiDir: distDir('gui'),
+      ideDir: distDir('ide'),
       backendDir,
     },
     process.env,
-  );
+  )
   for (const step of packagingSteps(variables, process.env)) {
-    const status = runInherited("corepack", ["pnpm", ...step.args], {
+    const status = runInherited('corepack', ['pnpm', ...step.args], {
       env: step.env,
-    });
+    })
     if (status !== 0) {
-      throw new Error(
-        `\`corepack pnpm ${step.args.join(" ")}\` failed (exit ${status}).`,
-      );
+      throw new Error(`\`corepack pnpm ${step.args.join(' ')}\` failed (exit ${status}).`)
     }
   }
 }
@@ -865,6 +879,7 @@ export function packageIde(options: PackageOptions): void {
 
 Replace the whole of `tools/build-scripts/src/commands/ide-build.ts` with:
 
+<!-- prettier-ignore -->
 ```ts
 /**
  * @file `ide-build`: packages the IDE from `dist/gui` and `dist/backend` into `dist/ide`, as CI's
@@ -874,26 +889,24 @@ Replace the whole of `tools/build-scripts/src/commands/ide-build.ts` with:
  *
  *     corepack pnpm --filter build-scripts run ide-build
  */
-import { parseArgs } from "node:util";
-import { packageIde } from "../ide-build/packageIde.ts";
-import { commandArguments } from "../lib/repo.ts";
-import { repositoryVersions } from "../version/repository.ts";
+import { parseArgs } from 'node:util'
+import { packageIde } from '../ide-build/packageIde.ts'
+import { commandArguments } from '../lib/repo.ts'
+import { repositoryVersions } from '../version/repository.ts'
 
 try {
   const { values } = parseArgs({
     args: commandArguments(),
-    options: { sign: { type: "boolean", default: false } },
-  });
+    options: { sign: { type: 'boolean', default: false } },
+  })
   packageIde({
     version: repositoryVersions().version,
     sign: values.sign,
     install: true,
-  });
+  })
 } catch (error) {
-  console.error(
-    `Error: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exitCode = 1;
+  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+  process.exitCode = 1
 }
 ```
 
@@ -907,15 +920,16 @@ Change the import line `import { invocation } from './repo.ts'` to
 `import { invocation, runInherited } from './repo.ts'`, and insert before
 `/** Stops a process started by {@link spawnSbt} and everything it started. */`:
 
+<!-- prettier-ignore -->
 ```ts
 /**
  * Runs `sbt <command>` in the repository to completion, with this process's output, and returns
  * its exit status (-1 when sbt cannot start).
  */
 export function runSbt(command: string, env: NodeJS.ProcessEnv): number {
-  return runInherited("sbt", sbtArguments(command), {
+  return runInherited('sbt', sbtArguments(command), {
     env: { ...env, ...SBT_ENV },
-  });
+  })
 }
 ```
 
@@ -923,20 +937,21 @@ export function runSbt(command: string, env: NodeJS.ProcessEnv): number {
 
 `tools/build-scripts/src/commands/ide-local.ts`:
 
+<!-- prettier-ignore -->
 ```ts
 /**
  * @file `ide-local`: builds the IDE installer from this checkout, start to finish. It builds the
  * engine bundle with sbt (`buildEngineBundle`, `ENSO_LAUNCHER=native` unless set), copies it to
  * `dist/backend`, installs the workspace, builds the GUI into `dist/gui`, and packages both into
- * `dist/ide`, as `ide-build` does in CI. `dist/backend` and `dist/gui` are replaced, never reused.
- * On Windows, run it from a Visual Studio developer prompt (the native images need MSVC). Never run
- * in CI: it starts sbt, so the workflow policy would require `setup-jvm` before it.
+ * `dist/ide`, as `ide-build` does in CI. `dist/backend`, `dist/gui` and `dist/ide` are replaced,
+ * never reused. On Windows, run it from a Visual Studio developer prompt (the native images need
+ * MSVC). Never run in CI: it starts sbt, so the workflow policy would require `setup-jvm` first.
  *
  *     corepack pnpm --filter build-scripts run ide-local [--mode <vite mode>]
  */
-import { cpSync, existsSync, rmSync } from "node:fs";
-import path from "node:path";
-import { parseArgs } from "node:util";
+import { cpSync, existsSync, rmSync } from 'node:fs'
+import path from 'node:path'
+import { parseArgs } from 'node:util'
 import {
   ENGINE_BUNDLE_COMMAND,
   engineBuildEnv,
@@ -944,72 +959,49 @@ import {
   guiBuildArgs,
   guiBuildEnv,
   msvcProblem,
-} from "../ide-build/ideLocal.ts";
-import {
-  commitHash,
-  distDir,
-  installWorkspace,
-  packageIde,
-} from "../ide-build/packageIde.ts";
-import { commandArguments, REPO_ROOT, runInherited } from "../lib/repo.ts";
-import { runSbt } from "../lib/sbt.ts";
-import { repositoryVersions } from "../version/repository.ts";
+} from '../ide-build/ideLocal.ts'
+import { commitHash, distDir, installWorkspace, packageIde } from '../ide-build/packageIde.ts'
+import { commandArguments, REPO_ROOT, runInherited } from '../lib/repo.ts'
+import { runSbt } from '../lib/sbt.ts'
+import { repositoryVersions } from '../version/repository.ts'
 
 /** Replaces `target` with a copy of the directory `source`. */
 function replaceWithCopy(source: string, target: string): void {
-  rmSync(target, { recursive: true, force: true });
-  cpSync(source, target, { recursive: true, verbatimSymlinks: true });
+  rmSync(target, { recursive: true, force: true })
+  cpSync(source, target, { recursive: true, verbatimSymlinks: true })
 }
 
 try {
   const { values } = parseArgs({
     args: commandArguments(),
-    options: { mode: { type: "string", default: "production" } },
-  });
-  const problem = msvcProblem(process.platform, process.env);
-  if (problem != null) throw new Error(problem);
-  const versions = repositoryVersions();
-  const version = versions.version.text;
-  console.log(`Building IDE ${version} from this checkout.`);
+    options: { mode: { type: 'string', default: 'production' } },
+  })
+  const problem = msvcProblem(process.platform, process.env)
+  if (problem != null) throw new Error(problem)
+  const versions = repositoryVersions()
+  const version = versions.version.text
+  console.log(`Building IDE ${version} from this checkout.`)
 
-  const sbtStatus = runSbt(
-    ENGINE_BUNDLE_COMMAND,
-    engineBuildEnv(process.env, versions),
-  );
-  if (sbtStatus !== 0) throw new Error(`sbt failed (exit ${sbtStatus}).`);
-  const bundle = engineBundleDir(
-    REPO_ROOT,
-    version,
-    process.platform,
-    process.arch,
-  );
-  if (!existsSync(bundle))
-    throw new Error(`sbt left no engine bundle at ${bundle}.`);
-  replaceWithCopy(bundle, distDir("backend"));
+  const sbtStatus = runSbt(ENGINE_BUNDLE_COMMAND, engineBuildEnv(process.env, versions))
+  if (sbtStatus !== 0) throw new Error(`sbt failed (exit ${sbtStatus}).`)
+  const bundle = engineBundleDir(REPO_ROOT, version, process.platform, process.arch)
+  if (!existsSync(bundle)) throw new Error(`sbt left no engine bundle at ${bundle}.`)
+  replaceWithCopy(bundle, distDir('backend'))
 
-  installWorkspace();
-  const guiStatus = runInherited(
-    "corepack",
-    ["pnpm", ...guiBuildArgs(values.mode)],
-    {
-      env: guiBuildEnv(process.env, version, commitHash()),
-    },
-  );
-  if (guiStatus !== 0)
-    throw new Error(`The GUI build failed (exit ${guiStatus}).`);
-  rmSync(distDir("gui"), { recursive: true, force: true });
-  replaceWithCopy(
-    path.join(REPO_ROOT, "app", "gui", "dist"),
-    path.join(distDir("gui"), "assets"),
-  );
+  installWorkspace()
+  const guiStatus = runInherited('corepack', ['pnpm', ...guiBuildArgs(values.mode)], {
+    env: guiBuildEnv(process.env, version, commitHash()),
+  })
+  if (guiStatus !== 0) throw new Error(`The GUI build failed (exit ${guiStatus}).`)
+  rmSync(distDir('gui'), { recursive: true, force: true })
+  replaceWithCopy(path.join(REPO_ROOT, 'app', 'gui', 'dist'), path.join(distDir('gui'), 'assets'))
 
-  packageIde({ version: versions.version, sign: false, install: false });
-  console.log(`Done: the installer is in ${distDir("ide")}.`);
+  rmSync(distDir('ide'), { recursive: true, force: true })
+  packageIde({ version: versions.version, sign: false, install: false })
+  console.log(`Done: the installer is in ${distDir('ide')}.`)
 } catch (error) {
-  console.error(
-    `Error: ${error instanceof Error ? error.message : String(error)}`,
-  );
-  process.exitCode = 1;
+  console.error(`Error: ${error instanceof Error ? error.message : String(error)}`)
+  process.exitCode = 1
 }
 ```
 
@@ -1017,22 +1009,27 @@ In `tools/build-scripts/package.json`, after
 `"ide-build": "node src/commands/ide-build.ts",` add
 `"ide-local": "node src/commands/ide-local.ts",`.
 
-In `tools/build-scripts/CLAUDE.md`, after the `ide-build` bullet (which ends
-`copy \`built-distribution/engine-bundle-\*/enso\` to \`dist/backend\`
-first.`), replace that bullet's last sentence ("Locally: build the GUI into `dist/gui`, … first.") with "Locally, use `ide-local`."
-and add:
+In `tools/build-scripts/CLAUDE.md`, in the `ide-build` bullet, replace its last
+sentence (the one beginning "Locally: build the GUI into" and ending "to
+dist/backend first.") with "Locally, use `ide-local`.", and add after the
+bullet:
 
 ```markdown
 - `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
   `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
   Visual Studio developer prompt, which it checks), the bundle copied to
   `dist/backend`, `pnpm install`, `build:gui` into `dist/gui`, then
-  `ide-build`'s packaging into `dist/ide`. It replaces `dist/backend` and
-  `dist/gui` every time, so an installer never ships a stale engine. It starts
-  sbt, so it never runs in CI.
+  `ide-build`'s packaging into `dist/ide`. It replaces `dist/backend`,
+  `dist/gui` and `dist/ide` every time, so it never reuses an old engine bundle;
+  the engine itself builds incrementally (`sbt clean` first for a clean one). It
+  starts sbt, so it never runs in CI.
 ```
 
 - [ ] **Step 9: Check the package**
+
+The TypeScript blocks above are in the package's style (single quotes, no
+semicolons); paste them as they are. Step 9's `prettier --write` is the
+authority either way.
 
 ```bash
 cd /c/Repos/Enso/ide-bs-5a
@@ -1091,6 +1088,7 @@ In `tools/build-scripts/src/stdlib-test/run.test.ts`, change the test name
 
 In `run.ts`, replace
 
+<!-- prettier-ignore -->
 ```ts
       'Enso Cloud test credentials are set, but signing in to the cloud has not moved off `./run` ' +
         'yet (Phase 4): use `./run backend test` for the cloud suites.',
@@ -1098,6 +1096,7 @@ In `run.ts`, replace
 
 with
 
+<!-- prettier-ignore -->
 ```ts
       'Enso Cloud test credentials are set, but stdlib-test cannot sign in to Enso Cloud: unset ' +
         `${CLOUD_VARIABLES.join(', ')} to run the cloud suites without the real cloud.`,
@@ -1145,9 +1144,8 @@ and add `tools/build-scripts/**` on the line after `build_tools/**` in `files:`.
 `tools/build-performance/bench-build.sh` drives
 `./run.sh wasm build --wasm-profile`, a script and a command that no longer
 exist. Delete the directory (`git rm -r tools/build-performance`) and, in
-`tools/CLAUDE.md`, delete the bullet `- \`build-performance/\` — Benchmark
-script (\`bench-build.sh\`) for measuring SBT build performance.` In the same
-file replace
+`tools/CLAUDE.md`, delete the bullet whose first words are "`build-performance/`
+— Benchmark script". In the same file replace
 
 ```markdown
 - `build-scripts/` — TypeScript package with the build logic that leaves `./run`
@@ -1215,10 +1213,12 @@ Four edits.
    `./run ide build` builds the IDE." with "sbt and `corepack pnpm install` run
    `cargo` themselves; you rarely need to."
 
-3. Add a section before "#### Running IDE" (inside "Hacking on Enso"):
+3. Add an h3 section immediately before "### Running Enso from CLI" (after "###
+   Building Enso Engine" and its h4 subsections; not before "#### Running IDE",
+   which sits under "### Testing Enso Libraries"):
 
    ````markdown
-   #### Building the IDE
+   ### Building the IDE
 
    With the tools above installed, one command builds an installer from your
    checkout:
@@ -1256,7 +1256,8 @@ Four edits.
    | The version a build gets                               | `corepack pnpm --silent --filter build-scripts run version`    |
    ````
 
-4. In "Native Image", nothing changes in 5a (5c rewrites the `ensoup` bullet).
+4. In "System Requirements", the `ensoup` Native Image bullet
+   (`CONTRIBUTING.md:191`) is left for 5c, which rewrites it.
 
 - [ ] **Step 6: The other documents**
 
@@ -1348,8 +1349,10 @@ git grep -nE "$P" -- docs/CONTRIBUTING.md docs/distribution test .claude app/ele
 ```
 
 Expected: only `tools/build-scripts/src/stdlib-test/run.ts`' two comment lines
-(3 and 28, which Task 8 rewrites). `node tools/ci/check-workflows.mjs` →
-`Workflow policy: OK`; actionlint from WSL clean.
+(3 and 28, which Task 9 rewrites) and `tools/CLAUDE.md:22` ("belongs in
+`build_tools/`", which Task 4 Step 8 rewrites when the directory goes).
+`node tools/ci/check-workflows.mjs` → `Workflow policy: OK`; actionlint from WSL
+clean.
 
 - [ ] **Step 8: Commit**
 
@@ -1373,9 +1376,14 @@ git push -u origin build/phase5-replacements
 ```
 
 Write `$SCRATCH/pr-5a.md`: what `ide-local` does and why it always replaces
-`dist/backend` (the stale-engine trap); D1–D4 with their reasons; that 5b
-deletes `build_tools/` and `run*` next; "Part of #289's Phase 5."; the
-attribution lines. Then:
+`dist/backend` (the stale-engine trap); D1–D4 with their reasons; for D2, that
+`extra-nightly-tests.yml` still passes the five `ENSO_CLOUD_*` values to
+`stdlib-test` and keeps them on purpose: the fork defines none of them (so the
+cloud suite runs without the real cloud, as now), and if someone defines all
+five the suite fails at once with D2's message, as it already did with the old
+one (Phase 4's Ticket 3 decides the suite's future); that 5b deletes
+`build_tools/` and `run*` next; "Part of #289's Phase 5."; the attribution
+lines. Then:
 
 ```bash
 gh pr create --base develop --head build/phase5-replacements --label "CI: No changelog needed" \
@@ -1390,21 +1398,23 @@ Expected checks: Build Scripts, Workflow Lint, Changelog (label), ✨ Engine
 
 - [ ] **Step 2: Build an installer on Windows with `ide-local`** (meanwhile)
 
-From a Visual Studio Developer PowerShell (VS 18 Professional; `vcvars64.bat` is
-at
-`C:\Program Files\Microsoft Visual Studio\18\Professional\VC\Auxiliary\Build\vcvars64.bat`):
+The agent's shell is not a developer prompt: enter the MSVC environment through
+`cmd` and `vcvars64.bat` (VS 18 Professional), and check that the Node on that
+`PATH` is still the repository's (the user's notes record an nvm-windows
+`run.cmd` trap and a stale MSVC `PATH` entry).
 
-```powershell
-cd C:\Repos\Enso\ide-bs-5a
+```bash
+cd /c/Repos/Enso/ide-bs-5a
 git submodule update --init --recursive
 corepack pnpm install --frozen-lockfile
-corepack pnpm --filter build-scripts run ide-local *> $env:TEMP\ide-local-win.log
+corepack pnpm --filter build-scripts run ide-local; echo "exit=$?"   # the guard
+cmd //c '"C:\Program Files\Microsoft Visual Studio\18\Professional\VC\Auxiliary\Build\vcvars64.bat" >nul && node --version && corepack pnpm --version && where cl'
+cmd //c '"C:\Program Files\Microsoft Visual Studio\18\Professional\VC\Auxiliary\Build\vcvars64.bat" >nul && corepack pnpm --filter build-scripts run ide-local > %TEMP%\ide-local-win.log 2>&1'
 ```
 
-Run it with `run_in_background` (about an hour). First check the guard: in a
-plain PowerShell (no developer environment)
-`corepack pnpm --filter build-scripts run ide-local` must stop at once with
-`Error: VCToolsRedistDir is not set.` and exit 1.
+Expected: the bare run stops at once with `Error: VCToolsRedistDir is not set.`
+and `exit=1`; the second command prints `v24.21.0`, the pinned pnpm and a
+`cl.exe` path; the third runs for about an hour (`run_in_background`).
 
 Expected: `Done: the installer is in C:\Repos\Enso\ide-bs-5a\dist\ide.`;
 `dist\ide\enso-win-x64-<version>.exe` and its `.sha256` exist; the engine in
@@ -1444,8 +1454,8 @@ If a check fails, apply "When a check fails".
   `.gitattributes:4-5`, `.gitignore:26`, `.prettierignore:6-7`,
   `.vscode/launch.json:37-42`
 - Modify: `.github/workflows/engine-changed-files.yml:31,54`,
-  `ide-changed-files.yml`, `wasm-changed-files.yml:33`,
-  `gui-changed-files.yml:38-51`
+  `ide-changed-files.yml`, `wasm-changed-files.yml:33`, `gui-changed-files.yml`
+  (both `files:` lists)
 - Modify: `CLAUDE.md`, `.github/CLAUDE.md`, `lib/rust/CLAUDE.md:3-6`,
   `lib/rust/macro-utils/CLAUDE.md:3-6`, `tools/CLAUDE.md:22`,
   `app/gui/src/project-view/assets/CLAUDE.md:22-23`,
@@ -1473,7 +1483,9 @@ grep -c '^\[\[package\]\]' Cargo.lock
 ```
 
 Expected: 506 packages. `pre-deletion-commit.txt` holds the develop commit 5b
-starts from: the last one with `build_tools/` (Task 8 names it).
+starts from: the last one with `build_tools/`. It goes into 5b's PR body (Task 5
+Step 4); Task 9 derives it again from 5b's merge commit, so it does not depend
+on this scratch file surviving.
 
 - [ ] **Step 2: Delete the files**
 
@@ -1590,14 +1602,28 @@ Check: `node --test tools/ci/toolchain-pins.test.mjs` passes, and in
   (`tools/build-scripts`), the toolchains, the dependency manifests and the
   workflows."
 - `wasm-changed-files.yml`: delete `build_tools/**`.
-- `gui-changed-files.yml`: in `files:` add, after `lib/rust/**`:
+- `gui-changed-files.yml` has two lists, kept in sync: the `files:` of step
+  `gui-changed-files` (output `any_changed`, which the GUI checks read) and the
+  `files:` of step `gui-changed-files-excluding-tests` (output
+  `any_changed_excluding_tests`, which `ide-pull-request.yml` reads to decide
+  packaging). In **both**, add these four lines after `lib/rust/**`, one glob
+  per line, at the list's indentation:
 
+  <!-- prettier-ignore -->
   ```yaml
-  .cargo/** Cargo.lock Cargo.toml rust-toolchain.toml
+              .cargo/**
+              Cargo.lock
+              Cargo.toml
+              rust-toolchain.toml
   ```
 
-  and, above `jobs:`, extend the comment block with one line: "# The Rust files
-  are here because the GUI build compiles the WASM parser through cargo."
+  Above `jobs:`, extend the comment block with one line: "# The Rust files are
+  here because the GUI build compiles the WASM parser through cargo." Check both
+  lists with
+  `node --input-type=module -e "$(cat "$SCRATCH/p5/yaml-same.mjs")" origin/develop --expect .github/workflows/gui-changed-files.yml:jobs.gui-changed-files.steps.1.with.files --expect .github/workflows/gui-changed-files.yml:jobs.gui-changed-files.steps.2.with.files .github/workflows/gui-changed-files.yml`
+  (two expected differences, nothing else), and
+  `grep -c '^            Cargo.lock$' .github/workflows/gui-changed-files.yml`
+  prints `2`.
 
 Check: `node tools/ci/check-workflows.mjs` → OK; actionlint clean (WSL).
 
@@ -1740,7 +1766,7 @@ git grep -lE "$P" -- . ':!docs/superpowers' | wc -l
 
 Expected: the first command (every hit that is not a comment line) prints
 nothing: no configuration, script or document still names the deleted files. The
-second counts the files Task 8 still has (about 50: comments, plus
+second counts the files Tasks 8–10 still have (about 50: comments, plus
 `CHANGELOG.md` and the allowlist of Decision 7).
 
 - [ ] **Step 3: Policy and actionlint**
@@ -1758,7 +1784,10 @@ git push -u origin build/phase5-delete
 Write `$SCRATCH/pr-5b.md`: the deleted paths; the workspace before and after (17
 → 15 members, 506 → 141 locked packages, 46 → 11 workspace pins, none moved —
 Step 4 of Task 4's comparison); D5; Decisions 3, 4, 8 and 11 in one line each;
-the Rust results of Step 1; "Part of #289's Phase 5."; the attribution lines.
+the Rust results of Step 1; a line "Pre-deletion commit: <hash>" with the hash
+from `$SCRATCH/p5/pre-deletion-commit.txt` (the last develop commit with
+`build_tools/`, which 5d's pointer names); "Part of #289's Phase 5."; the
+attribution lines.
 
 ```bash
 gh pr create --base develop --head build/phase5-delete --label "CI: No changelog needed" \
@@ -1802,7 +1831,11 @@ release, built on the Mac when it is online, is the first Mac build after it).
   (`distribution/launcher/THIRD-PARTY`),
   `tools/native-image-config-cleanup/index.js:7`,
   `.github/workflows/engine-checks-platform.yml:255`,
-  `project/NativeImage.scala:574` (a comment)
+  `project/NativeImage.scala:574` (a comment), `project/Dependencies.scala`
+  (Note [Engine And Launcher Version]),
+  `engine/language-server/src/test/scala/org/enso/languageserver/websocket/json/BaseServerTest.scala:417`
+  (a comment), `tools/legal-review/CLAUDE.md`,
+  `lib/scala/logging-service/CLAUDE.md`
 - Modify (docs): `docs/distribution/README.md`, `distribution.md`, `bundles.md`,
   `release-policy.md`, `licenses.md`, `docs/getting-enso.md`,
   `docs/infrastructure/README.md`, `native-image.md`, `logging.md`,
@@ -1842,7 +1875,7 @@ L=$(cat "$SCRATCH/p5/launcher-pattern.txt")
 git grep -lE "$L" -- . ':!engine/launcher' ':!docs/superpowers' > "$SCRATCH/p5/launcher-before.txt"; wc -l < "$SCRATCH/p5/launcher-before.txt"
 ```
 
-Expected: about 31 files (Task 0's count less `build_tools`' two).
+Expected: about 32 files (Task 0's count; it already left `build_tools` out).
 
 - [ ] **Step 2: Delete the launcher's files**
 
@@ -1893,11 +1926,12 @@ git rm -rq $R/runner $R/cli/Arguments.scala $R/releases/engine/EngineRepository.
      )
    ```
 
-5. Delete the whole `lazy val launcher = project` definition, from that line
-   through `  .dependsOn(\`version-output\`)`just before`lazy val
-   \`distribution-manager\` =
-   project`(≈90 lines: the native image`ensoup`, the `Test / test`and`Test /
-   testOnly`overrides that depend on`buildNativeImage`and`LauncherShimsForTest.prepare()`).
+5. Delete the whole `lazy val launcher = project` definition: from that line
+   down to and including its last line (the `.dependsOn` on `version-output`),
+   which sits just before the definition of the `distribution-manager` project.
+   That is about 90 lines: the native image `ensoup`, and the `Test / test` and
+   `Test / testOnly` overrides that depend on `buildNativeImage` and
+   `LauncherShimsForTest.prepare()`.
 6. Delete
    `lazy val launcherDistributionRoot = settingKey[File]("Root of built launcher distribution")`
    and its setting
@@ -2024,6 +2058,17 @@ distribution or its upgrade:
 - `lib/rust/CLAUDE.md`: delete the `launcher-shims/` bullet.
 - `distribution/CLAUDE.md`: delete the `launcher/` and `launcher-manifest.yaml`
   bullets.
+- `tools/legal-review/CLAUDE.md:4`: drop the `launcher` review directory from
+  its list.
+- `lib/scala/logging-service/CLAUDE.md:4`: drop the launcher from the users of
+  `LoggingSetupHelper` (read the line; keep the runner and the language server).
+- `project/Dependencies.scala`, Note [Engine And Launcher Version]: rename it
+  Note [Engine Version] (the citation at `val ensoVersion` too) and drop the
+  sentences about the launcher sharing the engine's version; a comment-only
+  change.
+- `engine/language-server/src/test/scala/org/enso/languageserver/websocket/json/BaseServerTest.scala:417`:
+  the comment that mentions the launcher; reword it for what the test does
+  (comment only).
 
 Run Prettier on every Markdown file touched.
 
@@ -2034,7 +2079,9 @@ L=$(cat "$SCRATCH/p5/launcher-pattern.txt")
 git grep -nE "$L" -- . ':!docs/superpowers' ':!CHANGELOG.md' ':!app/gui/integration-test/mock/data/latestGithubReleases.json'
 ```
 
-Expected: nothing.
+Expected: exactly one line,
+`lib/scala/distribution-manager/src/main/scala/org/enso/distribution/DistributionManager.scala:411:      OS.executableName("ensoup")`
+(the portable-mode detection that stays, Decision 7: **do not touch it**).
 
 - [ ] **Step 8: Commit**
 
@@ -2090,7 +2137,12 @@ git push -u origin build/phase5-launcher
 Write `$SCRATCH/pr-5c.md`: what was removed (Task 6's Files) and what stays and
 why (Task 6's "What stays"); D6, D7; Decision 9; the local results of Steps 1–3;
 that it **merges only after the user's engine nightly from this branch**; Ticket
-4; "Part of #289's Phase 5."; the attribution lines.
+4; what it does not verify (root CLAUDE.md: "say which of these a change did not
+verify"): `bloopInstall` (the BSP configuration for Metals and IntelliJ), the
+shape of the `gatherLicenses` report (only `verifyLicensePackages` ran), and the
+engine runner's native image without the `runner` and `cli` packages, which only
+CI's IDE packaging (`buildEngineBundle` with `ENSO_LAUNCHER=native`) builds;
+"Part of #289's Phase 5."; the attribution lines.
 
 ```bash
 gh pr create --base develop --head build/phase5-launcher --label "CI: No changelog needed" \
@@ -2144,27 +2196,44 @@ not need it); `sbt test` locally (CI only).
 
 ---
 
-### Task 8: The history notes (PR 5d)
+### Task 8: The history notes in `.github` (PR 5d, part 1)
 
-**Files:** comments only, in the files the sweep pattern finds (about 50):
-`.github/CLAUDE.md`, `.github/actions/setup-jvm/action.yml`,
-`.github/actions/setup-msvc/action.yml`,
-`.github/workflows/{build-scripts, changelog, engine-benchmark, engine-checks-nightly, engine-checks-platform, extra-nightly-tests, ide-packaging, macos-checks, macos-pull-request, release}.yml`,
-`app/electron-client/buildInfo.ts`,
-`app/electron-client/electron-builder-config.ts`, `build.sbt`,
-`lib/scala/runtime-version-manager/…/releases/testing/TestArchivePackager.scala`,
-`project/{EngineBundle, EngineDistributionChecks, EnsoSyntaxCheck, MsvcRuntime}.scala`,
-`tools/ci/{check-workflows.mjs, check-workflows.test.mjs, toolchain-pins.mjs}`,
-`tools/build-scripts/{CLAUDE.md, package.json}` and `tools/build-scripts/src/**`
-(24 files). Plus four test names, two sbt task descriptions and the package
-description listed in Step 4.
+**Files:** comments, plus four YAML values that hold history text:
+
+- `.github/CLAUDE.md`
+- `.github/actions/setup-jvm/action.yml` (its `description:`, line 5, and
+  `inputs.edition.description`, line 19, are YAML values)
+- `.github/actions/setup-msvc/action.yml` (its `description:`, lines 2–6, is a
+  YAML value)
+- `.github/workflows/{build-scripts, changelog, engine-benchmark, engine-checks-nightly, engine-checks-platform, extra-nightly-tests, ide-packaging, macos-checks, macos-pull-request, release}.yml`
+  (`engine-checks-platform.yml:278`, `# ./run reset the JUnit directory…`, is a
+  shell comment inside the `run:` script of step 9 of `jvm-tests`, "Generate the
+  parser's Java sources", so it is part of a YAML value too)
 
 **Interfaces:**
 
-- Consumes: 5c merged; `$SCRATCH/p5/pre-deletion-commit.txt` (Task 4 Step 1).
+- Consumes: 5c merged.
 - Produces: the Note names `[The Engine Bundle]`,
   `[The Engine Distribution Build]`, `[The JVM Test Steps]`,
-  `[Where The Release Logic Lives]`, `[The Standard Library Suites]`.
+  `[Where The Release Logic Lives]`, `[The Standard Library Suites]`, used by
+  Tasks 9 and 10 wherever a Note is cited.
+
+**The rules** (Ruling R1; the same for Tasks 8–10). The sweep is mechanical: it
+removes dangling references, it does not restructure.
+
+1. **`./run` becomes "the retired build CLI"** in place: "as `./run` did" → "as
+   the retired build CLI did"; "`./run`'s …" → "the retired build CLI's …";
+   "`./run backend test <suite>`" → "the retired build CLI's
+   `backend test <suite>`". Keep the sentence, its facts and its reason.
+2. **Paths into `build_tools/` lose the path**:
+   "`build_tools/build/src/release.rs` (`draft_a_new_release`)" → "the retired
+   build CLI's `release.rs` (`draft_a_new_release`)". Function names stay; they
+   are searchable at the pointer commit (Task 9 Step 2).
+3. **Note bullet lists keep their facts and their shape**: "What `./run` did for
+   each job, and where it went:" → "What the retired build CLI did for each job,
+   and where it went:". Do not rewrite them into another form.
+4. **Re-wrap only the paragraph you touched**, to the file's width (100 columns
+   here), in its comment style.
 
 - [ ] **Step 1: Create the branch and list the work**
 
@@ -2177,10 +2246,10 @@ git grep -cE "$P" -- . ':!docs/superpowers' ':!CHANGELOG.md' ':!docs/libraries/s
 git grep -n 'Without ./run]' -- . ':!docs/superpowers'
 ```
 
-Expected: the files listed above with their counts (on 2026-10-24's tree:
-`engine-checks-platform.yml` 26, `.github/CLAUDE.md` about 3 after 5b,
-`tools/build-scripts/CLAUDE.md` 10, …); a file not on the list is a reference
-5a–5c missed: fix it here, whatever it is.
+Expected: about 50 files, all in Tasks 8–10's file lists (on 2026-10-24's tree
+`engine-checks-platform.yml` had 26 hits, `tools/build-scripts/CLAUDE.md` 10). A
+file on no list is a reference 5a–5c missed: add it to the task whose directory
+it is in.
 
 - [ ] **Step 2: Rename the Notes**
 
@@ -2195,31 +2264,89 @@ prints one line, `release.yml:73` (a citation broken over two lines: "(Note
 [Engine" / "Bundle Without ./run] there)"). Fix it by hand to "(Note [The Engine
 Bundle] there)" and re-wrap the comment to 100 columns.
 
-- [ ] **Step 3: Rewrite the history comments**
+- [ ] **Step 3: Rewrite the `.github` hits**
 
-The rules, for every remaining hit:
+Apply the rules to every hit in `.github` (`git grep -nE "$P" -- .github`),
+including the three `description:` texts and the `run:` script's comment (rule
+1: "# The retired build CLI reset the JUnit directory before the tests; stale
+reports would be published.").
 
-1. **The comment describes what the code does, in the present tense.** Drop "as
-   `./run` did", "what `./run` ran", "`./run`'s …" where the sentence stands
-   without it: "`corepack pnpm install`, retried five times, as `./run` retried
-   it." → "`corepack pnpm install`, retried five times."
-2. **Where the old behaviour is the reason** (a parity choice someone might
-   otherwise "fix"), say "the retired build CLI" and keep the reason:
-   "`postgres:18` (`./run` took `latest`, 18.6 when this moved)" →
-   "`postgres:18` (the retired build CLI took `latest`, 18.6 when this moved)".
-3. **No paths into `build_tools/`.** "a port of
-   `build_tools/build/src/release.rs` (`draft_a_new_release`, …)" → "a port of
-   the retired build CLI's `release.rs` (`draft_a_new_release`, …)". Function
-   names may stay; they are searchable in the old commit.
-4. **Comments that existed only to compare with `./run`** (the "Note [… Without
-   ./run]" bullet lists of what moved where, `release.yml`'s "What `./run` did
-   for each job, and where it went:") become lists of what each job does: keep
-   the facts, drop the "moved from" framing.
-5. Line length and comment style stay as the file has them (100 columns in YAML,
-   TypeScript and Scala here); re-wrap only the paragraph you touch.
+- [ ] **Step 4: Check that only comments and the four values changed**
 
-Work file by file, in `sweep-before.txt` order. For the `tools/build-scripts`
-package, also replace `tools/build-scripts/CLAUDE.md`'s first paragraph with:
+```bash
+base=$(git merge-base HEAD origin/develop)
+node --input-type=module -e "$(cat "$SCRATCH/p5/yaml-same.mjs")" "$base" \
+  --expect .github/actions/setup-jvm/action.yml:description \
+  --expect .github/actions/setup-jvm/action.yml:inputs.edition.description \
+  --expect .github/actions/setup-msvc/action.yml:description \
+  --expect .github/workflows/engine-checks-platform.yml:jobs.jvm-tests.steps.9.run \
+  $(git diff --name-only "$base" -- '.github/*.yml' '.github/*.yaml')
+git diff "$base" -- .github/workflows/engine-checks-platform.yml | grep -A2 -B2 'JUnit directory'
+git grep -nE "$P" -- .github
+```
+
+Expected: `4 values differ, 0 problems` (no `UNEXPECTED`, no `MISSING`); the
+`run:` diff is the one comment line; the last grep prints nothing. Then
+`node tools/ci/check-workflows.mjs` (`Workflow policy: OK`), actionlint (WSL),
+`corepack pnpm exec prettier --check .github`.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add .github
+git commit -m "Sweep, part 1: the .github comments no longer describe ./run" \
+  -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DeWeRfNarvWR4LBYCUZHYx"
+```
+
+---
+
+### Task 9: The history notes in `tools/` (PR 5d, part 2)
+
+**Files:** `tools/build-scripts/CLAUDE.md`, `tools/build-scripts/package.json`
+(the description), `tools/build-scripts/src/**` (24 files), and
+`tools/ci/{check-workflows.mjs, check-workflows.test.mjs, toolchain-pins.mjs}`.
+
+**Interfaces:**
+
+- Consumes: Task 8's Note names; 5b's PR (its merge commit's parent is the
+  pointer commit).
+- Produces: the pointer commit in `tools/build-scripts/CLAUDE.md`, which Task 10
+  relies on.
+
+- [ ] **Step 1: The non-comment strings in `tools/`**
+
+These, and only these, change code text:
+
+| File                                                           | Old                                                                                                  | New                                                                                                |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `tools/build-scripts/src/stdlib-api-check/apiCheck.test.ts:34` | `test("the failure message is ./run's", () => {`                                                     | `test('the failure message names the library and the diff', () => {`                               |
+| `tools/build-scripts/src/ide-build/ideBuild.test.ts:57`        | `test("the children's variables, as ./run set them for a PR build", () => {`                         | `test("the children's variables for a PR build", () => {`                                          |
+| `tools/build-scripts/src/stdlib-test/suites.test.ts:44`        | `describe('selection, as ./run selected', () => {`                                                   | `describe('selection', () => {`                                                                    |
+| `tools/ci/check-workflows.test.mjs:536`                        | `"./run backend sbt '--' verifyLicensePackages",`                                                    | `"some-tool sbt '--' verifyLicensePackages",`                                                      |
+| `tools/ci/check-workflows.test.mjs:543`                        | `'time ./run backend get',`                                                                          | `'time some-tool get',`                                                                            |
+| `tools/build-scripts/package.json:5`                           | `"description": "The build logic that leaves ./run: version, toolchain-check and the CI commands.",` | `"description": "The build logic: version, toolchain-check, the IDE builds and the CI commands.",` |
+
+Then run the three test files (`corepack pnpm exec vitest run <file>` in
+`tools/build-scripts`) and `node --test tools/ci/check-workflows.test.mjs`.
+
+- [ ] **Step 2: The pointer commit**
+
+The commit before 5b's deletion is the parent of 5b's squash merge; derive it
+from GitHub, not from a scratch file (it is also in 5b's PR body):
+
+```bash
+merge=$(gh pr list --state merged --head build/phase5-delete --json mergeCommit --jq '.[0].mergeCommit.oid')
+PRE=$(git rev-parse "$merge^")
+git cat-file -e "$PRE:build_tools/CLAUDE.md" && echo "pointer commit $PRE has build_tools"
+git cat-file -e "$merge:build_tools/CLAUDE.md" 2>/dev/null || echo "and its child does not"
+```
+
+Expected: both lines print. Check that `$PRE` equals the "Pre-deletion commit"
+in 5b's PR body.
+
+Replace `tools/build-scripts/CLAUDE.md`'s first paragraph with the following,
+`<PRE>` being the full hash:
 
 ```markdown
 # tools/build-scripts
@@ -2232,56 +2359,110 @@ that Node runs as it is (type stripping): each command is
 
 Several commands and sbt tasks reproduce what the retired Rust build CLI did,
 quirks included; their comments say so where it matters. That CLI's sources are
-in Git at `<pre-deletion commit>`:
-`git ls-tree -r --name-only <pre-deletion commit> | grep '\.rs$'` lists them,
-and `git show <pre-deletion commit>:<path>` prints one.
+in Git at `<PRE>`: `git ls-tree -r --name-only <PRE> | grep '\.rs$'` lists them,
+and `git show <PRE>:<path>` prints one.
 ```
 
-with `<pre-deletion commit>` replaced by the full hash in
-`$SCRATCH/p5/pre-deletion-commit.txt`; and change its "Port, do not improve"
-convention to "**Keep the behaviour CI relies on.** A command that reproduces
-the retired build CLI keeps its quirks unless a PR names the difference."
+and change its "Port, do not improve" convention to "**Keep the behaviour CI
+relies on.** A command that reproduces the retired build CLI keeps its quirks
+unless a PR names the difference."
 
-- [ ] **Step 4: The non-comment strings**
+- [ ] **Step 3: Rewrite the `tools/` comments**
 
-These are the only lines that are not comments, and the only ones
-`comment-only.py` may pass by name:
+Apply Task 8's rules to every hit under `tools/` (`git grep -nE "$P" -- tools`).
 
-| File                                                           | Old                                                                                                  | New                                                                                                |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `tools/build-scripts/src/stdlib-api-check/apiCheck.test.ts:34` | `test("the failure message is ./run's", () => {`                                                     | `test('the failure message names the library and the diff', () => {`                               |
-| `tools/build-scripts/src/ide-build/ideBuild.test.ts:57`        | `test("the children's variables, as ./run set them for a PR build", () => {`                         | `test("the children's variables for a PR build", () => {`                                          |
-| `tools/build-scripts/src/stdlib-test/suites.test.ts:44`        | `describe('selection, as ./run selected', () => {`                                                   | `describe('selection', () => {`                                                                    |
-| `tools/ci/check-workflows.test.mjs:536`                        | `"./run backend sbt '--' verifyLicensePackages",`                                                    | `"some-tool sbt '--' verifyLicensePackages",`                                                      |
-| `tools/ci/check-workflows.test.mjs:543`                        | `'time ./run backend get',`                                                                          | `'time some-tool get',`                                                                            |
-| `build.sbt:281` (`buildEngineBundle`'s description)            | `… engine-bundle-<version>-<os>-<arch>/enso, as \`./run backend get\` did. " +`                      | `… engine-bundle-<version>-<os>-<arch>/enso. " +`                                                  |
-| `build.sbt:6620` (`checkEnsoSyntax`'s description)             | `"\`./run libraries check-syntax\`; see project/EnsoSyntaxCheck.scala."`                             | `"the Enso syntax check; see project/EnsoSyntaxCheck.scala."`                                      |
-| `tools/build-scripts/package.json:5`                           | `"description": "The build logic that leaves ./run: version, toolchain-check and the CI commands.",` | `"description": "The build logic: version, toolchain-check, the IDE builds and the CI commands.",` |
-
-Read each line before editing: the `build.sbt` line numbers move after 5c, and
-the sentence around the old text must still read correctly. Run the three test
-files and `node --test tools/ci/check-workflows.test.mjs` after the edits.
-
-- [ ] **Step 5: Prove that only comments changed**
+- [ ] **Step 4: Check that only comments and the six strings changed**
 
 ```bash
 base=$(git merge-base HEAD origin/develop)
 py -3 "$SCRATCH/p5/comment-only.py" "$base" \
-  "the failure message names the library" "the children's variables for a PR build" \
-  "describe('selection'" "some-tool sbt" "time some-tool get" \
-  "engine-bundle-<version>-<os>-<arch>/enso. " "the Enso syntax check; see project"
-node --input-type=module -e "$(cat "$SCRATCH/p5/yaml-same.mjs")" "$base" $(git diff --name-only "$base" -- '*.yml' '*.yaml')
-git diff --stat "$base" -- '*.json'
+  --allow "the failure message is ./run's" --allow "the failure message names the library and the diff" \
+  --allow "the children's variables, as ./run set them" --allow "the children's variables for a PR build" \
+  --allow "describe('selection, as ./run selected'" --allow "describe('selection', () => {" \
+  --allow "./run backend sbt '--' verifyLicensePackages" --allow "some-tool sbt '--' verifyLicensePackages" \
+  --allow "time ./run backend get" --allow "time some-tool get" \
+  -- tools
+git diff "$base" -- '*.json' | grep '^[-+] '
+git grep -nE "$P" -- tools
 ```
 
-Expected: `0 changed code lines are not comments.`;
-`… files compared, 0 differ.`; the JSON diff is
-`tools/build-scripts/package.json` only, one line. Then the package checks
-(`typecheck`, `lint`, `test:unit`: 184 passed), the policy
-(`Workflow policy: OK`; 98 tests) on both hosts, actionlint (WSL), and Prettier
-`--check` on `.github`, `tools/build-scripts` and the Markdown.
+Expected: `0 changed code lines are not comments.`; the JSON diff is the
+`package.json` description, one line each way; the last grep prints nothing.
+Then in `tools/build-scripts`: `typecheck`, `lint`, `test:unit` (184 passed);
+`node tools/ci/check-workflows.mjs` and `node --test tools/ci/*.test.mjs` (98)
+on both hosts; `corepack pnpm exec prettier --check tools/build-scripts`.
 
-- [ ] **Step 6: The final greps**
+- [ ] **Step 5: Commit**
+
+```bash
+git add tools
+git commit -m "Sweep, part 2: the build scripts and the policy no longer describe ./run" \
+  -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DeWeRfNarvWR4LBYCUZHYx"
+```
+
+---
+
+### Task 10: The rest, and the final greps (PR 5d, part 3)
+
+**Files:** `build.sbt`,
+`project/{EngineBundle, EngineDistributionChecks, EnsoSyntaxCheck, MsvcRuntime, Dependencies}.scala`,
+`lib/scala/runtime-version-manager/…/releases/testing/TestArchivePackager.scala`,
+`app/electron-client/buildInfo.ts`,
+`app/electron-client/electron-builder-config.ts`, and whatever Task 8 Step 1
+listed that is in none of Tasks 8–10's directories.
+
+**Interfaces:**
+
+- Consumes: Task 8's Note names; Task 9's pointer commit.
+- Produces: the programme's final greps.
+
+- [ ] **Step 1: The two sbt task descriptions**
+
+| File                                            | Old                                                                             | New                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `build.sbt` (`buildEngineBundle`'s description) | ``… engine-bundle-<version>-<os>-<arch>/enso, as `./run backend get` did. " +`` | `… engine-bundle-<version>-<os>-<arch>/enso. " +`             |
+| `build.sbt` (`checkEnsoSyntax`'s description)   | ``"`./run libraries check-syntax`; see project/EnsoSyntaxCheck.scala."``        | `"the Enso syntax check; see project/EnsoSyntaxCheck.scala."` |
+
+Find them with the command below (the line numbers moved in 5c), and read the
+sentence around each so that it still reads correctly.
+
+```bash
+git grep -nF -e 'as `./run backend get` did' -e '`./run libraries check-syntax`' build.sbt
+```
+
+- [ ] **Step 2: Comments the pattern cannot see, and the rest**
+
+Apply Task 8's rules to every remaining hit
+(`git grep -nE "$P" -- . ':!docs/superpowers' ':!CHANGELOG.md' ':!docs/libraries/sharing.md'`),
+and also to two mentions the pattern misses:
+
+- `app/electron-client/electron-builder-config.ts:365`: "electron-builder never
+  uploads: the build CLI does" → "electron-builder never uploads:
+  `tools/build-scripts`' `release upload-ide` does".
+- `project/Dependencies.scala:62-63`: "used by the Rust build script via regex
+  matching" → name the readers that remain: "read by
+  `tools/ci/toolchain-pins.mjs` (the workflow policy's pin check) and by
+  developers' WSL toolchain scripts, by regex matching" (read the comment first;
+  keep its warning about the format).
+
+- [ ] **Step 3: Check that only comments and the two descriptions changed**
+
+```bash
+base=$(git merge-base HEAD origin/develop)
+py -3 "$SCRATCH/p5/comment-only.py" "$base" \
+  --allow 'as `./run backend get` did. "' --allow 'engine-bundle-<version>-<os>-<arch>/enso. "' \
+  --allow '`./run libraries check-syntax`; see project/EnsoSyntaxCheck' --allow 'the Enso syntax check; see project/EnsoSyntaxCheck' \
+  -- build.sbt project lib app
+```
+
+Expected: `0 changed code lines are not comments.` Then compile what changed:
+`sbt "-Dsbt.server.autostart=false" "projects; runtime-version-manager/Test/compile"`
+loads the build (it compiles `project/` and `build.sbt`) and the one Scala
+source; `corepack pnpm --filter enso run typecheck` for `app/electron-client`;
+Prettier `--check` on the two TypeScript files.
+
+- [ ] **Step 4: The final greps**
 
 ```bash
 P=$(cat "$SCRATCH/p5/pattern.txt"); L=$(cat "$SCRATCH/p5/launcher-pattern.txt")
@@ -2290,27 +2471,34 @@ git grep -nE "$L" -- . ':!docs/superpowers' ':!CHANGELOG.md'
 git ls-files | grep -E '^(build_tools/|run$|run\.cmd$|run\.ps1$|engine/launcher/|lib/rust/launcher-shims/)'
 ```
 
-Expected, exactly: the first grep prints one line,
-`docs/libraries/sharing.md:59:- [build_tools/build/src/engine/edition.rs](https://github.com/enso-org/enso/blob/607b33414f94e77746c3880c417b5ebd523ad9f6/build_tools/build/src/engine/edition.rs).`
-(an upstream permalink, Decision 7); the second prints the three lines of
-`app/gui/integration-test/mock/data/latestGithubReleases.json` (recorded API
-data, Decision 7); the `ls-files` check prints nothing. Anything else is a miss:
-fix it.
+Expected, exactly (Decision 7):
 
-- [ ] **Step 7: Commit**
+- the first grep prints one line,
+  `docs/libraries/sharing.md:59:- [build_tools/build/src/engine/edition.rs](https://github.com/enso-org/enso/blob/607b33414f94e77746c3880c417b5ebd523ad9f6/build_tools/build/src/engine/edition.rs).`
+  (an upstream permalink);
+- the second prints the three lines of
+  `app/gui/integration-test/mock/data/latestGithubReleases.json` (recorded API
+  data) and
+  `lib/scala/distribution-manager/src/main/scala/org/enso/distribution/DistributionManager.scala`'s
+  `OS.executableName("ensoup")` (kept on purpose: do not touch it);
+- the `ls-files` check prints nothing.
+
+Anything else is a miss: fix it under the rules.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A
-git commit -m "Rewrite the comments that described the retired build CLI" \
+git commit -m "Sweep, part 3: the build, project and app comments no longer describe ./run" \
   -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01DeWeRfNarvWR4LBYCUZHYx"
 ```
 
 ---
 
-### Task 9: PR 5d
+### Task 11: PR 5d
 
-**Files:** none beyond Task 8.
+**Files:** none beyond Tasks 8–10.
 
 - [ ] **Step 1: Push, open, merge on green**
 
@@ -2318,10 +2506,10 @@ Claude-Session: https://claude.ai/code/session_01DeWeRfNarvWR4LBYCUZHYx"
 git push -u origin build/phase5-sweep
 ```
 
-Write `$SCRATCH/pr-5d.md`: the rules of Task 8 Step 3; the Note renames; the
-table of Step 4; the outputs of Steps 5 and 6 (comment-only, YAML-equal, the
-final greps with their two allowed results); "Part of #289's Phase 5."; the
-attribution lines.
+Write `$SCRATCH/pr-5d.md`: Task 8's rules; the Note renames; the string tables
+of Task 9 Step 1 and Task 10 Step 1; the outputs of the three checks (Task 8
+Step 4, Task 9 Step 4, Task 10 Step 3) and of the final greps with their allowed
+results; the pointer commit; "Part of #289's Phase 5."; the attribution lines.
 
 ```bash
 gh pr create --base develop --head build/phase5-sweep --label "CI: No changelog needed" \
@@ -2331,12 +2519,12 @@ gh pr create --base develop --head build/phase5-sweep --label "CI: No changelog 
 
 Expected checks: ✨ Engine (`project/`, `build.sbt`, `lib/`), ✨ IDE
 (`.github/**`, `app/electron-client/**`), ✨ GUI (`app/**`), Build Scripts,
-Workflow Lint, Changelog. They prove nothing new beyond "comments did not break
-the build"; Step 5 is the real check. Merge on green.
+Workflow Lint, Changelog. They prove only that the comments broke nothing; the
+three checks are the real proof. Merge on green.
 
 ---
 
-### Task 10: Close out Phase 5
+### Task 12: Close out Phase 5
 
 **Files:** `docs/superpowers/specs/2026-10-20-build-simplification-design.md` on
 the design branch (status line).
@@ -2351,9 +2539,10 @@ git -C /c/Repos/Enso/ide grep -cE "$L" origin/develop -- . ':!docs/superpowers' 
 git -C /c/Repos/Enso/ide show origin/develop:Cargo.toml | sed -n '/members/,/]/p'
 ```
 
-Expected: `docs/libraries/sharing.md:1` and
-`app/gui/integration-test/mock/data/latestGithubReleases.json:3`; the 14 members
-(`app/rust-ffi` and the 13 under `lib/rust`).
+Expected: `docs/libraries/sharing.md:1`; then
+`app/gui/integration-test/mock/data/latestGithubReleases.json:3` and
+`lib/scala/distribution-manager/src/main/scala/org/enso/distribution/DistributionManager.scala:1`;
+the 14 members (`app/rust-ffi` and the 13 under `lib/rust`).
 
 - [ ] **Step 2: Watch the first nightly release after 5b and 5c**
 
@@ -2376,6 +2565,10 @@ in the close-out comment instead; do not enable it.
 - Comment on #289: the four PR links, the nightly runs (Task 7's dispatch and
   Step 2's), "Phase 5 complete; the build-simplification programme is done", and
   the "Tickets to raise" list below (for the user to file; do not file them).
+- Update the user's memory note `local-windows-installer-build.md`: its
+  `cargo run -p enso-build-cli -- ide build …` recipe no longer exists; the
+  recipe is now `ide-local` from a `vcvars64.bat` environment (Task 3 Step 2),
+  and its traps 1 and 3 (a stale `dist/backend`; nvm's `run.cmd`) are gone.
 - Remove the worktrees `ide-bs-5a` … `ide-bs-5d` with
   `git -C /c/Repos/Enso/ide worktree remove <dir>` once their branches have
   merged, and the WSL clones `~/enso-p5`, `~/enso-p5c`.
@@ -2399,7 +2592,10 @@ the close-out comment for the user.
    `app/electron-client/macos/build-dmg.mjs` (`macos:build-dmg`) stages the app
    with `bazel run //app/electron-client:stage_bazel_macos_app`, which no longer
    exists; only `--app <path>` works. Delete the scripts, or port them to
-   electron-builder's output together with Phase 4's Ticket 5 (signing).
+   electron-builder's output together with Phase 4's Ticket 5 (signing). The Mac
+   signing path also still shells out to `7za`
+   (`app/electron-client/tasks/signArchivesMacOs.ts:246`), which 5a drops from
+   `CONTRIBUTING.md`'s requirements; document it there if signing comes back.
 4. **`runtime-version-manager` is now mostly test-only.** After 5c, outside its
    own tests only `engine/runner`'s `JavaFinder` (`GraalRuntime`,
    `GraalVMVersion`, `GraalVersionManager`) and the language server's tests
@@ -2417,31 +2613,72 @@ the close-out comment for the user.
    `enso-org/enso` release with `launcher-manifest.yaml`; refresh it from a fork
    release when the update tests next change.
 
+## Rulings
+
+From the independent review of 2026-10-24 and the user's answers to its open
+questions.
+
+1. **R1: the sweep (5d) stays, done mechanically.** The Notes are renamed in
+   full; `build_tools/…` paths become "the retired build CLI's `x.rs`" with one
+   pointer commit; the test names and descriptions are renamed. "As `./run` did"
+   becomes "as the retired build CLI did" in place: paragraphs and Note bullet
+   lists keep their facts and shape (Task 8's rules).
+   - **Why:** after 5b the comments cite files that do not exist, but their
+     reasons still matter; restructuring them would risk losing the why for
+     little gain.
+2. **R2: the sweep is three tasks (8: `.github`; 9: `tools/`; 10: the rest),
+   each with its own checks**, then one PR (Task 11).
+   - **Why:** about 200 hits in about 50 files is too much for one subagent's
+     context, and checks that run only at the end find mistakes late.
+3. **R3: the proof scripts judge what they can.** `comment-only.py` checks added
+   and removed lines of non-YAML code, and passes a rewritten string only by its
+   old and new text (`--allow`). `yaml-same.mjs` checks YAML by value, and a
+   value that holds history text (an action's `description:`, a comment inside a
+   `run:` script) must be named with `--expect`.
+4. **R4: `DistributionManager.scala`'s `ensoup` stays and is allowlisted** in
+   every launcher grep (Decision 7). It is the runner's portable-mode detection;
+   changing it belongs to Ticket 4.
+5. **R5: the pointer commit is derived, not remembered.** It is the parent of
+   5b's squash merge (Task 9 Step 2), and 5b's PR body records it too.
+6. **R6: `runtime-version-manager`'s deeper cut is Ticket 4, not 5c.** It would
+   rewrite `RuntimeVersionManagerSpec` and decide the engine manifest's
+   `minimum-launcher-version`, a format question; 5c deletes only what nothing
+   references.
+7. **R7: the GUI path filter gains the Rust files in both lists**, one glob per
+   line (Decision 4), rather than a one-off `CI: Build IDE` label on 5b.
+8. **R8: `ide-local` is a command**, with the per-step table in
+   `CONTRIBUTING.md` for anyone debugging one stage (Decision 2). It clears
+   `dist/ide` too, so the installer it reports is the one it built.
+9. **R9: skipped review points.** None of the thirteen Minor findings was
+   skipped. Minor 10 (the TypeScript's quote style) is met by printing the
+   blocks in the package's style behind `prettier-ignore`, plus a note that Step
+   9's Prettier run is the authority.
+
 ## Self-review against the spec
 
 | Spec section / requirement                                                                                                     | Where                                                                                                                                                 |
 | ------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Phase 5: delete `build_tools/`, `run*` and the provisioning code                                                               | Task 4 (the provisioning code is `build_tools/build`'s `ide_ci::cache::goodie` and `vs.rs`, deleted with it)                                          |
 | Phase 5: decide `launcher-shims`                                                                                               | User's ruling 2026-10-24: removed with the standalone launcher (Task 6); spec End state updated                                                       |
-| Phase 5: update the docs and every CLAUDE.md that mentions `./run`                                                             | Task 2 (instructions), Task 4 Step 8 (statements of existence), Task 6 Step 6 (launcher), Task 8 (history)                                            |
-| End state, Rust workspace: parser crates, `parser/debug` and fuzz, `app/rust-ffi`                                              | Task 4 Step 3, Task 6 Step 5; Task 10 Step 1 checks the 14 members                                                                                    |
+| Phase 5: update the docs and every CLAUDE.md that mentions `./run`                                                             | Task 2 (instructions), Task 4 Step 8 (statements of existence), Task 6 Step 6 (launcher), Tasks 8–10 (history)                                        |
+| End state, Rust workspace: parser crates, `parser/debug` and fuzz, `app/rust-ffi`                                              | Task 4 Step 3, Task 6 Step 5; Task 12 Step 1 checks the 14 members                                                                                    |
 | End state, entry points: sbt, `corepack pnpm`, cargo only for the parser                                                       | Task 1 (`ide-local` replaces `./run ide build`), Task 2 Step 5 (the command table)                                                                    |
 | End state, `build-config.yaml` reduced to `latest-release` and `toolchain:`                                                    | Task 4 Step 5                                                                                                                                         |
 | Remnants: `maven_install.json`, `stage-bazel-app.sh`, `tools/ci/nightly/*.js`, `tools/ci/check-changelog.js`, stale docs       | Phase 0 deleted the files (Task 0 Step 1 confirms); the stale docs are Task 2 Step 5 (`CONTRIBUTING.md`) and `build_tools/CLAUDE.md` goes with Task 4 |
 | Risks: local developers lose auto-provisioning                                                                                 | Task 2 Step 5 (`toolchain-check` and the MSVC prompt in `CONTRIBUTING.md`); `ide-local`'s MSVC guard                                                  |
 | Risks: required-check names                                                                                                    | Global Constraints; D3 changes job ids under unchanged `name:`s; no aggregator touched                                                                |
 | Verification, throughout: Linux and Windows; no `git stash`, no `--no-verify`; Prettier                                        | Global Constraints; Tasks 3, 5, 7 on both hosts                                                                                                       |
-| Gate: merge on green                                                                                                           | Tasks 3, 5, 9; Task 7 adds the user's nightly for the launcher (Decision 10)                                                                          |
+| Gate: merge on green                                                                                                           | Tasks 3, 5, 11; Task 7 adds the user's nightly for the launcher (Decision 10)                                                                         |
 | Brief: `Cargo.lock` shrinks cleanly; `cargo test --workspace` works; unused workspace pins                                     | Task 4 Steps 3–4 (506 → 141, nothing moved; 46 → 11 pins), Task 5 Step 1                                                                              |
 | Brief: `.github` (filters, setup-msvc, wasm-checks, engine-benchmark, changelog.yml, paths-ignore)                             | Task 2 Steps 2–3, Task 4 Step 7, Task 8 (comments). `paths-ignore` lists only `docs/superpowers/**`, generated by nothing since Phase 1: no change    |
-| Brief: `build.sbt`, `project/*.scala`, `electron-client`, `.gitattributes` … `.vscode`, `TestArchivePackager`, CLAUDE.md, docs | Tasks 4, 6 and 8 (file lists)                                                                                                                         |
+| Brief: `build.sbt`, `project/*.scala`, `electron-client`, `.gitattributes` … `.vscode`, `TestArchivePackager`, CLAUDE.md, docs | Tasks 4, 6, 8–10 (file lists)                                                                                                                         |
 
 **Placeholder scan:** `<N>` is a PR number, known once `gh pr create` prints it;
 `<ide-run-id>`, `<linux package job id>`, `$id`, `$nid` come from `gh run list`
-/ `gh run view`; `<pre-deletion commit>` is recorded in Task 4 Step 1 and
-substituted in Task 8. The documents in Task 6 Step 6 are given as targeted
-edits rather than full replacement text because they are long upstream prose;
-each edit names its line and what goes.
+/ `gh run view`; `<PRE>` is derived in Task 9 Step 2 from 5b's merge commit (and
+recorded in 5b's PR body by Task 5 Step 4). The documents in Task 6 Step 6 are
+given as targeted edits rather than full replacement text because they are long
+upstream prose; each edit names its line and what goes.
 
 **Consistency:** `ideLocal.ts`' six exports and `packageIde.ts`' five are used
 with the same names and signatures in `commands/ide-local.ts` and
@@ -2461,10 +2698,17 @@ document written before 5d cites a Note by its new name.
   with no package added or moved; `cargo test --workspace` passed on Windows and
   in WSL (55 suites, 172 tests, exit 0); `cargo fmt -- --check` clean on both;
   clippy showed only `enso-parser`'s warning.
-- `yaml-same.mjs`, `comment-only.py` and `rename-notes.py` ran against the tree:
-  the first two told a comment edit from a code edit; the third renamed the five
-  Notes in the five files and left the one split citation, as Task 8 Step 2
-  says.
+- `yaml-same.mjs`, `comment-only.py` and `rename-notes.py` ran against the tree
+  (the first two again after the review, in their final form): `yaml-same.mjs`
+  reported the `setup-jvm` description and the `jvm-tests` step 9 script as
+  unexpected until `--expect`ed, and the two `gui-changed-files.yml` lists as
+  the only differences of Task 4 Step 7; `comment-only.py` passed a comment
+  edit, flagged a renamed test name on both its `-` and `+` lines, and passed it
+  with `--allow` for the old and the new text; `rename-notes.py` renamed the
+  five Notes in the five files and left the one split citation, as Task 8 Step 2
+  says. A parse of every `.github` YAML file found the pattern inside exactly
+  four values outside the path filters: the three action descriptions and that
+  `run:` script (Task 8).
 - The two patterns were checked against the tree: the build-CLI pattern finds 77
   files and skips `./run.ts` imports and the `enso-build-scripts` User-Agent;
   the launcher pattern finds 33 files outside `engine/launcher`.
