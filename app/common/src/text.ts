@@ -103,6 +103,8 @@ interface PlaceholderOverrides {
   readonly engineLogsHistoryFailed: [message: string]
   readonly engineLogsDownloadFailed: [message: string]
   readonly engineLogsSessionUnlisted: [name: string]
+  readonly engineLogsOriginOne: [source: string]
+  readonly engineLogsOriginSome: [ticked: number, shown: number]
   readonly engineLogsUnseenErrors: [count: number]
   readonly localVersionsStatusError: [reason: string]
   readonly versionOnCloseWarning: [title: string, warning: string]

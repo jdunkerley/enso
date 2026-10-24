@@ -46,7 +46,7 @@ export class SessionLogWindow {
   /**
    * The start of the entry the window's first line continues, if that line starts none: found in
    * the page it is on, or in lines the window has dropped, so that continuation lines at the top
-   * take their entry's logger and level. `null` when that entry starts further back (an earlier
+   * take their entry's level and origin. `null` when that entry starts further back (an earlier
    * page, or beyond the scan) or the first line starts an entry; those lines are then classified
    * as an unknown library's, a known limitation.
    */

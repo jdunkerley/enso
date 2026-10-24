@@ -17,6 +17,11 @@
  *   it reaches the document, where Reka listens for outside clicks.
  * - It focuses itself as it opens, not its first control (Tab goes on from there); a keyboard user
  *   does not see a focus ring appear on the first entry.
+ * - `keepFocus` (read as it opens) leaves focus where it is instead: a popover that a field opens
+ *   as it takes focus, so typing goes on there (the engine log's filter opens its Sources).
+ * - `keepOutsideFocus` (read as it closes): focus that is outside the popover as it closes stays
+ *   there, however it was opened (a field beside it the user went on typing in); only focus left
+ *   inside it (or lost with it) goes back as without it.
  * - `@close` fires whenever it closes; `@closed` once it has closed and its
  *   exit animation has ended (a popover on the modal stack emits its `close` then).
  * - Attributes (`aria-label`, …) go on the `role="dialog"` element.
@@ -61,6 +66,8 @@ const {
   class: className,
   anchor,
   opener,
+  keepFocus = false,
+  keepOutsideFocus = false,
   // The dashboard's popovers keep 12px from the viewport's edges.
   containerPadding = 12,
 } = defineProps<{
@@ -88,6 +95,10 @@ const {
    * (`focusReturnTarget()`); otherwise the element focused as it opens.
    */
   opener?: FocusReturnTarget | undefined
+  /** Leave focus where it is as it opens; see the file comment. */
+  keepFocus?: boolean | undefined
+  /** On closing, leave focus that is outside the popover where it is; see the file comment. */
+  keepOutsideFocus?: boolean | undefined
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -126,8 +137,13 @@ const contentClass = computed(() => {
 const slots = useSlots()
 /** Where focus returns, for a popover without a trigger (on the modal stack, with an `anchor`). */
 let returnTarget: FocusReturnTarget | undefined
-
 function onOpenAutoFocus(event: Event) {
+  if (keepFocus) {
+    // Reka would otherwise focus the first control.
+    event.preventDefault()
+    returnTarget = undefined
+    return
+  }
   // Without a trigger, Reka would leave focus on the page's body on closing; return it to the
   // element focused as the popover opened.
   if (slots.trigger == null) returnTarget = opener ?? focusReturnTarget()
@@ -140,6 +156,19 @@ function onOpenAutoFocus(event: Event) {
 }
 
 function onCloseAutoFocus(event: Event) {
+  if (keepOutsideFocus) {
+    const focused = document.activeElement
+    const scope = event.target
+    const focusLeft =
+      focused != null &&
+      focused !== document.body &&
+      !(scope instanceof Node && scope.contains(focused))
+    // Focus is elsewhere (it may never have left the field that opened the popover): keep it there.
+    if (focusLeft) {
+      event.preventDefault()
+      return
+    }
+  }
   if (slots.trigger == null && returnTarget != null) returnFocus(event, returnTarget)
 }
 

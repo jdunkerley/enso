@@ -45,8 +45,6 @@ export interface LogLine {
   readonly entryStart: boolean
   /** Who wrote the line: the engine, a library or the user's own code (see {@link logOrigin}). */
   readonly origin: LogOrigin
-  /** The logger of the line's entry; `null` for stderr and before the first entry. */
-  readonly logger: string | null
 }
 
 /** A marker between lines. */
@@ -106,6 +104,24 @@ export const DEFAULT_ORIGINS: OriginFilter = {
   user: true,
   sql: true,
   performance: true,
+}
+
+/** How the Sources button sums up which of the tickboxes `shown` are ticked. */
+export type OriginSummary =
+  | { readonly kind: 'all' | 'none' }
+  | { readonly kind: 'one'; readonly origin: LogOrigin }
+  | { readonly kind: 'some'; readonly ticked: number; readonly shown: number }
+
+/**
+ * Sum up the tickboxes `shown` (in their order): all, none, the one ticked, or how many of them.
+ * Only the boxes shown count, so a hidden box's state never shows in the summary.
+ */
+export function originSummary(shown: readonly LogOrigin[], origins: OriginFilter): OriginSummary {
+  const ticked = shown.filter((origin) => origins[origin])
+  if (ticked.length === shown.length) return { kind: 'all' }
+  if (ticked.length === 0) return { kind: 'none' }
+  if (ticked.length === 1) return { kind: 'one', origin: ticked[0]! }
+  return { kind: 'some', ticked: ticked.length, shown: shown.length }
 }
 
 /**
@@ -197,7 +213,6 @@ export interface LineClass {
   readonly level: number
   readonly entryStart: boolean
   readonly origin: LogOrigin
-  readonly logger: string | null
 }
 
 /**
@@ -208,28 +223,25 @@ export interface LineClass {
 export class LineClassifier {
   private level = INFO_LEVEL
   private origin: LogOrigin = 'library'
-  private logger: string | null = null
 
-  /** The level, origin and logger of `text`, and whether it starts an entry. */
+  /** The level and origin of `text`, and whether it starts an entry. */
   classify(text: string, source: EngineLogSource): LineClass {
     if (source === 'stderr') {
-      return { level: ERROR_LEVEL, entryStart: true, origin: 'engine', logger: null }
+      return { level: ERROR_LEVEL, entryStart: true, origin: 'engine' }
     }
     const entry = parseEntry(text)
     if (entry == null) {
-      return { level: this.level, entryStart: false, origin: this.origin, logger: this.logger }
+      return { level: this.level, entryStart: false, origin: this.origin }
     }
     this.level = entry.level
     this.origin = logOrigin(entry.module)
-    this.logger = entry.module
-    return { level: entry.level, entryStart: true, origin: this.origin, logger: this.logger }
+    return { level: entry.level, entryStart: true, origin: this.origin }
   }
 
   /** Forget the current entry (a new session starts). */
   reset(): void {
     this.level = INFO_LEVEL
     this.origin = 'library'
-    this.logger = null
   }
 }
 
@@ -254,7 +266,7 @@ export interface WindowEdges {
   readonly sessionId: string
   /**
    * The start of the entry the first line continues, if known: continuation lines at the top take
-   * its logger and level instead of an unknown library's.
+   * its level and origin instead of an unknown library's.
    */
   readonly leadingEntry: string | null
 }
@@ -263,8 +275,8 @@ export interface WindowEdges {
  * Rows for lines of a file read (an earlier session, or a window of one): at most its newest
  * {@link LIVE_ROW_CAP} lines, with a `truncated` divider above them when there are older lines and a
  * `newer` one below them when there are newer ones. Lines above the first entry in view continue an
- * entry out of view: they take `leadingEntry`'s level and logger when it is given, else they are an
- * unknown library's, with no logger.
+ * entry out of view: they take `leadingEntry`'s level and origin when it is given, else they are an
+ * unknown library's.
  */
 export function rowsFromLines(
   lines: readonly string[],
@@ -303,56 +315,22 @@ export function rowsFromLines(
   return rows
 }
 
-/**
- * Whether `logger` is under `prefix`, by whole dot-separated segments (`Standard.Base` covers
- * `Standard.Base.Data` but not `Standard.Baseline`). A prefix ending in a dot matches by text, so a
- * prefix being typed out still matches its loggers.
- */
-export function loggerMatches(logger: string, prefix: string): boolean {
-  if (prefix.endsWith('.')) return logger.startsWith(prefix)
-  return underRoot(logger, prefix)
-}
-
-/**
- * Suggestions for the logger filter: every logger of `rows` and each of its dotted prefixes, sorted,
- * at most `limit` of them (the shortest prefixes first, so the broad ones are always offered).
- */
-export function loggerSuggestions(rows: readonly LogRow[], limit = 200): string[] {
-  const loggers = new Set<string>()
-  for (const row of rows) {
-    if (row.kind === 'line' && row.entryStart && row.logger != null) loggers.add(row.logger)
-  }
-  const names = new Set<string>()
-  for (const logger of loggers) {
-    const segments = logger.split('.')
-    for (let n = 1; n <= segments.length; n++) names.add(segments.slice(0, n).join('.'))
-  }
-  const byDepth = [...names].sort(
-    (a, b) => a.split('.').length - b.split('.').length || a.localeCompare(b),
-  )
-  return byDepth.slice(0, limit).sort((a, b) => a.localeCompare(b))
-}
-
 /** What the Logs tab filters on. */
 export interface RowFilter {
   readonly level: LevelFilter
   readonly text: string
   readonly origins: OriginFilter
-  /** A dotted logger prefix (see {@link loggerMatches}); empty for every logger. */
-  readonly logger?: string
 }
 
 /**
  * The rows a filter shows: every divider, and the lines of a shown origin, at or above the level,
- * under the logger prefix (a continuation line by its entry's logger; stderr has none), that
- * contain the text.
+ * that contain the text.
  */
 export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
   const origins = filter.origins
-  const prefix = (filter.logger ?? '').trim()
-  if (needle === '' && prefix === '' && Object.values(origins).every((shown) => shown)) {
+  if (needle === '' && Object.values(origins).every((shown) => shown)) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
@@ -360,7 +338,6 @@ export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly
       row.kind === 'divider' ||
       (row.level <= maxLevel &&
         origins[row.origin] &&
-        (prefix === '' || (row.logger != null && loggerMatches(row.logger, prefix))) &&
         (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
@@ -452,7 +429,7 @@ export class EngineLogModel {
   onLine(data: EngineLogLineData): void {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
-    const { level, entryStart, origin, logger } = this.classifier.classify(data.text, data.source)
+    const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
     this.pending.push({
       kind: 'line',
       key: this.nextKey++,
@@ -461,7 +438,6 @@ export class EngineLogModel {
       level,
       entryStart,
       origin,
-      logger,
     })
     if (data.source === 'file' && entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }

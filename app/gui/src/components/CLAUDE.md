@@ -60,6 +60,11 @@ no trigger (`opener`, or the element focused as it opened), and emits `closed`
 after its exit animation, so it can sit on the modal stack. `Tooltip` opens on
 focus only when the keyboard put the focus there (`$/utils/inputModality`).
 
+From the engine log's Sources popover: `Popover`'s `keepFocus` (read as it
+opens) leaves focus where it is, for a popover that a field opens as it takes
+focus; `keepOutsideFocus` (read as it closes) leaves focus that is outside the
+popover where it is, however it was opened.
+
 From #207: a press on the backdrop of a `Dialog` or `AlertDialog` keeps focus
 inside it (`keepFocusOnBackdropPress`), and Escape in a `ComboBox` whose list is
 still fading out closes the dialog or popover around it, as it does once the

@@ -28,10 +28,6 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     under `org.enso`; `__tests__/logOrigin.test.ts` reads
     `std-bits/*/src/main/java/org/enso/*` and fails when one is missing. stderr
     is the engine's; a continuation line takes its entry's origin.
-  - Logger: each line carries its entry's logger (`null` for stderr). The logger
-    filter (`RowFilter.logger`, `loggerMatches`) keeps the lines under a dotted
-    prefix by whole segments (a prefix ending in `.` by text);
-    `loggerSuggestions` offers the loggers seen and their prefixes.
   - The error badge (`unseenErrors`) counts ERROR entries of the log file,
     whatever their origin and the filters; stderr lines are not counted.
   - Dividers: `restarted` at a new engine's `waiting` (not at `session`, which
@@ -65,7 +61,7 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   the other end, so memory stays at one window plus one cached page however long
   the session. `firstLine` numbers its lines so row keys survive a move and the
   list keeps its place. `latest()` (also Reload) is all or nothing. Rows at the
-  top that continue an entry take its logger and level (`leadingEntry`, found in
+  top that continue an entry take its level and origin (`leadingEntry`, found in
   the page read or the lines dropped); one that starts on an earlier page stays
   unknown. `noFiles` marks a session whose files are gone, which the panel says.
   A rollover of the live file while paged back makes the listed `active` page
@@ -78,7 +74,23 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     off by default; Libraries; User log messages; SQL queries and Performance,
     shown only while their setting in Settings → Local → Engine logs is on,
     checked whenever they appear — an origin without a box is not filtered out),
-    text and session filters;
+    and text filters; a session picker only in the session log tab (below);
+  - the source tickboxes are in a Sources popover
+    (`$/components/Dialog/Popover`, non-modal), opened by its button beside the
+    text filter, whose label sums up the boxes shown (`originSummary`: All,
+    None, the one ticked, or "2 of 3"), and by the text filter taking focus,
+    which keeps the focus (`keepFocus`; the filter has `aria-haspopup`,
+    `aria-expanded` and `aria-controls`). Ticking a box leaves it open; a press
+    outside (but not on the text filter) or Escape closes it. On closing, focus
+    outside the popover stays where it is (`keepOutsideFocus`); focus inside it
+    moves to the button, at once on Escape (`takeFocusOutOfSources`: until the
+    content has gone, the app's key handling skips keys typed in it). Escape in
+    the filter is handled on the filter: the graph's `graph.deselectAll`, a
+    bubbling window listener registered before Reka's, would take it first. The
+    content is teleported to the end of the page, so Tab is routed by hand: from
+    the open popover's button to its first box, from its last box on to the
+    toolbar's next enabled control, Shift+Tab from its first box back to the
+    button;
   - at the toolbar's right, icon buttons for the log file of the session shown
     (live or earlier): Download log file (`downloadProjectSessionLogs`, the
     whole session, archives included; a failure is shown as an alert) and reveal
@@ -88,13 +100,15 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     stream's `logFile`, an earlier one's is `ProjectSession.logFile` from the
     session listing. Each is disabled while its session has no id or file;
   - the waiting and ended notices, and Jump to latest;
-  - an earlier session, read-only, through a `SessionLogWindow`; Load older
-    lines on the live view's `truncated` divider pages back the same way through
-    the live session's file ("Showing earlier lines… Back to live");
+  - the live panel (with a `stream`) has no session picker: it shows the current
+    session. Load older lines on its `truncated` divider pages back, read-only
+    through a `SessionLogWindow`, through that divider's session
+    (`liveSnapshotSession`): the live one ("Showing earlier lines… Back to
+    live"), or after a restart the previous one ("Showing an earlier session…").
+    Download and reveal follow the session paged back;
   - Reload (only off the live view, which is current anyway) reads the window's
     session again from its newest lines;
-  - a logger filter (a search box with a `datalist` of the loggers seen);
-  - without a `stream` (the session log tab): no live view; the picker lists the
+  - without a `stream` (the session log tab): no live view; a picker lists the
     project's sessions (`projectId`), or the asked-for session alone for a tab
     saved before tabs had a project;
   - history requests pass `{ project, sessionId }` to `loadHistory`, which drops
