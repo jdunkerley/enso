@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Savepoint;
+import java.sql.ShardingKey;
 import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Map;
@@ -30,9 +31,12 @@ abstract class AuditedConnection implements Connection {
 
   abstract void auditTransaction(String operation);
 
-  private RuntimeException unimplemented(String name) {
-    throw new UnsupportedOperationException(
-        name + " is not implemented. This is a bug in the Database library.");
+  /**
+   * Whether audit calls are recorded at all. When it is {@code false} the wrappers skip the work of
+   * building audit messages (e.g. accumulating a statement batch's SQL).
+   */
+  boolean isAuditEnabled() {
+    return true;
   }
 
   @Override
@@ -47,7 +51,9 @@ abstract class AuditedConnection implements Connection {
 
   @Override
   public CallableStatement prepareCall(String sql) throws SQLException {
-    throw unimplemented("prepareCall");
+    // A `CallableStatement` is not wrapped: its call is recorded when it is prepared.
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql);
   }
 
   @Override
@@ -152,7 +158,8 @@ abstract class AuditedConnection implements Connection {
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
-    throw unimplemented("prepareCall");
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql, resultSetType, resultSetConcurrency);
   }
 
   @Override
@@ -235,7 +242,8 @@ abstract class AuditedConnection implements Connection {
   public CallableStatement prepareCall(
       String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
       throws SQLException {
-    throw unimplemented("prepareCall");
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
   }
 
   @Override
@@ -345,9 +353,44 @@ abstract class AuditedConnection implements Connection {
     return underlying.isWrapperFor(iface);
   }
 
+  // The methods below have default implementations in `Connection`. They are delegated so that the
+  // wrapper behaves exactly like the driver's own connection.
+
+  @Override
+  public void beginRequest() throws SQLException {
+    underlying.beginRequest();
+  }
+
+  @Override
+  public void endRequest() throws SQLException {
+    underlying.endRequest();
+  }
+
+  @Override
+  public boolean setShardingKeyIfValid(
+      ShardingKey shardingKey, ShardingKey superShardingKey, int timeout) throws SQLException {
+    return underlying.setShardingKeyIfValid(shardingKey, superShardingKey, timeout);
+  }
+
+  @Override
+  public boolean setShardingKeyIfValid(ShardingKey shardingKey, int timeout) throws SQLException {
+    return underlying.setShardingKeyIfValid(shardingKey, timeout);
+  }
+
+  @Override
+  public void setShardingKey(ShardingKey shardingKey, ShardingKey superShardingKey)
+      throws SQLException {
+    underlying.setShardingKey(shardingKey, superShardingKey);
+  }
+
+  @Override
+  public void setShardingKey(ShardingKey shardingKey) throws SQLException {
+    underlying.setShardingKey(shardingKey);
+  }
+
   private class AuditedPreparedStatementImpl extends AuditedPreparedStatement {
     public AuditedPreparedStatementImpl(PreparedStatement underlying, String sql) {
-      super(underlying, sql);
+      super(underlying, sql, AuditedConnection.this);
     }
 
     @Override
@@ -358,12 +401,17 @@ abstract class AuditedConnection implements Connection {
 
   private class AuditedStatementImpl extends AuditedStatement {
     public AuditedStatementImpl(Statement underlying) {
-      super(underlying);
+      super(underlying, AuditedConnection.this);
     }
 
     @Override
     protected void auditQuery(String operationType, String sql) {
       AuditedConnection.this.auditQuery(operationType, sql);
+    }
+
+    @Override
+    protected boolean isAuditEnabled() {
+      return AuditedConnection.this.isAuditEnabled();
     }
   }
 }

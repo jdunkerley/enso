@@ -5371,6 +5371,7 @@ lazy val `std-tests` = project
   )
   .dependsOn(`std-base`)
   .dependsOn(`std-table`)
+  .dependsOn(`std-database`)
   .dependsOn(`runtime-language-arrow`)
   .dependsOn(`test-utils`)
 

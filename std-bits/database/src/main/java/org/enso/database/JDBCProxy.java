@@ -60,30 +60,63 @@ public final class JDBCProxy {
     }
 
     PartitionedProperties partitionedProperties = PartitionedProperties.parse(properties);
+    var audited = partitionedProperties.audited();
+    if (audited != null && !"local".equals(audited) && !"cloud".equals(audited)) {
+      throw new IllegalArgumentException("Unknown audit mode: " + audited);
+    }
+
     var rawConnection =
         EnsoSecretHelper.getJDBCConnection(url, partitionedProperties.jdbcProperties);
+    try {
+      if (catalog != null && !catalog.isEmpty()) {
+        rawConnection.setCatalog(catalog);
+      }
+      if (schema != null && !schema.isEmpty()) {
+        rawConnection.setSchema(schema);
+      }
 
-    if (catalog != null && !catalog.isEmpty()) {
-      rawConnection.setCatalog(catalog);
-    }
-    if (schema != null && !schema.isEmpty()) {
-      rawConnection.setSchema(schema);
-    }
+      if ("cloud".equals(audited)) {
+        runInitScript(rawConnection, initScript);
+        return new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
+      }
 
-    // Run the initialization script if provided.
+      var connection = withQueryLogging(rawConnection);
+      runInitScript(connection, initScript);
+      return connection;
+    } catch (Throwable e) {
+      // Don't leak the connection when setting it up fails.
+      try {
+        rawConnection.close();
+      } catch (Throwable closeError) {
+        e.addSuppressed(closeError);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Every connection that is not cloud-audited logs its statements locally, so that SQL logging
+   * (the `Standard.Database.Connection` logger at INFO) covers a plain `Database.connect` as well
+   * as a data link. Code that needs the driver's own connection class must `unwrap` it (see
+   * `DuckDBUtils`).
+   *
+   * <p>Logging must never break a connection: if the wrapper can't be created, the connection is
+   * returned as it is.
+   */
+  private static Connection withQueryLogging(Connection rawConnection) {
+    try {
+      return new LocalAuditedConnection(rawConnection);
+    } catch (RuntimeException | LinkageError e) {
+      return rawConnection;
+    }
+  }
+
+  private static void runInitScript(Connection connection, String initScript) throws SQLException {
     if (initScript != null && !initScript.isEmpty()) {
-      rawConnection.createStatement().executeUpdate(initScript);
+      try (var statement = connection.createStatement()) {
+        statement.executeUpdate(initScript);
+      }
     }
-
-    return switch (partitionedProperties.audited()) {
-      case "local" -> new LocalAuditedConnection(rawConnection);
-      case "cloud" ->
-          new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
-      case null -> rawConnection;
-      default ->
-          throw new IllegalArgumentException(
-              "Unknown audit mode: " + partitionedProperties.audited());
-    };
   }
 
   private static final String ENSO_PROPERTY_PREFIX = "enso.internal.";

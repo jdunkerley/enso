@@ -3,6 +3,7 @@ package org.enso.duckdb;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,12 +25,25 @@ import org.enso.table.data.column.storage.type.StorageType;
 
 public class DuckDBUtils {
   /**
+   * The driver's own connection behind {@code connection}.
+   *
+   * <p>The Database library hands out a wrapper that logs every statement (see {@code JDBCProxy}),
+   * so DuckDB-specific API must be reached through {@link Connection#unwrap}.
+   */
+  private static DuckDBConnection asDuckDBConnection(Connection connection) throws SQLException {
+    if (connection instanceof DuckDBConnection duckDBConnection) {
+      return duckDBConnection;
+    }
+    return connection.unwrap(DuckDBConnection.class);
+  }
+
+  /**
    * Retrieves the version of the connected DuckDB database.
    *
-   * @param connection an active DuckDBConnection
+   * @param connection an active connection to a DuckDB database
    * @return the version string of the DuckDB database
    */
-  public static String getVersion(DuckDBConnection connection) {
+  public static String getVersion(Connection connection) {
     try (var stmt = connection.createStatement();
         var rs = stmt.executeQuery("SELECT version()")) {
       if (rs.next()) {
@@ -44,7 +58,8 @@ public class DuckDBUtils {
   /**
    * Appends the data from the given table to the specified target table in DuckDB.
    *
-   * @param connection an active DuckDBConnection
+   * @param connection an active connection to a DuckDB database; it may wrap the {@link
+   *     DuckDBConnection} (as the query-logging connection does)
    * @param columnStorages the source data to append
    * @param targetTableName the name of the target table in DuckDB
    * @param targetTypes a list of StorageType representing the types of the target table columns
@@ -52,7 +67,7 @@ public class DuckDBUtils {
    * @throws SQLException if a database access error occurs
    */
   public static long append(
-      DuckDBConnection connection,
+      Connection connection,
       ColumnStorage<?>[] columnStorages,
       String targetTableName,
       List<StorageType<?>> targetTypes)
@@ -71,9 +86,10 @@ public class DuckDBUtils {
               + " types.");
     }
 
+    var duckDBConnection = asDuckDBConnection(connection);
     try (var appender =
-        connection.createAppender(
-            connection.getCatalog(), connection.getSchema(), targetTableName)) {
+        duckDBConnection.createAppender(
+            duckDBConnection.getCatalog(), duckDBConnection.getSchema(), targetTableName)) {
       for (long i = 0; i < rowCount; i++) {
         appender.beginRow();
         for (int col = 0; col < columnStorages.length; col++) {
