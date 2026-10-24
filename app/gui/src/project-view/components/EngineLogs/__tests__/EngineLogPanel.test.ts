@@ -780,7 +780,7 @@ describe("the live view's older lines", () => {
     // The engine restarts: the new session's lines come below the old one's.
     source.emit('waiting', { seq: seq++ })
     source.emit('session', { seq: seq++, sessionId: 's2', logFile: '/logs/s2.log' })
-    source.emit('line', { seq: seq++, source: 'file', sessionId: 's2', text: 'new session' })
+    source.emit('line', { seq, source: 'file', sessionId: 's2', text: 'new session' })
     await flush()
     const button = wrapper.find('.row.divider button')
     expect(button.text()).toBe('Load older lines')
