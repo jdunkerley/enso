@@ -1,3 +1,4 @@
+import { isEditableElement, isFieldKey, isTextControl, isTextControlShortcut } from '$/utils/event'
 import type { WindowEventTarget } from '@/composables/events'
 import { createContextStore } from '@/providers'
 
@@ -53,6 +54,39 @@ function isKeydownInOverlay(event: Event) {
   )
 }
 
+/**
+ * Whether the event is a key press that the focused field uses itself, so none of these
+ * window-level handlers runs for it and it reaches the field unchanged:
+ * - in any editable element (an `input`, `textarea`, `select` or `contenteditable`, which includes
+ *   CodeMirror), a key that types, edits or moves the caret, `Ctrl`/`Cmd` caret and word keys
+ *   included ({@link isFieldKey});
+ * - in a native text control (an `input` or `textarea`), also its editing shortcuts: select all,
+ *   the clipboard, undo and redo ({@link isTextControlShortcut}).
+ *
+ * Otherwise the graph's shortcuts take such a key from any field that does not stop it itself, and
+ * prevent its default: `Space` (show the visualization) would be dropped from the engine logs'
+ * filter, `Backspace` would delete the selected components, the arrow keys would pan the scene, and
+ * `Mod+Z` would undo a graph edit instead of the typing.
+ *
+ * Other `Ctrl`/`Cmd` shortcuts (`Mod+S`, `Mod+L`, …), `Escape` (which ends the interaction and
+ * leaves the field) and the function keys still reach the handlers. So do the editing shortcuts
+ * from `contenteditable` content: the code editor has no undo of its own, and relies on `Mod+Z`
+ * reaching the graph's undo, which covers its edits.
+ *
+ * The target is the first element of the composed path, so a field inside a visualization's
+ * shadow root counts too. `keyup` is not filtered, as in {@link isKeydownInOverlay}. Nor are the
+ * keydowns of modifier keys pressed alone, so the modifier tracking (`useGlobalKeyboard`) still
+ * sees every modifier change, though not a character keydown typed in a field.
+ */
+function isKeydownInField(event: Event) {
+  if (event.type !== 'keydown' || !(event instanceof KeyboardEvent)) return false
+  const target = event.composedPath()[0] ?? event.target
+  return (
+    (isFieldKey(event) && isEditableElement(target)) ||
+    (isTextControlShortcut(event) && isTextControl(target))
+  )
+}
+
 export type EventRegistryPhase = 'pre' | 'main'
 export type EventRegistryOptions = {
   capture: boolean
@@ -104,7 +138,7 @@ function eventRegistry(source?: EventTarget) {
   }
 
   function dispatchEvent(event: Event) {
-    if (isKeydownInOverlay(event)) return true
+    if (isKeydownInOverlay(event) || isKeydownInField(event)) return true
     const registry = event.eventPhase === Event.CAPTURING_PHASE ? registryCapture : registryBubble
     const handlers = registry.get(event.type as any)
     for (const handler of handlers?.pre ?? []) handler(event)

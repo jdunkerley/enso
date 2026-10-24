@@ -117,6 +117,103 @@ export function isElementSingleLineTextInput(
   )
 }
 
+/** The `input` types that take typed text, including the typed date and time fields. */
+const EDITABLE_INPUT_TYPES = new Set([...TEXT_INPUT_TYPES, 'date', 'time', 'datetime-local'])
+
+/**
+ * Whether the element is a field that keys are typed into: a text-like `input`, a `textarea`, a
+ * `select`, or `contenteditable` content (which includes every CodeMirror editor).
+ */
+export function isEditableElement(element: EventTarget | null): boolean {
+  return (
+    (element instanceof HTMLInputElement && EDITABLE_INPUT_TYPES.has(element.type)) ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement ||
+    (element instanceof HTMLElement && element.isContentEditable)
+  )
+}
+
+/** The named keys that a text field uses for itself: editing, and moving the caret or selection. */
+const FIELD_NAMED_KEYS = new Set([
+  'Backspace',
+  'Delete',
+  'Enter',
+  'Tab',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  // A dead key starts an accented character; `Process` is a key an input method is composing with.
+  'Dead',
+  'Process',
+])
+
+/**
+ * The keys that move the caret or delete by word, line or document when `Ctrl` or `Cmd` is held
+ * (`Ctrl+Left` on Windows and Linux, `Cmd+Left` on macOS).
+ */
+const FIELD_CARET_KEYS = new Set([
+  'Backspace',
+  'Delete',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+])
+
+/**
+ * Whether any field that has the focus uses this key press itself:
+ * - a character (Space included), or a key that edits the text or moves the caret, with `Shift` or
+ *   `Alt` at most;
+ * - with `Ctrl` or `Cmd`, a key that moves the caret or deletes by word, line or document
+ *   ({@link FIELD_CARET_KEYS}), or a character typed with `AltGr` (which sets `Ctrl` and `Alt` on
+ *   Windows);
+ * - any key while an input method is composing.
+ *
+ * Other `Ctrl` and `Cmd` shortcuts are not (but see {@link isTextControlShortcut}), nor are `Escape`
+ * and the function keys.
+ */
+export function isFieldKey(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'isComposing' | 'getModifierState'>,
+): boolean {
+  if (event.isComposing) return true
+  const isCharacter = event.key.length === 1
+  if (event.ctrlKey || event.metaKey) {
+    return FIELD_CARET_KEYS.has(event.key) || (isCharacter && event.getModifierState('AltGraph'))
+  }
+  return isCharacter || FIELD_NAMED_KEYS.has(event.key)
+}
+
+/** Whether the element is a native text control: a text-like `input` or a `textarea`. */
+export function isTextControl(element: EventTarget | null): boolean {
+  return (
+    (element instanceof HTMLInputElement && EDITABLE_INPUT_TYPES.has(element.type)) ||
+    element instanceof HTMLTextAreaElement
+  )
+}
+
+/** The letters of the editing shortcuts a native text control handles with `Ctrl` or `Cmd`. */
+const TEXT_CONTROL_SHORTCUT_KEYS = new Set(['a', 'c', 'x', 'v', 'z', 'y'])
+
+/**
+ * Whether the event is one of the editing shortcuts that a native text control ({@link isTextControl})
+ * handles itself: `Ctrl` or `Cmd` (without `Alt`) with `A` (select all), `C`, `X`, `V` (the
+ * clipboard), `Z` or `Y` (undo, redo), or `Shift+Z` (redo).
+ */
+export function isTextControlShortcut(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey'>,
+): boolean {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return false
+  const key = event.key.toLowerCase()
+  return event.shiftKey ? key === 'z' : TEXT_CONTROL_SHORTCUT_KEYS.has(key)
+}
+
 /** Whether the event occurred within the given {@link DOMRect}. */
 export function isElementInBounds(
   event: Pick<MouseEvent, 'clientX' | 'clientY'>,
