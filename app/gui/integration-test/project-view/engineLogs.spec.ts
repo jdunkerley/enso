@@ -60,9 +60,13 @@ test('the Logs tab follows the engine log and filters by level', async ({
     // The engine's lines, its stderr among them, show once Engine is ticked.
     await expect(log.getByText('Something failed')).toBeVisible()
     await expect(log.getByText('Language server started')).toBeHidden()
-    await (await openSources(page)).getByRole('checkbox', { name: 'Engine' }).check()
+    const sources = await openSources(page)
+    await sources.getByRole('checkbox', { name: 'Engine' }).check()
     await expect(log.getByText('Language server started')).toBeVisible()
+    // Escape closes the popover and returns the keyboard to its button, still in the dock.
     await page.keyboard.press('Escape')
+    await expect(sources).toBeHidden()
+    await expect(dock.getByTestId('engine-logs-sources-button')).toBeFocused()
     await expect(log.getByText(STDERR)).toBeVisible()
 
     // A line written later arrives without reopening anything.
