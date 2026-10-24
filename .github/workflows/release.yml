@@ -1,8 +1,10 @@
-# Hand-maintained. This is the last output of the CI generator (`build_tools/ci-gen`), which is
-# retired in Phase 1 of the build simplification
-# (docs/superpowers/specs/2026-10-20-build-simplification-design.md). It is kept unchanged on
-# purpose: Phase 4 rewrites the release workflows and proves them with an rc prerelease, so change
-# this file only together with such a release test.
+# Hand-written. Releases one version of the IDE: drafts a GitHub release, builds the engine bundle
+# and the GUI, packages the installers for Windows, Linux and (on the self-hosted Mac, when it is
+# online) macOS, uploads them with their checksums and update feeds to the draft, publishes it, and
+# records a stable version as `latest-release`. Called by `promote.yml`, which computes the version;
+# can be started by hand with one. The logic is `tools/build-scripts`' `release` command (build
+# simplification, Phase 4; docs/superpowers/specs/2026-10-20-build-simplification-design.md). Change
+# this file only together with an rc release test.
 
 name: Release
 on:
@@ -12,333 +14,308 @@ on:
         description: What version number this release should get.
         required: true
         type: string
+      publish:
+        description: >-
+          Publish the release when its installers are uploaded. False stops at the draft, for a
+          release test to check before anyone can download it; publish it later with
+          `release-id`.
+        required: false
+        type: boolean
+        default: true
+      release-id:
+        description: >-
+          Publish this existing draft (its id, from the run that made it) and record its version,
+          instead of building a release. `version` must be the draft's version.
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       version:
         description: What version number this release should get.
         required: true
         type: string
+      publish:
+        description: >-
+          Publish the release when its installers are uploaded. False stops at the draft, for a
+          release test to check before anyone can download it; publish it later with
+          `release-id`.
+        required: false
+        type: boolean
+        default: true
+      release-id:
+        description: >-
+          Publish this existing draft (its id, from the run that made it) and record its version,
+          instead of building a release. `version` must be the draft's version.
+        required: false
+        type: string
+        default: ""
+
 concurrency: release
+
+env:
+  # Every build of this run is this version: `tools/build-scripts`' `version` and `release` read
+  # `ENSO_VERSION`, and sbt reads both.
+  ENSO_VERSION: ${{ inputs.version }}
+  ENSO_EDITION: ${{ inputs.version }}
+  # Read by `.github/actions/git-clean`. A release always cleans, before and after each job: the
+  # self-hosted Mac keeps its working tree between runs.
+  ENSO_CI_CLEAN_BUILD: "true"
+
+# Note [Release Without ./run]
+# ============================
+# What `./run` did for each job, and where it went:
+# - `release create-draft`, `release publish`, `release update-latest-version`, `release promote`
+#   and the upload half of `ide upload` are `tools/build-scripts`' `release` command
+#   (`src/release/`). The release version must be given: an invalid one is an error, not a `-dev`
+#   build.
+# - `backend get` is the sbt task `buildEngineBundle`, as in `ide-packaging.yml` (Note [Engine
+#   Bundle Without ./run] there).
+# - `ide upload` built the GUI on each platform; the GUI is the same web bundle everywhere, so one
+#   job builds it, as `ide-packaging.yml` does, at the release version.
+# - The packaging is `ide-build`, then `release upload-ide` uploads the installer, its `.sha256`
+#   and what `electron-updater` reads (`latest.yml`, `latest-linux.yml`, the blockmaps; on a signed
+#   Mac `latest-mac.yml` and the zip) to the draft, by its id. electron-builder never publishes:
+#   `buildPackage` passes `publish: 'never'` and writes the feeds from its `publish` settings.
+# - `backend sbt verifyLicensePackages` is a plain sbt step.
+# - Gone, because the fork has no use for them: Sentry (`SENTRY_AUTH_TOKEN` and the
+#   `ENSO_IDE_SENTRY_*` variables), the cloud and analytics variables (`ENSO_IDE_HOST`, the Google
+#   Analytics tag; the IDE is local-only), the AG Grid licence key (the grid runs without one), the
+#   Apple and Microsoft signing secrets, and `assets.json` (only upstream's website read it).
+#
+# Note [Publishing Later]
+# ========================
+# A release test must not publish what it has not checked: as soon as a prerelease is public, the
+# installed apps that include prereleases are offered it. So `publish: false` stops a run at the
+# filled draft (the publish and latest-version jobs are skipped), and a second run with
+# `release-id: <the draft's id>` and the same `version` skips every build job and runs only those
+# two. `release publish` checks that the draft's tag is `version`. The nightly calls this workflow
+# through `promote.yml` with the defaults, and so publishes at once.
+#
+# Note [Signing The Installers]
+# =============================
+# The fork ships unsigned. To sign later, configure electron-builder, not this workflow's logic:
+# Windows through `win.signtoolOptions` (`WIN_CSC_LINK`/`WIN_CSC_KEY_PASSWORD`) or
+# `win.azureSignOptions` (Azure Trusted Signing), and macOS through `CSC_LINK`/`CSC_KEY_PASSWORD`
+# with the notarization `afterSign` hook that `app/electron-client/electron-builder-config.ts`
+# already has (`APPLEID`, `APPLEIDPASS`, `APPLETEAMID`). Pass the secrets as `env` on the
+# "Package the IDE" steps and add them to `RELEASE_SECRETS` in `tools/ci/check-workflows.mjs`.
+# `ide-build --sign` is already passed; without a certificate it changes nothing. A signed Mac
+# build also writes `latest-mac.yml` and the zip, which `upload-ide` then uploads.
+
 jobs:
-  build-script-linux-amd64:
-    name: Build Script
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli
-          retention-days: 1
-  build-script-macos-aarch64:
-    name: Build Script
-    needs:
-      - check-the-mac-os-runner
-    if: needs.check-the-mac-os-runner.outputs.online == 'true'
-    runs-on:
-      - self-hosted
-      - macOS
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli
-          retention-days: 1
-  build-script-windows-amd64:
-    name: Build Script
-    runs-on:
-      - windows-latest
-    steps:
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/develop' }}
-          shared-key: build-script
-      - name: Compile
-        run: cargo build -p enso-build-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload
-        uses: actions/upload-artifact@v5
-        with:
-          if-no-files-found: error
-          name: enso-build-cli-${{ runner.os }}
-          path: target/rust/debug/enso-build-cli.exe
-          retention-days: 1
+  # The Mac is a self-hosted runner that may be offline. Its jobs wait for it for one minute and are
+  # skipped when it does not appear; publishing then notes the missing installer. Keep in step with
+  # `engine-checks-nightly.yml` and `macos-pull-request.yml`.
   check-the-mac-os-runner:
     name: Check the macOS runner
-    runs-on:
-      - ubuntu-latest
+    if: inputs.release-id == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    outputs:
+      online: ${{ steps.wait.outputs.online }}
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
-        with:
-          clean: false
       - id: wait
         name: Wait for the macOS runner
         run: ./tools/ci/wait-for-macos-runner.sh 1 skip
-        shell: bash
         env:
           RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
-    outputs:
-      online: ${{ steps.wait.outputs.online }}
-    timeout-minutes: 6
-  enso-build-ci-gen-draft-release-linux-amd64:
+
+  draft-release:
     name: Create a release draft.
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - id: prepare
-        run: ./run release create-draft
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    if: inputs.release-id == ''
+    runs-on: ubuntu-latest
     outputs:
       ENSO_RELEASE_ID: ${{ steps.prepare.outputs.ENSO_RELEASE_ID }}
       ENSO_VERSION: ${{ steps.prepare.outputs.ENSO_VERSION }}
-  enso-build-ci-gen-job-build-backend-linux-amd64:
-    name: Build Backend (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - id: prepare
+        name: Create the draft release
+        run: corepack pnpm --filter build-scripts run release create-draft
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  license-check:
+    name: Verify License Packages (linux, amd64)
+    if: inputs.release-id == ''
+    runs-on: ubuntu-latest
+    steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
+          cache-key: engine
+      - name: Verify the license packages
+        run: sbt "-Dsbt.server.autostart=false" verifyLicensePackages
+        env:
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  gui-build:
+    name: GUI build (linux, amd64)
+    if: inputs.release-id == ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
         with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Restore sbt / Coursier downloads
-        uses: actions/cache/restore@v4
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - uses: ./.github/actions/setup-rust
         with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
+          shared-key: wasm-parser
+      - name: Add wasm target
+        run: rustup target add wasm32-unknown-unknown
+      # Keep the version in step with `wasm-bindgen` in `Cargo.lock` and with `gui-checks.yml`.
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
+      - name: Install dependencies
+        run: corepack pnpm install
+      - name: Build GUI
+        run: corepack pnpm run build:gui --mode=production
+        env:
+          ENSO_IDE_COMMIT_HASH: ${{ github.sha }}
+          ENSO_IDE_VERSION: ${{ inputs.version }}
+          MODE: production
+      - name: Collect GUI artifacts
+        run: mkdir -p dist/gui/assets && cp -R app/gui/dist/. dist/gui/assets/
+      - name: Upload gui
+        uses: actions/upload-artifact@v5
+        with:
+          name: gui
+          path: dist/gui/
+      - name: Upload WASM parser artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          if-no-files-found: error
+          name: wasm-artifacts
           path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-          restore-keys: sbt-deps-${{ runner.os }}-
-      - run: ./run backend get
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
-        name: Save sbt / Coursier downloads
-        uses: actions/cache/save@v4
+            app/rust-ffi/dist
+            app/ydoc-shared/src/ast/generated
+          retention-days: 1
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  build-backend:
+    name: Build Backend (${{ matrix.os }}, amd64)
+    if: inputs.release-id == ''
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+          - os: windows
+            runner: windows-latest
+    env:
+      ENSO_LAUNCHER: native
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
         with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-      - name: Upload Edition File
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          flatc: "true"
+          rust: "true"
+      - name: Set up MSVC
+        uses: ./.github/actions/setup-msvc
+      - id: version
+        name: Compute the version
+        run: corepack pnpm --filter build-scripts run version
+      - name: Build the engine bundle
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "clean; all buildEngineBundle"
+        env:
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
+      - if: matrix.os == 'linux'
+        name: Upload Edition File
         uses: actions/upload-artifact@v5
         with:
           name: Edition File
           path: distribution/editions/*.yaml
-      - name: Upload fbs-schema
+      - if: matrix.os == 'linux'
+        name: Upload fbs-schema
         uses: actions/upload-artifact@v5
         with:
           name: fbs-schema
           path: engine/language-server/src/main/schema/
       - name: Archive backend
-        run: tar -cvf backend.tar -C dist/backend .
+        run: tar -cvf backend.tar -C built-distribution/engine-bundle-${{ steps.version.outputs.ENSO_VERSION }}-${{ matrix.os }}-amd64/enso .
       - name: Upload backend
         uses: actions/upload-artifact@v5
         with:
-          name: backend-linux
+          name: backend-${{ matrix.os }}
           path: backend.tar
       - name: Cleanup
         run: rm backend.tar
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  build-backend-macos:
+    name: Build Backend (macos, aarch64)
+    needs: [check-the-mac-os-runner]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    continue-on-error: true
     env:
       ENSO_LAUNCHER: native
-  enso-build-ci-gen-job-build-backend-macos-aarch64:
-    name: Build Backend (macos, aarch64)
-    needs:
-      - build-script-macos-aarch64
-      - check-the-mac-os-runner
-    if: needs.check-the-mac-os-runner.outputs.online == 'true'
-    runs-on:
-      - self-hosted
-      - macOS
-    continue-on-error: true
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
         with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
+          cache-key: engine
+          flatc: "true"
+          rust: "true"
+      - id: version
+        name: Compute the version
+        run: corepack pnpm --filter build-scripts run version
+      - name: Build the engine bundle
+        run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "clean; all buildEngineBundle"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Restore sbt / Coursier downloads
-        uses: actions/cache/restore@v4
-        with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-          restore-keys: sbt-deps-${{ runner.os }}-
-      - run: ./run backend get
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
-        name: Save sbt / Coursier downloads
-        uses: actions/cache/save@v4
-        with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Archive backend
-        run: tar -cvf backend.tar -C dist/backend .
+        run: tar -cvf backend.tar -C built-distribution/engine-bundle-${{ steps.version.outputs.ENSO_VERSION }}-macos-aarch64/enso .
       - name: Upload backend
         uses: actions/upload-artifact@v5
         with:
@@ -346,215 +323,167 @@ jobs:
           path: backend.tar
       - name: Cleanup
         run: rm backend.tar
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  # Packages the IDE for one platform and uploads it to the draft. The legs run despite the other
+  # platform's failure, as in `ide-packaging.yml` (Note [Platform Legs Run Despite The Other
+  # Platform's Failure] there); publishing still needs both.
+  upload-ide:
+    name: Build IDE (${{ matrix.os }}, amd64)
+    needs: [draft-release, build-backend, gui-build]
+    if: ${{ !cancelled() && needs.draft-release.result == 'success' && needs.gui-build.result == 'success' }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-latest
+            installer: dist/ide/enso-*.AppImage
+          - os: windows
+            runner: windows-latest
+            installer: dist/ide/enso-*.exe
     env:
-      ENSO_LAUNCHER: native
-  enso-build-ci-gen-job-build-backend-windows-amd64:
-    name: Build Backend (windows, amd64)
-    needs:
-      - build-script-windows-amd64
-    runs-on:
-      - windows-latest
+      ENSO_BUILD_UPDATE_INFO: "true"
+      ENSO_RELEASE_ID: ${{ needs.draft-release.outputs.ENSO_RELEASE_ID }}
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Download backend
         uses: actions/download-artifact@v5
         with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Restore sbt / Coursier downloads
-        uses: actions/cache/restore@v4
+          name: backend-${{ matrix.os }}
+          path: dist/backend
+      - run: |-
+          tar -xvf dist/backend/backend.tar -C dist/backend
+          rm dist/backend/backend.tar
+      - name: Download GUI
+        uses: actions/download-artifact@v5
         with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-          restore-keys: sbt-deps-${{ runner.os }}-
-      - run: ./run backend get
+          name: gui
+          path: dist/gui
+      - name: Download WASM parser artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: app
+      - name: Package the IDE
+        run: corepack pnpm --filter build-scripts run ide-build --sign
+      - name: Upload the installer to the draft release
+        run: corepack pnpm --filter build-scripts run release upload-ide
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "!cancelled() && github.ref == 'refs/heads/develop'"
-        name: Save sbt / Coursier downloads
-        uses: actions/cache/save@v4
-        with:
-          key: sbt-deps-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-          path: |-
-            ~/.sbt
-            ~/.ivy2/cache
-            ~/.cache/coursier
-            ~/AppData/Local/Coursier/Cache
-            ~/Library/Caches/Coursier
-      - name: Archive backend
-        run: tar -cvf backend.tar -C dist/backend .
-      - name: Upload backend
+      - name: Upload ide
         uses: actions/upload-artifact@v5
         with:
-          name: backend-windows
-          path: backend.tar
-      - name: Cleanup
-        run: rm backend.tar
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
+          name: ide-${{ matrix.os }}-amd64
+          path: ${{ matrix.installer }}
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  upload-ide-macos:
+    name: Build IDE (macos, aarch64)
+    needs:
+      [check-the-mac-os-runner, draft-release, build-backend-macos, gui-build]
+    if: needs.check-the-mac-os-runner.outputs.online == 'true'
+    runs-on: [self-hosted, macOS]
+    continue-on-error: true
+    env:
+      ENSO_BUILD_UPDATE_INFO: "true"
+      ENSO_RELEASE_ID: ${{ needs.draft-release.outputs.ENSO_RELEASE_ID }}
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Download backend
+        uses: actions/download-artifact@v5
+        with:
+          name: backend-macos
+          path: dist/backend
+      - run: |-
+          tar -xvf dist/backend/backend.tar -C dist/backend
+          rm dist/backend/backend.tar
+      - name: Download GUI
+        uses: actions/download-artifact@v5
+        with:
+          name: gui
+          path: dist/gui
+      - name: Download WASM parser artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: wasm-artifacts
+          path: app
+      - name: Package the IDE
+        run: corepack pnpm --filter build-scripts run ide-build --sign
+      - name: Upload the installer to the draft release
+        run: corepack pnpm --filter build-scripts run release upload-ide
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_LAUNCHER: native
-  enso-build-ci-gen-publish-release-linux-amd64:
+      - name: Upload ide
+        uses: actions/upload-artifact@v5
+        with:
+          name: ide-macos-aarch64
+          path: dist/ide/enso-*.dmg
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  # Publishes when asked to (`publish`) and the draft, the license check and both hosted platforms
+  # succeeded; macOS may have failed or been skipped, and the notes then say so. With `release-id`
+  # it publishes that draft alone (Note [Publishing Later]).
+  publish-release:
     name: Publish release (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-draft-release-linux-amd64
-      - enso-build-ci-gen-upload-ide-linux-amd64
-      - enso-build-ci-gen-upload-ide-macos-aarch64
-      - enso-build-ci-gen-upload-ide-windows-amd64
-      - license-check-linux-amd64
-    if: "!cancelled() && needs.enso-build-ci-gen-draft-release-linux-amd64.result == 'success' && needs.license-check-linux-amd64.result == 'success' && needs.enso-build-ci-gen-upload-ide-windows-amd64.result == 'success' && needs.enso-build-ci-gen-upload-ide-linux-amd64.result == 'success'"
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: ./run release publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    needs: [draft-release, license-check, upload-ide, upload-ide-macos]
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
+    runs-on: ubuntu-latest
     env:
-      ENSO_RELEASE_ID: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_RELEASE_ID }}
-      ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
-  enso-build-ci-gen-update-latest-release-version-linux-amd64:
-    name: Update the latest release version (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-draft-release-linux-amd64
-      - enso-build-ci-gen-publish-release-linux-amd64
-    runs-on:
-      - ubuntu-latest
+      ENSO_RELEASE_ID: ${{ inputs.release-id != '' && inputs.release-id || needs.draft-release.outputs.ENSO_RELEASE_ID }}
     steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
       - name: Checking out the repository
         uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
+      - uses: ./.github/actions/setup-node
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
+      - name: Publish the release
+        run: corepack pnpm --filter build-scripts run release publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Tests the publish job's result itself: by default a job is skipped when any job before it
+  # failed, and a failed macOS job would then skip this one (the 2026.10.23 nightly's was).
+  update-latest-release-version:
+    name: Update the latest release version (linux, amd64)
+    needs: [draft-release, publish-release]
+    if: "!cancelled() && needs.publish-release.result == 'success'"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-node
+      - name: Set up the build scripts
+        uses: ./.github/actions/setup-build-scripts
       - id: update
-        run: ./run release update-latest-version
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: Record a stable version as the latest release
+        run: corepack pnpm --filter build-scripts run release update-latest-version
       - if: steps.update.outputs.ENSO_LATEST_RELEASE_UPDATED == 'true'
         name: Open a pull request with the update
         run: |-
@@ -570,326 +499,3 @@ jobs:
           gh pr create --base "$GITHUB_REF_NAME" --head "$BRANCH" --title "$TITLE" --body "$BODY"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_RELEASE_ID: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_RELEASE_ID }}
-      ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
-    permissions:
-      contents: write
-      pull-requests: write
-  enso-build-ci-gen-upload-ide-linux-amd64:
-    name: Build IDE (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-      - enso-build-ci-gen-draft-release-linux-amd64
-      - enso-build-ci-gen-job-build-backend-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: ${{ (always()) }}
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download backend
-        uses: actions/download-artifact@v5
-        with:
-          name: backend-linux
-          path: dist/backend
-      - run: |-
-          tar -xvf dist/backend/backend.tar -C dist/backend
-          rm dist/backend/backend.tar
-      - run: ./run ide upload --backend-source local --sign-artifacts
-        env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
-          ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      - name: Upload ide
-        uses: actions/upload-artifact@v5
-        with:
-          name: ide-linux-amd64
-          path: dist/ide/enso-*.AppImage
-      - if: ${{ (always()) }}
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_BUILD_UPDATE_INFO: "true"
-      ENSO_RELEASE_ID: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_RELEASE_ID }}
-      ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
-  enso-build-ci-gen-upload-ide-macos-aarch64:
-    name: Build IDE (macos, aarch64)
-    needs:
-      - build-script-macos-aarch64
-      - check-the-mac-os-runner
-      - enso-build-ci-gen-draft-release-linux-amd64
-      - enso-build-ci-gen-job-build-backend-macos-aarch64
-    if: needs.check-the-mac-os-runner.outputs.online == 'true'
-    runs-on:
-      - self-hosted
-      - macOS
-    continue-on-error: true
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: ${{ (always()) }}
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download backend
-        uses: actions/download-artifact@v5
-        with:
-          name: backend-macos
-          path: dist/backend
-      - run: |-
-          tar -xvf dist/backend/backend.tar -C dist/backend
-          rm dist/backend/backend.tar
-      - run: ./run ide upload --backend-source local --sign-artifacts
-        env:
-          APPLEID: ${{ secrets.APPLE_NOTARIZATION_USERNAME }}
-          APPLEIDPASS: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
-          APPLETEAMID: ${{ secrets.APPLE_NOTARIZATION_TEAM_ID }}
-          CSC_FOR_PULL_REQUEST: "true"
-          CSC_IDENTITY_AUTO_DISCOVERY: "true"
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CODE_SIGNING_CERT_PASSWORD }}
-          CSC_LINK: ${{ secrets.APPLE_CODE_SIGNING_CERT }}
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
-          ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      - name: Upload ide
-        uses: actions/upload-artifact@v5
-        with:
-          name: ide-macos-aarch64
-          path: dist/ide/enso-*.dmg
-      - if: ${{ (always()) }}
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_BUILD_UPDATE_INFO: "true"
-      ENSO_RELEASE_ID: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_RELEASE_ID }}
-      ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
-  enso-build-ci-gen-upload-ide-windows-amd64:
-    name: Build IDE (windows, amd64)
-    needs:
-      - build-script-windows-amd64
-      - enso-build-ci-gen-draft-release-linux-amd64
-      - enso-build-ci-gen-job-build-backend-windows-amd64
-    runs-on:
-      - windows-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: ${{ (always()) }}
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Download backend
-        uses: actions/download-artifact@v5
-        with:
-          name: backend-windows
-          path: dist/backend
-      - run: |-
-          tar -xvf dist/backend/backend.tar -C dist/backend
-          rm dist/backend/backend.tar
-      - run: ./run ide upload --backend-source local --sign-artifacts
-        env:
-          ENSO_IDE_AG_GRID_LICENSE_KEY: ${{ vars.ENSO_AG_GRID_LICENSE_KEY }}
-          ENSO_IDE_GOOGLE_ANALYTICS_TAG: ${{ vars.ENSO_CLOUD_GOOGLE_ANALYTICS_TAG }}
-          ENSO_IDE_HOST: ${{ vars.ENSO_HOST }}
-          ENSO_IDE_SENTRY_DSN: ${{ vars.ENSO_CLOUD_SENTRY_DSN }}
-          ENSO_IDE_SENTRY_ORGANIZATION: ${{ vars.ENSO_CLOUD_SENTRY_ORGANIZATION }}
-          ENSO_IDE_SENTRY_PROJECT: ${{ vars.ENSO_CLOUD_SENTRY_PROJECT }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT_PASSWORD }}
-          WIN_CSC_LINK: ${{ secrets.MICROSOFT_CODE_SIGNING_CERT }}
-      - name: Upload ide
-        uses: actions/upload-artifact@v5
-        with:
-          name: ide-windows-amd64
-          path: dist/ide/enso-*.exe
-      - if: ${{ (always()) }}
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    env:
-      ENSO_BUILD_UPDATE_INFO: "true"
-      ENSO_RELEASE_ID: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_RELEASE_ID }}
-      ENSO_VERSION: ${{ needs.enso-build-ci-gen-draft-release-linux-amd64.outputs.ENSO_VERSION }}
-  license-check-linux-amd64:
-    name: Verify License Packages (linux, amd64)
-    needs:
-      - build-script-linux-amd64
-    runs-on:
-      - ubuntu-latest
-    steps:
-      - name: Expose Artifact API and context information.
-        uses: actions/github-script@v8
-        with:
-          script: "\n    core.exportVariable(\"ACTIONS_RUNTIME_TOKEN\", process.env[\"ACTIONS_RUNTIME_TOKEN\"])\n    core.exportVariable(\"ACTIONS_RUNTIME_URL\", process.env[\"ACTIONS_RUNTIME_URL\"])\n    core.exportVariable(\"GITHUB_RETENTION_DAYS\", process.env[\"GITHUB_RETENTION_DAYS\"])\n    console.log(context)\n    "
-      - name: Checking out the repository
-        uses: actions/checkout@v5
-        with:
-          clean: false
-      - if: runner.os == 'macOS'
-        name: Setup nodejs version
-        uses: actions/setup-node@v5
-        with:
-          node-version-file: .node-version
-          package-manager-cache: false
-      - if: runner.os != 'Linux'
-        run: npm install -g --force corepack@0.36.0 && corepack --version
-      - name: Download Build Script
-        uses: actions/download-artifact@v5
-        with:
-          name: enso-build-cli-${{ runner.os }}
-          path: ${{ runner.temp }}/enso-build-cli
-      - name: Configure Build Script
-        run: |-
-          BIN="$RUNNER_TEMP/enso-build-cli/enso-build-cli"
-          [ "$RUNNER_OS" = "Windows" ] && BIN="$BIN.exe"
-          chmod +x "$BIN" || true
-          echo "ENSO_BUILD_CLI_BIN=$BIN" >> "$GITHUB_ENV"
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Script Setup
-        run: ./run --help
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean before
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: ./run backend sbt '--' verifyLicensePackages
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - if: "${{ (always()) && (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
-        name: Clean after
-        run: corepack pnpm run git-clean --verbose
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-env:
-  ENSO_BUILD_SKIP_VERSION_CHECK: "true"
-  ENSO_EDITION: ${{ inputs.version }}
-  ENSO_VERSION: ${{ inputs.version }}
-  RUST_BACKTRACE: full
