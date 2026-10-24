@@ -1,4 +1,4 @@
-import { isEditableElement, isFieldKey } from '$/utils/event'
+import { isEditableElement, isFieldKey, isTextControl, isTextControlShortcut } from '$/utils/event'
 import type { WindowEventTarget } from '@/composables/events'
 import { createContextStore } from '@/providers'
 
@@ -55,26 +55,35 @@ function isKeydownInOverlay(event: Event) {
 }
 
 /**
- * Whether the event is a key press that a focused text field uses itself (see {@link isFieldKey}):
- * typing, editing or moving the caret in an `input`, `textarea`, `select` or `contenteditable`
- * (CodeMirror) element.
+ * Whether the event is a key press that the focused field uses itself, so none of these
+ * window-level handlers runs for it and it reaches the field unchanged:
+ * - in any editable element (an `input`, `textarea`, `select` or `contenteditable`, which includes
+ *   CodeMirror), a key that types, edits or moves the caret, `Ctrl`/`Cmd` caret and word keys
+ *   included ({@link isFieldKey});
+ * - in a native text control (an `input` or `textarea`), also its editing shortcuts: select all,
+ *   the clipboard, undo and redo ({@link isTextControlShortcut}).
  *
- * Such a key belongs to the field, so none of these window-level handlers runs for it, and it
- * reaches the field unchanged. Otherwise the graph's single-key shortcuts take it from any field
- * that does not stop it itself, and prevent its default: `Space` (show the visualization) would be
- * dropped from the engine logs' filter, `Backspace` would delete the selected components and the
- * arrow keys would pan the scene. Keys with `Ctrl` or `Cmd` (`Mod+S`, `Mod+L`, …) still reach the
- * handlers, as do `Escape` (which ends the interaction and leaves the field) and the function keys.
+ * Otherwise the graph's shortcuts take such a key from any field that does not stop it itself, and
+ * prevent its default: `Space` (show the visualization) would be dropped from the engine logs'
+ * filter, `Backspace` would delete the selected components, the arrow keys would pan the scene, and
+ * `Mod+Z` would undo a graph edit instead of the typing.
+ *
+ * Other `Ctrl`/`Cmd` shortcuts (`Mod+S`, `Mod+L`, …), `Escape` (which ends the interaction and
+ * leaves the field) and the function keys still reach the handlers. So do the editing shortcuts
+ * from `contenteditable` content: the code editor has no undo of its own, and relies on `Mod+Z`
+ * reaching the graph's undo, which covers its edits.
  *
  * The target is the first element of the composed path, so a field inside a visualization's
- * shadow root counts too. `keyup` is not filtered, as in {@link isKeydownInOverlay}.
+ * shadow root counts too. `keyup` is not filtered, as in {@link isKeydownInOverlay}. Nor are the
+ * keydowns of modifier keys pressed alone, so the modifier tracking (`useGlobalKeyboard`) still
+ * sees every modifier change, though not a character keydown typed in a field.
  */
 function isKeydownInField(event: Event) {
+  if (event.type !== 'keydown' || !(event instanceof KeyboardEvent)) return false
+  const target = event.composedPath()[0] ?? event.target
   return (
-    event.type === 'keydown' &&
-    event instanceof KeyboardEvent &&
-    isFieldKey(event) &&
-    isEditableElement(event.composedPath()[0] ?? event.target)
+    (isFieldKey(event) && isEditableElement(target)) ||
+    (isTextControlShortcut(event) && isTextControl(target))
   )
 }
 

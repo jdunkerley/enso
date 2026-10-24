@@ -334,16 +334,30 @@ test('the dock header’s fullscreen and close buttons', async ({ editorPage }) 
 test('keys typed into the filter reach it, not the graph’s shortcuts', async ({ editorPage }) => {
   await editorPage.selectSingleNode('aggregated').do(async (page) => {
     const nodeCount = await locate.graphNode(page).count()
+    const node = locate.graphNodeByBinding(page, 'aggregated')
     await page.keyboard.press('ControlOrMeta+L')
     const filter = locate.bottomDock(page).getByRole('searchbox', { name: 'Filter logs' })
     await filter.click()
+    // The component stays selected, so each key below would reach a graph action that applies.
+    await expect(locate.selectedNodes(page)).toHaveCount(1)
+    const nodeBox = await node.boundingBox()
     // `Space` is the graph's "show the visualization", `Backspace` its "delete the selection".
     await page.keyboard.type('a b')
     await expect(filter).toHaveValue('a b')
     await page.keyboard.press('Backspace')
     await expect(filter).toHaveValue('a ')
-    const node = locate.graphNodeByBinding(page, 'aggregated')
+    // The arrow keys move the selected components; here they move the caret.
+    await page.keyboard.press('ArrowLeft')
+    await page.keyboard.type('c')
+    await expect(filter).toHaveValue('ac ')
+    // `Mod+A` selects all components; here it selects the filter's text.
+    await page.keyboard.press('ControlOrMeta+A')
+    await expect
+      .poll(() => filter.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd]))
+      .toEqual([0, 3])
+    await expect(locate.selectedNodes(page)).toHaveCount(1)
     await expect(locate.anyVisualization(node)).toHaveCount(0)
     await expect(locate.graphNode(page)).toHaveCount(nodeCount)
+    expect(await node.boundingBox()).toEqual(nodeBox)
   })
 })
