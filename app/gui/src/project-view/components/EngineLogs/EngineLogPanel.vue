@@ -19,13 +19,12 @@ import {
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed, ref, shallowRef, toValue, useId, watch } from 'vue'
+import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
 import {
   DEFAULT_ORIGINS,
   filterRows,
   LIVE_ROW_CAP,
-  loggerSuggestions,
   originSummary,
   rowsFromLines,
   type LevelFilter,
@@ -47,7 +46,6 @@ const { stream, projectId, initialSession } = defineProps<{
 const { getText } = useText()
 const backends = useBackends()
 const systemApi = window.api?.system
-const loggerListId = useId()
 
 const engineLogSettings = useEngineLogSettings()
 
@@ -167,8 +165,6 @@ watch(
   },
 )
 const filterText = ref('')
-/** A dotted logger prefix: only the entries of loggers under it show. */
-const loggerFilter = ref('')
 const follow = ref(true)
 /** The session picked; `''` for the live one (only with a live stream). */
 const selectedSession = ref(stream != null ? '' : (initialSession ?? ''))
@@ -252,11 +248,8 @@ const shownRows = computed(() =>
     level: level.value,
     text: filterText.value,
     origins: originFilter.value,
-    logger: loggerFilter.value,
   }),
 )
-
-const loggerOptions = computed(() => loggerSuggestions(sourceRows.value))
 
 /** The latest history or session request; only it may set `loading` and `loadError`. */
 let latestRequest = 0
@@ -439,17 +432,6 @@ function sessionLabel({ id, number, session }: PickableSession) {
         <option value="all">{{ getText('engineLogsLevelAll') }}</option>
       </select>
       <input
-        v-model="loggerFilter"
-        type="search"
-        class="loggerFilter"
-        :list="loggerListId"
-        :aria-label="getText('engineLogsLogger')"
-        :placeholder="getText('engineLogsLogger')"
-      />
-      <datalist :id="loggerListId">
-        <option v-for="name in loggerOptions" :key="name" :value="name" />
-      </datalist>
-      <input
         ref="filterInput"
         v-model="filterText"
         type="search"
@@ -608,10 +590,6 @@ function sessionLabel({ id, number, session }: PickableSession) {
 
 .toolbar input[type='search'] {
   width: 16em;
-}
-
-.toolbar .loggerFilter {
-  width: 12em;
 }
 
 .notice .link {

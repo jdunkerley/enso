@@ -770,7 +770,7 @@ describe('the session log tab: a session without a live stream', () => {
     expect(wrapper.text()).toContain('log files are not there')
   })
 
-  test('rows at the top of a window that continue an entry take its logger', async () => {
+  test('rows at the top of a window that continue an entry take its level', async () => {
     const lines = [
       '[ERROR] [2026-10-19T09:00:00.000Z] [Standard.Base.Data.Vector] boom',
       ...Array.from({ length: LIVE_ROW_CAP + 5 }, (_, n) => `  at frame ${n}`),
@@ -778,8 +778,7 @@ describe('the session log tab: a session without a live stream', () => {
     mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: lines })
     const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
     expect(lineTexts()[0]).toBe('at frame 5')
-    await wrapper.find('input[aria-label="Logger"]').setValue('Standard.Base')
-    expect(lineTexts()[0]).toBe('at frame 5')
+    // ERROR, from the entry above the window: an unknown library's lines would be INFO.
     await wrapper.find('select[aria-label="Level"]').setValue('error')
     expect(lineTexts()[0]).toBe('at frame 5')
   })
@@ -869,29 +868,6 @@ test('Load older lines in the live view pages back through the file; Back to liv
   expect(wrapper.text()).not.toContain('Showing earlier lines of this session')
   expect(wrapper.find('[data-testid="engine-logs-reload"]').exists()).toBe(false)
   expect(wrapper.find('.row.divider').text()).toContain('Load older lines')
-})
-
-test('filters by a logger prefix, offering the loggers seen', async () => {
-  const { source, wrapper, flush, lineTexts } = await mountPanel()
-  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
-  const lines = [LIBRARY_ERROR, 'Caused by: a continuation', STD_BITS_INFO, USER_WARN]
-  lines.forEach((text, n) =>
-    source.emit('line', { seq: n + 1, source: 'file', sessionId: 's1', text }),
-  )
-  await flush()
-  const logger = wrapper.find('input[aria-label="Logger"]')
-  const listId = logger.attributes('list')!
-  const options = wrapper
-    .findAll(`datalist[id="${listId}"] option`)
-    .map((o) => o.attributes('value'))
-  expect(options).toContain('Standard.Table')
-  expect(options).toContain('org.enso.table')
-  await logger.setValue('Standard.Table')
-  expect(lineTexts()).toEqual([LIBRARY_ERROR, 'Caused by: a continuation'])
-  await logger.setValue('org.enso')
-  expect(lineTexts()).toEqual([STD_BITS_INFO])
-  await logger.setValue('')
-  expect(lineTexts()).toEqual(lines)
 })
 
 describe("the live view's older lines", () => {

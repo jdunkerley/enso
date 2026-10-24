@@ -31,10 +31,10 @@
   toolbar.][343]
 - [One log viewer: Activity → Show Logs opens a session in the same viewer as
   the Logs tab, with its filters. Both can now page back through a whole session
-  with Load older lines, reload an earlier session, and filter by logger.][345]
+  with Load older lines and reload an earlier session.][345]
 - [The Logs tab's source tickboxes are in a Sources menu beside the text filter:
   its button names the sources shown, and it opens as you start typing in the
-  filter.][347]
+  filter. The Logger box is gone.][347]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
