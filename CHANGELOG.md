@@ -295,7 +295,7 @@
 
 #### Enso Standard Library
 
-- [Every database connection can log its SQL queries][NNN], not only one opened
+- [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
   connection's URL. Only the SQL text is logged, never the values bound to a
@@ -342,7 +342,7 @@
 [279]: https://github.com/jdunkerley/enso/pull/279
 [339]: https://github.com/jdunkerley/enso/pull/339
 [342]: https://github.com/jdunkerley/enso/pull/342
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[344]: https://github.com/jdunkerley/enso/pull/344
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
