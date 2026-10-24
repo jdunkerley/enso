@@ -52,18 +52,20 @@ test.describe('a session with two files', () => {
       await expect(tab.getByRole('button', { name: 'Reload' })).toBeVisible()
       await expect(tab.getByRole('button', { name: 'Download log file' })).toBeEnabled()
 
-      // The logger filter, with the loggers seen as suggestions.
-      const logger = tab.getByRole('combobox', { name: 'Logger' })
-      const listId = await logger.getAttribute('list')
-      await expect(
-        tab.locator(`datalist[id="${listId}"] option[value="Standard.Table"]`),
-      ).toHaveCount(1)
-      await logger.fill('Standard.Table')
-      await expect(log.getByText('Read 1,204 rows')).toBeVisible()
-      await expect(log.getByText('3 rows had invalid dates')).toBeVisible()
-      await expect(log.getByText('Report written')).toBeHidden()
-      await expect(log.getByText('Index out of bounds')).toBeHidden()
-      await logger.fill('')
+      // There is no logger filter.
+      await expect(tab.getByRole('combobox', { name: 'Logger' })).toHaveCount(0)
+
+      // The source tickboxes, in their popover, as in the Logs tab.
+      const sourcesButton = tab.getByTestId('engine-logs-sources-button')
+      await expect(sourcesButton).toHaveText('Sources: 2 of 3')
+      await sourcesButton.click()
+      const sources = page.getByRole('dialog', { name: 'Sources' })
+      await sources.getByRole('checkbox', { name: 'Engine' }).check()
+      await expect(log.getByText('Language server started')).toBeVisible()
+      await expect(sourcesButton).toHaveText('Sources: All')
+      await page.keyboard.press('Escape')
+      await expect(sources).toBeHidden()
+      await expect(sourcesButton).toBeFocused()
 
       await picker.selectOption({ index: 1 })
       await expect(log.getByText('from the first session')).toBeVisible()

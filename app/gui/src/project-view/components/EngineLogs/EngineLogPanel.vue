@@ -6,6 +6,7 @@
  * (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
  */
 import SvgIcon from '@/components/SvgIcon.vue'
+import Popover from '$/components/Dialog/Popover.vue'
 import { useBackends } from '$/providers/backends'
 import { useEngineLogSettings } from '$/providers/engineLogSettings'
 import { useText } from '$/providers/text'
@@ -18,13 +19,13 @@ import {
 import type { LocalBackend } from 'enso-common/src/services/LocalBackend'
 import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import * as detect from 'enso-common/src/utilities/detect'
-import { computed, ref, shallowRef, toValue, useId, watch } from 'vue'
+import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
 import {
   DEFAULT_ORIGINS,
   filterRows,
   LIVE_ROW_CAP,
-  loggerSuggestions,
+  originSummary,
   rowsFromLines,
   type LevelFilter,
   type LogOrigin,
@@ -45,7 +46,6 @@ const { stream, projectId, initialSession } = defineProps<{
 const { getText } = useText()
 const backends = useBackends()
 const systemApi = window.api?.system
-const loggerListId = useId()
 
 const engineLogSettings = useEngineLogSettings()
 
@@ -75,6 +75,135 @@ const originBoxes = computed(() =>
     ] as const
   ).filter((box) => box.shown),
 )
+/** The Sources button's label: which of the boxes shown are ticked. */
+const sourcesLabel = computed(() => {
+  const boxes = originBoxes.value
+  const summary = originSummary(
+    boxes.map((box) => box.origin),
+    origins.value,
+  )
+  switch (summary.kind) {
+    case 'all':
+      return getText('engineLogsOriginAll')
+    case 'none':
+      return getText('engineLogsOriginNone')
+    case 'one': {
+      const box = boxes.find((box) => box.origin === summary.origin)!
+      return getText('engineLogsOriginOne', getText(box.label))
+    }
+    case 'some':
+      return getText('engineLogsOriginSome', summary.ticked, summary.shown)
+  }
+})
+/** The Sources button's tooltip: the ticked boxes by name. */
+const sourcesTitle = computed(() =>
+  originBoxes.value
+    .filter((box) => origins.value[box.origin])
+    .map((box) => getText(box.label))
+    .join(', '),
+)
+/**
+ * Whether the Sources popover is open. It opens from its button, and as the text filter takes
+ * focus; it closes on Escape or a press outside it, but not on the text filter, nor as a box is
+ * ticked.
+ */
+const sourcesOpen = ref(false)
+/** Whether the popover was opened by the text filter, which then keeps the focus (`keepFocus`). */
+const sourcesOpenedByFilter = ref(false)
+const filterInput = ref<HTMLInputElement>()
+const sourcesButton = ref<HTMLButtonElement>()
+const sessionSelect = ref<HTMLSelectElement>()
+/**
+ * The open popover's element id, as its button names it (`aria-controls`); the text filter, which
+ * opens it too, names it as well.
+ */
+const sourcesPopoverId = ref<string>()
+
+function openSourcesFromFilter() {
+  if (sourcesOpen.value) return
+  sourcesOpenedByFilter.value = true
+  sourcesOpen.value = true
+}
+
+watch(
+  sourcesOpen,
+  (open) => {
+    if (!open) sourcesOpenedByFilter.value = false
+    sourcesPopoverId.value =
+      open ? (sourcesButton.value?.getAttribute('aria-controls') ?? undefined) : undefined
+  },
+  { flush: 'post' },
+)
+
+/** The open popover's element. */
+function sourcesPopover() {
+  const id = sourcesButton.value?.getAttribute('aria-controls')
+  return id ? document.getElementById(id) : null
+}
+
+/** The tickboxes of the open popover, in order. */
+function sourcesTickboxes(): HTMLInputElement[] {
+  return [...(sourcesPopover()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])]
+}
+
+/**
+ * Move the keyboard back to the Sources button at once if it is in the closing popover: until the
+ * content has gone (after its exit animation) the app's key handling skips keys typed in it, and
+ * Space would still tick a box.
+ */
+function takeFocusOutOfSources() {
+  const popover = sourcesPopover()
+  if (popover != null && popover.contains(document.activeElement)) sourcesButton.value?.focus()
+}
+
+/**
+ * Escape in the text filter closes the Sources popover. Handled on the filter: an Escape there goes
+ * on to the window, where the graph's `graph.deselectAll` (a bubbling window listener registered
+ * before Reka's) takes it, so Reka's own Escape listener never sees it. Only that: the first Escape
+ * does not also clear the filter or reach the graph. Inside the popover, Reka's listener handles it
+ * (the app's key handling skips keys typed in an overlay).
+ */
+function closeSourcesOnEscape(event: KeyboardEvent) {
+  if (!sourcesOpen.value) return
+  event.stopPropagation()
+  event.preventDefault()
+  sourcesOpen.value = false
+}
+
+/**
+ * The popover's content is teleported to the end of the page, so Tab is routed by hand to give it
+ * its place in the toolbar's order: from the open popover's button to its first box, from its last
+ * box on to the Session picker (which closes it, as focus leaves it), and Shift+Tab from its first
+ * box back to the button.
+ */
+function onSourcesButtonTab(event: KeyboardEvent) {
+  if (!sourcesOpen.value || event.shiftKey) return
+  const first = sourcesTickboxes()[0]
+  if (first == null) return
+  event.preventDefault()
+  first.focus()
+}
+
+function onSourcesPopoverTab(event: KeyboardEvent) {
+  const boxes = sourcesTickboxes()
+  const target = event.target
+  if (event.shiftKey) {
+    if (target === boxes[0] || !boxes.some((box) => box === target)) {
+      event.preventDefault()
+      sourcesButton.value?.focus()
+    }
+  } else if (target === boxes.at(-1)) {
+    event.preventDefault()
+    sessionSelect.value?.focus()
+  }
+}
+
+/** A press on, or focus moving to, the text filter leaves the Sources popover open. */
+function keepSourcesOpenForFilter(event: CustomEvent<{ originalEvent: Event }>) {
+  const target = event.detail.originalEvent.target
+  if (target instanceof Node && filterInput.value?.contains(target)) event.preventDefault()
+}
+
 /**
  * The origins the rows are filtered by. An origin without a tickbox is not filtered out: its lines
  * (from before its setting was turned off, or an earlier session's) stay in view rather than being
@@ -99,8 +228,6 @@ watch(
   },
 )
 const filterText = ref('')
-/** A dotted logger prefix: only the entries of loggers under it show. */
-const loggerFilter = ref('')
 const follow = ref(true)
 /** The session picked; `''` for the live one (only with a live stream). */
 const selectedSession = ref(stream != null ? '' : (initialSession ?? ''))
@@ -184,11 +311,8 @@ const shownRows = computed(() =>
     level: level.value,
     text: filterText.value,
     origins: originFilter.value,
-    logger: loggerFilter.value,
   }),
 )
-
-const loggerOptions = computed(() => loggerSuggestions(sourceRows.value))
 
 /** The latest history or session request; only it may set `loading` and `loadError`. */
 let latestRequest = 0
@@ -370,30 +494,58 @@ function sessionLabel({ id, number, session }: PickableSession) {
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
         <option value="all">{{ getText('engineLogsLevelAll') }}</option>
       </select>
-      <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
-        <label v-for="box in originBoxes" :key="box.origin" class="origin">
-          <input v-model="origins[box.origin]" type="checkbox" :aria-label="getText(box.label)" />
-          {{ getText(box.label) }}
-        </label>
-      </fieldset>
       <input
-        v-model="loggerFilter"
-        type="search"
-        class="loggerFilter"
-        :list="loggerListId"
-        :aria-label="getText('engineLogsLogger')"
-        :placeholder="getText('engineLogsLogger')"
-      />
-      <datalist :id="loggerListId">
-        <option v-for="name in loggerOptions" :key="name" :value="name" />
-      </datalist>
-      <input
+        ref="filterInput"
         v-model="filterText"
         type="search"
         :aria-label="getText('engineLogsFilter')"
         :placeholder="getText('engineLogsFilter')"
+        aria-haspopup="dialog"
+        :aria-expanded="sourcesOpen"
+        :aria-controls="sourcesPopoverId"
+        @focus="openSourcesFromFilter"
+        @keydown.escape="closeSourcesOnEscape"
       />
-      <select v-model="selectedSession" :aria-label="getText('engineLogsSession')">
+      <Popover
+        v-model:open="sourcesOpen"
+        isNonModal
+        :keepFocus="sourcesOpenedByFilter"
+        keepOutsideFocus
+        placement="bottom-start"
+        :offset="4"
+        size="auto-xxsmall"
+        rounded="large"
+        testId="engine-logs-sources"
+        :aria-label="getText('engineLogsOrigin')"
+        @interactOutside="keepSourcesOpenForFilter"
+        @escapeKeyDown="takeFocusOutOfSources"
+        @keydown.tab="onSourcesPopoverTab"
+      >
+        <template #trigger>
+          <button
+            ref="sourcesButton"
+            type="button"
+            class="sourcesButton"
+            :title="sourcesTitle"
+            data-testid="engine-logs-sources-button"
+            @keydown.tab="onSourcesButtonTab"
+          >
+            <span class="sourcesLabel">{{ sourcesLabel }}</span>
+            <SvgIcon name="arrow_right_head_only" class="sourcesArrow" />
+          </button>
+        </template>
+        <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
+          <label v-for="box in originBoxes" :key="box.origin" class="origin">
+            <input v-model="origins[box.origin]" type="checkbox" :aria-label="getText(box.label)" />
+            {{ getText(box.label) }}
+          </label>
+        </fieldset>
+      </Popover>
+      <select
+        ref="sessionSelect"
+        v-model="selectedSession"
+        :aria-label="getText('engineLogsSession')"
+      >
         <option v-if="stream != null" value="">{{ getText('engineLogsThisSession') }}</option>
         <option v-for="option in pickableSessions" :key="option.id" :value="option.id">
           {{ sessionLabel(option) }}
@@ -514,10 +666,6 @@ function sessionLabel({ id, number, session }: PickableSession) {
   width: 16em;
 }
 
-.toolbar .loggerFilter {
-  width: 12em;
-}
-
 .notice .link {
   margin-left: 6px;
   padding: 0;
@@ -528,13 +676,44 @@ function sessionLabel({ id, number, session }: PickableSession) {
   cursor: pointer;
 }
 
-.origins {
+.toolbar .sourcesButton {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  max-width: 16em;
+  cursor: pointer;
+}
+
+.toolbar .sourcesButton:focus-visible,
+.origin input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.sourcesLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourcesArrow {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  --icon-transform: rotate(90deg);
+  --icon-transform-origin: center;
+}
+
+/* In the popover, which is teleported out of the panel. */
+.origins {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  padding: 0;
+  padding: 4px 6px;
   border: none;
+  font-size: 12px;
+  color: var(--color-text);
 }
 
 .origin {
