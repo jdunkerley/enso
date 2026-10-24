@@ -6,6 +6,7 @@
  * (`docs/superpowers/specs/2026-10-20-engine-logs-panel-design.md`).
  */
 import SvgIcon from '@/components/SvgIcon.vue'
+import Popover from '$/components/Dialog/Popover.vue'
 import { useBackends } from '$/providers/backends'
 import { useEngineLogSettings } from '$/providers/engineLogSettings'
 import { useText } from '$/providers/text'
@@ -25,6 +26,7 @@ import {
   filterRows,
   LIVE_ROW_CAP,
   loggerSuggestions,
+  originSummary,
   rowsFromLines,
   type LevelFilter,
   type LogOrigin,
@@ -75,6 +77,72 @@ const originBoxes = computed(() =>
     ] as const
   ).filter((box) => box.shown),
 )
+/** The Sources button's label: which of the boxes shown are ticked. */
+const sourcesLabel = computed(() => {
+  const boxes = originBoxes.value
+  const summary = originSummary(
+    boxes.map((box) => box.origin),
+    origins.value,
+  )
+  switch (summary.kind) {
+    case 'all':
+      return getText('engineLogsOriginAll')
+    case 'none':
+      return getText('engineLogsOriginNone')
+    case 'one': {
+      const box = boxes.find((box) => box.origin === summary.origin)!
+      return getText('engineLogsOriginOne', getText(box.label))
+    }
+    case 'some':
+      return getText('engineLogsOriginSome', summary.ticked, summary.shown)
+  }
+})
+/** The Sources button's tooltip: the ticked boxes by name. */
+const sourcesTitle = computed(() =>
+  originBoxes.value
+    .filter((box) => origins.value[box.origin])
+    .map((box) => getText(box.label))
+    .join(', '),
+)
+/**
+ * Whether the Sources popover is open. It opens from its button, and as the text filter takes
+ * focus; it closes on Escape or a press outside it, but not on the text filter, nor as a box is
+ * ticked.
+ */
+const sourcesOpen = ref(false)
+/** Whether the popover was opened by the text filter, which then keeps the focus (`keepFocus`). */
+const sourcesOpenedByFilter = ref(false)
+const filterInput = ref<HTMLInputElement>()
+
+function openSourcesFromFilter() {
+  if (sourcesOpen.value) return
+  sourcesOpenedByFilter.value = true
+  sourcesOpen.value = true
+}
+
+watch(sourcesOpen, (open) => {
+  if (!open) sourcesOpenedByFilter.value = false
+})
+
+/**
+ * Escape closes the Sources popover, from the text filter or from inside it. Handled here, before
+ * the event reaches the window: the graph's Escape (`app.cancel`) would otherwise take it first, and
+ * Reka's own Escape listener never see it. Only that: the first Escape does not also clear the
+ * filter or reach the graph.
+ */
+function closeSourcesOnEscape(event: KeyboardEvent) {
+  if (!sourcesOpen.value) return
+  event.stopPropagation()
+  event.preventDefault()
+  sourcesOpen.value = false
+}
+
+/** A press on, or focus moving to, the text filter leaves the Sources popover open. */
+function keepSourcesOpenForFilter(event: CustomEvent<{ originalEvent: Event }>) {
+  const target = event.detail.originalEvent.target
+  if (target instanceof Node && filterInput.value?.contains(target)) event.preventDefault()
+}
+
 /**
  * The origins the rows are filtered by. An origin without a tickbox is not filtered out: its lines
  * (from before its setting was turned off, or an earlier session's) stay in view rather than being
@@ -370,12 +438,6 @@ function sessionLabel({ id, number, session }: PickableSession) {
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
         <option value="all">{{ getText('engineLogsLevelAll') }}</option>
       </select>
-      <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
-        <label v-for="box in originBoxes" :key="box.origin" class="origin">
-          <input v-model="origins[box.origin]" type="checkbox" :aria-label="getText(box.label)" />
-          {{ getText(box.label) }}
-        </label>
-      </fieldset>
       <input
         v-model="loggerFilter"
         type="search"
@@ -388,11 +450,45 @@ function sessionLabel({ id, number, session }: PickableSession) {
         <option v-for="name in loggerOptions" :key="name" :value="name" />
       </datalist>
       <input
+        ref="filterInput"
         v-model="filterText"
         type="search"
         :aria-label="getText('engineLogsFilter')"
         :placeholder="getText('engineLogsFilter')"
+        @focus="openSourcesFromFilter"
+        @keydown.escape="closeSourcesOnEscape"
       />
+      <Popover
+        v-model:open="sourcesOpen"
+        isNonModal
+        :keepFocus="sourcesOpenedByFilter"
+        placement="bottom-start"
+        :offset="4"
+        size="custom"
+        rounded="large"
+        testId="engine-logs-sources"
+        :aria-label="getText('engineLogsOrigin')"
+        @interactOutside="keepSourcesOpenForFilter"
+        @keydown.escape="closeSourcesOnEscape"
+      >
+        <template #trigger>
+          <button
+            type="button"
+            class="sourcesButton"
+            :title="sourcesTitle"
+            data-testid="engine-logs-sources-button"
+          >
+            <span class="sourcesLabel">{{ sourcesLabel }}</span>
+            <SvgIcon name="arrow_right_head_only" class="sourcesArrow" />
+          </button>
+        </template>
+        <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
+          <label v-for="box in originBoxes" :key="box.origin" class="origin">
+            <input v-model="origins[box.origin]" type="checkbox" :aria-label="getText(box.label)" />
+            {{ getText(box.label) }}
+          </label>
+        </fieldset>
+      </Popover>
       <select v-model="selectedSession" :aria-label="getText('engineLogsSession')">
         <option v-if="stream != null" value="">{{ getText('engineLogsThisSession') }}</option>
         <option v-for="option in pickableSessions" :key="option.id" :value="option.id">
@@ -528,13 +624,44 @@ function sessionLabel({ id, number, session }: PickableSession) {
   cursor: pointer;
 }
 
-.origins {
+.toolbar .sourcesButton {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
+  max-width: 16em;
+  cursor: pointer;
+}
+
+.toolbar .sourcesButton:focus-visible,
+.origin input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.sourcesLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourcesArrow {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  --icon-transform: rotate(90deg);
+  --icon-transform-origin: center;
+}
+
+/* In the popover, which is teleported out of the panel. */
+.origins {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  padding: 0;
+  padding: 8px 10px;
   border: none;
+  font-size: 12px;
+  color: var(--color-text);
 }
 
 .origin {

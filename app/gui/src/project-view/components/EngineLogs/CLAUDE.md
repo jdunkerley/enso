@@ -79,6 +79,15 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     shown only while their setting in Settings → Local → Engine logs is on,
     checked whenever they appear — an origin without a box is not filtered out),
     text and session filters;
+  - the source tickboxes are in a Sources popover
+    (`$/components/Dialog/Popover`, non-modal), opened by its button beside the
+    text filter, whose label sums up the boxes shown (`originSummary`: All,
+    None, the one ticked, or "2 of 3"), and by the text filter taking focus,
+    which keeps the focus (`keepFocus`). Ticking a box leaves it open; a press
+    outside (but not on the text filter) or Escape closes it. Escape is handled
+    on the filter and the popover themselves: in the project view the graph's
+    `app.cancel` takes an Escape at the window before Reka's own listener sees
+    it;
   - at the toolbar's right, icon buttons for the log file of the session shown
     (live or earlier): Download log file (`downloadProjectSessionLogs`, the
     whole session, archives included; a failure is shown as an alert) and reveal

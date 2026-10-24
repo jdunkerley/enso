@@ -65,6 +65,18 @@ test.describe('a session with two files', () => {
       await expect(log.getByText('Index out of bounds')).toBeHidden()
       await logger.fill('')
 
+      // The source tickboxes, in their popover, as in the Logs tab.
+      const sourcesButton = tab.getByTestId('engine-logs-sources-button')
+      await expect(sourcesButton).toHaveText('Sources: 2 of 3')
+      await sourcesButton.click()
+      const sources = page.getByRole('dialog', { name: 'Sources' })
+      await sources.getByRole('checkbox', { name: 'Engine' }).check()
+      await expect(log.getByText('Language server started')).toBeVisible()
+      await expect(sourcesButton).toHaveText('Sources: All')
+      await page.keyboard.press('Escape')
+      await expect(sources).toBeHidden()
+      await expect(sourcesButton).toBeFocused()
+
       await picker.selectOption({ index: 1 })
       await expect(log.getByText('from the first session')).toBeVisible()
       await expect(log.getByText('Report written')).toBeHidden()

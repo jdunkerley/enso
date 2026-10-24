@@ -108,6 +108,24 @@ export const DEFAULT_ORIGINS: OriginFilter = {
   performance: true,
 }
 
+/** How the Sources button sums up which of the tickboxes `shown` are ticked. */
+export type OriginSummary =
+  | { readonly kind: 'all' | 'none' }
+  | { readonly kind: 'one'; readonly origin: LogOrigin }
+  | { readonly kind: 'some'; readonly ticked: number; readonly shown: number }
+
+/**
+ * Sum up the tickboxes `shown` (in their order): all, none, the one ticked, or how many of them.
+ * Only the boxes shown count, so a hidden box's state never shows in the summary.
+ */
+export function originSummary(shown: readonly LogOrigin[], origins: OriginFilter): OriginSummary {
+  const ticked = shown.filter((origin) => origins[origin])
+  if (ticked.length === shown.length) return { kind: 'all' }
+  if (ticked.length === 0) return { kind: 'none' }
+  if (ticked.length === 1) return { kind: 'one', origin: ticked[0]! }
+  return { kind: 'some', ticked: ticked.length, shown: shown.length }
+}
+
 /**
  * The first segment of the logger name `log_message` logs under (`User.<qualified type name>`,
  * `distribution/lib/Standard/Base/0.0.0-dev/src/Logging.enso`). The libraries log with

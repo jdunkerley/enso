@@ -1,5 +1,5 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
-import { expect, test, type Locator } from 'integration-test/base'
+import { expect, test, type Locator, type Page } from 'integration-test/base'
 import * as fs from 'node:fs/promises'
 import * as locate from './locate'
 
@@ -7,6 +7,14 @@ async function box(locator: Locator) {
   const rect = await locator.boundingBox()
   expect(rect).not.toBeNull()
   return { ...rect!, bottom: rect!.y + rect!.height, right: rect!.x + rect!.width }
+}
+
+/** Open the Logs tab's Sources popover, which holds the source tickboxes. */
+async function openSources(page: Page) {
+  await locate.bottomDock(page).getByTestId('engine-logs-sources-button').click()
+  const sources = page.getByRole('dialog', { name: 'Sources' })
+  await expect(sources).toBeVisible()
+  return sources
 }
 
 const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Language server started'
@@ -52,8 +60,9 @@ test('the Logs tab follows the engine log and filters by level', async ({
     // The engine's lines, its stderr among them, show once Engine is ticked.
     await expect(log.getByText('Something failed')).toBeVisible()
     await expect(log.getByText('Language server started')).toBeHidden()
-    await dock.getByRole('checkbox', { name: 'Engine' }).check()
+    await (await openSources(page)).getByRole('checkbox', { name: 'Engine' }).check()
     await expect(log.getByText('Language server started')).toBeVisible()
+    await page.keyboard.press('Escape')
     await expect(log.getByText(STDERR)).toBeVisible()
 
     // A line written later arrives without reopening anything.
@@ -80,9 +89,12 @@ test('the Logs tab filters by source: engine, libraries, user log messages', asy
     await page.keyboard.press('ControlOrMeta+L')
     const dock = locate.bottomDock(page)
     const log = dock.getByRole('log')
-    const engine = dock.getByRole('checkbox', { name: 'Engine' })
-    const libraries = dock.getByRole('checkbox', { name: 'Libraries' })
-    const user = dock.getByRole('checkbox', { name: 'User log messages' })
+    const sourcesButton = dock.getByTestId('engine-logs-sources-button')
+    await expect(sourcesButton).toHaveText('Sources: 2 of 3')
+    const sources = await openSources(page)
+    const engine = sources.getByRole('checkbox', { name: 'Engine' })
+    const libraries = sources.getByRole('checkbox', { name: 'Libraries' })
+    const user = sources.getByRole('checkbox', { name: 'User log messages' })
     // By default: the libraries and the user's messages, not the engine or its stderr.
     await expect(engine).not.toBeChecked()
     await expect(libraries).toBeChecked()
@@ -102,6 +114,50 @@ test('the Logs tab filters by source: engine, libraries, user log messages', asy
     await expect(log.getByText(STDERR)).toBeVisible()
     await expect(log.getByText('Slow query')).toBeHidden()
     await expect(log.getByText('Something failed')).toBeHidden()
+    // Ticking leaves the popover open; its button sums the boxes up.
+    await expect(sources).toBeVisible()
+    await expect(sourcesButton).toHaveText('Sources: Engine')
+  })
+})
+
+test('the Sources popover opens from the text filter, which keeps the focus', async ({
+  editorPage,
+}) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    const log = dock.getByRole('log')
+    const filter = dock.getByRole('searchbox', { name: 'Filter logs' })
+    const sources = page.getByRole('dialog', { name: 'Sources' })
+    await filter.click()
+    await expect(sources).toBeVisible()
+    await expect(filter).toBeFocused()
+    await page.keyboard.type('Slow')
+    await expect(filter).toHaveValue('Slow')
+    await expect(log.getByText('Slow query')).toBeVisible()
+    await expect(log.getByText('Report written')).toBeHidden()
+    await expect(sources).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sources).toBeHidden()
+    await expect(filter).toBeFocused()
+    // From its button, the keyboard reaches the tickboxes; Escape returns to the button.
+    const sourcesButton = dock.getByTestId('engine-logs-sources-button')
+    await sourcesButton.focus()
+    await page.keyboard.press('Enter')
+    await expect(sources).toBeVisible()
+    await page.keyboard.press('Tab')
+    await expect(sources.getByRole('checkbox', { name: 'Engine' })).toBeFocused()
+    await page.keyboard.press('Space')
+    await expect(sources.getByRole('checkbox', { name: 'Engine' })).toBeChecked()
+    await expect(sources).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sources).toBeHidden()
+    await expect(sourcesButton).toBeFocused()
+    // A press outside closes it.
+    await sourcesButton.click()
+    await expect(sources).toBeVisible()
+    await log.click()
+    await expect(sources).toBeHidden()
   })
 })
 
@@ -128,8 +184,9 @@ test.describe('with SQL queries and performance timings logged', () => {
       await page.keyboard.press('ControlOrMeta+L')
       const dock = locate.bottomDock(page)
       const log = dock.getByRole('log')
-      const sql = dock.getByRole('checkbox', { name: 'SQL queries' })
-      const performance = dock.getByRole('checkbox', { name: 'Performance' })
+      const sources = await openSources(page)
+      const sql = sources.getByRole('checkbox', { name: 'SQL queries' })
+      const performance = sources.getByRole('checkbox', { name: 'Performance' })
       await expect(sql).toBeChecked()
       await expect(performance).toBeChecked()
       await expect(log.getByText('query: SELECT 1')).toBeVisible()
@@ -137,7 +194,7 @@ test.describe('with SQL queries and performance timings logged', () => {
       await expect(log.getByText('~12ms')).toBeVisible()
 
       // Not Libraries.
-      await dock.getByRole('checkbox', { name: 'Libraries' }).uncheck()
+      await sources.getByRole('checkbox', { name: 'Libraries' }).uncheck()
       await expect(log.getByText('Slow query')).toBeHidden()
       await expect(log.getByText('query: SELECT 1')).toBeVisible()
       await sql.uncheck()
@@ -154,10 +211,10 @@ test('the SQL queries and Performance sources are not offered while their settin
 }) => {
   await editorPage.do(async (page) => {
     await page.keyboard.press('ControlOrMeta+L')
-    const dock = locate.bottomDock(page)
-    await expect(dock.getByRole('checkbox', { name: 'User log messages' })).toBeVisible()
-    await expect(dock.getByRole('checkbox', { name: 'SQL queries' })).toHaveCount(0)
-    await expect(dock.getByRole('checkbox', { name: 'Performance' })).toHaveCount(0)
+    const sources = await openSources(page)
+    await expect(sources.getByRole('checkbox', { name: 'User log messages' })).toBeVisible()
+    await expect(sources.getByRole('checkbox', { name: 'SQL queries' })).toHaveCount(0)
+    await expect(sources.getByRole('checkbox', { name: 'Performance' })).toHaveCount(0)
   })
 })
 

@@ -1,5 +1,6 @@
 import { setEngineLogSettings } from '$/providers/engineLogSettings'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
+import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
 import { ProjectId, ProjectSessionId } from 'enso-common/src/services/Backend'
 import { createDeferred } from 'enso-common/src/utilities/async'
@@ -79,6 +80,42 @@ async function mountPanel() {
   return { stream, source, wrapper, flush, lineTexts }
 }
 
+type PanelWrapper = Awaited<ReturnType<typeof mountPanel>>['wrapper']
+
+/** The Sources popover (teleported out of the panel), if it is open. */
+const sourcesPopover = () =>
+  document.querySelector<HTMLElement>('[data-testid="engine-logs-sources"]')
+const sourcesButton = (wrapper: PanelWrapper) =>
+  wrapper.find<HTMLButtonElement>('[data-testid="engine-logs-sources-button"]')
+
+/** Open the Sources popover from its button, unless it is open. */
+async function openSources(wrapper: PanelWrapper) {
+  if (sourcesPopover() != null) return
+  await sourcesButton(wrapper).trigger('click')
+  await flushPromises()
+  expect(sourcesPopover()).not.toBeNull()
+}
+
+function tickbox(name: string) {
+  return document.querySelector<HTMLInputElement>(
+    `fieldset[aria-label="Sources"] input[type="checkbox"][aria-label="${name}"]`,
+  )
+}
+
+const tickboxLabels = () =>
+  [...document.querySelectorAll('fieldset[aria-label="Sources"] label')].map((label) =>
+    label.textContent?.trim(),
+  )
+
+/** Tick or untick a source, opening the Sources popover first. */
+async function setTickbox(wrapper: PanelWrapper, name: string, checked: boolean) {
+  await openSources(wrapper)
+  const box = tickbox(name)!
+  box.checked = checked
+  box.dispatchEvent(new Event('change'))
+  await flushPromises()
+}
+
 function stubScroller(element: Element, scrollTop: number) {
   Object.defineProperty(element, 'scrollHeight', { configurable: true, value: 1000 })
   Object.defineProperty(element, 'clientHeight', { configurable: true, value: 100 })
@@ -102,7 +139,7 @@ test('shows live lines, marks stderr, and says while it waits for the engine', a
   await flush()
   // stderr is the engine's: hidden until Engine is ticked.
   expect(lineTexts()).toEqual([])
-  await wrapper.find('input[type="checkbox"][aria-label="Engine"]').setValue(true)
+  await setTickbox(wrapper, 'Engine', true)
   expect(lineTexts()).toEqual(['Picked up JAVA_TOOL_OPTIONS'])
   expect(wrapper.find('.row.stderr .marker').text()).toBe('stderr')
   expect(wrapper.text()).toContain('Waiting for the engine…')
@@ -311,17 +348,13 @@ const STD_BITS_INFO = loggedBy('INFO', 'org.enso.table.Reader', 'read 10 rows')
 const USER_WARN = loggedBy('WARN', 'User.local.My_Project.Main.Report', 'rows look odd')
 const ENGINE_ERROR = loggedBy('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed')
 
-function tickbox(wrapper: Awaited<ReturnType<typeof mountPanel>>['wrapper'], name: string) {
-  return wrapper.find(`fieldset[aria-label="Sources"] input[type="checkbox"][aria-label="${name}"]`)
-}
-
 test('the source tickboxes: Engine off, Libraries and User log messages on', async () => {
   const { wrapper } = await mountPanel()
-  const boxes = wrapper.findAll('fieldset[aria-label="Sources"] label')
-  expect(boxes.map((box) => box.text())).toEqual(['Engine', 'Libraries', 'User log messages'])
-  expect((tickbox(wrapper, 'Engine').element as HTMLInputElement).checked).toBe(false)
-  expect((tickbox(wrapper, 'Libraries').element as HTMLInputElement).checked).toBe(true)
-  expect((tickbox(wrapper, 'User log messages').element as HTMLInputElement).checked).toBe(true)
+  await openSources(wrapper)
+  expect(tickboxLabels()).toEqual(['Engine', 'Libraries', 'User log messages'])
+  expect(tickbox('Engine')!.checked).toBe(false)
+  expect(tickbox('Libraries')!.checked).toBe(true)
+  expect(tickbox('User log messages')!.checked).toBe(true)
 })
 
 test('filters by source, with the level and text; the badge counts every ERROR entry but not stderr', async () => {
@@ -334,14 +367,14 @@ test('filters by source, with the level and text; the badge counts every ERROR e
   await flush()
   // By default, everything but the engine.
   expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO, USER_WARN])
-  await tickbox(wrapper, 'Engine').setValue(true)
+  await setTickbox(wrapper, 'Engine', true)
   expect(lineTexts()).toEqual(lines)
-  await tickbox(wrapper, 'Libraries').setValue(false)
+  await setTickbox(wrapper, 'Libraries', false)
   expect(lineTexts()).toEqual([ENGINE_INFO, USER_WARN])
-  await tickbox(wrapper, 'User log messages').setValue(false)
+  await setTickbox(wrapper, 'User log messages', false)
   expect(lineTexts()).toEqual([ENGINE_INFO])
-  await tickbox(wrapper, 'Engine').setValue(false)
-  await tickbox(wrapper, 'Libraries').setValue(true)
+  await setTickbox(wrapper, 'Engine', false)
+  await setTickbox(wrapper, 'Libraries', true)
   expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO])
   await wrapper.find('select[aria-label="Level"]').setValue('error')
   expect(lineTexts()).toEqual([LIBRARY_ERROR])
@@ -355,8 +388,8 @@ test('filters by source, with the level and text; the badge counts every ERROR e
   await flush()
   expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO])
   expect(stream.state.unseenErrors).toBe(2)
-  await tickbox(wrapper, 'Engine').setValue(true)
-  await tickbox(wrapper, 'Libraries').setValue(false)
+  await setTickbox(wrapper, 'Engine', true)
+  await setTickbox(wrapper, 'Libraries', false)
   expect(lineTexts()).toEqual([ENGINE_INFO, ENGINE_ERROR, 'boom'])
 })
 
@@ -373,7 +406,7 @@ test('filters an earlier session by source', async () => {
   const { source, wrapper, flush, lineTexts } = await mountPanel()
   source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
   await flush()
-  await tickbox(wrapper, 'Libraries').setValue(false)
+  await setTickbox(wrapper, 'Libraries', false)
   await wrapper.find('select[aria-label="Session"]').setValue('old')
   await flush()
   expect(lineTexts()).toEqual([USER_WARN])
@@ -392,7 +425,8 @@ const TIMING = loggedBy(
 
 test('SQL queries and Performance tickboxes show only while their setting is on, checked', async () => {
   const { source, wrapper, flush, lineTexts } = await mountPanel()
-  const labels = () => wrapper.findAll('fieldset[aria-label="Sources"] label').map((b) => b.text())
+  await openSources(wrapper)
+  const labels = tickboxLabels
   expect(labels()).toEqual(['Engine', 'Libraries', 'User log messages'])
   source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
   const lines = [SQL_INFO, TIMING, STD_BITS_INFO]
@@ -405,8 +439,8 @@ test('SQL queries and Performance tickboxes show only while their setting is on,
   setEngineLogSettings({ sqlQueries: true })
   await flush()
   expect(labels()).toEqual(['Engine', 'Libraries', 'User log messages', 'SQL queries'])
-  expect((tickbox(wrapper, 'SQL queries').element as HTMLInputElement).checked).toBe(true)
-  await tickbox(wrapper, 'SQL queries').setValue(false)
+  expect(tickbox('SQL queries')!.checked).toBe(true)
+  await setTickbox(wrapper, 'SQL queries', false)
   expect(lineTexts()).toEqual([TIMING, STD_BITS_INFO])
   setEngineLogSettings({ performanceTimings: true })
   await flush()
@@ -417,20 +451,129 @@ test('SQL queries and Performance tickboxes show only while their setting is on,
     'SQL queries',
     'Performance',
   ])
-  await tickbox(wrapper, 'Performance').setValue(false)
+  await setTickbox(wrapper, 'Performance', false)
   expect(lineTexts()).toEqual([STD_BITS_INFO])
   // They are not Libraries.
-  await tickbox(wrapper, 'Libraries').setValue(false)
-  await tickbox(wrapper, 'SQL queries').setValue(true)
-  await tickbox(wrapper, 'Performance').setValue(true)
+  await setTickbox(wrapper, 'Libraries', false)
+  await setTickbox(wrapper, 'SQL queries', true)
+  await setTickbox(wrapper, 'Performance', true)
   expect(lineTexts()).toEqual([SQL_INFO, TIMING])
   // Turned off and on again, a box comes back checked.
-  await tickbox(wrapper, 'SQL queries').setValue(false)
+  await setTickbox(wrapper, 'SQL queries', false)
   setEngineLogSettings({ sqlQueries: false })
   await flush()
   setEngineLogSettings({ sqlQueries: true })
   await flush()
-  expect((tickbox(wrapper, 'SQL queries').element as HTMLInputElement).checked).toBe(true)
+  expect(tickbox('SQL queries')!.checked).toBe(true)
+})
+
+describe('the Sources popover', () => {
+  const filterInput = (wrapper: PanelWrapper) =>
+    wrapper.find<HTMLInputElement>('input[aria-label="Filter logs"]').element
+  /** Let Reka register its outside-press listener, which it adds in a timeout. */
+  const settle = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await flushPromises()
+  }
+
+  test('its button opens it and says it is open; ticking a box leaves it open', async () => {
+    const { wrapper } = await mountPanel()
+    const button = sourcesButton(wrapper)
+    expect(sourcesPopover()).toBeNull()
+    expect(button.attributes('aria-expanded')).toBe('false')
+    await button.trigger('click')
+    await flushPromises()
+    expect(sourcesPopover()).not.toBeNull()
+    expect(sourcesPopover()!.getAttribute('aria-label')).toBe('Sources')
+    expect(button.attributes('aria-expanded')).toBe('true')
+    await settle()
+    const user = userEvent.setup()
+    await user.click(tickbox('Engine')!)
+    await flushPromises()
+    expect(tickbox('Engine')!.checked).toBe(true)
+    expect(sourcesPopover()).not.toBeNull()
+    // The button toggles it closed.
+    await button.trigger('click')
+    await flushPromises()
+    expect(sourcesPopover()).toBeNull()
+  })
+
+  test('Escape closes it, and focus returns to its button', async () => {
+    const { wrapper } = await mountPanel()
+    const button = sourcesButton(wrapper)
+    button.element.focus()
+    await openSources(wrapper)
+    await settle()
+    const user = userEvent.setup()
+    await user.keyboard('{Escape}')
+    await flushPromises()
+    expect(sourcesPopover()).toBeNull()
+    expect(document.activeElement).toBe(button.element)
+  })
+
+  test('a press outside closes it', async () => {
+    const { wrapper } = await mountPanel()
+    await openSources(wrapper)
+    await settle()
+    const user = userEvent.setup()
+    await user.click(wrapper.find('[role="log"]').element)
+    await flushPromises()
+    expect(sourcesPopover()).toBeNull()
+  })
+
+  test('the text filter opens it as it takes focus, and keeps the focus', async () => {
+    const { wrapper } = await mountPanel()
+    const input = filterInput(wrapper)
+    input.focus()
+    await flushPromises()
+    await settle()
+    expect(sourcesPopover()).not.toBeNull()
+    expect(document.activeElement).toBe(input)
+    // Typing goes on in the filter, and a press on it leaves the popover open.
+    const user = userEvent.setup()
+    await user.click(input)
+    await user.keyboard('rows')
+    await flushPromises()
+    expect(input.value).toBe('rows')
+    expect(sourcesPopover()).not.toBeNull()
+    // A box ticked from there leaves it open too.
+    await user.click(tickbox('Engine')!)
+    await flushPromises()
+    expect(sourcesPopover()).not.toBeNull()
+    // Back in the filter, Escape closes it and leaves the focus in the filter.
+    await user.click(input)
+    await user.keyboard('{Escape}')
+    await flushPromises()
+    await settle()
+    expect(sourcesPopover()).toBeNull()
+    expect(document.activeElement).toBe(input)
+  })
+
+  test('its button sums up the boxes shown: all, none, one by name, or how many', async () => {
+    const { wrapper } = await mountPanel()
+    const label = () => sourcesButton(wrapper).text()
+    // By default, Libraries and User log messages but not Engine.
+    expect(label()).toBe('Sources: 2 of 3')
+    expect(sourcesButton(wrapper).attributes('title')).toBe('Libraries, User log messages')
+    await setTickbox(wrapper, 'User log messages', false)
+    expect(label()).toBe('Sources: Libraries')
+    await setTickbox(wrapper, 'Libraries', false)
+    expect(label()).toBe('Sources: None')
+    await setTickbox(wrapper, 'Engine', true)
+    await setTickbox(wrapper, 'Libraries', true)
+    await setTickbox(wrapper, 'User log messages', true)
+    expect(label()).toBe('Sources: All')
+    // SQL queries appears ticked: still all of them.
+    setEngineLogSettings({ sqlQueries: true })
+    await flushPromises()
+    expect(label()).toBe('Sources: All')
+    await setTickbox(wrapper, 'SQL queries', false)
+    expect(label()).toBe('Sources: 3 of 4')
+    // A hidden box does not count.
+    setEngineLogSettings({ sqlQueries: false })
+    await flushPromises()
+    expect(label()).toBe('Sources: All')
+  })
 })
 
 describe('download and reveal', () => {
