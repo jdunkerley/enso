@@ -39,7 +39,7 @@ function feed(model = new EngineLogModel()) {
   }
 }
 
-const ALL_ORIGINS = { engine: true, library: true, user: true }
+const ALL_ORIGINS = { engine: true, library: true, user: true, sql: true, performance: true }
 
 const texts = (rows: readonly LogRow[]) =>
   rows.map((row) => (row.kind === 'line' ? row.text : `--${row.divider}--`))
@@ -271,7 +271,7 @@ describe('helpers', () => {
     expect(
       texts(filterRows(withDivider, { level: 'warn', text: ' SLOW ', origins: ALL_ORIGINS })),
     ).toEqual(['--restarted--', entry('WARN', 'slow query')])
-    expect(filterRows(withDivider, { level: 'info', text: '', origins: ALL_ORIGINS })).toHaveLength(
+    expect(filterRows(withDivider, { level: 'all', text: '', origins: ALL_ORIGINS })).toHaveLength(
       5,
     )
   })

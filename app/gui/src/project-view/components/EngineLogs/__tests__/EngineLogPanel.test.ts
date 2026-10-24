@@ -1,3 +1,4 @@
+import { setEngineLogSettings } from '$/providers/engineLogSettings'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
 import { flushPromises } from '@vue/test-utils'
 import { ProjectId, ProjectSessionId } from 'enso-common/src/services/Backend'
@@ -37,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   scope.stop()
   FakeEventSource.reset()
+  setEngineLogSettings({ sqlQueries: false, performanceTimings: false })
 })
 
 async function mountPanel() {
@@ -287,7 +289,7 @@ const loggedBy = (level: string, logger: string, message: string) =>
   `[${level}] [2026-10-20T10:00:00.000Z] [${logger}] ${message}`
 
 const ENGINE_INFO = loggedBy('INFO', 'org.enso.languageserver.Boot', 'server started')
-const LIBRARY_ERROR = loggedBy('ERROR', 'Standard.Database.Connection', 'query failed')
+const LIBRARY_ERROR = loggedBy('ERROR', 'Standard.Table.Table.Table', 'query failed')
 const STD_BITS_INFO = loggedBy('INFO', 'org.enso.table.Reader', 'read 10 rows')
 const USER_WARN = loggedBy('WARN', 'User.local.My_Project.Main.Report', 'rows look odd')
 const ENGINE_ERROR = loggedBy('ERROR', 'org.enso.interpreter.runtime.EnsoContext', 'context failed')
@@ -326,7 +328,7 @@ test('filters by source, with the level and text; the badge counts every ERROR e
   expect(lineTexts()).toEqual([LIBRARY_ERROR, STD_BITS_INFO])
   await wrapper.find('select[aria-label="Level"]').setValue('error')
   expect(lineTexts()).toEqual([LIBRARY_ERROR])
-  await wrapper.find('select[aria-label="Level"]').setValue('info')
+  await wrapper.find('select[aria-label="Level"]').setValue('all')
   await wrapper.find('input[aria-label="Filter logs"]').setValue('rows')
   expect(lineTexts()).toEqual([STD_BITS_INFO])
   await wrapper.find('input[aria-label="Filter logs"]').setValue('')
@@ -358,4 +360,58 @@ test('filters an earlier session by source', async () => {
   await wrapper.find('select[aria-label="Session"]').setValue('old')
   await flush()
   expect(lineTexts()).toEqual([USER_WARN])
+})
+
+const SQL_INFO = loggedBy(
+  'INFO',
+  'Standard.Database.Connection',
+  'jdbc:sqlite::memory: - query: SELECT 1',
+)
+const TIMING = loggedBy(
+  'DEBUG',
+  'Standard.Base.Logging.Progress.JDBC_Connection.[SQLite] SELECT 1',
+  'ADVANCE JDBC_Connection.[SQLite] SELECT 1+1~12ms',
+)
+
+test('SQL queries and Performance tickboxes show only while their setting is on, checked', async () => {
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  const labels = () => wrapper.findAll('fieldset[aria-label="Sources"] label').map((b) => b.text())
+  expect(labels()).toEqual(['Engine', 'Libraries', 'User log messages'])
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  const lines = [SQL_INFO, TIMING, STD_BITS_INFO]
+  lines.forEach((text, n) =>
+    source.emit('line', { seq: n + 1, source: 'file', sessionId: 's1', text }),
+  )
+  await flush()
+  // Without a box, nothing hides them: the DEBUG timing shows at All levels.
+  expect(lineTexts()).toEqual(lines)
+  setEngineLogSettings({ sqlQueries: true })
+  await flush()
+  expect(labels()).toEqual(['Engine', 'Libraries', 'User log messages', 'SQL queries'])
+  expect((tickbox(wrapper, 'SQL queries').element as HTMLInputElement).checked).toBe(true)
+  await tickbox(wrapper, 'SQL queries').setValue(false)
+  expect(lineTexts()).toEqual([TIMING, STD_BITS_INFO])
+  setEngineLogSettings({ performanceTimings: true })
+  await flush()
+  expect(labels()).toEqual([
+    'Engine',
+    'Libraries',
+    'User log messages',
+    'SQL queries',
+    'Performance',
+  ])
+  await tickbox(wrapper, 'Performance').setValue(false)
+  expect(lineTexts()).toEqual([STD_BITS_INFO])
+  // They are not Libraries.
+  await tickbox(wrapper, 'Libraries').setValue(false)
+  await tickbox(wrapper, 'SQL queries').setValue(true)
+  await tickbox(wrapper, 'Performance').setValue(true)
+  expect(lineTexts()).toEqual([SQL_INFO, TIMING])
+  // Turned off and on again, a box comes back checked.
+  await tickbox(wrapper, 'SQL queries').setValue(false)
+  setEngineLogSettings({ sqlQueries: false })
+  await flush()
+  setEngineLogSettings({ sqlQueries: true })
+  await flush()
+  expect((tickbox(wrapper, 'SQL queries').element as HTMLInputElement).checked).toBe(true)
 })

@@ -83,6 +83,19 @@ enso$ ENSO_ENGINE_ARGS="--log-level debug" corepack pnpm run dev:gui
 
 Turns the `DEBUG` verbosity on.
 
+Two loggers can also be turned up from the IDE itself, in Settings → Local →
+Engine logs. Each switch adds a `--vm.D <logger>.Logger.level=<level>` to the
+engines of projects opened while it is on (`engineLoggingArgs` in
+`app/common/src/services/engineLogs.ts`), and the Logs panel shows a source for
+it:
+
+- **Log SQL queries**: `Standard.Database.Connection` at `info`. The engine's
+  configs set it to `warn`, so the queries are not logged otherwise. Only
+  connections opened from a data link are audited (`LocalAuditedConnection`);
+  others log no queries.
+- **Log performance timings**: `Standard.Base.Logging.Progress` at `debug` (see
+  [Progress and Profiling](#progress-and-profiling)).
+
 ### Progress and Profiling
 
 Enso API accompanies `Logging` with additional `Progress` API. Such an API is

@@ -570,6 +570,7 @@ export class LocalBackend extends backend.Backend {
       await this.projectManager.openProject({
         projectPath: path,
         missingComponentAction: MissingComponentAction.install,
+        ...(body?.engineLogging != null && { engineLogging: body.engineLogging }),
       })
     } catch (error) {
       throw new Error(

@@ -5,6 +5,7 @@
  */
 import { PRODUCT_NAME } from 'enso-common/src/constants'
 import { makeProjectTelemetryKey } from 'enso-common/src/services/ProjectManager/projectIdentity'
+import { engineLoggingArgs, type EngineLoggingOptions } from 'enso-common/src/services/engineLogs'
 import { toRfc3339 } from 'enso-common/src/utilities/data/dateTime'
 import KSUID from 'ksuid'
 import * as crypto from 'node:crypto'
@@ -228,8 +229,16 @@ export class ProjectService {
     return exitCode
   }
 
-  /** Open a project and starts its language server. */
-  async openProject(projectId: UUID, projectsDirectory: Path): Promise<OpenProject> {
+  /**
+   * Open a project and starts its language server.
+   * @param engineLogging - Extra logging for the engine started here; the engine keeps it across
+   * restarts until the project closes. A project already open keeps the logging it was opened with.
+   */
+  async openProject(
+    projectId: UUID,
+    projectsDirectory: Path,
+    engineLogging?: EngineLoggingOptions,
+  ): Promise<OpenProject> {
     this.logger.debug('Opening project', projectId)
 
     const project = await this.getProject(projectId, projectsDirectory, true)
@@ -249,11 +258,12 @@ export class ProjectService {
 
     // Start the language server
     let sockets: LanguageServerSockets
+    const engineArgs = [...this.extraArgs, ...engineLoggingArgs(engineLogging)]
     try {
       sockets = await this.runner.openProject(
         project.path,
         projectId,
-        this.extraArgs.length > 0 ? this.extraArgs : undefined,
+        engineArgs.length > 0 ? engineArgs : undefined,
         this.projectEnvVars(localProjectKey),
         engineLog,
       )

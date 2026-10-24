@@ -1,4 +1,5 @@
 import { LabelName, Path, UUID, type LChColor } from 'enso-common/src/services/Backend'
+import type { EngineLoggingOptions } from 'enso-common/src/services/engineLogs'
 import type * as http from 'node:http'
 import * as datalinkFiles from '../datalinks.js'
 import type { LocalMetadata } from '../localMetadata/index.js'
@@ -341,11 +342,16 @@ export async function handleProjectServiceRequest(
       interface Body {
         readonly projectId: UUID
         readonly projectsDirectory: Path
+        readonly engineLogging?: EngineLoggingOptions
       }
       bodyJson<Body>(request)
         .then(async (body) => {
           const projectService = await getProjectService()
-          return projectService.openProject(body.projectId, body.projectsDirectory)
+          return projectService.openProject(
+            body.projectId,
+            body.projectsDirectory,
+            body.engineLogging,
+          )
         })
         .then((result) => {
           response.writeHead(HTTP_STATUS_OK, headers).end(toJSONRPCResult(result))

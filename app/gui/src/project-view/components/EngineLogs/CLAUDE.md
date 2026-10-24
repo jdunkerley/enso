@@ -11,11 +11,14 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   - Origin (the source tickboxes, #285): `logOrigin` classifies an entry's
     logger name, by whole name segments, as `user` (under `User`: Enso's
     `log_message` logs under `User.<qualified type name>`; the libraries use
-    `log_internal`, under the type name alone), `engine` (`ENGINE_LOGGER_ROOTS`:
-    `org.enso`, the Truffle language and instrument ids that Truffle prefixes to
-    its loggers' names, `akka`, `org.graalvm`, …) or `library` (everything else,
-    on purpose). The std-bits package roots (`STD_BITS_PACKAGE_ROOTS`) are
-    libraries though under `org.enso`; `__tests__/logOrigin.test.ts` reads
+    `log_internal`, under the type name alone), `sql` (exactly
+    `Standard.Database.Connection`, the local audited connections' queries),
+    `performance` (`Standard.Base.Logging.Progress` and its children,
+    `Progress.run`'s timings), `engine` (`ENGINE_LOGGER_ROOTS`: `org.enso`, the
+    Truffle language and instrument ids that Truffle prefixes to its loggers'
+    names, `akka`, `org.graalvm`, …) or `library` (everything else, on purpose).
+    The std-bits package roots (`STD_BITS_PACKAGE_ROOTS`) are libraries though
+    under `org.enso`; `__tests__/logOrigin.test.ts` reads
     `std-bits/*/src/main/java/org/enso/*` and fails when one is missing. stderr
     is the engine's; a continuation line takes its entry's origin.
   - The error badge (`unseenErrors`) counts ERROR entries of the log file,
@@ -35,8 +38,12 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 - `engineLogHistory.ts` — `fetchSessionLines`: a whole session through the
   existing session-log query (no history API of its own).
 - `EngineLogPanel.vue` — the tab's content:
-  - level, source (Engine, off by default; Libraries; User log messages), text
-    and session filters;
+  - level (Error, Warn and above, All levels: the file holds nothing below INFO
+    unless a logger was turned up, and the timings are DEBUG), source (Engine,
+    off by default; Libraries; User log messages; SQL queries and Performance,
+    shown only while their setting in Settings → Local → Engine logs is on,
+    checked whenever they appear — an origin without a box is not filtered out),
+    text and session filters;
   - "Show in folder" (Electron only; it reveals the current session's file,
     whose folder holds every session);
   - the waiting and ended notices, and Jump to latest;

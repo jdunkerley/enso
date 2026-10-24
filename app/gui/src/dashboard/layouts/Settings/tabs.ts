@@ -19,6 +19,7 @@ import { mapboxSettingsStore, setMapboxToken } from '$/providers/mapboxToken'
 import { Path } from 'enso-common/src/services/Backend'
 import { z } from 'zod'
 import CodeLigaturesSettingsSection from './CodeLigaturesSettingsSection.vue'
+import EngineLogsSettingsSection from './EngineLogsSettingsSection.vue'
 import HandwrittenCommentsSettingsSection from './HandwrittenCommentsSettingsSection.vue'
 import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection.vue'
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
@@ -100,6 +101,16 @@ const LOCAL_TAB: SettingsTabData = {
           type: 'custom',
           aliasesId: 'localVersionsSettingsCustomEntryAliases',
           component: LocalVersionsSettingsSection,
+        },
+      ],
+    },
+    {
+      nameId: 'engineLogsSettingsSection',
+      entries: [
+        {
+          type: 'custom',
+          aliasesId: 'engineLogsSettingsCustomEntryAliases',
+          component: EngineLogsSettingsSection,
         },
       ],
     },

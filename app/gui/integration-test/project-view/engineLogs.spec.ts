@@ -12,8 +12,13 @@ const INFO = '[INFO] [2026-10-20T10:00:00.000Z] [org.enso.languageserver] Langua
 // A library's ERROR: shown by default (Libraries is ticked), and counted by the badge.
 const ERROR = '[ERROR] [2026-10-20T10:00:01.000Z] [Standard.Base.Data] Something failed'
 const STDERR = 'Exception in thread "main" java.lang.IllegalStateException'
-const LIBRARY = '[WARN] [2026-10-20T10:00:01.500Z] [Standard.Database.Connection] Slow query'
+const LIBRARY = '[WARN] [2026-10-20T10:00:01.500Z] [Standard.Table.Table.Table] Slow query'
 const USER = '[INFO] [2026-10-20T10:00:01.700Z] [User.local.Mock.Main.Report] Report written'
+// Logged only while their settings are on (Settings → Local → Engine logs).
+const SQL =
+  '[INFO] [2026-10-20T10:00:01.800Z] [Standard.Database.Connection] jdbc:sqlite::memory: - query: SELECT 1'
+const TIMING =
+  '[DEBUG] [2026-10-20T10:00:01.900Z] [Standard.Base.Logging.Progress.JDBC_Connection.[SQLite] SELECT 1] ADVANCE JDBC_Connection.[SQLite] SELECT 1+1~12ms'
 
 test.use({
   setupApi: {
@@ -27,6 +32,8 @@ test.use({
       api.addEngineLogLine(ERROR)
       api.addEngineLogLine(LIBRARY)
       api.addEngineLogLine(USER)
+      api.addEngineLogLine(SQL)
+      api.addEngineLogLine(TIMING)
       api.addEngineLogLine(STDERR, 'stderr')
     },
   },
@@ -94,6 +101,62 @@ test('the Logs tab filters by source: engine, libraries, user log messages', asy
     await expect(log.getByText(STDERR)).toBeVisible()
     await expect(log.getByText('Slow query')).toBeHidden()
     await expect(log.getByText('Something failed')).toBeHidden()
+  })
+})
+
+test.describe('with SQL queries and performance timings logged', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'enso-engine-log-settings',
+        JSON.stringify({ state: { sqlQueries: true, performanceTimings: true }, version: 1 }),
+      )
+    })
+  })
+
+  test('opening a project asks its engine for both', async ({ drivePage, localApi }) => {
+    const calls = localApi.trackCalls()
+    await drivePage.driveTable.openProject('Mock Project').expectProjectEditorOpened('Mock Project')
+    expect(calls.openProject.at(-1)).toMatchObject({
+      engineLogging: { sqlQueries: true, performanceTimings: true },
+    })
+  })
+
+  test('the Logs tab has SQL queries and Performance sources, ticked', async ({ editorPage }) => {
+    await editorPage.do(async (page) => {
+      await page.keyboard.press('ControlOrMeta+L')
+      const dock = locate.bottomDock(page)
+      const log = dock.getByRole('log')
+      const sql = dock.getByRole('checkbox', { name: 'SQL queries' })
+      const performance = dock.getByRole('checkbox', { name: 'Performance' })
+      await expect(sql).toBeChecked()
+      await expect(performance).toBeChecked()
+      await expect(log.getByText('query: SELECT 1')).toBeVisible()
+      // DEBUG, shown at All levels.
+      await expect(log.getByText('~12ms')).toBeVisible()
+
+      // Not Libraries.
+      await dock.getByRole('checkbox', { name: 'Libraries' }).uncheck()
+      await expect(log.getByText('Slow query')).toBeHidden()
+      await expect(log.getByText('query: SELECT 1')).toBeVisible()
+      await sql.uncheck()
+      await expect(log.getByText('query: SELECT 1')).toBeHidden()
+      await expect(log.getByText('~12ms')).toBeVisible()
+      await performance.uncheck()
+      await expect(log.getByText('~12ms')).toBeHidden()
+    })
+  })
+})
+
+test('the SQL queries and Performance sources are not offered while their settings are off', async ({
+  editorPage,
+}) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    await expect(dock.getByRole('checkbox', { name: 'User log messages' })).toBeVisible()
+    await expect(dock.getByRole('checkbox', { name: 'SQL queries' })).toHaveCount(0)
+    await expect(dock.getByRole('checkbox', { name: 'Performance' })).toHaveCount(0)
   })
 })
 

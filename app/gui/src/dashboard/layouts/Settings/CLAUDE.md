@@ -50,6 +50,16 @@ build supplies none and nothing fetches one. The value lives in
 it (trimmed, blank clears). It is sent nowhere except Mapbox. Test:
 `__tests__/localTab.test.ts`.
 
+## Engine logs
+
+The Local tab's Engine logs section (`EngineLogsSettingsSection.vue`) holds two
+switches, both off: Log SQL queries and Log performance timings. They live in
+`$/providers/engineLogSettings` (`localStorage` key `enso-engine-log-settings`)
+and are read when a project opens (`projectStates.openProject` passes them as
+the open's `engineLogging`), so they apply from the next engine started, as the
+section says. The Logs panel shows the SQL queries and Performance sources only
+while their switch is on. Test: `__tests__/localTab.test.ts`.
+
 ## Keyboard shortcuts
 
 The Keyboard shortcuts tab edits the window's bindings

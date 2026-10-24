@@ -21,6 +21,11 @@
   engine's internal logs hidden: tickboxes next to the level filter choose
   Engine, Libraries and User log messages. The error badge counts errors in the
   log, not the engine's console output.][339]
+- [SQL queries and performance timings in the Logs tab, when you want them:
+  Settings → Local → Engine logs can log the SQL queries of data-link database
+  connections and how long each operation (each query among them) took, from the
+  next time a project opens. The Logs tab then offers SQL queries and
+  Performance tickboxes. SQL queries are no longer logged otherwise.][342]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -331,6 +336,7 @@
 [272]: https://github.com/jdunkerley/enso/pull/272
 [279]: https://github.com/jdunkerley/enso/pull/279
 [339]: https://github.com/jdunkerley/enso/pull/339
+[342]: https://github.com/jdunkerley/enso/pull/342
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71
