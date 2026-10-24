@@ -64,8 +64,14 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
   view holds); older/newer move it by half a window and drop as many lines from
   the other end, so memory stays at one window plus one cached page however long
   the session. `firstLine` numbers its lines so row keys survive a move and the
-  list keeps its place. `fetchNewestSessionLines` is the live view's history:
-  the newest lines only, never the whole session.
+  list keeps its place. `latest()` (also Reload) is all or nothing. Rows at the
+  top that continue an entry take its logger and level (`leadingEntry`, found in
+  the page read or the lines dropped); one that starts on an earlier page stays
+  unknown. `noFiles` marks a session whose files are gone, which the panel says.
+  A rollover of the live file while paged back makes the listed `active` page
+  read the new file; Reload lists the pages again. `fetchNewestSessionLines` is
+  the live view's history: the newest lines only, never the whole session, and
+  whether the file has older ones (`hasOlder`).
 - `EngineLogPanel.vue` — the tab's content:
   - level (Error, Warn and above, All levels: the file holds nothing below INFO
     unless a logger was turned up, and the timings are DEBUG), source (Engine,
