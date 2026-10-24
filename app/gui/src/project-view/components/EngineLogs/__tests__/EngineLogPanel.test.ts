@@ -16,10 +16,13 @@ const mocks = vi.hoisted(() => ({
   getProjectSessionLogs: vi.fn(),
   downloadProjectSessionLogs: vi.fn(),
   os: 'linux' as 'linux' | 'macos' | 'windows',
+  noLocalBackend: false,
 }))
 vi.mock('$/providers/backends', async () => {
   const { mockBackends } = await import('$/utils/testing/mountWithProviders')
-  return { useBackends: () => mockBackends({ localBackend: mocks }) }
+  return {
+    useBackends: () => mockBackends({ localBackend: mocks.noLocalBackend ? null : mocks }),
+  }
 })
 vi.mock('enso-common/src/utilities/detect', async (importOriginal) => ({
   ...(await importOriginal<typeof import('enso-common/src/utilities/detect')>()),
@@ -42,6 +45,7 @@ beforeEach(() => {
   mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: [] })
   mocks.downloadProjectSessionLogs.mockReset().mockResolvedValue(undefined)
   mocks.os = 'linux'
+  mocks.noLocalBackend = false
 })
 
 afterEach(() => {
@@ -479,6 +483,40 @@ describe('download and reveal', () => {
     await download(wrapper).trigger('click')
     await flush()
     expect(wrapper.find('[role="alert"]').text()).toContain('disk full')
+  })
+
+  test('a download error goes once another session shows', async () => {
+    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE])
+    mocks.downloadProjectSessionLogs.mockRejectedValue(new Error('disk full'))
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    await flush()
+    await download(wrapper).trigger('click')
+    await flush()
+    expect(wrapper.text()).toContain('disk full')
+    await wrapper.find('select[aria-label="Session"]').setValue('old')
+    await flush()
+    expect(wrapper.text()).not.toContain('disk full')
+  })
+
+  test('without the local backend, Download is disabled', async () => {
+    mocks.noLocalBackend = true
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    await flush()
+    expect(download(wrapper).element.disabled).toBe(true)
   })
 
   test('has no reveal button without the desktop API', async () => {
