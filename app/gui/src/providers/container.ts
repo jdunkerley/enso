@@ -126,6 +126,17 @@ export function routeFromTab(tab: Opt<Tab>, from: RouteLocation): RouteLocationR
   }
 }
 
+/**
+ * The session log tab to keep when Show Logs opens `tab`, given the tab saved for that session:
+ * `tab` when none is saved, or when the saved one (from before tabs had a project) lacks the
+ * project `tab` has; otherwise `null`, and the saved tab stays.
+ */
+export function sessionLogTabToSave(saved: Tab | undefined, tab: ProjectLogTab): Tab | null {
+  if (saved == null) return tab
+  const upgrade = saved.type === 'projectLog' && saved.projectId == null && tab.projectId != null
+  return upgrade ? tab : null
+}
+
 /** A key string of panel. May be used as Set element or Map key. */
 export function panelKey(panel: Opt<Panel>) {
   switch (panel?.type) {
@@ -215,11 +226,27 @@ function createContainerStore() {
     if (userAction) currentTab.value = tab
   }
 
-  /** Add a session log tab to the list, and show it. */
+  /**
+   * Add a session log tab to the list, and show it. A tab saved for the session before tabs had a
+   * project gets it now, so its session picker lists the project's sessions.
+   */
   function openProjectLogTab(id: ProjectSessionId, title: string, projectId?: ProjectId) {
-    const tab: Tab = { type: 'projectLog', id, title, ...(projectId != null && { projectId }) }
-    if (!isTabOpened(tab)) tabs.set(panelKey(tab), tab)
-    currentTab.value = tab
+    const tab: ProjectLogTab = {
+      type: 'projectLog',
+      id,
+      title,
+      ...(projectId != null && { projectId }),
+    }
+    const key = panelKey(tab)
+    const saved = tabs.get(key)
+    const toSave = sessionLogTabToSave(saved, tab)
+    if (toSave != null) tabs.set(key, toSave)
+    // Showing the same tab again changes no route; an upgraded one needs its project in the route.
+    if (saved != null && toSave != null && isCurrentTab(tab)) {
+      void router.replace(routeFromTab(toSave, route))
+    } else {
+      currentTab.value = toSave ?? saved ?? tab
+    }
   }
 
   /** Checks if project with given backend type may be opened locally. */

@@ -6,7 +6,7 @@ import LocalStorage from '$/utils/LocalStorage'
 import { ProjectId, ProjectSessionId } from 'enso-common/src/services/Backend'
 import { describe, expect, test } from 'vitest'
 import type { RouteLocation } from 'vue-router'
-import { routeFromTab, tabFromRoute, type Tab } from '../container'
+import { routeFromTab, sessionLogTabToSave, tabFromRoute, type Tab } from '../container'
 
 const SESSION = ProjectSessionId('localprojectsession-key/enso-language-server-2026-10-19-09-00-00')
 const PROJECT = ProjectId('project-%2Fprojects%2FSales')
@@ -57,5 +57,29 @@ describe('saved tabs', () => {
   test('a new session log tab is saved with its project', () => {
     const saved = [{ type: 'projectLog', id: SESSION, title: 'Sales', projectId: PROJECT }]
     expect(schema.safeParse(saved).data).toEqual(saved)
+  })
+})
+
+describe('opening a session that has a saved tab', () => {
+  const withProject = {
+    type: 'projectLog',
+    id: SESSION,
+    title: 'Sales',
+    projectId: PROJECT,
+  } as const
+  const withoutProject = { type: 'projectLog', id: SESSION, title: 'Sales' } as const
+
+  test('a new tab is saved', () => {
+    expect(sessionLogTabToSave(undefined, withProject)).toEqual(withProject)
+  })
+
+  test('a tab saved without its project gets it', () => {
+    expect(sessionLogTabToSave(withoutProject, withProject)).toEqual(withProject)
+  })
+
+  test('a tab saved with its project stays, and none is lost', () => {
+    expect(sessionLogTabToSave(withProject, withProject)).toBeNull()
+    expect(sessionLogTabToSave(withProject, withoutProject)).toBeNull()
+    expect(sessionLogTabToSave(withoutProject, withoutProject)).toBeNull()
   })
 })

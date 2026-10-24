@@ -105,7 +105,12 @@ test.describe('a long session', () => {
 test.describe('a session log tab saved by the old viewer', () => {
   const SESSION = 'localprojectsession-mock/enso-language-server-mock-0'
   test.use({
-    setupApi: { local: (api) => void api.addProjectSession('2026-10-19T09:00:00.000Z', [NEWER]) },
+    setupApi: {
+      local: (api) => {
+        api.addProjectSession('2026-10-19T09:00:00.000Z', [NEWER])
+        api.addProjectSession('2026-10-20T09:00:00.000Z', [['a later session']])
+      },
+    },
   })
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((session) => {
@@ -123,5 +128,35 @@ test.describe('a session log tab saved by the old viewer', () => {
     await expect(tab.getByRole('log').getByText('Report written')).toBeVisible()
     // Saved without its project: its own session alone.
     await expect(tab.getByRole('combobox', { name: 'Session' }).locator('option')).toHaveCount(1)
+  })
+})
+
+test.describe('a saved session log tab without its project', () => {
+  const SESSION = 'localprojectsession-mock/enso-language-server-mock-0'
+  test.use({
+    setupApi: {
+      local: (api) => {
+        api.addProjectSession('2026-10-19T09:00:00.000Z', [NEWER])
+        api.addProjectSession('2026-10-20T09:00:00.000Z', [['a later session']])
+      },
+    },
+  })
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((session) => {
+      localStorage.setItem(
+        'Enso::openedTabs',
+        JSON.stringify([{ type: 'projectLog', id: session, title: 'Mock Project' }]),
+      )
+    }, SESSION)
+  })
+
+  test('gets its project when Show Logs opens its session again', async ({ editorPage }) => {
+    await editorPage.do(async (page) => {
+      // The oldest session is the one the saved tab shows.
+      await showLogs(page, false)
+      const tab = sessionTab(page)
+      await expect(tab.getByRole('log').getByText('Report written')).toBeVisible()
+      await expect(tab.getByRole('combobox', { name: 'Session' }).locator('option')).toHaveCount(2)
+    })
   })
 })
