@@ -34,7 +34,8 @@
   with Load older lines and reload an earlier session.][345]
 - [The Logs tab's source tickboxes are in a Sources menu beside the text filter:
   its button names the sources shown, and it opens as you start typing in the
-  filter. The Logger box is gone.][347]
+  filter. The Logger box is gone, and the Logs tab always shows the running
+  session: earlier sessions open from Activity → Show Logs.][347]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —

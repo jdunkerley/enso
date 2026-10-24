@@ -112,7 +112,7 @@ const sourcesOpen = ref(false)
 const sourcesOpenedByFilter = ref(false)
 const filterInput = ref<HTMLInputElement>()
 const sourcesButton = ref<HTMLButtonElement>()
-const sessionSelect = ref<HTMLSelectElement>()
+const toolbar = ref<HTMLElement>()
 /**
  * The open popover's element id, as its button names it (`aria-controls`); the text filter, which
  * opens it too, names it as well.
@@ -173,8 +173,8 @@ function closeSourcesOnEscape(event: KeyboardEvent) {
 /**
  * The popover's content is teleported to the end of the page, so Tab is routed by hand to give it
  * its place in the toolbar's order: from the open popover's button to its first box, from its last
- * box on to the Session picker (which closes it, as focus leaves it), and Shift+Tab from its first
- * box back to the button.
+ * box on to the toolbar's next control (which closes it, as focus leaves it), and Shift+Tab from
+ * its first box back to the button.
  */
 function onSourcesButtonTab(event: KeyboardEvent) {
   if (!sourcesOpen.value || event.shiftKey) return
@@ -193,9 +193,22 @@ function onSourcesPopoverTab(event: KeyboardEvent) {
       sourcesButton.value?.focus()
     }
   } else if (target === boxes.at(-1)) {
+    const next = nextToolbarControl()
+    if (next == null) return
     event.preventDefault()
-    sessionSelect.value?.focus()
+    next.focus()
   }
+}
+
+/** The first enabled control of the toolbar after the Sources button, if any. */
+function nextToolbarControl(): HTMLElement | undefined {
+  const button = sourcesButton.value
+  if (button == null || toolbar.value == null) return undefined
+  return [...toolbar.value.querySelectorAll<HTMLElement>('button, input, select')].find(
+    (control) =>
+      !(control as HTMLButtonElement).disabled &&
+      button.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING,
+  )
 }
 
 /** A press on, or focus moving to, the text filter leaves the Sources popover open. */
@@ -229,11 +242,15 @@ watch(
 )
 const filterText = ref('')
 const follow = ref(true)
-/** The session picked; `''` for the live one (only with a live stream). */
+/**
+ * The session picked, in the session log tab (without a live stream). The live panel has no
+ * picker: it shows the current session, or one paged back from it.
+ */
 const selectedSession = ref(stream != null ? '' : (initialSession ?? ''))
 /**
- * The live session, when it is shown from its file, paged back from the live view; fixed when
- * paging back starts, so a restart meanwhile does not move the view to the new session.
+ * With a live stream, the session shown from its file, paged back from the live view (Load older
+ * lines): the live session, or an earlier one whose lines are still in view after a restart. Fixed
+ * when paging back starts, so a restart meanwhile does not move the view to the new session.
  */
 const liveSnapshotSession = ref<string | null>(null)
 const liveSnapshot = computed(() => liveSnapshotSession.value != null)
@@ -242,7 +259,7 @@ let pageBackOnOpen = false
 const loading = ref(false)
 const loadError = ref<string>()
 
-const live = computed(() => stream != null && selectedSession.value === '' && !liveSnapshot.value)
+const live = computed(() => stream != null && !liveSnapshot.value)
 
 const sessions = useQuery({
   queryKey: computed(() => ['engineLogSessions', projectId, stream?.state.sessionId]),
@@ -250,7 +267,10 @@ const sessions = useQuery({
     projectId == null ? [] : ((await backends.localBackend?.listProjectSessions(projectId)) ?? []),
 })
 
-/** A session the picker offers; `session` is missing for one asked for but not listed. */
+/**
+ * A session the session log tab's picker offers; `session` is missing for one asked for but not
+ * listed.
+ */
 interface PickableSession {
   readonly id: string
   readonly number: number
@@ -258,24 +278,23 @@ interface PickableSession {
 }
 
 /**
- * The sessions the picker offers besides the live one, newest first, numbered from the oldest as
- * the Activity tab numbers them. Without a live stream, the session asked for is always among them.
+ * The sessions the session log tab's picker offers, newest first, numbered from the oldest as the
+ * Activity tab numbers them. The session asked for is always among them.
  */
 const pickableSessions = computed<readonly PickableSession[]>(() => {
   const listed: PickableSession[] = (sessions.data.value ?? [])
     .map((session, index) => ({ id: String(session.projectSessionId), number: index + 1, session }))
-    .filter(({ id }) => stream == null || id !== stream.state.sessionId)
     .reverse()
   const initial = initialSession
-  if (stream == null && initial != null && !listed.some(({ id }) => id === initial)) {
+  if (initial != null && !listed.some(({ id }) => id === initial)) {
     listed.unshift({ id: initial, number: 0, session: undefined })
   }
   return listed
 })
 
-/** The session read from its files, if any: an earlier one picked, or the live one paged back. */
+/** The session read from its files, if any: the one picked, or one paged back from the live view. */
 const windowSessionId = computed(() =>
-  selectedSession.value !== '' ? selectedSession.value : liveSnapshotSession.value,
+  stream != null ? liveSnapshotSession.value : selectedSession.value || null,
 )
 const logWindow = shallowRef<SessionLogWindow>()
 const windowRows = shallowRef<readonly LogRow[]>([])
@@ -387,8 +406,8 @@ watch(
 
 /**
  * A divider's Load older lines for `sessionId`: in a window, page it back; in the live view, open
- * that session's file one step back: the live session in place (with Back to live), an earlier one
- * (whose lines are still in view after a restart) as if it had been picked.
+ * that session's file one step back, with Back to live: the live session, or an earlier one whose
+ * lines are still in view after a restart.
  */
 function loadOlder(sessionId: string) {
   if (!live.value) {
@@ -397,8 +416,7 @@ function loadOlder(sessionId: string) {
     return
   }
   pageBackOnOpen = true
-  if (sessionId === stream?.state.sessionId) liveSnapshotSession.value = sessionId
-  else selectedSession.value = sessionId
+  liveSnapshotSession.value = sessionId
 }
 
 function loadNewer() {
@@ -415,12 +433,7 @@ function reload() {
 function backToLive() {
   follow.value = true
   liveSnapshotSession.value = null
-  selectedSession.value = ''
 }
-
-watch(selectedSession, () => {
-  liveSnapshotSession.value = null
-})
 
 /** At the top of the live view: load the current session's earlier lines, if it has any. */
 function onReachedTop() {
@@ -439,11 +452,13 @@ function onReachedTop() {
 
 /** The session shown and its log file; either is `null` while there is none. */
 const shownSession = computed(() => {
-  if (stream != null && selectedSession.value === '') {
-    return { id: stream.state.sessionId, logFile: stream.state.logFile }
+  const id =
+    stream != null ? (liveSnapshotSession.value ?? stream.state.sessionId) : windowSessionId.value
+  if (stream != null && id === stream.state.sessionId) {
+    return { id, logFile: stream.state.logFile }
   }
-  const session = sessions.data.value?.find((s) => s.projectSessionId === selectedSession.value)
-  return { id: selectedSession.value || null, logFile: session?.logFile ?? null }
+  const session = sessions.data.value?.find((s) => s.projectSessionId === id)
+  return { id, logFile: session?.logFile ?? null }
 })
 
 /** The reveal button's name, as each OS calls its file manager. */
@@ -488,7 +503,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
 
 <template>
   <div class="EngineLogPanel" data-testid="engine-log-panel">
-    <div class="toolbar">
+    <div ref="toolbar" class="toolbar">
       <select v-model="level" :aria-label="getText('engineLogsLevel')">
         <option value="error">{{ getText('engineLogsLevelError') }}</option>
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
@@ -542,11 +557,10 @@ function sessionLabel({ id, number, session }: PickableSession) {
         </fieldset>
       </Popover>
       <select
-        ref="sessionSelect"
+        v-if="stream == null"
         v-model="selectedSession"
         :aria-label="getText('engineLogsSession')"
       >
-        <option v-if="stream != null" value="">{{ getText('engineLogsThisSession') }}</option>
         <option v-for="option in pickableSessions" :key="option.id" :value="option.id">
           {{ sessionLabel(option) }}
         </option>
@@ -589,7 +603,13 @@ function sessionLabel({ id, number, session }: PickableSession) {
       </button>
     </div>
     <div v-if="liveSnapshot" class="notice" role="status">
-      {{ getText('engineLogsPagedBack') }}
+      {{
+        getText(
+          liveSnapshotSession === stream?.state.sessionId ?
+            'engineLogsPagedBack'
+          : 'engineLogsPagedBackEarlier',
+        )
+      }}
       <button type="button" class="link" @click="backToLive">
         {{ getText('engineLogsBackToLive') }}
       </button>

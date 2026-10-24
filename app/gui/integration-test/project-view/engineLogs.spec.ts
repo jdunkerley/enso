@@ -57,6 +57,8 @@ test('the Logs tab follows the engine log and filters by level', async ({
     const dock = locate.bottomDock(page)
     await expect(dock.getByRole('tab', { name: /Logs/ })).toHaveAttribute('aria-selected', 'true')
     const log = dock.getByRole('log')
+    // The live panel shows the current session: it has no session picker.
+    await expect(dock.getByRole('combobox', { name: 'Session' })).toHaveCount(0)
     // The engine's lines, its stderr among them, show once Engine is ticked.
     await expect(log.getByText('Something failed')).toBeVisible()
     await expect(log.getByText('Language server started')).toBeHidden()

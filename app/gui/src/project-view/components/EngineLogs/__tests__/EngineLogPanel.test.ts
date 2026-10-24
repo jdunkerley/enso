@@ -82,6 +82,26 @@ async function mountPanel() {
 
 type PanelWrapper = Awaited<ReturnType<typeof mountPanel>>['wrapper']
 
+const OLD_SESSION = {
+  projectId: PROJECT,
+  projectSessionId: ProjectSessionId('old'),
+  createdAt: Rfc3339DateTime('2026-10-19T09:00:00'),
+}
+
+const NEWER_SESSION = {
+  projectId: PROJECT,
+  projectSessionId: ProjectSessionId('newer'),
+  createdAt: Rfc3339DateTime('2026-10-20T09:00:00'),
+}
+
+/** The session log tab: the panel without a live stream, showing `initialSession`. */
+async function mountStandalone(props: { initialSession: string; projectId?: typeof PROJECT }) {
+  const { wrapper } = await mountWithProviders(EngineLogPanel, { props })
+  await flushPromises()
+  const lineTexts = () => wrapper.findAll('.row .text').map((text) => text.text())
+  return { wrapper, lineTexts }
+}
+
 /** The Sources popover (teleported out of the panel), if it is open. */
 const sourcesPopover = () =>
   document.querySelector<HTMLElement>('[data-testid="engine-logs-sources"]')
@@ -216,53 +236,12 @@ test("scrolling up at the top loads the session's earlier lines", async () => {
   expect(mocks.getProjectSessionLogs).toHaveBeenCalledTimes(1)
 })
 
-test('lists earlier sessions apart from the current one', async () => {
-  mocks.listProjectSessions.mockResolvedValue([
-    {
-      projectId: PROJECT,
-      projectSessionId: ProjectSessionId('old'),
-      createdAt: Rfc3339DateTime('2026-10-19T09:00:00'),
-    },
-    {
-      projectId: PROJECT,
-      projectSessionId: ProjectSessionId('s1'),
-      createdAt: Rfc3339DateTime('2026-10-20T10:00:00'),
-    },
-  ])
+test('the live view has no session picker', async () => {
+  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
   const { source, wrapper, flush } = await mountPanel()
   source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
   await flush()
-  const options = wrapper.find('select[aria-label="Session"]').findAll('option')
-  expect(options.map((option) => option.text())).toEqual([
-    'This session',
-    expect.stringContaining('Session 1'),
-  ])
-})
-
-test('shows an earlier session, read-only', async () => {
-  mocks.listProjectSessions.mockResolvedValue([
-    {
-      projectId: PROJECT,
-      projectSessionId: ProjectSessionId('old'),
-      createdAt: Rfc3339DateTime('2026-10-19T09:00:00'),
-    },
-  ])
-  mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: ['from yesterday'] })
-  const { source, wrapper, flush, lineTexts } = await mountPanel()
-  // The engine is starting: live, the tab would say it is waiting.
-  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: null, logFile: null })
-  source.emit('waiting', { seq: 1 })
-  await flush()
-  expect(wrapper.text()).toContain('Waiting for the engine…')
-  const picker = wrapper.find('select[aria-label="Session"]')
-  await picker.setValue('old')
-  await flush()
-  expect(mocks.getProjectSessionLogs).toHaveBeenCalledWith(ProjectSessionId('old'), {
-    scrollId: 'active',
-  })
-  expect(lineTexts()).toEqual(['from yesterday'])
-  // Read-only: no live notices.
-  expect(wrapper.text()).not.toContain('Waiting for the engine…')
+  expect(wrapper.find('select[aria-label="Session"]').exists()).toBe(false)
 })
 
 test('once the history has loaded, reaching the cap does not reload it at the top', async () => {
@@ -287,56 +266,25 @@ test('once the history has loaded, reaching the cap does not reload it at the to
   expect(mocks.getProjectSessionLogs).toHaveBeenCalledTimes(1)
 })
 
-const OLD_SESSION = {
-  projectId: PROJECT,
-  projectSessionId: ProjectSessionId('old'),
-  createdAt: Rfc3339DateTime('2026-10-19T09:00:00'),
-}
-
-test("going back to this session clears an earlier session's load error", async () => {
-  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
-  mocks.getProjectSessionLogs.mockRejectedValue(new Error('unreadable'))
+test('Back to live clears a load error of the lines paged back', async () => {
+  const history = Array.from({ length: LIVE_ROW_CAP + 5 }, (_, n) => `old ${n}`)
+  mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: [...history, 'live'] })
   const { source, wrapper, flush } = await mountPanel()
-  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 2, sessionId: 's1', logFile: null })
+  source.emit('line', { seq: 1, source: 'file', sessionId: 's1', text: 'live' })
   await flush()
-  const picker = wrapper.find('select[aria-label="Session"]')
-  await picker.setValue('old')
-  await flush()
-  expect(wrapper.find('[role="alert"]').text()).toContain('unreadable')
-  await picker.setValue('')
-  await flush()
-  expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-})
-
-test('only the latest request sets the loading and error notices', async () => {
-  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
-  const history = createDeferred<{ scrollId: string; hits: string[] }>()
-  const earlier = createDeferred<{ scrollId: string; hits: string[] }>()
-  mocks.getProjectSessionLogs.mockImplementation((sessionId: string) =>
-    sessionId === 'old' ? earlier.promise : history.promise,
-  )
-  const { source, wrapper, flush, lineTexts } = await mountPanel()
-  source.emit('hello', { channel: 'c1', oldestSeq: 5, nextSeq: 6, sessionId: 's1', logFile: null })
-  source.emit('line', { seq: 5, source: 'file', sessionId: 's1', text: 'live' })
-  await flush()
-  const loadingNotice = () =>
-    wrapper.findAll('[role="status"]').some((n) => n.text().includes('Loading'))
   await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
   await flush()
-  expect(loadingNotice()).toBe(true)
-  // The earlier session is asked for while the history is still being read.
-  await wrapper.find('select[aria-label="Session"]').setValue('old')
+  mocks.getProjectSessionLogs.mockRejectedValue(new Error('unreadable'))
+  await wrapper.find('.row.divider button').trigger('click')
   await flush()
-  expect(loadingNotice()).toBe(true)
-  // The stale history request fails: it neither ends the loading nor reports an error.
-  history.reject(new Error('stale failure'))
+  expect(wrapper.find('[role="alert"]').text()).toContain('unreadable')
+  await wrapper
+    .findAll('button')
+    .find((b) => b.text() === 'Back to live')!
+    .trigger('click')
   await flush()
-  expect(loadingNotice()).toBe(true)
   expect(wrapper.find('[role="alert"]').exists()).toBe(false)
-  earlier.resolve({ scrollId: 'done', hits: ['from yesterday'] })
-  await flush()
-  expect(loadingNotice()).toBe(false)
-  expect(lineTexts()).toEqual(['from yesterday'])
 })
 
 const loggedBy = (level: string, logger: string, message: string) =>
@@ -391,25 +339,6 @@ test('filters by source, with the level and text; the badge counts every ERROR e
   await setTickbox(wrapper, 'Engine', true)
   await setTickbox(wrapper, 'Libraries', false)
   expect(lineTexts()).toEqual([ENGINE_INFO, ENGINE_ERROR, 'boom'])
-})
-
-test('filters an earlier session by source', async () => {
-  mocks.listProjectSessions.mockResolvedValue([OLD_SESSION])
-  mocks.getProjectSessionLogs.mockResolvedValue({
-    scrollId: 'done',
-    hits: [
-      loggedBy('INFO', 'akka.actor.ActorSystem', 'started'),
-      loggedBy('WARN', 'local.My_Project.Main', 'from a library'),
-      USER_WARN,
-    ],
-  })
-  const { source, wrapper, flush, lineTexts } = await mountPanel()
-  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
-  await flush()
-  await setTickbox(wrapper, 'Libraries', false)
-  await wrapper.find('select[aria-label="Session"]').setValue('old')
-  await flush()
-  expect(lineTexts()).toEqual([USER_WARN])
 })
 
 const SQL_INFO = loggedBy(
@@ -589,10 +518,19 @@ describe('the Sources popover', () => {
   })
 
   test('Tab goes from the filter to the button, through the tickboxes, then on', async () => {
-    const { wrapper } = await mountPanel()
+    const { source, wrapper, flush } = await mountPanel()
+    // A session, so that Download, the next control, is enabled.
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    await flush()
     const input = filterInput(wrapper)
     const button = sourcesButton(wrapper).element
-    const session = wrapper.find('select[aria-label="Session"]').element
+    const download = wrapper.find('[data-testid="engine-logs-download"]').element
     input.focus()
     await flushPromises()
     await settle()
@@ -616,11 +554,11 @@ describe('the Sources popover', () => {
     await user.tab()
     await user.tab()
     expect(document.activeElement).toBe(tickbox('User log messages'))
-    // Past the last box, on to the Session picker, which closes the popover.
+    // Past the last box, on to the toolbar's next control, which closes the popover.
     await user.tab()
     await flushPromises()
     await settle()
-    expect(document.activeElement).toBe(session)
+    expect(document.activeElement).toBe(download)
     expect(sourcesPopover()).toBeNull()
   })
 
@@ -666,8 +604,7 @@ describe('download and reveal', () => {
 
   beforeEach(() => showItemInFolder.mockReset())
 
-  test("downloads the shown session's log file: the live one, then an earlier one", async () => {
-    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE])
+  test("downloads the live session's log file", async () => {
     const { source, wrapper, flush } = await mountPanel()
     expect(download(wrapper).attributes('aria-label')).toBe('Download log file')
     // No session yet: nothing to download.
@@ -684,10 +621,17 @@ describe('download and reveal', () => {
     expect(download(wrapper).element.disabled).toBe(false)
     await download(wrapper).trigger('click')
     expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('s1')
-    await wrapper.find('select[aria-label="Session"]').setValue('old')
-    await flush()
+  })
+
+  test("in the session log tab, downloads the picked session's log file", async () => {
+    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE, NEWER_SESSION])
+    const { wrapper } = await mountStandalone({ initialSession: 'old', projectId: PROJECT })
     await download(wrapper).trigger('click')
     expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('old')
+    await wrapper.find('select[aria-label="Session"]').setValue('newer')
+    await flushPromises()
+    await download(wrapper).trigger('click')
+    expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('newer')
   })
 
   test('says when a download fails', async () => {
@@ -707,22 +651,14 @@ describe('download and reveal', () => {
   })
 
   test('a download error goes once another session shows', async () => {
-    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE])
+    mocks.listProjectSessions.mockResolvedValue([OLD_WITH_FILE, NEWER_SESSION])
     mocks.downloadProjectSessionLogs.mockRejectedValue(new Error('disk full'))
-    const { source, wrapper, flush } = await mountPanel()
-    source.emit('hello', {
-      channel: 'c1',
-      oldestSeq: 1,
-      nextSeq: 1,
-      sessionId: 's1',
-      logFile: null,
-    })
-    await flush()
+    const { wrapper } = await mountStandalone({ initialSession: 'old', projectId: PROJECT })
     await download(wrapper).trigger('click')
-    await flush()
+    await flushPromises()
     expect(wrapper.text()).toContain('disk full')
-    await wrapper.find('select[aria-label="Session"]').setValue('old')
-    await flush()
+    await wrapper.find('select[aria-label="Session"]').setValue('newer')
+    await flushPromises()
     expect(wrapper.text()).not.toContain('disk full')
   })
 
@@ -745,12 +681,8 @@ describe('download and reveal', () => {
     expect(reveal(wrapper).exists()).toBe(false)
   })
 
-  test("reveals the shown session's file, and is disabled while it has none", async () => {
+  test("reveals the live session's file, and is disabled while it has none", async () => {
     withSystemApi()
-    mocks.listProjectSessions.mockResolvedValue([
-      OLD_WITH_FILE,
-      { ...OLD_SESSION, projectSessionId: ProjectSessionId('older') },
-    ])
     const { source, wrapper, flush } = await mountPanel()
     source.emit('hello', {
       channel: 'c1',
@@ -766,14 +698,20 @@ describe('download and reveal', () => {
     await flush()
     await reveal(wrapper).trigger('click')
     expect(showItemInFolder).toHaveBeenLastCalledWith('/logs/live.log')
-    const picker = wrapper.find('select[aria-label="Session"]')
-    await picker.setValue('old')
-    await flush()
+  })
+
+  test("in the session log tab, reveals the picked session's file, if listed with one", async () => {
+    withSystemApi()
+    mocks.listProjectSessions.mockResolvedValue([
+      OLD_WITH_FILE,
+      { ...OLD_SESSION, projectSessionId: ProjectSessionId('older') },
+    ])
+    const { wrapper } = await mountStandalone({ initialSession: 'old', projectId: PROJECT })
     await reveal(wrapper).trigger('click')
     expect(showItemInFolder).toHaveBeenLastCalledWith('/logs/enso-language-server-old.log')
     // A session listed without its file cannot be revealed.
-    await picker.setValue('older')
-    await flush()
+    await wrapper.find('select[aria-label="Session"]').setValue('older')
+    await flushPromises()
     expect(reveal(wrapper).element.disabled).toBe(true)
   })
 
@@ -790,18 +728,48 @@ describe('download and reveal', () => {
 })
 
 describe('the session log tab: a session without a live stream', () => {
-  const NEWER_SESSION = {
-    projectId: PROJECT,
-    projectSessionId: ProjectSessionId('newer'),
-    createdAt: Rfc3339DateTime('2026-10-20T09:00:00'),
-  }
+  test('filters a session by source', async () => {
+    mocks.getProjectSessionLogs.mockResolvedValue({
+      scrollId: 'done',
+      hits: [
+        loggedBy('INFO', 'akka.actor.ActorSystem', 'started'),
+        loggedBy('WARN', 'local.My_Project.Main', 'from a library'),
+        USER_WARN,
+      ],
+    })
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
+    await setTickbox(wrapper, 'Libraries', false)
+    expect(lineTexts()).toEqual([USER_WARN])
+  })
 
-  async function mountStandalone(props: { initialSession: string; projectId?: typeof PROJECT }) {
-    const { wrapper } = await mountWithProviders(EngineLogPanel, { props })
+  test('only the latest request sets the loading and error notices', async () => {
+    mocks.listProjectSessions.mockResolvedValue([OLD_SESSION, NEWER_SESSION])
+    const first = createDeferred<{ scrollId: string; hits: string[] }>()
+    const second = createDeferred<{ scrollId: string; hits: string[] }>()
+    mocks.getProjectSessionLogs.mockImplementation((sessionId: string) =>
+      sessionId === 'old' ? first.promise : second.promise,
+    )
+    const { wrapper, lineTexts } = await mountStandalone({
+      initialSession: 'old',
+      projectId: PROJECT,
+    })
+    const loadingNotice = () =>
+      wrapper.findAll('[role="status"]').some((n) => n.text().includes('Loading'))
+    expect(loadingNotice()).toBe(true)
+    // Another session is picked while the first is still being read.
+    await wrapper.find('select[aria-label="Session"]').setValue('newer')
     await flushPromises()
-    const lineTexts = () => wrapper.findAll('.row .text').map((text) => text.text())
-    return { wrapper, lineTexts }
-  }
+    expect(loadingNotice()).toBe(true)
+    // The stale request fails: it neither ends the loading nor reports an error.
+    first.reject(new Error('stale failure'))
+    await flushPromises()
+    expect(loadingNotice()).toBe(true)
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    second.resolve({ scrollId: 'done', hits: ['from newer'] })
+    await flushPromises()
+    expect(loadingNotice()).toBe(false)
+    expect(lineTexts()).toEqual(['from newer'])
+  })
 
   test('shows the session asked for, and offers the project’s other sessions but no live one', async () => {
     mocks.listProjectSessions.mockResolvedValue([OLD_SESSION, NEWER_SESSION])
@@ -981,9 +949,9 @@ describe("the live view's older lines", () => {
     mocks.getProjectSessionLogs.mockClear()
     await button.trigger('click')
     await flush()
-    expect((wrapper.find('select[aria-label="Session"]').element as HTMLSelectElement).value).toBe(
-      's1',
-    )
+    expect(wrapper.text()).toContain('Showing an earlier session from its log file.')
+    await wrapper.find('[data-testid="engine-logs-download"]').trigger('click')
+    expect(mocks.downloadProjectSessionLogs).toHaveBeenLastCalledWith('s1')
     expect(mocks.getProjectSessionLogs).toHaveBeenCalledWith(ProjectSessionId('s1'), {
       scrollId: 'active',
     })
