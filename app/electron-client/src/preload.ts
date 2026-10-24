@@ -133,6 +133,9 @@ const system: ElectronApi['system'] = {
   showItemInFolder: (fullPath: string) => {
     electron.ipcRenderer.send(ipc.Channel.showItemInFolder, fullPath)
   },
+  showLogFileInFolder: (fullPath: string) => {
+    electron.ipcRenderer.send(ipc.Channel.showLogFileInFolder, fullPath)
+  },
   getFilePath: (item: File) => {
     return electron.webUtils.getPathForFile(item)
   },

@@ -622,7 +622,7 @@ function decodeSessionId(sessionId: string): { projectLogDir: string; baseName: 
 export interface ListedProjectSession {
   readonly projectSessionId: string
   readonly createdAt: Rfc3339DateTime
-  /** The session's file: its active `.log`, or its first archive when that is all there is. */
+  /** The session's file: its active `.log`, or its lowest-numbered archive when it has only archives. */
   readonly logFile: string
 }
 
@@ -649,7 +649,7 @@ export async function listProjectSessions(
   }
   const seen = new Set<string>()
   const sessions: ListedProjectSession[] = []
-  for (const entry of [...entries].sort()) {
+  for (const entry of entries) {
     const baseName = extractSessionBaseName(entry)
     if (baseName == null) continue
     if (seen.has(baseName)) continue
@@ -657,10 +657,16 @@ export async function listProjectSessions(
     const createdAt = parseDateTimeFromFilename(baseName)
     if (!createdAt) continue
     const active = `${baseName}.log`
+    // By number, not by name: `x.10.log.gz` sorts before `x.2.log.gz`.
+    const lowestArchive = collectArchiveIndices(projectLogDir, baseName)[0]
+    const file =
+      entries.includes(active) || lowestArchive == null ?
+        active
+      : `${baseName}.${lowestArchive}.log.gz`
     sessions.push({
       projectSessionId: encodeSessionId(localProjectKey, baseName),
       createdAt,
-      logFile: path.join(projectLogDir, entries.includes(active) ? active : entry),
+      logFile: path.join(projectLogDir, file),
     })
   }
   sessions.sort((a, b) => a.createdAt.localeCompare(b.createdAt))

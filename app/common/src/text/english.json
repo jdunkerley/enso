@@ -737,7 +737,7 @@
   "engineLogsSettingsSection": "Engine logs",
   "engineLogsSettingsCustomEntryAliases": "engine logs\nlogs\nlogging\nsql\nqueries\nperformance\ntimings",
   "logSqlQueriesSetting": "Log SQL queries",
-  "logSqlQueriesSettingDescription": "Write each SQL query a database connection opened from a data link runs to the engine log, under the SQL queries source of the Logs panel.",
+  "logSqlQueriesSettingDescription": "Write each SQL query a database connection opened from a data link runs to the engine log, under the SQL queries source of the Logs panel. Each line starts with the connection's JDBC URL, which can include credentials, so take care before sharing the log.",
   "logPerformanceTimingsSetting": "Log performance timings",
   "logPerformanceTimingsSettingDescription": "Write how long each tracked operation took, database queries among them, to the engine log, under the Performance source of the Logs panel.",
   "engineLogsSettingsNextStart": "These take effect the next time a project's engine starts: reopen an open project to apply them.",

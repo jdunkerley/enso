@@ -294,8 +294,15 @@ const revealLabel = getText(
   : 'engineLogsShowInFolder',
 )
 
-/** Why the last download failed; `undefined` unless it did. */
+/** Why the last download failed; `undefined` unless it did, or once another session shows. */
 const downloadError = ref<string>()
+watch(
+  () => shownSession.value.id,
+  () => (downloadError.value = undefined),
+)
+
+/** Downloading needs a session and the local backend, which reads its files. */
+const canDownload = computed(() => shownSession.value.id != null && backends.localBackend != null)
 
 async function downloadLogFile() {
   const id = shownSession.value.id
@@ -311,7 +318,7 @@ async function downloadLogFile() {
 
 function revealLogFile() {
   const file = shownSession.value.logFile
-  if (file != null) systemApi?.showItemInFolder(file)
+  if (file != null) systemApi?.showLogFileInFolder(file)
 }
 
 function sessionLabel({ id, number, session }: PickableSession) {
@@ -375,7 +382,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
         class="iconButton"
         :aria-label="getText('engineLogsDownload')"
         :title="getText('engineLogsDownload')"
-        :disabled="shownSession.id == null"
+        :disabled="!canDownload"
         data-testid="engine-logs-download"
         @click="downloadLogFile"
       >

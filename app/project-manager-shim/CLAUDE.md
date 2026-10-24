@@ -333,8 +333,8 @@ stays staged).
 ## Engine logs (`src/engineLogs/`)
 
 `--list-project-sessions` (`handler/filesystem.ts`) names each session's file as
-`logFile`: its active `.log`, or its first archive when that is all there is.
-The Logs panel reveals an earlier session's file with it.
+`logFile`: its active `.log`, or its lowest-numbered archive when it has only
+archives. The Logs panel reveals an earlier session's file with it.
 `--list-project-session-pages <sessionId>` lists a session's pages, oldest
 first: `archive:N` per rolled archive, then `active`. Each is a `scrollId` that
 `--get-project-session-logs` reads whole, so the viewer can read a session from

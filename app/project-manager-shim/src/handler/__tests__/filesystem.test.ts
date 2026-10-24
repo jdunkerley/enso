@@ -174,18 +174,18 @@ describe('listProjectSessions', () => {
     expect(result.sessions[0]!.logFile).toBe(path.join(projectLogDir, `${baseName}.log`))
   })
 
-  test("names a session's file: its active log, or its first archive", async () => {
+  test("names a session's file: its active log, or its lowest-numbered archive", async () => {
     const projectLogDir = path.join(tmpDir, projectId)
     const archived = 'enso-language-server-2026-03-30-09-00-00'
-    fs.writeFileSync(path.join(projectLogDir, `${archived}.1.log.gz`), zlib.gzipSync('1'))
-    fs.writeFileSync(path.join(projectLogDir, `${archived}.0.log.gz`), zlib.gzipSync('0'))
+    fs.writeFileSync(path.join(projectLogDir, `${archived}.10.log.gz`), zlib.gzipSync('10'))
+    fs.writeFileSync(path.join(projectLogDir, `${archived}.2.log.gz`), zlib.gzipSync('2'))
     const active = 'enso-language-server-2026-03-31-14-23-45'
     fs.writeFileSync(path.join(projectLogDir, `${active}.0.log.gz`), zlib.gzipSync('archive'))
     fs.writeFileSync(path.join(projectLogDir, `${active}.log`), 'active log')
 
     const result = await listProjectSessions(projectId)
     expect(result.sessions.map((session) => session.logFile)).toEqual([
-      path.join(projectLogDir, `${archived}.0.log.gz`),
+      path.join(projectLogDir, `${archived}.2.log.gz`),
       path.join(projectLogDir, `${active}.log`),
     ])
   })
