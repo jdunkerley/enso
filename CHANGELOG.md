@@ -25,11 +25,7 @@
   Settings → Local → Engine logs can log the SQL queries of database connections
   and how long each operation (each query among them) took, from the next time a
   project opens. The Logs tab then offers SQL queries and Performance tickboxes.
-  SQL queries are no longer logged otherwise.][342] Settings → Local → Engine
-  logs can log the SQL queries of data-link database connections and how long
-  each operation (each query among them) took, from the next time a project
-  opens. The Logs tab then offers SQL queries and Performance tickboxes. SQL
-  queries are no longer logged otherwise.][342]
+  SQL queries are no longer logged otherwise.][342]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
