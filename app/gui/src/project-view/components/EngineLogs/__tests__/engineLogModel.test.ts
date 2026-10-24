@@ -233,12 +233,85 @@ describe('EngineLogModel', () => {
     expect(texts(f.model.rows)).toEqual(['h1', 'h2', 'live'])
   })
 
-  test('caps prepended history to the room left, under a truncated divider', () => {
+  test('caps prepended history to the room left; the rest is older lines', () => {
     const f = feed()
     f.hello({ sessionId: 's1' })
     for (let n = 0; n < LIVE_ROW_CAP - 2; n++) f.line(`live ${n}`)
     f.model.prependHistory(['h1', 'h2', 'h3', 'h4'])
-    expect(texts(f.model.rows.slice(0, 4))).toEqual(['--truncated--', 'h3', 'h4', 'live 0'])
+    expect(texts(f.model.rows.slice(0, 3))).toEqual(['h3', 'h4', 'live 0'])
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+    // The start was not loaded, and the history is not loaded twice.
+    expect(f.model.sessionStartHeld).toBe(false)
+    expect(f.model.canLoadHistory).toBe(false)
+  })
+
+  test('older lines survive commits at the cap (history with no room left)', () => {
+    const f = feed()
+    f.hello({ sessionId: 's1' })
+    for (let n = 0; n < LIVE_ROW_CAP; n++) f.line(`live ${n}`)
+    f.model.commit()
+    f.model.prependHistory(['h1', 'h2', 'live 0'])
+    expect(f.model.rows).toHaveLength(LIVE_ROW_CAP)
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+    for (let n = 0; n < 10; n++) {
+      f.line(`more ${n}`)
+      f.model.commit()
+      expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+    }
+    expect(f.model.rows).toHaveLength(LIVE_ROW_CAP)
+  })
+
+  test('a live view that fills up has older lines of its session', () => {
+    const f = feed()
+    f.hello()
+    f.waiting()
+    f.session('s1')
+    for (let n = 0; n <= LIVE_ROW_CAP; n++) f.line(`line ${n}`)
+    expect(f.model.olderLines).toBeNull()
+    f.model.commit()
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+  })
+
+  test('history is from the start only when the file has nothing older', () => {
+    const partial = feed()
+    partial.hello({ sessionId: 's1' })
+    partial.line('live')
+    partial.model.prependHistory(['h9', 'live'], true)
+    expect(texts(partial.model.rows)).toEqual(['h9', 'live'])
+    expect(partial.model.olderLines).toEqual({ sessionId: 's1' })
+    expect(partial.model.sessionStartHeld).toBe(false)
+    expect(partial.model.canLoadHistory).toBe(false)
+
+    const whole = feed()
+    whole.hello({ sessionId: 's1' })
+    whole.line('live')
+    whole.model.prependHistory(['h1', 'live'], false)
+    expect(whole.model.olderLines).toBeNull()
+    expect(whole.model.sessionStartHeld).toBe(true)
+  })
+
+  test("older lines stay their session's after a restart", () => {
+    const f = feed()
+    f.hello({ sessionId: 's1' })
+    f.line('live')
+    f.model.prependHistory(['h9', 'live'], true)
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+    f.waiting()
+    f.session('s2')
+    f.line('new session')
+    f.model.commit()
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
+  })
+
+  test('older lines of a session without a file yet are named once it has one', () => {
+    const f = feed()
+    f.hello()
+    f.waiting()
+    for (let n = 0; n <= LIVE_ROW_CAP; n++) f.line(`line ${n}`)
+    f.model.commit()
+    expect(f.model.olderLines).toEqual({ sessionId: null })
+    f.session('s1')
+    expect(f.model.olderLines).toEqual({ sessionId: 's1' })
   })
 })
 

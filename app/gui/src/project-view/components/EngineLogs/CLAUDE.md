@@ -36,9 +36,18 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     whatever their origin and the filters; stderr lines are not counted.
   - Dividers: `restarted` at a new engine's `waiting` (not at `session`, which
     also fires for the first session), `skipped` after a gap or on a new
-    channel, `truncated` above capped or windowed lines and `newer` below a
-    window paged back; the list gives those two a Load older / Load newer lines
-    button.
+    channel; `truncated` above a window with older lines and `newer` below one
+    paged back. Each of those two names its session (`sessionId`), and the list
+    gives it a Load older / Load newer lines button only when it does.
+  - Older lines of the live view are state, not a row (`olderLines`, published
+    by the stream): set when history did not reach the session's start (the file
+    had older lines, `hasOlder`, or they did not fit) or when rows are dropped
+    at the cap, so trimming can never remove the offer. The panel shows it as a
+    `truncated` divider bound to its session: it stays the previous session's
+    after a restart (and pages that session), and has no button while its
+    session has no id. `sessionStartHeld` is true only when the session's first
+    line really was in the rows; `canLoadHistory` (not spliced yet, start not
+    held) gates the top-of-view history load.
   - The 20,000-row cap, `prependHistory` (a session's history spliced above the
     first live file line), `filterRows` and `rowsFromLines`.
 - `engineLogStream.ts` — `useEngineLogStream`:

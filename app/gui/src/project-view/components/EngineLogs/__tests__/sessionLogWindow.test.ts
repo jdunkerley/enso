@@ -114,8 +114,15 @@ test('a session with no pages is empty', async () => {
   expect(window.hasNewer).toBe(false)
 })
 
-test('fetchNewestSessionLines reads only as far back as it needs', async () => {
+test('fetchNewestSessionLines reads only as far back as it needs, and says what is left', async () => {
   const { reader, all } = session([4, 4, 4])
-  expect(await fetchNewestSessionLines(reader, SESSION, 5)).toEqual(all.slice(-5))
+  expect(await fetchNewestSessionLines(reader, SESSION, 5)).toEqual({
+    lines: all.slice(-5),
+    hasOlder: true,
+  })
   expect(reader.getProjectSessionLogs).toHaveBeenCalledTimes(2)
+  expect(await fetchNewestSessionLines(reader, SESSION, 12)).toEqual({
+    lines: all,
+    hasOlder: false,
+  })
 })

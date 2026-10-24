@@ -54,6 +54,17 @@ export interface LogDivider {
   readonly kind: 'divider'
   readonly key: number
   readonly divider: DividerKind
+  /**
+   * For `truncated` and `newer`: the session whose lines it stands for, which its Load older / Load
+   * newer lines button pages through; `null` when that session is not known, and nothing is offered.
+   */
+  readonly sessionId?: string | null
+}
+
+/** The lines above the live view that are not in it: which session they belong to. */
+export interface OlderLines {
+  /** `null` while that session is not known (it has no file yet, or it scrolled away unnamed). */
+  readonly sessionId: string | null
 }
 
 /** A row of the Logs tab. */
@@ -239,6 +250,8 @@ export interface WindowEdges {
    * keeps its key while the window moves and the list keeps its place.
    */
   readonly firstKey: number
+  /** The session the lines are from, which the dividers' load buttons page through. */
+  readonly sessionId: string
 }
 
 /**
@@ -256,7 +269,12 @@ export function rowsFromLines(
   const classifier = new LineClassifier()
   const rows: LogRow[] = []
   if (shown.length < lines.length || edges.older === true) {
-    rows.push({ kind: 'divider', key: Number.MIN_SAFE_INTEGER, divider: 'truncated' })
+    rows.push({
+      kind: 'divider',
+      key: Number.MIN_SAFE_INTEGER,
+      divider: 'truncated',
+      sessionId: edges.sessionId ?? null,
+    })
   }
   for (const [index, text] of shown.entries()) {
     rows.push({
@@ -268,7 +286,12 @@ export function rowsFromLines(
     })
   }
   if (edges.newer === true) {
-    rows.push({ kind: 'divider', key: Number.MAX_SAFE_INTEGER, divider: 'newer' })
+    rows.push({
+      kind: 'divider',
+      key: Number.MAX_SAFE_INTEGER,
+      divider: 'newer',
+      sessionId: edges.sessionId ?? null,
+    })
   }
   return rows
 }
@@ -346,6 +369,12 @@ export class EngineLogModel {
   logFile: string | null = null
   /** ERROR entries of the log file not yet seen, whatever their origin; stderr is not counted. */
   unseenErrors = 0
+  /**
+   * Lines above the rows that are not in them (history that did not fit, or rows dropped at the
+   * cap); `null` when the rows begin where the log does. State, not a row: the cap trims rows, and
+   * must not trim away the offer to load them. The view shows it as a `truncated` divider.
+   */
+  olderLines: OlderLines | null = null
 
   private pending: LogRow[] = []
   private channel: string | undefined
@@ -357,17 +386,30 @@ export class EngineLogModel {
   private sessionFirstKey: number | undefined
   /** The key of the first live row of the current session; history goes in at or after it. */
   private sessionAnchorKey = 0
-  private historyLoaded = false
+  /** Whether the current session's history has been spliced in (it is never spliced twice). */
+  private historySpliced = false
+  /** Whether that history reached back to the session's first line. */
+  private historyFromStart = false
   private sessionRowsDropped = false
+  /** Whether {@link olderLines} is the current session's (and follows its id). */
+  private olderLinesCurrent = false
   private readonly classifier = new LineClassifier()
 
   /**
-   * Whether the current session has nothing older to load: the rows hold it from its start, or its
-   * history has been loaded (the whole session, so a later drop at the cap loses nothing that a
-   * reload could put back).
+   * Whether the current session's first line has been in the rows: they held it from its start, or
+   * its spliced history reached back to it. (A later drop at the cap may have removed it again;
+   * {@link olderLines} then offers it.)
    */
   get sessionStartHeld(): boolean {
-    return this.historyLoaded || (this.sessionBeganInView && !this.sessionRowsDropped)
+    return (
+      (this.historySpliced && this.historyFromStart) ||
+      (this.sessionBeganInView && !this.sessionRowsDropped)
+    )
+  }
+
+  /** Whether reaching the top of the live view should splice in the session's history. */
+  get canLoadHistory(): boolean {
+    return !this.historySpliced && !this.sessionStartHeld
   }
 
   /** Where a dropped stream resumes; `undefined` before the first event of a channel. */
@@ -394,6 +436,7 @@ export class EngineLogModel {
     }
     this.channel = data.channel
     this.sessionId = data.sessionId
+    this.bindOlderLines()
     this.logFile = data.logFile ?? this.logFile
     this.ended = undefined
   }
@@ -422,12 +465,15 @@ export class EngineLogModel {
     if (this.hadEngine) this.addDivider('restarted')
     this.hadEngine = true
     this.waiting = true
+    // Older lines above the view stay the previous session's.
+    this.olderLinesCurrent = false
     this.sessionId = null
     this.sessionBeganInView = true
     this.sessionRowsDropped = false
     this.sessionFirstKey = this.nextKey
     this.sessionAnchorKey = this.nextKey
-    this.historyLoaded = false
+    this.historySpliced = false
+    this.historyFromStart = false
     this.classifier.reset()
   }
 
@@ -438,6 +484,7 @@ export class EngineLogModel {
     this.waiting = false
     this.sessionId = data.sessionId
     this.logFile = data.logFile
+    this.bindOlderLines()
   }
 
   /** The stream ended. */
@@ -447,7 +494,9 @@ export class EngineLogModel {
   }
 
   /**
-   * Move new rows into {@link rows}, keeping the newest {@link LIVE_ROW_CAP}.
+   * Move new rows into {@link rows}, keeping the newest {@link LIVE_ROW_CAP}. Rows dropped at the cap
+   * become {@link olderLines}: the current session's when any of its rows went (its spliced
+   * history has negative keys), else lines of an earlier session, offered only if already named.
    * @returns Whether anything changed.
    */
   commit(): boolean {
@@ -458,7 +507,15 @@ export class EngineLogModel {
     if (excess > 0) {
       const dropped = this.rows.splice(0, excess)
       const first = this.sessionFirstKey
-      if (first != null && dropped.some((row) => row.key >= first)) this.sessionRowsDropped = true
+      const currentDropped =
+        first != null &&
+        dropped.some((row) => row.key >= first || (this.historySpliced && row.key < 0))
+      if (currentDropped) {
+        this.sessionRowsDropped = true
+        this.setOlderLinesOfCurrent()
+      } else if (this.olderLines == null) {
+        this.olderLines = { sessionId: null }
+      }
     }
     return true
   }
@@ -469,13 +526,15 @@ export class EngineLogModel {
   }
 
   /**
-   * Put the current session's earlier lines above the rows. `lines` is the session's whole file
-   * history, oldest first; the part before the first live file line goes in above that line (after
-   * any start-up stderr), at most as many as fit under {@link LIVE_ROW_CAP}.
+   * Put the current session's earlier lines above the rows. `lines` are the newest lines of its
+   * file, oldest first, and `hasOlder` whether the file has lines before them; the part before the
+   * first live file line goes in above that line (after any start-up stderr), at most as many as
+   * fit under {@link LIVE_ROW_CAP}. Lines left out (older in the file, or cut for room) become
+   * {@link olderLines}; only history that reached the session's first line holds its start.
    */
-  prependHistory(lines: readonly string[]): void {
+  prependHistory(lines: readonly string[], hasOlder = false): void {
     this.commit()
-    if (this.historyLoaded) return
+    if (this.historySpliced) return
     const firstFileIndex = this.rows.findIndex(
       (row) => row.kind === 'line' && row.source === 'file' && row.key >= this.sessionAnchorKey,
     )
@@ -498,7 +557,6 @@ export class EngineLogModel {
       text,
       ...classifier.classify(text, 'file'),
     }))
-    if (truncated) added.unshift({ kind: 'divider', key: 0, divider: 'truncated' })
     // Keys below every existing one, increasing downwards, so they stay unique.
     const keyed = added.map((row, index): LogRow => ({
       ...row,
@@ -506,19 +564,40 @@ export class EngineLogModel {
     }))
     this.previousKey -= added.length
     this.rows.splice(firstFileIndex < 0 ? this.rows.length : firstFileIndex, 0, ...keyed)
-    this.historyLoaded = true
-    this.sessionBeganInView = true
-    this.sessionRowsDropped = false
+    this.historySpliced = true
+    this.historyFromStart = !hasOlder && !truncated
+    if (this.historyFromStart) {
+      this.sessionBeganInView = true
+      this.sessionRowsDropped = false
+    } else {
+      this.setOlderLinesOfCurrent()
+    }
     this.sessionFirstKey = keyed[0]?.key ?? this.sessionFirstKey ?? this.nextKey
+  }
+
+  /** The current session has lines above the rows. */
+  private setOlderLinesOfCurrent(): void {
+    this.olderLines = { sessionId: this.sessionId }
+    this.olderLinesCurrent = true
+  }
+
+  /** The current session's older lines take its id once it has one. */
+  private bindOlderLines(): void {
+    if (this.olderLinesCurrent && this.olderLines?.sessionId !== this.sessionId) {
+      this.olderLines = { sessionId: this.sessionId }
+    }
   }
 
   /** The rows from here on belong to a session whose start is not in view. */
   private startSessionOutOfView(): void {
+    // Older lines above the view stay the previous session's.
+    this.olderLinesCurrent = false
     this.sessionBeganInView = false
     this.sessionRowsDropped = false
     this.sessionFirstKey = this.nextKey
     this.sessionAnchorKey = this.nextKey
-    this.historyLoaded = false
+    this.historySpliced = false
+    this.historyFromStart = false
   }
 
   private accept(seq: number): boolean {

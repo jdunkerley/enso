@@ -104,8 +104,14 @@ const loggerFilter = ref('')
 const follow = ref(true)
 /** The session picked; `''` for the live one (only with a live stream). */
 const selectedSession = ref(stream != null ? '' : (initialSession ?? ''))
-/** Whether the live session is shown from its file, paged back from the live view. */
-const liveSnapshot = ref(false)
+/**
+ * The live session, when it is shown from its file, paged back from the live view; fixed when
+ * paging back starts, so a restart meanwhile does not move the view to the new session.
+ */
+const liveSnapshotSession = ref<string | null>(null)
+const liveSnapshot = computed(() => liveSnapshotSession.value != null)
+/** Whether the next session opened from its file starts one step back from its newest lines. */
+let pageBackOnOpen = false
 const loading = ref(false)
 const loadError = ref<string>()
 
@@ -142,17 +148,33 @@ const pickableSessions = computed<readonly PickableSession[]>(() => {
 
 /** The session read from its files, if any: an earlier one picked, or the live one paged back. */
 const windowSessionId = computed(() =>
-  selectedSession.value !== '' ? selectedSession.value
-  : liveSnapshot.value ? (stream?.state.sessionId ?? null)
-  : null,
+  selectedSession.value !== '' ? selectedSession.value : liveSnapshotSession.value,
 )
 const logWindow = shallowRef<SessionLogWindow>()
 const windowRows = shallowRef<readonly LogRow[]>([])
 
+/**
+ * The live rows, under a `truncated` divider while there are lines above them (`olderLines`, bound
+ * to their session: its button pages through that session, and is not offered while it is unknown).
+ */
+const liveRows = computed<readonly LogRow[]>(() => {
+  if (stream == null) return []
+  // `toValue`: a test harness may hand the stream over reactive, which unwraps `rows`.
+  const rows = toValue(stream.rows)
+  const older = stream.state.olderLines
+  if (older == null) return rows
+  const divider: LogRow = {
+    kind: 'divider',
+    key: Number.MIN_SAFE_INTEGER,
+    divider: 'truncated',
+    sessionId: older.sessionId,
+  }
+  return [divider, ...rows]
+})
+
 /** The rows of the view, before the filters. */
 const sourceRows = computed<readonly LogRow[]>(() =>
-  // `toValue`: a test harness may hand the stream over reactive, which unwraps `rows`.
-  live.value && stream != null ? toValue(stream.rows) : windowRows.value,
+  live.value ? liveRows.value : windowRows.value,
 )
 
 const shownRows = computed(() =>
@@ -193,6 +215,7 @@ function showWindow(window: SessionLogWindow) {
     older: window.hasOlder,
     newer: window.hasNewer,
     firstKey: window.firstLine,
+    sessionId: window.sessionId,
   })
 }
 
@@ -220,8 +243,9 @@ watch(
       logWindow.value = undefined
       return
     }
-    // The live session paged back from the live view: one step past its newest lines.
-    const pagedBack = liveSnapshot.value && selectedSession.value === ''
+    // Opened from a Load older lines in the live view: one step past its newest lines.
+    const pagedBack = pageBackOnOpen
+    pageBackOnOpen = false
     logWindow.value = new SessionLogWindow(backend, ProjectSessionId(sessionId))
     if (pagedBack) follow.value = false
     moveWindow(async (window) => {
@@ -232,14 +256,20 @@ watch(
   { immediate: true },
 )
 
-/** A divider's Load older lines: page back, from the live view through the session's file. */
-function loadOlder() {
-  if (live.value) {
-    liveSnapshot.value = true
+/**
+ * A divider's Load older lines for `sessionId`: in a window, page it back; in the live view, open
+ * that session's file one step back: the live session in place (with Back to live), an earlier one
+ * (whose lines are still in view after a restart) as if it had been picked.
+ */
+function loadOlder(sessionId: string) {
+  if (!live.value) {
+    follow.value = false
+    moveWindow((window) => window.older())
     return
   }
-  follow.value = false
-  moveWindow((window) => window.older())
+  pageBackOnOpen = true
+  if (sessionId === stream?.state.sessionId) liveSnapshotSession.value = sessionId
+  else selectedSession.value = sessionId
 }
 
 function loadNewer() {
@@ -255,26 +285,26 @@ function reload() {
 
 function backToLive() {
   follow.value = true
-  liveSnapshot.value = false
+  liveSnapshotSession.value = null
   selectedSession.value = ''
 }
 
 watch(selectedSession, () => {
-  liveSnapshot.value = false
+  liveSnapshotSession.value = null
 })
 
 /** At the top of the live view: load the current session's earlier lines, if it has any. */
 function onReachedTop() {
-  if (stream == null || !live.value || loading.value || stream.state.sessionStartHeld) return
+  if (stream == null || !live.value || loading.value || !stream.state.canLoadHistory) return
   const sessionId = stream.state.sessionId
   if (sessionId == null) return
   const request = { project: projectId ?? '', sessionId }
   // Never more than the view can hold: the rows it has, and a full view's worth above them.
   const wanted = LIVE_ROW_CAP + toValue(stream.rows).length
   void withBackend(async (backend) => {
-    const lines = await fetchNewestSessionLines(backend, ProjectSessionId(sessionId), wanted)
+    const newest = await fetchNewestSessionLines(backend, ProjectSessionId(sessionId), wanted)
     // `loadHistory` drops the lines if the project or the session changed while they were fetched.
-    stream.loadHistory(lines, request)
+    stream.loadHistory(newest.lines, request, newest.hasOlder)
   })
 }
 

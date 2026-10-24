@@ -729,3 +729,72 @@ test('filters by a logger prefix, offering the loggers seen', async () => {
   await logger.setValue('')
   expect(lineTexts()).toEqual(lines)
 })
+
+describe("the live view's older lines", () => {
+  async function fillToCap(
+    source: ReturnType<typeof FakeEventSource.latest>,
+    sessionId: string | null,
+    firstSeq: number,
+  ) {
+    for (let n = 0; n <= LIVE_ROW_CAP; n++) {
+      source.emit('line', { seq: firstSeq + n, source: 'file', sessionId, text: `line ${n}` })
+    }
+    return firstSeq + LIVE_ROW_CAP + 1
+  }
+
+  test("after a restart, the earlier session's divider pages that session", async () => {
+    mocks.listProjectSessions.mockResolvedValue([
+      { ...OLD_SESSION, projectSessionId: ProjectSessionId('s1') },
+    ])
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    let seq = await fillToCap(source, 's1', 1)
+    await flush()
+    // The engine restarts: the new session's lines come below the old one's.
+    source.emit('waiting', { seq: seq++ })
+    source.emit('session', { seq: seq++, sessionId: 's2', logFile: '/logs/s2.log' })
+    source.emit('line', { seq: seq++, source: 'file', sessionId: 's2', text: 'new session' })
+    await flush()
+    const button = wrapper.find('.row.divider button')
+    expect(button.text()).toBe('Load older lines')
+    mocks.getProjectSessionLogs.mockClear()
+    await button.trigger('click')
+    await flush()
+    expect((wrapper.find('select[aria-label="Session"]').element as HTMLSelectElement).value).toBe(
+      's1',
+    )
+    expect(mocks.getProjectSessionLogs).toHaveBeenCalledWith(ProjectSessionId('s1'), {
+      scrollId: 'active',
+    })
+    expect(mocks.getProjectSessionLogs).not.toHaveBeenCalledWith(
+      ProjectSessionId('s2'),
+      expect.anything(),
+    )
+  })
+
+  test('is not offered while its session has no id yet', async () => {
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: null,
+      logFile: null,
+    })
+    source.emit('waiting', { seq: 1 })
+    const seq = await fillToCap(source, null, 2)
+    await flush()
+    expect(wrapper.find('.row.divider').text()).toContain('Earlier lines are not shown')
+    expect(wrapper.find('.row.divider button').exists()).toBe(false)
+    // Once the session has its file, its older lines can be loaded.
+    source.emit('session', { seq, sessionId: 's1', logFile: '/logs/s1.log' })
+    await flush()
+    expect(wrapper.find('.row.divider button').text()).toBe('Load older lines')
+  })
+})

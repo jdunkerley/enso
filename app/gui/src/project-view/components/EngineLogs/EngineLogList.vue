@@ -16,7 +16,7 @@ const { rows, canLoad = true } = defineProps<{
   canLoad?: boolean
 }>()
 const follow = defineModel<boolean>('follow', { required: true })
-const emit = defineEmits<{ reachedTop: []; loadOlder: []; loadNewer: [] }>()
+const emit = defineEmits<{ reachedTop: []; loadOlder: [sessionId: string]; loadNewer: [] }>()
 const { getText } = useText()
 
 const DIVIDER_TEXT: Readonly<Record<DividerKind, TextId>> = {
@@ -26,10 +26,22 @@ const DIVIDER_TEXT: Readonly<Record<DividerKind, TextId>> = {
   newer: 'engineLogsNewer',
 }
 
-/** The dividers that offer to load the lines they stand for. */
-const DIVIDER_LOAD: Readonly<Partial<Record<DividerKind, { text: TextId; load: () => void }>>> = {
-  truncated: { text: 'engineLogsLoadOlder', load: () => emit('loadOlder') },
+/**
+ * The dividers that offer to load the lines they stand for: only when they name their session, so
+ * a button never pages a session other than the one whose lines are missing.
+ */
+const DIVIDER_LOAD: Readonly<
+  Partial<Record<DividerKind, { text: TextId; load: (sessionId: string) => void }>>
+> = {
+  truncated: { text: 'engineLogsLoadOlder', load: (sessionId) => emit('loadOlder', sessionId) },
   newer: { text: 'engineLogsLoadNewer', load: () => emit('loadNewer') },
+}
+
+function loadButton(row: LogRow) {
+  if (row.kind !== 'divider' || row.sessionId == null) return undefined
+  const load = DIVIDER_LOAD[row.divider]
+  const sessionId = row.sessionId
+  return load && { text: load.text, press: () => load.load(sessionId) }
 }
 
 const scroller = ref<HTMLElement>()
@@ -146,13 +158,13 @@ watch(follow, (following) => {
         <template v-else>
           <span class="dividerText">{{ getText(DIVIDER_TEXT[row.divider]) }}</span>
           <button
-            v-if="DIVIDER_LOAD[row.divider] != null"
+            v-if="loadButton(row) != null"
             type="button"
             class="load"
             :disabled="!canLoad"
-            @click="DIVIDER_LOAD[row.divider]?.load()"
+            @click="loadButton(row)?.press()"
           >
-            {{ getText(DIVIDER_LOAD[row.divider]!.text) }}
+            {{ getText(loadButton(row)!.text) }}
           </button>
         </template>
       </div>

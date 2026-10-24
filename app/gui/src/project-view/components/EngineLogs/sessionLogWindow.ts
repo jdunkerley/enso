@@ -188,15 +188,15 @@ export class SessionLogWindow {
 }
 
 /**
- * The newest `count` lines of a session, read from its newest page backwards: the live view's
- * history, which never needs more than fits in the view.
+ * The newest `count` lines of a session, read from its newest page backwards, and whether it has
+ * lines before them: the live view's history, which never needs more than fits in the view.
  */
 export async function fetchNewestSessionLines(
   reader: SessionPageReader,
   sessionId: ProjectSessionId,
   count: number,
-): Promise<readonly string[]> {
+): Promise<{ readonly lines: readonly string[]; readonly hasOlder: boolean }> {
   const window = new SessionLogWindow(reader, sessionId, count)
   await window.latest()
-  return window.lines
+  return { lines: window.lines, hasOlder: window.hasOlder }
 }
