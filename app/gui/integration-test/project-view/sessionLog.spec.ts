@@ -145,7 +145,8 @@ test.describe('a saved session log tab without its project', () => {
     await page.addInitScript((session) => {
       localStorage.setItem(
         'Enso::openedTabs',
-        JSON.stringify([{ type: 'projectLog', id: session, title: 'Mock Project' }]),
+        // Not the project's name, which the editor fixture looks its tab up by.
+        JSON.stringify([{ type: 'projectLog', id: session, title: 'Saved' }]),
       )
     }, SESSION)
   })
