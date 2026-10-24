@@ -1,8 +1,10 @@
 # Build simplification: pnpm + sbt, cargo only for the parser — design
 
-Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21, and for
-the Phase 3 plan on 2026-10-22. The corrections are factual (what the code does)
-or record the user's decisions of 2026-10-22; the design's intent is unchanged.
+Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21, for the
+Phase 3 plan on 2026-10-22, and for the Phase 5 plan on 2026-10-24. The
+corrections are factual (what the code does) or record the user's decisions of
+2026-10-22 and 2026-10-24 (the standalone launcher goes in Phase 5); the
+design's intent is unchanged.
 
 ## Goal
 
@@ -128,17 +130,22 @@ directories. Its commands fall into:
   - The parser crates.
   - `parser/debug` and fuzz.
   - `app/rust-ffi`.
-  - `launcher-shims`, unless it is ported to a script (decided in Phase 5).
+  - Nothing else: `launcher-shims` goes with the standalone launcher (decided
+    2026-10-24).
 - **Entry points:**
   - `sbt` for the engine, its distribution, bundles, native images and tests; it
     builds the parser through cargo, as today.
   - `corepack pnpm` for the GUI, the IDE, packaging and `tools/build-scripts`.
   - `cargo` only for the parser, invoked by sbt and the pnpm `postinstall`.
 - **Removed:** `build_tools/`, `run`, `run.cmd`, `run.ps1`, and `./run`'s
-  provisioning code. `build-config.yaml` survives Phase 5, reduced to
-  `latest-release`, which `version` reads, and the `toolchain:` block (added in
-  Phase 2) that `setup-jvm`, the workflow policy and `toolchain-check` read; it
-  is the checked copy, not a provisioning tool.
+  provisioning code; and the standalone launcher (the sbt project
+  `engine/launcher`, its native image `ensoup`, its packaging, its self-upgrade
+  test and `lib/rust/launcher-shims`), keeping the libraries it shared that
+  something else still uses. The engine runner (`bin/enso`, `ENSO_LAUNCHER`)
+  stays. `build-config.yaml` survives Phase 5, reduced to `latest-release`,
+  which `version` reads, and the `toolchain:` block (added in Phase 2) that
+  `setup-jvm`, the workflow policy and `toolchain-check` read; it is the checked
+  copy, not a provisioning tool.
 - **Workflows:** hand-written, linted with `actionlint` in CI.
 
 ## Components
@@ -270,7 +277,7 @@ NOTICE are derived from the build, so they are not replaceable copies.
 | 2     | Workflows call sbt directly where `./run` was a thin wrapper. No pnpm call site was thin (`gui build/check`, `fmt` and `java-gen build` have no workflow call site), so Phase 2 moved only sbt.                                     | Merge on green                                              |
 | 3     | Move the real logic, one PR each: `version`, `changelog-check`, `stdlib-api-check`, `buildEngineBundle`, `checkEnsoSyntax`, `backend test jvm`, `ci-build-engine-distribution`, `ide build`, `stdlib-test` with service containers. | Merge on green; `stdlib-test` after a side-by-side run      |
 | 4     | Release, promote, nightly and `ide upload` on `tools/build-scripts`.                                                                                                                                                                | Proven by an rc prerelease. Ask the user before publishing. |
-| 5     | Delete `build_tools/`, `run*` and the provisioning code. Decide `launcher-shims`. Update the docs and every CLAUDE.md that mentions `./run`.                                                                                        | Merge on green                                              |
+| 5     | Delete `build_tools/`, `run*` and the provisioning code. Remove the standalone launcher and `launcher-shims`. Update the docs and every CLAUDE.md that mentions `./run`.                                                            | Merge on green                                              |
 
 ### Phase 3 must carry
 
