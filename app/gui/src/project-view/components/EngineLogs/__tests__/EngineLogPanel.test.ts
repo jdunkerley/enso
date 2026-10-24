@@ -14,6 +14,7 @@ import { FakeEventSource } from './fakeEventSource'
 const mocks = vi.hoisted(() => ({
   listProjectSessions: vi.fn(),
   getProjectSessionLogs: vi.fn(),
+  listProjectSessionPages: vi.fn(),
   downloadProjectSessionLogs: vi.fn(),
   os: 'linux' as 'linux' | 'macos' | 'windows',
 }))
@@ -39,7 +40,9 @@ beforeEach(() => {
   scope = effectScope()
   frames = []
   mocks.listProjectSessions.mockResolvedValue([])
-  mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: [] })
+  mocks.getProjectSessionLogs.mockReset().mockResolvedValue({ scrollId: 'done', hits: [] })
+  // Each session is one page, its active file.
+  mocks.listProjectSessionPages.mockReset().mockResolvedValue(['active'])
   mocks.downloadProjectSessionLogs.mockReset().mockResolvedValue(undefined)
   mocks.os = 'linux'
 })
@@ -163,7 +166,7 @@ test("scrolling up at the top loads the session's earlier lines", async () => {
   await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
   await flush()
   expect(mocks.getProjectSessionLogs).toHaveBeenCalledWith(ProjectSessionId('s1'), {
-    scrollId: null,
+    scrollId: 'active',
   })
   expect(lineTexts()).toEqual(['L1', 'L2', 'L3', 'L4'])
   // The session is now held from its start: scrolling up again loads nothing.
@@ -214,7 +217,7 @@ test('shows an earlier session, read-only', async () => {
   await picker.setValue('old')
   await flush()
   expect(mocks.getProjectSessionLogs).toHaveBeenCalledWith(ProjectSessionId('old'), {
-    scrollId: null,
+    scrollId: 'active',
   })
   expect(lineTexts()).toEqual(['from yesterday'])
   // Read-only: no live notices.
@@ -528,4 +531,163 @@ describe('download and reveal', () => {
     const { wrapper } = await mountPanel()
     expect(reveal(wrapper).attributes('aria-label')).toBe(label)
   })
+})
+
+describe('the session log tab: a session without a live stream', () => {
+  const NEWER_SESSION = {
+    projectId: PROJECT,
+    projectSessionId: ProjectSessionId('newer'),
+    createdAt: Rfc3339DateTime('2026-10-20T09:00:00'),
+  }
+
+  async function mountStandalone(props: { initialSession: string; projectId?: typeof PROJECT }) {
+    const { wrapper } = await mountWithProviders(EngineLogPanel, { props })
+    await flushPromises()
+    const lineTexts = () => wrapper.findAll('.row .text').map((text) => text.text())
+    return { wrapper, lineTexts }
+  }
+
+  test('shows the session asked for, and offers the project’s other sessions but no live one', async () => {
+    mocks.listProjectSessions.mockResolvedValue([OLD_SESSION, NEWER_SESSION])
+    mocks.getProjectSessionLogs.mockImplementation(async (id: string) => ({
+      scrollId: 'done',
+      hits: [`from ${id}`],
+    }))
+    const { wrapper, lineTexts } = await mountStandalone({
+      initialSession: 'old',
+      projectId: PROJECT,
+    })
+    expect(lineTexts()).toEqual(['from old'])
+    const picker = wrapper.find<HTMLSelectElement>('select[aria-label="Session"]')
+    expect(picker.element.value).toBe('old')
+    expect(picker.findAll('option').map((option) => option.text())).toEqual([
+      expect.stringMatching(/^Session 2 /),
+      expect.stringMatching(/^Session 1 /),
+    ])
+    await picker.setValue('newer')
+    await flushPromises()
+    expect(lineTexts()).toEqual(['from newer'])
+    // No live view: no Jump to latest, no waiting notice.
+    expect(wrapper.find('.jump').exists()).toBe(false)
+  })
+
+  test('a tab saved without its project shows its own session alone', async () => {
+    mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: ['line'] })
+    const id = 'localprojectsession-key/enso-language-server-2026-10-19-09-00-00'
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: id })
+    expect(lineTexts()).toEqual(['line'])
+    expect(mocks.listProjectSessions).not.toHaveBeenCalled()
+    expect(wrapper.findAll('select[aria-label="Session"] option').map((o) => o.text())).toEqual([
+      'Session enso-language-server-2026-10-19-09-00-00',
+    ])
+  })
+
+  test('Reload reads the session again', async () => {
+    mocks.getProjectSessionLogs.mockResolvedValueOnce({ scrollId: 'done', hits: ['first'] })
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
+    expect(lineTexts()).toEqual(['first'])
+    mocks.getProjectSessionLogs.mockResolvedValueOnce({
+      scrollId: 'done',
+      hits: ['first', 'second'],
+    })
+    await wrapper.find('[data-testid="engine-logs-reload"]').trigger('click')
+    await flushPromises()
+    expect(lineTexts()).toEqual(['first', 'second'])
+    expect(mocks.listProjectSessionPages).toHaveBeenCalledTimes(2)
+  })
+
+  test('pages back past the newest lines, and forward again', async () => {
+    const archive = Array.from({ length: 15_000 }, (_, n) => `archived ${n}`)
+    const active = Array.from({ length: 15_000 }, (_, n) => `active ${n}`)
+    mocks.listProjectSessionPages.mockResolvedValue(['archive:0', 'active'])
+    mocks.getProjectSessionLogs.mockImplementation(async (_id: string, { scrollId }) => ({
+      scrollId: 'unused',
+      hits: scrollId === 'active' ? active : archive,
+    }))
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
+    const divider = () => wrapper.find('.row.divider')
+    // The newest 20,000 lines, under an offer to load older ones.
+    expect(divider().text()).toContain('Load older lines')
+    expect(lineTexts()[0]).toBe('archived 10000')
+    await divider().find('button').trigger('click')
+    await flushPromises()
+    // The list keeps its place: the line that was first is still in view, the older ones above it.
+    expect(lineTexts()).toContain('archived 10000')
+    expect(lineTexts()).toContain('archived 9999')
+    const list = wrapper.find('[role="log"]')
+    stubScroller(list.element, 0)
+    await list.trigger('scroll')
+    // At the start of the session: no more to load above, newer lines below.
+    expect(lineTexts()[0]).toBe('archived 0')
+    expect(divider().exists()).toBe(false)
+    // The window moved back: the newest lines are offered again at its end.
+    // Near the end of a long list, not following.
+    const scrollTo = (rows: number) => {
+      stubScroller(list.element, rows * 18)
+      Object.defineProperty(list.element, 'scrollHeight', { configurable: true, value: 1e9 })
+    }
+    scrollTo(20_000)
+    await list.trigger('scroll')
+    expect(lineTexts()).toContain('active 4999')
+    expect(divider().text()).toContain('Load newer lines')
+    await divider().find('button').trigger('click')
+    await flushPromises()
+    scrollTo(20_001)
+    await list.trigger('scroll')
+    expect(lineTexts()).toContain('active 14999')
+    expect(wrapper.findAll('.row.divider').map((d) => d.text())).not.toContain(
+      expect.stringContaining('Load newer lines'),
+    )
+  })
+})
+
+test('Load older lines in the live view pages back through the file; Back to live returns', async () => {
+  const history = Array.from({ length: LIVE_ROW_CAP + 5 }, (_, n) => `old ${n}`)
+  mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: [...history, 'live'] })
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 2, sessionId: 's1', logFile: null })
+  source.emit('line', { seq: 1, source: 'file', sessionId: 's1', text: 'live' })
+  await flush()
+  // No Reload in the live view: it is already current.
+  expect(wrapper.find('[data-testid="engine-logs-reload"]').exists()).toBe(false)
+  await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
+  await flush()
+  // The history filled the view; the rest is offered.
+  expect(wrapper.find('.row.divider').text()).toContain('Load older lines')
+  await wrapper.find('.row.divider button').trigger('click')
+  await flush()
+  expect(wrapper.text()).toContain('Showing earlier lines of this session')
+  expect(lineTexts()[0]).toBe('old 0')
+  expect(wrapper.find('[data-testid="engine-logs-reload"]').exists()).toBe(true)
+  await wrapper
+    .findAll('button')
+    .find((b) => b.text() === 'Back to live')!
+    .trigger('click')
+  await flush()
+  expect(wrapper.text()).not.toContain('Showing earlier lines of this session')
+  expect(wrapper.find('[data-testid="engine-logs-reload"]').exists()).toBe(false)
+  expect(wrapper.find('.row.divider').text()).toContain('Load older lines')
+})
+
+test('filters by a logger prefix, offering the loggers seen', async () => {
+  const { source, wrapper, flush, lineTexts } = await mountPanel()
+  source.emit('hello', { channel: 'c1', oldestSeq: 1, nextSeq: 1, sessionId: 's1', logFile: null })
+  const lines = [LIBRARY_ERROR, 'Caused by: a continuation', STD_BITS_INFO, USER_WARN]
+  lines.forEach((text, n) =>
+    source.emit('line', { seq: n + 1, source: 'file', sessionId: 's1', text }),
+  )
+  await flush()
+  const logger = wrapper.find('input[aria-label="Logger"]')
+  const listId = logger.attributes('list')!
+  const options = wrapper
+    .findAll(`datalist[id="${listId}"] option`)
+    .map((o) => o.attributes('value'))
+  expect(options).toContain('Standard.Table')
+  expect(options).toContain('org.enso.table')
+  await logger.setValue('Standard.Table')
+  expect(lineTexts()).toEqual([LIBRARY_ERROR, 'Caused by: a continuation'])
+  await logger.setValue('org.enso')
+  expect(lineTexts()).toEqual([STD_BITS_INFO])
+  await logger.setValue('')
+  expect(lineTexts()).toEqual(lines)
 })

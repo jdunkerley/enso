@@ -31,7 +31,13 @@ const container = useContainerData()
         isActive
         icon="log"
         :aria-label="getText('showLogs')"
-        @press="container.openProjectLogTab(projectSession.projectSessionId, project.title)"
+        @press="
+          container.openProjectLogTab(
+            projectSession.projectSessionId,
+            project.title,
+            projectSession.projectId,
+          )
+        "
       />
     </div>
   </div>

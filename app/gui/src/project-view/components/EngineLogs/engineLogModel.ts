@@ -3,7 +3,6 @@
  * level rules, dividers, the live cap and history splicing. Framework-free; `engineLogStream.ts`
  * makes it reactive.
  */
-import { LOG_LEVELS, parseEntry } from '$/components/ProjectLog/projectLogData'
 import {
   PERFORMANCE_LOGGER,
   SQL_QUERY_LOGGER,
@@ -14,6 +13,7 @@ import {
   type EngineLogSource,
   type EngineLogWaitingData,
 } from 'enso-common/src/services/engineLogs'
+import { LOG_LEVELS, parseEntry } from './logEntry'
 
 /** The most rows the view keeps; older ones remain in the session's history. */
 export const LIVE_ROW_CAP = 20_000
@@ -27,9 +27,11 @@ const OVERLAP_CHECK = 3
 /**
  * - `restarted` — a new engine started.
  * - `skipped` — lines were lost while the stream was down.
- * - `truncated` — older lines are not shown.
+ * - `truncated` — older lines are not shown; the list offers to load them.
+ * - `newer` — newer lines are not shown (a window paged back through a session); the list offers to
+ *   load them.
  */
-export type DividerKind = 'restarted' | 'skipped' | 'truncated'
+export type DividerKind = 'restarted' | 'skipped' | 'truncated' | 'newer'
 
 /** One line of the log. */
 export interface LogLine {
@@ -43,6 +45,8 @@ export interface LogLine {
   readonly entryStart: boolean
   /** Who wrote the line: the engine, a library or the user's own code (see {@link logOrigin}). */
   readonly origin: LogOrigin
+  /** The logger of the line's entry; `null` for stderr and before the first entry. */
+  readonly logger: string | null
 }
 
 /** A marker between lines. */
@@ -182,6 +186,7 @@ export interface LineClass {
   readonly level: number
   readonly entryStart: boolean
   readonly origin: LogOrigin
+  readonly logger: string | null
 }
 
 /**
@@ -192,21 +197,28 @@ export interface LineClass {
 export class LineClassifier {
   private level = INFO_LEVEL
   private origin: LogOrigin = 'library'
+  private logger: string | null = null
 
-  /** The level and origin of `text`, and whether it starts an entry. */
+  /** The level, origin and logger of `text`, and whether it starts an entry. */
   classify(text: string, source: EngineLogSource): LineClass {
-    if (source === 'stderr') return { level: ERROR_LEVEL, entryStart: true, origin: 'engine' }
+    if (source === 'stderr') {
+      return { level: ERROR_LEVEL, entryStart: true, origin: 'engine', logger: null }
+    }
     const entry = parseEntry(text)
-    if (entry == null) return { level: this.level, entryStart: false, origin: this.origin }
+    if (entry == null) {
+      return { level: this.level, entryStart: false, origin: this.origin, logger: this.logger }
+    }
     this.level = entry.level
     this.origin = logOrigin(entry.module)
-    return { level: entry.level, entryStart: true, origin: this.origin }
+    this.logger = entry.module
+    return { level: entry.level, entryStart: true, origin: this.origin, logger: this.logger }
   }
 
   /** Forget the current entry (a new session starts). */
   reset(): void {
     this.level = INFO_LEVEL
     this.origin = 'library'
+    this.logger = null
   }
 }
 
@@ -218,22 +230,77 @@ export function overlapStart(lines: readonly string[], head: readonly string[]):
   return lines.length
 }
 
-/** Rows for a session read whole (an earlier session): its newest {@link LIVE_ROW_CAP} lines. */
-export function rowsFromLines(lines: readonly string[]): LogRow[] {
+/** Whether a window of a session's lines has lines before or after it, and its first key. */
+export interface WindowEdges {
+  readonly older: boolean
+  readonly newer: boolean
+  /**
+   * The first line's key; the others follow it. A window passes its first line's number, so a line
+   * keeps its key while the window moves and the list keeps its place.
+   */
+  readonly firstKey: number
+}
+
+/**
+ * Rows for lines of a file read (an earlier session, or a window of one): at most its newest
+ * {@link LIVE_ROW_CAP} lines, with a `truncated` divider above them when there are older lines and a
+ * `newer` one below them when there are newer ones. Lines above the first entry in view continue an
+ * entry out of view: they are a library's, with no logger.
+ */
+export function rowsFromLines(
+  lines: readonly string[],
+  edges: Partial<WindowEdges> = {},
+): LogRow[] {
   const shown = lines.length > LIVE_ROW_CAP ? lines.slice(lines.length - LIVE_ROW_CAP) : lines
+  const firstKey = edges.firstKey ?? 1
   const classifier = new LineClassifier()
   const rows: LogRow[] = []
-  if (shown.length < lines.length) rows.push({ kind: 'divider', key: 0, divider: 'truncated' })
-  for (const text of shown) {
+  if (shown.length < lines.length || edges.older === true) {
+    rows.push({ kind: 'divider', key: Number.MIN_SAFE_INTEGER, divider: 'truncated' })
+  }
+  for (const [index, text] of shown.entries()) {
     rows.push({
       kind: 'line',
-      key: rows.length + 1,
+      key: firstKey + index,
       source: 'file',
       text,
       ...classifier.classify(text, 'file'),
     })
   }
+  if (edges.newer === true) {
+    rows.push({ kind: 'divider', key: Number.MAX_SAFE_INTEGER, divider: 'newer' })
+  }
   return rows
+}
+
+/**
+ * Whether `logger` is under `prefix`, by whole dot-separated segments (`Standard.Base` covers
+ * `Standard.Base.Data` but not `Standard.Baseline`). A prefix ending in a dot matches by text, so a
+ * prefix being typed out still matches its loggers.
+ */
+export function loggerMatches(logger: string, prefix: string): boolean {
+  if (prefix.endsWith('.')) return logger.startsWith(prefix)
+  return underRoot(logger, prefix)
+}
+
+/**
+ * Suggestions for the logger filter: every logger of `rows` and each of its dotted prefixes, sorted,
+ * at most `limit` of them (the shortest prefixes first, so the broad ones are always offered).
+ */
+export function loggerSuggestions(rows: readonly LogRow[], limit = 200): string[] {
+  const loggers = new Set<string>()
+  for (const row of rows) {
+    if (row.kind === 'line' && row.entryStart && row.logger != null) loggers.add(row.logger)
+  }
+  const names = new Set<string>()
+  for (const logger of loggers) {
+    const segments = logger.split('.')
+    for (let n = 1; n <= segments.length; n++) names.add(segments.slice(0, n).join('.'))
+  }
+  const byDepth = [...names].sort(
+    (a, b) => a.split('.').length - b.split('.').length || a.localeCompare(b),
+  )
+  return byDepth.slice(0, limit).sort((a, b) => a.localeCompare(b))
 }
 
 /** What the Logs tab filters on. */
@@ -241,17 +308,21 @@ export interface RowFilter {
   readonly level: LevelFilter
   readonly text: string
   readonly origins: OriginFilter
+  /** A dotted logger prefix (see {@link loggerMatches}); empty for every logger. */
+  readonly logger?: string
 }
 
 /**
  * The rows a filter shows: every divider, and the lines of a shown origin, at or above the level,
- * that contain the text.
+ * under the logger prefix (a continuation line by its entry's logger; stderr has none), that
+ * contain the text.
  */
 export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
   const origins = filter.origins
-  if (needle === '' && Object.values(origins).every((shown) => shown)) {
+  const prefix = (filter.logger ?? '').trim()
+  if (needle === '' && prefix === '' && Object.values(origins).every((shown) => shown)) {
     return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
   }
   return rows.filter(
@@ -259,6 +330,7 @@ export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly
       row.kind === 'divider' ||
       (row.level <= maxLevel &&
         origins[row.origin] &&
+        (prefix === '' || (row.logger != null && loggerMatches(row.logger, prefix))) &&
         (needle === '' || row.text.toLowerCase().includes(needle))),
   )
 }
@@ -330,7 +402,7 @@ export class EngineLogModel {
   onLine(data: EngineLogLineData): void {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
-    const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
+    const { level, entryStart, origin, logger } = this.classifier.classify(data.text, data.source)
     this.pending.push({
       kind: 'line',
       key: this.nextKey++,
@@ -339,6 +411,7 @@ export class EngineLogModel {
       level,
       entryStart,
       origin,
+      logger,
     })
     if (data.source === 'file' && entryStart && level === ERROR_LEVEL) this.unseenErrors += 1
   }

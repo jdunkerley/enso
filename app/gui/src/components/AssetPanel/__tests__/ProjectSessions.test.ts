@@ -145,6 +145,7 @@ test('the newest session comes first, and its button opens its logs', async () =
   expect(openProjectLogTab).toHaveBeenCalledWith(
     ProjectSessionId('projectsession-2'),
     'Local Project',
+    LOCAL_ID,
   )
 })
 

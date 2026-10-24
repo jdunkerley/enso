@@ -405,6 +405,15 @@ export class ProjectManager {
     )
   }
 
+  /** The pages of a local project session, oldest first (`archive:N`…, then `active`). */
+  async listProjectSessionPages(sessionId: string) {
+    return this.runStandaloneCommandJson<{ pages: readonly string[] }>(
+      null,
+      'list-project-session-pages',
+      sessionId,
+    )
+  }
+
   /** Download all log content for a local project session. */
   async downloadProjectSessionLogs(sessionId: string) {
     return this.runStandaloneCommandJson<string>(null, 'download-project-session-logs', sessionId)

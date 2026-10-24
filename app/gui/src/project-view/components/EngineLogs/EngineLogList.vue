@@ -10,15 +10,26 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ERROR_LEVEL, WARN_LEVEL, type DividerKind, type LogRow } from './engineLogModel'
 import { isNearBottom, ROW_HEIGHT_PX, visibleRange } from './engineLogView'
 
-const { rows } = defineProps<{ rows: readonly LogRow[] }>()
+const { rows, canLoad = true } = defineProps<{
+  rows: readonly LogRow[]
+  /** Whether the dividers' load buttons are enabled (not while a load is running). */
+  canLoad?: boolean
+}>()
 const follow = defineModel<boolean>('follow', { required: true })
-const emit = defineEmits<{ reachedTop: [] }>()
+const emit = defineEmits<{ reachedTop: []; loadOlder: []; loadNewer: [] }>()
 const { getText } = useText()
 
 const DIVIDER_TEXT: Readonly<Record<DividerKind, TextId>> = {
   restarted: 'engineLogsRestarted',
   skipped: 'engineLogsSkipped',
   truncated: 'engineLogsTruncated',
+  newer: 'engineLogsNewer',
+}
+
+/** The dividers that offer to load the lines they stand for. */
+const DIVIDER_LOAD: Readonly<Partial<Record<DividerKind, { text: TextId; load: () => void }>>> = {
+  truncated: { text: 'engineLogsLoadOlder', load: () => emit('loadOlder') },
+  newer: { text: 'engineLogsLoadNewer', load: () => emit('loadNewer') },
 }
 
 const scroller = ref<HTMLElement>()
@@ -80,7 +91,10 @@ watch(
     // Keep the row at the top of the view in place when rows are added above it or dropped.
     const element = scroller.value
     if (element == null || before.length === 0) return
-    const anchorIndex = Math.floor(element.scrollTop / ROW_HEIGHT_PX)
+    const topIndex = Math.floor(element.scrollTop / ROW_HEIGHT_PX)
+    // Anchor on a line: a divider at the top (the one whose button loaded older lines) stays there.
+    let anchorIndex = topIndex
+    while (before[anchorIndex]?.kind === 'divider') anchorIndex += 1
     const anchor = before[anchorIndex]
     if (anchor == null) return
     const index = now.findIndex((row) => row.key === anchor.key)
@@ -129,7 +143,18 @@ watch(follow, (following) => {
           <span v-if="row.source === 'stderr'" class="marker">stderr</span>
           <span class="text">{{ row.text }}</span>
         </template>
-        <span v-else class="dividerText">{{ getText(DIVIDER_TEXT[row.divider]) }}</span>
+        <template v-else>
+          <span class="dividerText">{{ getText(DIVIDER_TEXT[row.divider]) }}</span>
+          <button
+            v-if="DIVIDER_LOAD[row.divider] != null"
+            type="button"
+            class="load"
+            :disabled="!canLoad"
+            @click="DIVIDER_LOAD[row.divider]?.load()"
+          >
+            {{ getText(DIVIDER_LOAD[row.divider]!.text) }}
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -197,7 +222,26 @@ watch(follow, (following) => {
 .row.divider {
   text-align: center;
   font-style: italic;
-  opacity: 0.6;
+  color: color-mix(in oklab, var(--color-text) 60%, transparent);
   border-top: 1px dashed var(--color-dim);
+}
+
+.load {
+  margin-left: 8px;
+  padding: 0 6px;
+  height: 16px;
+  line-height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--color-dim);
+  background-color: white;
+  color: var(--color-text);
+  font: inherit;
+  font-style: normal;
+  cursor: pointer;
+}
+
+.load:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

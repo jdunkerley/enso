@@ -9,6 +9,7 @@ import {
   encodeSessionId,
   getProjectSessionLogs,
   handleFilesystemCommand,
+  listProjectSessionPages,
   listProjectSessions,
 } from '../filesystem'
 
@@ -256,6 +257,29 @@ describe('getProjectSessionLogs', () => {
   afterEach(async () => {
     vi.unstubAllEnvs()
     await fsPromises.rm(tmpDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 1000 })
+  })
+
+  test('lists the pages oldest first: each archive, then the active file', () => {
+    const baseName = 'enso-language-server-2026-03-31-14-23-45'
+    const projectLogDir = path.join(tmpDir, projectId)
+    fs.writeFileSync(path.join(projectLogDir, `${baseName}.10.log.gz`), zlib.gzipSync('c\n'))
+    fs.writeFileSync(path.join(projectLogDir, `${baseName}.2.log.gz`), zlib.gzipSync('b\n'))
+    fs.writeFileSync(path.join(projectLogDir, `${baseName}.log`), 'd\n')
+    const sessionId = encodeSessionId(projectId, baseName)
+    const { pages } = listProjectSessionPages(sessionId)
+    expect(pages).toEqual(['archive:2', 'archive:10', 'active'])
+    // Each page reads by itself, in that order.
+    expect(pages.map((page) => getProjectSessionLogs(sessionId, page).hits)).toEqual([
+      ['b'],
+      ['c'],
+      ['d'],
+    ])
+  })
+
+  test('a session without archives has the active page only', () => {
+    const baseName = 'enso-language-server-2026-03-31-14-23-45'
+    fs.writeFileSync(path.join(tmpDir, projectId, `${baseName}.log`), 'a\n')
+    expect(listProjectSessionPages(encodeSessionId(projectId, baseName)).pages).toEqual(['active'])
   })
 
   test('returns done with empty hits when scrollId is "done"', () => {
