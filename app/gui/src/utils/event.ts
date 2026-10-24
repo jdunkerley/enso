@@ -117,6 +117,56 @@ export function isElementSingleLineTextInput(
   )
 }
 
+/** The `input` types that take typed text, including the typed date and time fields. */
+const EDITABLE_INPUT_TYPES = new Set([...TEXT_INPUT_TYPES, 'date', 'time', 'datetime-local'])
+
+/**
+ * Whether the element is a field that keys are typed into: a text-like `input`, a `textarea`, a
+ * `select`, or `contenteditable` content (which includes every CodeMirror editor).
+ */
+export function isEditableElement(element: EventTarget | null): boolean {
+  return (
+    (element instanceof HTMLInputElement && EDITABLE_INPUT_TYPES.has(element.type)) ||
+    element instanceof HTMLTextAreaElement ||
+    element instanceof HTMLSelectElement ||
+    (element instanceof HTMLElement && element.isContentEditable)
+  )
+}
+
+/** The named keys that a text field uses for itself: editing, and moving the caret or selection. */
+const FIELD_NAMED_KEYS = new Set([
+  'Backspace',
+  'Delete',
+  'Enter',
+  'Tab',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  // A dead key starts an accented character; `Process` is a key an input method is composing with.
+  'Dead',
+  'Process',
+])
+
+/**
+ * Whether a field that has the focus uses this key press itself: a character (Space included), or
+ * a key that edits the text or moves the caret, with `Shift` or `Alt` at most. `Ctrl` and `Cmd`
+ * shortcuts are not the field's, except a character typed with `AltGr` (which sets `Ctrl` and
+ * `Alt` on Windows). `Escape` and the function keys never are.
+ */
+export function isFieldKey(
+  event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'isComposing' | 'getModifierState'>,
+): boolean {
+  if (event.isComposing) return true
+  const isCharacter = event.key.length === 1
+  if (event.ctrlKey || event.metaKey) return isCharacter && event.getModifierState('AltGraph')
+  return isCharacter || FIELD_NAMED_KEYS.has(event.key)
+}
+
 /** Whether the event occurred within the given {@link DOMRect}. */
 export function isElementInBounds(
   event: Pick<MouseEvent, 'clientX' | 'clientY'>,
