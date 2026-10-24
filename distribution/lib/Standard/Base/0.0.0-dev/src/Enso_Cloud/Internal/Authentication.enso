@@ -83,7 +83,7 @@ type Authentication_Service
         is_still_valid = expiry_date > (Date_Time.now + token_early_refresh_period)
         if is_still_valid then self.auth_data.get.access_token else
             # The token has expired or will expire soon, so we need to refresh it.
-            Authentication_Service.log_message "Access token expires at "+expiry_date.to_display_text+", so we are refreshing it."
+            Authentication_Service.log_internal "Access token expires at "+expiry_date.to_display_text+", so we are refreshing it."
             self.force_refresh
             self.auth_data.get.access_token
 
@@ -177,7 +177,7 @@ type Refresh_Token_Data
         response = HTTP.post self.refresh_url body=(Request_Body.Json payload) headers=headers write_operation=False
             . catch HTTP_Error error-> case error of
                 HTTP_Error.Status_Error status message _ ->
-                    Authentication_Service.log_message level=..Warning "Refresh token request failed with status "+status.to_text+": "+(message.if_nothing "<no message>")+"."
+                    Authentication_Service.log_internal level=..Warning "Refresh token request failed with status "+status.to_text+": "+(message.if_nothing "<no message>")+"."
 
                     if is_refresh_token_expired status message then Panic.throw (Cloud_Session_Expired.Error error) else
                         # Otherwise, we fail with the generic error that gives more details.

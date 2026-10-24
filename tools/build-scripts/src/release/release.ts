@@ -9,7 +9,7 @@
  */
 /* eslint-disable camelcase -- GitHub's REST API names its fields in snake_case. */
 import { retryDelays } from '../ide-build/ideBuild.ts'
-import type { GitHub, Release } from '../lib/githubApi.ts'
+import type { GitHub, Release, ReleaseAsset } from '../lib/githubApi.ts'
 import { deduceKind, parseVersion, type Designation, type Version } from '../version/version.ts'
 import {
   contentType,
@@ -205,6 +205,25 @@ async function deleteAssetNamed(api: GitHub, id: number, name: string): Promise<
 }
 
 /**
+ * After a failed upload of `name`: the asset it left on release `id`, `null` when it left none, or
+ * `undefined` when the release could not be read (a transient API error). That error is only
+ * logged: it must not replace the upload's error or end its retries.
+ */
+async function leftoverAsset(
+  api: GitHub,
+  id: number,
+  name: string,
+  log: (line: string) => void,
+): Promise<ReleaseAsset | null | undefined> {
+  try {
+    return (await getRelease(api, id)).assets.find((asset) => asset.name === name) ?? null
+  } catch (lookupError) {
+    log(`Could not check release ${id} for a partial ${name} (${String(lookupError)}).`)
+    return undefined
+  }
+}
+
+/**
  * Uploads `files` to release `id`, each retried as `./run` retried it (five more times, 0.5 s
  * growing by half).
  *
@@ -212,8 +231,13 @@ async function deleteAssetNamed(api: GitHub, id: number, name: string): Promise<
  *   before the upload, and the half-written one a failed attempt leaves before each retry and
  *   after the last (GitHub refuses a second asset of a name).
  * - On a published release (re-running a skipped platform's jobs adds its installer, as with
- *   `./run`), nothing is ever deleted or replaced: an asset of the same name, or one a failed
- *   attempt left, stops the upload with an error.
+ *   `./run`), nothing is ever deleted or replaced: an asset of any of the names, fully uploaded or
+ *   not, stops the upload before its first file, so the release is never half-updated; one a
+ *   failed attempt left stops it with an error.
+ *
+ * A failure to read the release after a failed attempt is logged and the retries go on; when the
+ * last attempt fails, its upload error is the final error (as the `cause` when the release could
+ * not be checked for its partial asset).
  */
 export async function uploadIdeAssets(
   api: GitHub,
@@ -225,14 +249,24 @@ export async function uploadIdeAssets(
   const release = await getRelease(api, id)
   const tag = release.tag_name
   const delays = retryDelays(5)
-  for (const { file, name } of files) {
-    if (release.assets.some((asset) => asset.name === name)) {
-      if (!release.draft) {
-        throw new Error(
-          `Release ${tag} is published and already has ${name}; a published release's assets ` +
-            'are never replaced. Delete the asset by hand first if it must change.',
+  const named = (name: string) => release.assets.filter((asset) => asset.name === name)
+  if (!release.draft) {
+    const collisions = files.flatMap(({ name }) => named(name))
+    if (collisions.length > 0) {
+      const names = collisions
+        .map((asset) =>
+          asset.state === 'uploaded' ? asset.name : `${asset.name} (${asset.state})`,
         )
-      }
+        .join(', ')
+      const [them, they] = collisions.length === 1 ? ['the asset', 'it'] : ['the assets', 'they']
+      throw new Error(
+        `Release ${tag} is published and already has ${names}; a published release's assets ` +
+          `are never replaced. Delete ${them} by hand first if ${they} must change.`,
+      )
+    }
+  }
+  for (const { file, name } of files) {
+    if (named(name).length > 0) {
       log(`Replacing ${name}, left on the draft by an earlier run.`)
       await deleteAssetNamed(api, id, name)
     }
@@ -242,8 +276,8 @@ export async function uploadIdeAssets(
         await api.upload(id, name, file, contentType(name))
         break
       } catch (error) {
-        const leftover = (await getRelease(api, id)).assets.some((asset) => asset.name === name)
-        if (leftover && !release.draft) {
+        const leftover = await leftoverAsset(api, id, name, log)
+        if (leftover != null && !release.draft) {
           throw new Error(
             `Uploading ${name} to the published release ${tag} failed and left a partial ` +
               `asset, which is never deleted automatically; delete it by hand and re-run. ` +
@@ -251,9 +285,24 @@ export async function uploadIdeAssets(
             { cause: error },
           )
         }
-        if (leftover) await deleteAssetNamed(api, id, name)
+        let unchecked = leftover === undefined
+        if (leftover != null) {
+          try {
+            await api.json('DELETE', `/repos/${api.repository}/releases/assets/${leftover.id}`)
+          } catch (deleteError) {
+            log(`Could not delete the partial ${name} (${String(deleteError)}).`)
+            unchecked = true
+          }
+        }
         const delay = delays[attempt]
-        if (delay == null) throw error
+        if (delay == null) {
+          if (!unchecked) throw error
+          throw new Error(
+            `Uploading ${name} to release ${tag} failed (${String(error)}), and a partial asset ` +
+              'it may have left could not be checked or deleted; check the release by hand.',
+            { cause: error },
+          )
+        }
         log(`Uploading ${name} failed (${String(error)}); retrying in ${delay} ms.`)
         await wait(delay)
       }

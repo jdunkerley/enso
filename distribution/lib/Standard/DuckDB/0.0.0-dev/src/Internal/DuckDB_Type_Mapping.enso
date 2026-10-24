@@ -148,7 +148,7 @@ type DuckDB_Type_Mapping
         result = infer_from_database_callback expression
         case result of
             Value_Type.Unsupported_Data_Type _ _ ->
-                DuckDB_Type_Mapping.log_message "Unknown return type for operation '"+op_name+"'." ..Warning
+                DuckDB_Type_Mapping.log_internal "Unknown return type for operation '"+op_name+"'." ..Warning
                 result
             _ -> result
 

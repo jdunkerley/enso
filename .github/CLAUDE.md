@@ -20,11 +20,14 @@ settings. Every workflow is hand-written YAML: the Rust generator
   `enso4igv.yml`, `workflow-lint.yml`, `build-scripts.yml` — single-purpose
   pull-request workflows. `build-scripts.yml` type-checks, lints and tests
   `tools/build-scripts`.
-- `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases. They are the
-  generator's last output, kept unchanged until Phase 4 rewrites them; change
-  them only together with an rc release test. `engine-checks-nightly.yml`,
-  `extra-nightly-tests.yml` and `macos-checks.yml` are likewise kept in the
-  generator's layout until Phase 4 (edit directly).
+- `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases.
+  `promote.yml` (by hand, or from `nightly.yml`'s daily cron) computes the
+  version and calls `release.yml`, which drafts the release, builds and uploads
+  the installers and publishes it with `tools/build-scripts`' `release` command
+  (Note [Release Without ./run] in `release.yml`). Change them only together
+  with an rc release test. `engine-checks-nightly.yml`,
+  `extra-nightly-tests.yml` and `macos-checks.yml` stay in the generator's
+  layout until PR 4c (edit directly).
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
   — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
   their `name:`; keep those names.
@@ -99,24 +102,27 @@ workflow steps (the JVM tests) (Phase 3). A moved step sets every variable
 `./run` set for it; the Notes in each workflow say which. A job that runs a
 distribution built by another job uses that job's version, from its outputs, not
 sbt's default `0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
-`engine-checks-platform.yml`. Release, promote, the nightly checks and the macOS
-checks (label-gated) still call `./run` until Phase 4.
+`engine-checks-platform.yml`. Phase 4 moved the releases to
+`tools/build-scripts`' `release` command (PR 4b); the nightly checks and the
+macOS checks (label-gated) still call `./run` until PR 4c.
 
-| Workflow › job                                           | Step                                                           | Goes through `./run`?                                |
-| -------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------- |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                        | No: `setup-jvm`                                      |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)            | No: `setup-jvm`                                      |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                    | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                          | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`   | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                 | No: `setup-jvm`, `setup-msvc`                        |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`    | No: `setup-build-scripts`                            |
-| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>` | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                    | No                                                   |
-| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`           | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`           | No: `setup-build-scripts`                            |
-| release, promote, nightly, nightly checks, macOS         | various                                                        | Yes: Phase 4                                         |
+| Workflow › job                                           | Step                                                                                                       | Goes through `./run`?                                |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                                                                    | No: `setup-jvm`                                      |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)                                                        | No: `setup-jvm`                                      |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                                                                | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                                                                      | No: `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                                                             | No: `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | No: `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | No                                                   |
+| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | No: `setup-build-scripts`                            |
+| `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `promote.yml`                                            | `release promote <designator>`                                                                             | No: `setup-build-scripts`                            |
+| nightly checks, extra nightly tests, macOS               | various                                                                                                    | Yes: PR 4c                                           |
 
 ## Checking a change
 

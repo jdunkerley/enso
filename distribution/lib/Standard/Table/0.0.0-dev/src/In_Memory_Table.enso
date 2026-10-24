@@ -110,7 +110,7 @@ private from_java_table java_table =
             _:Java_Table ->
                 DataQualityMetrics.triggerTable java_table
             _ ->
-                In_Memory_Table.log_message "Cannot compute DataQualityMetrics for "+java_table.to_text
+                In_Memory_Table.log_internal "Cannot compute DataQualityMetrics for "+java_table.to_text
 
     Table_Refinements.refine_table <|
         In_Memory_Table.Value java_table

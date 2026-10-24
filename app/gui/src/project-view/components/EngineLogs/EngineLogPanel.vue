@@ -16,7 +16,14 @@ import { toReadableIsoString } from 'enso-common/src/utilities/data/dateTime'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 import EngineLogList from './EngineLogList.vue'
 import { fetchSessionLines } from './engineLogHistory'
-import { filterRows, rowsFromLines, type LevelFilter, type LogRow } from './engineLogModel'
+import {
+  DEFAULT_ORIGINS,
+  filterRows,
+  rowsFromLines,
+  type LevelFilter,
+  type LogOrigin,
+  type LogRow,
+} from './engineLogModel'
 import type { EngineLogStream } from './engineLogStream'
 
 const { stream, projectId } = defineProps<{
@@ -29,6 +36,14 @@ const backends = useBackends()
 const systemApi = window.api?.system
 
 const level = ref<LevelFilter>('info')
+/** Which origins show; the engine's internals are hidden at first. */
+const origins = ref<Record<LogOrigin, boolean>>({ ...DEFAULT_ORIGINS })
+/** The origin tickboxes, in toolbar order. */
+const originBoxes = [
+  { origin: 'engine', label: 'engineLogsOriginEngine' },
+  { origin: 'library', label: 'engineLogsOriginLibraries' },
+  { origin: 'user', label: 'engineLogsOriginUser' },
+] as const
 const filterText = ref('')
 const follow = ref(true)
 /** The earlier session shown, read-only; `''` for the live one. */
@@ -58,6 +73,7 @@ const shownRows = computed(() =>
   filterRows(live.value ? toValue(stream.rows) : sessionRows.value, {
     level: level.value,
     text: filterText.value,
+    origins: origins.value,
   }),
 )
 
@@ -124,6 +140,12 @@ function sessionLabel(session: ProjectSession, number: number) {
         <option value="warn">{{ getText('engineLogsLevelWarn') }}</option>
         <option value="info">{{ getText('engineLogsLevelInfo') }}</option>
       </select>
+      <fieldset class="origins" :aria-label="getText('engineLogsOrigin')">
+        <label v-for="box in originBoxes" :key="box.origin" class="origin">
+          <input v-model="origins[box.origin]" type="checkbox" :aria-label="getText(box.label)" />
+          {{ getText(box.label) }}
+        </label>
+      </fieldset>
       <input
         v-model="filterText"
         type="search"
@@ -196,7 +218,7 @@ function sessionLabel(session: ProjectSession, number: number) {
 }
 
 .toolbar select,
-.toolbar input,
+.toolbar input[type='search'],
 .toolbar button {
   height: 22px;
   padding: 0 6px;
@@ -206,8 +228,31 @@ function sessionLabel(session: ProjectSession, number: number) {
   font: inherit;
 }
 
-.toolbar input {
+.toolbar input[type='search'] {
   width: 16em;
+}
+
+.origins {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.origin {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.origin input {
+  margin: 0;
+  accent-color: var(--color-text);
+  cursor: pointer;
 }
 
 .spacer {

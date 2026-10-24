@@ -17,6 +17,10 @@
   panel on either tab (a red dot marks new errors); `` Ctrl+` `` and `Ctrl+L`
   open the panel on Code or Logs, switch to it, or close the panel, and the
   panel's header has fullscreen and close buttons.][279]
+- [The Logs tab shows your own log messages and the libraries' logs, with the
+  engine's internal logs hidden: tickboxes next to the level filter choose
+  Engine, Libraries and User log messages. The error badge counts errors in the
+  log, not the engine's console output.][339]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -286,6 +290,8 @@
 
 #### Enso Standard Library
 
+- [`log_message` logs under a `User.` logger name, so the IDE can show your own
+  log messages separately from the libraries'.][339]
 - [Database connections and tables can be saved as local datalinks][276]:
   `save_as_data_link` now accepts a local `File` as well as an `Enso_File`. The
   password is stored as a local secret reference, not in the `.datalink` file.
@@ -324,6 +330,7 @@
 [264]: https://github.com/jdunkerley/enso/pull/264
 [272]: https://github.com/jdunkerley/enso/pull/272
 [279]: https://github.com/jdunkerley/enso/pull/279
+[339]: https://github.com/jdunkerley/enso/pull/339
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71

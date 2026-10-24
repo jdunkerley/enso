@@ -117,7 +117,7 @@ generate_github_error_annotation (title : Text) (message : Text) =
                 end = parts.at 1
                 start_field_name+"="+start+","+end_field_name+"="+end
     on_location_failing_to_parse caught_panic =
-        Test_Result.log_message "Failed to parse file location ["+location_match.to_display_text+"]: "+caught_panic.payload.to_display_text
+        Test_Result.log_internal "Failed to parse file location ["+location_match.to_display_text+"]: "+caught_panic.payload.to_display_text
         ""
     location_part = if location_match.is_nothing then "" else
         Panic.catch Any handler=on_location_failing_to_parse <|

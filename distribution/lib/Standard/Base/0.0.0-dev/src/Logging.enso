@@ -19,13 +19,34 @@ polyglot java import org.slf4j.LoggerFactory
    Log a message.
    This function needs to be enabled by importing `Standard.Base.Logging` using
    `from Standard.Base.Logging import all`.
+
+   The message is logged under the logger `User.` followed by the qualified
+   name of the type of `self` (e.g. `User.local.My_Project.Main.My_Type`), so
+   that a user's own log messages can be told apart from the libraries'. The
+   libraries log with `log_internal` instead.
 Any.log_message : Text -> Log_Level -> Any
 Any.log_message self ~message:Text level:Log_Level=Log_Level.Info =
-    typ = Meta_Helpers.type_of_value_or_type self
-    type_name = Meta_Helpers.get_qualified_type_name_builtin typ
-    logger = LoggerFactory.getLogger type_name
+    logger = LoggerFactory.getLogger ("User." + (logger_name self))
     log_impl logger message level []
     self
+
+## ---
+   private: true
+   ---
+   Log a message from a library.
+   Like `log_message`, but logged under the qualified name of the type of
+   `self` alone (e.g. `Standard.Table.In_Memory_Table.In_Memory_Table`). For
+   the standard library's own use; user code calls `log_message`.
+Any.log_internal : Text -> Log_Level -> Any
+Any.log_internal self ~message:Text level:Log_Level=Log_Level.Info =
+    logger = LoggerFactory.getLogger (logger_name self)
+    log_impl logger message level []
+    self
+
+## The qualified name of the type of `value`.
+private logger_name value =
+    typ = Meta_Helpers.type_of_value_or_type value
+    Meta_Helpers.get_qualified_type_name_builtin typ
 
 ## Infrastructure for reporting logs and progress of computations.
    Useful for longer running actions (more than a second). A must for long

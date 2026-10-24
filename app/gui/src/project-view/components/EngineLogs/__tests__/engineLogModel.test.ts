@@ -39,6 +39,8 @@ function feed(model = new EngineLogModel()) {
   }
 }
 
+const ALL_ORIGINS = { engine: true, library: true, user: true }
+
 const texts = (rows: readonly LogRow[]) =>
   rows.map((row) => (row.kind === 'line' ? row.text : `--${row.divider}--`))
 
@@ -106,14 +108,14 @@ describe('EngineLogModel', () => {
     expect(f.model.ended).toBeUndefined()
   })
 
-  test('counts ERROR entries and stderr lines as unseen until marked seen', () => {
+  test('counts ERROR entries, not stderr lines, as unseen until marked seen', () => {
     const f = feed()
     f.hello()
     f.line(entry('INFO', 'fine'))
     f.line(entry('ERROR', 'broken'))
     f.line('  at Foo.bar')
     f.line('boom', 'stderr')
-    expect(f.model.unseenErrors).toBe(2)
+    expect(f.model.unseenErrors).toBe(1)
     f.model.markSeen()
     expect(f.model.unseenErrors).toBe(0)
   })
@@ -263,15 +265,14 @@ describe('helpers', () => {
       '  at Query.run',
     ])
     const withDivider: LogRow[] = [{ kind: 'divider', key: 99, divider: 'restarted' }, ...rows]
-    expect(texts(filterRows(withDivider, { level: 'error', text: '' }))).toEqual([
-      '--restarted--',
-      entry('ERROR', 'query failed'),
-      '  at Query.run',
-    ])
-    expect(texts(filterRows(withDivider, { level: 'warn', text: ' SLOW ' }))).toEqual([
-      '--restarted--',
-      entry('WARN', 'slow query'),
-    ])
-    expect(filterRows(withDivider, { level: 'info', text: '' })).toHaveLength(5)
+    expect(
+      texts(filterRows(withDivider, { level: 'error', text: '', origins: ALL_ORIGINS })),
+    ).toEqual(['--restarted--', entry('ERROR', 'query failed'), '  at Query.run'])
+    expect(
+      texts(filterRows(withDivider, { level: 'warn', text: ' SLOW ', origins: ALL_ORIGINS })),
+    ).toEqual(['--restarted--', entry('WARN', 'slow query')])
+    expect(filterRows(withDivider, { level: 'info', text: '', origins: ALL_ORIGINS })).toHaveLength(
+      5,
+    )
   })
 })
