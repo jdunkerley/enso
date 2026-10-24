@@ -15,7 +15,7 @@ against the rules that the CI generator's unit tests used to enforce: pull
 request triggers ignore specs and plans, `setup-node` disables the package
 manager cache before pnpm is set up, releases are IDE-only and read only
 allow-listed secrets, only macOS release jobs may fail, macOS jobs are gated on
-the self-hosted Mac, `macos-checks.yml` runs only what is requested, IDE
+the self-hosted Mac, the release's latest-version update follows its publish job, `macos-checks.yml` runs only what is requested, IDE
 packaging needs no cloud account, Windows packaging smoke-tests the installer,
 the toolchain pins in `build-config.yaml` equal the build's own copies, no job
 runs sbt before `setup-jvm`, and in `tools/build-scripts` only `src/lib/sbt.ts`
