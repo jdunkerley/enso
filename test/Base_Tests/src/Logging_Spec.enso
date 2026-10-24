@@ -140,10 +140,10 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
 
             main secret="no-secret" =
                 connection = Database.connect SQLite.In_Memory
-                connection.read (SQL_Query.Raw_SQL "SELECT 42 AS answer") . row_count . to_text . print
+                IO.println (connection.read (SQL_Query.Raw_SQL "SELECT 42 AS answer") . row_count)
                 in_memory = Table.new [["name", ["a", secret]]]
                 db_table = in_memory.select_into_database_table connection "logged_table" temporary=True primary_key=Nothing
-                db_table.filter "name" (..Equal secret) . read . row_count . to_text . print
+                IO.println (db_table.filter "name" (..Equal secret) . read . row_count)
                 connection.close
 
     sql_logging_prj -> File =
