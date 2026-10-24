@@ -26,10 +26,6 @@
   and how long each operation (each query among them) took, from the next time a
   project opens. The Logs tab then offers SQL queries and Performance tickboxes.
   SQL queries are no longer logged otherwise.][342]
-  Settings → Local → Engine logs can log the SQL queries of data-link database
-  connections and how long each operation (each query among them) took, from the
-  next time a project opens. The Logs tab then offers SQL queries and
-  Performance tickboxes. SQL queries are no longer logged otherwise.][342]
 - [Download the log file of the session the Logs tab shows, or reveal it in
   Explorer, Finder or your file manager, with the buttons at the right of its
   toolbar.][343]
