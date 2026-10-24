@@ -464,7 +464,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
         :keepFocus="sourcesOpenedByFilter"
         placement="bottom-start"
         :offset="4"
-        size="custom"
+        size="auto-xxsmall"
         rounded="large"
         testId="engine-logs-sources"
         :aria-label="getText('engineLogsOrigin')"
@@ -658,7 +658,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
   flex-direction: column;
   gap: 6px;
   margin: 0;
-  padding: 8px 10px;
+  padding: 4px 6px;
   border: none;
   font-size: 12px;
   color: var(--color-text);
