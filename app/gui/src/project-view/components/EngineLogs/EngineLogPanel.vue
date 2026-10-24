@@ -152,6 +152,8 @@ const windowSessionId = computed(() =>
 )
 const logWindow = shallowRef<SessionLogWindow>()
 const windowRows = shallowRef<readonly LogRow[]>([])
+/** Whether the session shown from its files has none (it was deleted, or is unknown). */
+const windowHasNoFiles = ref(false)
 
 /**
  * The live rows, under a `truncated` divider while there are lines above them (`olderLines`, bound
@@ -216,7 +218,9 @@ function showWindow(window: SessionLogWindow) {
     newer: window.hasNewer,
     firstKey: window.firstLine,
     sessionId: window.sessionId,
+    leadingEntry: window.leadingEntry,
   })
+  windowHasNoFiles.value = window.noFiles
 }
 
 /** Run `move` on the window shown, and show its lines if it is still the one shown. */
@@ -233,6 +237,7 @@ watch(
   windowSessionId,
   (sessionId) => {
     windowRows.value = []
+    windowHasNoFiles.value = false
     follow.value = true
     // A request still running belongs to the view being left: it no longer sets the notices.
     latestRequest += 1
@@ -445,6 +450,9 @@ function sessionLabel({ id, number, session }: PickableSession) {
     </div>
     <div v-if="loadError != null" class="notice error" role="alert">
       {{ getText('engineLogsHistoryFailed', loadError) }}
+    </div>
+    <div v-if="!live && windowHasNoFiles && !loading" class="notice" role="status">
+      {{ getText('engineLogsSessionMissing') }}
     </div>
     <EngineLogList
       v-model:follow="follow"

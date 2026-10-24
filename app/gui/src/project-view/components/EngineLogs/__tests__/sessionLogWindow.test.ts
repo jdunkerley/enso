@@ -77,18 +77,92 @@ test('older moves back a step and keeps the size; newer moves forward again', as
   expect(window.hasOlder).toBe(true)
 })
 
-test('every line is reachable by paging back, over empty and long pages alike', async () => {
-  const { reader, all } = session([3, 0, 12, 1])
+/**
+ * Page `window` all the way in one direction, recording each line by its number (`firstLine` +
+ * index): every number must keep its line, and the lines must come out as the session, in order and
+ * without duplicates or gaps.
+ */
+async function pageThrough(window: SessionLogWindow, direction: 'older' | 'newer') {
+  const byNumber = new Map<number, string>()
+  const record = () =>
+    window.lines.forEach((line, index) => {
+      const number = window.firstLine + index
+      const seen = byNumber.get(number)
+      if (seen != null) expect(seen).toBe(line)
+      byNumber.set(number, line)
+    })
+  record()
+  while (direction === 'older' ? window.hasOlder : window.hasNewer) {
+    await window[direction]()
+    expect(window.lines.length).toBeLessThanOrEqual(window.size)
+    record()
+  }
+  return [...byNumber.entries()].sort(([a], [b]) => a - b).map(([, line]) => line)
+}
+
+test('every line is reachable by paging back, once and in order, over empty and long pages', async () => {
+  const { reader, all } = session([3, 0, 12, 0, 1])
   const window = new SessionLogWindow(reader, SESSION, 4, 2)
   await window.latest()
-  const seen = new Set(window.lines)
-  while (window.hasOlder) {
-    await window.older()
-    for (const line of window.lines) seen.add(line)
-    expect(window.lines.length).toBeLessThanOrEqual(4)
-  }
-  expect([...seen].sort()).toEqual([...all].sort())
+  expect(await pageThrough(window, 'older')).toEqual(all)
   expect(window.lines).toEqual(all.slice(0, 4))
+})
+
+test('every line is reachable paging forward again, over empty pages', async () => {
+  const { reader, all } = session([2, 0, 0, 5, 0, 3])
+  const window = new SessionLogWindow(reader, SESSION, 3, 2)
+  await window.latest()
+  while (window.hasOlder) await window.older()
+  expect(window.lines).toEqual(all.slice(0, 3))
+  expect(await pageThrough(window, 'newer')).toEqual(all)
+  expect(window.lines).toEqual(all.slice(-3))
+  expect(window.hasNewer).toBe(false)
+})
+
+test('a failed reload leaves the window as it was', async () => {
+  const { reader, all } = session([5, 5])
+  const window = new SessionLogWindow(reader, SESSION, 4, 2)
+  await window.latest()
+  await window.older()
+  const before = { lines: window.lines, firstLine: window.firstLine }
+  reader.getProjectSessionLogs.mockRejectedValueOnce(new Error('unreadable'))
+  await expect(window.latest()).rejects.toThrow('unreadable')
+  expect({ lines: window.lines, firstLine: window.firstLine }).toEqual(before)
+  // And it still pages from where it was.
+  await window.newer()
+  expect(window.lines).toEqual(all.slice(-4))
+})
+
+test("a window that starts inside an entry knows the entry's start", async () => {
+  const entry = '[ERROR] [2026-10-19T09:00:00.000Z] [Standard.Base.Data.Vector] boom'
+  const pages = ['active']
+  const lines = ['[INFO] [2026-10-19T09:00:00.000Z] [a.b] before', entry, '  at one', '  at two']
+  const reader = {
+    listProjectSessionPages: vi.fn(async () => pages),
+    getProjectSessionLogs: vi.fn(async () => ({ scrollId: 'unused', hits: lines })),
+  } as unknown as SessionPageReader
+  const window = new SessionLogWindow(reader, SESSION, 2, 1)
+  await window.latest()
+  expect(window.lines).toEqual(['  at one', '  at two'])
+  expect(window.leadingEntry).toBe(entry)
+  await window.older()
+  expect(window.lines).toEqual([entry, '  at one'])
+  expect(window.leadingEntry).toBeNull()
+  await window.newer()
+  expect(window.lines).toEqual(['  at one', '  at two'])
+  expect(window.leadingEntry).toBe(entry)
+})
+
+test('a session with no files says so', async () => {
+  const reader = {
+    listProjectSessionPages: vi.fn(async () => []),
+    getProjectSessionLogs: vi.fn(),
+  } as unknown as SessionPageReader
+  const window = new SessionLogWindow(reader, SESSION, 4, 2)
+  expect(window.noFiles).toBe(false)
+  await window.latest()
+  expect(window.noFiles).toBe(true)
+  expect(window.lines).toEqual([])
 })
 
 test('latest again is a reload: it lists the pages afresh', async () => {

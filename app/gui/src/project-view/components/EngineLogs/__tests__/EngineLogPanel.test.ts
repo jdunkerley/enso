@@ -620,6 +620,27 @@ describe('the session log tab: a session without a live stream', () => {
     ])
   })
 
+  test('a session whose files are gone says so', async () => {
+    mocks.listProjectSessionPages.mockResolvedValue([])
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
+    expect(lineTexts()).toEqual([])
+    expect(wrapper.text()).toContain('log files are not there')
+  })
+
+  test('rows at the top of a window that continue an entry take its logger', async () => {
+    const lines = [
+      '[ERROR] [2026-10-19T09:00:00.000Z] [Standard.Base.Data.Vector] boom',
+      ...Array.from({ length: LIVE_ROW_CAP + 5 }, (_, n) => `  at frame ${n}`),
+    ]
+    mocks.getProjectSessionLogs.mockResolvedValue({ scrollId: 'done', hits: lines })
+    const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })
+    expect(lineTexts()[0]).toBe('at frame 5')
+    await wrapper.find('input[aria-label="Logger"]').setValue('Standard.Base')
+    expect(lineTexts()[0]).toBe('at frame 5')
+    await wrapper.find('select[aria-label="Level"]').setValue('error')
+    expect(lineTexts()[0]).toBe('at frame 5')
+  })
+
   test('Reload reads the session again', async () => {
     mocks.getProjectSessionLogs.mockResolvedValueOnce({ scrollId: 'done', hits: ['first'] })
     const { wrapper, lineTexts } = await mountStandalone({ initialSession: 'old' })

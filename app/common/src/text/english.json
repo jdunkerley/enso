@@ -844,6 +844,7 @@
   "engineLogsReload": "Reload",
   "engineLogsLogger": "Logger",
   "engineLogsSessionUnlisted": "Session $0",
+  "engineLogsSessionMissing": "This session's log files are not there: they may have been deleted.",
   "engineLogsEnded": "The project's engine is no longer running",
   "engineLogsJumpToLatest": "Jump to latest",
   "engineLogsShowInFolder": "Show in folder",

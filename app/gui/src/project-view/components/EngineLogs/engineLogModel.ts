@@ -252,13 +252,19 @@ export interface WindowEdges {
   readonly firstKey: number
   /** The session the lines are from, which the dividers' load buttons page through. */
   readonly sessionId: string
+  /**
+   * The start of the entry the first line continues, if known: continuation lines at the top take
+   * its logger and level instead of an unknown library's.
+   */
+  readonly leadingEntry: string | null
 }
 
 /**
  * Rows for lines of a file read (an earlier session, or a window of one): at most its newest
  * {@link LIVE_ROW_CAP} lines, with a `truncated` divider above them when there are older lines and a
  * `newer` one below them when there are newer ones. Lines above the first entry in view continue an
- * entry out of view: they are a library's, with no logger.
+ * entry out of view: they take `leadingEntry`'s level and logger when it is given, else they are an
+ * unknown library's, with no logger.
  */
 export function rowsFromLines(
   lines: readonly string[],
@@ -267,6 +273,7 @@ export function rowsFromLines(
   const shown = lines.length > LIVE_ROW_CAP ? lines.slice(lines.length - LIVE_ROW_CAP) : lines
   const firstKey = edges.firstKey ?? 1
   const classifier = new LineClassifier()
+  if (edges.leadingEntry != null) classifier.classify(edges.leadingEntry, 'file')
   const rows: LogRow[] = []
   if (shown.length < lines.length || edges.older === true) {
     rows.push({
