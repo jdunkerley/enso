@@ -111,6 +111,13 @@ const sourcesOpen = ref(false)
 /** Whether the popover was opened by the text filter, which then keeps the focus (`keepFocus`). */
 const sourcesOpenedByFilter = ref(false)
 const filterInput = ref<HTMLInputElement>()
+const sourcesButton = ref<HTMLButtonElement>()
+const sessionSelect = ref<HTMLSelectElement>()
+/**
+ * The open popover's element id, as its button names it (`aria-controls`); the text filter, which
+ * opens it too, names it as well.
+ */
+const sourcesPopoverId = ref<string>()
 
 function openSourcesFromFilter() {
   if (sourcesOpen.value) return
@@ -118,21 +125,77 @@ function openSourcesFromFilter() {
   sourcesOpen.value = true
 }
 
-watch(sourcesOpen, (open) => {
-  if (!open) sourcesOpenedByFilter.value = false
-})
+watch(
+  sourcesOpen,
+  (open) => {
+    if (!open) sourcesOpenedByFilter.value = false
+    sourcesPopoverId.value =
+      open ? (sourcesButton.value?.getAttribute('aria-controls') ?? undefined) : undefined
+  },
+  { flush: 'post' },
+)
+
+/** The open popover's element. */
+function sourcesPopover() {
+  const id = sourcesButton.value?.getAttribute('aria-controls')
+  return id ? document.getElementById(id) : null
+}
+
+/** The tickboxes of the open popover, in order. */
+function sourcesTickboxes(): HTMLInputElement[] {
+  return [...(sourcesPopover()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])]
+}
 
 /**
- * Escape closes the Sources popover, from the text filter or from inside it. Handled here, before
- * the event reaches the window: the graph's Escape (`app.cancel`) would otherwise take it first, and
- * Reka's own Escape listener never see it. Only that: the first Escape does not also clear the
- * filter or reach the graph.
+ * Move the keyboard back to the Sources button at once if it is in the closing popover: until the
+ * content has gone (after its exit animation) the app's key handling skips keys typed in it, and
+ * Space would still tick a box.
+ */
+function takeFocusOutOfSources() {
+  const popover = sourcesPopover()
+  if (popover != null && popover.contains(document.activeElement)) sourcesButton.value?.focus()
+}
+
+/**
+ * Escape in the text filter closes the Sources popover. Handled on the filter: an Escape there goes
+ * on to the window, where the graph's `graph.deselectAll` (a bubbling window listener registered
+ * before Reka's) takes it, so Reka's own Escape listener never sees it. Only that: the first Escape
+ * does not also clear the filter or reach the graph. Inside the popover, Reka's listener handles it
+ * (the app's key handling skips keys typed in an overlay).
  */
 function closeSourcesOnEscape(event: KeyboardEvent) {
   if (!sourcesOpen.value) return
   event.stopPropagation()
   event.preventDefault()
   sourcesOpen.value = false
+}
+
+/**
+ * The popover's content is teleported to the end of the page, so Tab is routed by hand to give it
+ * its place in the toolbar's order: from the open popover's button to its first box, from its last
+ * box on to the Session picker (which closes it, as focus leaves it), and Shift+Tab from its first
+ * box back to the button.
+ */
+function onSourcesButtonTab(event: KeyboardEvent) {
+  if (!sourcesOpen.value || event.shiftKey) return
+  const first = sourcesTickboxes()[0]
+  if (first == null) return
+  event.preventDefault()
+  first.focus()
+}
+
+function onSourcesPopoverTab(event: KeyboardEvent) {
+  const boxes = sourcesTickboxes()
+  const target = event.target
+  if (event.shiftKey) {
+    if (target === boxes[0] || !boxes.some((box) => box === target)) {
+      event.preventDefault()
+      sourcesButton.value?.focus()
+    }
+  } else if (target === boxes.at(-1)) {
+    event.preventDefault()
+    sessionSelect.value?.focus()
+  }
 }
 
 /** A press on, or focus moving to, the text filter leaves the Sources popover open. */
@@ -437,6 +500,9 @@ function sessionLabel({ id, number, session }: PickableSession) {
         type="search"
         :aria-label="getText('engineLogsFilter')"
         :placeholder="getText('engineLogsFilter')"
+        aria-haspopup="dialog"
+        :aria-expanded="sourcesOpen"
+        :aria-controls="sourcesPopoverId"
         @focus="openSourcesFromFilter"
         @keydown.escape="closeSourcesOnEscape"
       />
@@ -444,6 +510,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
         v-model:open="sourcesOpen"
         isNonModal
         :keepFocus="sourcesOpenedByFilter"
+        keepOutsideFocus
         placement="bottom-start"
         :offset="4"
         size="auto-xxsmall"
@@ -451,14 +518,17 @@ function sessionLabel({ id, number, session }: PickableSession) {
         testId="engine-logs-sources"
         :aria-label="getText('engineLogsOrigin')"
         @interactOutside="keepSourcesOpenForFilter"
-        @keydown.escape="closeSourcesOnEscape"
+        @escapeKeyDown="takeFocusOutOfSources"
+        @keydown.tab="onSourcesPopoverTab"
       >
         <template #trigger>
           <button
+            ref="sourcesButton"
             type="button"
             class="sourcesButton"
             :title="sourcesTitle"
             data-testid="engine-logs-sources-button"
+            @keydown.tab="onSourcesButtonTab"
           >
             <span class="sourcesLabel">{{ sourcesLabel }}</span>
             <SvgIcon name="arrow_right_head_only" class="sourcesArrow" />
@@ -471,7 +541,11 @@ function sessionLabel({ id, number, session }: PickableSession) {
           </label>
         </fieldset>
       </Popover>
-      <select v-model="selectedSession" :aria-label="getText('engineLogsSession')">
+      <select
+        ref="sessionSelect"
+        v-model="selectedSession"
+        :aria-label="getText('engineLogsSession')"
+      >
         <option v-if="stream != null" value="">{{ getText('engineLogsThisSession') }}</option>
         <option v-for="option in pickableSessions" :key="option.id" :value="option.id">
           {{ sessionLabel(option) }}

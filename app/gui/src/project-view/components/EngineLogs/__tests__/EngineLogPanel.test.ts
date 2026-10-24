@@ -549,6 +549,81 @@ describe('the Sources popover', () => {
     expect(document.activeElement).toBe(input)
   })
 
+  test('opened from its button, Escape in the filter leaves the focus in the filter', async () => {
+    const { wrapper } = await mountPanel()
+    await openSources(wrapper)
+    await settle()
+    const input = filterInput(wrapper)
+    const user = userEvent.setup()
+    await user.click(input)
+    await user.keyboard('Slow')
+    expect(sourcesPopover()).not.toBeNull()
+    await user.keyboard('{Escape}')
+    await flushPromises()
+    await settle()
+    expect(sourcesPopover()).toBeNull()
+    expect(document.activeElement).toBe(input)
+    expect(input.value).toBe('Slow')
+  })
+
+  test('Escape from a tickbox moves the keyboard to the button at once', async () => {
+    const { wrapper } = await mountPanel()
+    await openSources(wrapper)
+    await settle()
+    tickbox('Engine')!.focus()
+    // Reka's own Escape listener closes it; no flush: the focus moves before the content goes.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(document.activeElement).toBe(sourcesButton(wrapper).element)
+  })
+
+  test('the filter says it opens the popover, and names it while it is open', async () => {
+    const { wrapper } = await mountPanel()
+    const input = filterInput(wrapper)
+    expect(input.getAttribute('aria-haspopup')).toBe('dialog')
+    expect(input.getAttribute('aria-expanded')).toBe('false')
+    expect(input.getAttribute('aria-controls')).toBeNull()
+    input.focus()
+    await flushPromises()
+    expect(input.getAttribute('aria-expanded')).toBe('true')
+    expect(input.getAttribute('aria-controls')).toBe(sourcesPopover()!.id)
+  })
+
+  test('Tab goes from the filter to the button, through the tickboxes, then on', async () => {
+    const { wrapper } = await mountPanel()
+    const input = filterInput(wrapper)
+    const button = sourcesButton(wrapper).element
+    const session = wrapper.find('select[aria-label="Session"]').element
+    input.focus()
+    await flushPromises()
+    await settle()
+    const user = userEvent.setup()
+    await user.tab()
+    expect(document.activeElement).toBe(button)
+    expect(sourcesPopover()).not.toBeNull()
+    await user.tab()
+    expect(document.activeElement).toBe(tickbox('Engine'))
+    // Space ticks it; the popover stays open.
+    await user.keyboard(' ')
+    await flushPromises()
+    expect(tickbox('Engine')!.checked).toBe(true)
+    await user.tab()
+    expect(document.activeElement).toBe(tickbox('Libraries'))
+    await user.tab({ shift: true })
+    await user.tab({ shift: true })
+    expect(document.activeElement).toBe(button)
+    expect(sourcesPopover()).not.toBeNull()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(document.activeElement).toBe(tickbox('User log messages'))
+    // Past the last box, on to the Session picker, which closes the popover.
+    await user.tab()
+    await flushPromises()
+    await settle()
+    expect(document.activeElement).toBe(session)
+    expect(sourcesPopover()).toBeNull()
+  })
+
   test('its button sums up the boxes shown: all, none, one by name, or how many', async () => {
     const { wrapper } = await mountPanel()
     const label = () => sourcesButton(wrapper).text()

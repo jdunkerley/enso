@@ -144,10 +144,17 @@ test('the Sources popover opens from the text filter, which keeps the focus', as
     await page.keyboard.press('Escape')
     await expect(sources).toBeHidden()
     await expect(filter).toBeFocused()
-    // From its button, the keyboard reaches the tickboxes; Escape returns to the button.
+    // The keyboard alone: back to the Level picker, Tab into the filter (which opens the popover),
+    // on to its button, and into the tickboxes; Escape returns to the button.
     const sourcesButton = dock.getByTestId('engine-logs-sources-button')
-    await sourcesButton.focus()
-    await page.keyboard.press('Enter')
+    await page.keyboard.press('Shift+Tab')
+    await expect(dock.getByRole('combobox', { name: 'Level' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(filter).toBeFocused()
+    await expect(sources).toBeVisible()
+    await expect(filter).toHaveAttribute('aria-expanded', 'true')
+    await page.keyboard.press('Tab')
+    await expect(sourcesButton).toBeFocused()
     await expect(sources).toBeVisible()
     await page.keyboard.press('Tab')
     await expect(sources.getByRole('checkbox', { name: 'Engine' })).toBeFocused()
@@ -157,6 +164,16 @@ test('the Sources popover opens from the text filter, which keeps the focus', as
     await page.keyboard.press('Escape')
     await expect(sources).toBeHidden()
     await expect(sourcesButton).toBeFocused()
+    // Opened from its button, then typing in the filter: Escape there leaves the focus in it.
+    await sourcesButton.click()
+    await expect(sources).toBeVisible()
+    await filter.click()
+    await page.keyboard.type('er')
+    await expect(sources).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(sources).toBeHidden()
+    await expect(filter).toBeFocused()
+    await expect(filter).toHaveValue('Slower')
     // A press outside closes it.
     await sourcesButton.click()
     await expect(sources).toBeVisible()

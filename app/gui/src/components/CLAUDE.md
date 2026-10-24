@@ -62,7 +62,8 @@ focus only when the keyboard put the focus there (`$/utils/inputModality`).
 
 From the engine log's Sources popover: `Popover`'s `keepFocus` (read as it
 opens) leaves focus where it is, for a popover that a field opens as it takes
-focus; on closing, focus stays wherever it went outside the popover.
+focus; `keepOutsideFocus` (read as it closes) leaves focus that is outside the
+popover where it is, however it was opened.
 
 From #207: a press on the backdrop of a `Dialog` or `AlertDialog` keeps focus
 inside it (`keepFocusOnBackdropPress`), and Escape in a `ComboBox` whose list is

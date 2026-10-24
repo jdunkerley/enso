@@ -79,11 +79,17 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     (`$/components/Dialog/Popover`, non-modal), opened by its button beside the
     text filter, whose label sums up the boxes shown (`originSummary`: All,
     None, the one ticked, or "2 of 3"), and by the text filter taking focus,
-    which keeps the focus (`keepFocus`). Ticking a box leaves it open; a press
-    outside (but not on the text filter) or Escape closes it. Escape is handled
-    on the filter and the popover themselves: in the project view the graph's
-    `app.cancel` takes an Escape at the window before Reka's own listener sees
-    it;
+    which keeps the focus (`keepFocus`; the filter has `aria-haspopup`,
+    `aria-expanded` and `aria-controls`). Ticking a box leaves it open; a press
+    outside (but not on the text filter) or Escape closes it. On closing, focus
+    outside the popover stays where it is (`keepOutsideFocus`); focus inside it
+    moves to the button, at once on Escape (`takeFocusOutOfSources`: until the
+    content has gone, the app's key handling skips keys typed in it). Escape in
+    the filter is handled on the filter: the graph's `graph.deselectAll`, a
+    bubbling window listener registered before Reka's, would take it first. The
+    content is teleported to the end of the page, so Tab is routed by hand: from
+    the open popover's button to its first box, from its last box on to the
+    Session picker, Shift+Tab from its first box back to the button;
   - at the toolbar's right, icon buttons for the log file of the session shown
     (live or earlier): Download log file (`downloadProjectSessionLogs`, the
     whole session, archives included; a failure is shown as an alert) and reveal
