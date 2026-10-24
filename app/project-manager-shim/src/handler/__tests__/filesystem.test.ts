@@ -276,6 +276,28 @@ describe('getProjectSessionLogs', () => {
     ])
   })
 
+  test('a session without an active file lists its archives only; one with no files, nothing', () => {
+    const baseName = 'enso-language-server-2026-03-31-14-23-45'
+    fs.writeFileSync(path.join(tmpDir, projectId, `${baseName}.0.log.gz`), zlib.gzipSync('a'))
+    expect(listProjectSessionPages(encodeSessionId(projectId, baseName)).pages).toEqual([
+      'archive:0',
+    ])
+    const gone = 'enso-language-server-2026-03-30-14-23-45'
+    expect(listProjectSessionPages(encodeSessionId(projectId, gone)).pages).toEqual([])
+  })
+
+  test('an archive that is gone reads empty, not the active file', () => {
+    const baseName = 'enso-language-server-2026-03-31-14-23-45'
+    fs.writeFileSync(path.join(tmpDir, projectId, `${baseName}.3.log.gz`), zlib.gzipSync('three'))
+    fs.writeFileSync(path.join(tmpDir, projectId, `${baseName}.log`), 'active')
+    const sessionId = encodeSessionId(projectId, baseName)
+    expect(getProjectSessionLogs(sessionId, 'archive:1')).toEqual({
+      scrollId: 'archive:3',
+      hits: [],
+    })
+    expect(getProjectSessionLogs(sessionId, 'archive:7')).toEqual({ scrollId: 'active', hits: [] })
+  })
+
   test('a session without archives has the active page only', () => {
     const baseName = 'enso-language-server-2026-03-31-14-23-45'
     fs.writeFileSync(path.join(tmpDir, projectId, `${baseName}.log`), 'a\n')

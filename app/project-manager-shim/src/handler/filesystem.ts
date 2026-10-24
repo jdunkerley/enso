@@ -708,7 +708,10 @@ export function getProjectSessionLogs(
     if (pos >= 0) {
       return readArchive(projectLogDir, baseName, sortedArchiveIndices, pos)
     }
-    return readActiveLog(projectLogDir, baseName)
+    // An archive that is gone (deleted, or never there) has no lines: never another file's. Paging
+    // on goes to the next archive after it, or the active file.
+    const next = sortedArchiveIndices.find((index) => index > requestedIndex)
+    return { scrollId: next != null ? `archive:${next}` : 'active', hits: [] }
   }
 
   if (scrollId === 'active') {
@@ -720,13 +723,15 @@ export function getProjectSessionLogs(
 
 /**
  * The pages of a session, oldest first: one `scrollId` per rolled archive (`archive:N`), then
- * `active`. Each is read whole by {@link getProjectSessionLogs}, so a client can read a session from
+ * `active` if the active file exists. Each is read whole by {@link getProjectSessionLogs}, so a client can read a session from
  * its newest page backwards, one file at a time.
  */
 export function listProjectSessionPages(sessionId: string): { pages: readonly string[] } {
   const { projectLogDir, baseName } = decodeSessionId(sessionId)
   const archives = collectArchiveIndices(projectLogDir, baseName).map((index) => `archive:${index}`)
-  return { pages: [...archives, 'active'] }
+  const hasActive = fsSync.existsSync(path.join(projectLogDir, `${baseName}.log`))
+  // A session with no files at all (deleted, or never there) has no pages.
+  return { pages: hasActive ? [...archives, 'active'] : archives }
 }
 
 /** Collect sorted archive indices for a session base name. */
