@@ -31,9 +31,12 @@ abstract class AuditedConnection implements Connection {
 
   abstract void auditTransaction(String operation);
 
-  private RuntimeException unimplemented(String name) {
-    throw new UnsupportedOperationException(
-        name + " is not implemented. This is a bug in the Database library.");
+  /**
+   * Whether audit calls are recorded at all. When it is {@code false} the wrappers skip the work of
+   * building audit messages (e.g. accumulating a statement batch's SQL).
+   */
+  boolean isAuditEnabled() {
+    return true;
   }
 
   @Override
@@ -48,7 +51,9 @@ abstract class AuditedConnection implements Connection {
 
   @Override
   public CallableStatement prepareCall(String sql) throws SQLException {
-    throw unimplemented("prepareCall");
+    // A `CallableStatement` is not wrapped: its call is recorded when it is prepared.
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql);
   }
 
   @Override
@@ -153,7 +158,8 @@ abstract class AuditedConnection implements Connection {
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
-    throw unimplemented("prepareCall");
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql, resultSetType, resultSetConcurrency);
   }
 
   @Override
@@ -236,7 +242,8 @@ abstract class AuditedConnection implements Connection {
   public CallableStatement prepareCall(
       String sql, int resultSetType, int resultSetConcurrency, int resultSetHoldability)
       throws SQLException {
-    throw unimplemented("prepareCall");
+    auditQuery("prepareCall", sql);
+    return underlying.prepareCall(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
   }
 
   @Override
@@ -383,7 +390,7 @@ abstract class AuditedConnection implements Connection {
 
   private class AuditedPreparedStatementImpl extends AuditedPreparedStatement {
     public AuditedPreparedStatementImpl(PreparedStatement underlying, String sql) {
-      super(underlying, sql);
+      super(underlying, sql, AuditedConnection.this);
     }
 
     @Override
@@ -394,12 +401,17 @@ abstract class AuditedConnection implements Connection {
 
   private class AuditedStatementImpl extends AuditedStatement {
     public AuditedStatementImpl(Statement underlying) {
-      super(underlying);
+      super(underlying, AuditedConnection.this);
     }
 
     @Override
     protected void auditQuery(String operationType, String sql) {
       AuditedConnection.this.auditQuery(operationType, sql);
+    }
+
+    @Override
+    protected boolean isAuditEnabled() {
+      return AuditedConnection.this.isAuditEnabled();
     }
   }
 }

@@ -23,10 +23,21 @@ Redshift, Generic_JDBC). Packaged as `std-database.jar`.
   the driver class fails at the Enso→Java call.
 - The wrappers must behave exactly like the driver: delegate every method,
   including the interfaces' `default` ones (`enquoteIdentifier` and friends), or
-  the interface's generic version silently replaces the driver's.
+  the interface's generic version silently replaces the driver's. Statements'
+  `getConnection()` returns the audited connection; a `PreparedStatement`'s
+  SQL-string methods throw `SQLException`, as JDBC requires; `prepareCall` is
+  logged when prepared and returns the driver's own `CallableStatement`.
+- The wrapper is not inescapable: `getMetaData().getConnection()`,
+  `ResultSet.getStatement()` and a `CallableStatement` reach the driver's
+  objects, and what runs through them is not logged.
 - **Log the SQL text only.** Never bound parameter values, never connection
   properties (credentials travel there); the URL is logged through
-  `LocalAuditedConnection.redactUrl`.
+  `LocalAuditedConnection.redactUrl`, which is pattern matching and can't catch
+  every form, so never claim that credentials can't appear.
+- **Logging must never break a connection or a statement.** The URL is read
+  lazily on the first line logged, any failure falls back to a fixed label, and
+  `JDBCProxy` returns the raw connection if the wrapper can't be created. While
+  INFO is off nothing is built (`isAuditEnabled`).
 - The logger is at `warn` in the engine configs, so logging is off unless the
   IDE's Log SQL queries setting (or
   `--vm.D Standard.Database.Connection.Logger.level=info`) turns it on.

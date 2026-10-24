@@ -94,11 +94,17 @@ it:
   connection the Database library opens, data link or not, is wrapped in a
   `LocalAuditedConnection` (`JDBCProxy`), which logs each statement as
   `<jdbc url> - <operation>: <sql>`: the SQL text only, with prepared
-  statements' `?` placeholders rather than their bound values, and with any
-  password-like part of the URL replaced by `***`. A cloud-audited connection (a
-  data link opened while signed in to Enso Cloud) is wrapped in a
-  `CloudAuditedConnection` instead and logs nothing locally. Code that needs a
-  driver's own connection class must `unwrap` it, as `DuckDBUtils` does.
+  statements' `?` placeholders rather than their bound values. The URL goes
+  through `LocalAuditedConnection.redactUrl`, which replaces the common forms of
+  a password in a URL (`user:password@`, Oracle's `user/password@`, and
+  password-, key-, secret- or token-like properties) with `***`. That is pattern
+  matching and can't be complete, so the log should be checked before it is
+  shared. The URL is only read when the first line is logged, and a failure
+  there (or in the logger) never fails the connection or the statement. A
+  cloud-audited connection (a data link opened while signed in to Enso Cloud) is
+  wrapped in a `CloudAuditedConnection` instead and logs nothing locally. Code
+  that needs a driver's own connection class must `unwrap` it, as `DuckDBUtils`
+  does.
 - **Log performance timings**: `Standard.Base.Logging.Progress` at `debug` (see
   [Progress and Profiling](#progress-and-profiling)).
 

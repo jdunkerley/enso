@@ -8,12 +8,16 @@ import java.sql.Statement;
 
 abstract class AuditedStatement implements Statement {
   private final Statement underlying;
+  private final Connection connection;
 
-  AuditedStatement(Statement underlying) {
+  AuditedStatement(Statement underlying, Connection connection) {
     this.underlying = underlying;
+    this.connection = connection;
   }
 
   protected abstract void auditQuery(String operationType, String sql);
+
+  protected abstract boolean isAuditEnabled();
 
   @Override
   public ResultSet executeQuery(String sql) throws SQLException {
@@ -138,33 +142,44 @@ abstract class AuditedStatement implements Statement {
     return underlying.getResultSetType();
   }
 
-  StringBuilder currentBatch = new StringBuilder();
+  /** The batch's SQL, kept only while auditing is enabled; {@code null} when there is none. */
+  private StringBuilder currentBatch = null;
+
+  private String takeBatch() {
+    var batch = currentBatch == null ? "" : currentBatch.toString();
+    currentBatch = null;
+    return batch;
+  }
 
   @Override
   public void addBatch(String sql) throws SQLException {
-    if (!currentBatch.isEmpty()) {
-      currentBatch.append("; ");
+    if (isAuditEnabled()) {
+      if (currentBatch == null) {
+        currentBatch = new StringBuilder();
+      } else {
+        currentBatch.append("; ");
+      }
+      currentBatch.append(sql);
     }
-    currentBatch.append(sql);
     underlying.addBatch(sql);
   }
 
   @Override
   public void clearBatch() throws SQLException {
-    currentBatch = new StringBuilder();
+    currentBatch = null;
     underlying.clearBatch();
   }
 
   @Override
   public int[] executeBatch() throws SQLException {
-    auditQuery("executeBatch", currentBatch.toString());
-    currentBatch = new StringBuilder();
+    auditQuery("executeBatch", takeBatch());
     return underlying.executeBatch();
   }
 
+  /** The audited connection that created this statement, as the JDBC contract requires. */
   @Override
   public Connection getConnection() throws SQLException {
-    throw new IllegalStateException("`getConnection` cannot be called on AuditedStatement");
+    return connection;
   }
 
   @Override
@@ -273,8 +288,7 @@ abstract class AuditedStatement implements Statement {
 
   @Override
   public long[] executeLargeBatch() throws SQLException {
-    auditQuery("executeBatch", currentBatch.toString());
-    currentBatch = new StringBuilder();
+    auditQuery("executeBatch", takeBatch());
     return underlying.executeLargeBatch();
   }
 

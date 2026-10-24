@@ -60,30 +60,54 @@ public final class JDBCProxy {
     }
 
     PartitionedProperties partitionedProperties = PartitionedProperties.parse(properties);
+    var audited = partitionedProperties.audited();
+    if (audited != null && !"local".equals(audited) && !"cloud".equals(audited)) {
+      throw new IllegalArgumentException("Unknown audit mode: " + audited);
+    }
+
     var rawConnection =
         EnsoSecretHelper.getJDBCConnection(url, partitionedProperties.jdbcProperties);
+    try {
+      if (catalog != null && !catalog.isEmpty()) {
+        rawConnection.setCatalog(catalog);
+      }
+      if (schema != null && !schema.isEmpty()) {
+        rawConnection.setSchema(schema);
+      }
 
-    if (catalog != null && !catalog.isEmpty()) {
-      rawConnection.setCatalog(catalog);
-    }
-    if (schema != null && !schema.isEmpty()) {
-      rawConnection.setSchema(schema);
-    }
+      if ("cloud".equals(audited)) {
+        runInitScript(rawConnection, initScript);
+        return new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
+      }
 
-    // Every connection that is not cloud-audited logs its statements locally, so that SQL logging
-    // (the `Standard.Database.Connection` logger at INFO) covers a plain `Database.connect` as well
-    // as a data link. With the logger at its default `warn`, each statement costs one discarded log
-    // call. Code that needs the driver's own connection class must `unwrap` it (see `DuckDBUtils`).
-    var audited = partitionedProperties.audited();
-    if ("cloud".equals(audited)) {
-      runInitScript(rawConnection, initScript);
-      return new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
-    } else if (audited == null || "local".equals(audited)) {
-      var connection = new LocalAuditedConnection(rawConnection);
+      var connection = withQueryLogging(rawConnection);
       runInitScript(connection, initScript);
       return connection;
-    } else {
-      throw new IllegalArgumentException("Unknown audit mode: " + audited);
+    } catch (Throwable e) {
+      // Don't leak the connection when setting it up fails.
+      try {
+        rawConnection.close();
+      } catch (Throwable closeError) {
+        e.addSuppressed(closeError);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Every connection that is not cloud-audited logs its statements locally, so that SQL logging
+   * (the `Standard.Database.Connection` logger at INFO) covers a plain `Database.connect` as well
+   * as a data link. Code that needs the driver's own connection class must `unwrap` it (see
+   * `DuckDBUtils`).
+   *
+   * <p>Logging must never break a connection: if the wrapper can't be created, the connection is
+   * returned as it is.
+   */
+  private static Connection withQueryLogging(Connection rawConnection) {
+    try {
+      return new LocalAuditedConnection(rawConnection);
+    } catch (RuntimeException | LinkageError e) {
+      return rawConnection;
     }
   }
 

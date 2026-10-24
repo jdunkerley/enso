@@ -737,7 +737,7 @@
   "engineLogsSettingsSection": "Engine logs",
   "engineLogsSettingsCustomEntryAliases": "engine logs\nlogs\nlogging\nsql\nqueries\nperformance\ntimings",
   "logSqlQueriesSetting": "Log SQL queries",
-  "logSqlQueriesSettingDescription": "Write each SQL query run by any database connection to the engine log, under the SQL queries source of the Logs panel. Each line starts with the connection's JDBC URL, with passwords masked. Values bound to a query's parameters are not logged, but SQL you write yourself is logged as written, so take care before sharing the log.",
+  "logSqlQueriesSettingDescription": "Write each SQL query run by any database connection to the engine log, under the SQL queries source of the Logs panel. Each line starts with the connection's JDBC URL. Common ways of putting a password in the URL are masked, and values bound to a query's parameters are not logged, but SQL you write yourself is logged as written: check the log before sharing it.",
   "logPerformanceTimingsSetting": "Log performance timings",
   "logPerformanceTimingsSettingDescription": "Write how long each tracked operation took, database queries among them, to the engine log, under the Performance source of the Logs panel.",
   "engineLogsSettingsNextStart": "These take effect the next time a project's engine starts: reopen an open project to apply them.",

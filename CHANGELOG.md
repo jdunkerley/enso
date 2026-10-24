@@ -298,8 +298,8 @@
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
-  connection's URL. Only the SQL text is logged, never the values bound to a
-  query's parameters.
+  connection's URL, with common forms of a password in it masked. Only the SQL
+  text is logged, never the values bound to a query's parameters.
 - [`log_message` logs under a `User.` logger name, so the IDE can show your own
   log messages separately from the libraries'.][339]
 - [Database connections and tables can be saved as local datalinks][276]:
