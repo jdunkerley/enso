@@ -138,7 +138,14 @@ export async function mockLocalApi(page: Page) {
   /** The Recent list, newest first, as the shim's `recent.json` keeps it. */
   let recentProjects: RecentProjectEntry[] = []
   /** The sessions every local project reports, as the engine's log files would list them. */
-  const projectSessions: { projectSessionId: string; createdAt: string }[] = []
+  const projectSessions: { projectSessionId: string; createdAt: string; logFile: string }[] = []
+  /**
+   * Each session's log, as the pages its files would be read in (`archive:0`, …, then `active`).
+   * A session added without lines has one empty page.
+   */
+  const sessionPages = new Map<string, readonly (readonly string[])[]>()
+  const pageIds = (pages: readonly unknown[]) =>
+    pages.map((_, index) => (index === pages.length - 1 ? 'active' : `archive:${index}`))
   /**
    * The engine log the mock stream (`GET /api/engine-logs/stream`) serves, numbered from 1. With
    * no events the stream answers that the project is not open, and the client retries with
@@ -1114,6 +1121,22 @@ data: ${JSON.stringify(data)}
           called('listProjectSessions', { localProjectKey })
           return succeed({ sessions: projectSessions })
         }
+        case 'list-project-session-pages': {
+          const pages = sessionPages.get(cliArguments[0] ?? '') ?? [[]]
+          return succeed({ pages: pageIds(pages) })
+        }
+        case 'get-project-session-logs': {
+          const pages = sessionPages.get(cliArguments[0] ?? '') ?? [[]]
+          const index = Math.max(pageIds(pages).indexOf(cliArguments[1] ?? 'active'), 0)
+          return succeed({ scrollId: 'done', hits: pages[index] ?? [] })
+        }
+        case 'download-project-session-logs': {
+          // Any session's file: the mock engine log's file lines.
+          const lines = engineLog.events.flatMap(({ event, data }) =>
+            event === 'line' && data['source'] === 'file' ? [String(data['text'])] : [],
+          )
+          return succeed(lines.join('\n'))
+        }
         case 'filesystem-delete': {
           const path = cliArguments[0]
           if (path == null) {
@@ -1163,8 +1186,16 @@ data: ${JSON.stringify(data)}
   }
 
   /** Add a session that every local project will report. */
-  function addProjectSession(createdAt: string) {
-    projectSessions.push({ projectSessionId: `local-session-${projectSessions.length}`, createdAt })
+  /**
+   * Add a session that every local project will report, with its log as `pages` (oldest first; the
+   * last is its active file). Its id is in the local format, `localprojectsession-<key>/<name>`.
+   */
+  function addProjectSession(createdAt: string, pages: readonly (readonly string[])[] = [[]]) {
+    const name = `enso-language-server-mock-${projectSessions.length}`
+    const projectSessionId = `localprojectsession-mock/${name}`
+    projectSessions.push({ projectSessionId, createdAt, logFile: `/logs/mock/${name}.log` })
+    sessionPages.set(projectSessionId, pages)
+    return projectSessionId
   }
 
   /** Add an event to the mock engine log stream. */

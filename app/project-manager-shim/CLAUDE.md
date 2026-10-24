@@ -332,6 +332,14 @@ stays staged).
 
 ## Engine logs (`src/engineLogs/`)
 
+`--list-project-sessions` (`handler/filesystem.ts`) names each session's file as
+`logFile`: its active `.log`, or its lowest-numbered archive when it has only
+archives. The Logs panel reveals an earlier session's file with it.
+`--list-project-session-pages <sessionId>` lists a session's pages, oldest
+first: `archive:N` per rolled archive, then `active`. Each is a `scrollId` that
+`--get-project-session-logs` reads whole, so the viewer can read a session from
+its newest page backwards, one file at a time (`sessionLogWindow.ts`).
+
 `project/open` may carry `engineLogging`
 (`{ sqlQueries?, performanceTimings? }`, from the GUI's Settings → Local →
 Engine logs). `openProject` adds `engineLoggingArgs(engineLogging)`

@@ -34,8 +34,9 @@ const routes = [
               },
               {
                 name: 'projectLog',
-                path: 'projectLog/:id/:title',
-                component: () => import('$/components/ProjectLog.vue'),
+                // `projectId` is optional: tabs and links from before it existed still open.
+                path: 'projectLog/:id/:title/:projectId?',
+                component: () => import('$/components/SessionLogTab.vue'),
               },
               {
                 name: 'settings',

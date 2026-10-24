@@ -117,7 +117,9 @@ describe('large delete sets', () => {
     const start = performance.now()
     expect(moduleStateCovers(server, state)).toBe(true)
     expect(performance.now() - start).toBeLessThan(100)
-  })
+    // Building the 10 000 ranges above is slow on a loaded CI runner and is not what this measures,
+    // so the test gets more than vitest's default 5 s; the 100 ms bound is the actual check.
+  }, 30_000)
 })
 
 describe('control messages', () => {

@@ -1,5 +1,6 @@
 import { initAiMcpServer, initClaudeAgentIpc } from '@/ai/claudeAgent'
 import { Channel } from '@/ipc'
+import { resolveLogFileToReveal } from '@/logFileReveal'
 import * as paths from '@/paths'
 import { getLocalSecrets, getSecretsKeySource, hasRunningProjects } from '@/projectService'
 import { resetSecrets, rotateSecretsKey } from '@/secretsKey'
@@ -10,7 +11,12 @@ import electronUpdater from 'electron-updater'
 import type { DownloadUrlOptions } from 'enso-common/src/download'
 import { unlinkSync } from 'node:fs'
 import { basename, dirname, extname } from 'node:path'
-import { importProjectFromPath, isProjectBundle, isProjectRoot } from 'project-manager-shim'
+import {
+  getEngineLogDirectory,
+  importProjectFromPath,
+  isProjectBundle,
+  isProjectRoot,
+} from 'project-manager-shim'
 import BUILD_INFO from '../buildInfo'
 import { toElectronFileFilter, type FileFilter } from './fileBrowser'
 
@@ -144,6 +150,11 @@ export function initIpc(
   })
   ipcMain.on(Channel.showItemInFolder, (_event, fullPath: string) => {
     shell.showItemInFolder(fullPath)
+  })
+  ipcMain.on(Channel.showLogFileInFolder, (_event, requested: unknown) => {
+    const decision = resolveLogFileToReveal(requested, getEngineLogDirectory())
+    if (decision.ok) shell.showItemInFolder(decision.file)
+    else console.warn(`Refusing to reveal a log file (${decision.reason}):`, requested)
   })
   ipcMain.handle(
     Channel.openFileBrowser,

@@ -101,6 +101,8 @@ interface PlaceholderOverrides {
   readonly versioningUseMessage: [repository: string]
   readonly versioningBlocked: [reason: string]
   readonly engineLogsHistoryFailed: [message: string]
+  readonly engineLogsDownloadFailed: [message: string]
+  readonly engineLogsSessionUnlisted: [name: string]
   readonly engineLogsUnseenErrors: [count: number]
   readonly localVersionsStatusError: [reason: string]
   readonly versionOnCloseWarning: [title: string, warning: string]

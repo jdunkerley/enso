@@ -1065,6 +1065,7 @@ export class LocalBackend extends backend.Backend {
       projectId,
       projectSessionId: backend.ProjectSessionId(s.projectSessionId),
       createdAt: s.createdAt as backend.ProjectSession['createdAt'],
+      ...(s.logFile != null && { logFile: s.logFile }),
     }))
   }
 
@@ -1077,6 +1078,16 @@ export class LocalBackend extends backend.Backend {
       String(projectSessionId),
       params.scrollId,
     )
+  }
+
+  /**
+   * The pages of a local project session, oldest first, as `scrollId`s that
+   * {@link getProjectSessionLogs} reads one at a time: its rolled archives, then `active`.
+   */
+  async listProjectSessionPages(
+    projectSessionId: backend.ProjectSessionId,
+  ): Promise<readonly string[]> {
+    return (await this.projectManager.listProjectSessionPages(String(projectSessionId))).pages
   }
 
   /**
