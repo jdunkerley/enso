@@ -90,9 +90,15 @@ engines of projects opened while it is on (`engineLoggingArgs` in
 it:
 
 - **Log SQL queries**: `Standard.Database.Connection` at `info`. The engine's
-  configs set it to `warn`, so the queries are not logged otherwise. Only
-  connections opened from a data link are audited (`LocalAuditedConnection`);
-  others log no queries.
+  configs set it to `warn`, so the queries are not logged otherwise. Every
+  connection the Database library opens, data link or not, is wrapped in a
+  `LocalAuditedConnection` (`JDBCProxy`), which logs each statement as
+  `<jdbc url> - <operation>: <sql>`: the SQL text only, with prepared
+  statements' `?` placeholders rather than their bound values, and with any
+  password-like part of the URL replaced by `***`. A cloud-audited connection (a
+  data link opened while signed in to Enso Cloud) is wrapped in a
+  `CloudAuditedConnection` instead and logs nothing locally. Code that needs a
+  driver's own connection class must `unwrap` it, as `DuckDBUtils` does.
 - **Log performance timings**: `Standard.Base.Logging.Progress` at `debug` (see
   [Progress and Profiling](#progress-and-profiling)).
 

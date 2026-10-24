@@ -13,6 +13,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Savepoint;
+import java.sql.ShardingKey;
 import java.sql.Statement;
 import java.sql.Struct;
 import java.util.Map;
@@ -343,6 +344,41 @@ abstract class AuditedConnection implements Connection {
   @Override
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
     return underlying.isWrapperFor(iface);
+  }
+
+  // The methods below have default implementations in `Connection`. They are delegated so that the
+  // wrapper behaves exactly like the driver's own connection.
+
+  @Override
+  public void beginRequest() throws SQLException {
+    underlying.beginRequest();
+  }
+
+  @Override
+  public void endRequest() throws SQLException {
+    underlying.endRequest();
+  }
+
+  @Override
+  public boolean setShardingKeyIfValid(
+      ShardingKey shardingKey, ShardingKey superShardingKey, int timeout) throws SQLException {
+    return underlying.setShardingKeyIfValid(shardingKey, superShardingKey, timeout);
+  }
+
+  @Override
+  public boolean setShardingKeyIfValid(ShardingKey shardingKey, int timeout) throws SQLException {
+    return underlying.setShardingKeyIfValid(shardingKey, timeout);
+  }
+
+  @Override
+  public void setShardingKey(ShardingKey shardingKey, ShardingKey superShardingKey)
+      throws SQLException {
+    underlying.setShardingKey(shardingKey, superShardingKey);
+  }
+
+  @Override
+  public void setShardingKey(ShardingKey shardingKey) throws SQLException {
+    underlying.setShardingKey(shardingKey);
   }
 
   private class AuditedPreparedStatementImpl extends AuditedPreparedStatement {

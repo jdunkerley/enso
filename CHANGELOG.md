@@ -22,10 +22,10 @@
   Engine, Libraries and User log messages. The error badge counts errors in the
   log, not the engine's console output.][339]
 - [SQL queries and performance timings in the Logs tab, when you want them:
-  Settings → Local → Engine logs can log the SQL queries of data-link database
-  connections and how long each operation (each query among them) took, from the
-  next time a project opens. The Logs tab then offers SQL queries and
-  Performance tickboxes. SQL queries are no longer logged otherwise.][342]
+  Settings → Local → Engine logs can log the SQL queries of database connections
+  and how long each operation (each query among them) took, from the next time a
+  project opens. The Logs tab then offers SQL queries and Performance tickboxes.
+  SQL queries are no longer logged otherwise.][342]
 - Table views no longer require an AG Grid Enterprise license to work. When no
   `AG_GRID_LICENSE_KEY` is configured, the grid now loads AG Grid Community and
   provides its own equivalents for the Enterprise features the IDE uses —
@@ -295,6 +295,11 @@
 
 #### Enso Standard Library
 
+- [Every database connection can log its SQL queries][NNN], not only one opened
+  from a data link: with the `Standard.Database.Connection` logger at `info`
+  (the IDE's Log SQL queries setting), each statement is logged with the
+  connection's URL. Only the SQL text is logged, never the values bound to a
+  query's parameters.
 - [`log_message` logs under a `User.` logger name, so the IDE can show your own
   log messages separately from the libraries'.][339]
 - [Database connections and tables can be saved as local datalinks][276]:
@@ -337,6 +342,7 @@
 [279]: https://github.com/jdunkerley/enso/pull/279
 [339]: https://github.com/jdunkerley/enso/pull/339
 [342]: https://github.com/jdunkerley/enso/pull/342
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 [69]: https://github.com/jdunkerley/enso/pull/69
 [70]: https://github.com/jdunkerley/enso/pull/70
 [71]: https://github.com/jdunkerley/enso/pull/71

@@ -68,6 +68,11 @@ add_specs suite_builder =
             connect.schemas.should_contain "main"
             connect.schemas.should_contain "information_schema"
 
+        # The connection is wrapped to log its queries, so `DuckDBUtils` has
+        # to unwrap the driver's own connection.
+        group_builder.specify "Report the DuckDB version" <|
+            connect.version.starts_with "v" . should_be_true
+
     suite_builder.group "DuckDB_Appender" group_builder->
         connect = Database.connect DuckDB.In_Memory
         connect.drop_table "test_table" if_exists=True

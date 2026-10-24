@@ -129,6 +129,26 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
     slf4j_logging_prj -> File =
         slf4j_logging_prj_lazy.get
 
+    sql_logging_prj_lazy = Ref.new lazy=True <|
+        prj_dir = tmp_root / "sql_logging"
+        prj_dir.create_directory
+
+        Enso_Bin_Utils.create_new_project prj_dir "logging_demo" """
+            from Standard.Base import all
+            from Standard.Table import Table
+            from Standard.Database import all
+
+            main secret="no-secret" =
+                connection = Database.connect SQLite.In_Memory
+                connection.read (SQL_Query.Raw_SQL "SELECT 42 AS answer") . row_count . to_text . print
+                in_memory = Table.new [["name", ["a", secret]]]
+                db_table = in_memory.select_into_database_table connection "logged_table" temporary=True primary_key=Nothing
+                db_table.filter "name" (..Equal secret) . read . row_count . to_text . print
+                connection.close
+
+    sql_logging_prj -> File =
+        sql_logging_prj_lazy.get
+
     perform_logging prj_dir:File (args:Vector Text)-> Pair Text Text =
         logs_random = "logs-" + Random.uuid
         logs_dir = prj_dir / logs_random
@@ -315,6 +335,21 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
         console_log . not_contains_line "INFO.*Pozdrawiam"
         console_log . contains_line "WARN.*java.lang.IllegalStateException.*WARN.*:.*Pozdrawiam"
         console_log . contains_line "ERROR.*java.lang.IllegalStateException.*ERROR.*:.*Pozdrawiam"
+
+    group_builder.specify "SQL queries of a plain database connection are not logged by default" <|
+        pair = perform_logging sql_logging_prj ["Geheim1"]
+        log = pair.first + pair.second
+
+        log . not_contains_line "jdbc:sqlite::memory: - "
+
+    group_builder.specify "SQL queries of a plain database connection are logged at info when asked for" <|
+        pair = perform_logging sql_logging_prj ["--vm.D", "Standard.Database.Connection.Logger.level=info", "Geheim2"]
+        log = pair.first
+
+        log . contains_line "INFO.*Standard\.Database\.Connection.*jdbc:sqlite::memory: - query: SELECT 42 AS answer"
+        log . contains_line "INFO.*Standard\.Database\.Connection.*jdbc:sqlite::memory: - .*logged_table"
+        # Values bound to a query's parameters are never logged.
+        log . not_contains_line "Standard\.Database\.Connection.*Geheim2"
 
 Text.contains_line self regex:Text =
     r = Regex.compile regex

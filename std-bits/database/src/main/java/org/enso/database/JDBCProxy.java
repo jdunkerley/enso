@@ -70,20 +70,29 @@ public final class JDBCProxy {
       rawConnection.setSchema(schema);
     }
 
-    // Run the initialization script if provided.
-    if (initScript != null && !initScript.isEmpty()) {
-      rawConnection.createStatement().executeUpdate(initScript);
+    // Every connection that is not cloud-audited logs its statements locally, so that SQL logging
+    // (the `Standard.Database.Connection` logger at INFO) covers a plain `Database.connect` as well
+    // as a data link. With the logger at its default `warn`, each statement costs one discarded log
+    // call. Code that needs the driver's own connection class must `unwrap` it (see `DuckDBUtils`).
+    var audited = partitionedProperties.audited();
+    if ("cloud".equals(audited)) {
+      runInitScript(rawConnection, initScript);
+      return new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
+    } else if (audited == null || "local".equals(audited)) {
+      var connection = new LocalAuditedConnection(rawConnection);
+      runInitScript(connection, initScript);
+      return connection;
+    } else {
+      throw new IllegalArgumentException("Unknown audit mode: " + audited);
     }
+  }
 
-    return switch (partitionedProperties.audited()) {
-      case "local" -> new LocalAuditedConnection(rawConnection);
-      case "cloud" ->
-          new CloudAuditedConnection(rawConnection, partitionedProperties.getRelatedAssetId());
-      case null -> rawConnection;
-      default ->
-          throw new IllegalArgumentException(
-              "Unknown audit mode: " + partitionedProperties.audited());
-    };
+  private static void runInitScript(Connection connection, String initScript) throws SQLException {
+    if (initScript != null && !initScript.isEmpty()) {
+      try (var statement = connection.createStatement()) {
+        statement.executeUpdate(initScript);
+      }
+    }
   }
 
   private static final String ENSO_PROPERTY_PREFIX = "enso.internal.";
