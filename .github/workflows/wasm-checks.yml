@@ -56,9 +56,11 @@ jobs:
         name: Clean before
         run: corepack pnpm run git-clean --verbose
       - name: Installing wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          version: v0.12.1
+        # Straight from the release, not jetli/wasm-pack-action: on the Node 24
+        # runtime its move from /tmp into ~/.cargo/bin fails with EXDEV.
+        run: >-
+          curl -sSfL https://github.com/rustwasm/wasm-pack/releases/download/v0.12.1/wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz
+          | tar -xz --strip-components=1 -C ~/.cargo/bin wasm-pack-v0.12.1-x86_64-unknown-linux-musl/wasm-pack
       - run: WASM_BINDGEN_TEST_TIMEOUT=300 wasm-pack test --headless --firefox lib/rust/parser
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
