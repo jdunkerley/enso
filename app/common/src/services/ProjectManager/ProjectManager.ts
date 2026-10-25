@@ -1,7 +1,7 @@
 /**
  * @file This module defines the Project Manager endpoint.
  * @see
- * https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Project-Manager
+ * https://github.com/jdunkerley/enso/wiki/Project-Manager-Shim
  */
 import * as dateTime from '../../utilities/data/dateTime.js'
 import { omit } from '../../utilities/data/object.js'
