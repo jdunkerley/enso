@@ -1,5 +1,5 @@
 /**
- * @file The release's name and notes: a port of `build_tools/build/src/release.rs`
+ * @file The release's name and notes: a port of the retired build CLI's `release.rs`
  * (`generate_release_body`, `release-body.md`) and `changelog.rs` (`top_release_notes`). Two
  * deliberate differences: the notes are not HTML-escaped (Handlebars' `{{changelog}}` turned every
  * backtick, quote and `<kbd>` into an entity, which GitHub then showed literally), and the

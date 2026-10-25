@@ -1,6 +1,7 @@
 /**
- * @file How each test project runs (`build_tools/build/src/enso.rs` `run_tests`): the launcher's
- * arguments and the environment, exactly as `./run` built them (the CI logs show the command lines).
+ * @file How each test project runs (the retired build CLI's `enso.rs` `run_tests`): the launcher's
+ * arguments and the environment, exactly as the retired build CLI built them (the CI logs show the
+ * command lines).
  */
 import path from 'node:path'
 import type { Suite } from './suites.ts'
@@ -55,10 +56,10 @@ export const SERVICE_VARIABLES = [
 ] as const
 
 /**
- * The tests' environment. On top of `base`: `./run`'s variables (`JAVA_TOOL_OPTIONS` is set, not
- * appended to), and without the service variables that are empty. Enso's `Environment.get` reads
- * an empty variable as `""`, not `Nothing`, which would turn a skipped database group into a
- * failing one.
+ * The tests' environment. On top of `base`: the retired build CLI's variables (`JAVA_TOOL_OPTIONS`
+ * is set, not appended to), and without the service variables that are empty. Enso's
+ * `Environment.get` reads an empty variable as `""`, not `Nothing`, which would turn a skipped
+ * database group into a failing one.
  */
 export function testEnvironment(inputs: TestEnvironmentInputs): Record<string, string> {
   const env: Record<string, string> = {}
@@ -91,8 +92,8 @@ export function testEnvironment(inputs: TestEnvironmentInputs): Record<string, s
 }
 
 /**
- * Warnings for a Linux run that `./run` would have given a database and that has none: the
- * database groups would be skipped silently, and the job would stay green.
+ * Warnings for a Linux run that the retired build CLI would have given a database and that has
+ * none: the database groups would be skipped silently, and the job would stay green.
  */
 export function missingServiceWarnings(
   projects: readonly string[],

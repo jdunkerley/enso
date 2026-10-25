@@ -1,8 +1,9 @@
 /**
  * @file The HTTP test helper (`tools/http-test-helper`, our own server with the Enso Cloud mocks;
- * no public httpbin image will do), started as `./run` started it (`build_tools/build/src/
- * httpbin.rs`): `sbt "http-test-helper/run localhost <free port>"`, ready once the port accepts a
- * connection (at most 180 s), and stopped with everything it started afterwards.
+ * no public httpbin image will do), started as the retired build CLI started it
+ * (the retired build CLI's `httpbin.rs`): `sbt "http-test-helper/run localhost <free port>"`, ready
+ * once the port accepts a connection (at most 180 s), and stopped with everything it started
+ * afterwards.
  */
 import type { ChildProcess } from 'node:child_process'
 import { createConnection, createServer } from 'node:net'
@@ -59,7 +60,7 @@ export async function waitUntilReady(
 
 /** A running HTTP test helper. */
 export interface Httpbin {
-  /** `ENSO_HTTP_TEST_HTTPBIN_URL`, with the trailing slash `./run`'s URL had. */
+  /** `ENSO_HTTP_TEST_HTTPBIN_URL`, with the trailing slash the retired build CLI's URL had. */
   readonly url: string
   readonly stop: () => void
 }

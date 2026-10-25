@@ -6,10 +6,10 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
 import { invocation, runInherited } from './repo.ts'
 
-/** What `./run` set on every sbt process. */
+/** What the retired build CLI set on every sbt process. */
 export const SBT_ENV = { LC_ALL: 'C.UTF-8', SBT_SERVER_FORCESTART: 'true' } as const
 
-/** `./run`'s sbt arguments around one command string. */
+/** The retired build CLI's sbt arguments around one command string. */
 export function sbtArguments(command: string): string[] {
   return ['-Dbench.compileOnly=false', '-Dsbt.server.autostart=false', command]
 }

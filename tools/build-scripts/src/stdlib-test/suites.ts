@@ -1,7 +1,7 @@
 /**
- * @file The standard-library test suites: `./run backend test <suite>` (`build_tools/cli/src/lib.rs`,
- * `engine.rs` `StandardLibraryTestsSelection`), with the same names, so the workflows' matrices do
- * not change.
+ * @file The standard-library test suites: the retired build CLI's `backend test <suite>` (the
+ * retired build CLI's `lib.rs`, `engine.rs` `StandardLibraryTestsSelection`), with the same names,
+ * so the workflows' matrices do not change.
  */
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
@@ -22,7 +22,7 @@ export interface Suite {
 
 const NOT_SEPARATE = ['Microsoft_Tests', 'AWS_Tests']
 
-/** The suites `./run backend test` knew. */
+/** The suites the retired build CLI's `backend test` knew. */
 export const SUITES: Readonly<Record<string, Suite>> = {
   'standard-library': { deny: NOT_SEPARATE, smallJdk: true, nativeRunner: true },
   'standard-library-in-native': { deny: NOT_SEPARATE, smallJdk: false, nativeRunner: true },
@@ -55,7 +55,7 @@ export const SUITES: Readonly<Record<string, Suite>> = {
   },
 }
 
-/** `./run`'s aliases. */
+/** The retired build CLI's aliases. */
 const ALIASES: Readonly<Record<string, string>> = {
   stdlib: 'standard-library',
   'stdlib-native': 'standard-library-in-native',
@@ -115,8 +115,8 @@ export function selectProjects(
 }
 
 /**
- * The AWS suite without credentials: `./run` warned and succeeded, before starting any service. Only
- * the dedicated suite (exactly `AWS_Tests`) is skipped this way.
+ * The AWS suite without credentials: the retired build CLI warned and succeeded, before starting
+ * any service. Only the dedicated suite (exactly `AWS_Tests`) is skipped this way.
  */
 export function skipsForMissingAwsCredentials(
   suite: Suite,

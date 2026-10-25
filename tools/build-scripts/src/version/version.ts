@@ -1,9 +1,9 @@
 /**
- * @file The Enso version: a port of `build_tools/build/src/version.rs`, `version/promote.rs` and
- * `version/nightly.rs`. `ENSO_VERSION` wins when it is a valid version; otherwise a build is
- * `<next stable>-dev`, where the next stable follows `latest-release` in `build-config.yaml` (or,
- * without that key, the repository's remote tags). `generateVersion` also covers the nightly, rc,
- * stable and patch designations, which Phase 4's `promote` uses.
+ * @file The Enso version: a port of the retired build CLI's `version.rs`, `version/promote.rs` and
+ * `version/nightly.rs`. `ENSO_VERSION` wins when it is a valid version; otherwise a build is `<next
+ * stable>-dev`, where the next stable follows `latest-release` in `build-config.yaml` (or, without
+ * that key, the repository's remote tags). `generateVersion` also covers the nightly, rc, stable
+ * and patch designations, which Phase 4's `promote` uses.
  */
 import semver from 'semver'
 import { parse as parseYaml } from 'yaml'
@@ -264,8 +264,8 @@ export interface VersionInputs {
 
 /**
  * `version::deduce_or_generate`. A valid `ENSO_VERSION` wins; an empty or invalid one is ignored,
- * silently, as `./run` did. When it wins, a set `ENSO_EDITION` (even an empty one) must equal it.
- * `ENSO_RELEASE_MODE` is never read: it follows from the version.
+ * silently, as the retired build CLI did. When it wins, a set `ENSO_EDITION` (even an empty one)
+ * must equal it. `ENSO_RELEASE_MODE` is never read: it follows from the version.
  */
 export function deduceOrGenerate(inputs: VersionInputs): Versions {
   const fromEnv = parseVersion(inputs.env.ENSO_VERSION ?? '')
@@ -282,7 +282,7 @@ export function deduceOrGenerate(inputs: VersionInputs): Versions {
 
 /**
  * `latest-release` from `build-config.yaml`, or `null` when the key is absent. An invalid value is
- * an error, as it failed `./run`'s whole configuration load.
+ * an error, as it failed the retired build CLI's whole configuration load.
  */
 export function latestReleaseFromConfig(configText: string): Version | null {
   const config: unknown = parseYaml(configText)
@@ -300,7 +300,7 @@ export function latestReleaseFromConfig(configText: string): Version | null {
 
 /**
  * The versions among the tags that `git ls-remote --tags origin` printed. A tag that is not strict
- * SemVer is skipped; a line that is not `<hash> <ref>` fails, as in `./run`.
+ * SemVer is skipped; a line that is not `<hash> <ref>` fails, as in the retired build CLI.
  */
 export function parseLsRemoteTags(stdout: string): Version[] {
   const found = new Map<string, Version>()

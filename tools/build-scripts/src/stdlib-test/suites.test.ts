@@ -41,7 +41,7 @@ test('discovery finds every *_Tests project with a package.yaml', () => {
   expect(found).toEqual([...found].sort())
 })
 
-describe('selection, as ./run selected', () => {
+describe('selection', () => {
   test('both standard-library suites run 15 projects: all but Microsoft and AWS', () => {
     for (const name of ['standard-library', 'standard-library-in-native']) {
       const selected = selectProjects(PROJECTS, suiteNamed(name).suite)

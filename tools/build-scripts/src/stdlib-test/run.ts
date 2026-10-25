@@ -1,10 +1,10 @@
 /**
- * @file `stdlib-test`: runs a standard-library test suite against a built engine package, as
- * `./run backend test <suite>` did (`build_tools/build/src/enso.rs` `run_tests`): each selected
- * `test/*_Tests` project in turn with `enso --no-ir-caches --run`, every one even after a failure,
- * then one `::error` naming the failures. The caller provides the engine package (the build job's
- * download), the small JDK for the JVM suite, and the databases (service containers in CI); the
- * runner starts the HTTP test helper itself.
+ * @file `stdlib-test`: runs a standard-library test suite against a built engine package, as the
+ * retired build CLI's `backend test <suite>` did (the retired build CLI's `enso.rs` `run_tests`):
+ * each selected `test/*_Tests` project in turn with `enso --no-ir-caches --run`, every one even
+ * after a failure, then one `::error` naming the failures. The caller provides the engine package
+ * (the build job's download), the small JDK for the JVM suite, and the databases (service
+ * containers in CI); the runner starts the HTTP test helper itself.
  */
 import path from 'node:path'
 import { ensoBinary } from '../lib/engine.ts'
@@ -25,7 +25,10 @@ import {
   unselectedNames,
 } from './suites.ts'
 
-/** The cloud credentials with which `./run` logged in to Enso Cloud (`cloud_tests/env.rs`). */
+/**
+ * The cloud credentials with which the retired build CLI logged in to Enso Cloud
+ * (`cloud_tests/env.rs`).
+ */
 export const CLOUD_VARIABLES = [
   'ENSO_CLOUD_TEST_ACCOUNT_USERNAME',
   'ENSO_CLOUD_TEST_ACCOUNT_PASSWORD',

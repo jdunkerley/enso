@@ -2,7 +2,7 @@
   "name": "build-scripts",
   "version": "0.0.0",
   "private": true,
-  "description": "The build logic that needs more than one tool: ide-local, version, toolchain-check and the CI commands.",
+  "description": "The build logic: version, toolchain-check, the IDE builds and the CI commands.",
   "type": "module",
   "scripts": {
     "version": "node src/commands/version.ts",

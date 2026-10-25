@@ -1,4 +1,7 @@
-/** @file The command lines and environment, against the ones `./run` logged in CI (run 39666057183). */
+/**
+ * @file The command lines and environment, against the ones the retired build CLI logged in CI
+ * (run 39666057183).
+ */
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {

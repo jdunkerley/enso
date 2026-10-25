@@ -1,13 +1,13 @@
 /**
- * @file `stdlib-api-check`: a port of `RunContext::stdlib_api_check` (`build_tools/build/src/engine/
- * context.rs`). For each standard library with a `docs/api` directory, the built engine regenerates
- * the API docs in the engine package (`enso --docs api --in-project <lib>`), and `git diff
- * --no-index` compares them with the committed ones. The first library that differs fails the
- * check, with `./run`'s messages.
+ * @file `stdlib-api-check`: a port of `RunContext::stdlib_api_check`
+ * (the retired build CLI's `context.rs`). For each standard library with a `docs/api`
+ * directory, the built engine regenerates the API docs in the engine package (`enso --docs api
+ * --in-project <lib>`), and `git diff --no-index` compares them with the committed ones. The first
+ * library that differs fails the check, with the retired build CLI's messages.
  *
- * One deliberate difference: `./run` read any non-zero `git diff` status as "the API changed". Here
- * only status 1 is; any other (128 for a bad path, -1 when git cannot start) is an error that
- * carries git's stderr, rather than an "API changed" report with an empty diff.
+ * One deliberate difference: the retired build CLI read any non-zero `git diff` status as "the API
+ * changed". Here only status 1 is; any other (128 for a bad path, -1 when git cannot start) is an
+ * error that carries git's stderr, rather than an "API changed" report with an empty diff.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -17,7 +17,7 @@ export const SOURCE_VERSION = '0.0.0-dev'
 
 /**
  * The libraries under `stdlibRoot` (`distribution/lib/Standard`) that have a committed API, sorted.
- * A library without a `0.0.0-dev` directory is an error, as in `./run`.
+ * A library without a `0.0.0-dev` directory is an error, as in the retired build CLI.
  */
 export function librariesWithApi(stdlibRoot: string): string[] {
   const libraries: string[] = []
@@ -31,7 +31,10 @@ export function librariesWithApi(stdlibRoot: string): string[] {
   return libraries
 }
 
-/** `./run`'s report for a library whose API changed. Paths are relative to the repository. */
+/**
+ * The retired build CLI's report for a library whose API changed. Paths are relative to the
+ * repository.
+ */
 export function failureLines(
   library: string,
   diff: string,

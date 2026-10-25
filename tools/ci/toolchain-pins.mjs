@@ -64,8 +64,8 @@ export const TOOLCHAIN_PINS = [
     pattern: /^\s*val graalMavenPackagesVersion\s*=\s*"([^"]+)"/m,
   },
   {
-    // The standalone GraalPy that `test/Examples_Tests` probes for; `./run` installed it at the
-    // Maven packages' version.
+    // The standalone GraalPy that `test/Examples_Tests` probes for; the retired build CLI installed
+    // it at the Maven packages' version.
     pin: 'graalpy',
     name: 'graalMavenPackagesVersion',
     file: 'project/Dependencies.scala',

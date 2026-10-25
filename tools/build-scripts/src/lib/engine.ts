@@ -1,7 +1,7 @@
 /**
  * @file Finding the engine package that `sbt buildEngineDistribution` built (or that a CI job
  * downloaded): `built-distribution/enso-engine-<version>-<os>-<arch>/enso-<version>`, the path
- * sbt's `engineDistributionRoot` and `./run`'s `paths.yaml` both name.
+ * sbt's `engineDistributionRoot` and the retired build CLI's `paths.yaml` both name.
  */
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'

@@ -1,6 +1,7 @@
 /**
- * @file `release <action>`: the release workflow's steps, as `./run release …` and `./run ide
- * upload` ran them. Every action talks to GitHub with `GITHUB_TOKEN`, about `GITHUB_REPOSITORY`.
+ * @file `release <action>`: the release workflow's steps, as the retired build CLI's `release …`
+ * and the retired build CLI's `ide upload` ran them. Every action talks to GitHub with
+ * `GITHUB_TOKEN`, about `GITHUB_REPOSITORY`.
  *
  * - `create-draft` — drafts release `ENSO_VERSION` at `GITHUB_SHA`, with the notes from
  *   `CHANGELOG.md`; publishes `ENSO_RELEASE_ID` and the version triple.
@@ -43,7 +44,7 @@ import {
 const USAGE =
   'Usage: release create-draft | upload-ide | publish | promote <stable|patch|rc|nightly> | update-latest-version'
 
-/** The version triple, under the names `./run` published. */
+/** The version triple, under the names the retired build CLI published. */
 function versionValues(version: Version): Record<string, string> {
   return {
     ENSO_VERSION: version.text,

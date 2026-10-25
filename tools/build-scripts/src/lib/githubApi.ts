@@ -1,10 +1,10 @@
 /**
  * @file A small client for GitHub's REST API over `fetch`, for the release commands. It does what
- * `./run`'s octocrab calls did and no more: JSON requests against one repository, release-asset
- * uploads (`uploads.github.com`), and checking that a download URL answers. Plain `fetch` rather
- * than Octokit (a new dependency) or `gh`: `gh release upload` finds a release by its tag, and
- * after a re-run two drafts can share one, so the upload must name the draft by id; and the
- * commands need the content type, the retry and the replacement rules in their own hands.
+ * the retired build CLI's octocrab calls did and no more: JSON requests against one repository,
+ * release-asset uploads (`uploads.github.com`), and checking that a download URL answers. Plain
+ * `fetch` rather than Octokit (a new dependency) or `gh`: `gh release upload` finds a release by
+ * its tag, and after a re-run two drafts can share one, so the upload must name the draft by id;
+ * and the commands need the content type, the retry and the replacement rules in their own hands.
  */
 import { readFileSync } from 'node:fs'
 
