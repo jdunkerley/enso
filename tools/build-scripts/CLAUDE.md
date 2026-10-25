@@ -32,10 +32,11 @@ that Node runs as it is (type stripping): each command is
   `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
   Visual Studio developer prompt, which it checks), the bundle copied to
   `dist/backend`, `pnpm install`, `build:gui` into `dist/gui`, then
-  `ide-build`'s packaging into `dist/ide`. It replaces `dist/backend`,
-  `dist/gui` and `dist/ide` every time, so it never reuses an old engine bundle;
-  the engine itself builds incrementally (`sbt clean` first for a clean one). It
-  starts sbt, so it never runs in CI.
+  `ide-build`'s packaging into `dist/ide`. It deletes `dist/backend`, `dist/gui`
+  and `dist/ide` when it starts, so it never reuses an old engine bundle and a
+  failed run leaves no earlier installer behind; the engine itself builds
+  incrementally (`sbt clean` first for a clean one). It starts sbt, so it never
+  runs in CI.
 - `stdlib-test <suite>` — what `./run backend test <suite>` did: each selected
   `test/*_Tests` project in turn, `enso --no-ir-caches --run`, with `./run`'s
   arguments and environment (`src/stdlib-test/invocation.ts`), then one
