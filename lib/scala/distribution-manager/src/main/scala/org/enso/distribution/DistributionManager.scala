@@ -10,7 +10,7 @@ import java.nio.file.{Files, Path}
 import scala.util.Try
 import scala.util.control.NonFatal
 
-/** Gathers filesystem paths used by the runner and the version managers.
+/** Gathers filesystem paths used by the runner, the language server and the version managers.
   *
   * @param dataRoot the root of the data directory; for a portable distribution
   *                 this is the root of the distribution, for a locally

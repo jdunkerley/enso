@@ -210,8 +210,8 @@ jobs:
 
   # Note [The JVM Test Steps]
   # =========================
-  # The steps are what the retired build CLI's `backend test jvm` ran (its
-  # `context.rs`), in its order, each sbt call as the retired build CLI made it (`LC_ALL=C.UTF-8
+  # The steps are what the retired build CLI's `backend test jvm` ran (its `context.rs`), in its
+  # order, each sbt call as the retired build CLI made it (`LC_ALL=C.UTF-8
   # SBT_SERVER_FORCESTART=true sbt -Dbench.compileOnly=<…> -Dsbt.server.autostart=false "<tasks>"`),
   # at the build job's version, from which sbt names the downloaded distribution. Its traps, kept on
   # purpose:
