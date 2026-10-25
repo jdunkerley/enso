@@ -23,12 +23,12 @@ settings. Every workflow is hand-written YAML (build simplification;
   `promote.yml` (by hand, or from `nightly.yml`'s daily cron) computes the
   version and calls `release.yml`, which drafts the release, builds and uploads
   the installers and publishes it with `tools/build-scripts`' `release` command
-  (Note [Release Without ./run] in `release.yml`). Change them only together
-  with an rc release test. `engine-checks-nightly.yml` (by hand) adds macOS and
-  Oracle GraalVM to the engine checks, `extra-nightly-tests.yml` (by hand) the
-  suites that need the Snowflake and Enso Cloud secrets, and `macos-checks.yml`
-  the self-hosted Mac's checks for `macos-pull-request.yml`; all three call
-  `engine-checks-platform.yml`.
+  (Note [Where The Release Logic Lives] in `release.yml`). Change them only
+  together with an rc release test. `engine-checks-nightly.yml` (by hand) adds
+  macOS and Oracle GraalVM to the engine checks, `extra-nightly-tests.yml` (by
+  hand) the suites that need the Snowflake and Enso Cloud secrets, and
+  `macos-checks.yml` the self-hosted Mac's checks for `macos-pull-request.yml`;
+  all three call `engine-checks-platform.yml`.
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
   — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
   their `name:`; keep those names.

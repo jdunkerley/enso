@@ -11,7 +11,10 @@ import {
   type Versions,
 } from './version.ts'
 
-/** The versions among `origin`'s tags: `./run`'s fallback when `latest-release` is absent. */
+/**
+ * The versions among `origin`'s tags: the retired build CLI's fallback when `latest-release` is
+ * absent.
+ */
 function remoteReleases(): Version[] {
   const result = capture('git', ['ls-remote', '--tags', 'origin'])
   if (result.status !== 0) {
@@ -22,8 +25,8 @@ function remoteReleases(): Version[] {
 
 /**
  * The version a build of this checkout gets: `ENSO_VERSION` when valid, else `<next stable>-dev`
- * after `latest-release` in `build-config.yaml` (read on every call; `./run` compiled it in), or
- * after `origin`'s tags when that key is absent.
+ * after `latest-release` in `build-config.yaml` (read on every call; the retired build CLI compiled
+ * it in), or after `origin`'s tags when that key is absent.
  */
 export function repositoryVersions(
   env: NodeJS.ProcessEnv = process.env,

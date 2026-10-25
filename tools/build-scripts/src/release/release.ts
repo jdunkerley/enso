@@ -1,8 +1,8 @@
 /**
- * @file The release operations: a port of `build_tools/build/src/release.rs` (`draft_a_new_release`,
- * `publish_release`, `validate_release`, `update_latest_release_version`,
- * `resolve_version_designation`) and of `./run ide upload`'s upload half
- * (`build_tools/cli/src/lib.rs` `upload_ide_assets`). Deliberate differences, each named where it
+ * @file The release operations: a port of the retired build CLI's `release.rs`
+ * (`draft_a_new_release`, `publish_release`, `validate_release`, `update_latest_release_version`,
+ * `resolve_version_designation`) and of the retired build CLI's `ide upload`'s upload half (the
+ * retired build CLI's `lib.rs` `upload_ide_assets`). Deliberate differences, each named where it
  * happens: the release version must be given (no silent `-dev` fallback), no `assets.json`, the
  * draft is edited and published in one call, a draft with a half-written asset is not published,
  * and an upload replaces same-named assets on a draft but never touches a published release's.
@@ -224,16 +224,16 @@ async function leftoverAsset(
 }
 
 /**
- * Uploads `files` to release `id`, each retried as `./run` retried it (five more times, 0.5 s
- * growing by half).
+ * Uploads `files` to release `id`, each retried as the retired build CLI retried it (five more
+ * times, 0.5 s growing by half).
  *
  * - On a draft, an asset of the same name is replaced: one left by an earlier run of the job
  *   before the upload, and the half-written one a failed attempt leaves before each retry and
  *   after the last (GitHub refuses a second asset of a name).
- * - On a published release (re-running a skipped platform's jobs adds its installer, as with
- *   `./run`), nothing is ever deleted or replaced: an asset of any of the names, fully uploaded or
- *   not, stops the upload before its first file, so the release is never half-updated; one a
- *   failed attempt left stops it with an error.
+ * - On a published release (re-running a skipped platform's jobs adds its installer, as with the
+ *   retired build CLI), nothing is ever deleted or replaced: an asset of any of the names, fully
+ *   uploaded or not, stops the upload before its first file, so the release is never half-updated;
+ *   one a failed attempt left stops it with an error.
  *
  * A failure to read the release after a failed attempt is logged and the retries go on; when the
  * last attempt fails, its upload error is the final error (as the `cause` when the release could

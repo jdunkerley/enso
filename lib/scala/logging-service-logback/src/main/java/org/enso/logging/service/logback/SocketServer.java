@@ -120,7 +120,7 @@ public class SocketServer extends Thread {
   /* Note [Logging Server Listens On Loopback Only]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    * Every client of the logging server runs on the same machine: language servers
-   * and the runners the launcher spawns connect to the `localhost` URI that
+   * and the runners connect to the `localhost` URI that
    * `LoggingServer.start` hands out, or to the `localhost` default of the `socket`
    * appender's `hostname`. Nothing needs to reach it from another host, while
    * anyone who can connect can feed it log and telemetry events, which it writes

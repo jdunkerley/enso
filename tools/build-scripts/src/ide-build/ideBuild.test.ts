@@ -54,7 +54,7 @@ describe('latestBundledEngine', () => {
   })
 })
 
-test("the children's variables, as ./run set them for a PR build", () => {
+test("the children's variables for a PR build", () => {
   const variables = ideBuildVariables(
     {
       version: version('2026.1.1-dev'),

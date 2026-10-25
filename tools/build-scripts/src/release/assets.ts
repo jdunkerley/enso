@@ -1,8 +1,8 @@
 /**
- * @file The release's installers and the files that go with them: a port of
- * `build_tools/build/src/release/manifest.rs` and of `project/ide.rs`' `electron_image_filename`
- * and `Artifact::update_files`. One deliberate difference: there is no `assets.json`. Only
- * upstream's website read it; nothing in this repository does.
+ * @file The release's installers and the files that go with them: a port of the retired build CLI's
+ * `manifest.rs` and of `project/ide.rs`' `electron_image_filename` and `Artifact::update_files`.
+ * One deliberate difference: there is no `assets.json`. Only upstream's website read it; nothing in
+ * this repository does.
  */
 import path from 'node:path'
 import type { TargetOs } from '../ide-build/ideBuild.ts'
@@ -131,7 +131,10 @@ export function ideUploadFiles(
   }))
 }
 
-/** The content type an asset is uploaded with, as `./run` guessed it from the extension. */
+/**
+ * The content type an asset is uploaded with, as the retired build CLI guessed it from the
+ * extension.
+ */
 export function contentType(name: string): string {
   const extension = path.extname(name).toLowerCase()
   switch (extension) {

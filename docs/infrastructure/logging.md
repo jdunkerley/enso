@@ -373,9 +373,8 @@ No logging server listens on a well-known port: each language server hosts its
 own on a port the operating system picks (see
 [Logging server](#logging-server)). So `port` defaults to `0`, which names no
 server. A language server connects its socket appender to the port its own
-server actually bound, whatever `port` says. Anything else - the launcher with
-`ENSO_APPENDER_DEFAULT=socket`, or a language server with
-`ENSO_LOGSERVER_START=false` - has to be given the port of a running server
+server actually bound, whatever `port` says. Anything else - a language server
+with `ENSO_LOGSERVER_START=false` - has to be given the port of a running server
 through `$ENSO_LOGSERVER_PORT`; without one it logs locally and warns that it
 does.
 

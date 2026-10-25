@@ -1,8 +1,9 @@
 /**
  * @file `junit-compare <old dir> <new dir> [--allow Project]...`: the side-by-side check for moving
- * the standard-library tests off `./run`. Both directories hold `<project>/JUnit.xml`. It prints a
- * Markdown table, and exits 1 when a project is missing on one side or its pass, fail or skip
- * count differs, unless the project is `--allow`ed (a documented flake).
+ * the standard-library tests off the retired build CLI. Both directories hold
+ * `<project>/JUnit.xml`. It prints a Markdown table, and exits 1 when a project is missing on one
+ * side or its pass, fail or skip count differs, unless the project is `--allow`ed (a documented
+ * flake).
  *
  *     corepack pnpm --silent --filter build-scripts run junit-compare -- old/ new/
  */

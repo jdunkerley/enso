@@ -8,16 +8,16 @@ import scala.sys.process._
 /** Parses every `.enso` file under `distribution/lib` and `test` with the Rust parser's
   * `check_syntax` tool, and fails on any syntax error or warning.
   *
-  * This is what `./run libraries check-syntax` ran
-  * (`build_tools/build/src/rust/enso_linter.rs`): `cargo run -p enso-parser-debug --bin
-  * check_syntax --release -- <files>`, which prints `E <path> <line>:<col>-<line>:<col>: <message>`
-  * (or `W …` for a warning) to stderr and exits 1 when any file has a message. The same files, the
-  * same tool and the same rules, so errors and warnings both fail.
+  * This is what the retired build CLI's `libraries check-syntax` ran (the retired build CLI's
+  * `enso_linter.rs`): `cargo run -p enso-parser-debug --bin check_syntax --release -- <files>`,
+  * which prints `E <path> <line>:<col>-<line>:<col>: <message>` (or `W …` for a warning) to stderr
+  * and exits 1 when any file has a message. The same files, the same tool and the same rules, so
+  * errors and warnings both fail.
   *
   * Two differences, both for Windows developers: the file list goes in batches of at most
   * [[MaxArgumentChars]] characters, since ~1,000 absolute paths are far over Windows' 32,767
-  * character command line (`./run` only ever ran it on Linux); and the exit code is checked here
-  * rather than through [[Cargo.run]], which only logs a failure.
+  * character command line (the retired build CLI only ever ran it on Linux); and the exit code is
+  * checked here rather than through [[Cargo.run]], which only logs a failure.
   */
 object EnsoSyntaxCheck {
 
@@ -27,7 +27,9 @@ object EnsoSyntaxCheck {
   private val Summary =
     """Errors or warnings found in (\d+) files""".r.unanchored
 
-  /** The `.enso` files `./run` checked: everything under `distribution/lib` and `test`, sorted. */
+  /** The `.enso` files the retired build CLI checked: everything under `distribution/lib` and
+    * `test`, sorted.
+    */
   def files(repoRoot: File): Seq[File] =
     Seq(repoRoot / "distribution" / "lib", repoRoot / "test").flatMap { dir =>
       if (!dir.exists()) Seq()

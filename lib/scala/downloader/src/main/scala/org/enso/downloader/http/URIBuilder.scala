@@ -4,8 +4,9 @@ import java.net.URI
 
 /** A simple immutable builder for URIs based on URLs.
   *
-  * It contains very limited functionality that is needed by the APIs used in
-  * the launcher. It can be easily extended if necessary.
+  * It contains very limited functionality that is needed by the APIs used for
+  * downloads and uploads (the version managers, the edition updater, the library uploader). It
+  * can be easily extended if necessary.
   */
 trait URIBuilder {
 

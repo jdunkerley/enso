@@ -21,12 +21,9 @@ object SbtLicenses {
     * get packaged.
     *
     * Provided dependencies are assumed to be already present in the used
-    * runtime, so we do not distribute them. One exception is the launcher which
-    * does distribute the provided SubstrateVM dependencies as part of it being
-    * compiled with the SVM. But that has to be handled independently anyway.
-    * Another is a JAR wrapper that a standard library depends on as `provided`
-    * and then ships itself; such a wrapper is listed as a component of the
-    * distribution.
+    * runtime, so we do not distribute them. One exception is a JAR wrapper that a
+    * standard library depends on as `provided` and then ships itself; such a
+    * wrapper is listed as a component of the distribution.
     */
   val relevantConfigurations = Seq(Compile)
 

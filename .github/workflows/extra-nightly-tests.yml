@@ -5,12 +5,12 @@
 #
 # Note [Extra Tests Without Their Secrets]
 # ========================================
-# The suites read the Snowflake and Enso Cloud secrets and variables, which this repository does
-# not have. `stdlib-test` passes them on as `./run` did, empty ones included, so a run without them
-# behaves as `./run`'s did: the Snowflake suites fail (`Snowflake_Spec` refuses an
-# `ENSO_SNOWFLAKE_ACCOUNT` that is set but empty), and the cloud suite skips its real-cloud tests
-# (no credentials file is made). Signing in to Enso Cloud did not move off `./run`: `stdlib-test`
-# refuses to run when all five cloud credentials are set.
+# The suites read the Snowflake and Enso Cloud secrets and variables, which this repository does not
+# have. `stdlib-test` passes them on as the retired build CLI did, empty ones included, so a run
+# without them behaves as the retired build CLI's did: the Snowflake suites fail (`Snowflake_Spec`
+# refuses an `ENSO_SNOWFLAKE_ACCOUNT` that is set but empty), and the cloud suite skips its
+# real-cloud tests (no credentials file is made). Signing in to Enso Cloud did not move off the
+# retired build CLI: `stdlib-test` refuses to run when all five cloud credentials are set.
 
 name: Extra Nightly Tests
 on:
@@ -39,7 +39,7 @@ jobs:
       clean_build_required: ${{ inputs.clean_build_required == true }}
     secrets: inherit
 
-  # As `stdlib-tests` in `engine-checks-platform.yml` (Note [Standard Library Tests Without ./run]
+  # As `stdlib-tests` in `engine-checks-platform.yml` (Note [The Standard Library Suites]
   # there), with these suites' secrets, `REPORT_ALL_TESTS`, and their job and report names.
   extra-tests:
     name: ${{ matrix.name }}
@@ -114,7 +114,7 @@ jobs:
           cache-key: stdlib-tests
           graalpy: "true"
           rust: "true"
-      # The line `./run` waited for (`sqlserver.rs`).
+      # The line the retired build CLI waited for (`sqlserver.rs`).
       - if: matrix.mssql
         name: Wait for SQL Server
         run: |-

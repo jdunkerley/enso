@@ -22,20 +22,20 @@ env:
 
 # Note [Benchmarks Call sbt Directly]
 # ===================================
-# `./run backend benchmark runtime` ran `sbt -Dbench.compileOnly=<just-check>
+# The retired build CLI's `backend benchmark runtime` ran `sbt -Dbench.compileOnly=<just-check>
 # -Dsbt.server.autostart=false <task>` (with `LC_ALL=C.UTF-8` and `SBT_SERVER_FORCESTART=true`),
-# where <task> is `runtime-benchmarks/benchOnly <bench-name>`, or `runtime-benchmarks/bench` when
-# no name is given, after provisioning GraalVM, sbt and flatc (now `setup-jvm`). Its other work was
+# where <task> is `runtime-benchmarks/benchOnly <bench-name>`, or `runtime-benchmarks/bench` when no
+# name is given, after provisioning GraalVM, sbt and flatc (now `setup-jvm`). Its other work was
 # either for its own later steps (GraalPy, which nothing in sbt calls) or a no-op on a fresh hosted
 # runner after `git-clean` (deleting the IR cache directory, `**/bench-report.xml` and
-# `engine/runtime/target`). The engine builds at sbt's default version, 0.0.0-dev, instead of
-# `./run`'s `<next>-dev`: nothing outside this job sees that distribution, and the report does not
-# record the version.
+# `engine/runtime/target`). The engine builds at sbt's default version, 0.0.0-dev, instead of the
+# retired build CLI's `<next>-dev`: nothing outside this job sees that distribution, and the report
+# does not record the version.
 #
-# `./run backend benchmark enso-jmh` (`std-libs-benchmark.yml`) did the same with
+# The retired build CLI's `backend benchmark enso-jmh` (`std-libs-benchmark.yml`) did the same with
 # `std-benchmarks/bench`, and also set `ENSO_LAUNCHER=native,-ls`: running the JMH benchmarks turns
-# on the native runner (`BuildConfigurationResolved::new` in `build_tools/build/src/engine.rs`), so
-# the distribution they run is built with a native-image runner without the language server. The
+# on the native runner (`BuildConfigurationResolved::new` in the retired build CLI's `engine.rs`),
+# so the distribution they run is built with a native-image runner without the language server. The
 # runtime benchmarks leave `ENSO_LAUNCHER` unset (the build's default, `shell`).
 
 jobs:

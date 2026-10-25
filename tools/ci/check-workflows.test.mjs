@@ -533,14 +533,14 @@ ${body}
   }
   test('accepts sbt as an argument rather than a command', () => {
     const script = [
-      "./run backend sbt '--' verifyLicensePackages",
+      "some-tool sbt '--' verifyLicensePackages",
       'command -v sbt',
       'echo sbt',
       'env | grep sbt',
       'echo "use sbt.bat"',
       'curl -fsSL -o "$dir/sbt.tgz" "https://github.com/sbt/sbt/releases/download/v1/sbt-1.tgz"',
       'echo "$RUNNER_TEMP/sbt/bin" >> "$GITHUB_PATH"',
-      'time ./run backend get',
+      'time some-tool get',
     ].join('\n')
     const repo = fixture({ 'workflows/a.yml': job(script) })
     assert.deepEqual(checkSbtRunsAfterSetupJvm(repo), [])

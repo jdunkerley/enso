@@ -1,8 +1,8 @@
 /**
  * @file `version`: computes the Enso version and publishes `ENSO_VERSION`, `ENSO_EDITION` and
- * `ENSO_RELEASE_MODE`, as `./run` did before every command. In GitHub Actions it writes them to
- * `GITHUB_OUTPUT` and `GITHUB_ENV`. One deliberate difference: `./run` never wrote `GITHUB_ENV`;
- * this does, so later steps of the job see the variables too.
+ * `ENSO_RELEASE_MODE`, as the retired build CLI did before every command. In GitHub Actions it
+ * writes them to `GITHUB_OUTPUT` and `GITHUB_ENV`. One deliberate difference: the retired build CLI
+ * never wrote `GITHUB_ENV`; this does, so later steps of the job see the variables too.
  *
  * Locally it prints `export` lines, for the shell to evaluate:
  *

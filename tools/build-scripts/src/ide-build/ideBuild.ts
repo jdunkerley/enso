@@ -1,9 +1,10 @@
 /**
- * @file `ide-build`: what `./run ide build --backend-source local --gui-source local` did in CI
- * (`build_tools/build/src/ide/web.rs` `IdeDesktop::dist`), minus what nothing used. With the GUI in
- * `dist/gui` and the engine bundle in `dist/backend`, it installs the workspace, then runs
- * `build:ide` and `dist:ide` with the variables electron-builder reads, and leaves the installer
- * (and its `.sha256`, which electron-builder's `computeHashes` hook writes) in `dist/ide`.
+ * @file `ide-build`: what the retired build CLI's `ide build --backend-source local --gui-source
+ * local` did in CI (the retired build CLI's `web.rs` `IdeDesktop::dist`), minus what nothing used.
+ * With the GUI in `dist/gui` and the engine bundle in `dist/backend`, it installs the workspace,
+ * then runs `build:ide` and `dist:ide` with the variables electron-builder reads, and leaves the
+ * installer (and its `.sha256`, which electron-builder's `computeHashes` hook writes) in
+ * `dist/ide`.
  */
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -54,7 +55,8 @@ export function withoutEmptyCscVariables(env: NodeJS.ProcessEnv): NodeJS.Process
 
 /**
  * The newest engine in a backend bundle: the greatest version-named directory under
- * `<backend>/dist`. A bundle without one is an error, the only check `./run` made of it.
+ * `<backend>/dist`. A bundle without one is an error, the only check the retired build CLI made of
+ * it.
  */
 export function latestBundledEngine(backendDir: string): string {
   const distDir = path.join(backendDir, 'dist')
@@ -121,7 +123,10 @@ export function packagingSteps(
   ]
 }
 
-/** The delays before each retry of `pnpm install`: 0.5 s, growing by half, at most 10 s (`ide_ci::io::retry`). */
+/**
+ * The delays before each retry of `pnpm install`: 0.5 s, growing by half, at most 10 s
+ * (the retired build CLI's `retry`).
+ */
 export function retryDelays(retries: number): number[] {
   return Array.from({ length: retries }, (_, attempt) => Math.min(500 * 1.5 ** attempt, 10_000))
 }

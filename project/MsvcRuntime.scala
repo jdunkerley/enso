@@ -6,20 +6,19 @@ import scala.sys.process._
 /** Copies the MSVC C runtime DLLs that the engine package's Windows binaries import next to those
   * binaries, so that the package runs on a machine without the Visual C++ redistributable.
   *
-  * This is what `./run` did after `buildEngineDistribution` on Windows
-  * (`build_tools/build/src/engine/context.rs`, `ci_utils/src/packaging.rs`,
-  * `programs/vs/redist.rs`): the CRT set is every DLL under
-  * `%VCToolsRedistDir%\x64\*.CRT\`, the binaries are every `.exe` and `.dll` in the package
-  * (listed before anything is copied), and each binary gets the CRT DLLs it imports copied into
-  * its own directory. Imports are read with `dumpbin /dependents`, which `setup-msvc` (CI) or a
-  * Developer Prompt (locally) puts on the PATH together with `VCToolsRedistDir`. The CRT DLLs
-  * that a copied DLL imports in turn are copied too (`msvcp140.dll` imports `vcruntime140.dll`).
+  * This is what the retired build CLI did after `buildEngineDistribution` on Windows (the retired
+  * build CLI's `context.rs`, `packaging.rs` and `redist.rs`): the CRT set is every DLL under
+  * `%VCToolsRedistDir%\x64\*.CRT\`, the binaries are every `.exe` and `.dll` in the package (listed
+  * before anything is copied), and each binary gets the CRT DLLs it imports copied into its own
+  * directory. Imports are read with `dumpbin /dependents`, which `setup-msvc` (CI) or a Developer
+  * Prompt (locally) puts on the PATH together with `VCToolsRedistDir`. The CRT DLLs that a copied
+  * DLL imports in turn are copied too (`msvcp140.dll` imports `vcruntime140.dll`).
   *
-  * Unlike `./run`, this does not walk the full import tree: it follows each binary's direct
-  * imports, and the CRT DLLs' own imports, but not the imports of a non-CRT DLL that a binary
-  * imports (`./run`'s `dependency_runner` resolved the whole tree). The two agree while every
-  * non-CRT intermediate DLL a binary loads sits in the package itself, since that DLL is then a
-  * binary of its own here and gets its CRT imports copied next to it.
+  * Unlike the retired build CLI, this does not walk the full import tree: it follows each binary's
+  * direct imports, and the CRT DLLs' own imports, but not the imports of a non-CRT DLL that a
+  * binary imports (the retired build CLI's `dependency_runner` resolved the whole tree). The two
+  * agree while every non-CRT intermediate DLL a binary loads sits in the package itself, since that
+  * DLL is then a binary of its own here and gets its CRT imports copied next to it.
   *
   * Copying nothing at all fails the build: `bin/` always needs some, so an empty result means
   * the imports were not read (for example, a change in `dumpbin`'s output format).

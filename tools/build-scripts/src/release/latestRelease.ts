@@ -1,6 +1,6 @@
 /**
- * @file `latest-release` in `build-config.yaml`, which a release moves forward: a port of
- * `build_tools/build/src/config.rs` `with_latest_release`.
+ * @file `latest-release` in `build-config.yaml`, which a release moves forward: a port of the
+ * retired build CLI's `config.rs` `with_latest_release`.
  */
 
 /** The `build-config.yaml` key recording the most recent stable Enso release. */

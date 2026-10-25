@@ -31,7 +31,7 @@ describe('librariesWithApi', () => {
   })
 })
 
-test("the failure message is ./run's", () => {
+test('the failure message names the library and the diff', () => {
   expect(
     failureLines(
       'Base',

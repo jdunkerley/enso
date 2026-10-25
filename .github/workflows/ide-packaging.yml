@@ -34,16 +34,16 @@ env:
 # are its longest path.
 
 jobs:
-  # Note [Engine Bundle Without ./run]
-  # ==================================
-  # `./run backend get` is the sbt task `buildEngineBundle` (project/EngineBundle.scala): the engine
-  # distribution, the IR cache check, the MSVC runtime DLLs on Windows (`setup-msvc` provides the
-  # environment), the small JDK, and the bundle in
-  # `built-distribution/engine-bundle-<version>-<os>-amd64/enso`, which is archived as it is
-  # (`./run` mirrored it to `dist/backend` first). sbt is called as `./run` called it; the version
-  # comes from `tools/build-scripts` (`version`), and `ENSO_LAUNCHER` stays `native`. `setup-jvm`
-  # installs the Rust toolchain (`rust`) before sbt starts several `cargo` calls at once (Note
-  # [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
+  # Note [The Engine Bundle]
+  # ========================
+  # The retired build CLI's `backend get` is the sbt task `buildEngineBundle`
+  # (project/EngineBundle.scala): the engine distribution, the IR cache check, the MSVC runtime DLLs
+  # on Windows (`setup-msvc` provides the environment), the small JDK, and the bundle in
+  # `built-distribution/engine-bundle-<version>-<os>-amd64/enso`, which is archived as it is (the
+  # retired build CLI mirrored it to `dist/backend` first). sbt is called as the retired build CLI
+  # called it; the version comes from `tools/build-scripts` (`version`), and `ENSO_LAUNCHER` stays
+  # `native`. `setup-jvm` installs the Rust toolchain (`rust`) before sbt starts several `cargo`
+  # calls at once (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   build-backend:
     name: Build Backend (${{ matrix.os }}, amd64)
     runs-on: ${{ matrix.runner }}
@@ -168,10 +168,10 @@ jobs:
             app/ydoc-shared/src/ast/generated
           retention-days: 1
 
-  # `tools/build-scripts`' `ide-build` packages the IDE as `./run ide build --backend-source local
-  # --gui-source local` did: the version, `pnpm install`, then `build:ide` and `dist:ide` with the
-  # variables electron-builder reads, and without the empty code-signing variables (a fork has no
-  # certificate). electron-builder writes the installer's `.sha256` itself.
+  # `tools/build-scripts`' `ide-build` packages the IDE as the retired build CLI's `ide build
+  # --backend-source local --gui-source local` did: the version, `pnpm install`, then `build:ide`
+  # and `dist:ide` with the variables electron-builder reads, and without the empty code-signing
+  # variables (a fork has no certificate). electron-builder writes the installer's `.sha256` itself.
   package-ide:
     name: Package New IDE (${{ matrix.os }}, amd64)
     needs: [build-backend, gui-build]

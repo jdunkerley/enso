@@ -295,7 +295,10 @@ export function checkMacosJobsAreGated({ workflows }) {
   return problems
 }
 
-/** The suites `macos-checks.yml` runs on `inputs.libraries`, as `./run` did on the Mac. */
+/**
+ * The suites `macos-checks.yml` runs on `inputs.libraries`, as the retired build CLI did on the
+ * Mac.
+ */
 const MACOS_LIBRARY_SUITES = ['standard-library-in-native', 'standard-library', 'std-aws']
 
 /**
@@ -457,10 +460,10 @@ const SBT_WORD = String.raw`"?(?:[^\s;&|()'"\x60]*[\\/])?sbt(?:\.bat|\.cmd)?"?(?
 
 /**
  * A script line that calls `sbt` itself, as a command: at a command's start, optionally after
- * PowerShell's `&`, inline `VAR=value` assignments (`LC_ALL=C.UTF-8 sbt …`, the shape of `./run`'s
- * own call), wrappers (`timeout 90m`, `time`, `nice -n 10`, `env A=1`, `xvfb-run -a`, …) and
- * `cmd /c`. An argument named `sbt` is not a call: neither `./run backend sbt` (`./run` provisions
- * sbt) nor `command -v sbt`.
+ * PowerShell's `&`, inline `VAR=value` assignments (`LC_ALL=C.UTF-8 sbt …`, the shape of the
+ * retired build CLI's own call), wrappers (`timeout 90m`, `time`, `nice -n 10`, `env A=1`,
+ * `xvfb-run -a`, …) and `cmd /c`. An argument named `sbt` is not a call: neither the retired build
+ * CLI's `backend sbt` (the retired build CLI provisions sbt) nor `command -v sbt`.
  */
 export const SBT_CALL = new RegExp(
   String.raw`${START}\s*(?:&\s*)?(?:${ASSIGN})*(?:${WRAPPER})*(?:cmd(?:\.exe)?\s+\/c\s+)?${SBT_WORD}`,
