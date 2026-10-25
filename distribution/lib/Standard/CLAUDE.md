@@ -48,7 +48,7 @@ Every public entity (type, constructor, method, function) is preceded by a `## `
 doc block. Doc blocks carry:
 
 - **Description** — written for users; states what the entity does.
-- `## Arguments:` — one bullet per argument explaining its role; argument types
+- `## Arguments` — one bullet per argument explaining its role; argument types
   appear in the type signature, not in these bullets.
 - `## Examples` — runnable snippets, each prefaced by a sentence describing what
   it shows. **These are the authoritative usage reference.**

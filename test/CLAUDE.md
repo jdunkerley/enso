@@ -48,9 +48,15 @@ variables — skipped tests are visible in the report, not silently dropped.
 
 ## Adding tests
 
-1. Import the relevant `Standard.*` module.
-2. Use `Standard.Test.Bundles`/`Test_Suite` to declare groups.
-3. Add assertions via `Test.specify` / `Test.expect`.
+1. Import the relevant `Standard.*` module and `from Standard.Test import all`.
+2. In the spec file, define `add_specs suite_builder` and declare a group with
+   `suite_builder.group "Name" group_builder->`.
+3. Add each test with `group_builder.specify "does x" <| ...`, using assertions
+   such as `should_equal`, `should_be_true` and `Test.expect_panic_with`.
+4. Register the spec in the project's `Main.enso`, inside
+   `Test.build suite_builder-> ...`, by calling
+   `Your_Spec.add_specs suite_builder`. `main filter=Nothing` ends with
+   `suite.run_with_filter filter`.
 
 ## Changing Java helpers
 

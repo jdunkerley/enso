@@ -7,12 +7,13 @@ debug/analysis tooling.
 ## Pipeline (read `src/lib.rs` module docs for the full story)
 
 1. **Lex** — `src/lexer.rs` produces `Token`s.
-2. **Build macro registry** — hardcoded macros (`if…then…else`, lambda `->`,
-   parens, etc.) are registered into a `MacroMatchTree`. There is no
-   user-defined macro support.
+2. **Build macro registry** — hardcoded macros (`if…then…else`, lambda
+   `\ … -> …`, `case`, imports, etc.) are registered into a `SegmentMap`.
+   Parentheses are not macros: the lexer emits them as group delimiters. There
+   is no user-defined macro support, and no macro has a left-hand prefix.
 3. **Split by macro segments** — token stream is segmented based on macro
    trigger tokens; nesting is hierarchical.
-4. **Resolve RHS / LHS patterns** — tokens are partitioned between each macro's
+4. **Resolve segment patterns** — tokens are partitioned between each macro's
    last segment and its parent.
 5. **Emit AST** — `src/syntax/tree/` is the final `Tree` structure.
 

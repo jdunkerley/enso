@@ -563,16 +563,12 @@ export enum LanguageServerErrorCode {
   ModuleNotFound = 2005,
   /**
    * The provided visualization could not be found.
-   *
-   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#visualizationnotfounderror)
    */
   VisualizationNotFound = 2006,
   /**
    * The expression specified in the {@link VisualizationConfiguration} cannot be evaluated.
    *
    * If relevant, a {@link Diagnostic} containing error details is returned as `payload`.
-   *
-   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#visualizationexpressionerror)
    */
   VisualizationExpression = 2007,
 

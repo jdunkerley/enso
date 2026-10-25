@@ -4,7 +4,7 @@ import org.enso.jsonrpc.Error
 
 /** Generic errors provided by the language server.
   *
-  * @see [[https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#errors---language-server]]
+  * @see [[https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#errors]]
   */
 object ErrorApi {
 

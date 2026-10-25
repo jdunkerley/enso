@@ -26,7 +26,6 @@ import scala.jdk.javaapi.CollectionConverters;
  * <ul>
  *   <li>No private module is exported
  *   <li>No private module from a different project is imported
- *   <li>Hierarchy of modules and submodules does not mix private and public modules
  * </ul>
  *
  * Inserts errors into imports/exports IRs if the above conditions are violated.
