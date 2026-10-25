@@ -20,8 +20,10 @@ data and layout.
 ## Editions and libraries
 
 Library versions and supported engine versions are grouped into **editions**
-(see `docs/libraries/editions.md`). The edition template in this directory is
-the source of truth for the layout a release artifact produces.
+(see
+[Libraries-Editions](https://github.com/jdunkerley/enso/wiki/Libraries-Editions)).
+The edition template in this directory is the source of truth for the layout a
+release artifact produces.
 
 ## Changing the standard library
 

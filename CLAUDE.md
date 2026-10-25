@@ -37,8 +37,12 @@ deserialize parser output.
 - `test/` — Enso-language test projects (one per standard library module).
 - `tools/` — Auxiliary dev tools: the build scripts (`tools/build-scripts`), the
   IGV plugin, the HTTP test helper, CI scripts, benchmark analysis.
-- `docs/` — Extensive developer documentation (RFCs, style guides, runtime
-  internals, LSP protocol). Start at `docs/README.md`.
+- `docs/` — Only the design specs and plans (`docs/superpowers/`), the community
+  files (`CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`) and
+  `docs/CLAUDE.md`. The developer documentation (RFCs, style guides, runtime
+  internals, LSP protocol) is in the
+  [wiki](https://github.com/jdunkerley/enso/wiki/Home); see `docs/CLAUDE.md` for
+  how to read it locally.
 - `project/` — SBT plugins and build helpers for the engine.
 - `internal/`, `patches/` — Build plumbing.
 
@@ -52,7 +56,7 @@ Three, **which one to use depends on what you're building**:
 - **pnpm + Vite/esbuild** — for the TypeScript monorepo (packages listed in
   `pnpm-workspace.yaml`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See
-  `docs/sbt-cheatsheet.md`.
+  [SBT-Cheatsheet](https://github.com/jdunkerley/enso/wiki/SBT-Cheatsheet).
 
 There is no orchestrator above these: the Rust build CLI was removed in build
 simplification Phase 5
@@ -80,8 +84,9 @@ build task.
   (`wasm-checks.yml`). **There is no clippy job** — the workspace carries
   warnings on `develop`, so a clean clippy run is a convention here, not
   something CI will catch for you.
-- Scala/Java: GraalVM-based. See `docs/infrastructure/` for `sbt`, native-image,
-  dual-JVM, and GraalVM upgrade guides.
+- Scala/Java: GraalVM-based. See
+  [Infrastructure](https://github.com/jdunkerley/enso/wiki/Infrastructure) for
+  `sbt`, native-image, dual-JVM, and GraalVM upgrade guides.
 - TypeScript: TS `catalog:` version in `pnpm-workspace.yaml`. Use
   `corepack pnpm` (not bare `pnpm`/`npm`).
 
@@ -123,12 +128,14 @@ has silently produced a wrong result here:
   entries to what a release-notes reader needs keeps that rare. Add the label
   when opening the PR: labelling re-runs only the `Changelog` workflow (a GitHub
   script of a few seconds), not the full CI. When in doubt about visibility,
-  ask. `docs/distribution/nightly.md` states the same rule; keep the two in
-  step. An entry goes in the `# Next Release` section under the right heading
-  (`#### Enso IDE`, `#### Enso Language & Runtime`,
-  `#### Enso Standard Library`), in the existing `- [Description][NNN]` form
-  with a matching link definition, where `NNN` is the PR number. Write it for
-  someone reading release notes, not for a reviewer reading the diff.
+  ask.
+  [Distribution-Nightly](https://github.com/jdunkerley/enso/wiki/Distribution-Nightly)
+  states the same rule; keep the two in step. An entry goes in the
+  `# Next Release` section under the right heading (`#### Enso IDE`,
+  `#### Enso Language & Runtime`, `#### Enso Standard Library`), in the existing
+  `- [Description][NNN]` form with a matching link definition, where `NNN` is
+  the PR number. Write it for someone reading release notes, not for a reviewer
+  reading the diff.
 
 - **PR CI skips the GUI checks and IDE packaging when nothing they depend on
   changed** (see the `*-changed-files.yml` workflows). Markdown-only changes
@@ -150,8 +157,10 @@ has silently produced a wrong result here:
   workflow policy on any change under `.github/`. See `.github/CLAUDE.md`.
 - Licensing is split: Engine = Apache-2.0, IDE = AGPL-3.0 (see
   `app/gui/LICENSE`).
-- The Rust workspace follows `docs/style-guide/rust.md`; additional house rules
-  live in `~/.claude/skills/rust-guidelines` (load it before Rust edits).
+- The Rust workspace follows
+  [Style-Guide-Rust](https://github.com/jdunkerley/enso/wiki/Style-Guide-Rust);
+  additional house rules live in `~/.claude/skills/rust-guidelines` (load it
+  before Rust edits).
 - When a module, crate, or package lacks a CLAUDE.md, create one when you start
   working in it — see `~/.claude/skills/project-structure`.
 - **A pin that is deliberately frozen must say so next to itself.** Several

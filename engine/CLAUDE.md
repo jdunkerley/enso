@@ -49,8 +49,10 @@ the **Truffle** framework.
 
 ## Key engineering conventions
 
-(See `docs/runtime-guide.md` for the long version, and
-`docs/style-guide/{java,scala}.md`.)
+(See [Runtime-Guide](https://github.com/jdunkerley/enso/wiki/Runtime-Guide) for
+the long version, and
+[Style-Guide-Java](https://github.com/jdunkerley/enso/wiki/Style-Guide-Java) and
+[Style-Guide-Scala](https://github.com/jdunkerley/enso/wiki/Style-Guide-Scala).)
 
 - **Nodes are built, not new'd.** Every Truffle `Node` in an AST has a
   `public static build(...)` method. DSL-generated nodes delegate `build` to the
@@ -67,7 +69,7 @@ the **Truffle** framework.
 - **Builtins.** The `Standard.Builtins` virtual module is synthesized from
   `runtime/runtime/builtin/*`. A Java-side annotation DSL generates boilerplate
   (`@BuiltinMethod`, `@Specialization`). See
-  `docs/runtime/builtin-base-methods.md`.
+  [Runtime-Builtin-Base-Methods](https://github.com/jdunkerley/enso/wiki/Runtime-Builtin-Base-Methods).
 - **Entry points.** Embedder-side: `Main` in `engine-runner`. Language-side:
   `EnsoLanguage` in `runtime/`. IDE flow goes via `language-server` →
   `RuntimeServerInstrument` → `runtime/`. They exchange messages via
@@ -81,8 +83,8 @@ the **Truffle** framework.
   `bench-report.xml`.
 - Per-library tests in `test/` (Enso code) run via
   `sbt 'runEngineDistribution --run test/…'`.
-- See `docs/runtime-guide.md` §"Code & Internal Documentation Map" for the map
-  of entry points.
+- See [Runtime-Guide](https://github.com/jdunkerley/enso/wiki/Runtime-Guide)
+  §"Code & Internal Documentation Map" for the map of entry points.
 
 ## Gotchas
 
@@ -90,9 +92,10 @@ the **Truffle** framework.
   The first full build can take 10+ minutes. Incremental SBT builds are much
   faster.
 - The Scala/Java source split is the result of an **ongoing** migration from
-  Scala to Java (see `docs/runtime-roadmap.md`). New code should lean Java-first
-  unless it benefits from Scala's type system; mixing is fine but inheritance
-  across languages needs care.
+  Scala to Java (see
+  [Runtime-Roadmap](https://github.com/jdunkerley/enso/wiki/Runtime-Roadmap)).
+  New code should lean Java-first unless it benefits from Scala's type system;
+  mixing is fine but inheritance across languages needs care.
 - `language-server` and `runtime` talk via binary Ydoc frames (via the polyglot
   `ydoc-server-polyglot`) when ydoc is enabled. The polyglot variant runs
   _inside_ the engine's GraalJS — not in Node.

@@ -113,7 +113,7 @@ object Editions {
   ) {
 
     /** A library that should be uploaded is one that is hosted in a "jar:" repository.
-      * See <a href="https://github.com/enso-org/enso/blob/2873e4d654fa836808afce40a28df44d07336177/docs/libraries/sharing.md">docs/libraries/sharing.md</a> for details.
+      * See <a href="https://github.com/jdunkerley/enso/wiki/Libraries-Sharing">Libraries-Sharing</a> for details.
       * @return
       */
     def libsToUpload(): Seq[String] = {

@@ -17,7 +17,8 @@ language server share.
 - `runtime-version-manager/` — Downloads and installs engine/GraalVM versions;
   handles upgrades.
 - `editions/` + `edition-updater/` — The "editions" abstraction — a named bundle
-  of engine version + library versions. See `docs/libraries/editions.md`.
+  of engine version + library versions. See
+  [Libraries-Editions](https://github.com/jdunkerley/enso/wiki/Libraries-Editions).
 - `library-manager/` + `downloader/` — Library download/resolution (from
   LibraryRepository / Enso Cloud).
 - `searcher/` — Completion database backing the LS `search/*` endpoints.
@@ -39,7 +40,8 @@ language server share.
 - `version-output/` — Formats `--version` strings with JVM/Graal info.
 - `logging-config/`, `logging-service/`, `logging-service-logback/`,
   `logging-truffle-connector/`, `logging-utils/`, `logging-utils-akka/` —
-  Unified logging story. See `docs/infrastructure/logging.md`.
+  Unified logging story. See
+  [Infrastructure-Logging](https://github.com/jdunkerley/enso/wiki/Infrastructure-Logging).
 - `common-polyglot-core-utils/` — Helpers needed by both language and embedder
   (the rare place that can sit on both sides of the polyglot boundary).
 - `bench-processor/` — Annotation processor generating JMH wrappers for Enso
@@ -48,9 +50,11 @@ language server share.
 
 ## Conventions
 
-- Follow `docs/style-guide/scala.md`.
+- Follow
+  [Style-Guide-Scala](https://github.com/jdunkerley/enso/wiki/Style-Guide-Scala).
 - No cycles. If two subprojects need each other, a third shared subproject is
   probably needed.
 - Prefer small modules over a few sprawling ones — the JPMS story relies on it.
-- Anywhere a Java-native rewrite is possible, see `docs/runtime-roadmap.md`:
+- Anywhere a Java-native rewrite is possible, see
+  [Runtime-Roadmap](https://github.com/jdunkerley/enso/wiki/Runtime-Roadmap):
   we're migrating Scala → Java.

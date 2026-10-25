@@ -146,4 +146,5 @@ in the library.
 - One top-level type or function per `src/<Thing>.enso` file.
 - Internal helpers go under `src/Internal/` and are not re-exported.
 - Each library exports its public API from `Main.enso`.
-- Follow `docs/style-guide/enso.md`.
+- Follow
+  [Style-Guide-Enso](https://github.com/jdunkerley/enso/wiki/Style-Guide-Enso).

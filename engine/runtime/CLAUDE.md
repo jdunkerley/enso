@@ -3,9 +3,9 @@
 The Truffle/GraalVM interpreter for Enso. The **language-side** code (everything
 that executes inside the polyglot context). Package root `org.enso.interpreter`.
 
-Read `docs/runtime-guide.md` before making non-trivial changes — it maps entry
-points, documents threading, and links the required Graal/Truffle background
-reading.
+Read [Runtime-Guide](https://github.com/jdunkerley/enso/wiki/Runtime-Guide)
+before making non-trivial changes — it maps entry points, documents threading,
+and links the required Graal/Truffle background reading.
 
 ## Key classes
 

@@ -27,7 +27,8 @@ GraalJS is **not** Node.js:
 - WebSocket support comes from the engine host, not `ws`; the bundle stubs this.
 
 When adding a dep to `ydoc-server`, verify the bundled output still loads under
-GraalJS before merging (see `docs/infrastructure/ydoc.md`).
+GraalJS before merging (see
+[Infrastructure-Ydoc](https://github.com/jdunkerley/enso/wiki/Infrastructure-Ydoc)).
 
 ## Source
 

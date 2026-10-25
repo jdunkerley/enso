@@ -37,5 +37,6 @@ Java support libraries for the engine. Two shapes live together here:
 
 ## Style
 
-Follow `docs/style-guide/java.md`. Wrappers should contain _zero_ logic — only
-module declarations.
+Follow
+[Style-Guide-Java](https://github.com/jdunkerley/enso/wiki/Style-Guide-Java).
+Wrappers should contain _zero_ logic — only module declarations.

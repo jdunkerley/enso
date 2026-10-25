@@ -126,7 +126,7 @@ export type TransportEvents = {
 }
 
 /**
- * This client implements the [Language Server Protocol](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md)
+ * This client implements the [Language Server Protocol](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server)
  *
  * It also handles the initialization (and re-initialization on every reconnect); each method
  * representing a remote call (except the `initProtocolConnection` obviously) waits for
@@ -270,42 +270,42 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     }
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#capabilityacquire) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#capabilityacquire) */
   acquireCapability(method: string, registerOptions: RegisterOptions): Promise<LsRpcResult<void>> {
     return this.request('capability/acquire', { method, registerOptions })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filereceivestreeupdates) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filereceivestreeupdates) */
   acquireReceivesTreeUpdates(path: Path): Promise<LsRpcResult<void>> {
     return this.acquireCapability('file/receivesTreeUpdates', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextcanmodify) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextcanmodify) */
   acquireExecutionContextCanModify(contextId: ContextId): Promise<LsRpcResult<void>> {
     return this.acquireCapability('executionContext/canModify', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#sessioninitprotocolconnection) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#sessioninitprotocolconnection) */
   initProtocolConnection(clientId: Uuid): Promise<LsRpcResult<response.InitProtocolConnection>> {
     return this.request('session/initProtocolConnection', { clientId }, false)
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#textopenfile) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#textopenfile) */
   openTextFile(path: Path): Promise<LsRpcResult<response.OpenTextFile>> {
     return this.request<response.OpenTextFile>('text/openFile', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#textclosefile) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#textclosefile) */
   closeTextFile(path: Path): Promise<LsRpcResult<void>> {
     return this.request('text/closeFile', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#textsave) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#textsave) */
   saveTextFile(path: Path, currentVersion: Checksum): Promise<LsRpcResult<void>> {
     return this.request('text/save', { path, currentVersion })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#textapplyedit) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#textapplyedit) */
   applyEdit(
     edit: FileEdit,
     execute: boolean,
@@ -314,87 +314,87 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.request('text/applyEdit', { edit, execute, idMap })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filewrite) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filewrite) */
   writeFile(path: Path, contents: TextFileContents): Promise<LsRpcResult<void>> {
     return this.request('file/write', { path, contents })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#fileread) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#fileread) */
   readFile(path: Path): Promise<LsRpcResult<response.FileContents>> {
     return this.request('file/read', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filecreate) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filecreate) */
   createFile(object: FileSystemObject): Promise<LsRpcResult<void>> {
     return this.request('file/create', { object })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filedelete) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filedelete) */
   deleteFile(path: Path): Promise<LsRpcResult<void>> {
     return this.request('file/delete', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filecopy) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filecopy) */
   copyFile(from: Path, to: Path): Promise<LsRpcResult<void>> {
     return this.request('file/copy', { from, to })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filemove) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filemove) */
   moveFile(from: Path, to: Path): Promise<LsRpcResult<void>> {
     return this.request('file/move', { from, to })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#fileexists) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#fileexists) */
   fileExists(path: Path): Promise<LsRpcResult<response.FileExists>> {
     return this.request('file/exists', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filetree) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filetree) */
   fileTree(path: Path, depth?: number): Promise<LsRpcResult<response.FileTree>> {
     return this.request('file/tree', { path, depth })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filelist) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filelist) */
   listFiles(path: Path): Promise<LsRpcResult<response.FileList>> {
     return this.request('file/list', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#fileinfo) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#fileinfo) */
   fileInfo(path: Path): Promise<LsRpcResult<response.FileInfo>> {
     return this.request('file/info', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filechecksum) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filechecksum) */
   fileChecksum(path: Path): Promise<LsRpcResult<response.FileChecksum>> {
     return this.request('file/checksum', { path })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextcreate) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextcreate) */
   createExecutionContext(contextId?: ContextId): Promise<LsRpcResult<response.ExecutionContext>> {
     return this.request('executionContext/create', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextdestroy) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextdestroy) */
   destroyExecutionContext(contextId: ContextId): Promise<LsRpcResult<void>> {
     return this.request('executionContext/destroy', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextfork) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextfork) */
   forkExecutionContext(contextId: ContextId): Promise<LsRpcResult<response.ExecutionContext>> {
     return this.request('executionContext/fork', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextpush) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextpush) */
   pushExecutionContextItem(contextId: ContextId, stackItem: StackItem): Promise<LsRpcResult<void>> {
     return this.request('executionContext/push', { contextId, stackItem })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextpop) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextpop) */
   popExecutionContextItem(contextId: ContextId): Promise<LsRpcResult<void>> {
     return this.request('executionContext/pop', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextrecompute) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextrecompute) */
   recomputeExecutionContext(
     contextId: ContextId,
     invalidatedExpressions?: 'all' | string[],
@@ -412,12 +412,12 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextinterrupt) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextinterrupt) */
   interruptExecutionContext(contextId: ContextId): Promise<LsRpcResult<void>> {
     return this.request('executionContext/interrupt', { contextId })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#executioncontextsetexecutionenvironment) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextsetexecutionenvironment) */
   setExecutionEnvironment(
     contextId: ContextId,
     executionEnvironment?: ExecutionEnvironment,
@@ -431,17 +431,17 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
   // Visualization attach/detach/modify and one-shot executeExpression have
   // moved off JSON-RPC onto the vis subdoc synced via ydoc-server.
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#searchgetsuggestionsdatabase) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#searchgetsuggestionsdatabase) */
   getSuggestionsDatabase(): Promise<LsRpcResult<response.GetSuggestionsDatabase>> {
     return this.request('search/getSuggestionsDatabase', {})
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#runtimegetcomponentgroups) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#runtimegetcomponentgroups) */
   getComponentGroups(): Promise<LsRpcResult<response.GetComponentGroups>> {
     return this.request('runtime/getComponentGroups', {})
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#refactoringrenamesymbol) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringrenamesymbol) */
   renameSymbol(
     module: string,
     expressionId: ExpressionId,
@@ -450,17 +450,17 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.request('refactoring/renameSymbol', { module, expressionId, newName })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#refactoringrenameproject) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringrenameproject) */
   renameProject(namespace: string, oldName: string, newName: string): Promise<LsRpcResult<void>> {
     return this.request('refactoring/renameProject', { namespace, oldName, newName })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#profilingstart) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#profilingstart) */
   profilingStart(memorySnapshot?: boolean): Promise<LsRpcResult<void>> {
     return this.request('profiling/start', { memorySnapshot })
   }
 
-  /** [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#profilingstop) */
+  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#profilingstop) */
   profilingStop(): Promise<LsRpcResult<void>> {
     return this.request('profiling/stop', {})
   }

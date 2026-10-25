@@ -10,7 +10,7 @@ import { onScopeDispose } from 'vue'
  * the active project, and reply over `Channel.aiToolReply`. Auto-disposes on scope dispose.
  *
  * The expression is anchored on the AI request's *captured* method body (not the currently-visible
- * one). See `docs/infrastructure/ydoc.md` ("Scope semantics of `nodeExternalId` for `inFrame`
+ * one). See `https://github.com/jdunkerley/enso/wiki/Infrastructure-Ydoc` ("Scope semantics of `nodeExternalId` for `inFrame`
  * one-shots") for why the body's externalId is the right anchor and why graph node ids are not.
  */
 export function useAiToolHandler(

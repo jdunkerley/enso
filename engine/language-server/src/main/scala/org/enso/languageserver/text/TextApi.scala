@@ -7,7 +7,7 @@ import org.enso.polyglot.runtime.Runtime.Api.ExpressionId
 import org.enso.text.editing.model.{IdMap, TextEdit}
 
 /** The text editing JSON RPC API provided by the language server.
-  * See [[https://github.com/enso-org/enso/blob/develop/docs/language-server/README.md]]
+  * See [[https://github.com/jdunkerley/enso/wiki/Language-Server]]
   * for message specifications.
   */
 object TextApi extends TextProtocol.Codecs {

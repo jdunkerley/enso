@@ -143,7 +143,7 @@ declare module '$/providers/openedProjects/widgetRegistry' {
     [FunctionName]?: {
       /**
        * Id of expression which is accepted by Language Server's
-       * [`refactoring/renameSymbol` method](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#refactoringrenamesymbol)
+       * [`refactoring/renameSymbol` method](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringrenamesymbol)
        */
       editableNameExpression: ExpressionId
       methodPointer: MethodPointer

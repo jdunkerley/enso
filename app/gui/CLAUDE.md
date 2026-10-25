@@ -209,10 +209,12 @@ their `name` prop against that list via `svgUseHref`
 name — `ai_sparkle` was a painful example of an invented name that rendered
 blank.
 
-**Drawing an icon:** follow `docs/style-guide/icons.md` (16px canvas, filled by
-default, 2px round strokes only for the tools family, `currentColor`, one 0.3
-secondary tone). `src/project-view/assets/__tests__/iconStyle.test.ts` enforces
-the mechanical rules; see `src/project-view/assets/CLAUDE.md`.
+**Drawing an icon:** follow
+[Style-Guide-Icons](https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons)
+(16px canvas, filled by default, 2px round strokes only for the tools family,
+`currentColor`, one 0.3 secondary tone).
+`src/project-view/assets/__tests__/iconStyle.test.ts` enforces the mechanical
+rules; see `src/project-view/assets/CLAUDE.md`.
 
 ## Gotcha: builds without an AG Grid licence ship AG Grid Community
 

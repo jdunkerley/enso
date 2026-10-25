@@ -4,7 +4,8 @@ Stylesheets, fonts and icons for the project view (the graph editor).
 
 - `icons.svg` — the icon sprite: one `<symbol id="...">` per icon, used through
   `SvgIcon` / `svgUseHref` and by standard library `icon:` doc tags. **Draw new
-  icons to `docs/style-guide/icons.md`.**
+  icons to
+  [Style-Guide-Icons](https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons).**
 - `__tests__/iconStyle.test.ts` — checks every symbol against the guide's
   mechanical rules. `iconStyleKnownViolations.ts` lists the icons that broke a
   rule when the check was added: remove an id when you fix it (the test fails

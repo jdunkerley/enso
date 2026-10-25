@@ -6,7 +6,7 @@ import org.enso.languageserver.filemanager.ContentRoot
 import java.util.UUID
 
 /** The connection management JSON RPC API provided by the language server.
-  * See [[https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#connection-management]]
+  * See [[https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#connection-management]]
   * for message specifications.
   */
 object SessionApi {
