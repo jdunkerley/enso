@@ -40,7 +40,7 @@ const RESTRICTED_IMPORT_PATHS = [
   {
     name: 'vue',
     importNames: ['proxyRefs'],
-    message: 'Use more type-safe alternative in @/util/reactivity',
+    message: 'Use more type-safe alternative in $/utils/reactivity',
   },
 ]
 

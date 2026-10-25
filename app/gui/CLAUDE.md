@@ -112,10 +112,12 @@ stays in `@/bindings` with the reason it is fixed. The rulings are in
   git versions).
 - `src/versionChecker/` — the "new version available" dialog (GitHub releases),
   mounted by `App.vue`.
-- `src/secrets/` — dormant: the secret and per-service credential forms and the
-  project view's `UpsertSecretPanel`, kept compiling and tested for local
-  secrets later (decision 5); nothing opens them.
-- `src/datalinks/` — dormant until PR 2b: the datalink editor and its dialog.
+- `src/secrets/` — the secret dialogs are live for local secrets (Settings, the
+  Drive bar, the pickers); only the per-service credential forms and
+  `UpsertSecretPanel` are dormant, kept compiling and tested. See its
+  `CLAUDE.md`.
+- `src/datalinks/` — the datalink editor and its dialog, opened from the Drive's
+  New/Edit Datalink actions (`dashboard/layouts/Drive/datalinkActions.ts`).
 - **Contribution registries.** The core reaches optional parts of the UI through
   registries, not by importing them: `contributeRightPanelTab` in
   `$/providers/rightPanelContributions` (the Versions tab uses it, from
@@ -160,11 +162,14 @@ is hidden.
 
 ## ProjectView ↔ backend
 
-The ProjectView subtree talks to the Enso Language Server via Yjs documents. The
-Yjs client lives in `ydoc-shared`; messaging is handled via WebSocket
-(`y-websocket` / `modern-isomorphic-ws`). Parsing of Enso source on the client
-side uses the Rust parser compiled to WASM (`rust-ffi` package →
-`ydoc-shared/src/ast/`).
+The ProjectView subtree never connects to the Enso Language Server directly. It
+opens WebSockets only to the ydoc server (which runs inside the engine), and the
+JSON-RPC and binary protocols travel as `YjsChannel`s on the index doc
+(`createRpcTransport` and `createDataSocket` in `src/project-view/util/net.ts`,
+used by `src/providers/openedProjects/project/project.ts`). The Yjs client lives
+in `ydoc-shared`; the sockets use `y-websocket` / `modern-isomorphic-ws`.
+Parsing of Enso source on the client side uses the Rust parser compiled to WASM
+(`rust-ffi` package → `ydoc-shared/src/ast/`).
 
 ## Dashboard ↔ backend
 
