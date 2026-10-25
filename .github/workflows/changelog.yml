@@ -17,12 +17,13 @@ permissions:
 
 # Note [The Changelog Check Reads The Pull Request's Own Files]
 # =============================================================
-# `./run changelog-check` diffed the merge commit against `origin/<default branch>`, so a pull request
-# stacked on another one saw its parent's changes too, and passed on the parent's `CHANGELOG.md`
-# entry. `pulls.listFiles` lists the files of this pull request against its own base. Otherwise
-# the rule and the messages are `./run`'s (`build_tools/build/src/changelog/check.rs`): no pull
-# request, pass; the label, pass; `CHANGELOG.md` among the files, pass; else fail with the same
-# text. The labels are the event's, as before: adding or removing one re-runs the check.
+# The retired build CLI's `changelog-check` diffed the merge commit against `origin/<default
+# branch>`, so a pull request stacked on another one saw its parent's changes too, and passed on the
+# parent's `CHANGELOG.md` entry. `pulls.listFiles` lists the files of this pull request against its
+# own base. Otherwise the rule and the messages are the retired build CLI's (its
+# `check.rs`): no pull request, pass; the label, pass; `CHANGELOG.md` among the files, pass; else
+# fail with the same text. The labels are the event's, as before: adding or removing one re-runs the
+# check.
 jobs:
   changelog:
     name: Changelog

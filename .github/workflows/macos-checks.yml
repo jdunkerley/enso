@@ -1,7 +1,7 @@
 # Hand-written. The engine's checks on the self-hosted Mac, as `macos-pull-request.yml` asks for
 # them with its labels: the engine distribution always, the JVM tests with `engine`, the Standard
 # Library suites with `libraries`. One call of `engine-checks-platform.yml`; the Mac has no Docker,
-# so its suites run without the databases, as under `./run`.
+# so its suites run without the databases, as under the retired build CLI.
 
 name: macOS Checks
 on:

@@ -1,7 +1,7 @@
 # Hand-written. Type-checks, lints and unit-tests `tools/build-scripts`, the TypeScript package that
-# takes over `./run`'s logic (build simplification, Phase 3). The GUI checks also run these scripts
-# (`ci:typecheck`, `ci:lint`, `ci:unit-test` cover every workspace package), but only when GUI files
-# change; this workflow runs them when the package or what it reads changes.
+# takes over the retired build CLI's logic (build simplification, Phase 3). The GUI checks also run
+# these scripts (`ci:typecheck`, `ci:lint`, `ci:unit-test` cover every workspace package), but only
+# when GUI files change; this workflow runs them when the package or what it reads changes.
 
 name: Build Scripts
 on:

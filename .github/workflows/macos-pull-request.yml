@@ -18,7 +18,7 @@ on:
 # - `CI: macOS Engine` — the engine's JVM tests;
 # - `CI: macOS Libraries` — the Standard Library tests;
 # - `CI: macOS GUI` — the GUI lint, typecheck, unit and Playwright tests.
-# The labels are catalogued in `build_tools/build/src/ci.rs` and `.github/settings.yml`.
+# The labels are catalogued in the retired build CLI's `ci.rs` and `.github/settings.yml`.
 #
 # The Mac is asked for explicitly here, so its absence is an error: `macos-runner` waits for it for
 # 1 minute (keep in step with the `wait-for-macos-runner.sh` calls in `release.yml` and

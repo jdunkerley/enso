@@ -68,22 +68,23 @@ env:
   ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required }}"
 
 jobs:
-  # Note [Engine Distribution Without ./run]
-  # ========================================
-  # `./run backend ci-build-engine-distribution` is the sbt task `ciBuildEngineDistribution` (Note
-  # [CI Engine Distribution Build] in build.sbt), called as `./run` called sbt: `LC_ALL=C.UTF-8
-  # SBT_SERVER_FORCESTART=true sbt -Dbench.compileOnly=false -Dsbt.server.autostart=false "clean;
-  # all ciBuildEngineDistribution"` (`all` because a hosted runner has more memory than `./run`'s
-  # single-batch threshold). The version comes from `tools/build-scripts` (`version`); its step
-  # keeps `id: build`, so the job's outputs are what they were, and it exports the version to the
-  # later steps, which is how sbt names the package. `ENSO_LAUNCHER` stays `native,test`, the value
-  # `./run` forced. `setup-msvc` replaces `./run`'s MSVC environment on Windows: the native images
-  # link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build compiles the Rust
-  # parser with several `cargo` calls at once, so `setup-jvm` installs the Rust toolchain first
-  # (`rust`; Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`). Gone
-  # from this job, because only `./run` read them here or nothing did: GraalPy, `GRAAL_EDITION`,
-  # `GITHUB_TOKEN` and the `GITHUB_ENV` copy of `ENSO_TEST_JUNIT_DIR`. (The standard library jobs
-  # still use GraalPy and `GRAAL_EDITION`.)
+  # Note [The Engine Distribution Build]
+  # ====================================
+  # The retired build CLI's `backend ci-build-engine-distribution` is the sbt task
+  # `ciBuildEngineDistribution` (Note [CI Engine Distribution Build] in build.sbt), called as the
+  # retired build CLI called sbt: `LC_ALL=C.UTF-8 SBT_SERVER_FORCESTART=true sbt
+  # -Dbench.compileOnly=false -Dsbt.server.autostart=false "clean; all ciBuildEngineDistribution"`
+  # (`all` because a hosted runner has more memory than the retired build CLI's single-batch
+  # threshold). The version comes from `tools/build-scripts` (`version`); its step keeps `id:
+  # build`, so the job's outputs are what they were, and it exports the version to the later steps,
+  # which is how sbt names the package. `ENSO_LAUNCHER` stays `native,test`, the value the retired
+  # build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
+  # native images link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build
+  # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
+  # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
+  # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
+  # here or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy of
+  # `ENSO_TEST_JUNIT_DIR`. (The standard library jobs still use GraalPy and `GRAAL_EDITION`.)
   build-engine-distribution:
     name: Build Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
@@ -139,22 +140,22 @@ jobs:
   # =============================================
   # `lintEnso` lints the distribution at `engineDistributionRoot`, which sbt names from
   # `ENSO_VERSION` (`built-distribution/enso-engine-<version>-<os>-<arch>/enso-<version>`), and
-  # sbt's default is 0.0.0-dev. On CI `lintEnso` still evaluates `buildEngineDistributionNoIndex.value`
-  # (build.sbt), so the lint job rebuilds the package at that same versioned path and lints that;
-  # the downloaded distribution is not what it lints today. The build job computed the version
-  # (`<next stable>-dev`) and published it as its outputs, so the lint step takes it from there
-  # rather than computing its own, which keeps the path identical to the build job's and stays
-  # correct once the lint really uses the download. Otherwise the step runs what
-  # `./run libraries lint` ran once it had provisioned GraalVM and sbt: `sbt
-  # -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with `LC_ALL=C.UTF-8`
-  # and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory than
-  # `./run`'s single-batch threshold; for one task it changes nothing). The rebuild compiles the
-  # language server, so the job needs flatc. Nothing in sbt or the engine reads `GITHUB_TOKEN`, so
-  # the step does not pass it. The syntax check (`checkEnsoSyntax`, which replaced
-  # `./run libraries check-syntax`) runs the Rust parser's `check_syntax` through cargo, so
-  # `setup-jvm` installs the Rust toolchain (`rust`) first: today that one cargo call runs before
-  # `all lintEnso` and would install it alone, but tasks run in parallel under `all` would race
-  # (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
+  # sbt's default is 0.0.0-dev. On CI `lintEnso` still evaluates
+  # `buildEngineDistributionNoIndex.value` (build.sbt), so the lint job rebuilds the package at that
+  # same versioned path and lints that; the downloaded distribution is not what it lints today. The
+  # build job computed the version (`<next stable>-dev`) and published it as its outputs, so the
+  # lint step takes it from there rather than computing its own, which keeps the path identical to
+  # the build job's and stays correct once the lint really uses the download. Otherwise the step
+  # runs what the retired build CLI's `libraries lint` ran once it had provisioned GraalVM and sbt:
+  # `sbt -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with
+  # `LC_ALL=C.UTF-8` and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory
+  # than the retired build CLI's single-batch threshold; for one task it changes nothing). The
+  # rebuild compiles the language server, so the job needs flatc. Nothing in sbt or the engine reads
+  # `GITHUB_TOKEN`, so the step does not pass it. The syntax check (`checkEnsoSyntax`, which
+  # replaced the retired build CLI's `libraries check-syntax`) runs the Rust parser's `check_syntax`
+  # through cargo, so `setup-jvm` installs the Rust toolchain (`rust`) first: today that one cargo
+  # call runs before `all lintEnso` and would install it alone, but tasks run in parallel under
+  # `all` would race (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   enso-code-lint:
     name: Enso Code Lint (linux, amd64)
     if: inputs.os == 'linux' && inputs.linux-checks
@@ -207,22 +208,25 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # Note [JVM Tests Without ./run]
-  # ==============================
-  # The steps are what `./run backend test jvm` ran (`build_tools/build/src/engine/context.rs`), in
-  # its order, each sbt call as `./run` made it (`LC_ALL=C.UTF-8 SBT_SERVER_FORCESTART=true sbt
-  # -Dbench.compileOnly=<…> -Dsbt.server.autostart=false "<tasks>"`), at the build job's version,
-  # from which sbt names the downloaded distribution. Its traps, kept on purpose:
-  # - `ENSO_TEST_JUNIT_DIR` is set on the `sbt test` step only. `./run` removed it for the
-  #   benchmark step, and an empty value is not "unset": ScalaTest would get `-u ""`.
+  # Note [The JVM Test Steps]
+  # =========================
+  # The steps are what the retired build CLI's `backend test jvm` ran (its
+  # `context.rs`), in its order, each sbt call as the retired build CLI made it (`LC_ALL=C.UTF-8
+  # SBT_SERVER_FORCESTART=true sbt -Dbench.compileOnly=<…> -Dsbt.server.autostart=false "<tasks>"`),
+  # at the build job's version, from which sbt names the downloaded distribution. Its traps, kept on
+  # purpose:
+  # - `ENSO_TEST_JUNIT_DIR` is set on the `sbt test` step only. The retired build CLI removed it for
+  #   the benchmark step, and an empty value is not "unset": ScalaTest would get `-u ""`.
   # - `CI_TEST_TIMEFACTOR=2` and `CI_TEST_FLAKY_ENABLE=true` are written to `GITHUB_ENV` on Windows
   #   only, so that on Linux they are absent rather than empty: an empty time factor breaks the
   #   language server's test configuration, and `FlakySpec` only asks whether the variable exists.
-  # - A failing `sbt test` does not stop the parser self-tests or the benchmark step: `./run`
-  #   deferred that failure. A failure of any other step stops the job, as it stopped `./run`.
-  # - Two things `./run` appeared to do never took effect, and are not added: the Enso benchmark
-  #   dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones) and the
-  #   heap-dump `JAVA_TOOL_OPTIONS` (`./run` passed them to the standard-library tests only).
+  # - A failing `sbt test` does not stop the parser self-tests or the benchmark step: the retired
+  #   build CLI deferred that failure. A failure of any other step stops the job, as it stopped the
+  #   retired build CLI.
+  # - Two things the retired build CLI appeared to do never took effect, and are not added: the Enso
+  #   benchmark dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones)
+  #   and the heap-dump `JAVA_TOOL_OPTIONS` (the retired build CLI passed them to the
+  #   standard-library tests only).
   # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call: sbt starts
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
@@ -275,7 +279,8 @@ jobs:
       - name: Generate the parser's Java sources
         shell: bash
         run: |-
-          # `./run` reset the JUnit directory before the tests; stale reports would be published.
+          # The retired build CLI reset the JUnit directory before the tests; stale reports would be
+          # published.
           rm -rf target/test-results
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
@@ -347,8 +352,8 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # `tools/build-scripts`' `stdlib-api-check` runs what `./run backend stdlib-api-check` ran, against
-  # the downloaded distribution at the build job's version.
+  # `tools/build-scripts`' `stdlib-api-check` runs what the retired build CLI's `backend
+  # stdlib-api-check` ran, against the downloaded distribution at the build job's version.
   standard-library-api-check:
     name: Standard Library API check (linux, amd64)
     if: inputs.os == 'linux' && inputs.linux-checks
@@ -376,24 +381,24 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # Note [Standard Library Tests Without ./run]
-  # ===========================================
-  # `tools/build-scripts`' `stdlib-test` runs a suite as `./run backend test <suite>` did (see its
-  # `src/stdlib-test/run.ts`), and starts the HTTP test helper itself, with sbt (hence `setup-jvm`).
-  # What moved out of `./run` into this file:
+  # Note [The Standard Library Suites]
+  # ==================================
+  # `tools/build-scripts`' `stdlib-test` runs a suite as the retired build CLI's `backend test
+  # <suite>` did (see its `src/stdlib-test/run.ts`), and starts the HTTP test helper itself, with
+  # sbt (hence `setup-jvm`). What moved out of the retired build CLI into this file:
   # - Postgres and SQL Server are service containers, on Linux only as before (Windows runners have
   #   none, and the self-hosted Mac has no Docker, so they share a job of their own,
-  #   `stdlib-tests-without-services`, under the same name). One job with OS-conditional
-  #   `services:` is not possible: a Windows runner cannot start the Linux containers, so that job
-  #   is the same steps without them. A suite gets a database when its
-  #   matrix entry asks (`postgres`, `mssql`); an empty image starts no container, and the runner
-  #   drops the connection variables that are empty, since Enso reads an empty variable as "".
-  #   Images: `postgres:18` (`./run` took `latest`, 18.6 when this moved) and SQL Server
-  #   `2022-latest`, as before. Postgres must be on localhost:5432: `Generic_JDBC_Tests` connects
-  #   to `jdbc:postgresql:<db>`.
+  #   `stdlib-tests-without-services`, under the same name). One job with OS-conditional `services:`
+  #   is not possible: a Windows runner cannot start the Linux containers, so that job is the same
+  #   steps without them. A suite gets a database when its matrix entry asks (`postgres`, `mssql`);
+  #   an empty image starts no container, and the runner drops the connection variables that are
+  #   empty, since Enso reads an empty variable as "". Images: `postgres:18` (the retired build CLI
+  #   took `latest`, 18.6 when this moved) and SQL Server `2022-latest`, as before. Postgres must be
+  #   on localhost:5432: `Generic_JDBC_Tests` connects to `jdbc:postgresql:<db>`.
   # - The JVM suite's small JDK has its own step (`small-jdk`), at `target/small-jdk` as before.
   # - GraalPy comes from `setup-jvm` (`graalpy`), for `Examples_Tests`' Python spec.
-  # - `ENSO_TEST_JUNIT_DIR` is set here; `./run` wrote it to `GITHUB_ENV` for the reporter.
+  # - `ENSO_TEST_JUNIT_DIR` is set here; the retired build CLI wrote it to `GITHUB_ENV` for the
+  #   reporter.
   # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call (the small JDK or
   #   the HTTP test helper): see Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`.
@@ -464,7 +469,7 @@ jobs:
           ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
-      # The line `./run` waited for (`sqlserver.rs`).
+      # The line the retired build CLI waited for (`sqlserver.rs`).
       - if: matrix.mssql
         name: Wait for SQL Server
         run: |-
@@ -523,7 +528,8 @@ jobs:
         uses: ./.github/actions/git-clean
 
   # The same as `stdlib-tests`, without the databases: Windows runners have no service containers,
-  # and the self-hosted Mac has no Docker (`./run` started the databases on Linux only).
+  # and the self-hosted Mac has no Docker (the retired build CLI started the databases on Linux
+  # only).
   stdlib-tests-without-services:
     name: Standard Library ${{ matrix.title }} Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.os != 'linux' && inputs.stdlib-suites != '[]'

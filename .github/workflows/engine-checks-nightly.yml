@@ -30,8 +30,9 @@ jobs:
         env:
           RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
 
-  # The suites each platform ran under `./run`. Oracle GraalVM had no lint or API check, and its JVM
-  # suite runs without the small JDK (`stdlib-test` leaves it out for that edition).
+  # The suites each platform ran under the retired build CLI. Oracle GraalVM had no lint or API
+  # check, and its JVM suite runs without the small JDK (`stdlib-test` leaves it out for that
+  # edition).
   platform:
     name: ${{ matrix.name }}
     strategy:

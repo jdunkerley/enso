@@ -3,15 +3,15 @@ description: >-
   The MSVC developer environment (`vcvarsall.bat x64`) for the rest of the job, on Windows; a no-op
   elsewhere. Native images on Windows link with MSVC, and the engine package gets the MSVC runtime
   DLLs from `VCToolsRedistDir` (`project/MsvcRuntime.scala`, which also needs `dumpbin`). What
-  `./run` applied when `cl` was not on the PATH (`build_tools/ci_utils/src/programs/vs.rs`).
+  the retired build CLI applied when `cl` was not on the PATH (its `vs.rs`).
 runs:
   using: composite
   steps:
-    # `ilammy/msvc-dev-cmd` runs on node20. If GitHub retires node20 before it moves, replace it with
-    # a pwsh step: `vswhere -latest -products * -requires
-    # Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`, then run
-    # `cmd /c "<path>\VC\Auxiliary\Build\vcvarsall.bat x64 && set"` and append every variable that
-    # changed to `$env:GITHUB_ENV` (PATH included), as `./run` did.
+    # `ilammy/msvc-dev-cmd` runs on node20. If GitHub retires node20 before it moves, replace it
+    # with a pwsh step: `vswhere -latest -products * -requires
+    # Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`, then run `cmd
+    # /c "<path>\VC\Auxiliary\Build\vcvarsall.bat x64 && set"` and append every variable that
+    # changed to `$env:GITHUB_ENV` (PATH included), as the retired build CLI did.
     - if: runner.os == 'Windows'
       name: Apply the MSVC developer environment
       uses: ilammy/msvc-dev-cmd@v1

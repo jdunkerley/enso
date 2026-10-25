@@ -2,8 +2,8 @@ name: Set up the JVM toolchain
 description: >-
   GraalVM CE and the sbt launcher at the versions pinned under `toolchain:` in `build-config.yaml`,
   `flatc`, the standalone GraalPy and the `rust-toolchain.toml` Rust toolchain too when asked, and
-  the sbt / Coursier download cache (saved only on `develop`). What `./run` provisioned before an sbt call, minus the MSVC environment
-  (`setup-msvc`). Expects the repository to be checked out.
+  the sbt / Coursier download cache (saved only on `develop`). What the retired build CLI provisioned before an sbt call, minus the MSVC
+  environment (`setup-msvc`). Expects the repository to be checked out.
 inputs:
   cache-key:
     description: >-
@@ -16,7 +16,7 @@ inputs:
   edition:
     description: >-
       `community` (GraalVM CE, the default) or `oracle` (Oracle GraalVM, at the same version), which
-      the nightly checks also build and test with. `./run` chose it by `GRAAL_EDITION`.
+      the nightly checks also build and test with. The retired build CLI chose it by `GRAAL_EDITION`.
     required: false
     default: community
   flatc:
@@ -86,7 +86,8 @@ runs:
         rm "$dir/sbt.tgz"
         echo "SBT_HOME=$RUNNER_TEMP/sbt" >> "$GITHUB_ENV"
         echo "$RUNNER_TEMP/sbt/bin" >> "$GITHUB_PATH"
-    # The release assets `ide_ci::cache::goodie::flatc` downloaded; a flatc bump may rename them.
+    # The release assets the retired build CLI's `flatc` goodie downloaded; a flatc bump may rename
+    # them.
     - if: inputs.flatc == 'true'
       name: Set up flatc
       shell: bash
@@ -111,8 +112,8 @@ runs:
         rm "$dir/flatc.zip"
         chmod +x "$dir/flatc/flatc" 2>/dev/null || true
         echo "$RUNNER_TEMP/flatc" >> "$GITHUB_PATH"
-    # The release asset `ide_ci::cache::goodie::graalpy` downloaded; it unpacks to one directory
-    # of the same name.
+    # The release asset the retired build CLI's `graalpy` goodie downloaded; it unpacks to one
+    # directory of the same name.
     - if: inputs.graalpy == 'true'
       name: Set up GraalPy
       shell: bash
@@ -148,10 +149,10 @@ runs:
     # sbt compiles the Rust parser (and `checkEnsoSyntax` runs it) with `cargo`, and under `all`
     # several tasks start `cargo`/`rustup` at once. With the `rust-toolchain.toml` toolchain
     # missing, each of them auto-installs it and they collide ("could not rename 'component' file",
-    # then "Cargo isn't installed!"). `./run`'s full `pnpm install` had compiled the parser first,
-    # which installed the toolchain; `setup-build-scripts` runs no scripts, so this step installs it
-    # once (rustup 1.28+ reads `rust-toolchain.toml`) before the job's first sbt call. It leaves
-    # rustup itself as the runner image has it (`--no-self-update`).
+    # then "Cargo isn't installed!"). The retired build CLI's full `pnpm install` had compiled the
+    # parser first, which installed the toolchain; `setup-build-scripts` runs no scripts, so this
+    # step installs it once (rustup 1.28+ reads `rust-toolchain.toml`) before the job's first sbt
+    # call. It leaves rustup itself as the runner image has it (`--no-self-update`).
     - if: inputs.rust == 'true'
       name: Install the Rust toolchain
       shell: bash

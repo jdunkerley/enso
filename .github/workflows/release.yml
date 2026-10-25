@@ -62,15 +62,15 @@ env:
   # self-hosted Mac keeps its working tree between runs.
   ENSO_CI_CLEAN_BUILD: "true"
 
-# Note [Release Without ./run]
-# ============================
-# What `./run` did for each job, and where it went:
+# Note [Where The Release Logic Lives]
+# ====================================
+# What the retired build CLI did for each job, and where it went:
 # - `release create-draft`, `release publish`, `release update-latest-version`, `release promote`
 #   and the upload half of `ide upload` are `tools/build-scripts`' `release` command
 #   (`src/release/`). The release version must be given: an invalid one is an error, not a `-dev`
 #   build.
-# - `backend get` is the sbt task `buildEngineBundle`, as in `ide-packaging.yml` (Note [Engine
-#   Bundle Without ./run] there).
+# - `backend get` is the sbt task `buildEngineBundle`, as in `ide-packaging.yml` (Note [The Engine
+#   Bundle] there).
 # - `ide upload` built the GUI on each platform; the GUI is the same web bundle everywhere, so one
 #   job builds it, as `ide-packaging.yml` does, at the release version.
 # - The packaging is `ide-build`, then `release upload-ide` uploads the installer, its `.sha256`
