@@ -218,10 +218,6 @@ helper tools for that. We recommend:
 - or configure Git installation selecting the third option:
   ![Git installation settings](https://github.com/user-attachments/assets/def189fa-985b-47f3-8c8b-153c0f39fa26)
 
-**For users of M1 Mac**: installing GraalVM on M1 Mac requires manual actions,
-please refer to a
-[dedicated documentation](https://github.com/jdunkerley/enso/wiki/GraalVM-M1-Mac).
-
 ### Getting the Sources
 
 Given you've probably been reading this document on GitHub, you might have an
