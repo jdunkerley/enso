@@ -21,12 +21,11 @@ import org.enso.build.BenchTasks.Benchmark
   *   circumstances under which the dependency could be upgraded to use the
   *   global version
   *
-  * Note [Engine And Launcher Version]
-  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  * Currently both Engine and Launcher versions are tied to each other - each new
-  * releases contains the Engine and the Launcher and thus the version number is
-  * shared. If the version numbers ever diverge, make sure to update the build
-  * scripts at .github/workflows accordingly.
+  * Note [Engine Version]
+  * ~~~~~~~~~~~~~~~~~~~~~
+  * The engine's version is shared by every release, which is versioned as a
+  * whole. If it ever has to diverge, make sure to update the build scripts at
+  * .github/workflows accordingly.
   *
   * Note [Default Editions]
   * ~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,7 +91,7 @@ object Dependencies {
   val ensoVersion = sys.env.getOrElse(
     "ENSO_VERSION",
     defaultDevEnsoVersion
-  ) // Note [Engine And Launcher Version]
+  ) // Note [Engine Version]
   val currentEdition = sys.env.getOrElse(
     "ENSO_EDITION",
     defaultDevEnsoVersion

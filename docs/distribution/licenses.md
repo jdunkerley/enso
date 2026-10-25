@@ -37,9 +37,9 @@ sources to gather copyright information related to the used dependencies.
 To configure the task, `GatherLicenses.distributions` should be set with
 sequence of distributions. Each distribution describes one component that is
 distributed separately and should include all references to all projects that
-are included as part of its distribution. Currently we have two main
-distributions (`launcher` and `engine`), as well as distributions for many of
-the major components of the standard library.
+are included as part of its distribution. Currently we have one main
+distribution (`engine`), as well as distributions for many of the major
+components of the standard library.
 
 Another relevant setting is `GatherLicenses.licenseConfigurations` which defines
 which configurations are considered to search for dependencies. Currently it is
@@ -98,8 +98,7 @@ described in detail in the [next section](#review).
 
 Each new type of license has to be reviewed to ensure that it is compatible with
 our distribution and usage scheme. Licenses are reviewed per-distribution, as
-for example the binary distribution of the launcher may impose different
-requirements than distribution of the engine as JARs.
+different distributions may impose different requirements.
 
 If an indirect dependency is found with a problematic license, the
 `analyzeDependency` command may prove helpful. Running `analyzeDependency <arg>`
@@ -225,11 +224,6 @@ Moreover `NOTICE` files for `scala-parser-combinators` and `scala-java8-compat`
 have been manually copied from their GitHub repositories. They should also be
 updated as necessary.
 
-Additionally, the Linux version of the launcher is statically linked with the
-`musl` implementation of libc which also uses `zlib`, so these two components
-are also added and described manually. If they are ever updated, the notices
-should be revisited.
-
 `CREDITS` for modules `com.fasterxml.jackson` mentioned in their NOTICES were
 manually scraped from GitHub where possible.
 
@@ -351,7 +345,6 @@ the standard library, its licenses should be reviewed before merging the PR.
 
 ## Bundles
 
-Beside the launcher and engine components, the distributed bundles also contain
-a distribution of GraalVM CE. This distribution however contains its own licence
-and notices within itself, so no further action should be necessary in that
-regard.
+Beside the engine, the distributed bundles also contain a distribution of
+GraalVM CE. This distribution however contains its own licence and notices
+within itself, so no further action should be necessary in that regard.

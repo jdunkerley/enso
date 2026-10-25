@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
 	"app/rust-ffi",
-	"lib/rust/launcher-shims",
 	"lib/rust/macro-utils",
 	"lib/rust/metamodel",
 	"lib/rust/parser/debug",

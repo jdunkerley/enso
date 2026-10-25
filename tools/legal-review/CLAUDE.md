@@ -1,7 +1,7 @@
 # tools/legal-review/
 
 Review configuration for the third-party notices shipped with each distribution
-(`launcher`, `engine`, and one directory per standard library). Read by
+(`engine` and one directory per standard library). Read by
 `project/GatherLicenses.scala`; the full process is in
 `docs/distribution/licenses.md`.
 

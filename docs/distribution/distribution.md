@@ -13,33 +13,14 @@ structured and how it should behave.
 
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 
-- [Universal Launcher](#universal-launcher)
 - [Enso Distribution Layout](#enso-distribution-layout)
   - [Portable Enso Distribution Layout](#portable-enso-distribution-layout)
   - [Installed Enso Distribution Layout](#installed-enso-distribution-layout)
-  - [Installing from a Portable Distribution](#installing-from-a-portable-distribution)
 - [Layout of an Enso Version Package](#layout-of-an-enso-version-package)
   - [Standard Library](#standard-library)
 - [Enso Home Layout](#enso-home-layout)
 
 <!-- /MarkdownTOC -->
-
-## Universal Launcher
-
-The [universal launcher](./launcher.md) should be able to launch the proper
-version of Enso executable based on the version specified in the project being
-run, or use the default version if none specified. It should also be able to
-launch other Enso components, provided as
-[plugins](./launcher.md#running-plugins).
-
-<!--
-> This launcher is under development. Until it is in a ready-to-use state, the
-> Enso version packages provide simple launcher scripts in the `bin` directory
-> of that package. They are a temporary replacement for the launcher
-> functionality, so once the universal launcher matures, they will be removed.
-> The universal launcher will not call the components through these scripts, as
-> it must have full control over which JVM is chosen and its parameters.
--->
 
 ## Enso Distribution Layout
 
@@ -49,15 +30,10 @@ directories, as explained below.
 
 ### Portable Enso Distribution Layout
 
-All files in the directory structure, except for the configuration, can be
-safely removed, and the launcher will re-download them if needed.
-
 The directory structure is as follows:
 
 ```
 extraction-location
-├── bin
-│   └── ensoup              # The universal launcher, responsible for choosing the appropriate compiler version.
 ├── config
 │   └── global-config.yaml  # Global user configuration.
 ├── dist                    # Per-compiler-version distribution directories.
@@ -80,7 +56,7 @@ extraction-location
 │   ├── 2021.4.yaml
 │   └── nightly-2021-06-31.yaml
 ├── README.md               # Information on layout and usage of the Enso distribution.
-├── .enso.bundle            # A file that allows the universal launcher to detect that if it is run from this directory, it should run in portable distribution mode.
+├── .enso.bundle            # Marks a portable distribution for `PortableDistributionManager`.
 └── THIRD-PARTY             # Contains licences of distributed components, including the NOTICE file.
 ```
 
@@ -114,7 +90,6 @@ ENSO_CONFIG_DIRECTORY
 └── global-config.yaml      # Global user configuration.
 
 ENSO_BIN_DIRECTORY
-└── ensoup                  # The universal launcher, responsible for choosing the appropriate compiler version.
 ```
 
 Where `ENSO_DATA_DIRECTORY`, `ENSO_CONFIG_DIRECTORY` and `ENSO_BIN_DIRECTORY`
@@ -132,21 +107,6 @@ value, depending on the system:
 | `ENSO_BIN_DIRECTORY`     | `$XDG_BIN_HOME` which defaults to `$HOME/.local/bin`                | `$HOME/.local/bin`                            | `%LocalAppData%/enso/bin`    |
 | `ENSO_RUNTIME_DIRECTORY` | `$XDG_RUNTIME_DIR/enso/` or if its missing, `ENSO_DATA_DIRECTORY`   | `ENSO_DATA_DIRECTORY`                         | `%LocalAppData%/enso`        |
 | `ENSO_LOG_DIRECTORY`     | `$XDG_CACHE_HOME/enso` or if its missing, `ENSO_DATA_DIRECTORY/log` | `$HOME/Library/Logs/org.enso/`                | `%LocalAppData%/enso/log`    |
-
-### Installing from a Portable Distribution
-
-After downloading and extracting the portable distribution, the user can run
-`extraction-location/bin/enso install distribution` to install it locally. This
-will copy the files from the portable distribution into the installed locations
-which are described above and then remove the original files.
-
-On Linux and macOS, if `ENSO_BIN_DIRECTORY` (`~/.local/bin` by default) is not
-on system `PATH`, the installer will issue a warning, telling the user how they
-can add it. On Windows, the installer automatically adds `ENSO_BIN_DIRECTORY` to
-the user's `PATH`.
-
-The installed distribution can be removed by running
-`enso uninstall distribution`.
 
 ## Layout of an Enso Version Package
 

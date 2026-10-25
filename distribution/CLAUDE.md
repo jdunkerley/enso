@@ -12,12 +12,10 @@ data and layout.
   development — release engineering rewrites it). See `lib/Standard/CLAUDE.md`.
 - `engine/` — Auxiliary files shipped alongside the compiled engine (component
   group metadata, etc.).
-- `launcher/` — Bundled resources for the Enso launcher.
 - `bin/` — Scripts shipped in the distribution.
 - `edition.template.yaml` — Template for edition manifests produced at release
   time.
 - `manifest.template.yaml` — Template for the distribution manifest.
-- `launcher-manifest.yaml` — Manifest describing launcher version metadata.
 
 ## Editions and libraries
 

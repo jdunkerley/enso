@@ -22,10 +22,8 @@ module org.enso.runtime.version.manager {
   requires org.yaml.snakeyaml;
 
   exports org.enso.runtimeversionmanager;
-  exports org.enso.runtimeversionmanager.cli;
   exports org.enso.runtimeversionmanager.config;
   exports org.enso.runtimeversionmanager.components;
   exports org.enso.runtimeversionmanager.releases.engine;
   exports org.enso.runtimeversionmanager.releases.graalvm;
-  exports org.enso.runtimeversionmanager.runner;
 }

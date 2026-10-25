@@ -13,23 +13,15 @@ that we have a well-defined release policy. This document defines said policy.
 
 > **Once a release has been made it is immutable. The release should only ever
 > be edited to mark it as broken. Nothing else should ever be changed.**
->
-> **No two release workflows can be running at once, to avoid race conditions
-> since releases
-> [must update files in S3](fallback-launcher-release-infrastructure.md#updating-the-release-list).
-> Make sure that tags which trigger release builds are pushed sequentially, only
-> pushing the next one after the previous build has finished.**
 
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 
 - [Versioning](#versioning)
-  - [Launcher Versioning](#launcher-versioning)
 - [Release Branches](#release-branches)
 - [Release Workflow](#release-workflow)
   - [Breaking Release Workflow](#breaking-release-workflow)
   - [Tag Naming](#tag-naming)
   - [Manifest Files](#manifest-files)
-  - [Breaking Changes to Launcher Upgrade](#breaking-changes-to-launcher-upgrade)
   - [GitHub Releases](#github-releases)
   - [Release Notes](#release-notes)
 - [Version Support](#version-support)
@@ -54,11 +46,6 @@ following hold:
 - Backwards-compatible bug fixes will result in a patch version increase.
 - The tag will indicate pre-release versions, and will increase when any
   pre-release change is made. These are not intended to be stable.
-
-### Launcher Versioning
-
-The launcher is released alongside Enso releases, so the launcher version is
-tied to the Enso version that it is released with.
 
 ## Release Workflow
 
@@ -111,9 +98,13 @@ the Enso tooling.
 
 #### Engine Manifest
 
-Each GitHub release contains an asset named `manifest.yaml` which is a YAML file
-containing metadata regarding the release. The manifest is also included in the
-root of an Enso version package. It has at least the following fields:
+> **This fork:** the manifest is not a release asset; it ships inside the engine
+> package. `minimum-launcher-version` is kept only because `Manifest` requires
+> the field.
+
+Each engine package contains a file named `manifest.yaml` at its root, a YAML
+file containing metadata regarding the release. It has at least the following
+fields:
 
 - `minimum-launcher-version` - specifies the minimum version of the launcher
   that should be used with this release of Enso,
@@ -167,52 +158,6 @@ stored in
 [`distribution/manifest.template.yaml`](../../distribution/manifest.template.yaml)
 and other values are added to this template at build time.
 
-#### Launcher Manifest
-
-Additionally, each release should contain an asset named
-`launcher-manifest.yaml` which contains launcher-specific release metadata.
-
-It contains the following fields:
-
-- `minimum-version-for-upgrade` - specifies the minimum version of the launcher
-  that is allowed to upgrade to this launcher version. If a launcher is older
-  than the version specified here it must perform the upgrade in steps, first
-  upgrading to an older version newer than `minimum-version-for-upgrade` and
-  only then, using that version, to the target version. This logic ensures that
-  if a newer launcher version required custom upgrade logic not present in older
-  versions, the upgrade can still be performed by first upgrading to a newer
-  version that does not require the new logic but knows about it and continuing
-  the upgrade with that knowledge.
-- `files-to-copy` - a list of files that should be copied into the
-  distribution's data root. This may include the `README` and similar files, so
-  that after the upgrade these additional files are also up-to-date. These files
-  are treated as non-essential, i.e. an error when copying them will not cancel
-  the upgrade (but it should be reported).
-- `directories-to-copy` - a list of directories that should be copied into the
-  distribution's data root. Acts similarly to `files-to-copy`.
-
-A template manifest file, located in
-[`distribution/launcher-manifest.yaml`](../../distribution/launcher-manifest.yaml),
-is automatically copied to the release. If any new files or directories are
-added or a breaking change to the upgrade mechanism is being made, this manifest
-template must be updated accordingly.
-
-### Breaking Changes to Launcher Upgrade
-
-If at any point the launcher's upgrade mechanism needs an update, i.e.
-additional logic must be added that was not present before, special action is
-required.
-
-First, the additional logic has to be implemented and a new launcher version
-should be released which includes this additional logic, but does not require it
-yet. Then, another version can be released that can depend on this new logic and
-its `minimum-version-for-upgrade` has to be bumped to that previous version
-which already includes new logic but does not depend on it.
-
-This way, old launcher versions can first upgrade to a version that contains the
-new logic (as it does not depend on it yet, the upgrade is possible) and using
-that new version, upgrade to the target version that depends on that logic.
-
 ### GitHub Releases
 
 A release is considered _official_ once it has been made into a release on
@@ -221,21 +166,11 @@ may not be changed in any way, except to mark it as broken.
 
 #### Release Assets Structure
 
-Each release contains a build of the Enso engine and native launcher binaries
-for each supported platform. Moreover, for convenience, it should include
-bundles containing native launcher binaries and the latest engine build for each
-platform. So each release should contain the following assets:
-
-- `enso-bundle-<version>-linux-amd64.tar.gz`
-- `enso-bundle-<version>-macos-amd64.tar.gz`
-- `enso-bundle-<version>-windows-amd64.zip`
-- `enso-engine-<version>-linux-amd64.tar.gz`
-- `enso-engine-<version>-macos-amd64.tar.gz`
-- `enso-engine-<version>-windows-amd64.zip`
-- `enso-launcher-<version>-linux-amd64.tar.gz`
-- `enso-launcher-<version>-macos-amd64.tar.gz`
-- `enso-launcher-<version>-windows-amd64.zip`
-- `manifest.yaml`
+Each release contains the IDE installer for each supported platform (Windows,
+Linux and, when the Mac runner is online, macOS), each with its `.sha256`
+checksum, and the update feeds `electron-updater` reads (`latest.yml`,
+`latest-linux.yml` and the blockmaps). Every installer bundles the engine and
+GraalVM, so nothing else needs downloading.
 
 #### Marking a Release as Broken
 
@@ -256,9 +191,8 @@ project specifies _an exact version match_, and it _must not_ be used in new
 projects by the launcher unless _explicitly_ specified by the user as an exact
 version match.
 
-When the release is marked as broken at GitHub, a GitHub Actions
-[Workflow](fallback-launcher-release-infrastructure.md#marking-the-release-as-broken)
-is triggered that also updates the release in the fallback mechanism. Given its
+When the release is marked as broken at GitHub, a GitHub Actions workflow is
+triggered that also updates the release in the fallback mechanism. Given its
 current implementation is prone to race conditions when updating releases, the
 `broken` file should be added to releases one by one, making sure that only one
 update workflow is running at the same time and that no release workflows are

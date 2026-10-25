@@ -147,9 +147,8 @@ and output target via section in `application.conf` configuration file. The
 configuration is using HOCON-style, as defined by
 [lightbend/config](https://github.com/lightbend/config). Individual values
 accepted in the config are inspired by SLF4J's properties, formatting and
-implementations. Currently 3 components define logging configuration:
+implementations. Currently one component defines logging configuration:
 
-- [`launcher`](../../engine/launcher/src/main/resources/application.conf)
 - [CLI](../../engine/runner/src/main/resources/application.conf)
 
 The configuration has two main sections:
@@ -291,9 +290,9 @@ ENSO_LOGSERVER_APPENDER=console ./project-manager
 
 #### Engine runner
 
-When executing the engine runner component, i.e., CLI usage, via `ensoup` or
-`enso`, the default log output can be overwritten by defining the
-`ENSO_APPENDER_DEFAULT` env variable
+When executing the engine runner component, i.e., CLI usage, via `enso`, the
+default log output can be overwritten by defining the `ENSO_APPENDER_DEFAULT`
+env variable
 
 #### Format
 
@@ -441,10 +440,9 @@ the first project's log file, lost them once that project closed, or - when an
 unrelated program owned port 6000 - sent them to that program. See Note [Each
 Process Hosts Its Own Logging Server] in `LoggingSetupHelper`.
 
-Nothing else hosts a logging server. The launcher passes `--logger-connect` to
-the engine runners it spawns only when it has a logging server endpoint, which
-it never does; the IDE's project manager (`app/project-manager-shim`) passes
-nothing logging-related to the language servers it starts.
+Nothing else hosts a logging server. The IDE's project manager
+(`app/project-manager-shim`) passes nothing logging-related to the language
+servers it starts.
 
 ## Telemetry
 

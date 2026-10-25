@@ -9,15 +9,12 @@ order: 5
 # Getting Enso
 
 Enso packages are best obtained from the
-[releases](https://github.com/enso-org/enso/releases) page of the repository.
-Each release has an "Assets" section at the bottom. You can click on this to
-view the list of artifacts from which you can download the most appropriate
-version.
+[releases](https://github.com/jdunkerley/enso/releases) page of this fork. Each
+release has an "Assets" section at the bottom. You can click on this to view the
+list of artifacts from which you can download the most appropriate version.
 
-These assets contain bundles that include the `ensoup` updater, an engine
-version, and GraalVM, allowing you to get up and running immediately.
-Alternatively, you can download just the updater, which will handle downloading
-and installing the required components for you.
+These assets are the IDE installers for Windows, Linux and macOS. Each one
+includes the engine and GraalVM, allowing you to get up and running immediately.
 
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 

@@ -19,8 +19,6 @@ workspace. These are the parser and its building blocks; the parser's WASM shim
 - `zst/` — Zero-sized type newtype utilities, clearer replacement for bare
   `PhantomData`. Published.
 - `macro-utils/` — `proc-macro2`/`syn`/`quote` helpers. Published.
-- `launcher-shims/` — Tiny proxy binaries used only by the launcher self-upgrade
-  test suite.
 
 ## Conventions
 
