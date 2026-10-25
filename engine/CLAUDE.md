@@ -13,15 +13,13 @@ the **Truffle** framework.
   methods, and the runtime-server instrument that exposes live execution info.
 - `language-server/` — Enso Language Server. Talks JSON-RPC + binary data-link
   over WebSocket to IDEs (our Electron client, VS Code, etc.).
-- `runner/` — CLI entry point (`enso` / `ensoup` command). Parses args,
-  constructs a GraalVM polyglot `Context`, loads the runtime language.
+- `runner/` — CLI entry point (`enso` command). Parses args, constructs a
+  GraalVM polyglot `Context`, loads the runtime language.
 - `polyglot-api/` + `polyglot-api-macros/` — Stable wire-format types used to
   cross the language/embedder boundary between `runtime/` (Truffle-side) and
   `language-server/` (embedder-side). Uses `enso-persistance` for custom
   serialization.
 - `common/` — Shared constants/interfaces used by multiple engine submodules.
-- `launcher/` — The `enso` launcher binary (Native Image-compiled) that resolves
-  the right engine version and invokes it.
 - `runner-common/` — Shared between multiple runner variants (CLI, Jupyter
   kernel, REPL).
 - `runtime-parser/`, `runtime-parser-dsl/`, `runtime-parser-processor/`,

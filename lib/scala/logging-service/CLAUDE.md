@@ -1,8 +1,8 @@
 # lib/scala/logging-service
 
 Process-level logging setup, independent of the logback backend:
-`LoggingSetupHelper` (each service - language server, launcher - subclasses it)
-and `LoggingServiceManager` (starts this process's logging server through the
+`LoggingSetupHelper` (the language server subclasses it) and
+`LoggingServiceManager` (starts this process's logging server through the
 `LoggingServiceFactory` service). Overview: `docs/infrastructure/logging.md`.
 
 - `LoggingSetupHelper.setup(Level, boolean)` starts the logging server when the

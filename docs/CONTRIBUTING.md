@@ -188,8 +188,9 @@ In order to build and run Enso you will need the following tools:
   that differs and how to install the right one.
 - On MacOS and Linux, the `tar` command is required for running some tests. It
   should be installed by default on most distributions.
-- If you want to be able to build the `ensoup` Native Image, you will need a
-  native C compiler for your platform as described in the
+- If you want to be able to build the `enso` Native Image
+  (`ENSO_LAUNCHER=native`), you will need a native C compiler for your platform
+  as described in the
   [Native Image Prerequisites](https://www.graalvm.org/reference-manual/native-image/#prerequisites).
   On Linux that will be `gcc`, on macOS you may need `xcode` and on Windows you
   need to configure the Developer Command Prompt for Microsoft Visual C++ for

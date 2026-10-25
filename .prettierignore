@@ -5,7 +5,6 @@ target
 
 .github/PULL_REQUEST_TEMPLATE.md
 .github/ISSUE_TEMPLATE
-distribution/launcher/THIRD-PARTY
 distribution/engine/THIRD-PARTY
 distribution/edition.template.yaml
 tools/*

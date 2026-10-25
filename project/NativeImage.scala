@@ -570,11 +570,11 @@ object NativeImage {
 
 /* Note [Static Build On Linux]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * The default `glibc` contains a bug that would cause crashes when downloading
- * files form the internet, which is a crucial Launcher functionality. Instead,
- * `musl` is suggested by Graal as an alternative libc. The sbt task
- * automatically downloads a bundle containing all requirements for a static
- * build with `musl`.
+ * The default `glibc` contains a bug that would cause crashes when a statically
+ * linked image downloads files from the internet. Instead, `musl` is suggested
+ * by Graal as an alternative libc. The sbt task automatically downloads a
+ * bundle containing all requirements for a static build with `musl`. No image
+ * currently sets `staticOnLinux`.
  *
  * The `musl` bundle that we use is not guaranteed to be maintained, so if in
  * the future a new version of `musl` comes out and we need to upgrade, we may

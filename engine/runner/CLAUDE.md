@@ -26,7 +26,6 @@ needs from the language comes back through `Value`.
 
 ## Native Image
 
-The runner is compiled to a native binary via Native Image for the
-`enso`/`ensoup` commands (see `docs/infrastructure/native-image.md`). Avoid
-anything that's not Native-Image-friendly (e.g. dynamic class loading,
-reflection without config).
+The runner is compiled to a native binary via Native Image for the `enso`
+command (see `docs/infrastructure/native-image.md`). Avoid anything that's not
+Native-Image-friendly (e.g. dynamic class loading, reflection without config).

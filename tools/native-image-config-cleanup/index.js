@@ -3,9 +3,7 @@ const path = require('path')
 const process = require('child_process')
 
 /// List of configs to clean.
-const configPaths = [
-  '../../engine/launcher/src/main/resources/META-INF/native-image/org/enso/launcher',
-]
+const configPaths = []
 
 /// Checks if the entry is ephemeral (contains a pointer in its name).
 function isEntryEphemeralClass(entry) {

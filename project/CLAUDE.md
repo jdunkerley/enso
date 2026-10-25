@@ -12,8 +12,8 @@ Every non-trivial build concern the engine has lives here as a Scala file.
 - `FrgaalJavaCompiler.scala` — Wires up the [Frgaal](https://frgaal.org/) Java
   compiler so we can use modern Java language features while targeting older
   bytecode versions.
-- `NativeImage.scala` — Native Image task definitions for the launcher and
-  `ensoup`.
+- `NativeImage.scala` — Native Image task definitions (the `enso` runner, the
+  ydoc server and the tests' images).
 - `GraalVM.scala` — Graal detection and options.
 - `Cargo.scala` — Calls into the Rust workspace (for parser JNI + wasm).
 - `GenerateFlatbuffers.scala` — Runs `flatc` (from `toolchains/flatc/`) to

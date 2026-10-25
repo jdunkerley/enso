@@ -147,9 +147,8 @@ and output target via section in `application.conf` configuration file. The
 configuration is using HOCON-style, as defined by
 [lightbend/config](https://github.com/lightbend/config). Individual values
 accepted in the config are inspired by SLF4J's properties, formatting and
-implementations. Currently 3 components define logging configuration:
+implementations. Currently one component defines logging configuration:
 
-- [`launcher`](../../engine/launcher/src/main/resources/application.conf)
 - [CLI](../../engine/runner/src/main/resources/application.conf)
 
 The configuration has two main sections:
@@ -291,9 +290,9 @@ ENSO_LOGSERVER_APPENDER=console ./project-manager
 
 #### Engine runner
 
-When executing the engine runner component, i.e., CLI usage, via `ensoup` or
-`enso`, the default log output can be overwritten by defining the
-`ENSO_APPENDER_DEFAULT` env variable
+When executing the engine runner component, i.e., CLI usage, via `enso`, the
+default log output can be overwritten by defining the `ENSO_APPENDER_DEFAULT`
+env variable
 
 #### Format
 

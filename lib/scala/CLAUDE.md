@@ -1,8 +1,8 @@
 # lib/scala
 
 Scala support libraries for the engine. Each subdir is an SBT subproject (see
-`build.sbt`, `project/`). These are the building blocks that the runtime,
-language server, and launcher share.
+`build.sbt`, `project/`). These are the building blocks that the runtime, and
+language server share.
 
 ## Module map
 
@@ -22,7 +22,8 @@ language server, and launcher share.
   LibraryRepository / Enso Cloud).
 - `searcher/` — Completion database backing the LS `search/*` endpoints.
 - `refactoring-utils/` — Shared rename/refactor helpers consumed by the LS.
-- `cli/` — Shared argument-parsing / CLI support used by launcher and runner.
+- `cli/` — Shared argument-parsing / CLI support used by the runner and the
+  language server.
 - `json-rpc-server/` — Akka-based JSON-RPC server core (used by
   `language-server`).
 - `filewatcher/` — File-system watcher (inotify/FSEvents/ReadDirectoryChangesW)

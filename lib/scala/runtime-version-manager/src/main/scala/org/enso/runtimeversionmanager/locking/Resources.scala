@@ -6,14 +6,6 @@ import org.enso.runtimeversionmanager.components.GraalVMVersion
 
 object Resources {
 
-  /** Synchronizes launcher upgrades. */
-  case object LauncherExecutable extends Resource {
-    override def name: String = "launcher-executable"
-    override def waitMessage: String =
-      "Another upgrade is in progress, " +
-      "the current process must wait until it is completed."
-  }
-
   /** This resource is held when adding or removing any components. */
   case object AddOrRemoveComponents extends Resource {
     override def name: String = "add-remove-components"

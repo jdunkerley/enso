@@ -99,9 +99,6 @@ object DistributionPackage {
     }
   }
 
-  private def executableName(baseName: String): String =
-    if (Platform.isWindows) baseName + ".exe" else baseName
-
   private def batOrExeName(baseName: String): String =
     if (Platform.isWindows) {
       if (GraalVM.EnsoLauncher.native) {
@@ -800,35 +797,6 @@ object DistributionPackage {
     IO.write(destination, base + extensions)
   }
 
-  def createLauncherPackage(
-    distributionRoot: File,
-    cacheFactory: CacheStoreFactory
-  ): Unit = {
-    copyDirectoryIncremental(
-      file("distribution/launcher/THIRD-PARTY"),
-      distributionRoot / "THIRD-PARTY",
-      cacheFactory.make("launcher-third-party")
-    )
-
-    copyFilesIncremental(
-      Seq(file(executableName("ensoup"))),
-      distributionRoot / "bin",
-      cacheFactory.make("launcher-exe")
-    )
-
-    IO.createDirectory(distributionRoot / "dist")
-    IO.createDirectory(distributionRoot / "runtime")
-
-    copyFilesIncremental(
-      Seq(
-        file("distribution/launcher/.enso.bundle"),
-        file("distribution/launcher/README.md")
-      ),
-      distributionRoot,
-      cacheFactory.make("launcher-rootfiles")
-    )
-  }
-
   sealed trait OS {
     def name:                String
     def hasSupportForSulong: Boolean
@@ -905,12 +873,7 @@ object DistributionPackage {
   }
 
   /** A helper class that manages building distribution artifacts. */
-  class Builder(
-    ensoVersion: String,
-    graalVersion: String,
-    graalJavaVersion: String,
-    val artifactRoot: File
-  ) {
+  class Builder(ensoVersion: String, val artifactRoot: File) {
 
     def artifactName(
       component: String,
@@ -918,133 +881,6 @@ object DistributionPackage {
       architecture: Architecture
     ): String =
       s"enso-$component-$ensoVersion-${os.name}-${architecture.name}"
-
-    private def extractZip(archive: File, root: File): Unit = {
-      IO.createDirectory(root)
-      val exitCode = Process(
-        Seq("unzip", "-q", archive.toPath.toAbsolutePath.normalize.toString),
-        cwd = Some(root)
-      ).!
-      if (exitCode != 0) {
-        throw new RuntimeException(s"Cannot extract $archive.")
-      }
-    }
-
-    private def listZip(archive: File): Seq[File] = {
-      val suppressStdErr = ProcessLogger(_ => ())
-      val zipList = Process(
-        Seq("zip", "-l", archive.toPath.toAbsolutePath.normalize.toString)
-      )
-      zipList.lineStream(suppressStdErr).map(file)
-    }
-
-    private def extractTarGz(archive: File, root: File): Unit = {
-      IO.createDirectory(root)
-      val exitCode = Process(
-        Seq(
-          "tar",
-          "xf",
-          archive.toPath.toAbsolutePath.toString
-        ),
-        cwd = Some(root)
-      ).!
-      if (exitCode != 0) {
-        throw new RuntimeException(s"Cannot extract $archive.")
-      }
-    }
-
-    private def extract(archive: File, root: File): Unit = {
-      if (archive.getName.endsWith("zip")) {
-        extractZip(archive, root)
-      } else {
-        extractTarGz(archive, root)
-      }
-    }
-
-    private def graalArchive(os: OS, architecture: Architecture): File = {
-      val packageDir =
-        artifactRoot / s"graalvm-$graalVersion-${os.name}-${architecture.name}"
-      if (!packageDir.exists()) {
-        IO.createDirectory(packageDir)
-      }
-      val archiveName =
-        s"graalvm-${os.name}-${architecture.name}-$graalVersion-$graalJavaVersion"
-      packageDir / (archiveName + os.archiveExt)
-    }
-
-    private def copyGraal(
-      os: OS,
-      architecture: Architecture,
-      runtimeDir: File
-    ): Unit = {
-      val archive = graalArchive(os, architecture)
-      extract(archive, runtimeDir)
-    }
-
-    def copyEngine(os: OS, architecture: Architecture, distDir: File): Unit = {
-      val engine = builtArtifact("engine", os, architecture)
-      if (!engine.exists()) {
-        throw new IllegalStateException(
-          s"Cannot create bundle for $os / $architecture because corresponding " +
-          s"engine has not been built."
-        )
-      }
-
-      IO.copyDirectory(engine / s"enso-$ensoVersion", distDir / ensoVersion)
-    }
-
-    def makeExecutable(file: File): Unit = {
-      val ownerOnly = false
-      file.setExecutable(true, ownerOnly)
-    }
-
-    def fixLauncher(root: File, os: OS): Unit = {
-      makeExecutable(root / "enso" / "bin" / os.executableName("enso"))
-      IO.createDirectories(
-        Seq("dist", "config", "runtime").map(root / "enso" / _)
-      )
-    }
-
-    def makeArchive(root: File, rootDir: String, target: File): Unit = {
-      val exitCode = if (target.getName.endsWith("zip")) {
-        Process(
-          Seq(
-            "zip",
-            "-9",
-            "-q",
-            "-r",
-            target.toPath.toAbsolutePath.normalize.toString,
-            rootDir
-          ),
-          cwd = Some(root)
-        ).!
-      } else {
-        Process(
-          Seq(
-            "tar",
-            "--use-compress-program=gzip -9",
-            "-cf",
-            target.toPath.toAbsolutePath.normalize.toString,
-            rootDir
-          ),
-          cwd = Some(root),
-          // Keeps macOS `tar` from adding `._` entries for files with extended attributes. See
-          // Note [Archives Without AppleDouble Entries] in
-          // `build_tools/ci_utils/src/programs/tar.rs`.
-          "COPYFILE_DISABLE" -> "1"
-        ).!
-      }
-      if (exitCode != 0) {
-        throw new RuntimeException(s"Failed to create archive $target")
-      }
-    }
-
-    /** Path to an arbitrary built artifact. */
-    def builtArtifact(
-      component: String,
-      os: OS,
-      architecture: Architecture
-    ): File = artifactRoot / artifactName(component, os, architecture)
 
     /** The OS and architecture of this machine, as the artifact names spell them. */
     def localPlatform: (OS, Architecture) = {
@@ -1067,107 +903,6 @@ object DistributionPackage {
     def localArtifact(component: String): File = {
       val (os, architecture) = localPlatform
       artifactRoot / artifactName(component, os, architecture)
-    }
-
-    /** Path to a built archive.
-      *
-      * These archives are built by [[makePackages]] and [[makeBundles]].
-      */
-    def builtArchive(
-      component: String,
-      os: OS,
-      architecture: Architecture
-    ): File =
-      artifactRoot / (artifactName(
-        component,
-        os,
-        architecture
-      ) + os.archiveExt)
-
-    private def cleanDirectory(dir: File): Unit = {
-      for (f <- IO.listFiles(dir)) {
-        IO.delete(f)
-      }
-    }
-
-    /** Creates compressed and ready for release packages for the launcher and
-      * engine.
-      *
-      * A project manager package is not created, as we release only its bundle.
-      * See [[makeBundles]].
-      *
-      * It does not trigger any builds. Instead, it uses available artifacts
-      * placed in `artifactRoot`. These artifacts may be created using the
-      * `enso/build*Distribution` tasks or they may come from other workers (as
-      * is the case in the release CI where the artifacts are downloaded from
-      * other jobs).
-      */
-    def makePackages = Command.command("makePackages") { state =>
-      val log = state.log
-      for {
-        os   <- OS.platforms
-        arch <- os.archs
-      } {
-        val launcher = builtArtifact("launcher", os, arch)
-        if (launcher.exists()) {
-          fixLauncher(launcher, os)
-          val archive = builtArchive("launcher", os, arch)
-          makeArchive(launcher, "enso", archive)
-          log.info(s"Created $archive")
-        }
-
-        val engine = builtArtifact("engine", os, arch)
-        if (engine.exists()) {
-          if (os.isUNIX) {
-            makeExecutable(engine / s"enso-$ensoVersion" / "bin" / "enso")
-          }
-          val archive = builtArchive("engine", os, arch)
-          makeArchive(engine, s"enso-$ensoVersion", archive)
-          log.info(s"Created $archive")
-        }
-      }
-      state
-    }
-
-    /** Creates launcher bundle that includes the component
-      * itself, the engine and a Graal runtime.
-      *
-      * It will download the GraalVM runtime and cache it in `artifactRoot` so
-      * further invocations for the same version will not need to download it.
-      *
-      * It does not trigger any builds. Instead, it uses available artifacts
-      * placed in `artifactRoot`. These artifacts may be created using the
-      * `enso/build*Distribution` tasks or they may come from other workers (as
-      * is the case in the release CI where the artifacts are downloaded from
-      * other jobs).
-      */
-    def makeBundles = Command.command("makeBundles") { state =>
-      val log = state.log
-      for {
-        os   <- OS.platforms
-        arch <- os.archs
-      } {
-        val launcher = builtArtifact("launcher", os, arch)
-        if (launcher.exists()) {
-          fixLauncher(launcher, os)
-          copyEngine(os, arch, launcher / "enso" / "dist")
-          copyGraal(
-            os,
-            arch,
-            launcher / "enso" / "runtime" / s"graalvm-ce-java$graalJavaVersion-$graalVersion/"
-          )
-
-          val archive = builtArchive("bundle", os, arch)
-          makeArchive(launcher, "enso", archive)
-
-          cleanDirectory(launcher / "enso" / "dist")
-          cleanDirectory(launcher / "enso" / "runtime")
-
-          log.info(s"Created $archive")
-        }
-
-      }
-      state
     }
   }
 }

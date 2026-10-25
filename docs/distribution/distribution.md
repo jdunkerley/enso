@@ -13,7 +13,6 @@ structured and how it should behave.
 
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 
-- [Universal Launcher](#universal-launcher)
 - [Enso Distribution Layout](#enso-distribution-layout)
   - [Portable Enso Distribution Layout](#portable-enso-distribution-layout)
   - [Installed Enso Distribution Layout](#installed-enso-distribution-layout)
@@ -23,23 +22,6 @@ structured and how it should behave.
 - [Enso Home Layout](#enso-home-layout)
 
 <!-- /MarkdownTOC -->
-
-## Universal Launcher
-
-The [universal launcher](./launcher.md) should be able to launch the proper
-version of Enso executable based on the version specified in the project being
-run, or use the default version if none specified. It should also be able to
-launch other Enso components, provided as
-[plugins](./launcher.md#running-plugins).
-
-<!--
-> This launcher is under development. Until it is in a ready-to-use state, the
-> Enso version packages provide simple launcher scripts in the `bin` directory
-> of that package. They are a temporary replacement for the launcher
-> functionality, so once the universal launcher matures, they will be removed.
-> The universal launcher will not call the components through these scripts, as
-> it must have full control over which JVM is chosen and its parameters.
--->
 
 ## Enso Distribution Layout
 
@@ -56,8 +38,6 @@ The directory structure is as follows:
 
 ```
 extraction-location
-├── bin
-│   └── ensoup              # The universal launcher, responsible for choosing the appropriate compiler version.
 ├── config
 │   └── global-config.yaml  # Global user configuration.
 ├── dist                    # Per-compiler-version distribution directories.
@@ -114,7 +94,6 @@ ENSO_CONFIG_DIRECTORY
 └── global-config.yaml      # Global user configuration.
 
 ENSO_BIN_DIRECTORY
-└── ensoup                  # The universal launcher, responsible for choosing the appropriate compiler version.
 ```
 
 Where `ENSO_DATA_DIRECTORY`, `ENSO_CONFIG_DIRECTORY` and `ENSO_BIN_DIRECTORY`

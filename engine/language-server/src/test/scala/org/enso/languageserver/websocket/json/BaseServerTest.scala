@@ -413,8 +413,8 @@ abstract class BaseServerTest
   }
 
   /** As we are testing the language server, we want to imitate the location
-    * context of the runner.jar, while the default implementation of this method
-    * was more suited towards testing the launcher.
+    * context of the runner.jar, rather than the default `bin/enso` in the test
+    * directory.
     */
   override def fakeExecutablePath(portable: Boolean): Path =
     Path.of("distribution/component/runner/runner.jar")

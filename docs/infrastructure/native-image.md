@@ -11,8 +11,8 @@ order: 3
 [`NativeImage`](../../project/NativeImage.scala) defines a task that is used for
 compiling a project into a native binary using Graal's Native Image. It compiles
 the project and runs the Native Image tool which builds the image. Currently,
-Native Image is used for building the `ensoup` launcher and `enso` executable
-once one **opts-in** to it via `ENSO_LAUNCHER` option.
+Native Image is used for building the `enso` executable once one **opts-in** to
+it via `ENSO_LAUNCHER` option.
 
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 
@@ -22,7 +22,6 @@ once one **opts-in** to it via `ENSO_LAUNCHER` option.
 - [Static Builds](#static-builds)
 - [No Cross-Compilation](#no-cross-compilation)
 - [Configuration](#configuration)
-  - [`ensoup` Configuration](#ensoup-configuration)
   - [Engine Configuration](#engine-configuration)
 - [Tips and tricks](#tips-and-tricks)
 
@@ -64,8 +63,7 @@ replaced with absolute paths to the bundle location.
 
 The task is parametrized with `staticOnLinux` parameter which if set to `true`,
 will statically link the built binary, to ensure portability between Linux
-distributions. For Windows and MacOS, the binaries should generally be portable,
-as described in [`ensoup` Portability](../distribution/launcher.md#portability).
+distributions. For Windows and MacOS, the binaries should generally be portable.
 
 ## No Cross-Compilation
 
@@ -107,14 +105,8 @@ java \
   <application arguments>
 ```
 
-For example, to update settings for the Launcher project:
-
-```bash
-java -agentlib:native-image-agent=config-merge-dir=engine/launcher/src/main/resources/META-INF/native-image/org/enso/launcher -jar launcher.jar <arguments>
-```
-
-Note that for convenience, you can run the launcher/engine runtime via
-`bin/enso`, e.g.
+For example, to update the settings for the engine runner, run it via
+`bin/enso`:
 
 ```bash
 env JAVA_TOOL_OPTIONS="-agentlib:native-image-agent=config-merge-dir=./engine/runner/src/main/resources/META-INF/native-image/org/enso/runner" ./built-distribution/enso-engine-0.0.0-dev-linux-amd64/enso-0.0.0-dev/bin/enso --run tmp.enso
@@ -140,32 +132,6 @@ After updating the Native Image configuration, make sure to clean it by running
 ```
 cd tools/native-image-config-cleanup && npm install && npm start
 ```
-
-### `ensoup` Configuration
-
-In case of the launcher, to gather the relevant reflective accesses one wants to
-test as many execution paths as possible, especially the ones that are likely to
-use reflection. One of these areas is HTTP support and archive extraction.
-
-To trace this accesses, it is good to run at least
-`... launcher.jar install engine` which will trigger HTTP downloads and archive
-extraction.
-
-Currently, archive-related accesses are platform dependent - Linux launcher only
-uses `.tar.gz` and Windows uses `.zip`. While the Linux launcher never unpacks
-ZIP files, we can manually force it to do so, to register the reflection
-configuration that will than be used on Windows to enable ZIP extraction.
-
-To force the launcher to extract a ZIP on Linux, one can add the following code
-snippet (with the necessary imports) to `org.enso.launcher.cli.Main.main`:
-
-```
-Archive.extractArchive(Path.of("enso-engine-windows.zip"), Path.of("somewhere"), None)
-```
-
-With this snippet, `launcher.jar` should be built using the
-`launcher / assembly` task, and the tracing tool should be re-run as shown
-above.
 
 Moreover, some reflective accesses may not be detected by the tool
 automatically, so they may need to be added manually. One of them is an access

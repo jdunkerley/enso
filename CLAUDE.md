@@ -48,8 +48,7 @@ Three, **which one to use depends on what you're building**:
 
 - **Cargo** — only for the parser: the `[workspace]` in root `Cargo.toml` (the
   parser crates under `lib/rust/`, `parser/debug` and its fuzzer,
-  `app/rust-ffi`, and `lib/rust/launcher-shims` until the standalone launcher
-  goes). sbt and the pnpm `postinstall` run it for you.
+  `app/rust-ffi`). sbt and the pnpm `postinstall` run it for you.
 - **pnpm + Vite/esbuild** — for the TypeScript monorepo (packages listed in
   `pnpm-workspace.yaml`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See

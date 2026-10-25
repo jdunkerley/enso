@@ -97,11 +97,6 @@ def makeStdLibDistribution(
 
 GatherLicenses.distributions := Seq(
   Distribution(
-    "launcher",
-    file("distribution/launcher/THIRD-PARTY"),
-    Distribution.sbtProjects(launcher)
-  ),
-  Distribution(
     "engine",
     file("distribution/engine/THIRD-PARTY"),
     Distribution.sbtProjects(
@@ -190,10 +185,8 @@ lazy val packageBuilder = SettingKey[DistributionPackage.Builder](
 packageBuilder := {
   val artifactRoot = distributionArtifactRoot.value
   new DistributionPackage.Builder(
-    ensoVersion      = ensoVersion,
-    graalVersion     = graalMavenPackagesVersion,
-    graalJavaVersion = graalVersion,
-    artifactRoot     = artifactRoot
+    ensoVersion  = ensoVersion,
+    artifactRoot = artifactRoot
   )
 }
 
@@ -432,7 +425,6 @@ lazy val enso = (project in file("."))
     `jvm-interop`,
     `language-server`,
     `language-server-deps-wrapper`,
-    launcher,
     `library-manager`,
     `locking-test-helper`,
     `logging-config`,
@@ -517,19 +509,10 @@ lazy val enso = (project in file("."))
   )
   .settings(Global / concurrentRestrictions += Tags.exclusive(Exclusive))
   .settings(
-    commands ++= {
-      Seq(
-        packageBuilder.value.makePackages,
-        packageBuilder.value.makeBundles
-      )
-    }
-  )
-  .settings(
     clean := Def.task {
       val _ = clean.value
       val filesToDelete = Seq(
         engineDistributionRoot.value,
-        launcherDistributionRoot.value,
         packageBuilder.value.artifactRoot
       )
       IO.delete(filesToDelete)
@@ -4128,97 +4111,6 @@ lazy val extraNITestLibs =
     "List of extra test libraries to be included in Native Image"
   )
 
-lazy val launcher = project
-  .in(file("engine/launcher"))
-  .enablePlugins(JPMSPlugin)
-  .configs(Test)
-  .settings(
-    frgaalJavaCompilerSetting,
-    mixedJavaScalaProjectSetting,
-    resolvers += Resolver.bintrayRepo("gn0s1s", "releases"),
-    commands += WithDebugCommand.withDebug,
-    libraryDependencies ++= slf4jApi ++ logbackPkg ++ Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"    % scalaLoggingVersion,
-      "org.apache.commons"          % "commons-compress" % commonsCompressVersion,
-      "org.scalatest"              %% "scalatest"        % scalatestVersion          % Test,
-      "org.graalvm.polyglot"        % "polyglot"         % graalMavenPackagesVersion % "provided",
-      akkaSLF4J
-    ),
-    Compile / moduleDependencies := {
-      (`logging-utils` / Compile / moduleDependencies).value ++
-      (`logging-service` / Compile / moduleDependencies).value ++
-      (`logging-service-logback` / Compile / moduleDependencies).value ++
-      (`logging-config` / Compile / moduleDependencies).value
-    },
-    Compile / internalModuleDependencies := {
-      (`logging-utils` / Compile / internalModuleDependencies).value ++
-      (`logging-service` / Compile / internalModuleDependencies).value ++
-      (`logging-service-logback` / Compile / internalModuleDependencies).value ++
-      (`logging-config` / Compile / internalModuleDependencies).value ++
-      Seq(
-        (`logging-utils` / Compile / exportedModule).value,
-        (`logging-service` / Compile / exportedModule).value,
-        (`logging-service-logback` / Compile / exportedModule).value,
-        (`logging-config` / Compile / exportedModule).value
-      )
-    }
-  )
-  .settings(
-    NativeImage.smallJdk := None,
-    NativeImage.additionalCp := Seq.empty,
-    rebuildNativeImage := Def
-      .taskDyn {
-        val mp = (Compile / modulePath).value.map(_.getAbsolutePath)
-        NativeImage
-          .buildNativeImage(
-            "ensoup",
-            staticOnLinux = true,
-            initializeAtRuntime = Seq(
-              "org.jline"
-            ),
-            additionalOptions = Seq(
-              "-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog",
-              "-H:IncludeResources=.*Main.enso$"
-            ),
-            modulePath = mp,
-            mainClass  = Some("org.enso.launcher.cli.Main")
-          )
-      }
-      .dependsOn(VerifyReflectionSetup.run)
-      .value,
-    buildNativeImage := NativeImage
-      .incrementalNativeImageBuild(
-        rebuildNativeImage,
-        "ensoup"
-      )
-      .value,
-    cleanFiles += {
-      new File("ensoup")
-    }
-  )
-  .settings(
-    Test / fork := true,
-    Test / javaOptions ++= testLogProviderOptions,
-    (Test / test) := (Test / test)
-      .dependsOn(buildNativeImage)
-      .dependsOn(LauncherShimsForTest.prepare())
-      .value,
-    (Test / testOnly) := (Test / testOnly)
-      .dependsOn(buildNativeImage)
-      .dependsOn(LauncherShimsForTest.prepare())
-      .evaluated,
-    Test / fork := true
-  )
-  .dependsOn(cli)
-  .dependsOn(`distribution-manager` % Test)
-  .dependsOn(`logging-service`)
-  .dependsOn(`logging-service-logback` % "test->test;runtime->runtime")
-  .dependsOn(`logging-utils` % "test->test")
-  .dependsOn(pkg)
-  .dependsOn(`runtime-version-manager`)
-  .dependsOn(`runtime-version-manager` % "test->test")
-  .dependsOn(`version-output`)
-
 lazy val `distribution-manager` = project
   .in(file("lib/scala/distribution-manager"))
   .enablePlugins(JPMSPlugin)
@@ -6406,14 +6298,9 @@ lazy val unmanagedExternalZip =
 
 lazy val engineDistributionRoot =
   settingKey[File]("Root of built engine distribution")
-lazy val launcherDistributionRoot =
-  settingKey[File]("Root of built launcher distribution")
 
 engineDistributionRoot :=
   packageBuilder.value.localArtifact("engine") / s"enso-$ensoVersion"
-launcherDistributionRoot := packageBuilder.value.localArtifact(
-  "launcher"
-) / "enso"
 
 lazy val extraEnvForStdLibIndexes = taskKey[Map[String, String]](
   "Extra environment variables for subprocesses when compiling std libs"
@@ -6646,14 +6533,3 @@ lazy val `http-test-helper` = project
     (Compile / run / connectInput) := true
   )
   .configs(Test)
-
-lazy val buildLauncherDistribution =
-  taskKey[Unit]("Builds the launcher distribution")
-buildLauncherDistribution := {
-  val _            = (launcher / buildNativeImage).value
-  val root         = launcherDistributionRoot.value
-  val log          = streams.value.log
-  val cacheFactory = streams.value.cacheStoreFactory
-  DistributionPackage.createLauncherPackage(root, cacheFactory)
-  log.info(s"Launcher package created at $root")
-}

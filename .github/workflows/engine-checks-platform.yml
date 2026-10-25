@@ -252,7 +252,7 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
-      # `sbt test` builds native images on Windows too (the launcher's and os-environment's tests).
+      # `sbt test` builds native images on Windows too (os-environment's tests).
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - if: runner.os == 'Windows'
