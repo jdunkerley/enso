@@ -1,4 +1,4 @@
-// Icons in `icons.svg` that break a rule of `docs/style-guide/icons.md` today. Checked by
+// Icons in `icons.svg` that break a rule of `https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons` today. Checked by
 // `iconStyle.test.ts`: remove an id once it is fixed (the test fails until you do), and never add one.
 // The lists are the icon cleanup backlog of epic #95.
 

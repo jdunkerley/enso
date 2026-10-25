@@ -8,7 +8,7 @@ import org.openjdk.jmh.runner.RunnerException;
  * The only purpose for this class is to enable the {@link
  * org.enso.benchmarks.processor.BenchProcessor} to generate JMH sources for the benchmarks in
  * {@code test/Benchmarks} project. For more information see {@code
- * docs/infrastructure/benchmarks.md#Standard-library-benchmarks}.
+ * https://github.com/jdunkerley/enso/wiki/Infrastructure-Benchmarks#Standard-library-benchmarks}.
  */
 @GenerateBenchSources(projectRootPath = "test/Benchmarks", moduleName = "enso_dev.Benchmarks.Main")
 public class LibBenchRunner {

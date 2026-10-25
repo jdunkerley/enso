@@ -32,8 +32,9 @@ provided.
 | `main@HEAD` | :white_check_mark: |
 | `wip/*`     | :x:                |
 
-Please see our [release policy](./distribution/release-policy.md) for more
-information on how we support released versions.
+Please see our
+[release policy](https://github.com/jdunkerley/enso/wiki/Distribution-Release-Policy)
+for more information on how we support released versions.
 
 ## Reporting a Vulnerability
 

@@ -273,7 +273,7 @@ export type FileSystemObject =
 
 /**
  * A single component of a component group.
- * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#librarycomponent)
+ * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarycomponent)
  */
 export interface LibraryComponent {
   /** The component name. */
@@ -284,7 +284,7 @@ export interface LibraryComponent {
 
 /**
  * The component group provided by a library.
- * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#librarycomponentgroup)
+ * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarycomponentgroup)
  */
 export interface LibraryComponentGroup {
   /**
@@ -456,7 +456,7 @@ export enum LanguageServerErrorCode {
   /**
    * The user doesn't have access to the requested resource.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#accessdeniederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#accessdeniederror)
    */
   AccessDenied = 100,
 
@@ -465,53 +465,53 @@ export enum LanguageServerErrorCode {
   /**
    * A miscellaneous file system error.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filesystemerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filesystemerror)
    */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   FileSystem = 1000,
   /**
    * The requested content root could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#contentrootnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#contentrootnotfounderror)
    */
   ContentRootNotFound = 1001,
   /**
    * The requested file does not exist.
    *
-   *[Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filenotfound)
+   *[Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filenotfound)
    */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   FileNotFound = 1003,
   /**
    * The file trying to be created already exists.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#fileexists)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#fileexists)
    */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   FileExists = 1004,
   /**
    * The IO operation timed out.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#operationtimeouterror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#operationtimeouterror)
    */
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
   OperationTimeoutError = 1005,
   /**
    * The provided path is not a directory.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#notdirectory)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#notdirectory)
    */
   NotDirectory = 1006,
   /**
    * The provided path is not a file.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#notfile)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#notfile)
    */
   NotFile = 1007,
   /**
    * The streaming file write cannot overwrite a portion of the requested file.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#cannotoverwrite)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#cannotoverwrite)
    */
   CannotOverwrite = 1008,
   /**
@@ -519,13 +519,13 @@ export enum LanguageServerErrorCode {
    *
    * The actual length of the file is returned in `payload.fileLength`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#readoutofbounds)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#readoutofbounds)
    */
   ReadOutOfBounds = 1009,
   /**
    * The project configuration cannot be decoded.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#cannotdecode)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#cannotdecode)
    */
   CannotDecode = 1010,
 
@@ -534,37 +534,37 @@ export enum LanguageServerErrorCode {
   /**
    * The provided execution stack item could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#stackitemnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#stackitemnotfounderror)
    */
   StackItemNotFound = 2001,
   /**
    * The provided exeuction context could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#contextnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#contextnotfounderror)
    */
   ContextNotFound = 2002,
   /**
    * The execution stack is empty.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#emptystackerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#emptystackerror)
    */
   EmptyStack = 2003,
   /**
    * The stack is invalid in this context.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#invalidstackitemerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#invalidstackitemerror)
    */
   InvalidStackItem = 2004,
   /**
    * The provided module could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#modulenotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#modulenotfounderror)
    */
   ModuleNotFound = 2005,
   /**
    * The provided visualization could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#visualizationnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#visualizationnotfounderror)
    */
   VisualizationNotFound = 2006,
   /**
@@ -572,7 +572,7 @@ export enum LanguageServerErrorCode {
    *
    * If relevant, a {@link Diagnostic} containing error details is returned as `payload`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#visualizationexpressionerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#visualizationexpressionerror)
    */
   VisualizationExpression = 2007,
 
@@ -581,25 +581,25 @@ export enum LanguageServerErrorCode {
   /**
    * A file was not opened.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#filenotopenederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filenotopenederror)
    */
   FileNotOpened = 3001,
   /**
    * Validation has failed for a series of text edits.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#texteditvalidationerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#texteditvalidationerror)
    */
   TextEditValidation = 3002,
   /**
    * The version provided by a client does not match the version computed by the server.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#invalidversionerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#invalidversionerror)
    */
   InvalidVersion = 3003,
   /**
    * The client doesn't hold write lock to the buffer.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#writedeniederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#writedeniederror)
    */
   WriteDenied = 3004,
 
@@ -608,7 +608,7 @@ export enum LanguageServerErrorCode {
   /**
    * The requested capability is not acquired.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#accessdeniederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#accessdeniederror)
    */
   CapabilityNotAcquired = 5001,
 
@@ -617,13 +617,13 @@ export enum LanguageServerErrorCode {
   /**
    * The request could not be proccessed, beacuse the session is not initialised.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#sessionnotinitialisederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#sessionnotinitialisederror)
    */
   SessionNotInitialised = 6001,
   /**
    * The session is already initialised.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#sessionalreadyinitialisederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#sessionalreadyinitialisederror)
    */
   SessionAlreadyInitialised = 6002,
 
@@ -632,25 +632,25 @@ export enum LanguageServerErrorCode {
   /**
    * There was an unexpected error accessing the suggestions database.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#suggestionsdatabaseerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#suggestionsdatabaseerror)
    */
   SuggestionsDatabase = 7001,
   /**
    * The project was not found in the root directory.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#projectnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#projectnotfounderror)
    */
   ProjectNotFound = 7002,
   /**
    * The module name could not be resolved for the given file.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#modulenamenotresolvederror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#modulenamenotresolvederror)
    */
   ModuleNameNotResolved = 7003,
   /**
    * The requested suggestion could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#suggestionnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#suggestionnotfounderror)
    */
   SuggestionNotFound = 7004,
 
@@ -661,31 +661,31 @@ export enum LanguageServerErrorCode {
    *
    * The requested edition is returned in `payload.editionName`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#editionnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#editionnotfounderror)
    */
   EditionNotFound = 8001,
   /**
    * A local library with the specified namespace and name combination already exists, so it cannot be created again.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#libraryalreadyexists)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#libraryalreadyexists)
    */
   LibraryAlreadyExists = 8002,
   /**
    * Authentication to the library repository was declined.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#libraryrepositoryauthenticationerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#libraryrepositoryauthenticationerror)
    */
   LibraryRepositoryAuthentication = 8003,
   /**
    * A request to the library repository failed.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#librarypublisherror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarypublisherror)
    */
   LibraryPublish = 8004,
   /**
    * Uploading the library failed for network-related reasons.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#libraryuploaderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#libraryuploaderror)
    */
   LibraryUpload = 8005,
   /**
@@ -693,13 +693,13 @@ export enum LanguageServerErrorCode {
    *
    * The requested library is returned in `payload.namespace`, `payload.name`, and `payload.version`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#librarydownloaderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarydownloaderror)
    */
   LibraryDownload = 8006,
   /**
    * A local library with the specified namespace and name combination was not found on the local libraries path.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#locallibrarynotfound)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#locallibrarynotfound)
    */
   LocalLibraryNotFound = 8007,
   /**
@@ -708,7 +708,7 @@ export enum LanguageServerErrorCode {
    *
    * The requested namespace and name are returned in `payload.namespace` and `payload.name`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#librarynotresolved)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#librarynotresolved)
    */
   LibraryNotResolved = 8008,
   /**
@@ -716,13 +716,13 @@ export enum LanguageServerErrorCode {
    *
    * A similar, valid name is returned in `payload.suggestedName`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#invalidlibraryname)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#invalidlibraryname)
    */
   InvalidLibraryName = 8009,
   /**
    * The library preinstall endpoint could not properly find dependencies of the requested library.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#dependencydiscoveryerror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#dependencydiscoveryerror)
    */
   DependencyDiscovery = 8010,
   /**
@@ -730,7 +730,7 @@ export enum LanguageServerErrorCode {
    *
    * The requested version is returned in `payload.version`.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#invalidsemverversion)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#invalidsemverversion)
    */
   InvalidSemverVersion = 8011,
 
@@ -739,19 +739,19 @@ export enum LanguageServerErrorCode {
   /**
    * An expression with the provided ID could not be found.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#expressionnotfounderror)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#expressionnotfounderror)
    */
   ExpressionNotFound = 9001,
   /**
    * The refactoring operation was not able to apply the generated edits.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#failedtoapplyedits)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#failedtoapplyedits)
    */
   FailedToApplyEdits = 9002,
   /**
    * Refactoring of the given expression is not supported.
    *
-   * [Documentation](https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-language-server.md#refactoringnotsupported)
+   * [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringnotsupported)
    */
   RefactoringNotSupported = 9003,
 }

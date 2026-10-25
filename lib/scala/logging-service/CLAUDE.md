@@ -3,7 +3,8 @@
 Process-level logging setup, independent of the logback backend:
 `LoggingSetupHelper` (the language server subclasses it) and
 `LoggingServiceManager` (starts this process's logging server through the
-`LoggingServiceFactory` service). Overview: `docs/infrastructure/logging.md`.
+`LoggingServiceFactory` service). Overview:
+[Infrastructure-Logging](https://github.com/jdunkerley/enso/wiki/Infrastructure-Logging).
 
 - `LoggingSetupHelper.setup(Level, boolean)` starts the logging server when the
   config's `logging-service.server.start` is set, then points the process's

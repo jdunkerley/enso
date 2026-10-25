@@ -4,8 +4,9 @@ The Enso Language Server (LS). Embedder-side service that owns a GraalVM
 polyglot `Context` running the Enso runtime and exposes its capabilities over
 **JSON-RPC (text protocol)** and a **binary protocol** for data links.
 
-Read `README.md` here and `docs/language-server/` for the full protocol and
-design notes.
+Read `README.md` here and
+[Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server) for
+the full protocol and design notes.
 
 ## Responsibilities
 
@@ -39,7 +40,8 @@ design notes.
 - **Ydoc**: Yjs updates tunneled via a binary channel. When enabled, text
   protocol is still active but most edits ride on Yjs.
 
-See `docs/language-server/` for every endpoint's schema.
+See [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server)
+for every endpoint's schema.
 
 ## Threading
 

@@ -3,7 +3,7 @@ import * as path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { KNOWN_VIOLATIONS, type StyleRule } from './iconStyleKnownViolations'
 
-// Machine-checkable rules from `docs/style-guide/icons.md`. Each rule lists today's offenders in
+// Machine-checkable rules from `https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons`. Each rule lists today's offenders in
 // `iconStyleKnownViolations.ts`: a *new* offender fails, and so does a listed icon that no longer
 // offends, so the lists only ever shrink as the icon set is cleaned up (epic #95).
 
@@ -133,7 +133,7 @@ describe('icons.svg follows the icon style guide', () => {
       const known = new Set(KNOWN_VIOLATIONS[rule])
       expect(
         offenders.filter((id) => !known.has(id)).join('\n'),
-        `icons breaking the "${rule}" rule of docs/style-guide/icons.md`,
+        `icons breaking the "${rule}" rule of https://github.com/jdunkerley/enso/wiki/Style-Guide-Icons`,
       ).toBe('')
       expect(
         [...known].filter((id) => !offenders.includes(id)).join('\n'),

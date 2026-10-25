@@ -63,7 +63,7 @@ case class Engine(version: SemVer, path: Path, manifest: Manifest) {
 
   /** Specifies if the engine version comes from a nightly release.
     *
-    * See `docs/distribution/nightly.md` for more information.
+    * See `https://github.com/jdunkerley/enso/wiki/Distribution-Nightly` for more information.
     */
   def isNightly: Boolean = Engine.isNightly(version)
 }
@@ -78,7 +78,7 @@ object Engine {
 
   /** Specifies if the engine version comes from a nightly release.
     *
-    * See `docs/distribution/nightly.md` for more information.
+    * See `https://github.com/jdunkerley/enso/wiki/Distribution-Nightly` for more information.
     */
   def isNightly(version: SemVer): Boolean =
     version.preReleaseVersion() != null && version

@@ -22,7 +22,7 @@ import scala.util.{Failure, Using}
 
 /** A class that manages the HTTP API of the Library Repository.
   *
-  * @see docs/libraries/repositories.md#libraries-repository
+  * @see https://github.com/jdunkerley/enso/wiki/Libraries-Repositories#libraries-repository
   */
 object RepositoryHelper {
 
