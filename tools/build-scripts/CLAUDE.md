@@ -26,9 +26,16 @@ that Node runs as it is (type stripping): each command is
 - `ide-build` — what `./run ide build --backend-source local --gui-source local`
   did: from `dist/gui` and `dist/backend`, `pnpm install`, then `build:ide` and
   `dist:ide` with the variables electron-builder reads (and without the empty
-  code-signing ones), into `dist/ide`. `--sign` signs (release only). Locally:
-  build the GUI into `dist/gui`, the bundle with `sbt buildEngineBundle` and
-  copy `built-distribution/engine-bundle-*/enso` to `dist/backend` first.
+  code-signing ones), into `dist/ide`. `--sign` signs (release only). Locally,
+  use `ide-local`.
+- `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
+  `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
+  Visual Studio developer prompt, which it checks), the bundle copied to
+  `dist/backend`, `pnpm install`, `build:gui` into `dist/gui`, then
+  `ide-build`'s packaging into `dist/ide`. It replaces `dist/backend`,
+  `dist/gui` and `dist/ide` every time, so it never reuses an old engine bundle;
+  the engine itself builds incrementally (`sbt clean` first for a clean one). It
+  starts sbt, so it never runs in CI.
 - `stdlib-test <suite>` — what `./run backend test <suite>` did: each selected
   `test/*_Tests` project in turn, `enso --no-ir-caches --run`, with `./run`'s
   arguments and environment (`src/stdlib-test/invocation.ts`), then one
