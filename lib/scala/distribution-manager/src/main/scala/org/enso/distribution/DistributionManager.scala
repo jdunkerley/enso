@@ -10,7 +10,7 @@ import java.nio.file.{Files, Path}
 import scala.util.Try
 import scala.util.control.NonFatal
 
-/** Gathers filesystem paths used by the launcher.
+/** Gathers filesystem paths used by the runner and the version managers.
   *
   * @param dataRoot the root of the data directory; for a portable distribution
   *                 this is the root of the distribution, for a locally
@@ -135,7 +135,7 @@ class DistributionManager(val env: Environment) {
   private val logger = Logger[DistributionManager]
   import DistributionManager._
 
-  /** Determines paths that should be used by the launcher.
+  /** Determines paths that should be used.
     */
   lazy val paths: DistributionPaths = {
     detectPaths()
@@ -276,7 +276,7 @@ class DistributionManager(val env: Environment) {
 
   /** A helper for managing directories of the non-portable installation.
     *
-    * It returns paths of the non-portable installation even if the launcher is
+    * It returns paths of the non-portable installation even if the distribution is
     * running in portable mode, so that this helper can be used by the installer
     * to determine destination for installed files.
     */
@@ -346,7 +346,7 @@ class DistributionManager(val env: Environment) {
         }
         .toAbsolutePath
 
-    /** The directory where the launcher binary will be placed for an installed
+    /** The directory where the binary will be placed for an installed
       * distribution.
       */
     def binDirectory: Path =

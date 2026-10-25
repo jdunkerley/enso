@@ -11,8 +11,8 @@ import java.nio.file.{
 import java.nio.file.attribute.BasicFileAttributes
 
 /** The engine bundle that the IDE ships: the engine package, a small JDK to run it with, and an
-  * empty `.enso.bundle` marker, laid out as `./run backend get` laid it out
-  * (`build_tools/build/src/engine/bundle.rs`, `paths.yaml`):
+  * empty `.enso.bundle` marker, laid out as the retired build CLI's `backend get` laid it out
+  * (its `bundle.rs`, `paths.yaml`):
   *
   * {{{
   * built-distribution/engine-bundle-<version>-<os>-<arch>/enso/
@@ -32,7 +32,7 @@ object EngineBundle {
   ): File =
     artifactRoot / s"engine-bundle-$ensoVersion-${os.name}-${arch.name}" / "enso"
 
-  /** The runtime directory's name, as `./run` named it. */
+  /** The runtime directory's name, as the retired build CLI named it. */
   def runtimeDirName(
     graalVersion: String,
     graalMavenPackagesVersion: String
@@ -57,10 +57,10 @@ object EngineBundle {
     bundleRoot
   }
 
-  /** Copies the tree at `source` to `target` as `./run`'s `mirror_directory` did: symbolic links
-    * stay links (jlink's `legal/<module>/LICENSE` and friends point at `../java.base/...`), and files
-    * keep their permissions and modification times. sbt's `IO.copyDirectory` follows links, so it
-    * would turn each into a copy of its target.
+  /** Copies the tree at `source` to `target` as the retired build CLI's `mirror_directory` did:
+    * symbolic links stay links (jlink's `legal/<module>/LICENSE` and friends point at
+    * `../java.base/...`), and files keep their permissions and modification times. sbt's
+    * `IO.copyDirectory` follows links, so it would turn each into a copy of its target.
     */
   private def copyTree(source: File, target: File): Unit = {
     val from = source.toPath

@@ -362,7 +362,8 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
     },
 
     // The update feed baked into the app (`app-update.yml`) and written as `latest*.yml`.
-    // electron-builder never uploads: the build CLI does (see `buildPackage`).
+    // electron-builder never uploads: `tools/build-scripts`' `release upload-ide` does (see
+    // `buildPackage`).
     publish: { provider: 'github', owner: 'jdunkerley', repo: 'enso' },
   }
 }
@@ -439,12 +440,12 @@ export async function buildPackage(passedArgs: Arguments) {
   await dumpConfiguration(configPath, config)
 
   // Electron Builder's node-module-collector shells out to the package manager to enumerate the
-  // dependency tree. `./run ide build` drives this whole chain through `corepack pnpm`, so that
-  // child would inherit `COREPACK_ROOT` — and pnpm refuses to switch to the version pinned in
-  // `packageManager` while it believes it is running under corepack. Anyone whose ambient pnpm
-  // differs from the pin then fails packaging with "This project is configured to use <pinned> of
-  // pnpm. Your current pnpm is <ambient>". Dropping the variable here lets that child self-switch
-  // to the pinned version, which is what we wanted in the first place.
+  // dependency tree. The retired build CLI's `ide build` drives this whole chain through `corepack
+  // pnpm`, so that child would inherit `COREPACK_ROOT` — and pnpm refuses to switch to the version
+  // pinned in `packageManager` while it believes it is running under corepack. Anyone whose ambient
+  // pnpm differs from the pin then fails packaging with "This project is configured to use <pinned>
+  // of pnpm. Your current pnpm is <ambient>". Dropping the variable here lets that child
+  // self-switch to the pinned version, which is what we wanted in the first place.
   // `Reflect.deleteProperty` rather than `delete`: this project types `process.env`'s index
   // signature as read-only.
   Reflect.deleteProperty(process.env, 'COREPACK_ROOT')

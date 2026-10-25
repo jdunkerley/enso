@@ -1,7 +1,7 @@
 package org.enso.distribution.locking
 
-/** Manages locks that can be used to synchronize different launcher processes
-  * running in parallel to avoid components corruption caused by simultaneous
+/** Manages locks that can be used to synchronize different processes (the runner,
+  * the project manager) running in parallel to avoid components corruption caused by simultaneous
   * modification of components.
   */
 trait LockManager {

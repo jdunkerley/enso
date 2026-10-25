@@ -45,8 +45,8 @@ object TestArchivePackager {
       ) ++ files.map(_.getFileName.toString),
       source.toFile,
       // Without it, macOS `tar` adds `._` entries for files with extended attributes, and the
-      // archive gains a second root. See Note [Archives Without AppleDouble Entries] in
-      // `build_tools/ci_utils/src/programs/tar.rs`.
+      // archive gains a second root. See Note [Archives Without AppleDouble Entries] in the retired
+      // build CLI's `tar.rs`.
       "COPYFILE_DISABLE" -> "1"
     ).!
     if (exitCode != 0) {

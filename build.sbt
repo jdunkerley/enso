@@ -230,14 +230,14 @@ checkIRCacheSizes := Def
 
 /* Note [CI Engine Distribution Build]
  * ===================================
- * What `./run backend ci-build-engine-distribution` ran after `clean`, in one sbt session:
- * `buildEngineDistribution`; then `checkIRCacheSizes`; then, on Windows, the MSVC runtime DLL
- * copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
+ * What the retired build CLI's `backend ci-build-engine-distribution` ran after `clean`, in one sbt
+ * session: `buildEngineDistribution`; then `checkIRCacheSizes`; then, on Windows, the MSVC runtime
+ * DLL copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
  * then, not on Windows, `verifyGeneratedPackage` for the engine and for Base, Table, Image and
- * Database at the package's versioned paths (`./run` skipped it on Windows: "FIXME ... CRLF
- * issues?"). CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its own, not a
- * CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and `CI` is
- * set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
+ * Database at the package's versioned paths (the retired build CLI skipped it on Windows: "FIXME
+ * ... CRLF issues?"). CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
+ * own, not a CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and
+ * `CI` is set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
  */
 lazy val ciBuildEngineDistribution = taskKey[Unit](
   "CI's engine distribution build: buildEngineDistribution, checkIRCacheSizes, the MSVC runtime " +
@@ -271,7 +271,7 @@ ciBuildEngineDistribution := Def
 
 lazy val buildEngineBundle = taskKey[File](
   "Builds the engine bundle the IDE ships (the engine package, a small JDK and `.enso.bundle`) " +
-  "in built-distribution/engine-bundle-<version>-<os>-<arch>/enso, as `./run backend get` did. " +
+  "in built-distribution/engine-bundle-<version>-<os>-<arch>/enso. " +
   "ENSO_LAUNCHER is the caller's: the IDE's CI passes `native`. See project/EngineBundle.scala."
 )
 buildEngineBundle := Def
@@ -6504,8 +6504,8 @@ lintEnso := {
 
 lazy val checkEnsoSyntax = taskKey[Unit](
   "Parses every .enso file under distribution/lib and test with the Rust parser's check_syntax " +
-  "tool (through cargo) and fails on any syntax error or warning. Replaces " +
-  "`./run libraries check-syntax`; see project/EnsoSyntaxCheck.scala."
+  "tool (through cargo) and fails on any syntax error or warning. Implements " +
+  "the Enso syntax check; see project/EnsoSyntaxCheck.scala."
 )
 checkEnsoSyntax := EnsoSyntaxCheck.run(baseDirectory.value, streams.value.log)
 
