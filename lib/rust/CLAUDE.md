@@ -29,8 +29,9 @@ workspace. These are the parser and its building blocks; the parser's WASM shim
   `enso-metamodel`).
 - Edition `2024` everywhere. Workspace pins dependency versions; members
   reference them with `{ workspace = true }`.
-- Follow the Enso Rust style guide in `docs/style-guide/rust.md` and the
-  stricter house rules under the `rust-guidelines` skill.
+- Follow the Enso Rust style guide in
+  [Style-Guide-Rust](https://github.com/jdunkerley/enso/wiki/Style-Guide-Rust)
+  and the stricter house rules under the `rust-guidelines` skill.
 
 ## Adding a crate
 

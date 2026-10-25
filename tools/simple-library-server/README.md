@@ -15,7 +15,7 @@ application. Then you can run the `main.js` file to start the server. See
 When launching the server, you need to provide it with a directory that is the
 root of the server. This directory should contain a `libraries` directory or
 `editions` directory (or both). Each of them should have the directory structure
-as described in [the Enso documentation](../../docs/libraries/repositories.md).
+as described in [the Enso documentation](https://github.com/jdunkerley/enso/wiki/Libraries-Repositories).
 
 For example, the root directory may look like this:
 

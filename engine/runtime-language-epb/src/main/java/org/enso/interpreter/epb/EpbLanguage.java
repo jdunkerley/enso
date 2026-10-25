@@ -7,7 +7,7 @@ import java.util.function.Consumer;
 /**
  * <em>Enso Polyglot Bindings</em> language is an internal language that serves as a bridge between
  * Enso and other supported languages. See <a
- * href="https://github.com/enso-org/enso/blob/develop/docs/polyglot/README.md">polyglot docs</a>
+ * href="https://github.com/jdunkerley/enso/wiki/Polyglot">polyglot docs</a>
  * for a high level overview of intended behavior. Technical details are provided in this Javadoc
  * and of course in this package code.
  *

@@ -175,7 +175,7 @@ object GatherLicenses {
         "ensuring that the legal review is complete and there are no warnings."
       )
       log.warn(
-        "See docs/distribution/licenses.md#review-process for a more detailed " +
+        "See https://github.com/jdunkerley/enso/wiki/Distribution-Licenses#review-process for a more detailed " +
         "explanation."
       )
       throw LegalReviewException(exceptionMessage)

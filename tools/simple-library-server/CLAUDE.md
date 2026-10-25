@@ -6,7 +6,7 @@ library-publishing flow without the cloud.
 
 User-facing usage (CLI flags, expected on-disk layout, publishing walkthrough)
 is in `README.md` next to this file and in
-[`docs/libraries/repositories.md`](../../docs/libraries/repositories.md). This
+[Libraries-Repositories](https://github.com/jdunkerley/enso/wiki/Libraries-Repositories). This
 file covers only what you need to know to *work on* the code.
 
 ## Shape
@@ -33,7 +33,7 @@ Three things here are deliberately unlike the other workspace packages. Don't
   `"type": "module"`. Most of `app/**` is ESM.
 - **`npm`, not `pnpm`, in the documented workflow.** The package is a member of
   the root `pnpm-workspace.yaml`, yet it also carries a tracked
-  `package-lock.json`, and `docs/libraries/repositories.md` tells users to run
+  `package-lock.json`, and [Libraries-Repositories](https://github.com/jdunkerley/enso/wiki/Libraries-Repositories) tells users to run
   `cd tools/simple-library-server && npm install`. Nothing in the repo records
   *why*; the likely reason is that the server should be runnable on its own
   without installing the whole workspace. Treat it as load-bearing until someone
@@ -47,4 +47,4 @@ Three things here are deliberately unlike the other workspace packages. Don't
 
 There is none. The `test` script is the npm placeholder that exits 1. Changes
 here are verified by running the server against a repository directory and
-exercising the flow in `docs/libraries/repositories.md`.
+exercising the flow in [Libraries-Repositories](https://github.com/jdunkerley/enso/wiki/Libraries-Repositories).

@@ -4,7 +4,8 @@ The logback implementation of Enso's logging: `LogbackSetup` (the `LoggerSetup`
 service: wires appenders onto a logback context from a parsed `logging-service`
 config) and the logging server (`LoggingServer`, `SocketServer`,
 `SocketLoggingNode`) that receives serialized events from socket appenders and
-writes them to its own sinks. Overview: `docs/infrastructure/logging.md`.
+writes them to its own sinks. Overview:
+[Infrastructure-Logging](https://github.com/jdunkerley/enso/wiki/Infrastructure-Logging).
 
 - Every language server hosts its own logging server, on port 0 by default (any
   free loopback port). `SocketServer.bind()` binds on the caller's thread so a

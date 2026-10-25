@@ -4,7 +4,7 @@ Parsing of the `logging-service` section of `application.conf`
 (`LoggingServiceConfig`, `LoggingServer` for its `server` section, one class per
 appender) and the abstract `LoggerSetup` that backends implement (the logback
 one is in `logging-service-logback`). Overview:
-`docs/infrastructure/logging.md`.
+[Infrastructure-Logging](https://github.com/jdunkerley/enso/wiki/Infrastructure-Logging).
 
 - A `socket` appender with `port = 0` names no server; `LogbackSetup` refuses it
   (Note [Socket Appender Port 0]) so callers fall back to local logging.

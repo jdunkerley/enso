@@ -68,8 +68,9 @@ issue to get a better idea of how much work a given issue might be.
 ## Feature Enhancements
 
 If you feel like you have a suggestion for a change to the way that Enso works
-as a language, please take a look at the [Enso RFC process](./rfcs/README.md) to
-learn how to file an RFC for the project.
+as a language, please take a look at the
+[Enso RFC process](https://github.com/jdunkerley/enso/wiki/RFCs) to learn how to
+file an RFC for the project.
 
 In essence, the RFC process provides a way to propose major changes to the
 language, the compiler, and the runtime in a way that ensures that they get seen
@@ -125,9 +126,10 @@ this, we recommend redirecting the output to `/dev/null`, via a command like
 The logs are kept in a central location `$ENSO_DATA_DIRECTORY/log` - on Linux,
 they are in `$XDG_DATA_HOME/enso/log` (usually `~/.local/share/enso/log`), and
 on Windows they are in `%APPDATA%\enso\log`, see
-[distribution.md](distribution/distribution.md) for details. The log level name
-consists of the timestamp of the log file creation. There is no automatic log
-rotation, so you may want to delete the old logs from time to time.
+[Distribution-Overview](https://github.com/jdunkerley/enso/wiki/Distribution-Overview)
+for details. The log level name consists of the timestamp of the log file
+creation. There is no automatic log rotation, so you may want to delete the old
+logs from time to time.
 
 ## Hacking on Enso
 
@@ -142,8 +144,8 @@ look at the design documentation for the language. These files explain provide
 both a rigorous specification of Enso's design, but also insight into the _why_
 behind the decisions that have been made.
 
-These can be found in [`docs/`](README.md), and are organised by the part of the
-compiler that they relate to.
+These can be found in the [wiki](https://github.com/jdunkerley/enso/wiki/Home),
+and are organised by the part of the compiler that they relate to.
 
 ### System Requirements
 
@@ -217,7 +219,8 @@ helper tools for that. We recommend:
   ![Git installation settings](https://github.com/user-attachments/assets/def189fa-985b-47f3-8c8b-153c0f39fa26)
 
 **For users of M1 Mac**: installing GraalVM on M1 Mac requires manual actions,
-please refer to a [dedicated documentation](./graalvm-m1-mac.md).
+please refer to a
+[dedicated documentation](https://github.com/jdunkerley/enso/wiki/GraalVM-M1-Mac).
 
 ### Getting the Sources
 
@@ -357,7 +360,7 @@ One can debug `project-manager` code by executing
 sbt:project-manager> withDebug run --debugger
 ```
 
-read more about [debugging Java & Enso code](debugger/README.md).
+read more about [debugging Java & Enso code](https://github.com/jdunkerley/enso/wiki/Debugger).
 
 #### Working with Assembly
 
@@ -487,8 +490,8 @@ sbt:enso> runEngineDistribution --run test/Base_Tests --debug
 ```
 
 Then connect your development environment to the 5005 port. More
-[details on debugging](./debugger/README.md) are available in a separate
-document.
+[details on debugging](https://github.com/jdunkerley/enso/wiki/Debugger) are
+available in a separate document.
 
 When using the `runEngineDistribution` command of `sbt` the Java assertions
 (`-ea` JVM option) as well as Enso assertions are enabled.
@@ -548,8 +551,8 @@ environment variable is set to "true". If JVM assertions are enable, Enso
 assertions are enabled as well.
 -->
 
-Details on [profiling](./profiler/engine.md) are available in a separate
-document.
+Details on [profiling](https://github.com/jdunkerley/enso/wiki/Profiler-Engine)
+are available in a separate document.
 
 #### Static Analysis
 
@@ -568,9 +571,9 @@ Native image is a capability provided alongside GraalVM that allows the
 generation of native executables from JVM language programs (such as the Enso
 interpreter itself). Details:
 
-- [infrastructure](./infrastructure/native-image.md)
-- [native image debugging](./debugger/native-debugging.md)
-- [sbt support](./infrastructure/sbt.md)
+- [infrastructure](https://github.com/jdunkerley/enso/wiki/Infrastructure-Native-Image)
+- [native image debugging](https://github.com/jdunkerley/enso/wiki/Debugger-Native-Debugging)
+- [sbt support](https://github.com/jdunkerley/enso/wiki/Infrastructure-SBT)
 
 Native image support is disabled for development (as it slows down
 edit/compile/run cycle significantly). One has to **opt-in** to enable it.
@@ -621,12 +624,12 @@ You can provide extra arguments to the enso executable using the
 enso$ ENSO_ENGINE_ARGS='--log-level trace' corepack pnpm run dev:gui
 ```
 
-To [debug](debugger/README.md) the language server process of a running project,
-you can set the
+To [debug](https://github.com/jdunkerley/enso/wiki/Debugger) the language server
+process of a running project, you can set the
 `JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,address=5005` environment
 variable when starting the `pnpm run dev:gui` dev server. Just
-[configure your Java IDE](debugger/README.md) to listen on port 5005 before
-starting the project.
+[configure your Java IDE](https://github.com/jdunkerley/enso/wiki/Debugger) to
+listen on port 5005 before starting the project.
 
 ## Pull Requests
 
@@ -644,8 +647,10 @@ Please make all pull requests against the `develop` branch.
   the tests yourself locally first! This can be done by running `test` in the
   `enso` project in sbt.
 - Additionally, please ensure that your code conforms to the Enso style guides,
-  particularly the [Scala Style Guide](./style-guide/scala.md) and the
-  [Java Style Guide](./style-guide/java.md).
+  particularly the
+  [Scala Style Guide](https://github.com/jdunkerley/enso/wiki/Style-Guide-Scala)
+  and the
+  [Java Style Guide](https://github.com/jdunkerley/enso/wiki/Style-Guide-Java).
 
 Make sure you perform these checks before _every_ pull request. You can even add
 [git hooks](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) before
@@ -670,9 +675,8 @@ the best results through open collaboration.
 
 Documentation improvements are very welcome! For now, the main documentation
 available is the _developer_ documentation for the language, which can be found
-at the [dev docs site](https://enso.org/docs/developer). The source for this
-documentation is found in the [`docs/`](.) folder, and can be altered from
-there.
+in this repository's [wiki](https://github.com/jdunkerley/enso/wiki/Home), and
+can be edited there.
 
 Documentation pull requests will be reviewed in exactly the same way as normal
 pull requests.
@@ -716,5 +720,5 @@ to contribute in other ways outside this repository:
 For people new to Enso, and just starting to contribute, or even for more
 seasoned developers, some useful places to look for information are:
 
-- The [design documentation](./README.md).
+- The [design documentation](https://github.com/jdunkerley/enso/wiki/Home).
 - The community! Don't be afraid to ask questions.

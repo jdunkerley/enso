@@ -81,7 +81,7 @@ body:
     id: "logs"
     attributes:
       label: "Logs"
-      description: "Attach a log file to help identify the issue. You can find the logs in the `ENSO_DATA_DIRECTORY`, which location is described in the [distribution.md](https://github.com/enso-org/enso/blob/develop/docs/distribution/distribution.md)."
+      description: "Attach a log file to help identify the issue. You can find the logs in the `ENSO_DATA_DIRECTORY`, which location is described in the [Distribution-Overview](https://github.com/jdunkerley/enso/wiki/Distribution-Overview)."
     validations:
       required: false
 

@@ -12,7 +12,7 @@ import org.enso.text.editing.model.Position
 
 /** The execution JSON RPC API provided by the language server.
   *
-  * @see `docs/language-server/protocol-language-server.md`
+  * @see `https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server`
   */
 object SearchApi {
 

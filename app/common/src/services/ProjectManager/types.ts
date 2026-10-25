@@ -1,7 +1,7 @@
 /**
  * @file This module defines the Project Manager types.
  * @see
- * https://github.com/enso-org/enso/blob/develop/docs/language-server/protocol-project-manager.md
+ * https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Project-Manager
  */
 import type * as dateTime from '../../utilities/data/dateTime.js'
 import * as newtype from '../../utilities/data/newtype.js'
