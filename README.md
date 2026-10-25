@@ -1,162 +1,87 @@
-# Enso Analytics
+# Enso (community fork)
 
-Enso Analytics is a cutting-edge self-service data preparation and analysis
-platform designed specifically for data teams. It empowers professionals in
-finance, accounting, revenue operations, and other data-intensive roles to
-transform complex data processes into efficient, repeatable workflows. Built by
-data experts, including an Alteryx co-founder, Enso offers a modern,
-low-code/no-code alternative to high-cost tools, with transparent pricing, no
-server fees, and all tools included. On average, it saves users approximately 7
-hours per week by simplifying data prep, blending, and automation.
+This is a community fork of [Enso](https://github.com/enso-org/enso), the visual
+and textual data-preparation tool built by Enso Analytics. It contains the two
+halves of Enso:
 
-For more details, visit our website at
-[ensoanalytics.com](https://www.ensoanalytics.com).
+- **The Enso IDE**: a desktop app (Electron, with a Vue graph editor) for
+  building data workflows visually or as Enso code.
+- **The Enso engine**: the Enso language's compiler and interpreter (on
+  GraalVM), its language server and the standard library.
 
-## Key Features
+The fork adjusts the build and runs **without Enso Analytics' cloud services**.
+The IDE is local-only: there is no sign-in and no cloud drive. Projects, labels,
+version history (local git) and secrets stay on your machine. It is intended for
+community contributions and development, and for building and running Enso for
+personal use (or where that fits the
+[license terms](https://ensoanalytics.com/eula) of Enso Analytics). It is not
+intended for commercial use or distribution.
 
-- **Data Preparation**: Clean, transform, and blend data from various sources,
-  handling both structured and unstructured data with ease.
-- **Data Analysis**: Perform powerful analyses to derive insights without
-  extensive programming knowledge.
-- **Catalog System**: A centralized repository for workflows and data assets,
-  enabling easy discovery, reuse, and management across your organization.
-- **Deployment Automation**: Schedule and deploy workflows for automatic,
-  consistent execution, reducing manual intervention.
-- **Full Transparency**: Complete visibility into every component's
-  configuration—no hidden settings.
-- **Real-Time Feedback**: Live updates as you configure, showing immediate
-  results to accelerate workflow development.
-- **Seamless Environment Transition**: Build locally with sample data and
-  promote effortlessly to production environments like Snowflake.
-- **Accessibility for All Skill Levels**: User-friendly for non-programmers,
-  with code editing options for developers.
-- **Consistent Experience**: The same intuitive interface across cloud and
-  desktop versions.
-- **Team Collaboration**: Cloud-based sharing of workflows, secrets, and
-  connections.
-- **Version History**: Automatic backups to prevent data loss and enable easy
-  recovery.
-- **Scheduling Options**: Run on your own hardware or serverlessly in Enso
-  Cloud.
-- **Built-In Documentation**: Workflows and data explained with version history.
-- **Advanced Tools**: Multi-row formulas, dynamic rename, user-defined
-  functions, "join between," and more for simplified transformations.
+## Download
 
-## Use Cases
+Installers are on this repository's
+[releases page](https://github.com/jdunkerley/enso/releases):
 
-- **Finance**: Automate budget-to-actuals reporting and harmonize data across
-  the organization.
-- **Accounting**: Streamline reconciliations, close books faster, and deliver
-  repeatable results.
-- **Tax**: Blend data from multiple entities and systems automatically.
-- **Sales Operations**: Handle sales commission reporting and integrate CRM with
-  marketing automation data.
+| Platform              | Installer                                  |
+| --------------------- | ------------------------------------------ |
+| Windows               | `enso-win-x64-<version>.exe`               |
+| Linux                 | `enso-linux-x86_64-<version>.AppImage`     |
+| macOS (Apple silicon) | `enso-mac-arm64-<version>.dmg`, when built |
 
-## Getting Started
+Stable releases are marked "Latest". Release candidates and nightly builds are
+prereleases. The installers are unsigned. See
+[Getting Enso](https://github.com/jdunkerley/enso/wiki/Getting-Enso) for the
+release channels and updates.
 
-To get started with Enso:
+## Using Enso
 
-- Explore our
-  [Getting Started guide](https://help.enso.org/docs/getting-started-intro) for
-  step-by-step instructions.
-- Try sample workflows to prep and blend data in seconds.
-- Enso works seamlessly across Windows, Mac, Linux, cloud, and desktop
-  environments.
+User documentation for the language, the libraries and the IDE is at
+[help.enso.org](https://help.enso.org). Some of it describes Enso Cloud
+features, which this fork does not have.
 
-For comprehensive documentation, visit [help.enso.org](https://help.enso.org).
+## Building from source
 
-## Enso Source Code
+You need Node (through corepack), a GraalVM JDK, sbt and Rust. The pinned
+versions are in the repository, and a check command tells you what is missing:
 
-If you want to start using Enso, please see the download links in the Getting
-Started section above. Alternatively, you can get the IDE
-[here](https://www.ensoanalytics.com/download). This section is intended for
-people interested in contributing to the development of Enso.
+```bash
+corepack pnpm install
+corepack pnpm --filter build-scripts run toolchain-check
+```
 
-Enso is a community-driven open source project which is, and will always be,
-open and free to use. Join us, help us to build it, and spread the word!
+Build an installer for your platform:
 
-### Project Components
+```bash
+corepack pnpm --filter build-scripts run ide-local
+```
 
-Enso consists of several sub projects:
+[Building and Running](https://github.com/jdunkerley/enso/wiki/Building-and-Running)
+covers everything else: the engine on its own, running the IDE in development
+mode, tests and formatting.
 
-- **Enso Engine**: The Enso Engine is the set of tools that implement the Enso
-  language and its associated services. These include the Enso interpreter, a
-  just-in-time compiler and runtime (both powered by
-  [GraalVM](https://www.graalvm.org/)), and a language server that lets you
-  inspect Enso code as it runs. These components can be used on their own as
-  command line tools.
+## Documentation for developers
 
-- **Enso IDE**: The [Enso IDE](https://www.ensoanalytics.com/product) is a
-  desktop application that allows working with the visual form of Enso. It
-  consists of an Electron application, and the searcher which provides
-  contextual search, hints, and documentation for all of Enso's functionality.
+The developer documentation is in this repository's
+[wiki](https://github.com/jdunkerley/enso/wiki). Good places to start:
 
-### License
+- [IDE Architecture](https://github.com/jdunkerley/enso/wiki/IDE-Architecture):
+  how the IDE, the project manager and the engine fit together.
+- [Runtime Guide](https://github.com/jdunkerley/enso/wiki/Runtime-Guide): a tour
+  of the engine.
+- [CI and Workflows](https://github.com/jdunkerley/enso/wiki/CI-and-Workflows):
+  what runs on a pull request, and how releases are made.
 
-The source code is open source. The downloadable binaries are not open source. A
-user may choose to download and build Enso in their environment under the open
-source licenses.
+## Contributing
 
-For downloadable binaries, we do offer no cost licenses to individuals, and to
-small companies. See
-[https://www.ensoanalytics.com/agreements/eula](https://www.ensoanalytics.com/agreements/eula).
+Issues and pull requests are welcome. Read the
+[contributing guide](docs/CONTRIBUTING.md) first, and report security issues as
+described in the [security policy](docs/SECURITY.md). Everyone taking part is
+expected to follow the [Code of Conduct](docs/CODE_OF_CONDUCT.md).
 
-Outside of this limited scope, we have commercial options.
+## License
 
-The Enso Engine is licensed under the
-[Apache 2.0](https://opensource.org/licenses/apache-2.0), as specified in the
-[LICENSE](https://github.com/enso-org/enso/blob/develop/LICENSE) file. The Enso
-IDE is licensed under the [AGPL 3.0](https://opensource.org/licenses/AGPL-3.0),
-as specified in the
-[LICENSE](https://github.com/enso-org/enso/blob/develop/app/gui/LICENSE) file.
+The Enso engine is licensed under [Apache 2.0](LICENSE), and the Enso IDE under
+[AGPL 3.0](app/gui/LICENSE).
 
-This license set was chosen to provide you with complete freedom to use Enso,
-create libraries, and release them under any license of your choice, while also
-allowing us to release commercial products on top of the platform, including
-Enso Cloud and Enso Enterprise server managers.
-
-## Contributing to Enso
-
-Enso is a community-driven open source project which is and will always be open
-and free to use. We are committed to a fully transparent development process and
-highly appreciate every contribution. If you love the vision behind Enso and you
-want to redefine the data processing world, join us and help us track down bugs,
-implement new features, improve the documentation or spread the word!
-
-If you'd like to help us make this vision a reality, please feel free to join
-our [chat](https://discord.gg/enso), and take a look at our
-[development and contribution guidelines](https://github.com/enso-org/enso/blob/develop/docs/CONTRIBUTING.md).
-The latter describes all the ways in which you can help out with the project, as
-well as provides detailed instructions for building and hacking on Enso.
-
-If you believe that you have found a security vulnerability in Enso, or that you
-have a bug report that poses a security risk to Enso's users, please take a look
-at our
-[security guidelines](https://github.com/enso-org/enso/blob/develop/docs/SECURITY.md)
-for a course of action.
-
-## Community
-
-Join the [Enso Community](https://community.ensoanalytics.com) to connect with
-fellow users, share insights, find sample projects, and get answers to your
-questions.
-
-## About
-
-Enso Analytics transforms complex processes into repeatable workflows, boosting
-productivity for data-intensive teams. Learn more at
-[ensoanalytics.com](https://www.ensoanalytics.com).
-
-## Fork Details
-
-This repository is a fork of the original Enso Analytics repository. The forked
-version adjusts the build process and does not depend on the services of Enso
-Analytics.
-
-It is adjusted so that it can run without the need for Enso Analytics' cloud
-services and can be run in a community mode. The forked version is intended for
-community contributions and development, allowing users to build and run Enso
-for personal use (or when they would fit the
-[license](https://ensoanalytics.com/eula) terms of Enso Analytics).
-
-It is not intended for commercial use or distribution.
+Enso is developed upstream by [Enso Analytics](https://www.ensoanalytics.com) at
+[enso-org/enso](https://github.com/enso-org/enso).

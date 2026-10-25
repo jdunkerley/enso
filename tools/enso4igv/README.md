@@ -51,7 +51,7 @@ executed and output is printed in the area below editor:
 To work with all Enso code base continue with choosing _File/Open Folder..._ and
 opening root of [Enso Git Repository](http://github.com/enso-org/enso)
 (presumably already built with
-[sbt buildEngineDistribution](https://github.com/enso-org/enso/blob/develop/docs/CONTRIBUTING.md#running-enso)).
+[sbt buildEngineDistribution](https://github.com/jdunkerley/enso/wiki/Building-and-Running#building-and-running-the-engine-from-source)).
 Following set of projects is opened and ready for use:
 
 ![Enso Projects](https://github.com/enso-org/enso/assets/26887752/7919d2ee-4bcd-4b7b-954a-e2dc61f7c01a)
@@ -83,7 +83,7 @@ Let's do a bit of debugging. Select _"Listen to 5005"_ debug configuration:
 ![Listen to 5005](https://github.com/enso-org/enso/assets/26887752/1874bcb1-cf8b-4df4-92d8-e7fb57e1b17a)
 
 And then just
-[execute the engine distribution](https://github.com/enso-org/enso/blob/develop/docs/CONTRIBUTING.md#running-enso)
+[execute the engine distribution](https://github.com/jdunkerley/enso/wiki/Building-and-Running#building-and-running-the-engine-from-source)
 in debug mode:
 
 ```bash

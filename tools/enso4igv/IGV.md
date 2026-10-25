@@ -61,7 +61,7 @@ Continue through the wizard to _finish_ the installation.
 ## Using the IGV
 
 Build an instance of the Enso runtime engine (see
-[Running Enso](../../docs/CONTRIBUTING.md#running-enso)) using and then launch
+[Running Enso](https://github.com/jdunkerley/enso/wiki/Building-and-Running#building-and-running-the-engine-from-source)) using and then launch
 it the following system properties:
 
 ```bash
