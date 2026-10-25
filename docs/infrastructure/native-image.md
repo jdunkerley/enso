@@ -40,11 +40,11 @@ the `native-image` executable is part of the JDK release.
 To be able to [link statically](#static-builds) on Linux, we need to link
 against a `libc` implementation. The default `glibc` contains
 [a bug](https://sourceware.org/bugzilla/show_bug.cgi?id=10652) that would cause
-crashes when downloading files form the internet, which is a crucial Launcher
-functionality. Instead, [`musl`](https://musl.libc.org/) implementation is
-suggested by Graal as an alternative. The sbt task automatically downloads a
-bundle containing all requirements for a static build with `musl`. It only
-requires a `tar` command to be available to extract the bundle.
+crashes when a statically linked image downloads files from the internet.
+Instead, [`musl`](https://musl.libc.org/) implementation is suggested by Graal
+as an alternative. The sbt task automatically downloads a bundle containing all
+requirements for a static build with `musl`. It only requires a `tar` command to
+be available to extract the bundle.
 
 Currently, to use `musl`, the `--libc=musl` option has to be added to the build
 and `x86_64-linux-musl-gcc` must be available in the system PATH for the
@@ -126,12 +126,6 @@ to maintain separate configs for each platform. Currently, the
 accesses may have to be gathered manually. For some types of accesses it may be
 possible to force the Windows-specific code paths to run on Linux and gather
 these accesses semi-automatically.
-
-After updating the Native Image configuration, make sure to clean it by running
-
-```
-cd tools/native-image-config-cleanup && npm install && npm start
-```
 
 Moreover, some reflective accesses may not be detected by the tool
 automatically, so they may need to be added manually. One of them is an access

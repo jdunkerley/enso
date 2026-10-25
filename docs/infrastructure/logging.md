@@ -440,10 +440,9 @@ the first project's log file, lost them once that project closed, or - when an
 unrelated program owned port 6000 - sent them to that program. See Note [Each
 Process Hosts Its Own Logging Server] in `LoggingSetupHelper`.
 
-Nothing else hosts a logging server. The launcher passes `--logger-connect` to
-the engine runners it spawns only when it has a logging server endpoint, which
-it never does; the IDE's project manager (`app/project-manager-shim`) passes
-nothing logging-related to the language servers it starts.
+Nothing else hosts a logging server. The IDE's project manager
+(`app/project-manager-shim`) passes nothing logging-related to the language
+servers it starts.
 
 ## Telemetry
 

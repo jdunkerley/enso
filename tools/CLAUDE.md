@@ -11,7 +11,6 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 - `build-scripts/` — TypeScript package with the build logic: `version`,
   `toolchain-check`, `ide-local` (a developer's whole IDE build) and the CI
   commands. Node runs it directly; see its CLAUDE.md.
-- `native-image-config-cleanup/` — TypeScript tool that de-duplicates Native Image `reflect-config.json` / `resource-config.json` across GraalVM builds.
 - `legal-review/`, `legal-review-helper/` — Third-party dependency license-review inputs and helpers.
 - `simple-library-server/` — Minimal HTTP library-server stub for testing the library download flow without touching the real library repository.
 

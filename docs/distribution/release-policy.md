@@ -17,7 +17,6 @@ that we have a well-defined release policy. This document defines said policy.
 <!-- MarkdownTOC levels="2,3" autolink="true" -->
 
 - [Versioning](#versioning)
-  - [Launcher Versioning](#launcher-versioning)
 - [Release Branches](#release-branches)
 - [Release Workflow](#release-workflow)
   - [Breaking Release Workflow](#breaking-release-workflow)
@@ -47,11 +46,6 @@ following hold:
 - Backwards-compatible bug fixes will result in a patch version increase.
 - The tag will indicate pre-release versions, and will increase when any
   pre-release change is made. These are not intended to be stable.
-
-### Launcher Versioning
-
-The launcher is released alongside Enso releases, so the launcher version is
-tied to the Enso version that it is released with.
 
 ## Release Workflow
 
@@ -104,9 +98,13 @@ the Enso tooling.
 
 #### Engine Manifest
 
-Each GitHub release contains an asset named `manifest.yaml` which is a YAML file
-containing metadata regarding the release. The manifest is also included in the
-root of an Enso version package. It has at least the following fields:
+> **This fork:** the manifest is not a release asset; it ships inside the engine
+> package. `minimum-launcher-version` is kept only because `Manifest` requires
+> the field.
+
+Each engine package contains a file named `manifest.yaml` at its root, a YAML
+file containing metadata regarding the release. It has at least the following
+fields:
 
 - `minimum-launcher-version` - specifies the minimum version of the launcher
   that should be used with this release of Enso,

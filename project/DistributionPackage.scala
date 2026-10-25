@@ -798,78 +798,39 @@ object DistributionPackage {
   }
 
   sealed trait OS {
-    def name:                String
-    def hasSupportForSulong: Boolean
-    def executableName(base: String): String = base
-    def archiveExt: String                   = ".tar.gz"
-    def isUNIX: Boolean                      = true
+    def name:  String
     def archs: Seq[Architecture]
   }
   object OS {
     case object Linux extends OS {
-      override val name: String                 = "linux"
-      override val hasSupportForSulong: Boolean = true
-      override val archs                        = Seq(Architecture.X64)
+      override val name: String = "linux"
+      override val archs        = Seq(Architecture.X64)
     }
     trait MacOS extends OS {
       override val name: String = "macos"
     }
     case object MacOSAmd extends MacOS {
-      override val hasSupportForSulong: Boolean = true
-      override val archs                        = Seq(Architecture.X64)
+      override val archs = Seq(Architecture.X64)
     }
-
     case object MacOSArm extends MacOS {
-      override val hasSupportForSulong: Boolean = true
-      override val archs                        = Seq(Architecture.AarchX64)
+      override val archs = Seq(Architecture.AarchX64)
     }
     case object Windows extends OS {
-      override val name: String                         = "windows"
-      override val hasSupportForSulong: Boolean         = false
-      override def executableName(base: String): String = base + ".exe"
-      override def archiveExt: String                   = ".zip"
-      override def isUNIX: Boolean                      = false
-      override val archs                                = Seq(Architecture.X64)
+      override val name: String = "windows"
+      override val archs        = Seq(Architecture.X64)
     }
-
-    val platforms = Seq(Linux, MacOSArm, MacOSAmd, Windows)
-
-    def apply(name: String, arch: Option[String]): Option[OS] =
-      name.toLowerCase match {
-        case Linux.`name` => Some(Linux)
-        case MacOSAmd.`name` =>
-          arch match {
-            case Some(Architecture.X64.`name`) =>
-              Some(MacOSAmd)
-            case Some(Architecture.AarchX64.`name`) =>
-              Some(MacOSArm)
-            case _ =>
-              None
-          }
-        case MacOSArm.`name` => Some(MacOSArm)
-        case Windows.`name`  => Some(Windows)
-        case _               => None
-      }
   }
 
   sealed trait Architecture {
     def name: String
-
-    /** Name of the architecture for GraalVM releases
-      */
-    def graalName: String
   }
   object Architecture {
     case object X64 extends Architecture {
-      override val name: String      = "amd64"
-      override def graalName: String = "x64"
+      override val name: String = "amd64"
     }
-
     case object AarchX64 extends Architecture {
-      override val name: String      = "aarch64"
-      override def graalName: String = "x64"
+      override val name: String = "aarch64"
     }
-
   }
 
   /** A helper class that manages building distribution artifacts. */
