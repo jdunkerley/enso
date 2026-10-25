@@ -26,6 +26,7 @@ Run `git submodule update --init --recursive` before the build. Without it
 the very first e2e step (login screen never renders, console shows
 `Failed to fetch`).
 
-The ide build should be with staging environment by default (`--mode staging`
-option in case of `./run ide build` script). The credentials file should be
-provided by user. If working on a worktree, try to copy it from main repo.
+The ide build should be with staging environment by default (`--mode staging`,
+e.g. `corepack pnpm --filter build-scripts run ide-local --mode staging`). The
+credentials file should be provided by user. If working on a worktree, try to
+copy it from main repo.

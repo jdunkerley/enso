@@ -91,7 +91,7 @@ describe('runStdlibTests', () => {
       runStdlibTests({ suite: 'standard-library', clean: false, dryRun: false }, c),
     ).rejects.toThrow('buildSmallJdkForRelease')
   })
-  test('the cloud suites refuse cloud credentials, which still need ./run', async () => {
+  test('the cloud suites refuse cloud credentials', async () => {
     const env = Object.fromEntries(
       [
         'ENSO_CLOUD_TEST_ACCOUNT_USERNAME',
@@ -104,7 +104,7 @@ describe('runStdlibTests', () => {
     const { context: c } = context(repository(['Base_Tests']), { env })
     await expect(
       runStdlibTests({ suite: 'std-cloud-related', clean: false, dryRun: false }, c),
-    ).rejects.toThrow('Phase 4')
+    ).rejects.toThrow('cannot sign in to Enso Cloud')
   })
   test('a dry run lists the commands and runs nothing', async () => {
     const { calls, logged, context: c } = context(repository(['Base_Tests']))

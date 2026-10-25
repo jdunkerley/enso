@@ -84,8 +84,8 @@ export async function runStdlibTests(
   const env = context.env
   if (CLOUD_VARIABLES.every((variable) => (env[variable] ?? '') !== '')) {
     throw new Error(
-      'Enso Cloud test credentials are set, but signing in to the cloud has not moved off `./run` ' +
-        'yet (Phase 4): use `./run backend test` for the cloud suites.',
+      'Enso Cloud test credentials are set, but stdlib-test cannot sign in to Enso Cloud: unset ' +
+        `${CLOUD_VARIABLES.join(', ')} to run the cloud suites without the real cloud.`,
     )
   }
   if (skipsForMissingAwsCredentials(suite, env)) {

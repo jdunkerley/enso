@@ -14,7 +14,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-wasm-checks
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 jobs:
-  enso-build-ci-gen-job-native-test-linux-amd64:
+  native-test:
     name: Native Rust tests (linux, amd64)
     runs-on: ubuntu-latest
     steps:
@@ -29,7 +29,7 @@ jobs:
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
         run: corepack pnpm run git-clean --verbose
-  enso-build-ci-gen-job-wasm-lint-linux-amd64:
+  lint:
     name: Lint (linux, amd64)
     runs-on: ubuntu-latest
     steps:
@@ -44,7 +44,7 @@ jobs:
       - if: "${{ (contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || (github.ref == 'refs/heads/develop') || inputs.clean_build_required) }}"
         name: Clean after
         run: corepack pnpm run git-clean --verbose
-  enso-build-ci-gen-job-parser-wasm-test-linux-amd64:
+  parser-wasm-test:
     name: Parser recursion test (linux, amd64)
     runs-on: ubuntu-latest
     steps:

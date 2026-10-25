@@ -6,7 +6,7 @@ To run the tests, you need to supply credentials for Google Sheets. Get your IDE
 ready, for example by:
 
 ```bash
-enso$ ./run ide build
+enso$ corepack pnpm --filter build-scripts run ide-local
 enso$ ls ./dist/ide/enso-linux-*.AppImage
 ```
 
