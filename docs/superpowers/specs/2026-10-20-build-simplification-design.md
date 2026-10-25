@@ -4,7 +4,8 @@ Status: approved 2026-10-20; corrected after Phases 1–2 on 2026-10-21, for the
 Phase 3 plan on 2026-10-22, and for the Phase 5 plan on 2026-10-24. The
 corrections are factual (what the code does) or record the user's decisions of
 2026-10-22 and 2026-10-24 (the standalone launcher goes in Phase 5); the
-design's intent is unchanged.
+design's intent is unchanged. Phase 5 complete 2026-10-25: the programme is
+done.
 
 ## Goal
 
