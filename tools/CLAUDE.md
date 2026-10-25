@@ -18,4 +18,4 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 ## Conventions
 
 - Each tool must stay runnable without the full repo build. If it needs the engine, make that explicit via environment variables or args.
-- Don't put anything here that belongs in `build_tools/` (orchestration) or `engine/`/`lib/` (production code).
+- Don't put production code here: it belongs in `engine/` or `lib/`.

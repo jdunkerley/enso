@@ -17,8 +17,6 @@ data and layout.
 - `edition.template.yaml` — Template for edition manifests produced at release
   time.
 - `manifest.template.yaml` — Template for the distribution manifest.
-- `enso.bundle.template` — Structure of the full Enso bundle (engine + stdlib +
-  launcher).
 - `launcher-manifest.yaml` — Manifest describing launcher version metadata.
 
 ## Editions and libraries

@@ -18,6 +18,7 @@ on:
 # Markdown is ignored: no GUI code or test reads a `.md` file, so a documentation-only change
 # (READMEs, CLAUDE.md) cannot affect the GUI checks. Prettier, which does format Markdown, is not
 # gated on this workflow.
+# The Rust files are here because the GUI build compiles the WASM parser through cargo.
 jobs:
   gui-changed-files:
     runs-on: ubuntu-latest
@@ -37,6 +38,10 @@ jobs:
           files: |
             app/**
             lib/rust/**
+            .cargo/**
+            Cargo.lock
+            Cargo.toml
+            rust-toolchain.toml
             package.json
             pnpm-lock.yaml
             pnpm-workspace.yaml
@@ -64,6 +69,10 @@ jobs:
           files: |
             app/**
             lib/rust/**
+            .cargo/**
+            Cargo.lock
+            Cargo.toml
+            rust-toolchain.toml
             package.json
             pnpm-lock.yaml
             pnpm-workspace.yaml

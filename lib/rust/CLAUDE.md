@@ -1,9 +1,8 @@
 # lib/rust
 
 Rust workspace libraries, declared as members of the root `Cargo.toml`
-workspace. These are general-purpose Rust building blocks — the "tools" layer
-(`build_tools/`) and the parser-integration shim (`app/rust-ffi/`) live
-elsewhere but share the same workspace.
+workspace. These are the parser and its building blocks; the parser's WASM shim
+(`app/rust-ffi/`) lives elsewhere but shares the same workspace.
 
 ## Crates
 

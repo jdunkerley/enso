@@ -23,7 +23,6 @@ target/
 wasm-pack.log
 generated/
 /target
-/build_tools/rust/target/
 /rust-analyzer-target
 
 ###########
