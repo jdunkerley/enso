@@ -1,6 +1,4 @@
-# Options intended to be common for all developers.
-
-wasm-size-limit: 16.20 MiB
+# Versions the build reads. Nothing here is installed by the build itself.
 
 # The most recent stable Enso release.
 #
@@ -10,11 +8,6 @@ wasm-size-limit: 16.20 MiB
 # stale value only misnames local dev builds, it does not affect a release build (which always sets
 # `ENSO_VERSION` explicitly).
 latest-release: 2025.3.4
-
-required-versions:
-  # NB. The Rust version is pinned in rust-toolchain.toml.
-  # NB. The Node version is pinned in .node-version.
-  # We no longer need cargo-watch: ^8.1.1
 
 # The JVM toolchain that CI's `.github/actions/setup-jvm` installs. The build keeps its own copies,
 # and `tools/ci/check-workflows.mjs` fails if these drift from them:

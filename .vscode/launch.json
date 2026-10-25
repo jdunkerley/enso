@@ -35,12 +35,6 @@
       // "args": "--vm.D=polyglot.dap=4711 --run ${file}"
     },
     {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Rust ./run",
-      "cargo": ["run", "-p", "enso-build-cli"],
-    },
-    {
       "name": "Enso GUI",
       "type": "editor-browser",
       "request": "launch",

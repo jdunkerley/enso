@@ -19,8 +19,7 @@ Stylesheets, fonts and icons for the project view (the graph editor).
 - `font-*.css` — one `@font-face` file per family; the font files and their
   licence notices live in `public/font-*/`. Give every `src` a `format()` and
   every face a `font-display` (`block` for M PLUS 1, which drives text
-  measurement and is preloaded from `index.html`). A renamed or added font
-  directory must also be listed in `build_tools/build/paths.yaml`.
+  measurement and is preloaded from `index.html`).
 - `font-monaspace.css` / `public/font-monaspace/` — Monaspace Neon and Radon
   (variable woff2, v1.400, unmodified upstream files; see the README there).
   `--font-mono` is Neon (13px in the code editor), followed only by system

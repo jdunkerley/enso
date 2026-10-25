@@ -2,8 +2,6 @@
 resolver = "2"
 members = [
 	"app/rust-ffi",
-	"build_tools/cli",
-	"build_tools/macros/lib",
 	"lib/rust/launcher-shims",
 	"lib/rust/macro-utils",
 	"lib/rust/metamodel",
@@ -24,74 +22,18 @@ members = [
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # !!!!!!!!!! WARNING !!!!!!!!!!
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# We are tryingto maintain minimum set of dependencies. Before adding a new dependency, consult it
-# with the core development team. Thank you!
-chrono = { version = "0.4.45", features = ["serde"] }
+# We are trying to maintain a minimum set of dependencies. Before adding a new dependency, consult
+# the core development team. Thank you!
+boolinator = { version = "2.4.0" }
 clap = { version = "4.6.7", features = [
 	"derive",
 	"env",
 	"wrap_help",
 	"string",
 ] }
+console_error_panic_hook = { version = "0.1.7" }
+convert_case = { version = "0.12.0" }
 derive-where = "1.7.0"
-dirs = { version = "7.0.0" }
-flate2 = { version = "1.1.10" }
-indicatif = { version = "0.18.6", features = ["tokio"] }
-mime = "0.3.17"
-new_mime_guess = "4.0.4"
-multimap = { version = "0.10.1" }
-native-windows-gui = { version = "1.0.13" }
-# Note [TLS Backend]
-# ~~~~~~~~~~~~~~~~~~
-# Every HTTPS client in the build tooling uses `rustls` with the `ring` provider and the bundled
-# Mozilla root store (`webpki-roots`), never the OS TLS library, so the build needs no OpenSSL and
-# trusts the same roots on every host. Neither crate's defaults give that any more:
-# - `octocrab` defaults to the OS root store and pulls `aws-lc-rs` for JWT support we do not use.
-#   The features below select `ring`, the bundled roots and the pure-Rust JWT backend instead.
-#   `retry` is left out on purpose: it re-sends requests on server errors, POSTs included, and
-#   requests such as creating a release are not idempotent.
-# - `reqwest` 0.13's only ready-made rustls feature bundles `aws-lc-rs` with the OS verifier.
-#   `rustls-no-provider` leaves the choice to us: clients must be built with
-#   `ide_ci::io::web::client::builder`, which supplies a `ring` + `webpki-roots` configuration.
-#   A client built any other way (`reqwest::Client::new`, `reqwest::get`, ...) panics on first
-#   use with "No rustls crypto provider". `clippy.toml` disallows those constructors, but CI runs
-#   no clippy and clippy cannot express `Client::default()`, so the `ide-ci` test
-#   `reqwest_clients` scans the sources for them instead.
-octocrab = { version = "0.54.2", default-features = false, features = [
-	"default-client",
-	"follow-redirect",
-	"jwt-rust-crypto",
-	"rustls",
-	"rustls-ring",
-	"rustls-webpki-tokio",
-	"tracing",
-] }
-path-absolutize = "4.0.1"
-portpicker = { version = "0.1.1" }
-regex = { version = "1.13.1" }
-serde = { version = "1.0.229", features = ["derive", "rc"] }
-# `serde_yaml` is unmaintained — its last release is literally `0.9.34+deprecated`. `serde_norway`
-# continues the 0.9 line, so it is a drop-in for the API used here. It is aliased to the old name
-# so the existing `serde_yaml::` paths keep working; the package being pulled is what this line
-# says, not the alias.
-serde_yaml = { package = "serde_norway", version = "0.9.42" }
-sha2 = { version = "0.11.0" }
-sysinfo = { version = "0.39.6" }
-tar = { version = "0.4.46" }
-tokio = { version = "1.53.1", features = ["full", "tracing"] }
-tokio-stream = { version = "0.1.19", features = ["fs"] }
-tokio-util = { version = "0.7.19", features = ["full"] }
-tracing = { version = "0.1.44" }
-tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-walkdir = { version = "2.5.0" }
-windows = { version = "0.62.2", features = [
-	"Win32_UI",
-	"Win32_UI_Shell",
-	"Win32_System_LibraryLoader",
-	"Win32_System_Com",
-] }
-winreg = { version = "0.56.0" }
-anyhow = { version = "1.0.104" }
 derive_more = { version = "2.1.1", features = [
 	"index",
 	"index_mut",
@@ -104,28 +46,10 @@ derive_more = { version = "2.1.1", features = [
 	"add",
 	"add_assign",
 ] }
-boolinator = { version = "2.4.0" }
-futures = { version = "0.3.34", default-features = false, features = [
-	"std",
-	"executor",
-] }
-futures-util = { version = "0.3.34", default-features = false }
-itertools = { version = "0.15.0" }
-lazy_static = { version = "1.5.0" }
-serde_json = { version = "1.0.151", features = ["raw_value"] }
-convert_case = { version = "0.12.0" }
-bytes = { version = "1.12.1" }
-console_error_panic_hook = { version = "0.1.7" }
-# See Note [TLS Backend] above.
-reqwest = { version = "0.13.5", default-features = false, features = [
-	"json",
-	"query",
-	"rustls-no-provider",
-	"stream",
-] }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
-webpki-roots = { version = "1.0.9" }
 proc-macro2 = { version = "1.0.107" }
+quote = { version = "1.0.47" }
+serde = { version = "1.0.229", features = ["derive", "rc"] }
+serde_json = { version = "1.0.151", features = ["raw_value"] }
 syn = { version = "3.0.6", features = [
 	"full",
 	"extra-traits",
@@ -134,9 +58,6 @@ syn = { version = "3.0.6", features = [
 	"visit",
 	"visit-mut",
 ] }
-quote = { version = "1.0.47" }
-semver = { version = "1.0.28", features = ["serde"] }
-strum = { version = "0.28.0", features = ["derive"] }
 
 [workspace.lints]
 [workspace.lints.rust]

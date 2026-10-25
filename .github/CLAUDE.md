@@ -1,8 +1,7 @@
 # .github
 
 GitHub Actions workflows, the composite actions they share, and repository
-settings. Every workflow is hand-written YAML: the Rust generator
-(`build_tools/ci-gen`) is retired (build simplification, Phase 1;
+settings. Every workflow is hand-written YAML (build simplification;
 `docs/superpowers/specs/2026-10-20-build-simplification-design.md`).
 
 ## Layout
@@ -66,8 +65,7 @@ settings. Every workflow is hand-written YAML: the Rust generator
   would share the group and cancel each other.
 - **Composite actions keep the shell a step had**: PowerShell on Windows, bash
   elsewhere, as two steps with `runner.os` conditions. A composite step must
-  name its shell, and on Windows `./run` and `tar` behave differently under Git
-  Bash.
+  name its shell, and on Windows `tar` behaves differently under Git Bash.
 - **`ENSO_CI_CLEAN_BUILD`**, set at the top of a workflow, decides whether
   `git-clean` cleans: the `CI: Clean build required` label, a run on `develop`,
   or the `clean_build_required` input.
@@ -92,40 +90,30 @@ settings. Every workflow is hand-written YAML: the Rust generator
   whose entry point imports `src/lib/sbt.ts`), run as a package script or with
   plain node.
 
-## What still goes through `./run`
+## Where the build logic lives
 
-Build simplification Phases 2 and 3 moved every default pull-request check off
-`./run`. Where it only wrapped one sbt call, the workflows call sbt (Phase 2).
-Its real logic went to sbt tasks (`checkEnsoSyntax`,
-`ciBuildEngineDistribution`, `buildEngineBundle`), to `tools/build-scripts`
-(`version`, `stdlib-api-check`, `ide-build`, `stdlib-test`), or to plain
-workflow steps (the JVM tests) (Phase 3). A moved step sets every variable
-`./run` set for it; the Notes in each workflow say which. A job that runs a
-distribution built by another job uses that job's version, from its outputs, not
-sbt's default `0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
-`engine-checks-platform.yml`. Phase 4 moved the releases to
-`tools/build-scripts`' `release` command, and the nightly and macOS checks to
-calls of `engine-checks-platform.yml`. No workflow calls `./run` any more;
-`build_tools/` and `run*` stay, unused by CI, until Phase 5 deletes them.
+Workflows call sbt directly for the engine, and `tools/build-scripts` for what
+needs more than one tool. A job that runs a distribution built by another job
+uses that job's version, from its outputs, not sbt's default `0.0.0-dev`: see
+Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 
-| Workflow › job                                           | Step                                                                                                       | Goes through `./run`?                                |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                                                                    | No: `setup-jvm`                                      |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)                                                        | No: `setup-jvm`                                      |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job)                                                                | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt checkEnsoSyntax`                                                                                      | No: `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (Note [JVM Tests Without ./run])                                                             | No: `setup-jvm`, `setup-msvc`                        |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | No: `setup-build-scripts`                            |
-| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | No                                                   |
-| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | No: `setup-build-scripts`                            |
-| `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | No: `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `promote.yml`                                            | `release promote <designator>`                                                                             | No: `setup-build-scripts`                            |
-| `engine-checks-nightly.yml`, `macos-checks.yml`          | calls of `engine-checks-platform.yml`                                                                      | No                                                   |
-| `extra-nightly-tests.yml`                                | `engine-checks-platform.yml`, then `stdlib-test <suite>`                                                   | No: `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| Workflow › job                                           | Step                                                                                                       | Set up by                                        |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                                                                    | `setup-jvm`                                      |
+| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)                                                        | `setup-jvm`                                      |
+| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps                                                                                              | `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | —                                                |
+| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | `setup-build-scripts`                            |
+| `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `promote.yml`                                            | `release promote <designator>`                                                                             | `setup-build-scripts`                            |
+| `engine-checks-nightly.yml`, `macos-checks.yml`          | calls of `engine-checks-platform.yml`                                                                      | —                                                |
+| `extra-nightly-tests.yml`                                | `engine-checks-platform.yml`, then `stdlib-test <suite>`                                                   | `setup-jvm` (GraalPy), `setup-build-scripts`     |
 
 ## Checking a change
 

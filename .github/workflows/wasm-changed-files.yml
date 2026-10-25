@@ -30,7 +30,6 @@ jobs:
           files: |
             .cargo/**
             app/rust-ffi/**
-            build_tools/**
             lib/rust/**
             Cargo.lock
             Cargo.toml

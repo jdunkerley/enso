@@ -12,9 +12,8 @@ on:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.ide-changed-files.outputs.any_changed }}
 
-# The build and packaging plumbing of the IDE: the build scripts (`tools/build-scripts`; `./run` and
-# `build_tools/` until build simplification Phase 5 deletes them), the toolchains, the dependency
-# manifests and the workflows. GUI sources are covered by
+# The build and packaging plumbing of the IDE: the build scripts (`tools/build-scripts`), the
+# toolchains, the dependency manifests and the workflows. GUI sources are covered by
 # `gui-changed-files.yml` and the bundled engine by `engine-changed-files.yml`. Markdown is ignored:
 # nothing on this list reads a `.md` file while building or packaging the IDE.
 jobs:
@@ -34,7 +33,6 @@ jobs:
         with:
           files: |
             app/electron-client/**
-            build_tools/**
             tools/build-scripts/**
             .cargo/**
             Cargo.lock
@@ -51,9 +49,6 @@ jobs:
             build.sbt
             .jvmopts
             git-clean.mjs
-            run
-            run.cmd
-            run.ps1
             .github/**
           files_ignore: |
             **/*.md

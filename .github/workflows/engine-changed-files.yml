@@ -28,7 +28,6 @@ jobs:
         uses: step-security/changed-files@v45
         with:
           files: |
-            build_tools/cli/**
             distribution/**
             engine/**
             lib/**
@@ -51,7 +50,6 @@ jobs:
           # deliberately NOT ignored: they ship with the standard library, and the IDE's assistant
           # reads them at run time.
           files_ignore: |
-            build_tools/**/CLAUDE.md
             engine/**/CLAUDE.md
             lib/**/CLAUDE.md
             project/**/CLAUDE.md

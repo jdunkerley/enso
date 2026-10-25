@@ -30,15 +30,13 @@ deserialize parser output.
   interpreter DSL, persistance, and ydoc server.
 - `lib/scala/` — Scala support libraries (pkg, project-manager, editions,
   logging, etc.).
-- `build_tools/` — The `./run` CLI (Rust). The end-to-end build orchestrator for
-  the IDE/engine bundle.
 - `distribution/` — Packaged output layout, templates, and the **Enso standard
   library sources** under `distribution/lib/Standard/`.
 - `std-bits/` — Java helpers that the Enso standard library calls via host
   interop.
 - `test/` — Enso-language test projects (one per standard library module).
-- `tools/` — Auxiliary dev tools (IGV plugin, http test helper, CI scripts,
-  benchmark analysis).
+- `tools/` — Auxiliary dev tools: the build scripts (`tools/build-scripts`), the
+  IGV plugin, the HTTP test helper, CI scripts, benchmark analysis.
 - `docs/` — Extensive developer documentation (RFCs, style guides, runtime
   internals, LSP protocol). Start at `docs/README.md`.
 - `project/` — SBT plugins and build helpers for the engine.
@@ -48,27 +46,25 @@ deserialize parser output.
 
 Three, **which one to use depends on what you're building**:
 
-- **Cargo** — for everything under the `[workspace]` in root `Cargo.toml`
-  (build_tools + lib/rust + app/rust-ffi).
+- **Cargo** — only for the parser: the `[workspace]` in root `Cargo.toml` (the
+  parser crates under `lib/rust/`, `parser/debug` and its fuzzer,
+  `app/rust-ffi`, and `lib/rust/launcher-shims` until the standalone launcher
+  goes). sbt and the pnpm `postinstall` run it for you.
 - **pnpm + Vite/esbuild** — for the TypeScript monorepo (packages listed in
   `pnpm-workspace.yaml`).
 - **SBT** — for the Scala/Java engine (`build.sbt`). See
   `docs/sbt-cheatsheet.md`.
 
-The `./run` (or `run.cmd` / `run.ps1`) script at the repo root dispatches to the
-Enso build CLI (in `build_tools/cli/`) — the end-to-end orchestrator. It runs
-the CLI via `cargo run -p enso-build-cli`.
-
-CI runs no default pull-request check through `./run` any more (the
-build-simplification spec,
-`docs/superpowers/specs/2026-10-20-build-simplification-design.md`, Phases 2 and
-3): the workflows call sbt directly, with `.github/actions/setup-jvm` providing
-GraalVM, sbt, flatc and GraalPy, and run the logic that left `./run` from
-`tools/build-scripts` (`corepack pnpm --filter build-scripts run <command>`;
-`toolchain-check` compares a local toolchain with the pins). `.github/CLAUDE.md`
-("What still goes through `./run`") lists each step. Release, promote, the
-nightly checks and the label-gated macOS checks still use `./run` until Phase 4;
-locally, `./run` keeps working until Phase 5.
+There is no orchestrator above these: the Rust build CLI was removed in build
+simplification Phase 5
+(`docs/superpowers/specs/2026-10-20-build-simplification-design.md`). What needs
+more than one tool lives in `tools/build-scripts`
+(`corepack pnpm --filter build-scripts run <command>`): `ide-local` builds an
+installer from the checkout, `version` computes the version, `toolchain-check`
+compares a local toolchain with the pins, and the CI commands. CI calls sbt
+directly, with `.github/actions/setup-jvm` providing GraalVM, sbt, flatc and
+GraalPy. `docs/CONTRIBUTING.md` ("Building the IDE") lists the command for each
+build task.
 
 ## Languages and toolchains
 
@@ -85,13 +81,6 @@ locally, `./run` keeps working until Phase 5.
   (`wasm-checks.yml`). **There is no clippy job** — the workspace carries
   warnings on `develop`, so a clean clippy run is a convention here, not
   something CI will catch for you.
-- **`cargo test --workspace` has one guaranteed failure on Windows.** `ide-ci`'s
-  `programs::tar::tests::test_directory_packing` shells out to
-  `C:\Program Files\Git\usr\bin\tar.exe`, and msys `tar` reads the `C:\…`
-  destination as a remote host:
-  `/usr/bin/tar: Cannot connect to C: resolve failed`, exit 128. It is not a
-  regression — reproduce it on any toolchain before blaming a change. CI runs
-  this job on `ubuntu-latest`, where it passes.
 - Scala/Java: GraalVM-based. See `docs/infrastructure/` for `sbt`, native-image,
   dual-JVM, and GraalVM upgrade guides.
 - TypeScript: TS `catalog:` version in `pnpm-workspace.yaml`. Use
@@ -191,9 +180,9 @@ has silently produced a wrong result here:
   ```
 
   `rust-toolchain.toml` is honoured there, so the pinned version installs on
-  first use. Worth doing for any dependency touching platform surface: `nix` is
-  POSIX-only and cannot be compiled on Windows at all, while `windows`/`winreg`
-  only compile on Windows — neither half is verifiable from one host alone.
+  first use. Worth doing for anything that touches platform surface: paths,
+  processes, native images and file permissions behave differently on the two
+  hosts.
 
 - **An incremental typecheck is not a verification after a dependency change.**
   TypeScript's `*.tsbuildinfo` reports success while skipping exactly the files
