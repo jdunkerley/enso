@@ -19,7 +19,7 @@ export type TextStore = ReturnType<typeof createTextStore>
  * A composable for getting localized text and setting the language.
  *
  * The composable is used in tests only; the application should use
- * `injectText` instead.
+ * `useText` instead.
  */
 function createTextStore() {
   const language = ref(resolveUserLanguage())

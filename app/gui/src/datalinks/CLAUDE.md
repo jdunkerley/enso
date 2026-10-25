@@ -2,8 +2,9 @@
 
 The **datalink editor** and the drive's "Create Datalink" dialog (#198). Vue;
 the decisions behind it are under "Rulings from #198" in
-`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Dormant: no UI
-entry point opens them; their unit tests are the guard against rot.
+`docs/superpowers/specs/2026-09-30-react-to-vue-foundations.md`. Opened from the
+Drive's New/Edit Datalink actions
+(`dashboard/layouts/Drive/datalinkActions.ts`).
 
 - `JSONSchemaInput.vue` — an editor built from a JSON schema, recursively
   (`const`, `string` (the `enso-secret` format is `SecretPicker.vue`), `number`,

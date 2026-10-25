@@ -32,7 +32,8 @@ ask first: is this ProjectView-specific, or would another feature want it too?
 - `composables/` — Vue composables (`useX()`). ProjectView-specific composables
   only; share-worthy ones belong at `src/composables/`.
 - `stores/` — App-wide reactive state for the ProjectView session. These are
-  **plain Vue composables that `provide()` a reactive shape**, not Pinia. A
+  **plain Vue composables that `provide()` a reactive shape**
+  (`createContextStore` pairs), and the GUI has no Pinia dependency. A
   `provideXxx()` is paired with a `useXxx()`/`injectXxx()`.
 - `providers/` — Pure `inject`/`provide` keys, no logic. Use when a single typed
   slot is enough and a full store is overkill.

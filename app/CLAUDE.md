@@ -13,8 +13,9 @@ Electron shell — plus a few grammars and shims.
 
 - `gui/` — The main GUI (Vue). Organized by feature subtree: `src/project-view/`
   for the ProjectView feature (graph editor, code editor, visualizations) and
-  `src/dashboard/` for the Dashboard feature (auth, cloud, project browser).
-  Shared UI/infrastructure lives at `src/` directly. See `gui/CLAUDE.md`.
+  `src/dashboard/` for the Dashboard feature (local project browser and Drive;
+  no login, no cloud). Shared UI/infrastructure lives at `src/` directly. See
+  `gui/CLAUDE.md`.
 - `electron-client/` — Electron main process. Packages the GUI + backend bundle,
   handles auto-update, file associations, custom protocol (`enso://`). The
   published binary name is just `enso`.
@@ -25,11 +26,14 @@ Electron shell — plus a few grammars and shims.
 
 - `ydoc-shared/` — Shared AST + language-server types + binary protocol.
   Consumed by both client and server halves. Exports `/ast`.
-- `ydoc-server/` — Node-side Yjs server: adapts the Enso LS text protocol into
-  Yjs CRDT updates, merges edits from multiple clients.
-- `ydoc-server-polyglot/` — Same server but bundled (esbuild, CommonJS) to run
-  **inside** the GraalVM JVM engine process via GraalJS. Lets the engine host
-  the ydoc server without a separate Node runtime.
+- `ydoc-server/` — Yjs server: adapts the Enso LS text protocol into Yjs CRDT
+  updates, merges edits from multiple clients. It runs inside the engine (see
+  below), in development too; the plain Node build is used only by the
+  Playwright mocks (`gui/integration-test/mock/localApi.ts`).
+- `ydoc-server-polyglot/` — The server bundled (esbuild, CommonJS) to run
+  **inside** the GraalVM JVM engine process via GraalJS. This is how the IDE
+  runs it; there is no separate Node runtime. It reaches the language server
+  through in-process channel callbacks, not a socket.
 - `ydoc-channel/` — Small Yjs-based bidirectional message channel library, used
   by both client and server.
 - `ydoc-inspect/` — Dev-only proxy that logs Ydoc/LS traffic for debugging

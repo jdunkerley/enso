@@ -132,10 +132,13 @@ has silently produced a wrong result here:
 
 - **PR CI skips the GUI checks and IDE packaging when nothing they depend on
   changed** (see the `*-changed-files.yml` workflows). Markdown-only changes
-  skip both, except under `distribution/`: that whole tree ships in the IDE
-  bundle, so any change there, docs included, still packages. Changes only to
-  GUI tests or their configuration run the GUI checks but skip packaging. Add
-  the `CI: Build IDE` label to force both. A PR that changes only
+  skip the GUI checks, but not always packaging: the engine gate
+  (`engine-changed-files.yml`) ignores only `CLAUDE.md` files under `engine/`,
+  `lib/`, `project/`, `std-bits/` and `test/`, so any other Markdown under its
+  paths (including a README there, and everything under `distribution/`, which
+  ships in the IDE bundle) runs the engine checks and so packages the IDE.
+  Changes only to GUI tests or their configuration run the GUI checks but skip
+  packaging. Add the `CI: Build IDE` label to force both. A PR that changes only
   `docs/superpowers/**` (specs and plans) starts no PR workflow at all, not even
   Changelog: `paths-ignore` lists it in each `pull_request` trigger, and
   `tools/ci/check-workflows.mjs` (run by the Workflow Lint check) fails a

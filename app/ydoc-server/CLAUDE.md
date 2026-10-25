@@ -1,8 +1,11 @@
 # ydoc-server
 
-Node-side Yjs server that bridges the Enso Language Server (JSON-RPC over
-WebSocket) and GUI clients (Yjs/CRDT over WebSocket). It holds a Yjs document
-per opened Enso module and reconciles local edits with LS file state.
+Yjs server that bridges the Enso Language Server and GUI clients (Yjs/CRDT over
+WebSocket). It runs inside the engine's JVM via `ydoc-server-polyglot`
+(GraalJS), in development too, and reaches the language server through
+in-process channel callbacks. The plain Node build is used only by the
+Playwright mocks (`gui/integration-test/mock/localApi.ts`). It holds a Yjs
+document per opened Enso module and reconciles local edits with LS file state.
 
 ## Role in the architecture
 
@@ -48,9 +51,9 @@ This server:
 
 ## Running
 
-- In dev: `corepack pnpm run -r compile` from repo root, then the GUI's
-  `dev:vite` spawns a server via its Vite middleware. Override via
-  `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`.
+- In dev: `dev:vite` does not start a ydoc server. It points the GUI at the
+  engine's (`ENSO_IDE_YDOC_SERVER_URL`, default `ws://<host>:5976`); override
+  with `ENSO_IDE_YDOC_SERVER_URL=ws://host:port`.
 - Standalone: `pnpm run dev:inspect` runs the server through `ydoc-inspect`.
 - Polyglot (inside engine): see `ydoc-server-polyglot/`.
 

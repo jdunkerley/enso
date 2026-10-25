@@ -1,23 +1,18 @@
 # Desktop app
 
-This folder contains projects related to the desktop app.
+This folder holds the Enso IDE: the Electron shell, the Vue GUI, the ydoc server
+and the supporting packages. It is a pnpm monorepo.
 
-## Folder structure
+- `gui/`: the Vue GUI (graph editor and local project dashboard).
+- `electron-client/`: the Electron main process.
+- `project-manager-shim/`: the project manager, replacing the Scala one.
+- `common/`: TypeScript utilities shared by the GUI and the Electron client.
+- `ydoc-server/`, `ydoc-server-polyglot/`, `ydoc-shared/`, `ydoc-channel/`,
+  `ydoc-inspect/`: the ydoc (collaborative editing) stack.
+- `rust-ffi/`: the Rust parser compiled to WASM.
+- `lezer-markdown/`, `lang-markdown/`, `table-expression/`: editor grammars.
+- `licenses/`: license data.
 
-Refer to the `README.md` in each individual module (if it exists) for the
-internal folder structure of the module.
-
-- `assets/`: Icons and images used by other modules. Currently these are only
-  used by `dashboard/`.
-- `client/`: The code for the Electron desktop app.
-- `common/`: Utility functions required by multiple other modules.
-- `content/`: The entry point for the GUI1 web app. This is the main page for
-  the desktop app.
-- `content-config/`: The statically-typed configuration object for `content/`.
-- [`dashboard/`](./lib/dashboard/README.md): The dashboard, used to manage
-  projects. It launches the GUI (located in `content/` for GUI1, or `/app/gui2/`
-  for GUI2) when a project is opened.
-- `icons/`: Generates the logo for the app.
-- `ts-plugin-namespace-auto-import/`: (WIP) A TypeScript plugin to change
-  auto-import to use `import * as moduleName` rather than `import {}`.
-- `types/`: Miscellaneous types used by multiple modules.
+See [`CLAUDE.md`](./CLAUDE.md) for details, and the wiki pages
+[IDE Architecture](https://github.com/jdunkerley/enso/wiki/IDE-Architecture) and
+[Building and Running](https://github.com/jdunkerley/enso/wiki/Building-and-Running).
