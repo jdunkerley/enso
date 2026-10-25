@@ -48,9 +48,9 @@ desktop binary (AppImage/DMG/exe + installer).
   `src/updaterIpc.ts` exposes it to the GUI (mode, check, download,
   quit-and-install handlers, and a status broadcast). The update mode is fixed
   at build time: `ENSO_IDE_UPDATES` is `auto` or `manual`, chosen by
-  `update_mode` in `build_tools/build/src/ide/web.rs` — `manual` for dev builds,
-  and for unsigned macOS, which cannot replace itself; an unpackaged run or a
-  Linux build outside an AppImage is also `manual` at run time
+  `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts` — `manual` for
+  dev builds, and for unsigned macOS, which cannot replace itself; an unpackaged
+  run or a Linux build outside an AppImage is also `manual` at run time
   (`resolveUpdateMode`). Manual mode never touches `electron-updater`. The
   "Include prerelease versions" setting sets `allowPrerelease` for each check;
   because `electron-updater` then matches only tags of the current version's
@@ -91,18 +91,17 @@ binary is bundled (pnpm installs just that optional dependency), so each
 platform must be packaged on its own OS. The other platforms' `require`s stay in
 the bundle as runtime requires inside `try`, which is harmless.
 
-Currently driven by `./run ide build` (the legacy Enso build CLI). Don't call
-`electron-builder` or `pnpm run dist` manually unless you're debugging packaging
-— the build CLI wires the engine bundle, GUI, and Electron together with the
-right env vars. CI packaging no longer uses `./run`: it builds the bundle with
-`sbt buildEngineBundle` and packages with `tools/build-scripts`' `ide-build`
-(see its CLAUDE.md); `./run ide build` stays the local route until build
-simplification Phase 5.
+Packaging is driven by `tools/build-scripts`: `ide-local` builds the engine
+bundle and the GUI from the checkout and packages them, and `ide-build` packages
+an existing `dist/gui` and `dist/backend` (what CI does). Don't call
+`electron-builder` or `pnpm run dist` by hand unless you're debugging packaging:
+those commands wire the engine bundle, the GUI and Electron together with the
+right env vars.
 
 ### Windows installer
 
 The Windows installer is built by electron-builder's NSIS target, not a custom
-installer (the Rust installer under `build_tools/install` was removed).
+installer (the old Rust installer was removed).
 
 - It is a per-user install to `%LOCALAPPDATA%\Programs\enso`, with a single
   entry under installed apps, and supports silent install and uninstall (`/S`).
@@ -113,13 +112,13 @@ installer (the Rust installer under `build_tools/install` was removed).
   installs silently, starts the app, and uninstalls.
 - Builds are unsigned for now.
 
-**Build the engine locally — don't bundle a released one.** `./run ide build`
-defaults to `--backend-source build`, which compiles the engine from these
-sources. Reaching for `--backend-source release --backend-release latest` to
-skip that ~25 minute Scala build produces an app that **launches fine but cannot
-open any project**: a develop-branch IDE is not protocol-compatible with the
-last released engine, so `session/initProtocolConnection` never completes and
-every attempt dies on a 15 s timeout. The Language Server log
+**Build the engine locally — don't bundle a released one.** `ide-local` always
+compiles the engine from these sources. Packaging a released engine instead
+(unpacking one into `dist/backend` and running `ide-build`) to skip that ~25
+minute Scala build produces an app that **launches fine but cannot open any
+project**: a develop-branch IDE is not protocol-compatible with the last
+released engine, so `session/initProtocolConnection` never completes and every
+attempt dies on a 15 s timeout. The Language Server log
 (`%LOCALAPPDATA%\enso\log\`) names the engine it booted — check it matches the
 IDE version before debugging anything else.
 
@@ -142,18 +141,18 @@ For testing, always build with `--mode staging`, to not pollute production
 backend and telemetry with test runs.
 
 `watch:linux` / `watch:macos` / `watch:windows` scripts are for local iteration
-once `./run ide build` has produced the engine bundle.
+once `ide-local` (or `sbt buildEngineBundle`) has produced the engine bundle.
 
 ## Env vars of note
 
 - `ENSO_BUILD_IDE`, `ENSO_BUILD_BACKEND` — output locations.
-- `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — nothing reads it: `./run` and the
-  `watch:*` scripts still set it, but the bundled engine is whatever is in
+- `ENSO_BUILD_IDE_BUNDLED_ENGINE_VERSION` — nothing reads it: the `watch:*`
+  scripts still set it, but the bundled engine is whatever is in
   `ENSO_BUILD_BACKEND`.
 - `ENSO_POLYGLOT_YDOC_SERVER` — URL for the (polyglot) ydoc server.
 - `ENSO_IDE_VERSION`, `ENSO_IDE_COMMIT_HASH` — embedded into buildinfo.
 - `ENSO_IDE_UPDATES` (`auto` | `manual`) — embedded into buildinfo; set by
-  `update_mode` in `build_tools/build/src/ide/web.rs`.
+  `updateMode` in `tools/build-scripts/src/ide-build/ideBuild.ts`.
 
 ## Local Claude agent
 

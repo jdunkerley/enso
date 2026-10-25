@@ -168,10 +168,11 @@ In order to build and run Enso you will need the following tools:
 - [Maven](https://maven.apache.org/) with version at least 3.6.3.
 - [GraalVM](https://www.graalvm.org/) with the same version as described in the
   [`build.sbt`](../build.sbt) file, configured as your default JVM.
-- [Flatbuffers Compiler](https://google.github.io/flatbuffers) with version
-  24.3.25. It is automatically downloaded when using the `run` command. For
-  direct `sbt` usage, you can download the `flatc` binary from the
-  [release assets](https://github.com/google/flatbuffers/releases/tag/v24.3.25).
+- [Flatbuffers Compiler](https://google.github.io/flatbuffers) at the version
+  pinned as `toolchain.flatc` in [`build-config.yaml`](../build-config.yaml):
+  download the `flatc` binary from the
+  [release assets](https://github.com/google/flatbuffers/releases/tag/v24.3.25)
+  and put it on your `PATH`.
 - [Rustup](https://rustup.rs), the rust toolchain management utility.
 - [corepack](https://github.com/nodejs/corepack), to run the pinned `pnpm`
   version declared in `package.json`'s `packageManager` field. Node dropped
@@ -181,13 +182,12 @@ In order to build and run Enso you will need the following tools:
   invocable as `node <path-to-pnpm>`, which breaks `internal/postinstall.mjs`
   (it re-invokes the package manager via `npm_execpath`) — use `corepack pnpm`
   for all commands to avoid this.
-- A `7z`/`7za`/`7zz` executable (e.g. `brew install p7zip` on macOS, or the
-  `p7zip-full` package on Linux), used by the build CLI to unpack the
-  Flatbuffers compiler release asset.
+- To check what you have installed against the pinned versions, run
+  `corepack pnpm install` once, then
+  `corepack pnpm --filter build-scripts run toolchain-check`: it names each tool
+  that differs and how to install the right one.
 - On MacOS and Linux, the `tar` command is required for running some tests. It
   should be installed by default on most distributions.
-- On Windows, the `run` command must be run in the latest version of
-  `Powershell` or in `cmd`.
 - If you want to be able to build the `ensoup` Native Image, you will need a
   native C compiler for your platform as described in the
   [Native Image Prerequisites](https://www.graalvm.org/reference-manual/native-image/#prerequisites).
@@ -246,14 +246,14 @@ the IntelliJ with the official
 
 ### Getting Set Up (Rust)
 
-The Rust code in this repository (the parser, and the `./run` build CLI) builds
-with the stable toolchain pinned in
+The Rust code in this repository (the parser, its WASM build for the GUI and its
+JNI build for the engine) builds with the stable toolchain pinned in
 [`rust-toolchain.toml`](../rust-toolchain.toml), with its `clippy` and `rustfmt`
 components and the `wasm32-unknown-unknown` target. Installing
 [Rustup](https://rustup.rs) is all you need: it installs that toolchain the
 first time `cargo` runs in the repository.
 
-With the tools listed above in place, `./run ide build` builds the IDE.
+sbt and `corepack pnpm install` run `cargo` themselves; you rarely need to.
 
 ### Getting Set Up (Documentation)
 
@@ -370,6 +370,43 @@ please choose one best suited for you.
 Once you have a copy of the dynamic library, it needs to be placed in
 `$JVM_HOME/lib/server`.
 -->
+
+### Building the IDE
+
+With the tools above installed, one command builds an installer from your
+checkout:
+
+```bash
+enso$ corepack pnpm install
+enso$ corepack pnpm --filter build-scripts run ide-local
+```
+
+It builds the engine bundle with `sbt buildEngineBundle`, the GUI with
+`corepack pnpm run build:gui`, and packages both with electron-builder into
+`dist/ide` (about an hour from a clean checkout). On Windows, run it from a
+Visual Studio "Developer PowerShell" or "x64 Native Tools Command Prompt": the
+engine's native images need the MSVC environment, and the command stops at once
+without it.
+
+The other build steps, each on its own:
+
+| Task                                                   | Command                                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| Package from an existing `dist/gui` and `dist/backend` | `corepack pnpm --filter build-scripts run ide-build`           |
+| The GUI only                                           | `corepack pnpm run build:gui`                                  |
+| The GUI's checks (lint, types, unit tests)             | `corepack pnpm run ci-check`                                   |
+| The engine bundle the IDE ships                        | `sbt buildEngineBundle` (with `ENSO_LAUNCHER=native`)          |
+| The engine distribution                                | `sbt buildEngineDistribution`                                  |
+| The engine's JVM tests                                 | `sbt test`                                                     |
+| One Standard Library suite                             | `corepack pnpm --filter build-scripts run stdlib-test <suite>` |
+| The Standard Library API check                         | `corepack pnpm --filter build-scripts run stdlib-api-check`    |
+| Benchmarks                                             | `sbt runtime-benchmarks/bench`, `sbt std-benchmarks/bench`     |
+| The parser's Java classes                              | `sbt syntax-rust-definition/compile`                           |
+| Enso syntax and lint checks                            | `sbt checkEnsoSyntax`, `sbt lintEnso`                          |
+| Formatting                                             | `corepack pnpm run format`, `cargo fmt`                        |
+| The WASM parser                                        | `corepack pnpm install` (its `postinstall` builds it)          |
+| Cleaning the working tree                              | `corepack pnpm run git-clean`                                  |
+| The version a build gets                               | `corepack pnpm --silent --filter build-scripts run version`    |
 
 ### Running Enso from CLI
 

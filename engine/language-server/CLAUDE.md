@@ -50,11 +50,11 @@ Don't block Akka receivers on runtime calls — dispatch via `ask` / futures.
 ## Running standalone
 
 ```
-./run backend test          # integration tests
-./run backend bench         # benches
+sbt language-server/test    # integration tests
+sbt language-server/bench   # benches
 ```
 
-Or from SBT directly:
+To start the server itself:
 
 ```
 sbt language-server/run

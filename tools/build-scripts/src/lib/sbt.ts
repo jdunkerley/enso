@@ -4,7 +4,7 @@
  * workflow must run `setup-jvm` before it.
  */
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process'
-import { invocation } from './repo.ts'
+import { invocation, runInherited } from './repo.ts'
 
 /** What `./run` set on every sbt process. */
 export const SBT_ENV = { LC_ALL: 'C.UTF-8', SBT_SERVER_FORCESTART: 'true' } as const
@@ -26,6 +26,16 @@ export function spawnSbt(command: string, cwd: string, env: NodeJS.ProcessEnv): 
     shell: how.shell,
     stdio: ['ignore', 'inherit', 'inherit'],
     detached: process.platform !== 'win32',
+  })
+}
+
+/**
+ * Runs `sbt <command>` in the repository to completion, with this process's output, and returns
+ * its exit status (-1 when sbt cannot start).
+ */
+export function runSbt(command: string, env: NodeJS.ProcessEnv): number {
+  return runInherited('sbt', sbtArguments(command), {
+    env: { ...env, ...SBT_ENV },
   })
 }
 

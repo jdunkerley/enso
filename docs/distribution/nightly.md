@@ -39,8 +39,9 @@ the first one finishes.
 
 ## Nightly Build Versions
 
-Build script automatically generates a new version for each nightly build, based
-on the current date and previous tags.
+The release workflow (`promote.yml`, through `tools/build-scripts`'
+`release promote`) generates a new version for each nightly build, based on the
+current date and previous tags.
 
 The nightly release version is consists of the following parts:
 

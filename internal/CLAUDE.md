@@ -11,11 +11,12 @@ published; ignored from linting.
   the Lezer table-expression parser (`lezer-enso-table-expr generate-parser`).
   tsconfig files are committed as static files. It re-invokes pnpm via
   `process.env.npm_execpath` so it does not depend on `pnpm` being on `PATH`.
-- Version/commit info is **not** handled here. The `./run` (Cargo) build sets
-  `ENSO_IDE_VERSION` / `ENSO_IDE_COMMIT_HASH` as env vars before the Vite build
-  (`build_tools/build/src/ide/web.rs`); Vite exposes them via
-  `envPrefix: 'ENSO_IDE_'`; `app/electron-client/buildInfo.ts` reads them at
-  bundle time; the engine gets its version from `project/BuildInfo.scala`.
+- Version/commit info is **not** handled here. The build sets `ENSO_IDE_VERSION`
+  / `ENSO_IDE_COMMIT_HASH` as env vars before the Vite build
+  (`tools/build-scripts`' `ide-build` and `ide-local`, `ideBuildVariables` in
+  `src/ide-build/ideBuild.ts`); Vite exposes them via `envPrefix: 'ENSO_IDE_'`;
+  `app/electron-client/buildInfo.ts` reads them at bundle time; the engine gets
+  its version from `project/BuildInfo.scala`.
 - `dependenciesVersions.cjs` — Central catalog of deps versions to keep in sync
   between pnpm and other consumers.
 
