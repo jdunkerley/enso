@@ -1,17 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Enso Issue Search
-    url: https://github.com/enso-org/enso/issues?q=is%3Aissue+is%3Aopen+a+sort%3Acreated-asc
-    about: Search Enso's open issues and feature requests.
-  - name: Discord
-    url: https://discord.gg/enso
-    about: Discuss new data processing, report bugs, and brainstorm new features of Enso.
-  - name: Enso Website
-    url: https://enso.org/
-    about: Our website.
+  - name: Search existing issues
+    url: https://github.com/jdunkerley/enso/issues?q=is%3Aissue
+    about: Check whether the bug or idea has already been reported.
+  - name: User documentation
+    url: https://help.enso.org
+    about: How to use Enso, its language and its libraries.
+  - name: Developer wiki
+    url: https://github.com/jdunkerley/enso/wiki
+    about: How the IDE and engine are built and how they work.
   - name: Changelog
-    url: https://github.com/enso-org/enso/blob/develop/CHANGELOG.md
-    about: See our changelog.
-  - name: Blank Issue (Enso Core Dev Team Only)
-    url: https://github.com/enso-org/enso/issues/new?template=blank
-    about: To be used by our core dev team only.
+    url: https://github.com/jdunkerley/enso/blob/develop/CHANGELOG.md
+    about: What changed in each release.

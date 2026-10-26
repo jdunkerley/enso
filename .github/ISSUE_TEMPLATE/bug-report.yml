@@ -1,17 +1,8 @@
 name: "Bug Report"
 description: "Found a bug? We'd appreciate if you'd first search through our open issues and docs, to make sure the issue isn't already known."
-labels: ["--bug", "triage"]
+labels: ["bug"]
 assignees: []
 body:
-  - type: "input"
-    id: "discord-id"
-    attributes:
-      label: "Discord username"
-      description: "If you're in our [Discord server](https://discord.gg/enso), please include your [Discord ID](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) formatted like so: `username#1234` (you can find it by clicking your profile on the bottom left of the application). This is so we can ask questions interactively and give you the `Bug Catcher` Discord role."
-      placeholder: "username#1234"
-    validations:
-      required: false
-
   - type: "dropdown"
     id: "issue-type"
     attributes:

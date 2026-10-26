@@ -1,61 +1,21 @@
----
-layout: developer-doc
-title: Security Policy
-category: summary
-tags: [summary, security, vulnerability, report]
-order: 4
----
-
 # Security Policy
 
-This document outlines the security policy for Enso and its libraries.
+## Supported versions
 
-> **If you believe that you have found a vulnerability in Enso or one of its
-> libraries, please see the section on
-> [reporting a vulnerability](#reporting-a-vulnerability) below.**
+Security fixes go into `develop` and ship in the next release. Only the latest
+stable release on the
+[releases page](https://github.com/jdunkerley/enso/releases) is supported. Older
+releases and prereleases get no backported fixes.
 
-<!-- MarkdownTOC levels="2" autolink="true" -->
+## Reporting a vulnerability
 
-- [Supported Versions](#supported-versions)
-- [Reporting a Vulnerability](#reporting-a-vulnerability)
+**Do not open a public issue.** Report it privately through GitHub instead: on
+this repository's **Security** tab, choose **Report a vulnerability**. Include
+what is affected, how to reproduce it, and what an attacker could do with it.
 
-<!-- /MarkdownTOC -->
+You'll get a reply in the private report. Once a fix has shipped, the advisory
+is published, and you can then disclose the issue publicly.
 
-## Supported Versions
-
-Security updates for Enso are provided for the versions shown below with a
-:white_check_mark: next to them. No other versions have security updates
-provided.
-
-| Version     | Supported          |
-| ----------- | ------------------ |
-| `main@HEAD` | :white_check_mark: |
-| `wip/*`     | :x:                |
-
-Please see our
-[release policy](https://github.com/jdunkerley/enso/wiki/Distribution-Release-Policy)
-for more information on how we support released versions.
-
-## Reporting a Vulnerability
-
-If you believe that you've found a security vulnerability in the Enso codebase
-or one of the libraries maintained in this repository, please contact
-[security@enso.org](mailto:security@enso.org) and provide details of the bug.
-
-You can expect an update on a reported vulnerability within one business day,
-and the timeline works as follows:
-
-1. We analyse your report to determine the risk posed by the vulnerability, and
-   our further steps forward. This may involve asking for more information.
-2. We will email the submitter with our verdict as to whether it is, or isn't a
-   vulnerability, as well as the severity if it is.
-3. We plan and outline any steps necessary to fixing the bug, including the
-   timeline for fixing the vulnerability within 90 days.
-4. We will communicate the planned fix with the person who submitted the
-   vulnerability report.
-5. We will fix the bug and communicate with the submitter when the fix has
-   landed on `main`, and when it has been backported to the above supported
-   versions.
-6. The submitted may then disclose the bug publicly.
-
-All communication will take place via email with a member of our team.
+A vulnerability in Enso itself, as opposed to this fork's changes, may also
+affect upstream ([enso-org/enso](https://github.com/enso-org/enso)), which has
+its own [security policy](https://github.com/enso-org/enso/security/policy).
