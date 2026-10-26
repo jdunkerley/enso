@@ -15,9 +15,5 @@ associated with the language. It encompasses the following functionality:
   suggestions intelligently based on context.
 - **Node Management:** Tracking and providing the language server's internal
   node representation of the Enso program.
-- **Code Analysis:** Analysis functionality for Enso code (e.g. find usages,
-  jump-to-definition, and so on).
-- **Refactoring:** Refactoring functionality for Enso code (e.g. rename, move,
-  extract, and so on).
-- **Type Interactions:** Features for type-driven-development that allow users
-  to interact with the types of their programs.
+- **Refactoring:** Refactoring functionality for Enso code (currently renaming a
+  project or a symbol).

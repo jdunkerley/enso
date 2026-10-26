@@ -159,8 +159,8 @@ has silently produced a wrong result here:
   `app/gui/LICENSE`).
 - The Rust workspace follows
   [Style-Guide-Rust](https://github.com/jdunkerley/enso/wiki/Style-Guide-Rust);
-  additional house rules live in `~/.claude/skills/rust-guidelines` (load it
-  before Rust edits).
+  additional Rust house rules, if installed, live in the `rust-guidelines` skill
+  (load it before Rust edits).
 - When a module, crate, or package lacks a CLAUDE.md, create one when you start
   working in it — see `~/.claude/skills/project-structure`.
 - **A pin that is deliberately frozen must say so next to itself.** Several

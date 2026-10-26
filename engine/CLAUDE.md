@@ -8,9 +8,10 @@ the **Truffle** framework.
 
 ## Top-level modules
 
-- `runtime/` — The Truffle-based interpreter. Parser Java bindings + JNI native
-  library live here. Contains the IR, compiler passes, the Truffle AST, builtin
-  methods, and the runtime-server instrument that exposes live execution info.
+- `runtime/` — The Truffle-based interpreter: the Truffle AST, the runtime data
+  model and the builtin type and method nodes. The parser bindings, the compiler
+  (IR and passes) and the instruments live in the sibling `runtime-parser`,
+  `runtime-compiler` and `runtime-instrument-*` modules below.
 - `language-server/` — Enso Language Server. Talks JSON-RPC + binary data-link
   over WebSocket to IDEs (our Electron client, VS Code, etc.).
 - `runner/` — CLI entry point (`enso` command). Parses args, constructs a
@@ -66,9 +67,13 @@ the long version, and
   (`ThreadManager`) that polls safepoints at method boundaries and TCO
   iterations. Don't block the Truffle thread with arbitrary Java code without
   yielding to safepoints.
-- **Builtins.** The `Standard.Builtins` virtual module is synthesized from
-  `runtime/runtime/builtin/*`. A Java-side annotation DSL generates boilerplate
-  (`@BuiltinMethod`, `@Specialization`). See
+- **Builtins.** The `Standard.Builtins` virtual module is not a directory of
+  sources. Enso code in `distribution/lib/Standard/` declares builtin types and
+  methods with `@Builtin_Type` and `@Builtin_Method "Type.name"`. On the Java
+  side, nodes in `runtime/` are annotated `@BuiltinType` / `@BuiltinMethod`
+  (`lib/java/interpreter-dsl`). Its annotation processors (`TypeProcessor`,
+  `MethodProcessor`, `BuiltinsMetadataProcessor`) generate the wrappers and the
+  metadata that `Builtins` / `BuiltinsRegistry` load at run time. See
   [Runtime-Builtin-Base-Methods](https://github.com/jdunkerley/enso/wiki/Runtime-Builtin-Base-Methods).
 - **Entry points.** Embedder-side: `Main` in `engine-runner`. Language-side:
   `EnsoLanguage` in `runtime/`. IDE flow goes via `language-server` →

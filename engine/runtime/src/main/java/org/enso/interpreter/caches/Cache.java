@@ -51,7 +51,8 @@ public final class Cache<T, M> {
    * will be closed, which will invalidate all byte buffers associated with that arena.
    *
    * <p>Note that currently, it is not possible to use {@link Arena#ofConfined()} here. See <a
-   * href="https://github.com/enso-org/enso/pull/13872#discussion_r2313983664">GH discussion</a>.
+   * href="https://github.com/enso-org/enso/pull/13872#discussion_r2313983664">upstream GH
+   * discussion</a>.
    */
   private final Supplier<Arena> memoryArenaSupplier;
 

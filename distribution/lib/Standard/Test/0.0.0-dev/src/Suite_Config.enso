@@ -38,7 +38,7 @@ find_caller_script stack =
 
     find_caller main_index
 
-## Holds configuration for a Test_Suite
+## Holds configuration for a Suite
 type Suite_Config
     ## ---
        private: true

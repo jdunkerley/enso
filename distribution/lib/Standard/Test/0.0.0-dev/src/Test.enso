@@ -141,15 +141,16 @@ type Test
        ## Examples
        ### Add a clue to a test
        ```
-            from Standard.Test import Test, Test_Suite
-            import Standard.Test.Extensions
-            main = Test_Suite.run_main <|
-                Test.group "Tests" <|
-                    Test.specify "some property" <|
-                        xs = Vector.new 100 (n -> n)
-                        xs.each x->
-                            Test.with_clue ("["+x.to_text+"] ") <|
-                                x . should_equal 0
+            from Standard.Test import all
+            main filter=Nothing =
+                suite = Test.build suite_builder->
+                    suite_builder.group "Tests" group_builder->
+                        group_builder.specify "some property" <|
+                            xs = Vector.new 100 (n -> n)
+                            xs.each x->
+                                Test.with_clue ("["+x.to_text+"] ") <|
+                                    x . should_equal 0
+                suite.run_with_filter filter
        ```
     with_clue : Text|(Text -> Text) -> Any -> Any
     with_clue ~clue ~behavior = Clue.with_clue clue... behavior...

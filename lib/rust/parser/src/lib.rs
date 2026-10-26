@@ -13,15 +13,15 @@
 //!
 //! Each macro defines one or more segments. Every segment starts with a predefined token and can
 //! contain any number of other tokens. For example, the macro `if ... then ... else ...` contains
-//! three segments. Macros can also accept prefix tokens, a set of tokens on the left of the first
-//! segment. A good example is the lambda macro `... -> ...`.
+//! three segments. The lambda macro `\ ... -> ...` is another example. Macros do not accept prefix
+//! tokens, i.e. tokens on the left of the first segment.
 //!
-//! In this step, a [`MacroMatchTree`] is built. Basically, it is a map from the possible next
-//! segment name to information of what other segments are required and what is the macro definition
-//! in case these segments were found. For example, let's consider two macros: `if ... then ...`,
-//! and `if ... then ... else ...`. In such a case, the macro registry will contain only one entry,
-//! "if", and two sets of possible resolution paths: ["then"], and ["then", "else"], each associated
-//! with the corresponding macro definition.
+//! In this step, a [`SegmentMap`](macros::resolver::SegmentMap) is built. Basically, it is a map
+//! from the possible next segment name to information of what other segments are required and what
+//! is the macro definition in case these segments were found. For example, let's consider two
+//! macros: `if ... then ...`, and `if ... then ... else ...`. In such a case, the macro registry
+//! will contain only one entry, "if", and two sets of possible resolution paths: ["then"], and
+//! ["then", "else"], each associated with the corresponding macro definition.
 //!
 //! # Splitting the token stream by the macro segments.
 //! The input token stream is being iterated and is being split based on the segments of the
@@ -40,26 +40,17 @@
 //! In the next steps, each macro is being analyzed, started from the most nested ones. For each
 //! macro, the [`Pattern`] of last segment is being run to check which tokens belong to that macro,
 //! and which tokens should be transferred to parent macro definition. For example, consider the
-//! following code `process (read file) content-> print content`. The `(...)` is a macro with two
-//! sections `(` and `)`. Let's mark the token splitting with `[` and `]` characters. The previous
+//! following code `process \ content -> print content`. The `\ ... ->` is a lambda macro with two
+//! segments, `\` and `->`. Let's mark the token splitting with `[` and `]` characters. The previous
 //! macro resolution steps would output such split of the token stream:
-//! `process [(read file][) content[-> print content]]`. In this step, the most inner macro will be
+//! `process [\ content[-> print content]]`. In this step, the most inner macro will be
 //! analyzed first. The pattern of the last segment of the inner macro (`->`) defines that it
 //! consumes all tokens, so all the tokens `print content` are left as they are. Now, the resolution
-//! moves to the parent macro. Its last segment starts with the `)` token, which pattern defines
-//! that it does not consume any tokens, so all of its current tokens (`content[-> print content]]`)
-//! are popped to a parent definition, forming `process [(read file][)] content[-> print content]`.
+//! moves to the parent macro, which is the root of the expression. Parentheses are not macros: the
+//! lexer emits them as group delimiters, so they never appear as macro segments.
 //!
 //! Please note, that root of the expression is considered a special macro as well. It is done for
 //! the algorithm unification purposes.
-//!
-//! # Resolving left-hand-side patterns of macro segments.
-//! In this step, each macro is being analyzed, started from the most nested ones. For each macro,
-//! the [`Pattern`] of the macro prefix is being run to check which tokens belong to the prefix of
-//! the macro (in case the macro defines the prefix). In the example above, the macro `->` defines
-//! complex prefix rules: if the token on the left of the arrow used no space, then only a single
-//! token will be consumed. As a result of this step, the following token split will occur:
-//! `[process [(read file][)] [content-> print content]`, which is exactly what we wanted.
 //!
 //! # Resolving patterns of macro segments.
 //! In this step, all macro segment patterns are being resolved and errors are reported in case it
