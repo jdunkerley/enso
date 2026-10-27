@@ -106,6 +106,34 @@ public class CallbacksTest extends ExecutorSetup {
   }
 
   @Test
+  public void onConnectOnClose() throws Exception {
+    var res = new AtomicReference<>();
+    var code =
+        """
+        class YjsChannel {
+          onClose(closeHandler) {
+            this.closeHandler = closeHandler;
+            return () => {};
+          }
+          close() {
+            this.closeHandler();
+          }
+        }
+
+        var channel = new YjsChannel();
+        callbacks.onConnect(channel);
+        channel.close();
+        """;
+
+    var callbacks = new TestCallbacks((channel) -> channel.onClose(() -> res.set("closed")));
+    context.getBindings("js").putMember("callbacks", callbacks);
+
+    CompletableFuture.runAsync(() -> context.eval("js", code), executor).get();
+
+    Assert.assertEquals("closed", res.get());
+  }
+
+  @Test
   public void onConnectSubscribeBuffer() throws Exception {
     var res = new AtomicReference<>();
     var code =

@@ -1,6 +1,6 @@
 package org.enso.jsonrpc
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.LazyLogging
@@ -8,6 +8,7 @@ import org.enso.jsonrpc.MessageHandler
 import org.enso.ydoc.api.YjsChannel
 
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 
 import scala.concurrent.ExecutionContext
@@ -70,6 +71,7 @@ object YdocJsonRpcServer {
     * - Creates a [[MessageHandlerSupervisor]] actor to process incoming messages
     * - Subscribes [[OnMessageHandler]] to the channel for inbound messages
     * - Creates [[OutgoingMessageHandler]] actor for sending responses via the channel
+    * - Registers [[OnCloseHandler]] to end the session when the channel closes
     */
   final class ServerCallbacks(
     protocolFactory: ProtocolFactory,
@@ -108,6 +110,39 @@ object YdocJsonRpcServer {
           )
         )
       incomingMessageHandler ! MessageHandler.Connected(outgoingMessageHandler)
+
+      try {
+        channel.onClose(
+          new OnCloseHandler(incomingMessageHandler, outgoingMessageHandler)
+        )
+      } catch {
+        case e: Exception =>
+          logger.error("JSON-RPC channel onClose error", e)
+      }
+    }
+  }
+
+  /** Ends the JSON-RPC session when its [[YjsChannel]] closes.
+    *
+    * The counterpart of the WebSocket stream completing in [[JsonRpcServer]]:
+    * the client controller receives [[MessageHandler.Disconnected]], so the
+    * session terminates and releases what it held, and the outgoing handler,
+    * which has no channel left to write to, stops.
+    */
+  final class OnCloseHandler(
+    incomingMessageHandler: ActorRef,
+    outgoingMessageHandler: ActorRef
+  ) extends Runnable
+      with LazyLogging {
+
+    private val closed = new AtomicBoolean(false)
+
+    override def run(): Unit = {
+      if (closed.compareAndSet(false, true)) {
+        logger.trace("JSON-RPC channel closed")
+        incomingMessageHandler ! MessageHandler.Disconnected()
+        outgoingMessageHandler ! PoisonPill
+      }
     }
   }
 

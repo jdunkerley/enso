@@ -920,6 +920,13 @@
     {
       "type": {
         "proxy": [
+          "java.lang.Runnable"
+        ]
+      }
+    },
+    {
+      "type": {
+        "proxy": [
           "org.enso.ydoc.api.YjsChannel"
         ]
       }

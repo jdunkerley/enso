@@ -190,6 +190,56 @@ describe('YjsChannel', () => {
     expect(receivedMessages).toEqual([])
   })
 
+  describe('onClose', () => {
+    it('should run the handler once, however often the channel is closed', () => {
+      const channel = new YjsChannel<string>(new Y.Doc(), 'test-channel')
+      let closes = 0
+      let closeEvents = 0
+      channel.onClose(() => closes++)
+      channel.on('close', () => closeEvents++)
+
+      channel.close()
+      channel.close()
+
+      expect(closes).toBe(1)
+      expect(closeEvents).toBe(1)
+    })
+
+    it('should run a handler registered after the close at once', () => {
+      const channel = new YjsChannel<string>(new Y.Doc(), 'test-channel')
+      channel.close()
+
+      let closes = 0
+      channel.onClose(() => closes++)
+
+      expect(closes).toBe(1)
+    })
+
+    it('should not run an unregistered handler', () => {
+      const channel = new YjsChannel<string>(new Y.Doc(), 'test-channel')
+      let closes = 0
+      const unregister = channel.onClose(() => closes++)
+
+      unregister()
+      channel.close()
+
+      expect(closes).toBe(0)
+    })
+
+    it('should run the other handlers when one throws', () => {
+      const channel = new YjsChannel<string>(new Y.Doc(), 'test-channel')
+      let closes = 0
+      channel.onClose(() => {
+        throw new Error('handler failed')
+      })
+      channel.onClose(() => closes++)
+
+      channel.close()
+
+      expect(closes).toBe(1)
+    })
+  })
+
   it('should deliver pre-existing messages when subscribing', () => {
     const doc = new Y.Doc()
     const channel1 = new YjsChannel<string>(doc, 'test-channel')

@@ -102,6 +102,12 @@ public final class Ydoc implements AutoCloseable {
       }
 
       @Override
+      public void onClose(Runnable closeHandler) {
+        LOG.log(System.Logger.Level.TRACE, "DelegateYjsChannel.onClose: {0}", closeHandler);
+        delegate.onClose(closeHandler);
+      }
+
+      @Override
       public void subscribe(Consumer<Object> cnsmr) {
         var wrap = new DelegateConsumer<Object>(cnsmr);
         LOG.log(

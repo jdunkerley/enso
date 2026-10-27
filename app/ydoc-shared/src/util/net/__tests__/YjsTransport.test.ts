@@ -319,4 +319,33 @@ describe('YjsTransport reconnect', () => {
     transport.close()
     ide.close()
   })
+
+  test('server transport tells the Language Server when its channels end', async () => {
+    const doc = new Y.Doc()
+    // Stands in for the Language Server, which ends a JSON-RPC session when its channel closes,
+    // as `YdocJsonRpcServer.ServerCallbacks` does.
+    const ended: string[] = []
+    let connections = 0
+    const server: YjsChannelServer = {
+      onConnect: (channel) => {
+        const name = `${channel.channelName}#${++connections}`
+        channel.onClose(() => ended.push(name))
+      },
+    }
+    const transport = new YjsServerTransport(doc, 'ls-url', server)
+
+    await transport.connect()
+    expect(ended).toEqual([])
+
+    // A reconnect ends the previous connection's sessions, and only those.
+    transport.close()
+    expect(ended).toEqual(['ls-url#1', 'backend-ls-url#2'])
+    await transport.connect()
+    expect(ended).toEqual(['ls-url#1', 'backend-ls-url#2'])
+
+    // Closing again ends the new sessions, each exactly once.
+    transport.close()
+    transport.close()
+    expect(ended).toEqual(['ls-url#1', 'backend-ls-url#2', 'ls-url#3', 'backend-ls-url#4'])
+  })
 })
