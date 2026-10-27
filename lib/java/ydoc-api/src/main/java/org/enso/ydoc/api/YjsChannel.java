@@ -35,6 +35,16 @@ public interface YjsChannel {
   void subscribe(Consumer<Object> messageHandler);
 
   /**
+   * Registers a callback run once when the channel closes, e.g. when the Ydoc server's session for
+   * a project ends because its last WebSocket client went away, or when it reconnects to the
+   * Language Server. A closed channel delivers no further messages. If the channel is already
+   * closed, the callback runs at once.
+   *
+   * @param closeHandler callback invoked when the channel closes
+   */
+  void onClose(Runnable closeHandler);
+
+  /**
    * Callback interface for receiving newly established {@link YjsChannel} connections.
    *
    * <p>Implementations handle the lifecycle of channels between the Language Server and Ydoc

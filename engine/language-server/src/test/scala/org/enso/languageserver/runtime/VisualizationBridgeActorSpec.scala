@@ -37,6 +37,8 @@ class VisualizationBridgeActorSpec
     override def send(message: Object): Unit = sent.add(message)
 
     override def subscribe(messageHandler: Consumer[Object]): Unit = ()
+
+    override def onClose(closeHandler: Runnable): Unit = ()
   }
 
   private def pollSentAsString(

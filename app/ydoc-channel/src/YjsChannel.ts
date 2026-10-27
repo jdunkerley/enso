@@ -83,6 +83,8 @@ export class YjsChannel<
   private readonly array: Y.Array<TStored>
   private readonly handlers: Set<MessageHandler<TMessage>> = new Set()
   private readonly tapHandlers: Set<TapHandler<TMessage>> = new Set()
+  private readonly closeHandlers: Set<() => void> = new Set()
+  private closed = false
   private readonly observeHandler: (event: Y.YArrayEvent<TStored>, tr: Y.Transaction) => void
   private readonly codec: ChannelCodec<TMessage, TStored>
 
@@ -214,12 +216,44 @@ export class YjsChannel<
   }
 
   /**
-   * Removes all message handlers and stops observing the Y.Array.
+   * Registers a callback run once when the channel is {@link close}d, or at once if it already is.
+   *
+   * This is how the Language Server learns that a channel it was handed in
+   * {@link YjsChannelServer.onConnect} has ended (`YjsChannel.onClose` on the Java side), so the
+   * handler takes no arguments.
+   * @param handler - The callback to invoke when the channel closes
+   * @returns A function to unregister the handler
+   */
+  onClose(handler: () => void): () => void {
+    if (this.closed) {
+      handler()
+      return () => {}
+    }
+    this.closeHandlers.add(handler)
+    return () => {
+      this.closeHandlers.delete(handler)
+    }
+  }
+
+  /**
+   * Removes all message handlers and stops observing the Y.Array. Closing is final, and closing an
+   * already closed channel does nothing.
    */
   close(): void {
+    if (this.closed) return
+    this.closed = true
     this.array.unobserve(this.observeHandler)
     this.handlers.clear()
     this.tapHandlers.clear()
+    const closeHandlers = Array.from(this.closeHandlers)
+    this.closeHandlers.clear()
+    for (const handler of closeHandlers) {
+      try {
+        handler()
+      } catch (e) {
+        console.error('Close handler error', e)
+      }
+    }
     this.emitClose()
   }
 

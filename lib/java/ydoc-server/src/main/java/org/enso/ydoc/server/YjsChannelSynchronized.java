@@ -48,4 +48,10 @@ final class YjsChannelSynchronized implements YjsChannel {
   public void subscribe(Consumer<Object> messageHandler) {
     executor.submit(() -> channel.subscribe(messageHandler));
   }
+
+  /** Queues the close handler to be registered on the Ydoc executor thread. */
+  @Override
+  public void onClose(Runnable closeHandler) {
+    executor.submit(() -> channel.onClose(closeHandler));
+  }
 }

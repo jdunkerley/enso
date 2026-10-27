@@ -280,6 +280,10 @@
       {
         "name": "subscribe",
         "parameterTypes": ["java.util.function.Consumer"]
+      },
+      {
+        "name": "onClose",
+        "parameterTypes": ["java.lang.Runnable"]
       }
     ]
   }

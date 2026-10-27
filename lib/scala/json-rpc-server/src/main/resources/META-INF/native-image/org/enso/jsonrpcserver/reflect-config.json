@@ -9,6 +9,15 @@
     ]
   },
   {
+    "name": "org.enso.jsonrpc.YdocJsonRpcServer$OnCloseHandler",
+    "methods": [
+      {
+        "name": "run",
+        "parameterTypes": []
+      }
+    ]
+  },
+  {
     "name": "org.enso.jsonrpc.YdocJsonRpcServer$ServerCallbacks",
     "methods": [
       {
