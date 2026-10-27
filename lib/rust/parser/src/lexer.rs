@@ -683,7 +683,7 @@ pub fn analyze_non_syntactic_operator(token: &str) -> OperatorProperties {
             .with_unary_prefix_mode(token::Precedence::Negation)
             .with_binary_infix_precedence(token::Precedence::Addition),
         "!" => OperatorProperties::value().with_binary_infix_precedence(token::Precedence::Not),
-        "||" | "\\\\" | "&&" => {
+        "||" | "&&" => {
             OperatorProperties::value().with_binary_infix_precedence(token::Precedence::Logical)
         }
         ">>" | "<<" => OperatorProperties::functional()
@@ -709,10 +709,6 @@ fn analyze_user_operator(token: &str) -> OperatorProperties {
     let has_left_arrow = token.starts_with("<-");
     if has_right_arrow && !has_left_arrow {
         operator = operator.as_right_associative();
-    }
-    if token.ends_with('=') && !token.bytes().all(|c| c == b'=') {
-        // Note that inclusive comparison operators (matched above) are not modifiers.
-        operator = operator.as_modifier();
     }
     // "The precedence of all other operators is determined by the operator's Precedence Character:"
     let mut precedence_char = None;

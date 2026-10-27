@@ -11,7 +11,6 @@ pub struct OperatorProperties {
     is_value_operation: bool,
     is_right_associative: bool,
     // Special properties
-    is_modifier: bool,
     is_compile_time: bool,
     rhs_is_non_expression: bool,
 }
@@ -97,11 +96,6 @@ impl OperatorProperties {
         Self { is_right_associative: true, ..self }
     }
 
-    /// Return a copy of this operator, modified to be flagged as a modified-assignment operator.
-    pub fn as_modifier(self) -> Self {
-        Self { is_modifier: true, ..self }
-    }
-
     /// Return this operator's binary infix precedence, if it has one.
     pub fn binary_infix_precedence(&self) -> Option<Precedence> {
         self.binary_infix_precedence
@@ -115,11 +109,6 @@ impl OperatorProperties {
     /// Return whether this operator can form operator sections.
     pub fn can_form_section(&self) -> bool {
         !self.is_compile_time
-    }
-
-    /// Return whether this operator is a modified-assignment operator.
-    pub fn is_modifier(&self) -> bool {
-        self.is_modifier
     }
 
     /// Return this operator's associativity.

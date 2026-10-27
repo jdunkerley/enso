@@ -904,7 +904,6 @@ pub enum SyntaxError {
     StmtUnexpectedFunctionExpressionOprSection,
     TypeBodyUnexpectedPrivateUsage,
     TypeDefExpectedTypeName,
-    ExprUnexpectedAssignment,
     ExprUnclosedParen,
     UnexpectedExpressionInTypeBody,
     ImportsNoAllInExport,
@@ -964,7 +963,6 @@ impl From<SyntaxError> for Cow<'static, str> {
             TypeBodyUnexpectedPrivateUsage =>
                 "In a type definition, the \"private\" keyword can only be applied to a constructor or function definition",
             TypeDefExpectedTypeName => "Expected type identifier in type declaration",
-            ExprUnexpectedAssignment => "Unexpected use of assignment operator in expression",
             ExprUnclosedParen => "Unclosed parenthesis in expression",
             UnexpectedExpressionInTypeBody => "Expression unexpected in type definition",
             ImportsExpectedNameInExport => "Expected name following \"export\" keyword",
