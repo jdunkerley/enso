@@ -13,7 +13,6 @@ use crate::syntax;
 // ==============
 
 pub mod built_in;
-pub mod expand;
 pub mod pattern;
 pub mod resolver;
 

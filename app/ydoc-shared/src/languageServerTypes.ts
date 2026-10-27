@@ -435,10 +435,6 @@ export namespace response {
     componentGroups: LibraryComponentGroup[]
   }
 
-  export interface AICompletion {
-    code: string
-  }
-
   export interface RenameSymbol {
     newName: string
   }

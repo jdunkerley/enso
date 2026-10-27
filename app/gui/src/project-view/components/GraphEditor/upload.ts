@@ -40,7 +40,7 @@ export interface UploadResult {
  * This will upload file chunks using binary protocol, updating information of progress in
  * {@link Awareness} object. On error, the file will be deleted.
  *
- * Checking the checksum is not implemented yet because of https://github.com/enso-org/enso/issues/6691
+ * The uploaded file's checksum is not verified: see the note in {@link Uploader.upload}.
  */
 export class Uploader {
   private checksum: Hash<Keccak>
@@ -140,9 +140,11 @@ export class Uploader {
         throw new Error(`Uploading process aborted. ${reason}`)
       },
     })
-    // Disabled until https://github.com/enso-org/enso/issues/6691 is fixed.
-    // Plus, handle the error here, as it should be displayed to the user.
-    // this.projectFiles.assertChecksum(remotePath)
+    // The checksum is not verified (https://github.com/enso-org/enso/issues/6691, closed upstream
+    // as not planned). The language server's `file/checksum` hashes the whole file with SHA3-224
+    // inside the file manager's 3-second timeout, so it fails with "Service error" on large files.
+    // A verification would go after the `pipeTo` below, pass `this.checksum`, and show its error to
+    // the user: `await this.projectFiles.assertChecksum(remotePath, this.checksum)`.
     await this.file.stream().pipeTo(writableStream)
     return Ok({ source: 'Project', name: name.value })
   }

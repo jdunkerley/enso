@@ -43,9 +43,6 @@ final class Package[F](
   val polyglotDir: F       = root.getChild(Package.polyglotExtensionsDirName)
   val nativeLibraryDir: F  = polyglotDir.getChild(Package.nativeLibraryDirName)
   val internalDirectory: F = root.getChild(Package.internalDirName)
-  val irCacheDirectory: F = internalDirectory
-    .getChild(Package.cacheDirName)
-    .getChild(Package.irCacheDirName)
   val bindingsCacheDirectory: F = internalDirectory
     .getChild(Package.cacheDirName)
     .getChild(Package.bindingsCacheDirName)
@@ -113,17 +110,6 @@ final class Package[F](
     }
 
     saveConfig(keepDevVersions)
-  }
-
-  /** Gets the cache root location within this package for a given Enso version.
-    *
-    * This will create the location if it does not exist.
-    *
-    * @param ensoVersion the enso version to get the cache root for
-    * @return the cache root location
-    */
-  def getIrCacheRootForPackage(ensoVersion: String): F = {
-    irCacheDirectory.getChild(ensoVersion)
   }
 
   /** Gets the bindings cache root location within this package for a given Enso
@@ -648,7 +634,6 @@ object Package {
   val mainFileName              = "Main.enso"
   val thumbFileName             = "thumb.png"
   val cacheDirName              = "cache"
-  val irCacheDirName            = "ir"
   val bindingsCacheDirName      = "bindings"
   val suggestionsCacheDirName   = "suggestions"
 }

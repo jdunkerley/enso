@@ -7,11 +7,7 @@ import com.typesafe.scalalogging.LazyLogging
 import org.enso.cli.task.ProgressUnit
 import org.enso.cli.task.notifications.TaskNotificationApi
 import org.enso.jsonrpc._
-import org.enso.languageserver.ai.AiApi.{
-  AiCompletion,
-  AiCompletion2,
-  AiCompletionProgress
-}
+import org.enso.languageserver.ai.AiApi.{AiCompletion2, AiCompletionProgress}
 import org.enso.languageserver.ai.AiProtocol
 import org.enso.languageserver.boot.resource.{
   InitializationComponent,
@@ -567,9 +563,6 @@ class JsonConnectionController(
         .props(requestTimeout, suggestionsHandler),
       InvalidateSuggestionsDatabase -> search.InvalidateSuggestionsDatabaseHandler
         .props(requestTimeout, suggestionsHandler),
-      AiCompletion -> ai.AICompletionHandler.props(
-        languageServerConfig.aiCompletionConfig
-      ),
       AiCompletion2 -> ai.AICompletion2Handler.props(
         languageServerConfig.aiCompletionConfig,
         rpcSession,

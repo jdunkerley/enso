@@ -8,22 +8,6 @@ import java.util.UUID
 
 case object AiApi {
 
-  case object AiCompletion extends Method("ai/completion") {
-
-    case class Params(prompt: String, stopSequence: String)
-    case class Result(code: String)
-
-    implicit val hasParams: HasParams.Aux[this.type, AiCompletion.Params] =
-      new HasParams[this.type] {
-        type Params = AiCompletion.Params
-      }
-
-    implicit val hasResult: HasResult.Aux[this.type, AiCompletion.Result] =
-      new HasResult[this.type] {
-        type Result = AiCompletion.Result
-      }
-  }
-
   case object AiCompletion2 extends Method("ai/completion_v2") {
 
     case class Params(
