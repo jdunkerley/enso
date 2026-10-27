@@ -17,6 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
 permissions:
+  actions: read # Download develop's engine distribution artifact
   contents: read # Read-only access to repository contents
   issues: write # Write access to issues
   pull-requests: write # Write access to pull requests
@@ -158,11 +159,39 @@ jobs:
           fail-on-error: false
           fail-on-warning: false
 
-      - name: 📥 Download Enso Engine
-        working-directory: app/project-manager-shim
-        run: pnpm run download-engine
+      # The shim's `ProjectService` tests start a real engine. They get develop's latest engine
+      # distribution: the newest unexpired artifact of `engine-pull-request.yml` on develop (kept 90
+      # days). Only Linux has one here; elsewhere those tests skip (#359).
+      - name: 🔎 Find develop's engine distribution
+        id: engine
+        if: runner.os == 'Linux'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+        run: |
+          run_id=$(gh api -X GET "repos/${{ github.repository }}/actions/artifacts" \
+            -f name="$ARTIFACT" -f per_page=100 \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "develop")][0].workflow_run.id // empty')
+          if [ -z "$run_id" ]; then
+            echo "::error::No unexpired '$ARTIFACT' artifact from develop. Re-run the Engine workflow on develop."
+            exit 1
+          fi
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: 📥 Download develop's engine distribution
+        if: runner.os == 'Linux'
+        uses: actions/download-artifact@v5
+        with:
+          name: Engine Distribution (GraalVM CE) (native,test) (linux, amd64)
+          run-id: ${{ steps.engine.outputs.run-id }}
+          github-token: ${{ github.token }}
+
+      - name: 📦 Unpack the engine distribution
+        if: runner.os == 'Linux'
+        run: |
+          tar -xf built-distribution.tar built-distribution
+          rm built-distribution.tar
+          find built-distribution -path '*/bin/enso' -print -quit | grep .
 
       - name: 🧪 Unit Tests
         id: unit-tests

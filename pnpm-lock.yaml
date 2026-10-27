@@ -927,9 +927,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.2
-      extract-zip:
-        specifier: ^2.0.1
-        version: 2.0.1(supports-color@8.1.1)
       typescript:
         specifier: 6.0.3
         version: 6.0.3

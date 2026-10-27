@@ -36,6 +36,7 @@ concurrency:
 
 # The union of what the called workflows need: a called workflow cannot have more than its caller.
 permissions:
+  actions: read
   contents: read
   issues: write
   pull-requests: write

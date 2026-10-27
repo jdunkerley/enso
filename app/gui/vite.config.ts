@@ -2,7 +2,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath } from 'node:url'
 import postcssNesting from 'postcss-nesting'
-import { downloadEnsoEngine, findEnsoExecutable } from 'project-manager-shim'
+import { findEnsoExecutable } from 'project-manager-shim'
 import tailwindcss from 'tailwindcss'
 import tailwindcssNesting from 'tailwindcss/nesting'
 import { defaultClientConditions, defineConfig, type Connect, type Plugin } from 'vite'
@@ -144,7 +144,8 @@ async function projectManagerShim(): Promise<Plugin> {
       )
 
   if (isDevMode) {
-    await setupEnsoRunnerPath()
+    // Warn now; the first project-service request fails with the same message.
+    await setupEnsoRunnerPath().catch((error: Error) => console.warn(`\n⚠️  ${error.message}\n`))
   }
 
   return {
@@ -158,15 +159,19 @@ async function projectManagerShim(): Promise<Plugin> {
   }
 }
 
+/**
+ * Point the shim at the checkout's engine. Nothing is downloaded (#359): an engine from elsewhere
+ * would not match the checkout.
+ */
 async function setupEnsoRunnerPath(): Promise<void> {
   const projectRoot = fileURLToPath(new URL('../..', import.meta.url))
-  let ensoExecutable = findEnsoExecutable(projectRoot)
+  const ensoExecutable = findEnsoExecutable(projectRoot)
   if (!ensoExecutable) {
-    await downloadEnsoEngine(projectRoot)
-    ensoExecutable = findEnsoExecutable(projectRoot)
+    throw new Error(
+      'No Enso engine found in built-distribution/ or ENSO_ENGINE_PATH. ' +
+        'Build one with `sbt buildEngineDistribution`.',
+    )
   }
-  if (ensoExecutable) {
-    console.log('Found enso executable:', ensoExecutable)
-    process.env.ENSO_ENGINE_PATH = ensoExecutable
-  }
+  console.log('Found enso executable:', ensoExecutable)
+  process.env.ENSO_ENGINE_PATH = ensoExecutable
 }

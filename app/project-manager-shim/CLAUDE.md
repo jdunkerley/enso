@@ -17,8 +17,8 @@ distribution — fast to iterate on, no JVM needed.
 
 Consumers import by subpath (see `package.json#exports`):
 
-- `project-manager-shim` — public helpers (`downloadEnsoEngine`,
-  `findEnsoExecutable`, …).
+- `project-manager-shim` — public helpers (`findEnsoExecutable`,
+  `findStdlibRoot`, …).
 - `project-manager-shim/handler` — JSON-RPC request handler, and
   `acceptLocalRequest` / `checkLocalRequest` (`handler/localRequest.ts`): the
   one check both hosts (Electron's `server.ts`, the Vite middleware in
@@ -36,10 +36,16 @@ Consumers import by subpath (see `package.json#exports`):
   projects.
 - `project-manager-shim/projectService` — project-lifecycle service.
 
-## Engine download
+## Finding the engine
 
-`scripts/download-engine.js` fetches a prebuilt engine distribution; cache is
-under `~/.cache/enso` (or platform equivalent).
+`findEnsoExecutable` looks at `ENSO_ENGINE_PATH`, then next to the running
+executable (the packaged app), then under the checkout's `built-distribution/`
+(`sbt buildEngineDistribution`). Nothing downloads an engine (#359): a prebuilt
+one would not match the checkout, and the fork's releases ship installers only.
+Dev mode (`dev:vite`) warns at start-up when there is none, and fails the first
+project-service request with the same message. The `ProjectService` tests skip
+without one; GUI CI on Linux gives them develop's engine distribution artifact
+(`.github/workflows/gui-checks.yml`).
 
 ## Scope
 
