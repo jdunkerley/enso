@@ -168,7 +168,11 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
     editionProvider,
     editionResolver
   )
-  val editionManager = EditionManager(distributionManager, Some(languageHome))
+  // Updating, so that `editions/listAvailable` with `update: true` fetches
+  // new editions. Only that endpoint uses this manager, and nothing is
+  // downloaded unless a client asks for it.
+  val editionManager =
+    EditionManager(distributionManager, Some(languageHome), updating = true)
   val lockManager = new ThreadSafeFileLockManager(
     distributionManager.paths.locks
   )
