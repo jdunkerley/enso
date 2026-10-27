@@ -8,6 +8,8 @@
 import { useBackends } from '$/providers/backends'
 import { useDevtoolsStore } from '$/providers/devTools'
 import { IS_DEV_MODE } from 'enso-common/src/utilities/detect'
+import gt from 'semver/functions/gt'
+import parse from 'semver/functions/parse'
 import { computed } from 'vue'
 
 /** Whether the version checker is enabled. */
@@ -20,26 +22,23 @@ export function useVersionCheckerEnabled() {
 }
 
 /**
- * The version number of a version string, or `null` if it is not one. (Only the first dot is
- * removed, so `2025.1.1` is `20251.1`, as it always has been.)
+ * The semantic version of a version string, or `null` if it is not one. (Comparing versions as
+ * numbers, with only the first dot removed, put `2026.1.10` before `2026.1.9` and made every rc
+ * version `NaN`, #358.)
  */
-export function getVersionNumber(version: string) {
-  const versionNumber = Number(version.replace('.', ''))
-  return isNaN(versionNumber) ? null : versionNumber
+export function parseVersion(version: string) {
+  return parse(version)
 }
 
 /**
  * Whether the release tagged `releaseTag` is an update of the build `currentVersion`: both are
- * version numbers, the release's is the greater, and the build is not a development or nightly one.
+ * versions, the release's is the greater by semantic-versioning precedence (so a release is newer
+ * than its own rcs), and the build is a release or an rc (not a development, nightly or test one).
  */
 export function isNewerRelease(releaseTag: string, currentVersion: string) {
-  const releaseNumber = getVersionNumber(releaseTag)
-  const currentNumber = getVersionNumber(currentVersion)
-  return (
-    releaseNumber != null &&
-    currentNumber != null &&
-    !currentVersion.endsWith('-dev') &&
-    !currentVersion.includes('-nightly') &&
-    releaseNumber > currentNumber
-  )
+  const release = parseVersion(releaseTag)
+  const current = parseVersion(currentVersion)
+  const isReleaseOrRc =
+    current != null && (current.prerelease.length === 0 || current.prerelease[0] === 'rc')
+  return release != null && current != null && isReleaseOrRc && gt(release, current)
 }

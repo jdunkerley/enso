@@ -34,7 +34,7 @@ import { openInNewBrowserTab } from '$/utils/window'
 import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import { computed, onScopeDispose, ref, watch, watchEffect } from 'vue'
 import { useAutoUpdate } from './appUpdate'
-import { getVersionNumber, isNewerRelease } from './versionChecker'
+import { isNewerRelease, parseVersion } from './versionChecker'
 
 const STALE_TIME = 24 * 60 * 60 * 1000 // 1 day
 const AUTO_CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 1 day
@@ -92,13 +92,12 @@ const metadataQuery = useQuery({
   },
   select: (data: CachedRelease | null) => {
     if (data == null) return null
-    const versionNumber = getVersionNumber(data.tag_name)
     const publishedAt = new Date(data.published_at).toLocaleString(text.locale, {
       dateStyle: 'long',
     })
     return {
       publishedAt,
-      tagName: versionNumber == null ? currentVersion : data.tag_name,
+      tagName: parseVersion(data.tag_name) == null ? currentVersion : data.tag_name,
       htmlUrl: data.html_url,
       isPostponed: data.isPostponed,
     }
