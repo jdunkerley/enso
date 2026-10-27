@@ -1,8 +1,8 @@
 package org.enso.interpreter.instrument.command
 
 import org.enso.interpreter.instrument.execution.RuntimeContext
-import org.enso.interpreter.instrument.job.StartBackgroundProcessingJob
 import org.enso.polyglot.runtime.Runtime.Api
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,7 +19,23 @@ final class StartBackgroundProcessingCmd(
     ctx: RuntimeContext,
     ec: ExecutionContext
   ): Future[Unit] = {
-    Future(StartBackgroundProcessingJob.startBackgroundJobs())
+    Future(StartBackgroundProcessingCmd.startBackgroundJobs())
   }
 
+}
+
+object StartBackgroundProcessingCmd {
+  private def logger: org.slf4j.Logger =
+    LoggerFactory.getLogger(classOf[StartBackgroundProcessingCmd])
+
+  /** Start background jobs execution. */
+  private def startBackgroundJobs()(implicit ctx: RuntimeContext): Unit = {
+    val jobsStarted = ctx.jobControlPlane.startBackgroundJobs()
+    if (jobsStarted) {
+      logger.debug("Background jobs started")
+      ctx.endpoint.sendToClient(
+        Api.Response(Api.BackgroundJobsStartedNotification())
+      )
+    }
+  }
 }

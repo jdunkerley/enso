@@ -1,14 +1,10 @@
 package org.enso.languageserver.search
 
 import org.enso.jsonrpc.{Error, HasParams, HasResult, Method, Unused}
-import org.enso.languageserver.filemanager.Path
 import org.enso.languageserver.search.SearchProtocol.{
   SuggestionDatabaseEntry,
-  SuggestionId,
-  SuggestionKinds,
   SuggestionsDatabaseUpdate
 }
-import org.enso.text.editing.model.Position
 
 /** The execution JSON RPC API provided by the language server.
   *
@@ -79,29 +75,6 @@ object SearchApi {
     implicit val hasResult: HasResult.Aux[this.type, Unused.type] =
       new HasResult[this.type] {
         type Result = Unused.type
-      }
-  }
-
-  case object Completion extends Method("search/completion") {
-
-    case class Params(
-      file: Path,
-      position: Position,
-      selfType: Option[String],
-      returnType: Option[String],
-      tags: Option[Seq[SuggestionKinds.SuggestionKind]],
-      isStatic: Option[Boolean]
-    )
-
-    case class Result(results: Seq[SuggestionId], currentVersion: Long)
-
-    implicit val hasParams: HasParams.Aux[this.type, Completion.Params] =
-      new HasParams[this.type] {
-        type Params = Completion.Params
-      }
-    implicit val hasResult: HasResult.Aux[this.type, Completion.Result] =
-      new HasResult[this.type] {
-        type Result = Completion.Result
       }
   }
 

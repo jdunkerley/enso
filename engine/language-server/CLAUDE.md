@@ -38,7 +38,8 @@ the full protocol and design notes.
 ## Protocol
 
 - **Text**: JSON-RPC 2.0 over WebSocket. Endpoints defined per feature (e.g.
-  `text/applyEdit`, `session/initProtocolConnection`, `search/completion`).
+  `text/applyEdit`, `session/initProtocolConnection`,
+  `search/getSuggestionsDatabase`).
 - **Binary**: Flatbuffers envelopes over WebSocket. Used for bulk data
   transfers.
 - **Ydoc**: Yjs updates tunneled via a binary channel. When enabled, text
@@ -46,6 +47,13 @@ the full protocol and design notes.
 
 See [Language-Server](https://github.com/jdunkerley/enso/wiki/Language-Server)
 for every endpoint's schema.
+
+**A method needs two registrations.** `JsonRpc.scala` declares it to the
+protocol (so its params parse); `JsonConnectionController` maps it to a handler.
+A method in the first list but not the second parses and is then never answered
+— that is how `search/completion` sat dead until #370. Check both when adding or
+removing an endpoint, and grep the GUI (`app/ydoc-shared/` `languageServer.ts`)
+and its Playwright mock (`app/gui/integration-test/mock/`) for callers.
 
 ## Threading
 

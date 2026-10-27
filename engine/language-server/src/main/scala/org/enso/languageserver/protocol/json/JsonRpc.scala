@@ -80,7 +80,6 @@ object JsonRpc {
     .registerRequest(GetSuggestionsDatabase)
     .registerRequest(GetSuggestionsDatabaseVersion)
     .registerRequest(InvalidateSuggestionsDatabase)
-    .registerRequest(Completion)
     .registerRequest(AiCompletion)
     .registerRequest(AiCompletion2)
     .registerRequest(RenameProject)
