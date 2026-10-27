@@ -265,7 +265,22 @@ describe('isNewerRelease', () => {
     expect(isNewerRelease('2025.1.1', '2025.1.1')).toBe(false)
     expect(isNewerRelease('2024.1.1', '2025.1.1')).toBe(false)
   })
+  test('versions compare part by part, not as one number (#358)', () => {
+    expect(isNewerRelease('2026.1.10', '2026.1.9')).toBe(true)
+    expect(isNewerRelease('2026.1.9', '2026.1.10')).toBe(false)
+    expect(isNewerRelease('2026.10.1', '2026.9.1')).toBe(true)
+  })
+  test('an rc build is offered its release, and a later one', () => {
+    expect(isNewerRelease('2026.1.1', '2026.1.1-rc.2')).toBe(true)
+    expect(isNewerRelease('2026.1.2', '2026.1.1-rc.2')).toBe(true)
+    expect(isNewerRelease('2026.1.1-rc.10', '2026.1.1-rc.9')).toBe(true)
+    expect(isNewerRelease('2026.1.1-rc.2', '2026.1.1')).toBe(false)
+    expect(isNewerRelease('2025.1.1', '2026.1.1-rc.2')).toBe(false)
+  })
   test('nor anything to a development or nightly build, or a tag that is not a version', () => {
+    expect(isNewerRelease('2026.1.2', '2026.1.1-nightly.2026.10.22')).toBe(false)
+    expect(isNewerRelease('2099.1.1', '0.0.0-dev')).toBe(false)
+    expect(isNewerRelease('2099.1.1', '0.0.1-testing')).toBe(false)
     expect(isNewerRelease('2099.1.1', '2025.1.1-dev')).toBe(false)
     expect(isNewerRelease('2099.1.1', '2025.1.1-nightly.2025.1.1')).toBe(false)
     expect(isNewerRelease('latest', '2025.1.1')).toBe(false)
