@@ -105,7 +105,6 @@ import java.math.BigInteger
 import java.util.function.Supplier
 import java.util.logging.Level
 
-import scala.annotation.tailrec
 import scala.annotation.unused
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -289,7 +288,6 @@ private[runtime] class IrToTruffle(
                     AscriptionReason.forFunctionResult("conversion"),
                     toType
                   ),
-                  None,
                   true
                 )
               val rootNode = MethodRootNode.build(
@@ -333,21 +331,6 @@ private[runtime] class IrToTruffle(
         "Method definition missing frame information."
       )
 
-      @tailrec
-      def getContext(tp: Expression): Option[String] = tp match {
-        case fn: Tpe.Function => getContext(fn.result)
-        case ctx: Tpe.Context =>
-          ctx.context match {
-            case lit: Name.Literal => Some(lit.name)
-            case _                 => None
-          }
-        case _ => None
-      }
-
-      val effectContext = method
-        .getMetadata(TypeSignatures, classOf[TypeSignatures.Metadata])
-        .flatMap(sig => getContext(sig.signature))
-
       val cons = getTypeDefiningMethod(method)
       if (cons != null) {
         val fullMethodDefName =
@@ -367,7 +350,6 @@ private[runtime] class IrToTruffle(
           () => {
             buildFunction(
               method,
-              effectContext,
               cons,
               fullMethodDefName,
               expressionProcessor
@@ -553,7 +535,6 @@ private[runtime] class IrToTruffle(
 
   private def buildFunction(
     methodDef: Method.Explicit,
-    effectContext: Option[String],
     cons: Type,
     fullMethodDefName: String,
     expressionProcessor: ExpressionProcessor
@@ -564,7 +545,6 @@ private[runtime] class IrToTruffle(
           fn,
           expressionProcessor,
           methodDef,
-          effectContext,
           cons,
           fullMethodDefName
         )
@@ -573,7 +553,6 @@ private[runtime] class IrToTruffle(
           Some(
             buildRegularFunction(
               methodDef,
-              effectContext,
               cons,
               fullMethodDefName,
               expressionProcessor,
@@ -600,7 +579,6 @@ private[runtime] class IrToTruffle(
 
   private def buildRegularFunction(
     methodDef: Method.Explicit,
-    effectContext: Option[String],
     cons: Type,
     fullMethodDefName: String,
     expressionProcessor: ExpressionProcessor,
@@ -613,7 +591,6 @@ private[runtime] class IrToTruffle(
         fn.arguments,
         fn.body,
         null,
-        effectContext,
         true
       )
 
@@ -728,7 +705,6 @@ private[runtime] class IrToTruffle(
     fn: Function,
     expressionProcessor: ExpressionProcessor,
     methodDef: Method.Explicit,
-    effectContext: Option[String],
     cons: Type,
     fullMethodDefName: String
   ): Either[CompilerError, Option[RuntimeFunction]] = {
@@ -2240,7 +2216,6 @@ private[runtime] class IrToTruffle(
       val arguments: List[DefinitionArgument],
       val body: Expression,
       val typeCheck: TypeCheckValueNode,
-      val effectContext: Option[String],
       val subjectToInstrumentation: Boolean
     ) {
       private val argFactory =
@@ -2395,7 +2370,6 @@ private[runtime] class IrToTruffle(
           arguments,
           body,
           null,
-          None,
           subjectToInstrumentation
         )
       val fnRootNode = ClosureRootNode.build(

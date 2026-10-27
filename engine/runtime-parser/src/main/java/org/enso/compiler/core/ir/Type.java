@@ -85,41 +85,6 @@ public interface Type extends Expression {
     }
   }
 
-  /**
-   * A representation of the {@code in} portion of a type signature that represents the ascription
-   * of a monadic context.
-   */
-  @GenerateIR(interfaces = {Type.class, IRKind.Primitive.class})
-  final class Context extends TypeContextGen {
-    public static final String NAME = "in";
-
-    /**
-     * @param typed the type being ascribed a monadic context
-     * @param context the context being ascribed to `typed`
-     */
-    @GenerateFields
-    public Context(
-        @IRChild Expression typed,
-        @IRChild Expression context,
-        IdentifiedLocation identifiedLocation,
-        MetadataStorage passData) {
-      super(typed, context, identifiedLocation, passData);
-    }
-
-    public static Builder builder() {
-      return new Builder();
-    }
-
-    public Builder copyBuilder() {
-      return new Builder(this);
-    }
-
-    @Override
-    public String showCode(int indent) {
-      return typed().showCode(indent) + " in " + context().showCode(indent);
-    }
-  }
-
   /** Represents the ascription of an error context to an expression */
   @GenerateIR(interfaces = {Type.class, IRKind.Primitive.class})
   final class Error extends TypeErrorGen {

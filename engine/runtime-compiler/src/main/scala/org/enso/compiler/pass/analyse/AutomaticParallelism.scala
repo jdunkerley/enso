@@ -14,15 +14,14 @@ import org.enso.compiler.core.ir.{
 import org.enso.compiler.core.ir.module.scope.definition
 import org.enso.compiler.data.BindingsMap.{Resolution, ResolvedModuleMethod}
 import org.enso.compiler.core.{CompilerError, IR}
-import org.enso.compiler.core.ir.expression.{Application, Operator}
+import org.enso.compiler.core.ir.expression.Application
 import org.enso.compiler.pass.IRPass
 import org.enso.compiler.pass.analyse.alias.graph.Graph
 import org.enso.compiler.pass.desugar.ComplexType
 import org.enso.compiler.pass.resolve.{
   IgnoredBindings,
   MethodCalls,
-  ModuleAnnotations,
-  TypeSignatures
+  ModuleAnnotations
 }
 import org.enso.persist.Persistance
 
@@ -32,10 +31,9 @@ import scala.annotation.{tailrec, unused}
 /** This pass is responsible for discovering occurrences of automatically
   * parallelizable computations.
   *
-  * It uses type signatures and annotations to drive the system. Each method
-  * is split into blocks, where the first lines in the block are only performing
-  * operations annotated with `@Parallelize` or typed as returning values
-  * `in Pure`. The the parallelizable sub-blocks are analyzed separately,
+  * It uses annotations to drive the system. Each method is split into blocks,
+  * where the first lines in the block are only performing operations annotated
+  * with `@Parallelize`. The the parallelizable sub-blocks are analyzed separately,
   * possibly splitting their execution into separate threads, if allowed by the
   * dataflow dependencies.
   *
@@ -516,21 +514,6 @@ object AutomaticParallelism extends IRPass {
       Pinned
   }
 
-  @tailrec
-  private def getMonad(signature: Expression): Option[String] =
-    signature match {
-      case lam: Function.Lambda => getMonad(lam.body)
-      case app: Operator.Binary =>
-        if (app.operator.name == "in") {
-          app.right.value match {
-            case lit: Name.Literal => Some(lit.name)
-            case _                 => None
-          }
-        } else if (app.operator.name == "->") { getMonad(app.right.value) }
-        else None
-      case _ => None
-    }
-
   /** Computes the parallelism status of an expression.
     *
     * @param expr the expression to compute status for.
@@ -554,13 +537,8 @@ object AutomaticParallelism extends IRPass {
                 classOf[ModuleAnnotations.Metadata]
               )
               .exists(_.annotations.exists(_.name == "@Parallelize"))
-            val monad = methodIr
-              .getMetadata(TypeSignatures, classOf[TypeSignatures.Metadata])
-              .flatMap(sig => getMonad(sig.signature))
             val baseStatus: ParallelismStatus =
-              if (isParallelize) Parallelize
-              else if (monad.contains("Pure")) Pure
-              else Pinned
+              if (isParallelize) Parallelize else Pinned
             app.arguments
               .map(_.value)
               .foldLeft(baseStatus)((status, ir) =>

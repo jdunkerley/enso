@@ -64,6 +64,29 @@ public class ExecStrictCompilerTest {
   }
 
   @Test
+  public void typeContextIsRejected() {
+    try {
+      var module =
+          ctxRule.eval(
+              "enso",
+              """
+              type A
+              type Input
+              foo : A -> A in Input
+              foo x = x
+              """);
+      fail("Expecting no returned value: " + module);
+    } catch (PolyglotException ex) {
+      assertTrue("Syntax error", ex.isSyntaxError());
+      assertThat(
+          ex.getMessage(),
+          containsString(
+              "error: Type contexts (`T in Ctx`) are no longer supported. Remove the `in` part of"
+                  + " the type."));
+    }
+  }
+
+  @Test
   public void testUnknownConstructorLocation() throws Exception {
     var code =
         Source.newBuilder(

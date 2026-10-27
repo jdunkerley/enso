@@ -468,23 +468,6 @@ case object DataflowAnalysis extends IRPass {
           .build()
           .updateMetadata(toMetadata(info))
 
-      case ctx: Type.Context =>
-        val typed      = ctx.typed()
-        val context    = ctx.context()
-        val ctxDep     = asStatic(ctx)
-        val typedDep   = asStatic(typed)
-        val contextDep = asStatic(context)
-        info._1.updateAt(typedDep, Set(ctxDep))
-        info._1.updateAt(contextDep, Set(ctxDep))
-        info._2.updateAt(ctxDep, Set(typedDep, contextDep))
-
-        ctx
-          .copyBuilder()
-          .typed(analyseExpression(typed, info))
-          .context(analyseExpression(context, info))
-          .build()
-          .updateMetadata(toMetadata(info))
-
       case err: Type.Error =>
         val typed    = err.typed()
         val error    = err.error()
