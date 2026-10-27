@@ -258,6 +258,48 @@ add_specs suite_builder =
         group_builder.specify "pow with negative" <|
             (10 ^ -1) . should_equal 0.1
 
+        group_builder.specify "pow with zero gives the Integer 1 for every base" <|
+            (5 ^ 0) . should_equal 1
+            (5 ^ 0) . should_be_a Integer
+            (hundred_factorial ^ 0) . should_equal 1
+            (hundred_factorial ^ 0) . should_be_a Integer
+
+        group_builder.specify "pow with a huge exponent is exact for bases 0, 1 and -1" <|
+            even = 2 ^ 70
+            odd = even + 1
+            (0 ^ even) . should_equal 0
+            (0 ^ even) . should_be_a Integer
+            (1 ^ even) . should_equal 1
+            (1 ^ even) . should_be_a Integer
+            ((-1) ^ even) . should_equal 1
+            ((-1) ^ odd) . should_equal -1
+            ((-1) ^ odd) . should_be_a Integer
+
+        group_builder.specify "pow with a huge negative exponent matches a small negative one" <|
+            even = 2 ^ 70
+            odd = even + 1
+            (0 ^ -1) . should_equal Number.positive_infinity
+            (0 ^ (-even)) . should_equal Number.positive_infinity
+            (1 ^ -1) . should_equal 1.0
+            (1 ^ (-even)) . should_equal 1.0
+            (1 ^ (-even)) . should_be_a Float
+            ((-1) ^ (-even)) . should_equal 1.0
+            ((-1) ^ (-odd)) . should_equal -1.0
+            ((-1) ^ (-odd)) . should_be_a Float
+            (2 ^ (-even)) . should_equal 0.0
+            ((-2) ^ (-odd)) . should_equal 0.0
+            (hundred_factorial ^ (-even)) . should_equal 0.0
+            (hundred_factorial ^ (-even)) . should_be_a Float
+
+        group_builder.specify "pow with a huge exponent overflows to infinity for other bases" <|
+            even = 2 ^ 70
+            odd = even + 1
+            (2 ^ even) . should_equal Number.positive_infinity
+            ((-2) ^ even) . should_equal Number.positive_infinity
+            ((-2) ^ odd) . should_equal Number.negative_infinity
+            (hundred_factorial ^ even) . should_equal Number.positive_infinity
+            ((-hundred_factorial) ^ odd) . should_equal Number.negative_infinity
+
     suite_builder.group "Floats" group_builder->
 
         group_builder.specify "should exist and expose basic arithmetic operations" <|
