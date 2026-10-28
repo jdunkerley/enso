@@ -1,7 +1,7 @@
 # engine/runtime-integration-tests
 
-End-to-end JUnit and ScalaTest tests that run the whole engine (the compiler
-and the interpreter) in a live polyglot context. Java tests live under
+End-to-end JUnit and ScalaTest tests that run the whole engine (the compiler and
+the interpreter) in a live polyglot context. Java tests live under
 `src/test/java/org/enso/interpreter/`, Scala ones under `src/test/scala/`.
 Compiler pass tests are here too, under
 `src/test/scala/org/enso/compiler/test/`, not in `runtime-compiler`.
