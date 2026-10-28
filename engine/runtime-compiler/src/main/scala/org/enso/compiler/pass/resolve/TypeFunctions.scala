@@ -29,7 +29,7 @@ import org.enso.compiler.pass.lint.UnusedBindings
 import scala.annotation.unused
 
 /** This pass is responsible for lifting applications of type functions such as
-  * `:` and `in` and `!` into their specific IR nodes.
+  * `:` and `!` into their specific IR nodes.
   *
   * This pass requires the context to provide:
   *
@@ -91,7 +91,6 @@ case object TypeFunctions extends IRPass {
   /** The names of the known typing functions. */
   private val knownTypingFunctions: Set[String] = Set(
     Type.Ascription.NAME,
-    Type.Context.NAME,
     Type.Error.NAME,
     `type`.Set.Union.NAME,
     `type`.Set.Intersection.NAME
@@ -201,13 +200,6 @@ case object TypeFunctions extends IRPass {
             .builder()
             .typed(leftArg)
             .signature(rightArg)
-            .location(location)
-            .build()
-        case Type.Context.NAME =>
-          Type.Context
-            .builder()
-            .typed(leftArg)
-            .context(rightArg)
             .location(location)
             .build()
         case Type.Error.NAME =>

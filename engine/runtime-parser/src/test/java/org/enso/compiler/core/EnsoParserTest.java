@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
@@ -20,6 +21,7 @@ import org.enso.compiler.core.ir.Expression;
 import org.enso.compiler.core.ir.Function.Binding;
 import org.enso.compiler.core.ir.Module;
 import org.enso.compiler.core.ir.expression.Error;
+import org.enso.compiler.core.ir.expression.errors.Syntax;
 import org.enso.compiler.core.ir.module.scope.Definition;
 import org.enso.compiler.core.ir.module.scope.definition.Method;
 import org.junit.Test;
@@ -1241,11 +1243,33 @@ public class EnsoParserTest {
   }
 
   @Test
-  public void testResolveExecutionContext() {
-    parseTest(
-        """
-        foo : A -> B -> C in Input
-        """);
+  public void testTypeContextIsSyntaxError() {
+    var ir =
+        compile(
+            """
+            foo : A -> B -> C in Input
+            """);
+    expectTypeContextError(ir);
+  }
+
+  @Test
+  public void testTypeContextInArgumentTypeIsSyntaxError() {
+    var ir =
+        compile(
+            """
+            foo (x : Integer in Output) = x
+            """);
+    expectTypeContextError(ir);
+  }
+
+  @Test
+  public void testInIsStillAnOrdinaryIdentifier() {
+    var ir =
+        compile(
+            """
+            foo in = in
+            """);
+    expectNoErrorsInIr(ir);
   }
 
   @Test
@@ -1705,6 +1729,21 @@ public class EnsoParserTest {
               }
               return null;
             });
+  }
+
+  private static void expectTypeContextError(Module moduleIr) {
+    var found = new ArrayList<Syntax>();
+    moduleIr
+        .preorder()
+        .foreach(
+            ir -> {
+              if (ir instanceof Syntax err
+                  && err.reason() == Syntax.TypeContextUnsupported.INSTANCE) {
+                found.add(err);
+              }
+              return null;
+            });
+    assertEquals("One type-context syntax error in " + moduleIr.showCode(), 1, found.size());
   }
 
   static void assertIR(String msg, Module old, Module now) throws IOException {

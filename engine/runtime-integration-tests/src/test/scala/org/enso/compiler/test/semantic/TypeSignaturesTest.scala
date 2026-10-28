@@ -5,6 +5,7 @@ import org.enso.compiler.core.ir.{Expression, Module, Type}
 import org.enso.compiler.core.ir
 import org.enso.compiler.core.ir.module.scope.definition
 import org.enso.compiler.core.ir.`type`
+import org.enso.compiler.core.ir.expression.errors
 import org.enso.compiler.pass.resolve.{TypeNames, TypeSignatures}
 import org.enso.interpreter.runtime.EnsoContext
 import org.enso.interpreter.test.InterpreterContext
@@ -35,15 +36,12 @@ trait TypeMatchers {
       }
       Union(toUnion(this) ++ toUnion(that))
     }
-
-    def inCtx(context: Name): Sig = In(this, context)
   }
 
   case class Name(name: String)               extends Sig
   case class AnyQualName(name: QualifiedName) extends Sig
   case class Fn(args: List[Sig], result: Sig) extends Sig
   case class Union(items: List[Sig])          extends Sig
-  case class In(item: Sig, context: Name)     extends Sig
 
   implicit def fromString(str: String): Sig = {
     if (str.contains(".")) {
@@ -52,8 +50,6 @@ trait TypeMatchers {
   }
 
   def typeAs(sig: Sig): TypeMatcher = TypeMatcher(sig)
-
-  val Input = Name("Input")
 
   case class TypeMatcher(sig: Sig) extends Matcher[Expression] {
     private def findInequalityWitness(
@@ -96,11 +92,6 @@ trait TypeMatchers {
         } else {
           items.lazyZip(t.operands).flatMap(findInequalityWitness).headOption
         }
-      case (In(typed, context), ctx: Type.Context) =>
-        findInequalityWitness(typed, ctx.typed()).orElse(
-          findInequalityWitness(context, ctx.context())
-        )
-
       case _ => Some((sig, expr, "constructors are incompatible"))
     }
 
@@ -286,7 +277,7 @@ class TypeSignaturesTest
       )
     }
 
-    "resolve execution contexts" in {
+    "reject the removed type-context syntax" in {
       val code =
         """
           |type A
@@ -297,9 +288,11 @@ class TypeSignaturesTest
           |foo : A -> B -> C in Input
           |foo a b = c
           |""".stripMargin
-      getSignature(code.preprocessModule, "foo") should typeAs(
-        "A" ->: "B" ->: ("C" inCtx Input)
-      )
+      // The pass moves the signature into metadata, out of the IR tree.
+      val errs = getSignature(code.preprocessModule, "foo").preorder().collect {
+        case err: errors.Syntax => err.reason
+      }
+      errs should contain(errors.Syntax.TypeContextUnsupported.INSTANCE)
     }
   }
 }

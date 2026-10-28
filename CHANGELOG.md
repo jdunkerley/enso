@@ -216,6 +216,10 @@
 
 #### Enso Language & Runtime
 
+- [Removed the unused `T in Context` type-signature syntax][384]. Writing `in`
+  in a type, as in `foo : Integer -> Integer in Input`, is now a compile error;
+  the context part was never checked. Execution contexts are unaffected: they
+  are controlled with `Runtime.Context`, not with types.
 - [Fixed `==` sometimes answering `False` for equal values in the native
   engine][66]. When a comparison attached a warning - for example comparing a
   Float with an equal Decimal, which attaches `Loss_Of_Numeric_Precision` - the
@@ -410,6 +414,7 @@
 [40]: https://github.com/jdunkerley/enso/pull/40
 [37]: https://github.com/jdunkerley/enso/pull/37
 [39]: https://github.com/jdunkerley/enso/pull/39
+[384]: https://github.com/jdunkerley/enso/pull/384
 
 # Enso 2026.1
 

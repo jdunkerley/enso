@@ -442,18 +442,22 @@ final class TreeToIr {
     };
   }
 
+  /**
+   * The {@code in} of the removed {@code T in Ctx} type-context syntax. It is not reserved: only a
+   * type application that has it as an argument is rejected.
+   */
+  private static final String TYPE_CONTEXT_KEYWORD = "in";
+
   @SuppressWarnings("unchecked")
   private Application translateTypeApplication(Tree.App app) throws SyntaxException {
     List<CallArgument> args = nil();
     Tree t = app;
-    Name.Literal in = null;
     while (t instanceof Tree.App tApp) {
       var typeArg = translateTypeCallArgument(tApp.getArg());
-      if (typeArg.value() instanceof Name.Literal l && "in".equals(l.name())) {
-        in = l.copyBuilder().build();
-      } else {
-        args = join(typeArg, args);
+      if (typeArg.value() instanceof Name.Literal l && TYPE_CONTEXT_KEYWORD.equals(l.name())) {
+        throw translateEntity(app, Syntax.TypeContextUnsupported.INSTANCE);
       }
+      args = join(typeArg, args);
       t = tApp.getFunc();
     }
     var fullQualifiedNames = qualifiedNameSegments(t, false).reverse();
@@ -490,23 +494,12 @@ final class TreeToIr {
             yield name;
           }
         };
-    if (in == null) {
-      return Application.Prefix.builder()
-          .function(type)
-          .arguments(args)
-          .hasDefaultsSuspended(false)
-          .location(getIdentifiedLocation(app))
-          .build();
-    } else {
-      var fn =
-          CallArgument.Specified.builder()
-              .name(Option.empty())
-              .value(type)
-              .isSynthetic(false)
-              .location(getIdentifiedLocation(app))
-              .build();
-      return new Operator.Binary(fn, in, args.head(), getIdentifiedLocation(app), meta());
-    }
+    return Application.Prefix.builder()
+        .function(type)
+        .arguments(args)
+        .hasDefaultsSuspended(false)
+        .location(getIdentifiedLocation(app))
+        .build();
   }
 
   private Definition translateAnnotation(FunctionAnnotation anno) {

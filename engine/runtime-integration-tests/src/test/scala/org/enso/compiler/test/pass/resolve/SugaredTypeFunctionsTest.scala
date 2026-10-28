@@ -132,16 +132,6 @@ class SugaredTypeFunctionsTest extends CompilerTest {
       ir shouldBe an[Type.Ascription]
     }
 
-    "resolve context ascription" ignore {
-      // FIXME: Not supported by new parser--needs triage (#6165).
-      val ir =
-        """
-          |a in IO
-          |""".stripMargin.preprocessExpression.get.resolve
-
-      ir shouldBe an[Type.Context]
-    }
-
     "resolve error ascription" in {
       val ir =
         """

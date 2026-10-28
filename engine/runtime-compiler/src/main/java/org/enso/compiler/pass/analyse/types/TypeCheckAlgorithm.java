@@ -106,9 +106,6 @@ public abstract class TypeCheckAlgorithm<R, E extends Exception> {
           // documentation
           // purposes and is not checked.
           extractAscribedType(typeWithError.typed());
-      case Type.Context typeInContext ->
-          // Type contexts aren't currently really used. But we should still check the base type.
-          extractAscribedType(typeInContext.typed());
       case Resolution err -> forError(err);
       default -> {
         var res =

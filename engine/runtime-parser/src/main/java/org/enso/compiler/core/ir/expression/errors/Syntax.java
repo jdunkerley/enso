@@ -130,6 +130,18 @@ public final class Syntax extends SyntaxErrorGen {
     }
   }
 
+  /** {@code T in Ctx} in a type: the type-context syntax was removed from the language. */
+  public static final class TypeContextUnsupported implements Reason {
+    private TypeContextUnsupported() {}
+
+    public static final TypeContextUnsupported INSTANCE = new TypeContextUnsupported();
+
+    @Override
+    public String explanation() {
+      return "Type contexts (`T in Ctx`) are no longer supported. Remove the `in` part of the type";
+    }
+  }
+
   public static final class EmptyParentheses implements Reason {
     private EmptyParentheses() {}
 
