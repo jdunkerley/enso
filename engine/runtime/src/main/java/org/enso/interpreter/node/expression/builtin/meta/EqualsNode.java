@@ -110,6 +110,21 @@ public final class EqualsNode extends Node {
       return findType(TypeOfNode.getUncached(), obj);
     }
 
+    @NeverDefault
+    static EqualsSimpleNode createEqualsSimpleNode() {
+      return EqualsSimpleNode.build();
+    }
+
+    /**
+     * The uncached variant must use the uncached {@link EqualsSimpleNode}. Building a fresh cached
+     * node instead (what {@code allowUncached = true} does) gives a node no {@code RootNode} has
+     * adopted, which fails Truffle's adoption assertion under {@code -ea} (#67).
+     */
+    @NeverDefault
+    static EqualsSimpleNode uncachedEqualsSimpleNode() {
+      return EqualsSimpleNode.getUncached();
+    }
+
     private static boolean isDefinedIn(ModuleScope scope, Function fn) {
       if (fn != null && fn.getCallTarget().getRootNode() instanceof EnsoRootNode ensoRoot) {
         return ensoRoot.getModuleScope().getModule() == scope.getModule();
@@ -203,7 +218,9 @@ public final class EqualsNode extends Node {
             Type thatType,
         @Cached("findConversions(selfType, thatType, self, that)") Boolean convert,
         @Shared("convert") @Cached InteropConversionCallNode convertNode,
-        @Shared("invoke") @Cached(allowUncached = true) EqualsSimpleNode equalityNode) {
+        @Shared("invoke")
+            @Cached(value = "createEqualsSimpleNode()", uncached = "uncachedEqualsSimpleNode()")
+            EqualsSimpleNode equalityNode) {
       if (convert == null) {
         return EqualsAndInfo.FALSE;
       }
@@ -221,7 +238,9 @@ public final class EqualsNode extends Node {
         Object that,
         @Shared("typeOf") @Cached TypeOfNode typeOfNode,
         @Shared("convert") @Cached InteropConversionCallNode convertNode,
-        @Shared("invoke") @Cached(allowUncached = true) EqualsSimpleNode equalityNode) {
+        @Shared("invoke")
+            @Cached(value = "createEqualsSimpleNode()", uncached = "uncachedEqualsSimpleNode()")
+            EqualsSimpleNode equalityNode) {
       var selfType = findType(typeOfNode, self);
       var thatType = findType(typeOfNode, that);
       var conv = findConversions(selfType, thatType, self, that);

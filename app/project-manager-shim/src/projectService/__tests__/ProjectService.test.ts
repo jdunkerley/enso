@@ -16,27 +16,24 @@ const Path = newtypeConstructor<Path>()
 // Test timeout for operations involving language server startup
 const LANGUAGE_SERVER_TEST_TIMEOUT = 35000
 
-describe('ProjectService', () => {
-  let ensoPath: Path | undefined
+// These tests run a real engine: the checkout's `built-distribution/` (`sbt buildEngineDistribution`)
+// or `ENSO_ENGINE_PATH`. CI on Linux provides develop's; without one they skip (#359).
+const repositoryRoot = path.join(__dirname, '..', '..', '..', '..', '..')
+const ensoPath = findEnsoExecutable(repositoryRoot)
+if (ensoPath == null) {
+  console.warn(
+    `${PRODUCT_NAME} executable not found: skipping the ProjectService tests. ` +
+      'Build one with `sbt buildEngineDistribution`.',
+  )
+}
+
+describe.skipIf(ensoPath == null)('ProjectService', () => {
   let projectService: ProjectService
   let tempDir: string
   let projectsDirectory: Path
 
   beforeAll(async () => {
-    // Try to find the Enso executable providing path to repository root
-    const repositoryRoot = path.join(__dirname, '..', '..', '..', '..', '..')
-    ensoPath = findEnsoExecutable(repositoryRoot)
-
-    if (ensoPath) {
-      // Use real Enso runner if available
-      const runner = new EnsoRunner(ensoPath)
-      projectService = new ProjectService(runner, [])
-    } else {
-      // Fail the test if executable is not available
-      throw new Error(
-        `${PRODUCT_NAME} executable not found. Cannot run tests without Enso runtime.`,
-      )
-    }
+    projectService = new ProjectService(new EnsoRunner(ensoPath!), [])
   })
 
   beforeEach(async () => {
@@ -44,13 +41,6 @@ describe('ProjectService', () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'project-service-test-'))
     projectsDirectory = Path(tempDir)
     vi.stubEnv('ENSO_LOG_DIRECTORY', path.join(tempDir, 'log'))
-
-    if (!ensoPath) {
-      // Fail the test if executable is not available
-      throw new Error(
-        `${PRODUCT_NAME} executable not found. Cannot run tests without Enso runtime.`,
-      )
-    }
   })
 
   afterEach(async () => {
