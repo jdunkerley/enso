@@ -12,11 +12,13 @@ import org.slf4j.Logger;
  * Background job processing inspired by {@code org.enso.base.enso_cloud.logging.LogApiAccess}.
  *
  * <p>This base class appender encapsulates the core logic needed to send logs a remote endpoint
- * provided by Enso infrastructure. It is supposed to be started by the project manager, within
- * {@link org.enso.logging.service.logback.LoggingServer}. The logging events that are received in
- * this {@link RemoteAppender#append(ILoggingEvent)} method are received from a socket and
- * deserialized by the logback framework. Thus, the {@link ILoggingEvent#getArgumentArray() log
- * event arguments} are most likely strings.
+ * provided by Enso infrastructure. It runs within {@link
+ * org.enso.logging.service.logback.LoggingServer}, the logging server that a process hosts for
+ * itself when its config asks for one (the language server does; see Note [Each Process Hosts Its
+ * Own Logging Server] in {@code LoggingSetupHelper}). The logging events that are received in this
+ * {@link RemoteAppender#append(ILoggingEvent)} method are received from a socket and deserialized
+ * by the logback framework. Thus, the {@link ILoggingEvent#getArgumentArray() log event arguments}
+ * are most likely strings.
  */
 public abstract class RemoteAppender
     extends org.enso.logging.service.logback.AbstractRemoteAppender {

@@ -58,7 +58,8 @@ object Dependencies {
   // See Note [GraalVM Is Held At 25.0.1]
   val graalVersion = "25.0.1"
   // Version used for the Graal/Truffle related Maven packages
-  // Keep in sync with GraalVM.version. Do not change the name of this variable,
+  // Must equal graalVersion: GraalVM.versionCheck fails the build otherwise.
+  // Do not change the name of this variable,
   // it is read by `tools/ci/toolchain-pins.mjs` (the workflow policy's pin check) and by
   // developers' WSL toolchain scripts, by regex matching.
   // See Note [GraalVM Is Held At 25.0.1]

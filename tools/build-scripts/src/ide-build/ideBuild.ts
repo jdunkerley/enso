@@ -22,8 +22,8 @@ export function targetOs(platform: NodeJS.Platform): TargetOs {
 }
 
 /**
- * `ENSO_IDE_UPDATES` (`web.rs` `update_mode`): `manual` for a dev version (its prerelease contains
- * `dev`) and for an unsigned macOS build, `auto` otherwise.
+ * `ENSO_IDE_UPDATES`: `manual` for a dev version (its prerelease contains `dev`) and for an
+ * unsigned macOS build, `auto` otherwise. Ported from the retired build CLI's `update_mode`.
  */
 export function updateMode(version: Version, os: TargetOs, macSigned: boolean): 'auto' | 'manual' {
   return version.pre.includes('dev') || (os === 'macos' && !macSigned) ? 'manual' : 'auto'

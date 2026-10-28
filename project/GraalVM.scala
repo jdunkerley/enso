@@ -9,6 +9,22 @@ import scala.collection.immutable.Seq
 /** A collection of utility methods for everything related to the GraalVM and Truffle.
   */
 object GraalVM {
+
+  /** The `ENSO_LAUNCHER` env variable: a comma-separated list choosing how the
+    * `enso` launcher is built. Unset, it is `native` in release mode and
+    * `shell` otherwise.
+    *
+    *  - `shell`: the launcher script running the engine on the JVM; it cannot
+    *    be combined with any other value.
+    *  - `native`: a native image of the runner (`-Os`).
+    *  - `test`: `native`, unoptimised (`-Ob`), with assertions on (`-ea`).
+    *  - `debug`: `native`, unoptimised, with debug info (`-g -O0`).
+    *  - `fast`: `native`, unoptimised, with only `Standard.Base`'s polyglot
+    *    support in the image.
+    *  - `-ls`: `native`, unoptimised, without the language server.
+    *
+    * Any other value fails the build.
+    */
   object EnsoLauncher {
     val VAR_NAME = "ENSO_LAUNCHER"
 
@@ -52,9 +68,6 @@ object GraalVM {
         case "-ls" => {
           native                = true
           disableLanguageServer = true
-        }
-        case "-ms" => {
-          native = true
         }
         case v =>
           throw new IllegalStateException(s"Unexpected value of $VAR_NAME: $v")
@@ -246,10 +259,14 @@ object GraalVM {
     oldState: State
   ): State = {
     val log = oldState.log
-    if (graalPackagesVersion != version) {
+    // The Truffle runtime in the GraalVM / Truffle Maven packages must match the
+    // Graal compiler of the JDK it runs on, and since GraalVM 25 both carry the
+    // same version. `build-config.yaml` pins them as one `graalvm` value too.
+    if (!isSameVersion(graalPackagesVersion, graalVersion)) {
       log.error(
-        s"Expected GraalVM packages version $version, but got $graalPackagesVersion. " +
-        s"Version specified in build.sbt and GraalVM.scala must be in sync"
+        s"GraalVM packages version $graalPackagesVersion does not match " +
+        s"GraalVM version $graalVersion. Bump graalMavenPackagesVersion and " +
+        s"graalVersion in project/Dependencies.scala together."
       )
       return oldState.fail
     }

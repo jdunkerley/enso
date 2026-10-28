@@ -309,11 +309,20 @@ object GatherLicenses {
 
   /** Launches a server that allows to easily review the generated report.
     *
-    * Requires `npm` to be on the system PATH.
+    * Requires `npm` to be on the system PATH. The helper is a standalone
+    * package with its own `package-lock.json`, outside the pnpm workspace, so
+    * it is installed with `npm` in its own directory.
     */
   def runReportServer(): Unit = {
-    Seq("npm", "install").!
-    Process(Seq("npm", "start"), file("tools/legal-review-helper"))
+    val helperRoot = file("tools/legal-review-helper")
+    val npm        = if (Platform.isWindows) "npm.cmd" else "npm"
+    val installed  = Process(Seq(npm, "install"), helperRoot).!
+    if (installed != 0) {
+      throw LegalReviewException(
+        s"`npm install` in $helperRoot failed with exit code $installed."
+      )
+    }
+    Process(Seq(npm, "start"), helperRoot)
       .run(connectInput = true)
       .exitValue()
   }

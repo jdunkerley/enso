@@ -16,8 +16,9 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   ydoc server and the tests' images).
 - `GraalVM.scala` — Graal detection and options.
 - `Cargo.scala` — Calls into the Rust workspace (for parser JNI + wasm).
-- `GenerateFlatbuffers.scala` — Runs `flatc` (from `toolchains/flatc/`) to
-  generate the LS binary-protocol bindings.
+- `GenerateFlatbuffers.scala` — Runs `flatc` from the `PATH` (at the version in
+  `flatbuffersVersion`, `project/Dependencies.scala`) to generate the LS
+  binary-protocol bindings.
 - `Distribution.scala` + `DistributionPackage.scala` — Produces the engine
   distribution directory layout (matches `distribution/`).
 - `Editions.scala` — Edition-manifest generation.

@@ -2463,11 +2463,6 @@ lazy val `language-server` = (project in file("engine/language-server"))
   .dependsOn(`ydoc-api`)
   .dependsOn(`ydoc-polyfill`)
 
-lazy val cleanInstruments = taskKey[Unit](
-  "Cleans fragile class files to force a full recompilation and preserve" +
-  "consistency of instrumentation configuration."
-)
-
 /** Overrides for the environment variables related to the distribution, so that
   * a local installation does not interfere with runtime tests.
   */

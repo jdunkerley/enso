@@ -14,7 +14,7 @@ import {
   withoutEmptyCscVariables,
 } from './ideBuild.ts'
 
-describe('updateMode (web.rs tests)', () => {
+describe('updateMode (ported from the retired build CLI)', () => {
   test('a stable or rc version updates automatically, a dev version does not', () => {
     expect(updateMode(version('2026.2.0'), 'windows', false)).toBe('auto')
     expect(updateMode(version('2026.2.0-rc.1'), 'linux', false)).toBe('auto')
