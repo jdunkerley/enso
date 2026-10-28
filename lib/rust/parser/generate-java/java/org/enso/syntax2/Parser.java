@@ -5,6 +5,9 @@ import java.net.URISyntaxException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -14,6 +17,9 @@ import org.slf4j.LoggerFactory;
 
 public final class Parser {
   private Parser() {}
+
+  /** U+FFFD in UTF-8. */
+  private static final byte[] UTF8_REPLACEMENT_CHARACTER = {(byte) 0xEF, (byte) 0xBF, (byte) 0xBD};
 
   public static String getWarningMessage(Warning warning) {
     return getWarningTemplate(warning.getId());
@@ -36,6 +42,16 @@ public final class Parser {
   /** Whether the input is a single numeric literal, optionally negated with a unary minus. */
   public static boolean isNumericLiteral(CharSequence input) {
     return getWorker().isNumericLiteral(input);
+  }
+
+  /**
+   * The XXH3-128 digest (seed 0) of the input's UTF-8 encoding, exactly as {@code hash-wasm}'s
+   * {@code xxhash128} returns it for a JS string: 32 lowercase hex digits, high 64 bits first. An
+   * unpaired surrogate is encoded as U+FFFD, as JS's {@code TextEncoder} and Node's {@code Buffer}
+   * do (Java's {@link String#getBytes} would write {@code ?}).
+   */
+  public static String xxHash128(CharSequence input) {
+    return getWorker().xxHash128(input);
   }
 
   public static ByteBuffer parseModuleLazy(CharSequence input) {
@@ -230,6 +246,26 @@ public final class Parser {
       return Parser.isNumericLiteral(inputBuf);
     }
 
+    String xxHash128(CharSequence input) {
+      var encoder =
+          StandardCharsets.UTF_8
+              .newEncoder()
+              .onMalformedInput(CodingErrorAction.REPLACE)
+              .onUnmappableCharacter(CodingErrorAction.REPLACE)
+              .replaceWith(UTF8_REPLACEMENT_CHARACTER);
+      ByteBuffer encoded;
+      try {
+        encoded = encoder.encode(CharBuffer.wrap(input));
+      } catch (CharacterCodingException e) {
+        // Unreachable: both error actions are REPLACE.
+        throw new IllegalStateException(e);
+      }
+      ByteBuffer inputBuf = ByteBuffer.allocateDirect(encoded.remaining());
+      inputBuf.put(encoded);
+
+      return Parser.xxHash128(inputBuf);
+    }
+
     ByteBuffer parseLazy(CharSequence input, boolean isInternalBlock) {
       byte[] inputBytes = input.toString().getBytes(StandardCharsets.UTF_8);
       ByteBuffer inputBuf = ByteBuffer.allocateDirect(inputBytes.length);
@@ -294,6 +330,8 @@ public final class Parser {
   private static native int selfArgSeparator(ByteBuffer input);
 
   private static native boolean isNumericLiteral(ByteBuffer input);
+
+  private static native String xxHash128(ByteBuffer input);
 
   private static native long getLastInputBase(long state);
 

@@ -24,8 +24,16 @@ Web/Node API polyfills (WebSocket, timers, crypto, zlib, URL, …) that let the
 `app/ydoc-server-polyglot/src/ffiPolyglot.ts` destructures (the JVM counterpart
 of the WASM `app/rust-ffi`), calling `org.enso.syntax2.Parser` over JNI.
 `ParserPolyfillTest.definesEveryFunctionFfiPolyglotExpects` reads that file and
-fails when a name is missing (#360). `xxHash128` here is not xxHash128: it is
-the hex of Java's `String.hashCode`.
+fails when a name is missing (#360).
+
+`xxHash128` must give byte-for-byte the digest the GUI gets from `hash-wasm`
+(`app/ydoc-shared/src/ast/ffi.ts`), because function-doc hashes travel in the
+Yjs doc between the two (#394). `Parser.xxHash128` encodes the string as UTF-8
+the way JS does (an unpaired surrogate becomes U+FFFD, not Java's `?`) and the
+JNI library hashes it with `twox-hash`'s XXH3-128, seed 0, printed as 32
+lowercase hex digits, high half first.
+`ParserPolyfillTest.xxHash128MatchesHashWasm` holds digests generated with
+`hash-wasm`; regenerate them with it, never with the code under test.
 
 ## Tests
 

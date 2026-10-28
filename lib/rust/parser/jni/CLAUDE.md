@@ -18,6 +18,11 @@ JNI `cdylib` that exposes `enso-parser` to the JVM. The output library name is
   `app/ydoc-server-polyglot/src/ffiPolyglot.ts` needs all three layers, and
   `ParserPolyfillTest.definesEveryFunctionFfiPolyglotExpects` fails until it has
   them (#360).
+- `xxHash128` is the one function here that is not the parser's: the JVM ydoc
+  server's stand-in for the GUI's `hash-wasm` digest (#394). It hashes the raw
+  bytes with `twox-hash` (XXH3-128, the only reason the crate is a dependency)
+  and its output format is pinned by `tests::xx_hash_128_matches_hash_wasm`. It
+  lives here, not in `enso-parser`, so the WASM build does not carry it.
 - Parsing produces a raw buffer; the Java side uses the generated deserializers
   from `parser/generate-java/` to inflate it. Keep both in sync.
 - Returned byte buffers are owned by the JVM after transfer; don't leak Rust
