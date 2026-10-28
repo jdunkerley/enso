@@ -5,8 +5,14 @@ import * as path from 'node:path'
 
 /** Error codes for which a rename over an existing file is retried (Windows file locks). */
 const RETRYABLE_RENAME_CODES = new Set(['EPERM', 'EACCES', 'EBUSY'])
-const RENAME_ATTEMPTS = 5
+/**
+ * How long a rename keeps retrying those errors. Real-time virus scanning holds a file it has just
+ * seen written for about a second (0.9 to 1.3 s measured, #275), so a budget of a few hundred
+ * milliseconds fails a write made soon after the previous one.
+ */
+export const RENAME_RETRY_BUDGET_MS = 5_000
 const RENAME_RETRY_DELAY_MS = 20
+const RENAME_RETRY_MAX_DELAY_MS = 200
 
 /** The tail of the action chain for each absolute path. */
 const queues = new Map<string, Promise<unknown>>()
@@ -110,19 +116,21 @@ async function writeFileExclusively(filePath: string, text: string): Promise<voi
 }
 
 /**
- * Rename `from` over `to`, retrying a few times on the errors Windows reports while another
- * process briefly holds either file.
+ * Rename `from` over `to`, retrying for up to {@link RENAME_RETRY_BUDGET_MS} on the errors Windows
+ * reports while another process holds either file.
  */
 export async function renameWithRetry(from: string, to: string): Promise<void> {
+  const deadline = Date.now() + RENAME_RETRY_BUDGET_MS
   for (let attempt = 1; ; attempt += 1) {
     try {
       await fs.rename(from, to)
       return
     } catch (error) {
-      if (attempt >= RENAME_ATTEMPTS || !RETRYABLE_RENAME_CODES.has(errorCode(error) ?? '')) {
+      if (!RETRYABLE_RENAME_CODES.has(errorCode(error) ?? '') || Date.now() >= deadline) {
         throw error
       }
-      await new Promise((resolve) => setTimeout(resolve, RENAME_RETRY_DELAY_MS * attempt))
+      const delay = Math.min(RENAME_RETRY_DELAY_MS * attempt, RENAME_RETRY_MAX_DELAY_MS)
+      await new Promise((resolve) => setTimeout(resolve, delay))
     }
   }
 }
