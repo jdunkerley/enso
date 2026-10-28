@@ -335,8 +335,7 @@ class ContextEventsListenerSpec
       ExecutionContextConfig(requestTimeout = 3.seconds),
       ProjectDirectoriesConfig.initialize(root.file),
       ProfilingConfig.none(),
-      StartupConfig(),
-      None
+      StartupConfig()
     )
   }
 
