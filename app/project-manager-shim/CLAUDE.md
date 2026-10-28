@@ -111,6 +111,10 @@ Rules worth keeping:
   (`updateJsonFile`), which serialises writers per path and renames a temporary
   file into place. A plain `writeFile` of a fresh object drops `lastOpened`
   written by someone else.
+- Rename a temporary file over an existing one with `renameWithRetry`, not a
+  bare `fs.rename`. On Windows, real-time virus scanning holds a file it has
+  just seen written for about a second, and a rename over it fails with `EPERM`
+  meanwhile; the helper retries `EPERM`/`EACCES`/`EBUSY` for up to 5 s (#275).
 - A corrupt or newer `labels.json`/`recent.json` is renamed to
   `<name>.corrupt-<ts>`/`<name>.newer-<ts>` and treated as empty. A corrupt
   `project.json` is never moved: that would cost the project its UUID.
