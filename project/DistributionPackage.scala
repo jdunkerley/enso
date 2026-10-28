@@ -497,7 +497,14 @@ object DistributionPackage {
     val envToFill: java.util.Map[String, String] = pb.environment()
     var atEnv                                    = args.indexOf("--env")
     while (atEnv >= 0) {
-      var keyAndValue = args.get(atEnv + 1).split("=")
+      // Split on the first `=` only: values such as URL query strings or
+      // base64 padding may contain `=` themselves.
+      val keyAndValue = args.get(atEnv + 1).split("=", 2)
+      if (keyAndValue.length != 2) {
+        throw new IllegalArgumentException(
+          s"--env expects KEY=VALUE, got: ${args.get(atEnv + 1)}"
+        )
+      }
       envToFill.put(keyAndValue(0), keyAndValue(1))
       args.remove(atEnv)
       args.remove(atEnv)

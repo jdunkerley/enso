@@ -42,3 +42,9 @@ Every non-trivial build concern the engine has lives here as a Scala file.
 - Scala 2 syntax (SBT's version). Don't try to import Scala 3 features.
 - When adding a new JPMS module, wire it through `JPMSPlugin` — don't hand-roll
   module flags.
+
+## Testing
+
+- The meta-build has no test sources and no test framework on its classpath
+  (`project/plugins.sbt` adds none), so there is no seam for unit-testing code
+  here. Loading the build (any `sbt` command) compiles it; that is the check.
