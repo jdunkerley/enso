@@ -82,11 +82,17 @@ object EditionManager {
 
   /** Create an [[EditionManager]] that can locate editions from the
     * distribution and the language home.
+    *
+    * @param updating whether [[EditionManager.findAllAvailableEditions]] with
+    *                 `update = true` should download new editions from the
+    *                 edition providers in the global config; without it that
+    *                 flag has no effect
     */
   def apply(
     distributionManager: DistributionManager,
-    languageHome: Option[LanguageHome] = None
+    languageHome: Option[LanguageHome] = None,
+    updating: Boolean                  = false
   ): EditionManager = new EditionManager(
-    makeEditionProvider(distributionManager, languageHome, false)
+    makeEditionProvider(distributionManager, languageHome, updating)
   )
 }

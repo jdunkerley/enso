@@ -339,7 +339,8 @@ abstract class BaseServerTest
       editionProvider,
       editionResolver
     )
-    val editionManager = EditionManager(distributionManager, Some(languageHome))
+    val editionManager =
+      EditionManager(distributionManager, Some(languageHome), updating = true)
 
     val projectSettingsManager = system.actorOf(
       ProjectSettingsManager.props(
