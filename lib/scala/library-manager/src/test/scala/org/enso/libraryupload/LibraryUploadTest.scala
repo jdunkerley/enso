@@ -41,6 +41,8 @@ class LibraryUploadTest
       )
       // Left over from compiling the library: it must not be uploaded.
       Files.writeString(projectRoot.resolve("main.tgz"), "stale archive")
+      val licenseText = "Upload_Test license"
+      Files.writeString(projectRoot.resolve("LICENSE.md"), licenseText)
 
       emptyRepository.withServer(port, repoRoot, uploads = true) {
         val uploadUrl = s"http://localhost:$port/upload"
@@ -73,6 +75,8 @@ class LibraryUploadTest
           .normalizedName shouldEqual libraryName.name
         assert(Files.exists(libRoot.resolve("manifest.yaml")))
         assert(Files.exists(libRoot.resolve("main.tgz")))
+        // Served as a loose file, which is where the installer looks for it.
+        Files.readString(libRoot.resolve("LICENSE.md")) shouldEqual licenseText
 
         withDownloader { cache =>
           cache.findCachedLibrary(libraryName, libraryVersion) shouldBe empty
@@ -93,6 +97,9 @@ class LibraryUploadTest
           Files.exists(
             installedRoot.location.resolve("main.tgz")
           ) shouldBe false
+          Files.readString(
+            installedRoot.location.resolve("LICENSE.md")
+          ) shouldEqual licenseText
         }
 
       }

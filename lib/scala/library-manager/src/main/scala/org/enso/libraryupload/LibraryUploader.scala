@@ -10,6 +10,7 @@ import org.enso.downloader.http.{HTTPDownload, HTTPRequestBuilder, URIBuilder}
 import org.enso.editions.LibraryName
 import org.enso.librarymanager.published.repository.LibraryManifest
 import org.enso.libraryupload.LibraryUploader.{
+  licenseFileName,
   mainArchiveName,
   UploadFailedError
 }
@@ -75,6 +76,13 @@ class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
 
       updateManifest(pkg).get
 
+      // The repository serves the license as a loose file next to the
+      // package config; without it, installing the library warns that the
+      // license is missing. It stays in the main archive as well.
+      val licensePath = projectRoot / licenseFileName
+      val license =
+        if (Files.isRegularFile(licensePath)) Seq(licensePath) else Seq()
+
       logger.info(s"Uploading library package to the server at [$uploadUrl].")
       val upload = uploadFiles(
         uri,
@@ -83,7 +91,7 @@ class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
           projectRoot / Package.configFileName,
           projectRoot / LibraryManifest.filename,
           archivePath
-        )
+        ) ++ license
       )
       progressReporter.trackProgress(
         s"Uploading packages to [$uploadUrl].",
@@ -250,4 +258,9 @@ object LibraryUploader {
       extends RuntimeException(message)
 
   val mainArchiveName: String = "main.tgz"
+
+  /** Name of the license file, uploaded next to the package config when the
+    * library has one. Must match the name `RepositoryHelper` downloads.
+    */
+  val licenseFileName: String = "LICENSE.md"
 }
