@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import * as Y from 'yjs'
 import { MutableModule } from '../ast/mutableModule'
+import { assertDefined } from '../util/assert'
 import {
   encodeControlMessage,
   moduleState,
@@ -99,26 +100,48 @@ describe('graph edits (MutableModule.edit and applyEdit)', () => {
 })
 
 describe('large delete sets', () => {
-  test('covering many deletion ranges is fast', () => {
+  /**
+   * Replace `client`'s structs in `doc`'s store with a view that counts reads of its elements, the
+   * work a cover check does. Counting instead of timing keeps the check independent of how loaded
+   * the machine is.
+   */
+  function countStructReads(doc: Y.Doc, client: number) {
+    const structs = doc.store.clients.get(client)
+    assertDefined(structs)
+    const counter = { reads: 0, structs: structs.length }
+    const counted = new Proxy(structs, {
+      get(target, key, receiver) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) counter.reads += 1
+        return Reflect.get(target, key, receiver)
+      },
+    })
+    doc.store.clients.set(client, counted)
+    return counter
+  }
+
+  test('covering many deletion ranges reads a logarithmic number of structs per range', () => {
+    const RANGES = 10_000
     const a = new Y.Doc()
     const array = a.getArray<number>('a')
     array.insert(
       0,
-      Array.from({ length: 20_000 }, (_, i) => i),
+      Array.from({ length: RANGES * 2 }, (_, i) => i),
     )
     // Every other element: 10 000 separate ranges.
     a.transact(() => {
-      for (let i = 10_000; i > 0; i--) array.delete(i * 2 - 1, 1)
+      for (let i = RANGES; i > 0; i--) array.delete(i * 2 - 1, 1)
     })
     const state = moduleState(a)
-    expect(state.deleteSet[String(a.clientID)]).toHaveLength(10_000)
+    expect(state.deleteSet[String(a.clientID)]).toHaveLength(RANGES)
     const server = new Y.Doc()
     Y.applyUpdate(server, Y.encodeStateAsUpdate(a))
-    const start = performance.now()
+    const counter = countStructReads(server, a.clientID)
     expect(moduleStateCovers(server, state)).toBe(true)
-    expect(performance.now() - start).toBeLessThan(100)
-    // Building the 10 000 ranges above is slow on a loaded CI runner and is not what this measures,
-    // so the test gets more than vitest's default 5 s; the 100 ms bound is the actual check.
+    // A binary search per range plus the one struct each range spans. Scanning the store for each
+    // range would read about RANGES * structs / 2 = 100 million.
+    expect(counter.reads).toBeLessThan(RANGES * (Math.log2(counter.structs) + 4))
+    // Building the 10 000 ranges above is slow on a loaded CI runner and is not what this checks,
+    // so the test gets more than vitest's default 5 s.
   }, 30_000)
 })
 
