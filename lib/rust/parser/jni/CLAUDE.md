@@ -6,8 +6,18 @@ JNI `cdylib` that exposes `enso-parser` to the JVM. The output library name is
 
 ## What to keep in mind
 
-- Only narrow FFI surface — each `JNIEnv`-facing function here must match a Java
-  `native` declaration on the engine side.
+- Only narrow FFI surface — each `JNIEnv`-facing function here must match a
+  `private static native` declaration in
+  `../generate-java/java/org/enso/syntax2/Parser.java` (plus its public static
+  wrapper and `Worker` method).
+- The snippet queries the GUI asks (`isIdentOrOperator`, `selfArgSeparator`,
+  `isNumericLiteral`) are thin wrappers over `enso_parser::queries`, which the
+  WASM binding (`app/rust-ffi`) calls too. Put logic there, not here. The
+  JVM-hosted ydoc server reaches them through `lib/java/ydoc-polyfill`
+  (`ParserPolyfill` + `parser.js`); a function added to
+  `app/ydoc-server-polyglot/src/ffiPolyglot.ts` needs all three layers, and
+  `ParserPolyfillTest.definesEveryFunctionFfiPolyglotExpects` fails until it has
+  them (#360).
 - Parsing produces a raw buffer; the Java side uses the generated deserializers
   from `parser/generate-java/` to inflate it. Keep both in sync.
 - Returned byte buffers are owned by the JVM after transfer; don't leak Rust

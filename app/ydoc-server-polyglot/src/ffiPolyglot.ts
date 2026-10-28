@@ -2,6 +2,8 @@
  * @file This file is used as rust ffi interface for building the polyglot ydoc server.
  * All the exported methods are provided by the ydoc server implementation.
  * The interface should be kept in sync with Rust ffi interface {@link ydoc-shared/src/ast/ffi}.
+ * In the JVM, these globals are defined by `lib/java/ydoc-polyfill` (`parser.js`); its
+ * `ParserPolyfillTest` reads this file and fails if any name below is missing there.
  * @module ffiPolyglot
  */
 

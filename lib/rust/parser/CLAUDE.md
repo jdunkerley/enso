@@ -32,6 +32,13 @@ Each has its own `CLAUDE.md`:
 - `src/syntax/tree/visitor/` — Derive-macro crate (optional, via `debug`
   feature) that generates visitor boilerplate over the `Tree` type.
 
+## Snippet queries
+
+`src/queries.rs` answers the small questions the GUI asks about a snippet
+(`is_ident_or_operator`, `self_arg_separator`, `is_numeric_literal`). Both
+bindings call it — WASM (`app/rust-ffi`) and JNI (`jni/`) — so keep the logic
+there rather than in either binding.
+
 ## Feature flags
 
 - `debug` — enables the visitor derive crate; required for `parser-debug` and

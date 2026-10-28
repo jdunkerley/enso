@@ -23,6 +23,21 @@ public final class Parser {
     return getWorker().isIdentOrOperator(input);
   }
 
+  /**
+   * What should separate this expression from a self argument applied to it.
+   *
+   * @return -1 if {@code self} should be joined with a dot, otherwise the number of spaces to join
+   *     it with
+   */
+  public static int selfArgSeparator(CharSequence input) {
+    return getWorker().selfArgSeparator(input);
+  }
+
+  /** Whether the input is a single numeric literal, optionally negated with a unary minus. */
+  public static boolean isNumericLiteral(CharSequence input) {
+    return getWorker().isNumericLiteral(input);
+  }
+
   public static ByteBuffer parseModuleLazy(CharSequence input) {
     return getWorker().parseLazy(input, false);
   }
@@ -199,6 +214,22 @@ public final class Parser {
       return Parser.isIdentOrOperator(inputBuf);
     }
 
+    int selfArgSeparator(CharSequence input) {
+      byte[] inputBytes = input.toString().getBytes(StandardCharsets.UTF_8);
+      ByteBuffer inputBuf = ByteBuffer.allocateDirect(inputBytes.length);
+      inputBuf.put(inputBytes);
+
+      return Parser.selfArgSeparator(inputBuf);
+    }
+
+    boolean isNumericLiteral(CharSequence input) {
+      byte[] inputBytes = input.toString().getBytes(StandardCharsets.UTF_8);
+      ByteBuffer inputBuf = ByteBuffer.allocateDirect(inputBytes.length);
+      inputBuf.put(inputBytes);
+
+      return Parser.isNumericLiteral(inputBuf);
+    }
+
     ByteBuffer parseLazy(CharSequence input, boolean isInternalBlock) {
       byte[] inputBytes = input.toString().getBytes(StandardCharsets.UTF_8);
       ByteBuffer inputBuf = ByteBuffer.allocateDirect(inputBytes.length);
@@ -259,6 +290,10 @@ public final class Parser {
   private static native ByteBuffer parseBlockLazy(long state, ByteBuffer input);
 
   private static native long isIdentOrOperator(ByteBuffer input);
+
+  private static native int selfArgSeparator(ByteBuffer input);
+
+  private static native boolean isNumericLiteral(ByteBuffer input);
 
   private static native long getLastInputBase(long state);
 

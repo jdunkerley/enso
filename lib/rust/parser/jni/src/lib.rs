@@ -15,6 +15,8 @@ use enso_parser::macros::resolver::RootContext;
 use jni::JNIEnv;
 use jni::objects::JByteBuffer;
 use jni::objects::JClass;
+use jni::sys::jboolean;
+use jni::sys::jint;
 use jni::sys::jobject;
 use jni::sys::jstring;
 
@@ -163,20 +165,42 @@ pub extern "system" fn Java_org_enso_syntax2_Parser_isIdentOrOperator(
     input: JByteBuffer,
 ) -> u64 {
     let input = unsafe { decode_utf8_buffer(&env, &input) };
+    enso_parser::queries::is_ident_or_operator(input).into()
+}
 
-    let parsed = enso_parser::lexer::run(input);
-    if parsed.internal_error.is_some() {
-        return 0;
-    }
-    let token = match &parsed.value[..] {
-        [token] => token,
-        _ => return 0,
-    };
-    match &token.variant {
-        enso_parser::syntax::token::Variant::Ident(_) => 1,
-        enso_parser::syntax::token::Variant::Operator(_) => 2,
-        _ => 0,
-    }
+/// What should separate this expression from self argument applied to it: -1 to join with a dot,
+/// or a non-negative number of spaces. See [`enso_parser::queries::self_arg_separator`].
+///
+/// # Safety
+///
+/// The input buffer contents MUST be valid UTF-8.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_enso_syntax2_Parser_selfArgSeparator(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteBuffer,
+) -> jint {
+    let input = unsafe { decode_utf8_buffer(&env, &input) };
+    enso_parser::queries::self_arg_separator(input)
+}
+
+/// Whether the input is a single numeric literal, optionally negated. See
+/// [`enso_parser::queries::is_numeric_literal`].
+///
+/// # Safety
+///
+/// The input buffer contents MUST be valid UTF-8.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_enso_syntax2_Parser_isNumericLiteral(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteBuffer,
+) -> jboolean {
+    let input = unsafe { decode_utf8_buffer(&env, &input) };
+    let parser = enso_parser::Parser::new();
+    enso_parser::queries::is_numeric_literal(&parser, input).into()
 }
 
 /// Return the `base` parameter to pass to the `Message` class along with the other output of the

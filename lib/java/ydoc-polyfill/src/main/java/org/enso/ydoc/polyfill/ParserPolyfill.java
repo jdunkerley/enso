@@ -18,6 +18,8 @@ public final class ParserPolyfill implements ProxyExecutable {
   private static final String PARSE_MODULE = "parse-module";
   private static final String XX_HASH_128 = "xx-hash-128";
   private static final String IS_IDENT_OR_OPERATOR = "is-ident-or-operator";
+  private static final String SELF_ARG_SEPARATOR = "self-arg-separator";
+  private static final String IS_NUMERIC_LITERAL = "is-numeric-literal";
 
   private static final String PARSER_JS = "parser.js";
 
@@ -66,6 +68,18 @@ public final class ParserPolyfill implements ProxyExecutable {
         var input = arguments[1].asString();
 
         yield Parser.isIdentOrOperator(input);
+      }
+
+      case SELF_ARG_SEPARATOR -> {
+        var input = arguments[1].asString();
+
+        yield Parser.selfArgSeparator(input);
+      }
+
+      case IS_NUMERIC_LITERAL -> {
+        var input = arguments[1].asString();
+
+        yield Parser.isNumericLiteral(input);
       }
 
       default -> throw new IllegalStateException(command);
