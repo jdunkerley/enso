@@ -2,7 +2,7 @@ name: Code Formatting Check
 
 on:
   push:
-    branches: [develop, "release/*"]
+    branches: [develop]
   pull_request:
     # Specs and plans alone start no checks; every `pull_request` workflow ignores them
     # (`tools/ci/check-workflows.mjs` checks it).
