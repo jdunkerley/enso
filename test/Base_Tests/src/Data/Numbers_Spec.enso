@@ -291,14 +291,14 @@ add_specs suite_builder =
             (hundred_factorial ^ (-even)) . should_equal 0.0
             (hundred_factorial ^ (-even)) . should_be_a Float
 
-        group_builder.specify "pow with a huge exponent overflows to infinity for other bases" <|
+        group_builder.specify "pow with a huge exponent raises Arithmetic_Error for other bases" <|
             even = 2 ^ 70
             odd = even + 1
-            (2 ^ even) . should_equal Number.positive_infinity
-            ((-2) ^ even) . should_equal Number.positive_infinity
-            ((-2) ^ odd) . should_equal Number.negative_infinity
-            (hundred_factorial ^ even) . should_equal Number.positive_infinity
-            ((-hundred_factorial) ^ odd) . should_equal Number.negative_infinity
+            (2 ^ even) . should_fail_with Arithmetic_Error
+            ((-2) ^ even) . should_fail_with Arithmetic_Error
+            ((-2) ^ odd) . should_fail_with Arithmetic_Error
+            (hundred_factorial ^ even) . should_fail_with Arithmetic_Error
+            ((-hundred_factorial) ^ odd) . should_fail_with Arithmetic_Error
 
     suite_builder.group "Floats" group_builder->
 

@@ -1196,9 +1196,9 @@ type Integer
 
        ### Huge Exponents
        An exponent too large for a 64-bit integer is exact only for the bases
-       `0`, `1` and `-1`. Any other base gives `Number.positive_infinity` (or
-       `Number.negative_infinity` for a negative base and an odd exponent) for
-       a positive exponent, and `0.0` for a negative one.
+       `0`, `1` and `-1`. For any other base, a positive exponent raises an
+       `Arithmetic_Error`, because the result cannot be represented, and a
+       negative one gives `0.0`.
     ^ self that:Integer -> Number = integer_pow self that
 
     ## ---

@@ -7,6 +7,8 @@ import com.oracle.truffle.api.nodes.Node.Child;
 import java.math.BigInteger;
 import org.enso.interpreter.dsl.BuiltinMethod;
 import org.enso.interpreter.node.expression.builtin.number.utils.BigIntegerOps;
+import org.enso.interpreter.runtime.EnsoContext;
+import org.enso.interpreter.runtime.error.DataflowError;
 import org.enso.interpreter.runtime.number.EnsoBigInteger;
 
 /**
@@ -63,7 +65,7 @@ public abstract class PowNode extends IntegerNode.Binary {
 
   @Specialization
   Object doBigInteger(long self, EnsoBigInteger that) {
-    return powHugeExponent(self, that.getValue());
+    return orExponentTooLarge(powHugeExponent(self, that.getValue()));
   }
 
   @Specialization
@@ -79,7 +81,7 @@ public abstract class PowNode extends IntegerNode.Binary {
 
   @Specialization
   Object doBigInteger(EnsoBigInteger self, EnsoBigInteger that) {
-    return powHugeExponent(self.getValue(), that.getValue());
+    return orExponentTooLarge(powHugeExponent(self.getValue(), that.getValue()));
   }
 
   @Specialization
@@ -98,9 +100,12 @@ public abstract class PowNode extends IntegerNode.Binary {
    *   Integer (0, 1, or -1/1 by parity). A negative one gives a Float, as a
    *   small negative exponent does: `1.0`, `-1.0`/`1.0` by parity, and for 0
    *   `Infinity`, matching `0 ^ -1`.
-   * - Any other base overflows or underflows: a positive exponent gives
-   *   `Infinity` and a negative one `0.0`, both Floats as `Math.pow` would
-   *   give, and both negative when the base is negative and the exponent odd.
+   * - Any other base with a positive exponent overflows: the result has more
+   *   than 2^63 bits, so it raises `Arithmetic_Error` ("Exponent too large")
+   *   rather than return an approximate Float `Infinity`.
+   * - Any other base with a negative exponent underflows to `0.0` (`-0.0` for
+   *   a negative base and an odd exponent), as `Math.pow` already does for
+   *   small negative exponents such as `2 ^ -2000`.
    *
    * The exponent is never zero here (zero fits in a `long`), but it is still
    * handled to return the Integer 1, as the small-exponent path does.
@@ -131,9 +136,23 @@ public abstract class PowNode extends IntegerNode.Binary {
     }
   }
 
-  private static double powOtherBase(boolean negativeBase, BigInteger exponent) {
-    var magnitude = exponent.signum() > 0 ? Double.POSITIVE_INFINITY : 0.0D;
-    return negativeBase && exponent.testBit(0) ? -magnitude : magnitude;
+  /**
+   * @return {@code null} when the result overflows, which {@link #orExponentTooLarge} turns into an
+   *     {@code Arithmetic_Error}; otherwise the underflowed {@code 0.0}.
+   */
+  private static Double powOtherBase(boolean negativeBase, BigInteger exponent) {
+    if (exponent.signum() > 0) {
+      return null;
+    }
+    return negativeBase && exponent.testBit(0) ? -0.0D : 0.0D;
+  }
+
+  private Object orExponentTooLarge(Object result) {
+    if (result == null) {
+      return DataflowError.withDefaultTrace(
+          EnsoContext.get(this).getBuiltins().error().getExponentTooLargeError(), this);
+    }
+    return result;
   }
 
   @CompilerDirectives.TruffleBoundary
