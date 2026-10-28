@@ -53,8 +53,7 @@ Test files that start (fake) engines pass `firstPort` from
 `projectService/__tests__/testPorts.ts`, never the default: each file has its
 own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
-own there. `ProjectService.test.ts` needs a real engine (`findEnsoExecutable`)
-and fails as a suite without one; that is expected locally.
+own there.
 
 ## Local secrets (`src/localSecrets/`)
 
