@@ -47,6 +47,15 @@ Historically some advanced features (multi-engine, upgrade) deferred to the old
 Scala PM. Those paths now need to live here or be served by the language server
 directly — don't add Scala-PM back-references when extending this package.
 
+## Tests that start engines
+
+Test files that start (fake) engines pass `firstPort` from
+`projectService/__tests__/testPorts.ts`, never the default: each file has its
+own band (parallel workers), and each run starts at a random port inside it
+(another checkout's run at the same time). A new such file needs a band of its
+own there. `ProjectService.test.ts` needs a real engine (`findEnsoExecutable`)
+and fails as a suite without one; that is expected locally.
+
 ## Local secrets (`src/localSecrets/`)
 
 `LocalSecrets` is the Node side of `~/.enso/secrets.json` (`ENSO_SECRETS_FILE`
