@@ -97,6 +97,7 @@ pub mod format;
 pub mod lexer;
 pub mod macros;
 pub mod metadata;
+pub mod queries;
 pub mod serialization;
 pub mod source;
 pub mod syntax;

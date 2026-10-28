@@ -39,7 +39,11 @@ run if it is missing or the wrong version.
 
 ## Adding a new API
 
-1. Add a `#[wasm_bindgen]` function here.
+1. Add a `#[wasm_bindgen]` function here. Put any logic beyond a call into
+   `enso_parser` (e.g. `lib/rust/parser/src/queries.rs`) so the JNI binding can
+   share it: the JVM-hosted ydoc server needs the same function through
+   `lib/rust/parser/jni` and `lib/java/ydoc-polyfill` (see
+   `app/ydoc-server-polyglot/src/ffiPolyglot.ts`).
 2. Extend TypeScript bindings in `ydoc-shared/src/ast/`.
 3. Rebuild WASM (`corepack pnpm run -r compile` from repo root is the simplest).
 

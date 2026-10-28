@@ -18,6 +18,15 @@ Web/Node API polyfills (WebSocket, timers, crypto, zlib, URL, …) that let the
   yet; a send there was silently lost (#214). Any new per-connection callback
   that needs the session must wait for `open` too.
 
+## Parser functions
+
+`ParserPolyfill` + `parser.js` define on `globalThis` the parser functions that
+`app/ydoc-server-polyglot/src/ffiPolyglot.ts` destructures (the JVM counterpart
+of the WASM `app/rust-ffi`), calling `org.enso.syntax2.Parser` over JNI.
+`ParserPolyfillTest.definesEveryFunctionFfiPolyglotExpects` reads that file and
+fails when a name is missing (#360). `xxHash128` here is not xxHash128: it is
+the hex of Java's `String.hashCode`.
+
 ## Tests
 
 `sbt ydoc-polyfill/test`. `WebSocketServerFirstMessageTest` guards #214; it
