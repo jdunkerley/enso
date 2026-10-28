@@ -1,5 +1,4 @@
 import type { ProjectStore } from '$/providers/openedProjects/project'
-import { bytesToHex, Hash } from '@noble/hashes/utils'
 import { Err, Ok, type Result, withContext } from 'enso-common/src/utilities/data/result'
 import { basenameAndExtension } from 'enso-common/src/utilities/file'
 import { Error as DataError } from 'ydoc-shared/binaryProtocol'
@@ -109,20 +108,6 @@ export function useProjectFiles(projectStore: ProjectStoreSubset) {
     return Ok(candidate)
   }
 
-  async function assertChecksum<T extends Hash<T>>(
-    path: Path,
-    checksum: Hash<T>,
-  ): Promise<Result<void>> {
-    const engineChecksum = await lsRpc.fileChecksum(path)
-    if (!engineChecksum.ok) return engineChecksum
-    const hexChecksum = bytesToHex(checksum.digest())
-    if (hexChecksum != engineChecksum.value.checksum) {
-      return Err(`Checksum does not match. ${hexChecksum} != ${engineChecksum.value.checksum}`)
-    } else {
-      return Ok()
-    }
-  }
-
   return {
     projectRootId,
     readFileBinary,
@@ -131,6 +116,5 @@ export function useProjectFiles(projectStore: ProjectStoreSubset) {
     deleteFile,
     ensureDirExists,
     pickUniqueName,
-    assertChecksum,
   }
 }
