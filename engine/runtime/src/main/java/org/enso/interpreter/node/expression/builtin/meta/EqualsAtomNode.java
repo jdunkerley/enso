@@ -146,13 +146,16 @@ abstract class EqualsAtomNode extends Node {
       Atom self,
       Atom other,
       @Shared @CachedLibrary(limit = "10") WarningsLibrary warnings) {
-    if (self.getConstructor() != other.getConstructor()) {
-      return EqualsAndInfo.FALSE;
-    } else {
-      return equalsAtomsUncached(frame == null ? null : frame.materialize(), self, other, warnings);
-    }
+    return equalsAtomsUncached(frame == null ? null : frame.materialize(), self, other, warnings);
   }
 
+  /**
+   * Must agree with the cached specializations above. Only the default comparator requires both
+   * atoms to share a constructor; a custom comparator decides for itself, as {@link
+   * #equalsAtomsWithCustomComparator} does. (One type can produce atoms with different
+   * constructors: a {@code Decimal} built from text and one converted from a {@code Float}, for
+   * example.)
+   */
   @CompilerDirectives.TruffleBoundary
   private EqualsAndInfo equalsAtomsUncached(
       MaterializedFrame frame, Atom self, Atom other, WarningsLibrary warnings) {
@@ -170,6 +173,9 @@ abstract class EqualsAtomNode extends Node {
           invokeFuncNode,
           warnings,
           BranchProfile.getUncached());
+    }
+    if (self.getConstructor() != other.getConstructor()) {
+      return EqualsAndInfo.FALSE;
     }
     for (int i = 0; i < self.getConstructor().getArity(); i++) {
       var selfField = StructsLibrary.getUncached().getField(self, i);

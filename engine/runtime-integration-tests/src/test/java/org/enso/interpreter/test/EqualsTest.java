@@ -197,6 +197,41 @@ public class EqualsTest {
     assertTrue(equalityCheck(ensoVector, javaVector));
   }
 
+  /**
+   * {@code EqualsNode.getUncached()} must agree with the cached node when a comparison needs a
+   * conversion (#67). A Float and a Decimal compare equal only by converting the Float to a
+   * Decimal, which also attaches a {@code Loss_Of_Numeric_Precision} warning.
+   *
+   * <p>Two bugs on that path: the uncached conversion built a fresh, unadopted {@code
+   * EqualsSimpleNode}, which fails Truffle's adoption assertion under {@code -ea}; and the uncached
+   * atom comparison required the same constructor before consulting a custom comparator, so a
+   * converted Decimal never equalled one built from text.
+   */
+  @Test
+  public void testUncachedEqualsAcrossConversion() {
+    var assertsOn = false;
+    assert assertsOn = true;
+    assertTrue("This test needs Java assertions enabled (-ea)", assertsOn);
+
+    var imports = "from Standard.Base import Decimal";
+    var ensoFloat = ctxRule.unwrapValue(ctxRule.createValue("1.5", ""));
+    var ensoDecimal = ctxRule.unwrapValue(ctxRule.createValue("Decimal.new '1.5'", imports));
+    var convertedDecimal = ctxRule.unwrapValue(ctxRule.createValue("Decimal.from 1.5", imports));
+    var otherDecimal = ctxRule.unwrapValue(ctxRule.createValue("Decimal.new '2.5'", imports));
+
+    var uncached = EqualsNode.getUncached();
+    assertTrue("Float == Decimal", uncached.execute(null, ensoFloat, ensoDecimal).isTrue());
+    assertTrue("Decimal == Float", uncached.execute(null, ensoDecimal, ensoFloat).isTrue());
+    assertTrue(
+        "Decimal == converted Decimal",
+        uncached.execute(null, ensoDecimal, convertedDecimal).isTrue());
+    assertFalse("Float != other Decimal", uncached.execute(null, ensoFloat, otherDecimal).isTrue());
+
+    assertTrue("Cached: Float == Decimal", equalityCheck(ensoFloat, ensoDecimal));
+    assertTrue("Cached: Decimal == Float", equalityCheck(ensoDecimal, ensoFloat));
+    assertFalse("Cached: Float != other Decimal", equalityCheck(ensoFloat, otherDecimal));
+  }
+
   @Test
   public void testTruffleNumberLong() {
     var ensoNumber = ctxRule.unwrapValue(ctxRule.createValue("1", ""));
