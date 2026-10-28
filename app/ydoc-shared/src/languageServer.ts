@@ -87,7 +87,7 @@ const RemoteRpcErrorSchema = z.object({
 })
 type RemoteRpcErrorParsed = z.infer<typeof RemoteRpcErrorSchema>
 
-/** Payload for a {@linnk LsRpcError}. */
+/** Payload for a {@link LsRpcError}. */
 export class RemoteRpcError {
   code: ErrorCode
   message: string
@@ -377,11 +377,6 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
   /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextdestroy) */
   destroyExecutionContext(contextId: ContextId): Promise<LsRpcResult<void>> {
     return this.request('executionContext/destroy', { contextId })
-  }
-
-  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextfork) */
-  forkExecutionContext(contextId: ContextId): Promise<LsRpcResult<response.ExecutionContext>> {
-    return this.request('executionContext/fork', { contextId })
   }
 
   /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextpush) */
