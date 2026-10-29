@@ -24,13 +24,17 @@ class EditionManagerTest
   /** A distribution inside the test directory whose global config points the
     * edition providers at the local test repository.
     */
-  def makeDistributionManager(): DistributionManager = {
+  def makeDistributionManager(
+    withProviders: Boolean = true
+  ): DistributionManager = {
     val configDir = getTestDirectory.resolve("test_config")
     Files.createDirectories(configDir)
-    Files.writeString(
-      configDir.resolve(GlobalConfigurationManager.globalConfigName),
-      s"edition-providers:\n- http://localhost:$port/editions\n"
-    )
+    if (withProviders) {
+      Files.writeString(
+        configDir.resolve(GlobalConfigurationManager.globalConfigName),
+        s"edition-providers:\n- http://localhost:$port/editions\n"
+      )
+    }
     val env = Map(
       "ENSO_DATA_DIRECTORY"    -> getTestDirectory.resolve("test_data"),
       "ENSO_CONFIG_DIRECTORY"  -> configDir,
@@ -60,6 +64,17 @@ class EditionManagerTest
         manager.findAllAvailableEditions(update =
           true
         ) should contain theSameElementsAs Seq("testlocal")
+      }
+    }
+
+    "have no edition provider by default, so an update downloads nothing" in {
+      repo.withServer(port, repoPath) {
+        val dm = makeDistributionManager(withProviders = false)
+        new GlobalConfigurationManager(
+          dm
+        ).getConfig.editionProviders shouldBe empty
+        val manager = EditionManager(dm, updating = true)
+        manager.findAllAvailableEditions(update = true) shouldBe empty
       }
     }
 

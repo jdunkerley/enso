@@ -112,7 +112,8 @@ object Editions {
     private val libraries: Seq[Library]
   ) {
 
-    /** A library that should be uploaded is one that is hosted in a "jar:" repository.
+    /** A library that should be uploaded is one that is hosted in a "jar:" repository
+      * and is listed in [[uploadedLibraries]].
       * See <a href="https://github.com/jdunkerley/enso/wiki/Libraries-Sharing">Libraries-Sharing</a> for details.
       * @return
       */
@@ -123,9 +124,17 @@ object Editions {
           repo.name == lib.repository
         }
       }
-      libs.map { _.name }
+      libs.map { _.name }.filter(uploadedLibraries.contains)
     }
   }
+
+  /** The libraries uploaded as release assets. Only `Standard.Image` is today,
+    * as before the edition template had a single repository; the library
+    * system work decides which others follow. Every edition entry names the
+    * `release` repository, so this list, not the repository, is what limits
+    * the upload (and the source archives, ~50 MB each for the large libraries).
+    */
+  private val uploadedLibraries: Set[String] = Set("Standard.Image")
 
   case class Repository(
     name: String,

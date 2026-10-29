@@ -43,18 +43,18 @@ case class GlobalConfig(
 }
 
 object GlobalConfig {
-  private val defaultEditionProviders: Seq[String] = Seq(
-    "https://editions.release.enso.org/enso"
-  )
 
   /** The default configuration used when the configuration file does not exist.
+    *
+    * There is no default edition provider: nothing is downloaded unless the
+    * user lists a provider under `edition-providers`.
     */
   val Default: GlobalConfig =
     GlobalConfig(
       defaultVersion   = DefaultVersion.LatestInstalled,
       authorName       = None,
       authorEmail      = None,
-      editionProviders = defaultEditionProviders
+      editionProviders = Seq.empty
     )
 
   /** Field names used when serializing the configuration.

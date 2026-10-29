@@ -11,11 +11,11 @@ Set the `--source` parameter to either `engine` or `stdlib`.
 
 The generated website is placed under "generated_site" directory
 
-The default GH artifact retention period is 3 months, which means that all
-the artifacts older than 3 months are dropped. If you wish to gather the data
-for benchmarks older than 3 months, make sure that the `use_cache` parameter
-is set to true, and that the cache directory is populated with older data.
-If the script encounters an expired artifact, it prints a warning.
+Runs are looked up in the jdunkerley/enso workflows `Benchmark Engine` and
+`Benchmark Standard Libraries`. The default GH artifact retention period is
+3 months, which means that all the artifacts older than 3 months are dropped
+and cannot be downloaded. If the script encounters an expired artifact, it
+prints an error.
 
 This script is under continuous development, so it is advised to use
 `-v|--verbose` option all the time.
@@ -25,7 +25,7 @@ in a given period, no results will be written.
 
 The process of the script is roughly as follows:
 - Asynchronously gather all the benchmark results from GH API into job reports (JobReport dataclass)
-    - Use cache if possible to avoid unnecessary GH API queries
+    - Reports are cached in memory, so each run is parsed once
 - Transform the gathered results into data for a particular benchmark sorted
   by an appropriate commit timestamp.
     - BenchmarkData class
@@ -49,7 +49,7 @@ import sys
 from dataclasses import dataclass
 
 from bench_tool.bench_results import get_bench_runs, fetch_job_reports
-from bench_tool.remote_cache import ReadonlyRemoteCache
+from bench_tool.report_cache import ReportCache
 from bench_tool.utils import gather_all_bench_labels, sort_job_reports
 
 if not (sys.version_info.major >= 3 and sys.version_info.minor >= 7):
@@ -219,18 +219,17 @@ async def main():
 
     ensure_gh_installed()
 
-    # If the user requires benchmarks for which artifacts are not retained
-    # anymore, then cache should be used.
+    # Artifacts older than the retention period are gone, and there is no
+    # persistent cache of reports to fall back to.
     min_since_without_cache = datetime.today() - GH_ARTIFACT_RETENTION_PERIOD
     if since < min_since_without_cache:
-        logging.info(f"The default GH artifact retention period is "
-                     f"{GH_ARTIFACT_RETENTION_PERIOD.days} days. "
-                     f"This means that all the artifacts older than "
-                     f"{min_since_without_cache.date()} are expired."
-                     f"The since date was set to {since}, so the remote cache is enabled, "
-                     f"and the older artifacts will be fetched from the cache.")
+        logging.warning(f"The default GH artifact retention period is "
+                        f"{GH_ARTIFACT_RETENTION_PERIOD.days} days. "
+                        f"This means that all the artifacts older than "
+                        f"{min_since_without_cache.date()} are expired, and "
+                        f"their runs will be skipped.")
 
-    remote_cache = ReadonlyRemoteCache()
+    cache = ReportCache()
 
     bench_labels: Optional[Set[str]] = None
     """ Set of all gathered benchmark labels from all the job reports """
@@ -247,7 +246,7 @@ async def main():
                 f" until {until} for branch {branch}")
             exit(1)
 
-        job_reports = await fetch_job_reports(bench_runs, remote_cache)
+        job_reports = await fetch_job_reports(bench_runs, cache)
         logging.debug(f"Got {len(job_reports)} job reports for branch {branch}")
         if len(job_reports) == 0:
             print(f"There were 0 job_reports in the specified time interval, "

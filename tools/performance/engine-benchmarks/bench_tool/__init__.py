@@ -11,28 +11,23 @@ def pkg_dir() -> Path:
     return Path(os.path.dirname(os.path.realpath(__file__)))
 
 
-ENSO_REPO = "enso-org/enso"
-BENCH_REPO = "enso-org/engine-benchmark-results"
+ENSO_REPO = "jdunkerley/enso"
 BRANCH_DEVELOP = "develop"
 DATE_FORMAT = "%Y-%m-%d"
 GH_DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-ENGINE_BENCH_WORKFLOW_ID = 67075764
+ENGINE_BENCH_WORKFLOW_ID = 269071669
 """
-Workflow ID of engine benchmarks, got via `gh api 
-'/repos/enso-org/enso/actions/workflows'`.
-The name of the workflow is 'Benchmark Engine'.
-This workflow was created at 2023-08-22.
-There is an older workflow with the same name, but it is not used anymore, with
-the ID 29450898
+Workflow ID of engine benchmarks (`.github/workflows/engine-benchmark.yml`, named
+'Benchmark Engine'), got via `gh api '/repos/jdunkerley/enso/actions/workflows'`.
 """
-STDLIBS_BENCH_WORKFLOW_ID = 66661001
+STDLIBS_BENCH_WORKFLOW_ID = 269071692
 """
-Workflow ID of stdlibs benchmarks, got via `gh api 
-'/repos/enso-org/enso/actions/workflows'`.
-The name is 'Benchmark Standard Libraries'
+Workflow ID of stdlibs benchmarks (`.github/workflows/std-libs-benchmark.yml`,
+named 'Benchmark Standard Libraries'), got via
+`gh api '/repos/jdunkerley/enso/actions/workflows'`.
 """
 """ Date format as returned from responses in GH API"""
-ENSO_COMMIT_BASE_URL = "https://github.com/enso-org/enso/commit/"
+ENSO_COMMIT_BASE_URL = "https://github.com/jdunkerley/enso/commit/"
 
 GH_ARTIFACT_RETENTION_PERIOD = timedelta(days=90)
 
