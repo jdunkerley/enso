@@ -21,7 +21,8 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   binary-protocol bindings.
 - `Distribution.scala` + `DistributionPackage.scala` — Produces the engine
   distribution directory layout (matches `distribution/`).
-- `Editions.scala` — Edition-manifest generation.
+- `Editions.scala` — Edition-manifest generation (fills in the versions of
+  `distribution/edition.template.yaml`).
 - `GatherLicenses.scala` — Drives the legal-review report and checks
   (`gatherLicenses`, `verifyLicensePackages`); the dependency list comes from
   each project's coursier `update` report (`src/main/scala/licenses/`, see

@@ -14,6 +14,14 @@ inputs:
       dependencies: a cache entry is never overwritten, so the first job to save one decides its
       contents.
     required: true
+  cache-save:
+    description: >-
+      Whether a job on `develop` saves the cache (`"true"`, the default). A job that only needs what
+      another job with the same `cache-key` saves (it resolves no more than that job does) passes
+      `"false"`, so that it only restores, and the first to finish cannot decide a shared entry's
+      contents with less than the full set.
+    required: false
+    default: "true"
   edition:
     description: >-
       `community` (GraalVM CE, the default) or `oracle` (Oracle GraalVM, at the same version), which
@@ -188,27 +196,47 @@ runs:
           echo "$graalpy"
           grep -qF "$GRAALPY_VERSION" <<< "$graalpy"
         fi
-    - if: github.ref == 'refs/heads/develop'
+    # Note [The sbt Dependency Cache Key]
+    # ====================================
+    # The key hashes only the files that decide which artifacts sbt resolves: `build.sbt`,
+    # `project/*.sbt` (the plugins), `project/Dependencies.scala` and `project/build.properties`
+    # (the sbt version). Not `build-config.yaml` (the toolchain pins change what is installed, not
+    # what is downloaded, and its edits re-keyed the ~830 MB entries; #314) and not the rest of
+    # `project/*.scala` (build logic). An entry is never overwritten, so a stale one is removed by
+    # `prune-caches.yml`.
+    #
+    # The key and the paths are defined once, here, and used by whichever of the two steps below
+    # runs. The cache is saved only by a job on `develop` that has `cache-save` on: a pull request's
+    # cache is invisible to every other ref, so saving it only spends the 10 GB budget.
+    - name: Name the sbt dependency cache
+      id: sbt-cache
+      shell: bash
+      env:
+        KEY_PREFIX: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-
+        KEY_HASH: ${{ hashFiles('build.sbt', 'project/*.sbt', 'project/build.properties', 'project/Dependencies.scala') }}
+      run: |-
+        {
+          echo "prefix=$KEY_PREFIX"
+          echo "key=$KEY_PREFIX$KEY_HASH"
+          echo "path<<EOF"
+          echo "~/.sbt"
+          echo "~/.ivy2/cache"
+          echo "~/.cache/coursier"
+          echo "~/AppData/Local/Coursier/Cache"
+          echo "~/Library/Caches/Coursier"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+    - if: github.ref == 'refs/heads/develop' && inputs.cache-save == 'true'
       name: Cache sbt / Coursier downloads
       uses: actions/cache@v4
       with:
-        key: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-        restore-keys: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-
-        path: |-
-          ~/.sbt
-          ~/.ivy2/cache
-          ~/.cache/coursier
-          ~/AppData/Local/Coursier/Cache
-          ~/Library/Caches/Coursier
-    - if: github.ref != 'refs/heads/develop'
+        key: ${{ steps.sbt-cache.outputs.key }}
+        restore-keys: ${{ steps.sbt-cache.outputs.prefix }}
+        path: ${{ steps.sbt-cache.outputs.path }}
+    - if: github.ref != 'refs/heads/develop' || inputs.cache-save != 'true'
       name: Restore sbt / Coursier downloads
       uses: actions/cache/restore@v4
       with:
-        key: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-${{ hashFiles('**/*.sbt', 'project/build.properties', 'project/plugins.sbt', 'project/Dependencies.scala', 'build-config.yaml') }}
-        restore-keys: sbt-deps-${{ inputs.cache-key }}-${{ runner.os }}-
-        path: |-
-          ~/.sbt
-          ~/.ivy2/cache
-          ~/.cache/coursier
-          ~/AppData/Local/Coursier/Cache
-          ~/Library/Caches/Coursier
+        key: ${{ steps.sbt-cache.outputs.key }}
+        restore-keys: ${{ steps.sbt-cache.outputs.prefix }}
+        path: ${{ steps.sbt-cache.outputs.path }}
