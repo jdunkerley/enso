@@ -21,6 +21,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.enso.ydoc.polyfill.Arguments;
 import org.graalvm.polyglot.Value;
@@ -208,7 +209,9 @@ final class WebSocket implements ProxyExecutable {
         if (session != null) {
           try {
             session.terminate();
-          } catch (IllegalStateException socketClosed) {
+          } catch (IllegalStateException | UncheckedIOException socketClosed) {
+            // The peer already closed the socket (#409). Like `WebSocket.close()` in browsers and
+            // Node, closing a closed socket must not throw.
             connection.onClose(session, WsCloseCodes.CLOSED_ABNORMALLY, SOCKET_CLOSED_REASON);
           }
         }
@@ -226,7 +229,7 @@ final class WebSocket implements ProxyExecutable {
           var reason = reasonArgument == null ? "Close" : reasonArgument;
           try {
             session.close(code, reason);
-          } catch (IllegalStateException socketClosed) {
+          } catch (IllegalStateException | UncheckedIOException socketClosed) {
             connection.onClose(session, WsCloseCodes.CLOSED_ABNORMALLY, SOCKET_CLOSED_REASON);
           }
         }
@@ -273,6 +276,7 @@ final class WebSocket implements ProxyExecutable {
     // Written by Helidon's thread in `onOpen`, read by the executor's.
     private volatile WsSession session;
     private final List<byte[]> fragments = new ArrayList<>();
+    private final AtomicBoolean closeDispatched = new AtomicBoolean();
 
     private WebSocketConnection(
         ScheduledExecutorService executor,
@@ -370,14 +374,22 @@ final class WebSocket implements ProxyExecutable {
       log.debug(
           "onClose [this={}, session={}, status={}, reason={}]", this, session, status, reason);
 
-      handleCallback(() -> handleClose.executeVoid(status, reason));
+      // Helidon reports the close, and `close()` on a socket that is already closed reports it
+      // too; JS must see one `close` event.
+      if (closeDispatched.compareAndSet(false, true)) {
+        handleCallback(() -> handleClose.executeVoid(status, reason));
+      }
     }
 
     @Override
     public void onError(WsSession session, Throwable t) {
       log.error("onError [this={}, session={}]", this, session, t);
 
-      session.close(WsCloseCodes.CLOSED_ABNORMALLY, SOCKET_CLOSED_REASON);
+      try {
+        session.close(WsCloseCodes.CLOSED_ABNORMALLY, SOCKET_CLOSED_REASON);
+      } catch (IllegalStateException | UncheckedIOException socketClosed) {
+        log.debug("Socket already closed in onError", socketClosed);
+      }
 
       handleCallback(() -> handleError.executeVoid(t.getMessage()));
     }

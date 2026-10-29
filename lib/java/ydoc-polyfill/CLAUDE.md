@@ -42,3 +42,9 @@ fails on the old code without any extra load (a few of 100 connections lose
 their first message). The same race through the real bundle (a `YdocTest`-style
 open/close loop in `ydoc-server`) only showed up under CPU load: 7 of 200
 sockets on a 32-core machine with 40 busy processes, none when idle.
+
+`close()` on a socket the peer already closed must not throw, and JS sees one
+`close` event however many times Helidon and the fallback path report it (#409).
+The WebSocket tests take their locks from `TimedLock` (10 s, then fail) and
+their ports from `TimedLock.freePort()`, so a missed handler fails a test
+instead of hanging the job.

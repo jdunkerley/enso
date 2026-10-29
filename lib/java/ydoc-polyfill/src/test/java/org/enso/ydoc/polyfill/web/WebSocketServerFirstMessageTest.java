@@ -24,7 +24,7 @@ import org.junit.Test;
  */
 public class WebSocketServerFirstMessageTest extends ExecutorSetup {
 
-  private static final int PORT = 33446;
+  private int port;
   private static final int CONNECTIONS = 100;
 
   private Context context;
@@ -32,6 +32,7 @@ public class WebSocketServerFirstMessageTest extends ExecutorSetup {
   @Before
   public void setup() throws Exception {
     super.setup();
+    port = TimedLock.freePort();
 
     var hostAccess =
         WebEnvironment.defaultHostAccess
@@ -71,7 +72,7 @@ public class WebSocketServerFirstMessageTest extends ExecutorSetup {
         };
         wss.start();
         """
-            .formatted(PORT);
+            .formatted(port);
     context.getBindings("js").putMember("sendErrors", sendErrors);
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
@@ -79,7 +80,7 @@ public class WebSocketServerFirstMessageTest extends ExecutorSetup {
     var missed = new ArrayList<Integer>();
     for (var i = 0; i < CONNECTIONS; i++) {
       var listener = new FirstMessageListener();
-      client.connect("ws://localhost:" + PORT + "/doc-" + i, listener);
+      client.connect("ws://localhost:" + port + "/doc-" + i, listener);
       try {
         listener.firstMessage.get(5, TimeUnit.SECONDS);
       } catch (java.util.concurrent.TimeoutException e) {

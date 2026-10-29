@@ -3,7 +3,6 @@ package org.enso.ydoc.polyfill.web;
 import io.helidon.webclient.websocket.WsClient;
 import io.helidon.websocket.WsListener;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import org.enso.ydoc.polyfill.ExecutorSetup;
 import org.graalvm.polyglot.Context;
@@ -26,7 +25,7 @@ public class WebSocketServerTest extends ExecutorSetup {
         WebEnvironment.defaultHostAccess
             .allowAccess(
                 AtomicReferenceArray.class.getDeclaredMethod("set", int.class, Object.class))
-            .allowAccess(Semaphore.class.getDeclaredMethod("release"))
+            .allowAccess(TimedLock.class.getDeclaredMethod("release"))
             .build();
     var contextBuilder = WebEnvironment.createContext(hostAccess);
 
@@ -49,7 +48,8 @@ public class WebSocketServerTest extends ExecutorSetup {
 
   @Test
   public void webSocketServer() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
+    var port = TimedLock.freePort();
     var res = new AtomicReferenceArray<>(new Object[3]);
 
     var code =
@@ -61,21 +61,22 @@ public class WebSocketServerTest extends ExecutorSetup {
             lock.release();
         }
 
-        let wss = new WebSocketServer({host: 'localhost', port: 33445});
+        let wss = new WebSocketServer({host: 'localhost', port: port});
         wss.onconnect = onconnect;
 
         wss.start();
         """;
 
     context.getBindings("js").putMember("lock", lock);
+    context.getBindings("js").putMember("port", port);
     context.getBindings("js").putMember("res", res);
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
     var ws = WsClient.builder().build();
-    ws.connect("ws://localhost:33445/hello?foo=bar", new TestWsListener());
+    ws.connect("ws://localhost:" + port + "/hello?foo=bar", new TestWsListener());
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertTrue((boolean) res.get(0));
     Assert.assertEquals("/hello", res.get(1));
