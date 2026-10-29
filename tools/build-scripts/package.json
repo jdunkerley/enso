@@ -11,6 +11,7 @@
     "ide-build": "node src/commands/ide-build.ts",
     "ide-local": "node src/commands/ide-local.ts",
     "stdlib-test": "node src/commands/stdlib-test.ts",
+    "stdlib-test-plan": "node src/commands/stdlib-test-plan.ts",
     "junit-compare": "node src/commands/junit-compare.ts",
     "release": "node src/commands/release.ts",
     "test:unit": "vitest run",
