@@ -22,7 +22,14 @@ class FakeChildProcess extends EventEmitter {
     return true
   }
 
+  /** The process exits and its stdio streams end (the usual order: 'close' follows 'exit'). */
   simulateExit(code: number | null, signal: NodeJS.Signals | null = null): void {
+    this.simulateExitBeforeDrain(code, signal)
+    this.emit('close', code, signal)
+  }
+
+  /** The process has exited, but its stdio streams have not ended yet. */
+  simulateExitBeforeDrain(code: number | null, signal: NodeJS.Signals | null = null): void {
     this.emit('exit', code, signal)
   }
 
@@ -176,6 +183,43 @@ describe('ChildProcessHandle', () => {
   })
 })
 
+describe('ChildProcessHandle.waitForDrain', () => {
+  test('waits for the streams to end after the exit', async () => {
+    const fake = new FakeChildProcess()
+    const handle = new ChildProcessHandle(asChild(fake))
+    fake.simulateExitBeforeDrain(1)
+    let drained = false
+    void handle.waitForDrain().then(() => (drained = true))
+    await flush()
+    expect(drained).toBe(false)
+    fake.emit('close', 1, null)
+    await flush()
+    expect(drained).toBe(true)
+  })
+
+  test('gives up after the timeout when the streams never end', async () => {
+    const fake = new FakeChildProcess()
+    const handle = new ChildProcessHandle(asChild(fake))
+    fake.simulateExitBeforeDrain(1)
+    let drained = false
+    void handle.waitForDrain(500).then(() => (drained = true))
+    await vi.advanceTimersByTimeAsync(499)
+    expect(drained).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(drained).toBe(true)
+  })
+
+  test('does not wait for the streams of a child that failed to spawn', async () => {
+    const fake = new FakeChildProcess()
+    const handle = new ChildProcessHandle(asChild(fake))
+    fake.simulateError(enoent())
+    let drained = false
+    void handle.waitForDrain().then(() => (drained = true))
+    await flush()
+    expect(drained).toBe(true)
+  })
+})
+
 describe('WatchedChildProcess', () => {
   type SpawnerControl = {
     spawner: () => ChildProcess
@@ -290,6 +334,25 @@ describe('WatchedChildProcess', () => {
       exitError: null,
     })
     expect(watcher.respawnSuspended).toBe(false)
+    await teardown(watcher, ctrl.fakes)
+  })
+
+  test("does not respawn before the exited child's output has drained", async () => {
+    const ctrl = makeSpawner()
+    const events: string[] = []
+    const watcher = new WatchedChildProcess(ctrl.spawner, {
+      onChildStarted: () => void events.push('started'),
+      onUnexpectedExit: () => void events.push('exit'),
+    })
+    await watcher.firstSpawn
+    const fake = ctrl.fakes[0]!
+    fake.simulateExitBeforeDrain(1)
+    await flush()
+    expect(ctrl.fakes).toHaveLength(1)
+    events.push('last output')
+    fake.emit('close', 1, null)
+    await flush()
+    expect(events).toEqual(['started', 'last output', 'exit', 'started'])
     await teardown(watcher, ctrl.fakes)
   })
 

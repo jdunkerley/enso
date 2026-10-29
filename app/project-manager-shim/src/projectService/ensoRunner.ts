@@ -349,10 +349,12 @@ class OpenedProject {
         clearTimeout(killTimeout)
       }
       console.log('Language server process of', this.path, 'exited')
-      return
+    } else {
+      // No stdin to write to — fall back to SIGTERM with SIGKILL after timeout.
+      await handle.terminate({ timeoutMs: TERMINATE_TIMEOUT_MS })
     }
-    // No stdin to write to — fall back to SIGTERM with SIGKILL after timeout.
-    await handle.terminate({ timeoutMs: TERMINATE_TIMEOUT_MS })
+    // Its last stderr may still be in the pipe at the exit: the log must not end before it.
+    await handle.waitForDrain()
   }
 
   // Health check function
