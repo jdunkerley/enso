@@ -1,5 +1,4 @@
-# Hand-written. Runs the Standard Library benchmarks when started by hand; `bench-upload.yml`
-# publishes the results when a run completes (it keys on this workflow's name). Calls sbt directly:
+# Hand-written. Runs the Standard Library benchmarks when started by hand. Calls sbt directly:
 # see Note [Benchmarks Call sbt Directly] in `engine-benchmark.yml`.
 
 name: Benchmark Standard Libraries
