@@ -1,6 +1,9 @@
 package org.enso.editions.updater
 
-import org.enso.librarymanager.test.published.repository.ExampleRepository
+import org.enso.librarymanager.test.published.repository.{
+  DummyRepository,
+  ExampleRepository
+}
 import org.enso.semver.SemVer
 import org.enso.testkit.WithTemporaryDirectory
 import org.scalatest.Inside
@@ -16,7 +19,7 @@ class UpdatingEditionProviderTest
     with WithTemporaryDirectory {
 
   val repo      = new ExampleRepository(Path.of("."))
-  def port: Int = 47309
+  val port: Int = DummyRepository.freePort()
   def repoPath  = getTestDirectory.resolve("repo")
   def cachePath = getTestDirectory.resolve("cache")
 

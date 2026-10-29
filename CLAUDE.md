@@ -298,17 +298,21 @@ has silently produced a wrong result here:
     --no-ir-caches --run "$PWD/DuckDB_Tests"
   ```
 
-- **`LibraryUploadTest` fails intermittently on Windows with
-  `HTTPException: Server responded with: [java.net.ConnectException]`, and it is
-  a harness race, not your change.** `DummyRepository.startServer` decides the
-  Node `tools/simple-library-server` is ready by waiting for it to print
-  `Serving the repository` on stdout — which it does before the socket starts
-  accepting. Its `withRetries` wrapper retries the process _spawn_, not the
-  connection, so it does not cover this. The tell is that the log contains both
-  `Serving the repository … on port 47305` _and_ the `ConnectException`, and
-  that `LibraryDownloadTest` on the next port passes. Re-run the job to confirm
-  before investigating anything else; one failing test in an hour-long
-  `JVM Tests (windows)` run is the shape to look for.
+- **The library-repository tests (`LibraryUploadTest`, `LibraryDownloadTest`,
+  `LibrariesTest`, `UpdatingEditionProviderTest`, `EditionManagerTest`) no
+  longer use fixed ports or race the server's startup.** They take a free port
+  from `DummyRepository.freePort()` (ask the OS for port 0, release it, hand it
+  to the Node `tools/simple-library-server`), so `EADDRINUSE` from a leftover
+  server or a concurrent run is gone. `tools/simple-library-server` logs
+  `Serving the repository` only from the `listen` callback, and
+  `DummyRepository.startServer` additionally connects to the port
+  (`waitUntilAccepting`) before it returns, so the old
+  `HTTPException: … ConnectException` flake (the log said `Serving` before the
+  socket accepted) cannot recur. What remains is a tiny window between
+  `freePort()` releasing the port and Node binding it; if you ever see
+  `EADDRINUSE` again, that is it, and the fix is to let the server bind port 0
+  and report the port, which needs the tests to build their URLs after the
+  server starts.
 
 ## Cross-cutting gotchas
 

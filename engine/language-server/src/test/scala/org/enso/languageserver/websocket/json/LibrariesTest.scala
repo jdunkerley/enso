@@ -12,6 +12,7 @@ import org.enso.languageserver.runtime.TestComponentGroups
 import org.enso.librarymanager.published.bundles.LocalReadOnlyRepository
 import org.enso.librarymanager.published.repository.LibraryManifest
 import org.enso.librarymanager.test.published.repository.{
+  DummyRepository,
   EmptyRepository,
   ExampleRepository
 }
@@ -25,7 +26,7 @@ import java.nio.file.Path
 import scala.concurrent.duration._
 
 class LibrariesTest extends BaseServerTest with ReportLogsOnFailure {
-  private val libraryRepositoryPort: Int = 47308
+  private val libraryRepositoryPort: Int = DummyRepository.freePort()
   private val defaultTimeout             = 30.seconds
 
   private val exampleRepo = new ExampleRepository(

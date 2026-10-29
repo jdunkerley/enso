@@ -2,7 +2,10 @@ package org.enso.editions.updater
 
 import org.enso.distribution.{DistributionManager, Environment}
 import org.enso.distribution.config.GlobalConfigurationManager
-import org.enso.librarymanager.test.published.repository.ExampleRepository
+import org.enso.librarymanager.test.published.repository.{
+  DummyRepository,
+  ExampleRepository
+}
 import org.enso.testkit.WithTemporaryDirectory
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
@@ -15,7 +18,7 @@ class EditionManagerTest
     with WithTemporaryDirectory {
 
   val repo      = new ExampleRepository(Path.of("."))
-  def port: Int = 47310
+  val port: Int = DummyRepository.freePort()
   def repoPath  = getTestDirectory.resolve("repo")
 
   /** A distribution inside the test directory whose global config points the

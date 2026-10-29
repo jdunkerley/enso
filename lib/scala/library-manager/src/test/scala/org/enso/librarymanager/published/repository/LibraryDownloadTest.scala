@@ -4,6 +4,7 @@ import org.enso.editions.Editions
 import org.enso.librarymanager.published.cache.DownloadingLibraryCache
 import org.enso.librarymanager.test.published.repository.{
   DownloaderTest,
+  DummyRepository,
   ExampleRepository
 }
 import org.enso.pkg.PackageManager
@@ -23,7 +24,7 @@ class LibraryDownloadTest
     with DownloaderTest
     with RetrySpec {
 
-  val port: Int = 47306
+  val port: Int = DummyRepository.freePort()
 
   "DownloadingLibraryCache" should {
     "be able to download and install libraries from a repository" taggedAs Retry in {
