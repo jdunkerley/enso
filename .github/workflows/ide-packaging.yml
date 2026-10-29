@@ -11,7 +11,21 @@ on:
         required: false
         type: boolean
         default: false
-  workflow_call: {}
+      build_backend:
+        description: >-
+          Build the backend. When false, the packaging uses the backend of the newest develop run
+          whose commit is an ancestor of the commit being packaged.
+        required: false
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      build_backend:
+        description: >-
+          Build the backend. When false (a PR that changes no engine file), the packaging uses the
+          backend of the newest develop run whose commit is an ancestor of the commit being packaged (the PR's merge commit).
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-ide-packaging
@@ -33,6 +47,19 @@ env:
 # The Linux legs wait for the slower Windows ones, which does not lengthen the run: the Windows legs
 # are its longest path.
 
+# Note [Reusing Develop's Backend]
+# ==================================
+# A pull request that changes no engine file packages the IDE with the backend that develop already
+# built, instead of rebuilding it (`build_backend` is false; `ide-pull-request.yml` decides).
+# `find-backend` picks the newest develop run whose `backend-linux` artifact is unexpired, whose
+# commit is an ancestor of the commit being packaged (`github.sha`: on a pull request its merge
+# commit, which `package-ide` checks out, so the backend is never newer than the GUI), which is a run
+# of this repository (not a fork's branch named `develop`), and which also has `backend-windows`.
+# The search reaches back only as far as the first 100 `backend-linux` artifacts (any branch) and the
+# first 30 develop candidates among them. `package-ide` downloads from that run. `build_backend` is declared on
+# `workflow_dispatch` too, with a default: an undeclared input is null, and in an expression
+# `null == false` is true (both coerce to 0), which would skip the build on a hand-started run.
+
 jobs:
   # Note [The Engine Bundle]
   # ========================
@@ -46,6 +73,8 @@ jobs:
   # calls at once (Note [Install The Rust Toolchain Before sbt] in `.github/actions/setup-jvm`).
   build-backend:
     name: Build Backend (${{ matrix.os }}, amd64)
+    # `!= false`, not `== true`: see Note [Reusing Develop's Backend].
+    if: ${{ inputs.build_backend != false }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -107,6 +136,38 @@ jobs:
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean
+
+  find-backend:
+    name: Find develop's backend
+    # See Note [Reusing Develop's Backend].
+    if: ${{ inputs.build_backend == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      run-id: ${{ steps.find.outputs.run-id }}
+    steps:
+      - id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          candidates=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name=backend-linux -f per_page=100 \
+            --jq '[.artifacts[] | select(.expired | not) | select(.workflow_run.head_branch == "develop" and .workflow_run.head_repository_id == .workflow_run.repository_id)
+                   | "\(.workflow_run.id) \(.workflow_run.head_sha)"] | .[:30] | .[]')
+          while read -r run_id sha; do
+            [ -n "$run_id" ] || continue
+            status=$(gh api "repos/$REPO/compare/$sha...$HEAD_SHA" --jq .status)
+            case "$status" in ahead|identical) ;; *) continue ;; esac
+            windows=$(gh api "repos/$REPO/actions/runs/$run_id/artifacts" \
+              --jq '[.artifacts[] | select(.name == "backend-windows" and (.expired | not))] | length')
+            [ "$windows" -ge 1 ] || continue
+            echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+            echo "Backend not built: no engine files changed. Using develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          done <<< "$candidates"
+          echo "::error::No develop backend whose commit is an ancestor of $HEAD_SHA (the commit being packaged). Merge develop into the branch, or add the 'CI: Build IDE' label to build one."
+          exit 1
 
   gui-build:
     name: GUI build (linux, amd64)
@@ -174,9 +235,10 @@ jobs:
   # variables (a fork has no certificate). electron-builder writes the installer's `.sha256` itself.
   package-ide:
     name: Package New IDE (${{ matrix.os }}, amd64)
-    needs: [build-backend, gui-build]
-    # See Note [Platform Legs Run Despite The Other Platform's Failure].
-    if: ${{ !cancelled() && needs.gui-build.result == 'success' }}
+    needs: [build-backend, find-backend, gui-build]
+    # See Note [Platform Legs Run Despite The Other Platform's Failure]. `find-backend` is skipped
+    # when the backend is built; when it ran and failed, there is no backend to package.
+    if: ${{ !cancelled() && needs.gui-build.result == 'success' && needs.find-backend.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -204,6 +266,9 @@ jobs:
         with:
           name: backend-${{ matrix.os }}
           path: dist/backend
+          # develop's run when `find-backend` ran, otherwise this one.
+          run-id: ${{ needs.find-backend.outputs.run-id || github.run_id }}
+          github-token: ${{ github.token }}
       - run: |-
           tar -xvf dist/backend/backend.tar -C dist/backend
           rm dist/backend/backend.tar

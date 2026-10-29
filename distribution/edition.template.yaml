@@ -1,74 +1,76 @@
 # This file is a template and should not be used directly.
 # The processing replaces placeholders in double brackets with actual values.
 #
-# See [editions.md](https://github.com/enso-org/enso/blob/87ce78615afecb8bd8d586c798c97ab5e28083cd/docs/libraries/editions.md)
+# See [Libraries-Editions](https://github.com/jdunkerley/enso/wiki/Libraries-Editions)
 # for the description of its contents.
 #
 # === Library upload ===
 # Some libraries may be uploaded during the (nightly) release.
 # Such libraries need to have an associated repository with URL with `jar` scheme.
-# See [sharing.md](https://github.com/enso-org/enso/blob/87ce78615afecb8bd8d586c798c97ab5e28083cd/docs/libraries/sharing.md)
+# See [Libraries-Sharing](https://github.com/jdunkerley/enso/wiki/Libraries-Sharing)
+#
+# The `release` repository is this fork's GitHub release. The release workflow
+# does not publish the zip yet; libraries that are not bundled with the engine
+# will be resolved from it.
 #
 
 engine-version: {{ENGINE_VERSION}}
 repositories:
-  - name: main
-    url: 'https://libraries.release.enso.org/libraries'
-  - name: std_image_repo.zip
-    url: 'jar:https://github.com/enso-org/enso/releases/download/{{ENGINE_VERSION}}/std_image_repo.zip!/'
+  - name: release
+    url: 'jar:https://github.com/jdunkerley/enso/releases/download/{{ENGINE_VERSION}}/std_image_repo.zip!/'
 
 libraries:
   - name: Standard.Base
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Test
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Table
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Database
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.AWS
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Geo
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Visualization
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Examples
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Searcher
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Generic_JDBC
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Google
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Google_Api
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Snowflake
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Microsoft
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Tableau
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Saas
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.DuckDB
-    repository: main
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Image
-    repository: std_image_repo.zip
+    repository: release
     version: {{LIBS_VERSION}}

@@ -95,6 +95,13 @@ class EditionUpdater(cachePath: Path, sources: Seq[String]) {
     }
 
   private def fetchManifests(): Try[Seq[(URIBuilder, Manifest)]] = Try {
+    if (sources.isEmpty) {
+      logger.info(
+        "No edition providers are configured, so no editions are downloaded. " +
+        "Add a URL under `edition-providers` in the global configuration to " +
+        "enable downloading."
+      )
+    }
     for {
       source <- sources
       repositoryRoot <- Try { URIBuilder.fromUri(source) }.recoverWith {

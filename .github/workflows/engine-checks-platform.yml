@@ -454,7 +454,8 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: stdlib-tests
+          cache-key: engine
+          cache-save: "false"
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           graalpy: "true"
           rust: "true"
@@ -560,7 +561,8 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: stdlib-tests
+          cache-key: engine
+          cache-save: "false"
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           graalpy: "true"
           rust: "true"

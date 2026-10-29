@@ -25,6 +25,22 @@ Library versions and supported engine versions are grouped into **editions**
 The edition template in this directory is the source of truth for the layout a
 release artifact produces.
 
+The fork runs no upstream library repository or edition provider, so nothing in
+the template points at enso-org. Every library entry names the one repository,
+`release`: a `jar:` URL for `std_image_repo.zip` on the fork's GitHub release.
+It is the future home of libraries that are not bundled with the engine (the
+build uploads only the libraries in `uploadedLibraries` in
+`project/Editions.scala`, today just `Standard.Image`, see `librariesToUpload`
+in `build.sbt`; the library-system work decides the rest). Nothing is uploaded
+yet: the release workflow does not publish the zip, so a library that is not
+bundled fails as not found. The engine looks bundled libraries (everything in
+`lib/Standard` today) up in its own distribution before it consults the
+repository. `repository: local` cannot name a bundled library: it resolves only
+the user's local library roots, not the engine's `lib/`. Source archives
+(`main.tgz`) are created for the uploaded libraries only: one, about 51 MB.
+Adding a library to the set adds its archive to every bundle (the other thirteen
+non-core libraries would add about 190 MB).
+
 ## Changing the standard library
 
 Most changes land in `lib/Standard/<Module>/0.0.0-dev/src/` (Enso) paired with

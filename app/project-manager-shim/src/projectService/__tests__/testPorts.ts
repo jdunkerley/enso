@@ -16,7 +16,11 @@ import * as crypto from 'node:crypto'
 const BAND_SIZE = 3_000
 /** Room left at the top of a band for the search to step past ports already in use. */
 const BAND_HEADROOM = 100
-const FIRST_BAND_START = 20_000
+/**
+ * Low enough that six bands end at 30,000, below the default and the ephemeral ranges. A seventh
+ * band needs this lowered again (or the bands narrowed).
+ */
+const FIRST_BAND_START = 12_000
 
 /** A random start port inside band `band`. */
 function randomPortInBand(band: number): number {
@@ -34,3 +38,5 @@ export const STARTUP_CRASH_PORT = randomPortInBand(2)
 export const STDIN_CLOSED_PORT = randomPortInBand(3)
 /** `respawnClose.test.ts`. */
 export const RESPAWN_CLOSE_PORT = randomPortInBand(4)
+/** `portInUse.test.ts`. */
+export const PORT_IN_USE_PORT = randomPortInBand(5)

@@ -32,6 +32,10 @@ settings. Every workflow is hand-written YAML (build simplification;
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml` — benchmarks,
   started by hand. Their artifacts are the only output: the upstream
   `bench-upload.yml` was removed (#307), as the fork has no results repository.
+- `workflows/prune-caches.yml` — weekly (and by hand, with `dry-run`): deletes
+  the Actions caches of closed PRs, caches not accessed for 7 days, and
+  superseded `sbt-deps-*` / `node-cache-*` entries, with
+  `tools/ci/prune-caches.mjs` (#314). `actions: write` only.
 - `actions/` — composite actions: `setup-node`, `setup-rust`, `setup-jvm`
   (GraalVM CE, or Oracle GraalVM with `edition: oracle`, sbt, optionally `flatc`
   and GraalPy at the `toolchain:` pins in `build-config.yaml` and the
@@ -55,6 +59,12 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **A new workflow or composite action used by the engine checks goes on the
   list in `engine-changed-files.yml`**, or a change to it will not run them.
   `ide-changed-files.yml` already covers all of `.github/**`.
+- **App-only PRs package with develop's backend.** When no engine file changed,
+  `ide-pull-request.yml` passes `build_backend: false` and `ide-packaging.yml`
+  downloads the `backend-<os>` artifacts of the newest develop run whose commit
+  is an ancestor of the commit being packaged, the PR's merge commit
+  (`find-backend`). The `CI: Build IDE` label or any engine change builds the
+  backend instead; develop and releases always do.
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);
@@ -76,8 +86,12 @@ settings. Every workflow is hand-written YAML (build simplification;
   same build share a `cache-key` (`engine` for the engine build, JVM tests, lint
   and the IDE's backend), so that one ~830 MB entry per OS serves them all: the
   repository's Actions cache is capped at 10 GB. Give a distinct key only to
-  jobs that resolve different dependencies. A job whose sbt tasks compile the
-  Rust parser passes `rust: "true"`. Quote `-D` arguments
+  jobs that resolve different dependencies. Only `develop` saves the cache, and
+  a job that merely reuses another's passes `cache-save: "false"` (formatting,
+  enso4igv and the stdlib tests restore the `engine` entry). The key hashes only
+  `build.sbt`, `project/*.sbt`, `project/Dependencies.scala` and
+  `project/build.properties` (Note [The sbt Dependency Cache Key]). A job whose
+  sbt tasks compile the Rust parser passes `rust: "true"`. Quote `-D` arguments
   (`sbt "-Dsbt.server.autostart=false" …`): on Windows, PowerShell splits an
   unquoted one at its first dot. `tools/ci/check-workflows.mjs` fails a job that
   runs `sbt` before `setup-jvm`, and fails `build-config.yaml`'s pins if they
@@ -109,6 +123,7 @@ Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 | `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | `setup-jvm` (GraalPy), `setup-build-scripts`     |
 | `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | —                                                |
 | `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `ide-packaging.yml` › Find develop's backend             | `gh api` (artifact list, compare); no build                                                                | —                                                |
 | `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | `setup-build-scripts`                            |
 | `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `promote.yml`                                            | `release promote <designator>`                                                                             | `setup-build-scripts`                            |
