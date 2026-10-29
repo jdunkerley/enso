@@ -55,8 +55,6 @@ object FileManagerConfig {
     )
 }
 
-case class AICompletionConfig(apiKey: String)
-
 /** Configuration of the execution context.
   *
   * @param requestTimeout timeout of requests to the engine
@@ -135,8 +133,7 @@ case class Config(
   executionContext: ExecutionContextConfig,
   directories: ProjectDirectoriesConfig,
   profiling: ProfilingConfig,
-  startup: StartupConfig,
-  aiCompletionConfig: Option[AICompletionConfig]
+  startup: StartupConfig
 ) extends ToLogString {
 
   /** @inheritdoc */

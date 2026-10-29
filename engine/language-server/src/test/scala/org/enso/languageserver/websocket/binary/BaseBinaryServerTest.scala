@@ -51,8 +51,7 @@ abstract class BaseBinaryServerTest extends BinaryServerTestKit {
     ExecutionContextConfig(requestTimeout = 3.seconds),
     ProjectDirectoriesConfig.initialize(testContentRoot.file),
     ProfilingConfig.none(),
-    StartupConfig(),
-    None
+    StartupConfig()
   )
 
   var threadPool: ExecutorService = _

@@ -94,8 +94,7 @@ class RepoInitializationSpec
       ExecutionContextConfig(requestTimeout = 3.seconds.dilated),
       ProjectDirectoriesConfig.initialize(root.file),
       ProfilingConfig.none(),
-      StartupConfig(),
-      None
+      StartupConfig()
     )
   }
 

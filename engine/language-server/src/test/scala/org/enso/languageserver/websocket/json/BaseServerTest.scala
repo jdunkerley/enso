@@ -114,8 +114,7 @@ abstract class BaseServerTest
       ExecutionContextConfig(requestTimeout = 3.seconds),
       ProjectDirectoriesConfig(testContentRoot.file),
       ProfilingConfig.none(),
-      StartupConfig(),
-      None
+      StartupConfig()
     )
 
   override def protocolFactory: ProtocolFactory =
