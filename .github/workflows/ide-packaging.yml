@@ -49,8 +49,12 @@ env:
 
 # Note [Reusing Develop's Backend]
 # ==================================
-# A pull request that changes no engine file packages the IDE with the backend that develop already
-# built, instead of rebuilding it (`build_backend` is false; `ide-pull-request.yml` decides).
+# A pull request to develop packages the IDE with the backend that develop already built, instead of
+# rebuilding it (`build_backend` is false; `ide-pull-request.yml` decides), unless it changes an
+# engine file (`engine-changed-files.yml`), a file the backend build reads outside the engine paths
+# (`backend_changed` in `ide-changed-files.yml`: the ydoc server and its workspace dependencies, the
+# manifests, and this file), or carries the `CI: Build IDE` label. A pull request to any other base
+# (stacked on another branch) always builds it, as develop's backend may lack the base's changes.
 # `find-backend` picks the newest develop run whose `backend-linux` artifact is unexpired, whose
 # commit is an ancestor of the commit being packaged (`github.sha`: on a pull request its merge
 # commit, which `package-ide` checks out, so the backend is never newer than the GUI), which is a run
@@ -162,13 +166,16 @@ jobs:
                    | "\(.workflow_run.id) \(.workflow_run.head_sha)"] | .[:30] | .[]')
           while read -r run_id sha; do
             [ -n "$run_id" ] || continue
-            status=$(gh api "repos/$REPO/compare/$sha...$HEAD_SHA" --jq .status)
+            # Only pull-request runs of the IDE workflow build a backend (release.yml also runs on develop).
+            path=$(gh api "repos/$REPO/actions/runs/$run_id" --jq .path) || continue
+            [ "$path" = ".github/workflows/ide-pull-request.yml" ] || continue
+            status=$(gh api "repos/$REPO/compare/$sha...$HEAD_SHA" --jq .status) || continue
             case "$status" in ahead|identical) ;; *) continue ;; esac
             windows=$(gh api "repos/$REPO/actions/runs/$run_id/artifacts" \
-              --jq '[.artifacts[] | select(.name == "backend-windows" and (.expired | not))] | length')
+              --jq '[.artifacts[] | select(.name == "backend-windows" and (.expired | not))] | length') || continue
             [ "$windows" -ge 1 ] || continue
             echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
-            echo "Backend not built: no engine files changed. Using develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
+            echo "Backend not built: no engine or ydoc server files changed. Using develop run [$run_id](https://github.com/$REPO/actions/runs/$run_id) at \`$sha\`." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           done <<< "$candidates"
           echo "::error::No develop backend whose commit is an ancestor of $HEAD_SHA (the commit being packaged). Merge develop into the branch, or add the 'CI: Build IDE' label to build one."

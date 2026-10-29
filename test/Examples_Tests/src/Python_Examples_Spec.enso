@@ -37,7 +37,7 @@ setup_venv dir =
 
 
 install_num_py dir =
-    res = Process.run (dir/"bin"/"graalpy").to_text [ "-m", "pip", "install", "numpy" ]
+    res = Process.run (dir/"bin"/"graalpy").to_text [ "-m", "pip", "install", "numpy==2.2.6" ]
     IO.println res.stdout
     IO.println res.stderr
     res.exit_code . should_equal Exit_Code.Success
