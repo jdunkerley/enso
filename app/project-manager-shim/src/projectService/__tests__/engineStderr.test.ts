@@ -15,6 +15,7 @@ import { ENGINE_STDERR_PORT } from './testPorts.js'
 
 const FAKE_ENSO = `
 import * as fs from 'node:fs'
+import * as childProcess from 'node:child_process'
 import * as http from 'node:http'
 const args = process.argv.slice(2)
 const value = (flag) => args[args.indexOf(flag) + 1]
@@ -33,6 +34,13 @@ const crash = setInterval(() => {
     fs.rmSync(project + '.crash')
     clearInterval(crash)
     process.stderr.write('crashing now\\n')
+    if (fs.existsSync(project + '.late')) {
+      // A grandchild holding the stderr pipe: the engine exits before its last output is read.
+      const code = 'setTimeout(() => process.stderr.write("late output" + String.fromCharCode(10)), 400)'
+      childProcess
+        .spawn(process.execPath, ['-e', code], { stdio: ['ignore', 'ignore', 'inherit'], windowsHide: true, detached: true })
+        .unref()
+    }
     process.exit(3)
   }
 }, 20)
@@ -117,4 +125,35 @@ test("the engine's stderr reaches the sink and this process's stderr, start by s
     await runner.closeProject(project)
   }
   expect(calls.at(-1)).toBe('closed')
+}, 45_000)
+
+test("an engine's last output, still in the pipe when it exits, comes before the next start", async () => {
+  vi.spyOn(process.stderr, 'write').mockImplementation((() => true) as typeof process.stderr.write)
+  const events: string[] = []
+  const sink: EngineLogSink = {
+    engineStarted: () => void events.push('started'),
+    engineStderr: (chunk) => {
+      for (const line of chunk.toString('utf8').split(/\r?\n/)) if (line) events.push(line)
+    },
+    projectClosed: () => void events.push('closed'),
+  }
+  const project = Path(path.join(root, 'Project'))
+  try {
+    await runner.openProject(project, 'id', undefined, undefined, sink)
+    await vi.waitFor(() => expect(events).toContain('engine 1 started'), { timeout: 15_000 })
+    await fs.writeFile(`${project}.late`, '')
+    await fs.writeFile(`${project}.crash`, '')
+    await vi.waitFor(() => expect(events).toContain('engine 2 started'), { timeout: 15_000 })
+    expect(events).toEqual([
+      'started',
+      'engine 1 started',
+      'crashing now',
+      'late output',
+      'started',
+      'engine 2 started',
+    ])
+  } finally {
+    vi.restoreAllMocks()
+    await runner.closeProject(project)
+  }
 }, 45_000)
