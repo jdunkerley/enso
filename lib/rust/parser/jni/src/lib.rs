@@ -203,6 +203,30 @@ pub extern "system" fn Java_org_enso_syntax2_Parser_isNumericLiteral(
     enso_parser::queries::is_numeric_literal(&parser, input).into()
 }
 
+/// The XXH3-128 digest of the input bytes, in the format of `hash-wasm`'s `xxhash128`. See
+/// [`xx_hash_128_hex`].
+///
+/// # Safety
+///
+/// The input MUST be a direct-allocated buffer. Its contents may be any bytes.
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_org_enso_syntax2_Parser_xxHash128(
+    env: JNIEnv,
+    _class: JClass,
+    input: JByteBuffer,
+) -> jstring {
+    let input = unsafe { direct_buffer_bytes(&env, &input) };
+    env.new_string(xx_hash_128_hex(input)).unwrap().into_raw()
+}
+
+/// The XXH3-128 digest (seed 0) of `input` in the format of `hash-wasm`'s `xxhash128`, which the
+/// GUI uses (`app/ydoc-shared/src/ast/ffi.ts`): 32 lowercase hex digits of the canonical
+/// (big-endian) form, high 64 bits first.
+fn xx_hash_128_hex(input: &[u8]) -> String {
+    format!("{:032x}", twox_hash::XxHash3_128::oneshot(input))
+}
+
 /// Return the `base` parameter to pass to the `Message` class along with the other output of the
 /// most recent call to `parseInput`.
 ///
@@ -357,11 +381,19 @@ unsafe fn decode_utf8_unchecked(input: &[u8]) -> &str {
 /// The input buffer contents MUST be valid UTF-8.
 #[allow(unsafe_code)]
 unsafe fn decode_utf8_buffer<'a>(env: &JNIEnv, buffer: &'a JByteBuffer) -> &'a str {
+    unsafe { decode_utf8_unchecked(direct_buffer_bytes(env, buffer)) }
+}
+
+/// # Safety
+///
+/// The buffer MUST be direct-allocated, and MUST NOT be modified or freed while the returned slice
+/// is in use.
+#[allow(unsafe_code)]
+unsafe fn direct_buffer_bytes<'a>(env: &JNIEnv, buffer: &'a JByteBuffer) -> &'a [u8] {
     unsafe {
         let ptr = env.get_direct_buffer_address(buffer).expect(DIRECT_ALLOCATED);
         let len = env.get_direct_buffer_capacity(buffer).expect(DIRECT_ALLOCATED);
-        let bytes = slice::from_raw_parts(ptr, len);
-        decode_utf8_unchecked(bytes)
+        slice::from_raw_parts(ptr, len)
     }
 }
 
@@ -382,5 +414,32 @@ mod static_trait_check {
         // Require `State` to be `Send`-safe so that in Java it can be deallocated (or potentially
         // reused) by any thread.
         assert_send::<super::State>()
+    }
+}
+
+// =============
+// === Tests ===
+// =============
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Digests produced by `hash-wasm` 4.12.0 (`createXXHash128`), the GUI's implementation. The
+    /// polyfill asserts the same vectors through the JVM in `ParserPolyfillTest`.
+    #[test]
+    fn xx_hash_128_matches_hash_wasm() {
+        let cases: &[(&[u8], &str)] = &[
+            (b"", "99aa06d3014798d86001c324468d497f"),
+            (b"a", "a96faf705af16834e6c632b61e964e1f"),
+            (b"main = 1 + 2", "b3e28b3039d1c052b34614ba4dd10ccd"),
+            ("Größe ñ 日本語".as_bytes(), "33b9ef08583c475755be1135a98833b8"),
+            ("😀👍🏽".as_bytes(), "7d8503939196d2b93fbb407fe858fce7"),
+            (&[b'x'; 129], "e7f1abc92bce4135ae9ec8f29e5baa27"),
+            (&[b'y'; 241], "9542183325e41bab97295e4657a9e196"),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(xx_hash_128_hex(input), *expected, "input: {input:?}");
+        }
     }
 }

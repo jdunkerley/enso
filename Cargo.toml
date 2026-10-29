@@ -58,6 +58,8 @@ syn = { version = "3.0.6", features = [
 	"visit",
 	"visit-mut",
 ] }
+# XXH3-128 for the JVM ydoc server, which must match the GUI's hash-wasm digest (#394).
+twox-hash = { version = "2.1.5", default-features = false, features = ["xxhash3_128"] }
 
 [workspace.lints]
 [workspace.lints.rust]

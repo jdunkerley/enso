@@ -13,6 +13,7 @@ license-file = "../../LICENSE"
 enso-prelude = { path = "../../prelude" }
 enso-parser = { path = "../" }
 jni = "0.21.0"
+twox-hash = { workspace = true }
 
 [lib]
 name = "enso_parser"

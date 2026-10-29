@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
@@ -87,7 +88,41 @@ public class ParserPolyfillTest extends ExecutorSetup {
 
     var result = CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    Assert.assertEquals("6930bc04", result.asString());
+    Assert.assertEquals("b3e28b3039d1c052b34614ba4dd10ccd", result.asString());
+  }
+
+  /**
+   * The GUI hashes with {@code hash-wasm}'s {@code xxhash128} ({@code ydoc-shared/src/ast/ffi.ts});
+   * these digests come from {@code hash-wasm} 4.12.0, so the two sides cannot drift (#394).
+   */
+  @Test
+  public void xxHash128MatchesHashWasm() throws Exception {
+    var longInput = new StringBuilder();
+    for (var i = 0; i < 300; i++) {
+      longInput.append("line ").append(i).append(": main = 1 + 2 ## é 😀\n");
+    }
+    var cases = new LinkedHashMap<String, String>();
+    cases.put("", "99aa06d3014798d86001c324468d497f");
+    cases.put("a", "a96faf705af16834e6c632b61e964e1f");
+    cases.put("main = 1 + 2", "b3e28b3039d1c052b34614ba4dd10ccd");
+    cases.put("Größe ñ 日本語", "33b9ef08583c475755be1135a98833b8");
+    cases.put("😀👍🏽", "7d8503939196d2b93fbb407fe858fce7");
+    // An unpaired surrogate: TextEncoder and Node's Buffer encode it as U+FFFD.
+    cases.put("a\uD800b", "dc54facfa0efca3f3676d7ab9e9a7a45");
+    // Lengths either side of XXH3's 16-, 128- and 240-byte code-path boundaries.
+    cases.put("0123456789abcdef", "ccba8085a0434e9e0befb4873dbe58f8");
+    cases.put("0123456789abcdefg", "d54994a55733db61c7401fb9f6fbf86b");
+    cases.put("x".repeat(128), "fd990d088a9365ae7813452547ab9912");
+    cases.put("x".repeat(129), "e7f1abc92bce4135ae9ec8f29e5baa27");
+    cases.put("y".repeat(240), "131d6bf413b4bef2dc6070e1c666a217");
+    cases.put("y".repeat(241), "9542183325e41bab97295e4657a9e196");
+    cases.put(longInput.toString(), "8ccecd16163cc4f83835da693dbd714f");
+    for (var entry : cases.entrySet()) {
+      var input = entry.getKey();
+      var label =
+          input.length() > 40 ? input.substring(0, 40) + "... (" + input.length() + ")" : input;
+      assertEquals(label, entry.getValue(), call("xxHash128", input).asString());
+    }
   }
 
   @Test

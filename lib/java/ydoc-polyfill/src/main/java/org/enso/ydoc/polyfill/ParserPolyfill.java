@@ -61,7 +61,7 @@ public final class ParserPolyfill implements ProxyExecutable {
       case XX_HASH_128 -> {
         var input = arguments[1].asString();
 
-        yield Integer.toHexString(input.hashCode());
+        yield Parser.xxHash128(input);
       }
 
       case IS_IDENT_OR_OPERATOR -> {

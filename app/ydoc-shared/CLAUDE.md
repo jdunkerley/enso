@@ -50,6 +50,13 @@ Vitest only (`pnpm run test:unit`). Tests live in `src/__tests__/`.
 
 ## Gotchas
 
+- `xxHash128` (`src/ast/ffi.ts`, `hash-wasm`) has a JVM twin: the production
+  ydoc server runs on GraalJS and gets it from `lib/java/ydoc-polyfill`. Hashes
+  it returns are stored in the Yjs doc (a function's `docLineMarkdownHash`) and
+  compared on the other side, so the two must agree byte for byte (#394). Change
+  the input encoding or output format on one side only with the other, and
+  regenerate the vectors in `ParserPolyfillTest`.
+
 - Closing a `YjsChannel` is final: it stops observing its `Y.Array`, and a later
   `subscribe` on it never hears another message. `YjsTransport` therefore takes
   a fresh channel when it connects again after `close`, and `YjsServerTransport`
