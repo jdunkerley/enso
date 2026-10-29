@@ -20,15 +20,12 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}-gui-pull-request${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && format('-unrelated-label-{0}', github.run_id) || '' }}"
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
+# The union of what `gui-checks.yml` needs: a called workflow cannot exceed its caller.
 permissions:
   actions: read # `gui-checks.yml` downloads develop's engine distribution artifact
-  contents: read # Read-only access to repository contents
-  issues: write # Write access to issues
-  pull-requests: write # Write access to pull requests
-  statuses: write # Write access to commit statuses
-  checks: write
-  id-token: write
-  pages: write
+  contents: read
+  checks: write # `gui-checks.yml` annotates the lint results
+  pull-requests: read
 
 jobs:
   gui-changed-files:

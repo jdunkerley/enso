@@ -67,6 +67,9 @@ env:
   # Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "${{ contains(github.event.pull_request.labels.*.name, 'CI: Clean build required') || github.ref == 'refs/heads/develop' || inputs.clean_build_required }}"
 
+permissions:
+  contents: read
+
 jobs:
   # Note [The Engine Distribution Build]
   # ====================================
@@ -238,6 +241,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       checks: write
+      contents: read
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -413,6 +417,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       checks: write
+      contents: read
     env:
       GRAAL_EDITION: ${{ inputs.edition }}
       ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
@@ -575,6 +580,7 @@ jobs:
     timeout-minutes: 90
     permissions:
       checks: write
+      contents: read
     env:
       GRAAL_EDITION: ${{ inputs.edition }}
       ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results

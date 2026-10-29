@@ -708,6 +708,21 @@ export function checkJobsHaveTimeouts({ workflows }) {
   return problems
 }
 
+/**
+ * A workflow with no top-level `permissions:` runs with the repository's default token, which here
+ * is read and write (#304). Every workflow declares its own, `{}` or `contents: read` at least;
+ * a job that needs more says so in its own block. A reusable workflow's token cannot exceed its
+ * caller's, so a caller grants the union of what the workflows it calls need.
+ */
+export function checkWorkflowsDeclarePermissions({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    if (doc?.permissions !== undefined) continue
+    problems.push(`${file}: no top-level \`permissions:\` (the default token can write)`)
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -722,6 +737,7 @@ export const CHECKS = [
   checkSbtRunsAfterSetupJvm,
   checkBuildScriptsSpawnSbtThroughHelper,
   checkJobsHaveTimeouts,
+  checkWorkflowsDeclarePermissions,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

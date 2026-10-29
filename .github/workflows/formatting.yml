@@ -10,6 +10,9 @@ on:
       - "docs/superpowers/**"
     branches: ["*"]
 
+permissions:
+  contents: read
+
 jobs:
   test_formatting:
     name: Test Formatting

@@ -23,6 +23,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   macos:
     name: macos
