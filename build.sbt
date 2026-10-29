@@ -6475,10 +6475,15 @@ lazy val lintEnso =
   inputKey[Unit](
     "Run Enso linter on one or many projects. If no arguments are specified, all projects are linted. Otherwise, the argument should be the full path or just the name of the project to lint."
   )
-lintEnso := {
-  if (sys.env.get("CI").isEmpty) buildEngineDistributionNoIndex.value
-  val fileTree = fileTreeView.value
-
+// Note [lintEnso Builds The Distribution Only Locally]
+// ====================================================
+// sbt's task macro evaluates every `.value` in a body unconditionally, so
+// `if (CI) … else buildEngineDistributionNoIndex.value` built the distribution
+// on CI too (the lint job then needed flatc and rebuilt what it had just
+// downloaded). `Def.inputTaskDyn` chooses the task to run: with `CI` set the
+// build is not in the task graph, and the lint reads the distribution at
+// `engineDistributionRoot`, as the job downloaded it.
+lintEnso := Def.inputTaskDyn {
   val args: Seq[String] = spaceDelimited("<arg>").parsed
   val whatToLint = args match {
     case Seq()     => EnsoLint.LintTarget.All
@@ -6489,13 +6494,19 @@ lintEnso := {
       )
   }
 
-  val linter = new EnsoLint(
-    baseDirectory.value,
-    engineDistributionRoot.value,
-    streams.value.log
-  )
-  linter.check(whatToLint)
-}
+  val lint = Def.task {
+    val fileTree = fileTreeView.value
+    val linter = new EnsoLint(
+      baseDirectory.value,
+      engineDistributionRoot.value,
+      streams.value.log
+    )
+    linter.check(whatToLint)
+  }
+  if (sys.env.get("CI").isEmpty)
+    Def.taskDyn { buildEngineDistributionNoIndex.value; lint }
+  else lint
+}.evaluated
 
 lazy val checkEnsoSyntax = taskKey[Unit](
   "Parses every .enso file under distribution/lib and test with the Rust parser's check_syntax " +

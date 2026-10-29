@@ -140,17 +140,16 @@ jobs:
   # =============================================
   # `lintEnso` lints the distribution at `engineDistributionRoot`, which sbt names from
   # `ENSO_VERSION` (`built-distribution/enso-engine-<version>-<os>-<arch>/enso-<version>`), and
-  # sbt's default is 0.0.0-dev. On CI `lintEnso` still evaluates
-  # `buildEngineDistributionNoIndex.value` (build.sbt), so the lint job rebuilds the package at that
-  # same versioned path and lints that; the downloaded distribution is not what it lints today. The
-  # build job computed the version (`<next stable>-dev`) and published it as its outputs, so the
-  # lint step takes it from there rather than computing its own, which keeps the path identical to
-  # the build job's and stays correct once the lint really uses the download. Otherwise the step
+  # sbt's default is 0.0.0-dev. On CI (`CI` set) `lintEnso` does not build the distribution
+  # (Note [lintEnso Builds The Distribution Only Locally] in build.sbt), so the lint job lints the
+  # downloaded one at that versioned path. The build job computed the version (`<next stable>-dev`)
+  # and published it as its outputs, so the lint step takes it from there rather than computing its
+  # own, which keeps the path identical to the build job's. Otherwise the step
   # runs what the retired build CLI's `libraries lint` ran once it had provisioned GraalVM and sbt:
   # `sbt -Dbench.compileOnly=false -Dsbt.server.autostart=false "all lintEnso"`, with
   # `LC_ALL=C.UTF-8` and `SBT_SERVER_FORCESTART=true` (`all` because a hosted runner has more memory
-  # than the retired build CLI's single-batch threshold; for one task it changes nothing). The
-  # rebuild compiles the language server, so the job needs flatc. Nothing in sbt or the engine reads
+  # than the retired build CLI's single-batch threshold; for one task it changes nothing). With no
+  # build the job needs no flatc. Nothing in sbt or the engine reads
   # `GITHUB_TOKEN`, so the step does not pass it. The syntax check (`checkEnsoSyntax`, which
   # replaced the retired build CLI's `libraries check-syntax`) runs the Rust parser's `check_syntax`
   # through cargo, so `setup-jvm` installs the Rust toolchain (`rust`) first: today that one cargo
@@ -176,7 +175,6 @@ jobs:
         with:
           cache-key: engine
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
-          flatc: "true"
           rust: "true"
       - name: Check syntax
         run: sbt "-Dsbt.server.autostart=false" checkEnsoSyntax
