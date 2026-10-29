@@ -127,6 +127,18 @@ const LANGUAGE_SERVER_STARTUP_TIMEOUT = 30000
 
 const TERMINATE_TIMEOUT_MS = 10_000
 
+/**
+ * How many times an open looks for ports and starts an engine, when each engine fails to bind
+ * them. The ports are free when found, but another program can take one before the engine binds it.
+ */
+const PORT_ATTEMPTS = 3
+/** How much of an engine's stderr is kept to tell why it failed to start. */
+const STDERR_TAIL_LENGTH = 4096
+/** How long to wait for an exited engine's stderr to end, to read why it exited. */
+const STDERR_END_TIMEOUT_MS = 1000
+/** What a language server prints when it cannot bind its port (Akka, the JVM; Windows and Unix). */
+const PORT_IN_USE = /address already in use|EADDRINUSE|BindException/i
+
 class OpenedProject {
   loaded: Promise<void>
   shutdownHooks: Map<ShutdownHookType, () => void | Promise<void>> = new Map()
@@ -136,6 +148,10 @@ class OpenedProject {
   private nextWatchdogCheck: ReturnType<typeof setTimeout> | undefined
   private readonly watcher: WatchedChildProcess
   private loadedDeferred: Deferred<void> = createDeferred()
+  /** The end of what the latest engine wrote to stderr. */
+  private stderrTail = ''
+  /** Resolves when the latest engine's stderr has ended (its last output has been read). */
+  private stderrEnded: Promise<void> = Promise.resolve()
 
   private constructor(
     private path: Path,
@@ -209,7 +225,14 @@ class OpenedProject {
    */
   private captureStderr(handle: ChildProcessHandle): void {
     this.logSink?.engineStarted()
-    handle.child.stderr?.on('data', (chunk: Buffer) => {
+    this.stderrTail = ''
+    const stderr = handle.child.stderr
+    this.stderrEnded =
+      stderr ?
+        new Promise<void>((resolve) => stderr.once('close', () => resolve()))
+      : Promise.resolve()
+    stderr?.on('data', (chunk: Buffer) => {
+      this.stderrTail = (this.stderrTail + chunk.toString()).slice(-STDERR_TAIL_LENGTH)
       echoToStderr(chunk)
       this.logSink?.engineStderr(chunk)
     })
@@ -229,6 +252,21 @@ class OpenedProject {
         console.error('Error writing to the stdin of the language server of', this.path, error)
       }
     })
+  }
+
+  /**
+   * Whether the engine that failed to start did so because it could not bind its port: something
+   * else took it after the search found it free. The 'exit' event can come before the last of the
+   * engine's output is read, so this waits (briefly) for the end of stderr.
+   */
+  async failedToBindPort(): Promise<boolean> {
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      this.stderrEnded,
+      new Promise((resolve) => (timeout = setTimeout(resolve, STDERR_END_TIMEOUT_MS))),
+    ])
+    clearTimeout(timeout)
+    return PORT_IN_USE.test(this.stderrTail)
   }
 
   private startLoadingRoutine(): void {
@@ -502,8 +540,13 @@ export class EnsoRunner implements Runner {
         .next()
         .value?.catch(() => undefined)
     }
-    const openedProject = this.findServerPorts(this.options.firstPort ?? DEFAULT_JSONRPC_PORT).then(
-      async ([jsonPort, ydocPort]) => {
+    const openedProject = (async () => {
+      // The ports are found free, but another program can take one before the engine binds it:
+      // such an engine exits with a bind failure, and the open looks for new ports and tries again.
+      for (let attempt = 1; ; attempt++) {
+        const [jsonPort, ydocPort] = await this.findServerPorts(
+          this.options.firstPort ?? DEFAULT_JSONRPC_PORT,
+        )
         const rootId = crypto.randomUUID()
         const args: readonly string[] = [
           '--server',
@@ -548,9 +591,17 @@ export class EnsoRunner implements Runner {
           this.runningProjects.delete(projectPath)
           this.loadingProjects.delete(projectPath)
         })
-        return project.loaded.then(() => project)
-      },
-    )
+        try {
+          await project.loaded
+          return project
+        } catch (error) {
+          if (attempt >= PORT_ATTEMPTS || !(await project.failedToBindPort())) throw error
+          console.warn(
+            `Language Server for project ${projectPath} could not bind its port; looking for new ports.`,
+          )
+        }
+      }
+    })()
 
     this.loadingProjects.set(projectPath, openedProject)
     // The caller gets the failure, from the promise returned below.

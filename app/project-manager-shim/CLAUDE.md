@@ -61,6 +61,18 @@ own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
 own there.
 
+## Ports and the engine's health check
+
+`EnsoRunner.openProject` probes for two free ports and then starts the engine,
+so another program can take one in between. The engine's `/_health` answers a
+bare `OK` with nothing that identifies it, so a lookalike answer cannot be told
+apart; the runner relies on the engine's own failure instead. An engine that
+exits while starting with a bind failure on stderr (`Address already in use`,
+`BindException`, `EADDRINUSE`) makes the open probe again and start another
+engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
+(#336). Not covered: another program that answers `/_health` with a success
+before the engine has failed to bind.
+
 ## Child processes
 
 Always attach an `'error'` listener to a child's stdin (`EnsoRunner` does at
