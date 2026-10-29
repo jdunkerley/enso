@@ -17,8 +17,14 @@ import { readToolchainPins, TOOLCHAIN_PIN_FILES, TOOLCHAIN_PINS } from './toolch
 /** Specs and plans: a pull request that changes only these starts no workflow. */
 export const SPEC_PATHS = 'docs/superpowers/**'
 
+/** Test fixtures keyed by `component/truffle-*-<graalVersion>.jar`; see `checkNativeLibsFixtures`. */
+export const NATIVE_LIBS_FILES = [
+  'test/Base_Tests/data/native_libs.json',
+  'test/Cloud_Tests/data/native_libs.json',
+]
+
 /** Files outside `.github` that a rule reads: the toolchain pins, and the build's own copies. */
-export const ROOT_FILES = ['build-config.yaml', ...TOOLCHAIN_PIN_FILES]
+export const ROOT_FILES = ['build-config.yaml', ...TOOLCHAIN_PIN_FILES, ...NATIVE_LIBS_FILES]
 
 /** The TypeScript package whose commands workflows run with `corepack pnpm --filter build-scripts`. */
 export const BUILD_SCRIPTS = 'tools/build-scripts'
@@ -444,6 +450,39 @@ export function checkToolchainPins({ files }) {
   return problems
 }
 
+/**
+ * The `native_libs.json` test fixtures list the native libraries inside GraalVM's Truffle jars and
+ * are keyed by jar name (`component/truffle-api-<graalVersion>.jar`). A GraalVM bump that leaves
+ * them behind fails only in the Standard Library test jobs, ~20 minutes in. So every key must name
+ * the `graalVersion` in `project/Dependencies.scala`, and there must be a `truffle-api` key.
+ */
+export function checkNativeLibsFixtures({ files }) {
+  const graalVersion = files?.['project/Dependencies.scala']?.match(TOOLCHAIN_PINS[0].pattern)?.[1]
+  if (graalVersion == null) return ['project/Dependencies.scala: no `graalVersion` found']
+  const problems = []
+  for (const file of NATIVE_LIBS_FILES) {
+    let keys
+    try {
+      keys = Object.keys(JSON.parse(files[file]))
+    } catch {
+      problems.push(`${file}: missing or not a JSON object`)
+      continue
+    }
+    for (const key of keys) {
+      const version = key.match(/-(\d[^/]*)\.jar$/)?.[1]
+      if (version !== graalVersion) {
+        problems.push(
+          `${file}: \`${key}\` is not for \`graalVersion\` ${graalVersion} in project/Dependencies.scala`,
+        )
+      }
+    }
+    if (!keys.some((key) => key.includes('/truffle-api-'))) {
+      problems.push(`${file}: no \`component/truffle-api-${graalVersion}.jar\` key`)
+    }
+  }
+  return problems
+}
+
 // An inline `VAR=value ` assignment before a command.
 const ASSIGN = String.raw`[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S*)\s+`
 // A wrapper's option or argument: `-x`, `--x=y`, a number or duration (`10`, `90m`), a quoted
@@ -663,6 +702,7 @@ export const CHECKS = [
   checkIdePackagingNeedsNoCloudAccount,
   checkWindowsInstallerSmokeTest,
   checkToolchainPins,
+  checkNativeLibsFixtures,
   checkSbtRunsAfterSetupJvm,
   checkBuildScriptsSpawnSbtThroughHelper,
 ]

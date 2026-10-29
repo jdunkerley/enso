@@ -20,6 +20,7 @@ import {
   checkRepo,
   checkSbtRunsAfterSetupJvm,
   checkSetupNodeCache,
+  checkNativeLibsFixtures,
   checkToolchainPins,
   checkWindowsInstallerSmokeTest,
   loadRepo,
@@ -474,6 +475,42 @@ describe('checkToolchainPins', () => {
     )
     assert.deepEqual(checkToolchainPins(repo), ['project/build.properties: no `sbt.version` found'])
     assert.deepEqual(checkToolchainPins(fixture({})), ['build-config.yaml: missing'])
+  })
+})
+
+describe('checkNativeLibsFixtures', () => {
+  const scala = 'object Dependencies {\n  val graalVersion = "25.0.1"\n}\n'
+  const libs = (version) =>
+    JSON.stringify({
+      [`component/truffle-api-${version}.jar`]: ['a.so'],
+      [`component/truffle-nfi-libffi-${version}.jar`]: ['b.so'],
+    })
+  const repoWith = (base, cloud) =>
+    fixture(
+      {},
+      {
+        'project/Dependencies.scala': scala,
+        'test/Base_Tests/data/native_libs.json': base,
+        'test/Cloud_Tests/data/native_libs.json': cloud,
+      },
+    )
+  test('accepts fixtures keyed by the graalVersion', () => {
+    assert.deepEqual(checkNativeLibsFixtures(repoWith(libs('25.0.1'), libs('25.0.1'))), [])
+  })
+  test('rejects a fixture left behind by a GraalVM bump', () => {
+    const problems = checkNativeLibsFixtures(repoWith(libs('25.0.1'), libs('25.0.0')))
+    assert.deepEqual(problems, [
+      'test/Cloud_Tests/data/native_libs.json: `component/truffle-api-25.0.0.jar` is not for `graalVersion` 25.0.1 in project/Dependencies.scala',
+      'test/Cloud_Tests/data/native_libs.json: `component/truffle-nfi-libffi-25.0.0.jar` is not for `graalVersion` 25.0.1 in project/Dependencies.scala',
+    ])
+  })
+  test('rejects a missing or malformed fixture, and a build without graalVersion', () => {
+    const problems = checkNativeLibsFixtures(repoWith(libs('25.0.1'), 'not json'))
+    assert.deepEqual(problems, ['test/Cloud_Tests/data/native_libs.json: missing or not a JSON object'])
+    const none = fixture({}, { 'project/Dependencies.scala': 'object Dependencies {}\n' })
+    assert.deepEqual(checkNativeLibsFixtures(none), [
+      'project/Dependencies.scala: no `graalVersion` found',
+    ])
   })
 })
 
