@@ -30,6 +30,10 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}-ide-pull-request${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && format('-unrelated-label-{0}', github.run_id) || '' }}"
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
+permissions:
+  actions: read # `ide-packaging.yml` lists develop's artifacts and downloads its backend
+  contents: read
+
 jobs:
   gui-changed-files:
     name: 🔍 GUI Files Changed
@@ -56,6 +60,14 @@ jobs:
     name: 📦 Package
     uses: ./.github/workflows/ide-packaging.yml
     needs: [gui-changed-files, ide-changed-files, engine-changed-files]
+    with:
+      # A pull request that changes no engine file packages with develop's backend (Note [Reusing
+      # Develop's Backend] in `ide-packaging.yml`).
+      build_backend: >-
+        ${{ github.event_name != 'pull_request'
+            || needs.engine-changed-files.outputs.any_changed == 'true'
+            || contains(github.event.pull_request.labels.*.name, 'CI: Build IDE')
+        }}
     if: >-
       needs.gui-changed-files.outputs.any_changed_excluding_tests == 'true'
       || needs.ide-changed-files.outputs.any_changed == 'true'
