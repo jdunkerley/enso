@@ -30,3 +30,5 @@ export const ENGINE_STDERR_PORT = randomPortInBand(0)
 export const RUNNING_PROJECTS_PORT = randomPortInBand(1)
 /** `startupCrash.test.ts`. */
 export const STARTUP_CRASH_PORT = randomPortInBand(2)
+/** `stdinClosed.test.ts`. */
+export const STDIN_CLOSED_PORT = randomPortInBand(3)
