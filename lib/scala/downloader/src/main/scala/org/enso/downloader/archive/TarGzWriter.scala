@@ -62,6 +62,9 @@ object TarGzWriter {
       Using(new BufferedOutputStream(outputStream)) { bufferedStream =>
         Using(new GzipCompressorOutputStream(bufferedStream)) { gzipStream =>
           Using(new TarArchiveOutputStream(gzipStream)) { archive =>
+            // The default mode throws on entries with names over 100 bytes,
+            // e.g. polyglot-sources/benchmark-java-helpers/....
+            archive.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX)
             val writer = new TarGzWriter(archive)
             actions(writer)
           }.get
