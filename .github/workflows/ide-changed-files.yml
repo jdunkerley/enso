@@ -11,6 +11,9 @@ on:
       any_changed:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.ide-changed-files.outputs.any_changed }}
+      backend_changed:
+        description: "Returns `true` when a file the IDE's backend build reads outside the engine paths has changed"
+        value: ${{ jobs.ide-changed-files.outputs.backend_changed }}
 
 # The build and packaging plumbing of the IDE: the build scripts (`tools/build-scripts`), the
 # toolchains, the dependency manifests and the workflows. GUI sources are covered by
@@ -24,6 +27,7 @@ jobs:
     outputs:
       all_changed_files: ${{ steps.ide-changed-files.outputs.all_changed_files }}
       any_changed: ${{ steps.ide-changed-files.outputs.any_changed }}
+      backend_changed: ${{ steps.backend-changed-files.outputs.any_changed }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -51,6 +55,38 @@ jobs:
             .jvmopts
             git-clean.mjs
             .github/**
+          files_ignore: |
+            **/*.md
+      # Note [The Backend Reads The ydoc Server]
+      # ========================================
+      # The engine bundle embeds `ydoc.cjs`, which sbt builds from `app/ydoc-server-polyglot`
+      # (`project/Ydoc.scala`; the `ydoc-server` module is part of the bundle). So an app-only pull
+      # request that edits the ydoc server must build the backend instead of reusing develop's
+      # (Note [Reusing Develop's Backend] in `ide-packaging.yml`). The list is the `workspace:`
+      # dependency closure of `ydoc-server-polyglot`, minus `rust-ffi`: the esbuild plugin in
+      # `app/ydoc-server-polyglot/build.mjs` swaps `ydoc-shared`'s `ast/ffi.ts` (the only importer of
+      # `rust-ffi`) for `src/ffiPolyglot.ts`, so the WASM is never bundled.
+      #   ydoc-server-polyglot -> ydoc-channel, ydoc-server
+      #   ydoc-server          -> enso-common (`app/common`), ydoc-channel, ydoc-shared
+      #   ydoc-shared          -> @lezer/markdown (`app/lezer-markdown`), enso-common, rust-ffi
+      # Keep it in step with those `package.json` files. It is not on the engine gate: the engine
+      # checks do not read these files. The manifests and `ide-packaging.yml` (which builds the
+      # backend) are on it too.
+      - name: Get files the backend build reads
+        id: backend-changed-files
+        uses: step-security/changed-files@v45
+        with:
+          files: |
+            app/ydoc-server-polyglot/**
+            app/ydoc-server/**
+            app/ydoc-shared/**
+            app/ydoc-channel/**
+            app/common/**
+            app/lezer-markdown/**
+            package.json
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            .github/workflows/ide-packaging.yml
           files_ignore: |
             **/*.md
       - name: List all changed files

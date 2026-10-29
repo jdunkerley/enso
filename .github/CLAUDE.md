@@ -15,9 +15,10 @@ settings. Every workflow is hand-written YAML (build simplification;
   `ide-packaging.yml`, `gui-checks.yml`, `wasm-checks.yml`, `macos-checks.yml` —
   the checks, callable (`workflow_call`) and mostly startable by hand
   (`workflow_dispatch`).
-- `workflows/changelog.yml`, `std-libs-labels.yml`, `formatting.yml`,
-  `enso4igv.yml`, `workflow-lint.yml`, `build-scripts.yml` — single-purpose
-  pull-request workflows. `build-scripts.yml` type-checks, lints and tests
+- `workflows/changelog.yml`, `std-libs-labels.yml` (called from
+  `engine-pull-request.yml`), `formatting.yml`, `enso4igv.yml`,
+  `workflow-lint.yml`, `build-scripts.yml` — single-purpose pull-request
+  workflows. `build-scripts.yml` type-checks, lints and tests
   `tools/build-scripts`.
 - `workflows/release.yml`, `promote.yml`, `nightly.yml` — releases.
   `promote.yml` (by hand, or from `nightly.yml`'s daily cron) computes the
@@ -59,17 +60,28 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **Every job sets `timeout-minutes`** (a hung job otherwise runs for GitHub's
   default of 6 hours): 90 for tests, 45 for builds, 30 otherwise, raised where a
   job's slowest recent run needs more than 1.5x headroom (the engine and backend
-  builds use 60). `check-workflows.mjs` fails a job without one; jobs that call
-  a reusable workflow are exempt, as the called jobs carry it.
+  builds use 60). Windows JVM Tests stays at 90 although its slowest recent run
+  (62 min) gives only ~1.45x headroom: the spec caps a hung job at 1.5 h.
+  `check-workflows.mjs` fails a job without one; jobs that call a reusable
+  workflow are exempt, as the called jobs carry it.
 - **A new workflow or composite action used by the engine checks goes on the
   list in `engine-changed-files.yml`**, or a change to it will not run them.
   `ide-changed-files.yml` already covers all of `.github/**`.
-- **App-only PRs package with develop's backend.** When no engine file changed,
-  `ide-pull-request.yml` passes `build_backend: false` and `ide-packaging.yml`
-  downloads the `backend-<os>` artifacts of the newest develop run whose commit
-  is an ancestor of the commit being packaged, the PR's merge commit
-  (`find-backend`). The `CI: Build IDE` label or any engine change builds the
-  backend instead; develop and releases always do.
+- **App-only PRs package with develop's backend.** A PR to `develop` that
+  changes no engine file (`engine-changed-files.yml`) and none of the files the
+  backend build reads outside the engine paths (`backend_changed` in
+  `ide-changed-files.yml`: `app/ydoc-server-polyglot`, `app/ydoc-server`,
+  `app/ydoc-shared`, `app/ydoc-channel`, `app/common`, `app/lezer-markdown`, the
+  root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, and
+  `ide-packaging.yml`; the engine bundle embeds the ydoc server) gets
+  `build_backend: false`, and `ide-packaging.yml` downloads the `backend-<os>`
+  artifacts of the newest develop run of `ide-pull-request.yml` whose commit is
+  an ancestor of the commit being packaged, the PR's merge commit
+  (`find-backend`). Any of those changes, a PR to another base branch (stacked),
+  or the `CI: Build IDE` label builds the backend instead; develop and releases
+  always do. The ydoc list is the `workspace:` closure of
+  `ydoc-server-polyglot`; keep it in step with those `package.json` files (Note
+  [The Backend Reads The ydoc Server]).
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);
