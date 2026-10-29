@@ -320,6 +320,17 @@ stays staged).
   non-recursive `mkdir` (an existing directory is rejected, never used or
   removed).
 
+### Tests
+
+`localVersioning.test.ts` runs real git, dozens of processes per test. On
+Windows a test takes 1–5 s on an idle machine, so the file sets
+`vi.setConfig({ testTimeout: 30_000 })`: under load, vitest's default 5 s failed
+a different handful of tests each run (#395). A vitest timeout can be reported
+as `STACK_TRACE_ERROR` (the placeholder error vitest builds the timeout from),
+so read that as "timed out", not as an error in the code. A timed-out test's
+body also keeps running into the next test, so look at the first failure, not
+the ones after it.
+
 ### Known limitations
 
 - Moving a project out of its repository (or to another repository) leaves the

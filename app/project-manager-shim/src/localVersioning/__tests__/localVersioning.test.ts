@@ -11,6 +11,11 @@ import {
 } from '../index.js'
 import { versioningFor, withTempRepo, writeFiles } from './testRepo.js'
 
+// Every test here runs dozens of real git processes; on Windows (process start-up, virus scanning
+// of the new files) a test takes 1–5 s unloaded, and vitest's default 5 s timeout failed several
+// of them whenever the machine was busy (#395). A timed-out test reports `STACK_TRACE_ERROR`.
+vi.setConfig({ testTimeout: 30_000 })
+
 vi.mock('../git.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../git.js')>()
   return { ...actual, findGit: vi.fn(actual.findGit), runGit: vi.fn(actual.runGit) }
@@ -1054,7 +1059,7 @@ describe('history across moves', () => {
         expect(await git(root, 'status', '--porcelain', '--', 'A', 'B2')).toBe('')
       }
     })
-  }, 30_000)
+  })
 
   test('a reused name shows the moved project, not the deleted one', async () => {
     await withRepo(async (root, versioning) => {
