@@ -233,6 +233,10 @@ jobs:
   # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call: sbt starts
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
+  # - The retired build CLI rebuilt the ydoc native image here on Linux (4-7 min). It is not
+  #   rebuilt: the downloaded distribution's `component/` holds the one the build job made, and no
+  #   test loads it. The ydoc server's JavaScript bundle, which the tests do use, is still built by
+  #   `sbt test` (`ydoc-server`'s resource generator).
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.jvm-tests
@@ -290,15 +294,6 @@ jobs:
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
           cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
-      - if: runner.os == 'Linux'
-        name: Build the ydoc native image
-        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all ydoc-server/buildNativeImage"
-        env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
-          LC_ALL: C.UTF-8
-          SBT_SERVER_FORCESTART: "true"
       - id: tests
         name: JVM tests
         run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test"
