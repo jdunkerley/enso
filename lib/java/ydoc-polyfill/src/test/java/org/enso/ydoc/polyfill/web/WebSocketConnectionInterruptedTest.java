@@ -29,19 +29,21 @@ public class WebSocketConnectionInterruptedTest {
 
   @Test
   public void interruptThreadBeforeExecution() throws Exception {
+    var port = TimedLock.freePort();
     var mockExecutor = new MockExecutor();
     var ctx = WebEnvironment.createContext(HostAccess.ALL).build();
     WebEnvironment.initialize(ctx, mockExecutor);
     var server =
         """
         let ret = [ null ]
-        let wss = new WebSocketServer({host: 'localhost', port: 33455});
+        let wss = new WebSocketServer({host: 'localhost', port: %d});
         wss.onconnect = function() {
           ret[0] = "Successfully connected";
         };
         wss.start();
         ret
-        """;
+        """
+            .formatted(port);
     var res = new Object[1];
     mockExecutor.execute(
         () -> {
@@ -60,7 +62,7 @@ public class WebSocketConnectionInterruptedTest {
       // The server starts on the executor, so it may not be listening yet.
       for (var connected = false; !connected; ) {
         try {
-          WsClient.builder().build().connect("ws://localhost:33455", listener);
+          WsClient.builder().build().connect("ws://localhost:" + port, listener);
           connected = true;
         } catch (UncheckedIOException notListeningYet) {
           Thread.sleep(50);
