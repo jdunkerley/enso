@@ -198,6 +198,9 @@ class OpenedProject {
     console.log('Closing Project', this.path)
     this.closed = true
     clearTimeout(this.nextWatchdogCheck)
+    // A watchdog respawn may be waiting for the old engine to stop, or spawning: without this it
+    // would start an engine after the close, which nothing could close (#335).
+    this.watcher.stopRespawning()
     try {
       await this.gracefulShutdown()
     } finally {

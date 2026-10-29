@@ -1,14 +1,18 @@
 package org.enso.languageserver.http.server
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import com.typesafe.scalalogging.LazyLogging
-import org.enso.languageserver.http.server.BinaryWebSocketControlProtocol.OutboundStreamEstablished
+import org.enso.languageserver.http.server.BinaryWebSocketControlProtocol.{
+  ConnectionClosed,
+  OutboundStreamEstablished
+}
 import org.enso.languageserver.util.binary.{BinaryDecoder, BinaryEncoder}
 import org.enso.ydoc.api.YjsChannel
 import org.graalvm.polyglot.Context
 
 import java.lang.foreign.MemorySegment
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.util.control.NonFatal
 
@@ -21,6 +25,7 @@ object BinaryYdocServer {
     * - Creates a connection controller to process incoming binary messages
     * - Subscribes to the channel with [[onMessage]] for inbound message decoding
     * - Creates [[OutgoingMessageHandler]] actor for encoding and sending responses
+    * - Registers [[OnCloseHandler]] to end the session when the channel closes
     *
     * Binary messages use direct ByteBuffer for efficient cross-runtime data transfer.
     *
@@ -54,6 +59,15 @@ object BinaryYdocServer {
           Props(new OutgoingMessageHandler(channel, encoder))
         )
       incomingMessageHandler ! OutboundStreamEstablished(outgoingMessageHandler)
+
+      try {
+        channel.onClose(
+          new OnCloseHandler(incomingMessageHandler, outgoingMessageHandler)
+        )
+      } catch {
+        case NonFatal(e) =>
+          logger.error("Binary channel onClose error", e)
+      }
     }
 
     /** Decodes an incoming binary message and forwards to the controller. */
@@ -77,6 +91,31 @@ object BinaryYdocServer {
             s"Received unsupported binary message: ${message.getClass}",
             e
           )
+      }
+    }
+  }
+
+  /** Ends the binary session when its [[YjsChannel]] closes.
+    *
+    * The counterpart of the WebSocket stream completing in
+    * [[BinaryWebSocketServer]]: the connection controller receives
+    * [[ConnectionClosed]], so it publishes the session termination and stops
+    * itself, and the outgoing handler, which has no channel left to write to,
+    * stops. May run on any thread; it only sends actor messages.
+    */
+  final class OnCloseHandler(
+    incomingMessageHandler: ActorRef,
+    outgoingMessageHandler: ActorRef
+  ) extends Runnable
+      with LazyLogging {
+
+    private val closed = new AtomicBoolean(false)
+
+    override def run(): Unit = {
+      if (closed.compareAndSet(false, true)) {
+        logger.trace("Binary channel closed")
+        incomingMessageHandler ! ConnectionClosed
+        outgoingMessageHandler ! PoisonPill
       }
     }
   }
