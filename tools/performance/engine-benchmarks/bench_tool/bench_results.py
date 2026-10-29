@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 from bench_tool import JobRun, DATE_FORMAT, ENSO_REPO, JobReport, Source
 from bench_tool.gh import invoke_gh_api
-from bench_tool.remote_cache import RemoteCache
+from bench_tool.report_cache import ReportCache
 from bench_tool.utils import WithTempDir
 
 ARTIFACT_ID = "Runtime Benchmark Report"
@@ -69,22 +69,22 @@ async def get_bench_runs(since: datetime, until: datetime, branch: str, workflow
 
 async def fetch_job_reports(
         bench_runs: List[JobRun],
-        remote_cache: RemoteCache
+        cache: ReportCache
 ) -> List[JobReport]:
     """
     Fetches all benchmark reports for the given benchmark runs. Benchmark runs are basically
     just IDs of artifacts, and the reports are the actual benchmark results. These results are
-    either on the GH as artifacts, or are fetched from the cache if the artifact is expired.
+    on the GH as artifacts; an expired artifact has no report.
     All the runs are fetched in parallel.
     :param bench_runs:
-    :param remote_cache:
+    :param cache:
     :return:
     """
     job_reports: List[JobReport] = []
 
     async def _process_report(_bench_run: JobRun):
         with WithTempDir("bench_download") as temp_dir:
-            _job_report = await get_bench_report(_bench_run, temp_dir, remote_cache)
+            _job_report = await get_bench_report(_bench_run, temp_dir, cache)
         if _job_report:
             job_reports.append(_job_report)
 
@@ -99,14 +99,14 @@ def _known_artifact_names() -> List[str]:
     return Source.STDLIB.artifact_names() + Source.ENGINE.artifact_names()
 
 
-async def get_bench_report(bench_run: JobRun, temp_dir: str, remote_cache: RemoteCache) -> Optional[JobReport]:
+async def get_bench_report(bench_run: JobRun, temp_dir: str, cache: ReportCache) -> Optional[JobReport]:
     """
     Extracts some data from the given bench_run, which was fetched via the GH API,
-    optionally getting it from the cache.
+    optionally getting it from the in-memory cache.
     An artifact in GH can expire, in such case, returns None.
     :param bench_run:
     :param temp_dir: Used for downloading and unzipping artifacts.
-    :return: None if the corresponding artifact cannot be found, neither as a GH artifact, neither from the remote cache.
+    :return: None if the corresponding artifact cannot be found, as a GH artifact (e.g. it has expired).
     """
     assert os.path.exists(temp_dir) and os.path.isdir(temp_dir)
 
@@ -137,10 +137,10 @@ async def get_bench_report(bench_run: JobRun, temp_dir: str, remote_cache: Remot
                   f"created_at={created_at}, updated_at={updated_at}, expires_at={expires_at}, "
                   f"is_expired={is_expired}")
 
-    job_report = await remote_cache.fetch(bench_run.id)
+    job_report = await cache.fetch(bench_run.id)
     if is_expired and job_report is None:
         _logger.error(
-            f"Artifact {artifact_id} from bench run {bench_run.id} is expired, and it is not in the remote cache")
+            f"Artifact {artifact_id} from bench run {bench_run.id} is expired")
         return None
     if job_report:
         _logger.debug(f"Got job report from the cache for {bench_run.id}")
@@ -167,7 +167,7 @@ async def get_bench_report(bench_run: JobRun, temp_dir: str, remote_cache: Remot
     assert path.exists(bench_report_xml)
 
     bench_report_parsed = _parse_bench_report_from_xml(bench_report_xml, bench_run)
-    await remote_cache.put(bench_run.id, bench_report_parsed)
+    await cache.put(bench_run.id, bench_report_parsed)
     return bench_report_parsed
 
 
