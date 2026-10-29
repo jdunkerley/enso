@@ -285,7 +285,7 @@ jobs:
   merge-reports:
     name: 🔗 Merge Playwright Reports
     # Merge whenever Playwright actually ran (pass or fail), but not when it was
-    # skipped because lint failed.
+    # skipped because Build WASM failed.
     if: ${{ !cancelled() && needs.playwright.result != 'skipped' }}
     needs: [playwright]
     runs-on: ubuntu-latest
