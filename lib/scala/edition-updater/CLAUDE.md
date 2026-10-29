@@ -20,4 +20,5 @@ Locates editions on disk and, if asked, downloads new ones (sbt project
 
 `sbt edition-updater/test` serves an `ExampleRepository` from
 `library-manager`'s test sources, through the Node
-`tools/simple-library-server`. Each suite uses its own port (473xx).
+`tools/simple-library-server`. Each suite takes a free port from
+`DummyRepository.freePort()`, never a fixed one.

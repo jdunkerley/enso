@@ -5,6 +5,7 @@ import org.enso.cli.task.{ProgressReporter, TaskProgress}
 import org.enso.editions.{Editions, LibraryName}
 import org.enso.librarymanager.test.published.repository.{
   DownloaderTest,
+  DummyRepository,
   EmptyRepository
 }
 import org.enso.libraryupload.auth.SimpleHeaderToken
@@ -24,7 +25,7 @@ class LibraryUploadTest
 
   val emptyRepository = new EmptyRepository(Path.of("../../../"))
 
-  def port: Int = 47305
+  val port: Int = DummyRepository.freePort()
 
   "LibraryUploader" should {
     "upload the files to the server" in {

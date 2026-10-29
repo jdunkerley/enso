@@ -21,6 +21,6 @@ Resolves, downloads, caches and uploads Enso libraries (sbt project
 
 - `sbt "library-manager/testOnly org.enso.libraryupload.*"`. `LibraryUploadTest`
   and `LibraryDownloadTest` start the Node `tools/simple-library-server`.
-- `LibraryUploadTest` sometimes fails on Windows with a `ConnectException`. That
-  is a race in the test harness (see the root `CLAUDE.md`), so re-run it before
-  you investigate.
+- Test servers use a port from `DummyRepository.freePort()`, so a taken port
+  cannot fail a suite. `DummyRepository` waits for the server to accept a
+  connection before returning (see the root `CLAUDE.md`).

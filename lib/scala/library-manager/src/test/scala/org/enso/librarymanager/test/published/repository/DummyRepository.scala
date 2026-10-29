@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.lang.ProcessBuilder.Redirect
-import java.net.{InetSocketAddress, Socket}
+import java.net.{InetSocketAddress, ServerSocket, Socket}
 import java.nio.file.{Files, Path}
 import scala.util.Using
 import scala.util.control.NonFatal
@@ -297,4 +297,17 @@ object DummyRepository {
   private val lock = new Object
 
   private def isCI = sys.env.contains("CI")
+
+  /** Asks the OS for a currently unused TCP port.
+    *
+    * Tests must not hard-code a port: a leftover server or a concurrent run
+    * would make the Node server fail with `EADDRINUSE`. The port is released
+    * before returning, so another process could in theory claim it before the
+    * server binds; that window is tiny, unlike a fixed port which is taken
+    * for as long as anything holds it.
+    */
+  def freePort(): Int =
+    Using.resource(new ServerSocket(0)) { socket =>
+      socket.getLocalPort
+    }
 }
