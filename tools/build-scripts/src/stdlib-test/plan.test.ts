@@ -2,6 +2,7 @@
 /* eslint-disable camelcase -- Test project names are `Name_Tests`, as the directories under `test/`. */
 import { describe, expect, test } from 'vitest'
 import {
+  changedFilesFor,
   planMatrix,
   planSummary,
   selectTestProjects,
@@ -146,6 +147,34 @@ describe('planMatrix', () => {
         only: 'Base_Tests,DuckDB_Tests,Geo_Tests,Table_Tests,Tableau_Tests,Visualization_Tests',
       },
       { ...AWS, only: 'AWS_Tests' },
+    ])
+  })
+})
+
+describe('planMatrix without a catch-all shard', () => {
+  test('throws rather than dropping projects', () => {
+    const map = { ...MAP, shards: [{ name: 'Table', projects: ['Table_Tests'] }] }
+    expect(() => planMatrix([JVM], map, PROJECTS, { projects: null, reasons: [] }, true)).toThrow(
+      /no "\*" shard/,
+    )
+  })
+})
+
+describe('changedFilesFor', () => {
+  test('a non-PR event runs everything', () => {
+    expect(changedFilesFor('push', 'a.enso')).toBeNull()
+    expect(changedFilesFor(undefined, 'a.enso')).toBeNull()
+  })
+  test('a PR with no files runs everything', () => {
+    expect(changedFilesFor('pull_request', '')).toBeNull()
+    expect(changedFilesFor('pull_request', '  \n ')).toBeNull()
+    expect(changedFilesFor('pull_request', undefined)).toBeNull()
+  })
+  test('a PR with files returns them', () => {
+    expect(changedFilesFor('pull_request', 'a.enso b.java\nc.ts')).toEqual([
+      'a.enso',
+      'b.java',
+      'c.ts',
     ])
   })
 })

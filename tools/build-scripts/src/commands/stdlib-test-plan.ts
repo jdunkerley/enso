@@ -14,6 +14,7 @@ import path from 'node:path'
 import { parse } from 'yaml'
 import { REPO_ROOT } from '../lib/repo.ts'
 import {
+  changedFilesFor,
   planMatrix,
   planSummary,
   selectTestProjects,
@@ -24,11 +25,14 @@ import { discoverProjects } from '../stdlib-test/suites.ts'
 
 try {
   const env = process.env
-  const entries = JSON.parse(env.STDLIB_SUITES ?? '[]') as SuiteEntry[]
+  if ((env.STDLIB_SUITES ?? '').trim() === '')
+    throw new Error(
+      'STDLIB_SUITES is not set; pass the platform\'s stdlib-suites JSON ("[]" for none).',
+    )
+  const entries = JSON.parse(env.STDLIB_SUITES ?? '') as SuiteEntry[]
   const mapFile = path.join(REPO_ROOT, 'tools', 'ci', 'stdlib-test-map.yaml')
   const map = parse(readFileSync(mapFile, 'utf8')) as StdlibTestMap
-  const files = (env.CHANGED_FILES ?? '').split(/\s+/).filter((file) => file !== '')
-  const changed = env.GITHUB_EVENT_NAME === 'pull_request' && files.length > 0 ? files : null
+  const changed = changedFilesFor(env.GITHUB_EVENT_NAME, env.CHANGED_FILES)
   const selection = selectTestProjects(map, changed)
   const projects = discoverProjects(path.join(REPO_ROOT, 'test'))
   const matrix = planMatrix(entries, map, projects, selection, env.STDLIB_SHARDS !== 'false')

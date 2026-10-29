@@ -77,6 +77,19 @@ function closure(start: Iterable<string>, next: (item: string) => readonly strin
 }
 
 /**
+ * The changed files that narrow the run: `null` (every project) unless this is a pull request
+ * and `raw` (space-separated) names at least one file.
+ */
+export function changedFilesFor(
+  eventName: string | undefined,
+  raw: string | undefined,
+): string[] | null {
+  if (eventName !== 'pull_request') return null
+  const files = (raw ?? '').split(/\s+/).filter((file) => file !== '')
+  return files.length > 0 ? files : null
+}
+
+/**
  * The test projects that `changedFiles` can affect (`null`: outside a pull request, every one). A
  * changed library selects the projects that import it or any library depending on it; a changed
  * test project selects itself; either also selects the projects that import a selected one. Any
@@ -171,6 +184,10 @@ export function planMatrix(
       if (only.length > 0) matrix.push({ ...entry, only: only.join(',') })
       continue
     }
+    if (!map.shards.some(({ projects: listed }) => listed === '*'))
+      throw new Error(
+        'The test map has no "*" shard: projects outside the named shards would not run.',
+      )
     const taken = new Set<string>()
     for (const { name, projects: listed } of map.shards) {
       const shardProjects =
