@@ -7,15 +7,23 @@
 //    ref, so it only eats the budget);
 //  - not accessed for `--days` days (GitHub evicts at 7 days anyway, but only when it is short of
 //    room, so the cap is hit first); or
-//  - superseded: a dependency cache (`sbt-deps-*`, `node-cache-*`) whose key ends in a content
-//    hash, when a newer entry with the same key but another hash exists on the same ref.
+//  - superseded: a dependency cache (`sbt-deps-*`, `node-cache-*`, `v0-rust-*`) whose key ends in a
+//    content hash, when a newer entry with the same key but another hash exists on the same ref.
 
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-/** `<family>-<sha256>`: the keys whose hash changes when the cached inputs do. */
-const HASHED_KEY = /^((?:sbt-deps|node-cache)-.+)-[0-9a-f]{64}$/
+/**
+ * The family of a key whose trailing hash changes when the cached inputs do: `<family>-<sha256>`
+ * (`sbt-deps-*`, `node-cache-*`), or rust-cache's `v0-rust-<key>-<OS>-<arch>-<8 hex>-<8 hex>`.
+ */
+function familyOf(key) {
+  return (
+    /^((?:sbt-deps|node-cache)-.+)-[0-9a-f]{64}$/.exec(key)?.[1] ??
+    /^(v0-rust-.+)-[0-9a-f]{8}-[0-9a-f]{8}$/.exec(key)?.[1]
+  )
+}
 
 /**
  * @param {{ id: number, key: string, ref: string, sizeInBytes: number, createdAt: string, lastAccessedAt: string }[]} caches
@@ -35,7 +43,7 @@ export function selectPrunable(caches, { openPrs, now, days }) {
     } else if (now - Date.parse(cache.lastAccessedAt) > days * DAY_MS) {
       mark(cache, `not accessed for more than ${days} days`)
     }
-    const family = HASHED_KEY.exec(cache.key)?.[1]
+    const family = familyOf(cache.key)
     if (family != null) {
       const group = `${cache.ref} ${family}`
       const best = newest.get(group)
@@ -45,7 +53,7 @@ export function selectPrunable(caches, { openPrs, now, days }) {
     }
   }
   for (const cache of caches) {
-    const family = HASHED_KEY.exec(cache.key)?.[1]
+    const family = familyOf(cache.key)
     if (family != null && newest.get(`${cache.ref} ${family}`) !== cache) {
       mark(cache, 'superseded by a newer entry with another hash')
     }

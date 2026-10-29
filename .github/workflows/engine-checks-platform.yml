@@ -88,12 +88,22 @@ jobs:
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
   # here or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy of
   # `ENSO_TEST_JUNIT_DIR`. (The standard library jobs still use GraalPy and `GRAAL_EDITION`.)
+  # Note [The Engine's Cargo Target Directory]
+  # ==========================================
+  # The jobs that compile Rust (the parser's WASM build and AST generator in the ydoc bundle, the
+  # Java generator, the syntax check) build into `../cargo-target`, next to the checkout, not into
+  # `.cargo/config.toml`'s `target/rust`: the build job starts with `sbt clean`, and on develop
+  # `git-clean` runs before the Rust cache's post-job save, and both delete `target/`. They share
+  # one cache entry per OS (`setup-rust`, key `engine`), which only the build job saves, on develop.
+  # The parser's JNI library is built by sbt into `lib/rust/parser/target` with its own
+  # `--target-dir` and is not cached (`sbt clean` deletes it).
   build-engine-distribution:
     name: Build Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 60
     env:
       ENSO_LAUNCHER: native,test
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
     # Version].
     outputs:
@@ -117,6 +127,11 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "true" # "false" in every job but build-engine-distribution
+          workspaces: ". -> ../cargo-target"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - id: build
@@ -167,6 +182,7 @@ jobs:
     timeout-minutes: 30
     env:
       ENSO_LINT_ENABLE_GITHUB_ANNOTATIONS: "true"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -181,6 +197,11 @@ jobs:
           cache-key: engine
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           rust: "true"
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       - name: Check syntax
         run: sbt "-Dsbt.server.autostart=false" checkEnsoSyntax
         env:
@@ -242,6 +263,8 @@ jobs:
     permissions:
       checks: write
       contents: read
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -261,6 +284,11 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
+      - uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       # `sbt test` builds native images on Windows too (os-environment's tests).
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
