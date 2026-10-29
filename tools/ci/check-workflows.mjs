@@ -29,6 +29,15 @@ export const ROOT_FILES = ['build-config.yaml', ...TOOLCHAIN_PIN_FILES, ...NATIV
 /** The TypeScript package whose commands workflows run with `corepack pnpm --filter build-scripts`. */
 export const BUILD_SCRIPTS = 'tools/build-scripts'
 
+/** The standard library test map; see `checkStdlibTestMap`. */
+export const STDLIB_TEST_MAP = 'tools/ci/stdlib-test-map.yaml'
+
+/**
+ * A top-level import of a standard library or of a test project. An indented one is an example in
+ * a doc comment and does not count.
+ */
+const ENSO_IMPORT = /^(?:from|import)\s+(?:Standard\.(\w+)|enso_dev\.(\w+))/gm
+
 /** Every `.ts` file under `dir`, as paths relative to `base` with `/` separators. */
 function typeScriptFiles(dir, base) {
   if (!existsSync(dir)) return []
@@ -55,9 +64,69 @@ function loadBuildScripts(root) {
   return { scripts, sources }
 }
 
+/** The names of the directories in `dir`, sorted; none when it does not exist. */
+function subdirectories(dir) {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+}
+
+/** Every `.enso` file under `dir`. */
+function ensoFiles(dir) {
+  if (!existsSync(dir)) return []
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) return ensoFiles(full)
+    return entry.name.endsWith('.enso') ? [full] : []
+  })
+}
+
+/** The libraries and the test projects that the `.enso` files under `dir` import, but `self`. */
+function ensoImports(dir, self) {
+  const libraries = new Set()
+  const tests = new Set()
+  for (const file of ensoFiles(dir)) {
+    for (const [, library, project] of readFileSync(file, 'utf8').matchAll(ENSO_IMPORT)) {
+      if (library != null && library !== self) libraries.add(library)
+      if (project != null && project !== self) tests.add(project)
+    }
+  }
+  return { libraries: [...libraries].sort(), tests: [...tests].sort() }
+}
+
+/**
+ * What `checkStdlibTestMap` compares the map with: the libraries under
+ * `distribution/lib/Standard` (their first version directory with a `package.yaml`), the
+ * `std-bits` directories and the `test/*_Tests` projects with a `package.yaml`, the last as
+ * `tools/build-scripts`' `discoverProjects` finds them.
+ */
+function loadStdlib(root) {
+  const mapFile = path.join(root, STDLIB_TEST_MAP)
+  const map = existsSync(mapFile) ? parse(readFileSync(mapFile, 'utf8')) : null
+  const standard = path.join(root, 'distribution', 'lib', 'Standard')
+  const libraries = {}
+  for (const name of subdirectories(standard)) {
+    const version = subdirectories(path.join(standard, name)).find((dir) =>
+      existsSync(path.join(standard, name, dir, 'package.yaml')),
+    )
+    libraries[name] =
+      version == null ? [] : ensoImports(path.join(standard, name, version, 'src'), name).libraries
+  }
+  const testDir = path.join(root, 'test')
+  const testProjects = {}
+  for (const name of subdirectories(testDir)) {
+    if (!name.endsWith('_Tests') || !existsSync(path.join(testDir, name, 'package.yaml'))) continue
+    testProjects[name] = ensoImports(path.join(testDir, name, 'src'), name)
+  }
+  return { map, libraries, stdBits: subdirectories(path.join(root, 'std-bits')), testProjects }
+}
+
 /**
  * Loads every workflow and every local composite action under `root/.github`, the `ROOT_FILES`
- * (`null` when absent), and `tools/build-scripts` (`null` when absent).
+ * (`null` when absent), `tools/build-scripts` (`null` when absent) and the standard library test
+ * map with what it describes.
  */
 export function loadRepo(root) {
   const read = (file) => {
@@ -82,7 +151,13 @@ export function loadRepo(root) {
     const target = path.join(root, file)
     files[file] = existsSync(target) ? readFileSync(target, 'utf8') : null
   }
-  return { workflows, actions, files, buildScripts: loadBuildScripts(root) }
+  return {
+    workflows,
+    actions,
+    files,
+    buildScripts: loadBuildScripts(root),
+    stdlib: loadStdlib(root),
+  }
 }
 
 function triggers(doc) {
@@ -723,6 +798,104 @@ export function checkWorkflowsDeclarePermissions({ workflows }) {
   return problems
 }
 
+/**
+ * The standard library test map (`tools/ci/stdlib-test-map.yaml`) decides which test projects a
+ * pull request runs (spec 2a), so a library or test project missing from it, or an import it does
+ * not know, would silently skip tests. It must name every library, `std-bits` directory and test
+ * project, and its import lists must equal the sources' top-level imports.
+ */
+export function checkStdlibTestMap({ stdlib }) {
+  const { map, libraries, stdBits, testProjects } = stdlib
+  const at = `${STDLIB_TEST_MAP}:`
+  if (map == null) {
+    if (Object.keys(libraries).length === 0) return []
+    return [`${at} missing (every library under distribution/lib/Standard needs an entry)`]
+  }
+  const problems = []
+  const compare = (label, declared, actual, source, prefix) => {
+    for (const name of actual) {
+      if (!(declared ?? []).includes(name)) {
+        problems.push(`${at} \`${label}\` lacks \`${name}\`: ${source} imports ${prefix}${name}`)
+      }
+    }
+    for (const name of declared ?? []) {
+      if (!actual.includes(name)) {
+        problems.push(`${at} \`${label}\` lists \`${name}\`, which ${source} does not import`)
+      }
+    }
+  }
+  const declaredLibraries = map.libraries ?? {}
+  for (const [name, imports] of Object.entries(libraries)) {
+    const entry = declaredLibraries[name]
+    const source = `distribution/lib/Standard/${name}`
+    if (entry == null) problems.push(`${at} no entry for library \`${name}\` (${source})`)
+    else compare(`libraries.${name}.dependsOn`, entry.dependsOn, imports, source, 'Standard.')
+  }
+  for (const name of Object.keys(declaredLibraries)) {
+    if (!(name in libraries)) {
+      problems.push(`${at} \`libraries.${name}\` names no directory under distribution/lib/Standard`)
+    }
+  }
+  const owned = new Set([
+    ...(map.everything?.stdBits ?? []),
+    ...Object.values(declaredLibraries).flatMap((entry) => entry?.stdBits ?? []),
+  ])
+  for (const dir of stdBits) {
+    if (!owned.has(dir)) {
+      problems.push(
+        `${at} std-bits/${dir} belongs to no library (add it to a library's \`stdBits\` or to \`everything.stdBits\`)`,
+      )
+    }
+  }
+  for (const dir of owned) {
+    if (!stdBits.includes(dir)) problems.push(`${at} std-bits/${dir} is listed but does not exist`)
+  }
+  const declaredTests = map.testProjects ?? {}
+  for (const [name, imports] of Object.entries(testProjects)) {
+    const entry = declaredTests[name]
+    const source = `test/${name}`
+    if (entry == null) {
+      problems.push(`${at} no entry for test project \`${name}\` (${source})`)
+      continue
+    }
+    compare(`testProjects.${name}.imports`, entry.imports, imports.libraries, source, 'Standard.')
+    compare(`testProjects.${name}.testImports`, entry.testImports, imports.tests, source, 'enso_dev.')
+  }
+  for (const name of Object.keys(declaredTests)) {
+    if (!(name in testProjects)) {
+      problems.push(`${at} \`testProjects.${name}\` names no test project under test/`)
+    }
+  }
+  for (const name of map.everything?.libraries ?? []) {
+    if (!(name in libraries)) {
+      problems.push(`${at} \`everything.libraries\` names \`${name}\`, which is not a library`)
+    }
+  }
+  const shards = map.shards ?? []
+  if (shards.at(-1)?.projects !== '*') {
+    problems.push(
+      `${at} the last shard must have \`projects: "*"\` (the projects no other shard names)`,
+    )
+  }
+  const runBy = new Map()
+  for (const shard of shards.slice(0, -1)) {
+    for (const project of Array.isArray(shard.projects) ? shard.projects : []) {
+      if (!(project in testProjects)) {
+        problems.push(
+          `${at} shard \`${shard.name}\` names \`${project}\`, which is not a test project`,
+        )
+      } else if (runBy.has(project)) {
+        problems.push(
+          `${at} shard \`${shard.name}\` names \`${project}\`, which shard \`${runBy.get(project)}\` already runs`,
+        )
+      } else {
+        runBy.set(project, shard.name)
+      }
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -738,6 +911,7 @@ export const CHECKS = [
   checkBuildScriptsSpawnSbtThroughHelper,
   checkJobsHaveTimeouts,
   checkWorkflowsDeclarePermissions,
+  checkStdlibTestMap,
 ]
 
 /** Every violation in the repository at `root`, one message each. */
