@@ -121,7 +121,7 @@ settings. Every workflow is hand-written YAML (build simplification;
   enso4igv and the stdlib tests restore the `engine` entry). The key hashes only
   `build.sbt`, `project/*.sbt`, `project/Dependencies.scala` and
   `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
-  stdlib tests also cache pip's `~/.cache/pip`
+  stdlib tests also cache GraalPy's pip wheels, `~/.cache/pip-graalpy`
   (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the
   `standard-library*` legs only; Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for

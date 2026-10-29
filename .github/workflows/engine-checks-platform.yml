@@ -472,8 +472,9 @@ jobs:
           rust: "true"
       # Note [GraalPy Wheel Cache]
       # Examples_Tests' Python spec pip-installs numpy into a GraalPy venv. PyPI has no wheel for
-      # GraalPy, so pip compiles it (12-13 min). pip keeps the built wheel in ~/.cache/pip; caching
-      # that directory lets later runs install it in seconds. Saved on develop only, like the sbt
+      # GraalPy, so pip compiles it (12-13 min). GraalPy's pip keeps the built wheel in
+      # ~/.cache/pip-graalpy (not ~/.cache/pip, which stays empty); caching that
+      # directory lets later runs install it in seconds. Saved on develop only, like the sbt
       # cache; keyed on the GraalPy version, as a wheel built for one GraalPy does not fit another,
       # and on the spec that pins the numpy version (`numpy==X` in `Python_Examples_Spec.enso`), so
       # bumping the pin makes a new entry. Only the suites that run Examples_Tests save it: an entry
@@ -482,7 +483,7 @@ jobs:
       - name: Restore the GraalPy wheel cache
         uses: actions/cache/restore@v4
         with:
-          path: ~/.cache/pip
+          path: ~/.cache/pip-graalpy
           key: graalpy-pip-${{ runner.os }}-${{ steps.jvm.outputs.graalpy-version }}-${{ hashFiles('test/Examples_Tests/src/Python_Examples_Spec.enso') }}
       - if: matrix.small-jdk && inputs.edition != 'Oracle GraalVM'
         name: Build the small JDK
@@ -532,17 +533,17 @@ jobs:
         id: wheel
         name: Check for the GraalPy numpy wheel
         run: |
-          if [ -n "$(find ~/.cache/pip -name 'numpy-*.whl' 2>/dev/null | head -n 1)" ]; then
+          if [ -n "$(find ~/.cache/pip-graalpy -name 'numpy-*.whl' 2>/dev/null | head -n 1)" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No numpy wheel under ~/.cache/pip: the GraalPy wheel cache is not saved." >> "$GITHUB_STEP_SUMMARY"
+            echo "No numpy wheel under ~/.cache/pip-graalpy: the GraalPy wheel cache is not saved." >> "$GITHUB_STEP_SUMMARY"
           fi
       - if: ${{ steps.wheel.outputs.found == 'true' }}
         name: Save the GraalPy wheel cache
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/pip
+          path: ~/.cache/pip-graalpy
           key: graalpy-pip-${{ runner.os }}-${{ steps.jvm.outputs.graalpy-version }}-${{ hashFiles('test/Examples_Tests/src/Python_Examples_Spec.enso') }}
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
