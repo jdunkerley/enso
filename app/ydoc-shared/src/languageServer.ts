@@ -364,11 +364,6 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.request('file/info', { path })
   }
 
-  /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#filechecksum) */
-  fileChecksum(path: Path): Promise<LsRpcResult<response.FileChecksum>> {
-    return this.request('file/checksum', { path })
-  }
-
   /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#executioncontextcreate) */
   createExecutionContext(contextId?: ContextId): Promise<LsRpcResult<response.ExecutionContext>> {
     return this.request('executionContext/create', { contextId })

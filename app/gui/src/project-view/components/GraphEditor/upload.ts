@@ -2,8 +2,6 @@ import { Awareness } from '@/stores/awareness'
 import { useProjectFiles, type ProjectFiles } from '@/stores/projectFiles'
 import { Vec2 } from '@/util/data/vec2'
 import type { DataServer } from '@/util/net/dataServer'
-import { Keccak, sha3_224 as SHA3 } from '@noble/hashes/sha3'
-import type { Hash } from '@noble/hashes/utils'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { escapeTextLiteral } from 'ydoc-shared/ast/text'
 import type { LanguageServer } from 'ydoc-shared/languageServer'
@@ -39,11 +37,8 @@ export interface UploadResult {
  *
  * This will upload file chunks using binary protocol, updating information of progress in
  * {@link Awareness} object. On error, the file will be deleted.
- *
- * The uploaded file's checksum is not verified: see the note in {@link Uploader.upload}.
  */
 export class Uploader {
-  private checksum: Hash<Keccak>
   private uploadedBytes: bigint
   private awareness: Awareness
   private projectFiles: ProjectFiles
@@ -62,7 +57,6 @@ export class Uploader {
     private disableDirectRead: boolean,
     private readonly method: ExternalId,
   ) {
-    this.checksum = SHA3.create()
     this.uploadedBytes = BigInt(0)
     this.awareness = projectStore.awareness
     this.projectFiles = useProjectFiles(projectStore)
@@ -127,7 +121,6 @@ export class Uploader {
           chunk,
         )
         if (!result.ok) throw result.error
-        this.checksum.update(chunk)
         this.uploadedBytes += BigInt(chunk.length)
         const bytes = Number(this.uploadedBytes)
         const sizePercentage = Math.round((bytes / this.file.size) * 100)
@@ -140,11 +133,6 @@ export class Uploader {
         throw new Error(`Uploading process aborted. ${reason}`)
       },
     })
-    // The checksum is not verified (https://github.com/enso-org/enso/issues/6691, closed upstream
-    // as not planned). The language server's `file/checksum` hashes the whole file with SHA3-224
-    // inside the file manager's 3-second timeout, so it fails with "Service error" on large files.
-    // A verification would go after the `pipeTo` below, pass `this.checksum`, and show its error to
-    // the user: `await this.projectFiles.assertChecksum(remotePath, this.checksum)`.
     await this.file.stream().pipeTo(writableStream)
     return Ok({ source: 'Project', name: name.value })
   }

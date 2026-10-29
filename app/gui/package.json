@@ -66,7 +66,6 @@
     "@lexical/markdown": "^0.21.0",
     "@lezer/common": "catalog:",
     "@lezer/highlight": "catalog:",
-    "@noble/hashes": "^1.6.1",
     "@sentry/vite-plugin": "^2.22.7",
     "@sentry/vue": "^7.120.2",
     "@tanstack/query-core": "^5.90.9",

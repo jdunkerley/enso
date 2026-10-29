@@ -416,10 +416,6 @@ export namespace response {
     attributes: FileAttributes
   }
 
-  export interface FileChecksum {
-    checksum: Checksum
-  }
-
   export interface ExecutionContext {
     contextId: ContextId
     canModify: CapabilityRegistration

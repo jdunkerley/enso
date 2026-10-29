@@ -4,7 +4,6 @@ import type { YjsChannel } from 'ydoc-channel'
 import {
   Builder,
   ByteBuffer,
-  ChecksumBytesCommand,
   ChecksumBytesReply,
   EnsoUUID,
   Error,
@@ -244,21 +243,6 @@ export class DataServer extends ObservableV2<DataServerEvents> {
     const segmentOffset = FileSegment.createFileSegment(builder, pathOffset, index, length)
     const command = ReadBytesCommand.createReadBytesCommand(builder, segmentOffset)
     return await this.send(builder, InboundPayload.READ_BYTES_CMD, command)
-  }
-
-  /** TODO: Add docs */
-  async checksumBytes(
-    path: LSPath,
-    index: bigint,
-    length: bigint,
-  ): Promise<ChecksumBytesReply | Error> {
-    const builder = new Builder()
-    const segmentOffsets = path.segments.map((segment) => builder.createString(segment))
-    const segmentsOffset = Path.createSegmentsVector(builder, segmentOffsets)
-    const pathOffset = Path.createPath(builder, this.createUUID(path.rootId), segmentsOffset)
-    const segmentOffset = FileSegment.createFileSegment(builder, pathOffset, index, length)
-    const command = ChecksumBytesCommand.createChecksumBytesCommand(builder, segmentOffset)
-    return await this.send(builder, InboundPayload.WRITE_BYTES_CMD, command)
   }
 }
 
