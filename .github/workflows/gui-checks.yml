@@ -219,8 +219,9 @@ jobs:
 
   playwright:
     name: 🎭 Playwright Tests
-    # Only run once lint (compile + typecheck + lint + unit tests) has passed.
-    needs: [build-wasm, lint]
+    # Runs alongside lint. A lint failure still fails the GUI checks: `gui-pull-request.yml`'s
+    # "GUI Required Checks" reads the result of this whole workflow.
+    needs: [build-wasm]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     runs-on: ${{ fromJSON(inputs.runs-on) }}
