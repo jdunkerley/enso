@@ -316,7 +316,9 @@ add_specs suite_builder =
 
             r4 = x ^ y
             r4.value_type . should_equal Value_Type.Float
-            r4.to_vector . should_equal [(10^30)^(10^20), (2^70)^2, Nothing, 3^4]
+            # The column computes `^` as a Float, so a huge power is infinity
+            # rather than the Integer `^`'s Arithmetic_Error.
+            r4.to_vector . should_equal [Number.positive_infinity, (2^70)^2, Nothing, 3^4]
 
             (x.min y).to_vector . should_equal [10^20, 2, 3, 3]
             (x.max y).to_vector . should_equal [10^30, 2^70, 3, 4]
@@ -425,7 +427,9 @@ add_specs suite_builder =
 
             r5 = c ^ x
             r5.value_type . should_equal Value_Type.Float
-            r5.to_vector . should_equal [1 ^ x, 2 ^ x, Nothing, 3 ^ x]
+            # The column computes `^` as a Float, so a huge power is infinity
+            # rather than the Integer `^`'s Arithmetic_Error.
+            r5.to_vector . should_equal [1, Number.positive_infinity, Nothing, Number.positive_infinity]
 
             r6 = c.min x
             r6.value_type . should_be_a (Value_Type.Decimal ...)
