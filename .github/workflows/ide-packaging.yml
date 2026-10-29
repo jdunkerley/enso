@@ -76,6 +76,7 @@ jobs:
     # `!= false`, not `== true`: see Note [Reusing Develop's Backend].
     if: ${{ inputs.build_backend != false }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -172,6 +173,7 @@ jobs:
   gui-build:
     name: GUI build (linux, amd64)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -240,6 +242,7 @@ jobs:
     # when the backend is built; when it ran and failed, there is no backend to package.
     if: ${{ !cancelled() && needs.gui-build.result == 'success' && needs.find-backend.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

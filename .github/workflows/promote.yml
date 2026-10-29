@@ -37,6 +37,7 @@ jobs:
   promote:
     name: Promote release (linux, amd64)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       ENSO_VERSION: ${{ steps.promote.outputs.ENSO_VERSION }}
       ENSO_EDITION: ${{ steps.promote.outputs.ENSO_EDITION }}

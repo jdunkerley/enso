@@ -127,6 +127,7 @@ jobs:
     name: Create a release draft.
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     outputs:
       ENSO_RELEASE_ID: ${{ steps.prepare.outputs.ENSO_RELEASE_ID }}
       ENSO_VERSION: ${{ steps.prepare.outputs.ENSO_VERSION }}
@@ -146,6 +147,7 @@ jobs:
     name: Verify License Packages (linux, amd64)
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -171,6 +173,7 @@ jobs:
     name: GUI build (linux, amd64)
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -221,6 +224,7 @@ jobs:
     name: Build Backend (${{ matrix.os }}, amd64)
     if: inputs.release-id == ''
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -287,6 +291,7 @@ jobs:
     needs: [check-the-mac-os-runner]
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
+    timeout-minutes: 45
     continue-on-error: true
     env:
       ENSO_LAUNCHER: native
@@ -335,6 +340,7 @@ jobs:
     needs: [draft-release, build-backend, gui-build]
     if: ${{ !cancelled() && needs.draft-release.result == 'success' && needs.gui-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -397,6 +403,7 @@ jobs:
       [check-the-mac-os-runner, draft-release, build-backend-macos, gui-build]
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
+    timeout-minutes: 30
     continue-on-error: true
     env:
       ENSO_BUILD_UPDATE_INFO: "true"
@@ -452,6 +459,7 @@ jobs:
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
     if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       ENSO_RELEASE_ID: ${{ inputs.release-id != '' && inputs.release-id || needs.draft-release.outputs.ENSO_RELEASE_ID }}
     steps:
@@ -472,6 +480,7 @@ jobs:
     needs: [draft-release, publish-release]
     if: "!cancelled() && needs.publish-release.result == 'success'"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       pull-requests: write

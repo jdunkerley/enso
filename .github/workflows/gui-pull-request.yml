@@ -40,6 +40,7 @@ jobs:
   prettier:
     name: 🧹 Prettier
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
     steps:
       - uses: actions/checkout@v5
@@ -92,6 +93,7 @@ jobs:
     # See Note [Ignoring Unrelated Label Events] in `ide-pull-request.yml`.
     name: "${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && 'GUI Checks (unrelated label change, ignored)' || 'GUI Required Checks' }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [gui-changed-files, prettier, gui-checks]
     if: "${{ always() && !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
     steps:

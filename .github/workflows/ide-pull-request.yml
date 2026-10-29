@@ -80,6 +80,7 @@ jobs:
     # See Note [Ignoring Unrelated Label Events].
     name: "${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && 'IDE Checks (unrelated label change, ignored)' || 'IDE Required Checks' }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs:
       - gui-changed-files
       - ide-changed-files
