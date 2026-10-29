@@ -58,8 +58,9 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **App-only PRs package with develop's backend.** When no engine file changed,
   `ide-pull-request.yml` passes `build_backend: false` and `ide-packaging.yml`
   downloads the `backend-<os>` artifacts of the newest develop run whose commit
-  is an ancestor of the PR head (`find-backend`). The `CI: Build IDE` label or
-  any engine change builds the backend instead; develop and releases always do.
+  is an ancestor of the commit being packaged, the PR's merge commit
+  (`find-backend`). The `CI: Build IDE` label or any engine change builds the
+  backend instead; develop and releases always do.
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);
