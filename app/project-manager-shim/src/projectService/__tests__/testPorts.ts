@@ -32,3 +32,5 @@ export const RUNNING_PROJECTS_PORT = randomPortInBand(1)
 export const STARTUP_CRASH_PORT = randomPortInBand(2)
 /** `stdinClosed.test.ts`. */
 export const STDIN_CLOSED_PORT = randomPortInBand(3)
+/** `respawnClose.test.ts`. */
+export const RESPAWN_CLOSE_PORT = randomPortInBand(4)

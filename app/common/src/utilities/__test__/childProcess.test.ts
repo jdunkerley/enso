@@ -437,6 +437,26 @@ describe('WatchedChildProcess', () => {
     await teardown(watcher, ctrl.fakes)
   })
 
+  test('stopRespawning during a respawn leaves the live child alone and spawns no new one', async () => {
+    const ctrl = makeSpawner()
+    const watcher = new WatchedChildProcess(ctrl.spawner, defaultOptions())
+    await watcher.firstSpawn
+    const respawnPromise = watcher.respawn()
+    watcher.stopRespawning()
+    ctrl.fakes[0]!.simulateExit(0, 'SIGTERM')
+    await respawnPromise
+    expect(ctrl.fakes).toHaveLength(1)
+    // Unlike close(), it killed nothing by itself: the SIGTERM is the respawn's.
+    const live = makeSpawner()
+    const other = new WatchedChildProcess(live.spawner, defaultOptions())
+    await other.firstSpawn
+    other.stopRespawning()
+    expect(live.fakes[0]!.killCalls).toEqual([])
+    await other.respawn()
+    expect(live.fakes).toHaveLength(1)
+    await teardown(other, live.fakes)
+  })
+
   test('manual respawn does not trigger onUnexpectedExit', async () => {
     const ctrl = makeSpawner()
     const onUnexpectedExit = vi.fn()
