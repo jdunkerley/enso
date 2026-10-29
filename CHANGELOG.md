@@ -306,6 +306,14 @@
   the parser, the WASM and JNI builds of it, and the `./run` build CLI. No
   behaviour changes — the parser produces the same AST and the same Java
   bindings as before.
+- [Libraries and editions are no longer downloaded from upstream by
+  default][412]. The engine used to fetch missing editions from
+  `editions.release.enso.org` and its standard library entries pointed at
+  `libraries.release.enso.org`; neither is configured now. The standard
+  libraries (including `Standard.Image`) are bundled with the engine and resolve
+  as before. To download editions, list an edition provider under
+  `edition-providers` in `global-config.yaml`, or set up your own library
+  repository.
 
 #### Enso Standard Library
 
@@ -415,6 +423,7 @@
 [37]: https://github.com/jdunkerley/enso/pull/37
 [39]: https://github.com/jdunkerley/enso/pull/39
 [384]: https://github.com/jdunkerley/enso/pull/384
+[412]: https://github.com/jdunkerley/enso/pull/412
 
 # Enso 2026.1
 
