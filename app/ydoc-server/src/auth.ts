@@ -1,4 +1,4 @@
-/** @file Utility methods for ydoc server authentication. */
+/** @file Utility methods for ydoc server authentication (throwaway CI test). */
 
 export type ConnectionData = {
   lsUrl: string | null
