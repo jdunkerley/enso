@@ -454,6 +454,7 @@ jobs:
         with:
           name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
+        id: jvm
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: engine
@@ -461,6 +462,19 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           graalpy: "true"
           rust: "true"
+      # Note [GraalPy Wheel Cache]
+      # Examples_Tests' Python spec pip-installs numpy into a GraalPy venv. PyPI has no wheel for
+      # GraalPy, so pip compiles it (12-13 min). pip keeps the built wheel in ~/.cache/pip; caching
+      # that directory lets later runs install it in seconds. Saved on develop only, like the sbt
+      # cache; keyed on the GraalPy version, as a wheel built for one GraalPy does not fit another.
+      # Only the suites that run Examples_Tests save it: an entry is never overwritten, so a leg
+      # that ran no pip install must not claim the key. It saves even when a test failed (not when
+      # cancelled): the wheel is built whatever else fails.
+      - name: Restore the GraalPy wheel cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/pip
+          key: graalpy-pip-${{ runner.os }}-${{ steps.jvm.outputs.graalpy-version }}
       - if: matrix.small-jdk && inputs.edition != 'Oracle GraalVM'
         name: Build the small JDK
         run: sbt "-Dbench.compileOnly=false" "-Dsbt.server.autostart=false" "buildSmallJdkForRelease ${{ github.workspace }}/target/small-jdk"
@@ -503,6 +517,13 @@ jobs:
           ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
           ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
           ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
+      - if: ${{ !cancelled() && github.ref == 'refs/heads/develop' && startsWith(matrix.suite, 'standard-library') }}
+        name: Save the GraalPy wheel cache
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/pip
+          key: graalpy-pip-${{ runner.os }}-${{ steps.jvm.outputs.graalpy-version }}
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1

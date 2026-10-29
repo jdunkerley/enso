@@ -90,12 +90,18 @@ settings. Every workflow is hand-written YAML (build simplification;
   a job that merely reuses another's passes `cache-save: "false"` (formatting,
   enso4igv and the stdlib tests restore the `engine` entry). The key hashes only
   `build.sbt`, `project/*.sbt`, `project/Dependencies.scala` and
-  `project/build.properties` (Note [The sbt Dependency Cache Key]). A job whose
-  sbt tasks compile the Rust parser passes `rust: "true"`. Quote `-D` arguments
-  (`sbt "-Dsbt.server.autostart=false" …`): on Windows, PowerShell splits an
-  unquoted one at its first dot. `tools/ci/check-workflows.mjs` fails a job that
-  runs `sbt` before `setup-jvm`, and fails `build-config.yaml`'s pins if they
-  drift from `graalVersion`, `graalMavenPackagesVersion`, `flatbuffersVersion`
+  `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
+  stdlib tests also cache pip's `~/.cache/pip`
+  (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the
+  `standard-library*` legs only; Note [GraalPy Wheel Cache] in
+  `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
+  GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
+  `graalpy-version` output. A job whose sbt tasks compile the Rust parser passes
+  `rust: "true"`. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`):
+  on Windows, PowerShell splits an unquoted one at its first dot.
+  `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
+  and fails `build-config.yaml`'s pins if they drift from `graalVersion`,
+  `graalMavenPackagesVersion`, `flatbuffersVersion`
   (`project/Dependencies.scala`) or `sbt.version` (`project/build.properties`).
   It counts `sbt` (and `sbt.bat`) as a command after inline `VAR=value`
   assignments and wrappers (`timeout`, `time`, `env`, `nice`, `xvfb-run`,
