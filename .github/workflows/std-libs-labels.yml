@@ -23,6 +23,7 @@ jobs:
   stdlib-api-check:
     name: ${{ matrix.library }}-change-labels
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       # Each library is labelled on its own, as when they were separate jobs.
       fail-fast: false

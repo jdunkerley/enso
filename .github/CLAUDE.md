@@ -52,6 +52,11 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **Every `pull_request` trigger ignores `docs/superpowers/**`** (or uses a
   `paths` whitelist that leaves it out). `tools/ci/check-workflows.mjs` fails
   any workflow that forgets.
+- **Every job sets `timeout-minutes`** (a hung job otherwise runs for GitHub's
+  default of 6 hours): 90 for tests, 45 for builds, 30 otherwise, raised where a
+  job's slowest recent run needs more than 1.5x headroom (the engine and backend
+  builds use 60). `check-workflows.mjs` fails a job without one; jobs that call
+  a reusable workflow are exempt, as the called jobs carry it.
 - **A new workflow or composite action used by the engine checks goes on the
   list in `engine-changed-files.yml`**, or a change to it will not run them.
   `ide-changed-files.yml` already covers all of `.github/**`.

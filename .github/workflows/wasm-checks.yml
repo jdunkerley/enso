@@ -17,6 +17,7 @@ jobs:
   native-test:
     name: Native Rust tests (linux, amd64)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -32,6 +33,7 @@ jobs:
   lint:
     name: Lint (linux, amd64)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -47,6 +49,7 @@ jobs:
   parser-wasm-test:
     name: Parser recursion test (linux, amd64)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5

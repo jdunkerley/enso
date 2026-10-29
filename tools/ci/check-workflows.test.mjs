@@ -12,6 +12,7 @@ import {
   callsSbt,
   checkBuildScriptsSpawnSbtThroughHelper,
   checkIdePackagingNeedsNoCloudAccount,
+  checkJobsHaveTimeouts,
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
@@ -97,6 +98,24 @@ jobs:
     steps:
       - run: corepack pnpm --filter build-scripts run release update-latest-version
 `
+
+describe('checkJobsHaveTimeouts', () => {
+  test('accepts runner jobs with timeout-minutes, and reusable-workflow calls', () => {
+    const repo = fixture({
+      'workflows/a.yml':
+        'on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps: []\n  b:\n    uses: ./.github/workflows/c.yml\n',
+    })
+    assert.deepEqual(checkJobsHaveTimeouts(repo), [])
+  })
+  test('rejects a runner job without timeout-minutes', () => {
+    const repo = fixture({
+      'workflows/a.yml': 'on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps: []\n',
+    })
+    assert.deepEqual(checkJobsHaveTimeouts(repo), [
+      'a.yml: job `a` has no `timeout-minutes` (the default is 6 hours)',
+    ])
+  })
+})
 
 describe('checkPullRequestsIgnoreSpecs', () => {
   test('accepts paths-ignore with the spec paths, and a paths whitelist', () => {

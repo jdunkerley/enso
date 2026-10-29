@@ -45,6 +45,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: [engine]
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       checks: write
     env:

@@ -653,6 +653,22 @@ export function checkSbtRunsAfterSetupJvm({ workflows, actions = {}, buildScript
   return problems
 }
 
+/**
+ * A job left without `timeout-minutes` runs for GitHub's default of 6 hours when it hangs (#406's
+ * JVM tests hung for 2 hours until cancelled). Jobs that call a reusable workflow cannot set it;
+ * the called workflow's jobs do.
+ */
+export function checkJobsHaveTimeouts({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      if (job?.uses || job?.['timeout-minutes'] !== undefined) continue
+      problems.push(`${file}: job \`${id}\` has no \`timeout-minutes\` (the default is 6 hours)`)
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -665,6 +681,7 @@ export const CHECKS = [
   checkToolchainPins,
   checkSbtRunsAfterSetupJvm,
   checkBuildScriptsSpawnSbtThroughHelper,
+  checkJobsHaveTimeouts,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

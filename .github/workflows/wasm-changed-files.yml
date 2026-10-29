@@ -15,6 +15,7 @@ on:
 jobs:
   wasm-changed-files:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     name: Changed Files
     outputs:
       all_changed_files: ${{ steps.wasm-changed-files.outputs.all_changed_files }}

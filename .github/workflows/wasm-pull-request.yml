@@ -32,6 +32,7 @@ jobs:
   required-checks:
     name: WASM Required Checks
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [wasm-changed-files, wasm-checks]
     if: always()
     steps:
