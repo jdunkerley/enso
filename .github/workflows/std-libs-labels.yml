@@ -16,32 +16,15 @@ on:
   workflow_call: {}
 
 permissions:
-  checks: write
   pull-requests: write
 
 jobs:
-  stdlib-api-check:
-    name: ${{ matrix.library }}-change-labels
+  stdlib-api-labels:
+    name: Standard library API change labels
+    # Labels exist only on pull requests; a called workflow sees its caller's event name.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    strategy:
-      # Each library is labelled on its own, as when they were separate jobs.
-      fail-fast: false
-      matrix:
-        library:
-          - AWS
-          - Base
-          - Database
-          - DuckDB
-          - Generic_JDBC
-          - Google
-          - Image
-          - Microsoft
-          - Saas
-          - Snowflake
-          - Table
-          - Tableau
-          - Test
-          - Visualization
+    timeout-minutes: 10
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -49,24 +32,27 @@ jobs:
           clean: false
           fetch-depth: 2
       - id: changed-files
-        name: ${{ matrix.library }}-changed-files
+        name: Changed API files
         uses: step-security/changed-files@v45
         with:
-          files: distribution/lib/Standard/${{ matrix.library }}/**/docs/api/**/**.md
-      - name: List all changed files in ${{ matrix.library }}
+          files: distribution/lib/Standard/*/**/docs/api/**/**.md
+      - name: Add the labels
+        if: steps.changed-files.outputs.any_changed == 'true'
         env:
-          ANY_CHANGED: ${{ steps.changed-files.outputs.any_changed }}
-          ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          FILES: ${{ steps.changed-files.outputs.all_changed_files }}
         run: |
-          if [[ "$ANY_CHANGED" == "true" ]]; then
-            echo "Files changed:"
-          fi
-          for file in ${ALL_CHANGED_FILES}; do
-            echo "$file"
-          done
-      - if: steps.changed-files.outputs.any_changed == 'true'
-        name: Append -libs-API-change-${{ matrix.library }} label
-        uses: actions-ecosystem/action-add-labels@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          labels: -libs-API-change-${{ matrix.library }}
+          # `distribution/lib/Standard/<Library>/...`: the library is the fourth path segment.
+          libraries=$(for f in $FILES; do echo "$f" | cut -d/ -f4; done | sort -u)
+          for library in $libraries; do
+            label="-libs-API-change-$library"
+            # Only libraries with a label are labelled (Examples, Geo, ... have none).
+            if gh api "repos/$REPO/labels/$label" --silent 2>/dev/null; then
+              echo "$label"
+              gh pr edit "$PR" --repo "$REPO" --add-label "$label"
+            else
+              echo "No label $label exists; skipped"
+            fi
+          done | tee -a "$GITHUB_STEP_SUMMARY"
