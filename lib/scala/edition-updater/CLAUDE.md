@@ -8,7 +8,8 @@ Locates editions on disk and, if asked, downloads new ones (sbt project
   cache), or, when `updating`, an `UpdatingEditionProvider`. The updating one
   downloads a missing edition on lookup, and on `findAvailableEditions(true)` it
   fetches every edition from the `edition-providers` URLs in the global config.
-  The default URL is `GlobalConfig.Default`. With the plain provider the
+  There is no default URL: `GlobalConfig.Default` has no edition providers, so
+  nothing is downloaded until the user lists one. With the plain provider the
   `update` flag does nothing.
 - `EditionManager.apply` defaults to `updating = false`. The language server
   passes `true` (for `editions/listAvailable`), and so does the runner's
