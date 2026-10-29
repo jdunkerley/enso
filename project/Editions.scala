@@ -112,7 +112,8 @@ object Editions {
     private val libraries: Seq[Library]
   ) {
 
-    /** A library that should be uploaded is one that is hosted in a "jar:" repository.
+    /** A library that should be uploaded is one that is hosted in a "jar:" repository
+      * and is not bundled with the engine for good (see [[alwaysBundled]]).
       * See <a href="https://github.com/jdunkerley/enso/wiki/Libraries-Sharing">Libraries-Sharing</a> for details.
       * @return
       */
@@ -123,9 +124,22 @@ object Editions {
           repo.name == lib.repository
         }
       }
-      libs.map { _.name }
+      libs.map { _.name }.filterNot(alwaysBundled.contains)
     }
   }
+
+  /** The core libraries that are always bundled with the engine, so they are
+    * never uploaded. Every edition entry still names the `release` repository:
+    * the edition format has no way to say "bundled" (`repository: local` only
+    * searches the user's local library roots, not the engine's `lib`).
+    */
+  private val alwaysBundled: Set[String] = Set(
+    "Standard.Base",
+    "Standard.Table",
+    "Standard.Database",
+    "Standard.Visualization",
+    "Standard.Test"
+  )
 
   case class Repository(
     name: String,

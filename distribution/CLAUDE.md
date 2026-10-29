@@ -29,11 +29,16 @@ The fork runs no upstream library repository or edition provider, so nothing in
 the template points at enso-org. Every library entry names the one repository,
 `release`: a `jar:` URL for `std_image_repo.zip` on the fork's GitHub release.
 It is the future home of libraries that are not bundled with the engine (the
-build marks every library in a `jar:` repository for upload, `librariesToUpload`
-in `build.sbt`). Nothing is uploaded yet: the release workflow does not publish
-the zip, so a library that is not bundled fails as not found. The engine looks
-bundled libraries (everything in `lib/Standard`, `Standard.Image` included) up
-in its own distribution before it consults the repository.
+build marks every library in a `jar:` repository for upload, except the core set
+that is always bundled: Base, Table, Database, Visualization and Test, see
+`alwaysBundled` in `project/Editions.scala` and `librariesToUpload` in
+`build.sbt`). Nothing is uploaded yet: the release workflow does not publish the
+zip, so a library that is not bundled fails as not found. The engine looks
+bundled libraries (everything in `lib/Standard` today) up in its own
+distribution before it consults the repository. `repository: local` cannot name
+a bundled library: it resolves only the user's local library roots, not the
+engine's `lib/`. Source archives (`main.tgz`) are created for the uploaded
+libraries only, about 240 MB for the thirteen non-core ones.
 
 ## Changing the standard library
 
