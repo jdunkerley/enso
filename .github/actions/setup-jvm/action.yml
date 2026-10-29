@@ -37,6 +37,10 @@ inputs:
       tasks compile the Rust parser needs it; see Note [Install The Rust Toolchain Before sbt].
     required: false
     default: "false"
+outputs:
+  graalpy-version:
+    description: The pinned GraalPy version (`toolchain.graalpy` in `build-config.yaml`), installed or not.
+    value: ${{ steps.pins.outputs.graalpy }}
 runs:
   using: composite
   steps:
