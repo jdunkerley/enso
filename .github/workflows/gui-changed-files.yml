@@ -15,6 +15,9 @@ on:
         description: "Returns `true` when any of the filenames other than GUI tests have changed"
         value: ${{ jobs.gui-changed-files.outputs.any_changed_excluding_tests }}
 
+permissions:
+  contents: read
+
 # Markdown is ignored: no GUI code or test reads a `.md` file, so a documentation-only change
 # (READMEs, CLAUDE.md) cannot affect the GUI checks. Prettier, which does format Markdown, is not
 # gated on this workflow.

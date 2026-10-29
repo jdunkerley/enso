@@ -10,9 +10,16 @@ on:
     - cron: "0 2 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+
 jobs:
   promote-nightly:
     name: Promote nightly
+    # The union of what promote.yml's release job grants: a called workflow cannot exceed its caller.
+    permissions:
+      contents: write
+      pull-requests: write
     uses: ./.github/workflows/promote.yml
     with:
       designator: nightly

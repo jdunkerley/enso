@@ -24,6 +24,7 @@ import {
   checkNativeLibsFixtures,
   checkToolchainPins,
   checkWindowsInstallerSmokeTest,
+  checkWorkflowsDeclarePermissions,
   loadRepo,
 } from './check-workflows.mjs'
 
@@ -117,6 +118,28 @@ describe('checkJobsHaveTimeouts', () => {
     ])
   })
 })
+
+describe('checkWorkflowsDeclarePermissions', () => {
+  test('accepts a top-level permissions block, including an empty one', () => {
+    const repo = fixture({
+      'workflows/a.yml': 'on: push\npermissions:\n  contents: read\njobs: {}\n',
+      'workflows/b.yml': 'on: push\npermissions: {}\njobs: {}\n',
+    })
+    assert.deepEqual(checkWorkflowsDeclarePermissions(repo), [])
+  })
+  test('rejects a workflow with only job-level permissions, or none', () => {
+    const repo = fixture({
+      'workflows/a.yml':
+        'on: push\njobs:\n  a:\n    permissions:\n      checks: write\n    steps: []\n',
+      'workflows/b.yml': 'on: push\njobs: {}\n',
+    })
+    assert.deepEqual(checkWorkflowsDeclarePermissions(repo), [
+      'a.yml: no top-level `permissions:` (the default token can write)',
+      'b.yml: no top-level `permissions:` (the default token can write)',
+    ])
+  })
+})
+
 
 describe('checkPullRequestsIgnoreSpecs', () => {
   test('accepts paths-ignore with the spec paths, and a paths whitelist', () => {

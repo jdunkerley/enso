@@ -19,6 +19,9 @@ env:
   # Benchmarks always start and end with a clean working tree. Read by `.github/actions/git-clean`.
   ENSO_CI_CLEAN_BUILD: "true"
 
+permissions:
+  contents: read
+
 jobs:
   benchmark-standard-libraries-graal-vm-ce:
     name: Benchmark Standard Libraries (GraalVM CE)

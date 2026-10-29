@@ -12,6 +12,9 @@ on:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.ide-changed-files.outputs.any_changed }}
 
+permissions:
+  contents: read
+
 # The build and packaging plumbing of the IDE: the build scripts (`tools/build-scripts`), the
 # toolchains, the dependency manifests and the workflows. GUI sources are covered by
 # `gui-changed-files.yml` and the bundled engine by `engine-changed-files.yml`. Markdown is ignored:

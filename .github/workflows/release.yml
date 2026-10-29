@@ -103,6 +103,9 @@ env:
 # `ide-build --sign` is already passed; without a certificate it changes nothing. A signed Mac
 # build also writes `latest-mac.yml` and the zip, which `upload-ide` then uploads.
 
+permissions:
+  contents: read
+
 jobs:
   # The Mac is a self-hosted runner that may be offline. Its jobs wait for it for one minute and are
   # skipped when it does not appear; publishing then notes the missing installer. Keep in step with
@@ -128,6 +131,8 @@ jobs:
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     outputs:
       ENSO_RELEASE_ID: ${{ steps.prepare.outputs.ENSO_RELEASE_ID }}
       ENSO_VERSION: ${{ steps.prepare.outputs.ENSO_VERSION }}
@@ -341,6 +346,8 @@ jobs:
     if: ${{ !cancelled() && needs.draft-release.result == 'success' && needs.gui-build.result == 'success' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -404,6 +411,8 @@ jobs:
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
     timeout-minutes: 30
+    permissions:
+      contents: write
     continue-on-error: true
     env:
       ENSO_BUILD_UPDATE_INFO: "true"
@@ -460,6 +469,8 @@ jobs:
     if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     env:
       ENSO_RELEASE_ID: ${{ inputs.release-id != '' && inputs.release-id || needs.draft-release.outputs.ENSO_RELEASE_ID }}
     steps:

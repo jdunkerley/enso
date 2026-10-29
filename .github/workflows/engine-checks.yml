@@ -17,6 +17,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-engine-checks
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   platform:
     name: ${{ matrix.os }}

@@ -33,6 +33,9 @@ on:
         type: boolean
         default: true
 
+permissions:
+  contents: read
+
 jobs:
   promote:
     name: Promote release (linux, amd64)
@@ -57,6 +60,11 @@ jobs:
   release:
     name: Release
     needs: [promote]
+    # What release.yml's jobs need together: it drafts and publishes the release (contents) and opens
+    # the latest-release pull request (pull-requests). A called workflow cannot exceed its caller.
+    permissions:
+      contents: write
+      pull-requests: write
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ needs.promote.outputs.ENSO_VERSION }}

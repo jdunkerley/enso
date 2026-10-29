@@ -16,6 +16,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-wasm-pull-request
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
+permissions:
+  contents: read
+
 jobs:
   wasm-changed-files:
     name: 🔍 Files Changed

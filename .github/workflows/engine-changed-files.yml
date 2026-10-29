@@ -12,6 +12,9 @@ on:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.engine-changed-files.outputs.any_changed }}
 
+permissions:
+  contents: read
+
 jobs:
   engine-changed-files:
     runs-on: ubuntu-latest

@@ -36,14 +36,10 @@ concurrency:
 
 # The union of what the called workflows need: a called workflow cannot have more than its caller.
 permissions:
-  actions: read
+  actions: read # `gui-checks.yml` downloads develop's engine distribution artifact
   contents: read
-  issues: write
-  pull-requests: write
-  statuses: write
-  checks: write
-  id-token: write
-  pages: write
+  checks: write # Test reports and the lint results
+  pull-requests: read
 
 jobs:
   macos-runner:

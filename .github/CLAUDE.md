@@ -61,6 +61,19 @@ settings. Every workflow is hand-written YAML (build simplification;
   job's slowest recent run needs more than 1.5x headroom (the engine and backend
   builds use 60). `check-workflows.mjs` fails a job without one; jobs that call
   a reusable workflow are exempt, as the called jobs carry it.
+- **Every workflow has a top-level `permissions:`** (`contents: read` at least;
+  the repository's default token can write). A job that needs more has its own
+  block, which replaces the top-level one, so it repeats `contents: read`. A
+  called workflow's token cannot exceed its caller's, so a caller grants the
+  union of what the workflows it calls need (`*-pull-request.yml`, and the
+  `release` job of `promote.yml`, which `nightly.yml` repeats). What is granted
+  and why: `checks: write` for the test reporters (`dorny/test-reporter`) and
+  the lint annotations; `pull-requests: write` for labels and the latest-release
+  pull request; `contents: write` for release drafts, uploads and the
+  latest-release branch; `actions: read` for downloading another run's artifacts
+  (a download from the same run needs none); `actions: write` for
+  `prune-caches.yml`. `check-workflows.mjs` fails a workflow without a top-level
+  block.
 - **A new workflow or composite action used by the engine checks goes on the
   list in `engine-changed-files.yml`**, or a change to it will not run them.
   `ide-changed-files.yml` already covers all of `.github/**`.

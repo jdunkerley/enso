@@ -60,6 +60,10 @@ env:
 # `workflow_dispatch` too, with a default: an undeclared input is null, and in an expression
 # `null == false` is true (both coerce to 0), which would skip the build on a hand-started run.
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   # Note [The Engine Bundle]
   # ========================

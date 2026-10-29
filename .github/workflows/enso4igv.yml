@@ -19,6 +19,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-enso4igv
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
+permissions:
+  contents: read
+
 jobs:
   build_linux_parser:
     runs-on: ubuntu-22.04

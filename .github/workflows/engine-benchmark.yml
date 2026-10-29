@@ -37,6 +37,9 @@ env:
 # so the distribution they run is built with a native-image runner without the language server. The
 # runtime benchmarks leave `ENSO_LAUNCHER` unset (the build's default, `shell`).
 
+permissions:
+  contents: read
+
 jobs:
   benchmark-engine-graal-vm-ce:
     name: Benchmark Engine (GraalVM CE)

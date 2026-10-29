@@ -13,6 +13,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  checks: write
+
 jobs:
   # Waits one minute for the Mac; keep in step with `release.yml` and `macos-pull-request.yml`.
   check-the-mac-os-runner:
