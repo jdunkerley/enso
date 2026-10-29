@@ -23,8 +23,16 @@ export const NATIVE_LIBS_FILES = [
   'test/Cloud_Tests/data/native_libs.json',
 ]
 
+/** Where the `wasm-bindgen` CLI version is pinned; see `checkWasmBindgenPins`. */
+export const WASM_BINDGEN_SOURCE = 'app/rust-ffi/build-wasm.mjs'
+
 /** Files outside `.github` that a rule reads: the toolchain pins, and the build's own copies. */
-export const ROOT_FILES = ['build-config.yaml', ...TOOLCHAIN_PIN_FILES, ...NATIVE_LIBS_FILES]
+export const ROOT_FILES = [
+  'build-config.yaml',
+  ...TOOLCHAIN_PIN_FILES,
+  ...NATIVE_LIBS_FILES,
+  WASM_BINDGEN_SOURCE,
+]
 
 /** The TypeScript package whose commands workflows run with `corepack pnpm --filter build-scripts`. */
 export const BUILD_SCRIPTS = 'tools/build-scripts'
@@ -723,6 +731,31 @@ export function checkWorkflowsDeclarePermissions({ workflows }) {
   return problems
 }
 
+/**
+ * The prebuilt `wasm-bindgen` CLI that jobs install must be the version `build-wasm.mjs` pins:
+ * with another one, `build-wasm.mjs` falls back to `cargo install` (minutes), or, if versions
+ * drift the other way, emits bindings against the wrong ABI (`app/rust-ffi/CLAUDE.md`).
+ */
+export function checkWasmBindgenPins({ workflows, actions = {}, files }) {
+  const source = files[WASM_BINDGEN_SOURCE]
+  if (source == null) return []
+  const pinned = /const WASM_BINDGEN_VERSION = '([^']+)'/.exec(source)?.[1]
+  if (pinned == null) return [`${WASM_BINDGEN_SOURCE}: no \`const WASM_BINDGEN_VERSION = '…'\``]
+  const problems = []
+  const scan = (label, text) => {
+    for (const [, version] of text.matchAll(/wasm-bindgen-cli@([\w.+-]+)/g)) {
+      if (version !== pinned) {
+        problems.push(
+          `${label}: installs wasm-bindgen-cli@${version}, but ${WASM_BINDGEN_SOURCE} pins ${pinned}`,
+        )
+      }
+    }
+  }
+  for (const [file, { text }] of Object.entries(workflows)) scan(file, text)
+  for (const [name, { text }] of Object.entries(actions)) scan(`actions/${name}`, text)
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -734,6 +767,7 @@ export const CHECKS = [
   checkWindowsInstallerSmokeTest,
   checkToolchainPins,
   checkNativeLibsFixtures,
+  checkWasmBindgenPins,
   checkSbtRunsAfterSetupJvm,
   checkBuildScriptsSpawnSbtThroughHelper,
   checkJobsHaveTimeouts,
