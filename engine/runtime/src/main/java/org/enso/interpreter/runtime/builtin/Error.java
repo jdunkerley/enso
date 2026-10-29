@@ -53,9 +53,12 @@ public final class Error {
   @CompilerDirectives.CompilationFinal private Atom arithmeticErrorShiftTooBig;
 
   @CompilerDirectives.CompilationFinal private Atom arithmeticErrorDivideByZero;
+  @CompilerDirectives.CompilationFinal private Atom arithmeticErrorExponentTooBig;
 
   private static final Text shiftTooBigMessage = Text.create("Shift amount too large.");
   private static final Text divideByZeroMessage = Text.create("Cannot divide by zero.");
+  private static final Text exponentTooBigMessage =
+      Text.create("Exponent too large: the result cannot be represented.");
 
   /** Creates builders for error Atom Constructors. */
   Error(Builtins builtins, EnsoContext context) {
@@ -250,6 +253,18 @@ public final class Error {
       arithmeticErrorDivideByZero = makeArithmeticError(divideByZeroMessage);
     }
     return arithmeticErrorDivideByZero;
+  }
+
+  /**
+   * @return An arithmetic error representing an integer power whose exponent is too large for the
+   *     result to be represented.
+   */
+  public Atom getExponentTooLargeError() {
+    if (arithmeticErrorExponentTooBig == null) {
+      transferToInterpreterAndInvalidate();
+      arithmeticErrorExponentTooBig = makeArithmeticError(exponentTooBigMessage);
+    }
+    return arithmeticErrorExponentTooBig;
   }
 
   /**
