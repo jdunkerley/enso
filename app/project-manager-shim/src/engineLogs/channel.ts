@@ -86,6 +86,8 @@ export class EngineLogChannel {
   private readonly pollMs: number
   private stderrLines = new LineSplitter()
   private tailer: LogFileTailer | undefined
+  /** Settles once every tailer replaced by a start has emitted its last lines. */
+  private stopping: Promise<void> = Promise.resolve()
   private finderTimer: ReturnType<typeof setInterval> | undefined
   private finderWatcher: fsSync.FSWatcher | undefined
   private generation = 0
@@ -133,8 +135,10 @@ export class EngineLogChannel {
     const generation = ++this.generation
     // Listed now, before the new engine can create its file.
     const known = new Set(this.listKnownLogs())
-    // The old session's last lines come before the new session's `waiting`.
-    void (previous?.stop() ?? Promise.resolve()).then(() => {
+    // The old session's last lines come before the new session's `waiting`, also when a second
+    // start follows before the first one's tailer has stopped.
+    this.stopping = Promise.all([this.stopping, stopQuietly(previous)]).then(() => {})
+    void this.stopping.then(() => {
       if (generation !== this.generation || this.state !== 'open') return
       this.push({ type: 'waiting' })
       this.startFinder(generation, known)
@@ -161,11 +165,7 @@ export class EngineLogChannel {
       this.emitLines('stderr', this.stderrLines.flush(), this.sessionId)
       const tailer = this.tailer
       this.tailer = undefined
-      try {
-        await tailer?.stop()
-      } catch (error) {
-        console.error('Failed to stop following the engine log:', error)
-      }
+      await Promise.all([this.stopping, stopQuietly(tailer)])
       this.state = 'closed'
       for (const subscriber of this.subscribers) {
         try {
@@ -287,5 +287,14 @@ export class EngineLogChannel {
     })
     this.tailer = tailer
     tailer.start()
+  }
+}
+
+/** Stop `tailer`, if any; a failure is logged, not thrown. */
+async function stopQuietly(tailer: LogFileTailer | undefined): Promise<void> {
+  try {
+    await tailer?.stop()
+  } catch (error) {
+    console.error('Failed to stop following the engine log:', error)
   }
 }

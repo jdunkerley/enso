@@ -8,7 +8,7 @@ import io.helidon.websocket.WsSession;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicReferenceArray;
@@ -24,12 +24,13 @@ public class WebSocketTest extends ExecutorSetup {
   private Context context;
   private ExecutorService webServerExecutor;
   private WebServer ws;
+  private int port;
 
   public WebSocketTest() {}
 
   private WebServer startWebSocketServer(ExecutorService executor) {
     var routing = WsRouting.builder().endpoint("/", new TestWsListener());
-    var ws = WebServer.builder().host("localhost").port(22334).addRouting(routing).build();
+    var ws = WebServer.builder().host("localhost").port(port).addRouting(routing).build();
 
     executor.submit(ws::start);
 
@@ -40,6 +41,7 @@ public class WebSocketTest extends ExecutorSetup {
   public void setup() throws Exception {
     super.setup();
     webServerExecutor = Executors.newSingleThreadExecutor();
+    port = TimedLock.freePort();
     ws = startWebSocketServer(webServerExecutor);
 
     var hostAccess =
@@ -48,8 +50,8 @@ public class WebSocketTest extends ExecutorSetup {
             .allowAccess(AtomicReference.class.getDeclaredMethod("set", Object.class))
             .allowAccess(
                 AtomicReferenceArray.class.getDeclaredMethod("set", int.class, Object.class))
-            .allowAccess(Semaphore.class.getDeclaredMethod("acquire"))
-            .allowAccess(Semaphore.class.getDeclaredMethod("release"))
+            .allowAccess(TimedLock.class.getDeclaredMethod("acquire", int.class))
+            .allowAccess(TimedLock.class.getDeclaredMethod("release"))
             .build();
     var contextBuilder = WebEnvironment.createContext(hostAccess);
 
@@ -58,6 +60,7 @@ public class WebSocketTest extends ExecutorSetup {
                 () -> {
                   var ctx = contextBuilder.build();
                   WebEnvironment.initialize(ctx, executor);
+                  ctx.getBindings("js").putMember("port", port);
                   return ctx;
                 },
                 executor)
@@ -74,12 +77,12 @@ public class WebSocketTest extends ExecutorSetup {
 
   @Test
   public void addEventListenerOpen() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicBoolean(false);
 
     var code =
         """
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         ws.addEventListener('open', () => {
           res.set(true);
           lock.release();
@@ -91,21 +94,21 @@ public class WebSocketTest extends ExecutorSetup {
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertTrue(res.get());
   }
 
   @Test
   public void dispatchClonedEvent() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicReferenceArray<>(new Object[2]);
 
     var code =
         """
         var count = 0;
         var cloneEvent = (e) => new e.constructor(e.type, e);
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         var cb = (event) => {
           res.set(count, event.data);
           count += 1;
@@ -134,12 +137,12 @@ public class WebSocketTest extends ExecutorSetup {
 
   @Test
   public void onOpen() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicBoolean(false);
 
     var code =
         """
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         ws.on('open', () => {
           res.set(true);
           lock.release();
@@ -151,19 +154,19 @@ public class WebSocketTest extends ExecutorSetup {
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertTrue(res.get());
   }
 
   @Test
   public void sendText() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicReference<>();
 
     var code =
         """
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         ws.addEventListener('open', () => {
           ws.send('Hello!');
         });
@@ -178,19 +181,19 @@ public class WebSocketTest extends ExecutorSetup {
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertEquals("Hello!", res.get());
   }
 
   @Test
   public void sendBinary() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicReference<>();
 
     var code =
         """
-        const ws = new WebSocket('ws://localhost:22334');
+        const ws = new WebSocket('ws://localhost:' + port);
         ws.on('open', () => {
           ws.send(new Uint8Array([0, 31, 255]));
         });
@@ -205,19 +208,19 @@ public class WebSocketTest extends ExecutorSetup {
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertEquals("0,31,255", res.get());
   }
 
   @Test
   public void ping() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicBoolean(false);
 
     var code =
         """
-        const ws = new WebSocket('ws://localhost:22334');
+        const ws = new WebSocket('ws://localhost:' + port);
         ws.on('open', () => {
           ws.ping();
         });
@@ -232,19 +235,19 @@ public class WebSocketTest extends ExecutorSetup {
 
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertTrue(res.get());
   }
 
   @Test
   public void closeIdempotent() throws Exception {
-    var lock = new Semaphore(0);
+    var lock = new TimedLock();
     var res = new AtomicBoolean(false);
 
     var code =
         """
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         ws.addEventListener('open', () => {
           ws.close();
           ws.close();
@@ -260,26 +263,26 @@ public class WebSocketTest extends ExecutorSetup {
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
     // Wait until the client socket is closed
-    lock.acquire();
+    lock.acquire(1);
 
     Assert.assertTrue(res.get());
   }
 
   @Test
   public void handleSocketClosed() throws Exception {
-    var lock1 = new Semaphore(0);
-    var lock2 = new Semaphore(0);
-    var lock3 = new Semaphore(0);
+    var lock1 = new TimedLock();
+    var lock2 = new TimedLock();
+    var lock3 = new TimedLock();
     var res = new AtomicBoolean(false);
 
     var code =
         """
-        var ws = new WebSocket('ws://localhost:22334');
+        var ws = new WebSocket('ws://localhost:' + port);
         ws.addEventListener('open', () => {
           // Notify that the client socket is connected
           lock1.release();
           // Wait until the server socket is closed
-          lock2.acquire();
+          lock2.acquire(1);
           // Close the client socket (closed by the server)
           ws.close();
           res.set(true);
@@ -296,34 +299,96 @@ public class WebSocketTest extends ExecutorSetup {
     CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
     // Wait for the client socket connection
-    lock1.acquire();
+    lock1.acquire(1);
     // Close the server socket
     ws.stop();
     // Notify that the server socked is closed
     lock2.release();
     // Wait until the client socket is closed
-    lock3.acquire();
+    lock3.acquire(1);
 
     Assert.assertTrue(res.get());
   }
 
+  /**
+   * The server closes the connection, then the client closes its socket again, with and without a
+   * close code. Neither call may throw, and the {@code close} event is dispatched exactly once
+   * (#409).
+   */
+  @Test
+  public void closeAfterServerClosedDoesNotThrowOrDispatchTwice() throws Exception {
+    var connected = new TimedLock();
+    var closedByServer = new TimedLock();
+    var done = new TimedLock();
+    var res = new AtomicReferenceArray<>(new Object[2]);
+
+    var code =
+        """
+        var closeEvents = 0;
+        var ws = new WebSocket('ws://localhost:' + port);
+        ws.addEventListener('close', () => { closeEvents += 1; });
+        ws.addEventListener('open', () => {
+          connected.release();
+          closedByServer.acquire(1);
+          try {
+            ws.close();
+            ws.close(1000, 'bye');
+            res.set(0, 'no throw');
+          } catch (e) {
+            res.set(0, 'threw: ' + e);
+          }
+          res.set(1, ws.readyState);
+          done.release();
+        });
+        """;
+
+    context.getBindings("js").putMember("connected", connected);
+    context.getBindings("js").putMember("closedByServer", closedByServer);
+    context.getBindings("js").putMember("done", done);
+    context.getBindings("js").putMember("res", res);
+
+    CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
+
+    connected.acquire(1);
+    ws.stop();
+    closedByServer.release();
+    done.acquire(1);
+
+    Assert.assertEquals("no throw", res.get(0));
+    Assert.assertEquals(3, res.get(1));
+
+    // The close notification queued behind the handler must arrive once, and only once.
+    var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+    while (closeEvents() == 0 && System.nanoTime() < deadline) {
+      Thread.sleep(50);
+    }
+    Thread.sleep(300);
+    Assert.assertEquals(1, closeEvents());
+  }
+
+  private int closeEvents() throws Exception {
+    return CompletableFuture.supplyAsync(() -> context.eval("js", "closeEvents").asInt(), executor)
+        .get();
+  }
+
   @Test
   public void reassembleFragmentedBinaryMessage() throws Exception {
+    var fragmentPort = TimedLock.freePort();
     var fragmentServer =
         WebServer.builder()
             .host("localhost")
-            .port(22335)
+            .port(fragmentPort)
             .addRouting(WsRouting.builder().endpoint("/", new FragmentingWsListener()))
             .build();
     fragmentServer.start();
 
     try {
-      var lock = new Semaphore(0);
+      var lock = new TimedLock();
       var res = new AtomicReference<>();
 
       var code =
           """
-          const ws = new WebSocket('ws://localhost:22335');
+          const ws = new WebSocket('ws://localhost:' + fragmentPort);
           ws.on('open', () => {
             ws.send('trigger');
           });
@@ -333,12 +398,13 @@ public class WebSocketTest extends ExecutorSetup {
           });
           """;
 
+      context.getBindings("js").putMember("fragmentPort", fragmentPort);
       context.getBindings("js").putMember("lock", lock);
       context.getBindings("js").putMember("res", res);
 
       CompletableFuture.supplyAsync(() -> context.eval("js", code), executor).get();
 
-      lock.acquire();
+      lock.acquire(1);
 
       Assert.assertEquals("1,2,3,4,5,6", res.get());
     } finally {

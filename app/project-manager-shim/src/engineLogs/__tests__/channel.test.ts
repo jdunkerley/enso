@@ -124,6 +124,22 @@ describe('EngineLogChannel', () => {
     })
   })
 
+  test("a second start before the first one's tailer has stopped still waits for its last lines", async () => {
+    const log = collect()
+    channel.engineStarted()
+    await writeLog(FIRST, 'a1\n')
+    await vi.waitFor(() => expect(log.lines('file')).toEqual(['a1']))
+    // Written, but not yet read: only the tailer's final read at its stop gets it.
+    await writeLog(FIRST, 'a2\n')
+    channel.engineStarted()
+    channel.engineStarted()
+    await vi.waitFor(() => expect(log.types().filter((t) => t === 'waiting')).toHaveLength(2))
+    const lastLine = log.types().lastIndexOf('line')
+    const secondWaiting = log.types().indexOf('waiting', log.types().indexOf('waiting') + 1)
+    expect(log.lines('file')).toEqual(['a1', 'a2'])
+    expect(lastLine).toBeLessThan(secondWaiting)
+  })
+
   test('replays its buffer, after a sequence number of the same channel only', () => {
     channel.engineStderr(Buffer.from('1\n2\n3\n'))
     const all = channel.subscribe(NOOP)

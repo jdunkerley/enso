@@ -427,6 +427,14 @@ buffer; the runner feeds it through `EngineLogSink` (`engineStarted`,
   `enso-common/src/services/engineLogs.ts`. A write to a socket that has gone
   away ends the subscription quietly instead of throwing into the channel.
 
+- **Ordering (#280).** Node reports a child's `exit` before its stdio has
+  drained, so the old engine's last stderr (a crash dump) can still be in the
+  pipe. `ChildProcessHandle.waitForDrain` waits for `close` (bounded by 1 s,
+  since a grandchild can hold the pipe), and both `WatchedChildProcess` (before
+  it respawns, hence before the next `engineStarted`) and the graceful shutdown
+  (before `projectClosed`) wait for it. In the channel, `engineStarted` chains
+  every replaced tailer's `stop()` (`stopping`), so a second start cannot emit
+  `waiting` before the first one's tailer has emitted its final lines.
 - **Tests** never touch real log directories: channels take a temporary
   `logDirectory`, and code that calls `getEngineLogDirectory()` runs with
   `ENSO_LOG_DIRECTORY` stubbed.

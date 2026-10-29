@@ -4,6 +4,7 @@ import type { ChildProcess } from 'node:child_process'
 import { createDeferred, type Deferred } from './async.js'
 
 const DEFAULT_TERMINATE_TIMEOUT_MS = 5_000
+const DEFAULT_DRAIN_TIMEOUT_MS = 1_000
 
 /**
  * Wraps a spawned {@link ChildProcess} and provides:
@@ -15,12 +16,18 @@ const DEFAULT_TERMINATE_TIMEOUT_MS = 5_000
 export class ChildProcessHandle {
   private exitDeferred: Deferred<{ code: number | null; signal: NodeJS.Signals | null }> =
     createDeferred()
+  private closeDeferred: Deferred<void> = createDeferred()
   private _alive = true
   private _exitReason: string | null = null
   private _exitError: NodeJS.ErrnoException | null = null
 
   /** Construct a handle for a child that has just been spawned. */
   constructor(public readonly child: ChildProcess) {
+    // 'close' fires once the stdio streams have ended, which can be after 'exit': the output the
+    // child wrote just before it died may still be in the pipes at 'exit'. A child that never
+    // spawned has no streams to wait for.
+    child.once('close', () => this.closeDeferred.resolve())
+    child.once('error', () => this.closeDeferred.resolve())
     child.once('exit', (code, signal) => {
       if (!this._alive) return
       this._alive = false
@@ -64,6 +71,24 @@ export class ChildProcessHandle {
   /** Resolves once the process has exited (immediately if it already has). */
   waitForExit(): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
     return this.exitDeferred.promise
+  }
+
+  /**
+   * Resolves once the process has exited and its stdio streams have ended, so every chunk it
+   * wrote has reached the listeners on them. A grandchild that inherited a pipe can keep it open
+   * indefinitely, so this gives up `timeoutMs` after the exit.
+   */
+  async waitForDrain(timeoutMs = DEFAULT_DRAIN_TIMEOUT_MS): Promise<void> {
+    await this.exitDeferred.promise
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, timeoutMs)
+    })
+    try {
+      await Promise.race([this.closeDeferred.promise, timeout])
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   /**
@@ -256,14 +281,19 @@ export class WatchedChildProcess {
       this.firstSpawnDeferred.resolve(handle)
     }
     this.options.onChildStarted(handle)
-    void handle.waitForExit().then(() => {
-      if (this.closed) return
-      if (this.suppressNextAutoRespawn) {
-        this.suppressNextAutoRespawn = false
-        return
-      }
-      this.handleExit(handle.exitReason ?? 'unknown exit', handle.exitError)
-    })
+    // The exit is acted on once the child's output has drained, so its last output is delivered
+    // before `onUnexpectedExit` and the next `onChildStarted` can begin a new session.
+    void handle
+      .waitForExit()
+      .then(() => handle.waitForDrain())
+      .then(() => {
+        if (this.closed) return
+        if (this.suppressNextAutoRespawn) {
+          this.suppressNextAutoRespawn = false
+          return
+        }
+        this.handleExit(handle.exitReason ?? 'unknown exit', handle.exitError)
+      })
   }
 
   private handleExit(reason: string, exitError: NodeJS.ErrnoException | null): void {
