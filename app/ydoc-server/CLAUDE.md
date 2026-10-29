@@ -64,6 +64,17 @@ This server:
   doc from LS state; see `languageServerSession.ts`.
 - Binary messages use a custom framing (`YjsBinaryChannel`); don't assume plain
   Yjs awareness protocol works end-to-end.
+- **The binary data channel is shared and reference-counted, not per socket.**
+  The GUI opens its data channel (`gui-data-<uuid>`) on the index doc but sends
+  the same `data` parameter on every doc's socket (index, modules, the
+  visualization subdoc). `setupGatewayClient` therefore takes a reference with
+  `YjsBinaryChannel.acquire` on the session's index doc and `release`s it when
+  its socket closes; the channel closes with the last reference, and the next
+  `acquire` makes a fresh one (a new Language Server connection). A plain
+  forever-cache closed on any socket's close handed every later connection a
+  dead channel, so uploads and downloads went unanswered (#396). A
+  per-connection channel, like `YjsServerTransport`'s, would not do here: two
+  channels on one array would each receive, and answer, the same requests.
 - The Polyglot variant runs on GraalJS — only a subset of Node APIs is
   available. Check that any new dep works in both `node` and `graaljs` before
   importing.

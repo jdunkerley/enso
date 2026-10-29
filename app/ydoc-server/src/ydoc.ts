@@ -103,7 +103,7 @@ export function setupGatewayClient(
   docName: string,
   byteBuffer: JavaByteBufferClass,
   jsonChannelServer: YjsChannelServer,
-  // Unlike `jsonChannelServer`, this is passed straight to `YjsBinaryChannel.get`, which requires
+  // Unlike `jsonChannelServer`, this is passed straight to `YjsBinaryChannel.acquire`, which requires
   // a `YjsChannelServer<JavaByteBuffer>` — leaving this defaulted to `unknown` was a latent type
   // hole that only surfaced once `tsconfig.node.json` started type-checking this file (#141).
   binaryChannelServer: YjsChannelServer<JavaByteBuffer>,
@@ -128,15 +128,19 @@ export function setupGatewayClient(
     return
   }
 
-  let dataSocket: YjsBinaryChannel | undefined
-  if (dataUrl) {
-    dataSocket = YjsBinaryChannel.get(wsDoc.doc, dataUrl, binaryChannelServer, byteBuffer)
-  }
+  // The GUI opens its data channel on the index doc but passes `data` on every doc's socket (index
+  // and modules alike), so all of them share the index doc's channel, each holding a reference to
+  // it. It closes when the last of them does: closing it on any one close left the others, and any
+  // later connection, with a dead channel whose requests were never answered (#396).
+  const dataSocket =
+    dataUrl ?
+      YjsBinaryChannel.acquire(lsSession.indexDoc.doc, dataUrl, binaryChannelServer, byteBuffer)
+    : undefined
 
   const connection = new YjsConnection(ws, wsDoc)
   connection.once('close', async () => {
     try {
-      dataSocket?.close()
+      dataSocket?.release()
       await lsSession.release()
       if (LanguageServerSession.sessions.size === 0) {
         inspectManager?.unregisterSession()

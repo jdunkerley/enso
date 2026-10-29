@@ -54,7 +54,15 @@ export class JavaByteBufferCodec implements ChannelCodec<JavaByteBuffer, Uint8Ar
  * the Ydoc server (JavaScript) and the Language Server (Java/Scala).
  */
 export class YjsBinaryChannel extends YjsChannel<JavaByteBuffer, Uint8Array> {
-  private static channels = new Map<string, YjsBinaryChannel>()
+  /**
+   * The open channels, by document and then by name, each with the number of gateway connections
+   * holding it. Keyed by document too, so a session started again (with a new index doc) never
+   * gets a channel over the old, destroyed one.
+   */
+  private static channels = new WeakMap<
+    Y.Doc,
+    Map<string, { channel: YjsBinaryChannel; refs: number }>
+  >()
 
   /**
    * @param doc - The Yjs document for CRDT-based message synchronization
@@ -72,15 +80,37 @@ export class YjsBinaryChannel extends YjsChannel<JavaByteBuffer, Uint8Array> {
     server.onConnect(this)
   }
 
-  /** Gets or creates a channel for the given name. Channels are cached and reused. */
-  static get(
+  /**
+   * Take a reference to the channel of the given name on `doc`, creating it (and so connecting it
+   * to the Language Server) if no open one exists. The channel is shared by every connection that
+   * names it and closed when the last of them calls the returned `release`; the next `acquire`
+   * then creates a fresh one, since closing a {@link YjsChannel} is final (#396).
+   * @returns The channel and the function that drops this reference to it (idempotent).
+   */
+  static acquire(
     doc: Y.Doc,
     channelName: string,
     server: YjsChannelServer<JavaByteBuffer>,
     byteBuffer: JavaByteBufferClass,
-  ): YjsBinaryChannel {
-    return map.setIfUndefined(YjsBinaryChannel.channels, channelName, () => {
-      return new YjsBinaryChannel(doc, channelName, server, byteBuffer)
+  ): { channel: YjsBinaryChannel; release: () => void } {
+    const channels = YjsBinaryChannel.channels.get(doc) ?? new Map()
+    YjsBinaryChannel.channels.set(doc, channels)
+    const entry = map.setIfUndefined(channels, channelName, () => {
+      const channel = new YjsBinaryChannel(doc, channelName, server, byteBuffer)
+      // However the channel ends, the next connection must not be handed it.
+      channel.onClose(() => {
+        if (channels.get(channelName)?.channel === channel) channels.delete(channelName)
+      })
+      return { channel, refs: 0 }
     })
+    entry.refs += 1
+    let released = false
+    const release = () => {
+      if (released) return
+      released = true
+      entry.refs -= 1
+      if (entry.refs === 0) entry.channel.close()
+    }
+    return { channel: entry.channel, release }
   }
 }
