@@ -12,6 +12,7 @@ import org.enso.pkg.{Config => PkgConfig}
 import org.enso.version.BuildVersion
 
 import java.io.{File, FileReader}
+import scala.util.Using
 
 /** A request handler for `workspace/openFile` commands.
   */
@@ -25,9 +26,11 @@ class ProjectInfoHandler(languageServerConfig: Config)
     val configFile  = new File(projectRoot, PkgConfig.ensoPackageConfigName)
 
     if (configFile.exists()) {
-      val projectConfig = PkgConfig.fromYaml(
-        new FileReader(configFile)
-      )
+      // Close the reader: on Windows an open handle stops the file from being
+      // deleted or renamed until the reader happens to be garbage collected.
+      val projectConfig = Using.resource(new FileReader(configFile)) { reader =>
+        PkgConfig.fromYaml(reader)
+      }
       if (projectConfig.isSuccess) {
         val projectInfo = ProjectInfo.Result(
           projectName   = projectConfig.get.moduleName,

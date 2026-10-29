@@ -2,15 +2,13 @@ package org.enso.languageserver.websocket.json
 
 import io.circe.literal.JsonStringContext
 import org.enso.pkg.Config
-import org.enso.testkit.{FlakySpec, ReportLogsOnFailure}
+import org.enso.testkit.ReportLogsOnFailure
 import org.enso.version.BuildVersion
 
 import java.io.{File, FileOutputStream}
+import java.nio.file.Files
 
-class WorkspaceOperationsTest
-    extends BaseServerTest
-    with FlakySpec
-    with ReportLogsOnFailure {
+class WorkspaceOperationsTest extends BaseServerTest with ReportLogsOnFailure {
 
   override def initializeProjectPackage: Boolean = false
 
@@ -18,8 +16,8 @@ class WorkspaceOperationsTest
     val packageConfigName = Config.ensoPackageConfigName
     val testYamlPath      = new File(testContentRoot.file, packageConfigName)
 
-    "return the project info" taggedAs Flaky in {
-      testYamlPath.delete()
+    "return the project info" in {
+      Files.deleteIfExists(testYamlPath.toPath)
       val packageYamlContents =
         getClass.getClassLoader.getResourceAsStream(packageConfigName)
       val yamlOutStream = new FileOutputStream(testYamlPath)
@@ -48,8 +46,8 @@ class WorkspaceOperationsTest
           """)
     }
 
-    "return an error when the project configuration cannot be decoded" taggedAs Flaky in {
-      testYamlPath.delete()
+    "return an error when the project configuration cannot be decoded" in {
+      Files.deleteIfExists(testYamlPath.toPath)
       val yamlOutStream = new FileOutputStream(testYamlPath)
       yamlOutStream.write(0x00)
       yamlOutStream.close()
@@ -75,8 +73,8 @@ class WorkspaceOperationsTest
           """)
     }
 
-    "return an error when the project configuration is not present" taggedAs Flaky in {
-      testYamlPath.delete()
+    "return an error when the project configuration is not present" in {
+      Files.deleteIfExists(testYamlPath.toPath)
 
       val client = getInitialisedWsClient()
 
