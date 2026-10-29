@@ -1,0 +1,50 @@
+# Hand-written. Weekly, and by hand: deletes the Actions caches that only eat the repository's 10 GB
+# budget (#314): those of pull requests that are no longer open, those not accessed for `days` days,
+# and dependency caches superseded by a newer hash on the same ref. The rules are in
+# `tools/ci/prune-caches.mjs`; `gh workflow run prune-caches.yml -f dry-run=true` only lists them.
+
+name: Prune Caches
+on:
+  # Mondays at 03:00 UTC, after the nightly release (02:00 UTC).
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: Delete caches not accessed for more than this many days.
+        type: number
+        default: 7
+      dry-run:
+        description: Only list what would be deleted.
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+# `gh cache delete` needs `actions: write`. Listing the open pull requests reads public data.
+permissions:
+  actions: write
+
+jobs:
+  prune-caches:
+    name: Prune caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DAYS: ${{ inputs.days || 7 }}
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          package-manager-cache: false
+      - name: Prune
+        run: |-
+          args=(--days "$DAYS")
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          node tools/ci/prune-caches.mjs "${args[@]}"
