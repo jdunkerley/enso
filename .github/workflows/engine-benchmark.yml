@@ -1,5 +1,4 @@
-# Hand-written. Runs the engine's runtime benchmarks when started by hand; `bench-upload.yml`
-# publishes the results when a run completes (it keys on this workflow's name). Calls sbt directly:
+# Hand-written. Runs the engine's runtime benchmarks when started by hand. Calls sbt directly:
 # see Note [Benchmarks Call sbt Directly].
 
 name: Benchmark Engine

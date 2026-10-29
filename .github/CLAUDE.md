@@ -29,9 +29,9 @@ settings. Every workflow is hand-written YAML (build simplification;
   hand) the suites that need the Snowflake and Enso Cloud secrets, and
   `macos-checks.yml` the self-hosted Mac's checks for `macos-pull-request.yml`;
   all three call `engine-checks-platform.yml`.
-- `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml`, `bench-upload.yml`
-  — benchmarks, started by hand. `bench-upload.yml` keys on the other two by
-  their `name:`; keep those names.
+- `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml` — benchmarks,
+  started by hand. Their artifacts are the only output: the upstream
+  `bench-upload.yml` was removed (#307), as the fork has no results repository.
 - `actions/` — composite actions: `setup-node`, `setup-rust`, `setup-jvm`
   (GraalVM CE, or Oracle GraalVM with `edition: oracle`, sbt, optionally `flatc`
   and GraalPy at the `toolchain:` pins in `build-config.yaml` and the

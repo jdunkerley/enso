@@ -235,6 +235,16 @@ export class WatchedChildProcess {
   }
 
   /**
+   * Permanently stop spawning, but leave the current child running: for a consumer that shuts it
+   * down itself (gracefully), and must not have a pending {@link respawn}, or a spawn already in
+   * flight, start another child after that. A child that was in flight is killed. Terminates
+   * nothing else; {@link close} does that.
+   */
+  stopRespawning(): void {
+    this.closed = true
+  }
+
+  /**
    * Permanently terminate. Suppresses respawn and SIGTERMs the current child, falling back to
    * SIGKILL after `timeoutMs`. Subsequent calls are no-ops.
    */
