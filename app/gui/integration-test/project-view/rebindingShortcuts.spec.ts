@@ -50,14 +50,9 @@ async function backToProject(page: Page) {
   await expect(locate.graphEditor(page)).toBeVisible()
 }
 
-test('A rebound graph shortcut works at once, shows in the palette, persists and resets', async ({
-  editorPage,
-  page,
-}) => {
-  await editorPage
-  const codeEditor = page.locator('.CodeEditor')
+/** Rebind the Code Editor shortcut to {@link NEW_KEY} in Settings, and go back to the graph. */
+async function rebindCodeEditorShortcut(page: Page) {
   const name = TEXT.graphToggleCodeEditorShortcut
-
   await openKeyboardShortcuts(page)
   const row = shortcutRow(page, name)
   await expect(row).toContainText('`')
@@ -65,9 +60,23 @@ test('A rebound graph shortcut works at once, shows in the palette, persists and
   await expect(row).not.toContainText('`')
   await addShortcut(page, name, NEW_KEY)
   await expect(row).toContainText('U')
-
-  // The open graph editor takes the new key, and ignores the old one.
   await backToProject(page)
+}
+
+// The scenario is split in three, each rebinding afresh: as one test it took ~17 s of the 25 s
+// timeout (a full reload and two trips through Settings on top of the ~8 s fixture), and timed out
+// under load (#245).
+
+test('A rebound graph shortcut works at once, ignores the old key and shows in the palette', async ({
+  editorPage,
+  page,
+}) => {
+  await editorPage
+  const codeEditor = page.locator('.CodeEditor')
+  const name = TEXT.graphToggleCodeEditorShortcut
+
+  await rebindCodeEditorShortcut(page)
+  // The open graph editor takes the new key, and ignores the old one.
   await expect(codeEditor).toHaveCount(0)
   await page.keyboard.press(NEW_KEY)
   await expect(codeEditor).toBeVisible()
@@ -86,8 +95,14 @@ test('A rebound graph shortcut works at once, shows in the palette, persists and
   await expect(entry).not.toContainText('`')
   await page.keyboard.press('Escape')
   await expect(palette).toHaveCount(0)
+})
 
-  // The change survives a reload (the project is reopened with it).
+test('A rebound graph shortcut persists across a reload', async ({ editorPage, page }) => {
+  await editorPage
+  const codeEditor = page.locator('.CodeEditor')
+
+  await rebindCodeEditorShortcut(page)
+  // The project is reopened with the change.
   await page.reload()
   await expect(locate.graphEditor(page)).toBeVisible()
   await expect(page.locator('.ProjectView').getByTestId('spinner')).toHaveCount(0)
@@ -95,10 +110,15 @@ test('A rebound graph shortcut works at once, shows in the palette, persists and
   await expect(codeEditor).toBeVisible()
   await page.keyboard.press(NEW_KEY)
   await expect(codeEditor).toHaveCount(0)
+})
 
-  // Reset brings the default back.
+test('Reset brings the default graph shortcut back', async ({ editorPage, page }) => {
+  await editorPage
+  const codeEditor = page.locator('.CodeEditor')
+  const row = shortcutRow(page, TEXT.graphToggleCodeEditorShortcut)
+
+  await rebindCodeEditorShortcut(page)
   await openKeyboardShortcuts(page)
-  await expect(row).toContainText('U')
   await row.getByRole('button', { name: TEXT.resetShortcut }).click()
   await expect(row).toContainText('`')
   await expect(row).not.toContainText('U')
