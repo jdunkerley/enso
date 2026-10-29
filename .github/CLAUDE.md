@@ -177,6 +177,10 @@ Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 
 - `node tools/ci/check-workflows.mjs` and `node --test tools/ci/*.test.mjs` —
   the workflow policy (the rules the generator's tests enforced) and its tests.
+- Workflow Lint also runs on standard library and test project changes: it
+  checks `tools/ci/stdlib-test-map.yaml` against their imports. A new library,
+  `std-bits` directory, test project or cross-library import needs an entry
+  there; the failure message says which.
 - A pull request from a branch of this repository runs **its own** workflow
   files and composite actions, so the PR's checks are the test of a workflow
   change. A workflow that only runs by hand is tested with

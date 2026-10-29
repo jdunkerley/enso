@@ -1,0 +1,87 @@
+# The standard library test map: which `test/*_Tests` projects a pull request runs, from the files
+# it changes. `tools/build-scripts`' `stdlib-test-plan` reads it (Note [Standard Library Test
+# Selection] in `.github/workflows/engine-checks-platform.yml`). `tools/ci/check-workflows.mjs`
+# (`checkStdlibTestMap`) fails when it no longer matches the repository, and its message says what
+# to change.
+#
+# Adding a library: an entry under `libraries`, with its `std-bits` directories and `dependsOn`,
+# exactly the libraries its sources import (top-level `from`/`import Standard.X` lines).
+# Adding a test project: an entry under `testProjects`, with the `Standard.*` libraries it imports
+# (`imports`) and the `enso_dev.*` projects it imports (`testImports`).
+# develop runs every project whatever this file says.
+
+# A change to any of these runs every test project.
+everything:
+  libraries: [Base, Test]
+  stdBits: [benchmarks, tests]
+
+libraries:
+  AWS: { stdBits: [aws], dependsOn: [Base, Database, Table] }
+  Base: { stdBits: [base], dependsOn: [] }
+  Database: { stdBits: [database], dependsOn: [Base, Table] }
+  DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table] }
+  Examples: { stdBits: [], dependsOn: [Base, Table] }
+  Generic_JDBC: { stdBits: [], dependsOn: [Base, Database, Table] }
+  Geo: { stdBits: [], dependsOn: [Base, Table] }
+  Google: { stdBits: [google], dependsOn: [Base, Table] }
+  Google_Api: { stdBits: [], dependsOn: [] }
+  Image: { stdBits: [image], dependsOn: [Base] }
+  Microsoft: { stdBits: [microsoft], dependsOn: [Base, Database, Table] }
+  Saas: { stdBits: [saas], dependsOn: [Base, Table] }
+  Searcher: { stdBits: [], dependsOn: [Base] }
+  Snowflake: { stdBits: [snowflake], dependsOn: [Base, Database, Table] }
+  Table: { stdBits: [table], dependsOn: [Base] }
+  Tableau: { stdBits: [tableau], dependsOn: [Base, Table] }
+  Test: { stdBits: [], dependsOn: [Base] }
+  Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
+
+testProjects:
+  AWS_Tests:
+    imports: [AWS, Base, Database, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+  Base_Internal_Tests: { imports: [Base, Test], testImports: [Cloud_Tests] }
+  Base_Tests: { imports: [AWS, Base, Test], testImports: [Helpers] }
+  Cloud_Tests:
+    imports: [Base, Table, Test]
+    testImports: [Base_Tests, Table_Tests]
+  DuckDB_Tests:
+    imports: [Base, Database, DuckDB, Table, Test]
+    testImports: [Table_Tests]
+  Examples_Tests: { imports: [Base, Examples, Test], testImports: [Base_Tests] }
+  Generic_JDBC_Tests:
+    imports: [Base, Database, Generic_JDBC, Test]
+    testImports: [Table_Tests]
+  Geo_Tests: { imports: [Base, Geo, Table, Test], testImports: [] }
+  Image_Tests: { imports: [Base, Image, Test], testImports: [Cloud_Tests] }
+  Microsoft_Tests:
+    imports: [Base, Database, Microsoft, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+  Saas_Tests:
+    imports: [Base, Saas, Table, Test]
+    testImports: [Base_Tests, Table_Tests]
+  Snowflake_Tests:
+    imports: [Base, Database, Snowflake, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+  Table_Internal_Tests:
+    imports: [Base, Database, Table, Test, Visualization]
+    testImports: []
+  Table_Tests:
+    imports: [Base, Database, Examples, Table, Test, Visualization]
+    testImports: [Base_Tests, Cloud_Tests, Generic_JDBC_Tests, Test_Tests]
+  Tableau_Tests:
+    imports: [Base, Table, Tableau, Test]
+    testImports: [Table_Tests]
+  Test_Tests: { imports: [Base, Test], testImports: [] }
+  Visualization_Tests:
+    imports:
+      [AWS, Base, Database, Examples, Geo, Image, Table, Test, Visualization]
+    testImports: []
+
+# The jobs a standard library suite that runs "every project but …" splits into; a suite with an
+# allow list (AWS, Microsoft) stays one job. Each shard runs the listed projects the suite runs;
+# the last (`"*"`) runs the rest. Sized from the timings in
+# docs/superpowers/plans/2026-10-30-ci-speed-phase-2.md: Table_Tests alone is the longest.
+shards:
+  - { name: Table, projects: [Table_Tests] }
+  - { name: Base, projects: [Base_Tests, DuckDB_Tests, Cloud_Tests] }
+  - { name: Others, projects: "*" }

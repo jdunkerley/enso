@@ -21,6 +21,7 @@ import {
   checkRepo,
   checkSbtRunsAfterSetupJvm,
   checkSetupNodeCache,
+  checkStdlibTestMap,
   checkNativeLibsFixtures,
   checkToolchainPins,
   checkWasmBindgenPins,
@@ -789,6 +790,97 @@ ${before}      - name: Tests
   test('a repository without the package has no such commands', () => {
     assert.deepEqual([...buildScriptsSbtCommands(fixture({}).buildScripts)], [])
     assert.deepEqual([...buildScriptsSbtEntries(fixture({}).buildScripts)], [])
+  })
+})
+
+const STDLIB_MAP_OK = `
+everything: { libraries: [Base], stdBits: [] }
+libraries:
+  Base: { stdBits: [], dependsOn: [] }
+  Table: { stdBits: [table], dependsOn: [Base] }
+testProjects:
+  Table_Tests: { imports: [Table], testImports: [Helpers] }
+shards:
+  - { name: Table, projects: [Table_Tests] }
+  - { name: Others, projects: "*" }
+`
+
+/** A standard library with Base and Table, `std-bits/table` and `test/Table_Tests`. */
+const STDLIB_FILES = {
+  'distribution/lib/Standard/Base/0.0.0-dev/package.yaml': 'name: Base\n',
+  'distribution/lib/Standard/Base/0.0.0-dev/src/Main.enso': 'import Standard.Base.Any\n',
+  'distribution/lib/Standard/Table/0.0.0-dev/package.yaml': 'name: Table\n',
+  // The indented import is an example in a doc comment: it must not count.
+  'distribution/lib/Standard/Table/0.0.0-dev/src/Main.enso':
+    'from Standard.Base import all\n## Example\n    import Standard.Geo\n',
+  'std-bits/table/README.md': '',
+  'test/Table_Tests/package.yaml': 'name: Table_Tests\n',
+  'test/Table_Tests/src/Main.enso':
+    'from Standard.Table import all\nimport enso_dev.Helpers\nimport enso_dev.Table_Tests.Util\n',
+}
+
+const at = 'tools/ci/stdlib-test-map.yaml:'
+
+describe('checkStdlibTestMap', () => {
+  test('accepts a map that matches the repository', () => {
+    const repo = fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': STDLIB_MAP_OK })
+    assert.deepEqual(checkStdlibTestMap(repo), [])
+  })
+  test('accepts a repository without a standard library or a map', () => {
+    assert.deepEqual(checkStdlibTestMap(fixture({})), [])
+  })
+  test('requires the map once there is a standard library', () => {
+    assert.deepEqual(checkStdlibTestMap(fixture({}, STDLIB_FILES)), [
+      `${at} missing (every library under distribution/lib/Standard needs an entry)`,
+    ])
+  })
+  test('reports what the map lacks', () => {
+    const repo = fixture(
+      {},
+      {
+        ...STDLIB_FILES,
+        'distribution/lib/Standard/Geo/0.0.0-dev/package.yaml': 'name: Geo\n',
+        'distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso': 'from Standard.Table import all\n',
+        'distribution/lib/Standard/Table/0.0.0-dev/src/Database.enso':
+          'import Standard.Database.Connection\n',
+        'std-bits/geo/README.md': '',
+        'test/Geo_Tests/package.yaml': 'name: Geo_Tests\n',
+        'test/Geo_Tests/src/Main.enso': 'from Standard.Geo import all\n',
+        'tools/ci/stdlib-test-map.yaml': STDLIB_MAP_OK,
+      },
+    )
+    assert.deepEqual(checkStdlibTestMap(repo), [
+      `${at} no entry for library \`Geo\` (distribution/lib/Standard/Geo)`,
+      `${at} \`libraries.Table.dependsOn\` lacks \`Database\`: distribution/lib/Standard/Table imports Standard.Database`,
+      `${at} std-bits/geo belongs to no library (add it to a library's \`stdBits\` or to \`everything.stdBits\`)`,
+      `${at} no entry for test project \`Geo_Tests\` (test/Geo_Tests)`,
+    ])
+  })
+  test('reports stale entries and malformed shards', () => {
+    const stale = `
+everything: { libraries: [Base, Gone], stdBits: [] }
+libraries:
+  Base: { stdBits: [], dependsOn: [] }
+  Table: { stdBits: [table, old], dependsOn: [Base] }
+  Old: { stdBits: [], dependsOn: [] }
+testProjects:
+  Table_Tests: { imports: [Table], testImports: [Helpers] }
+  Old_Tests: { imports: [], testImports: [] }
+shards:
+  - { name: Table, projects: [Table_Tests, Nope_Tests] }
+  - { name: Again, projects: [Table_Tests] }
+  - { name: Rest, projects: [Table_Tests] }
+`
+    const repo = fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': stale })
+    assert.deepEqual(checkStdlibTestMap(repo), [
+      `${at} \`libraries.Old\` names no directory under distribution/lib/Standard`,
+      `${at} std-bits/old is listed but does not exist`,
+      `${at} \`testProjects.Old_Tests\` names no test project under test/`,
+      `${at} \`everything.libraries\` names \`Gone\`, which is not a library`,
+      `${at} the last shard must have \`projects: "*"\` (the projects no other shard names)`,
+      `${at} shard \`Table\` names \`Nope_Tests\`, which is not a test project`,
+      `${at} shard \`Again\` names \`Table_Tests\`, which shard \`Table\` already runs`,
+    ])
   })
 })
 
