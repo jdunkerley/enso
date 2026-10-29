@@ -236,7 +236,6 @@ jobs:
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.jvm-tests
-    needs: [build-engine-distribution]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 90
     permissions:
@@ -250,10 +249,6 @@ jobs:
       - uses: ./.github/actions/setup-node
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - name: Download the engine distribution
-        uses: ./.github/actions/download-engine-distribution
-        with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
@@ -276,9 +271,6 @@ jobs:
       - name: Resolve the parser's Java class path
         run: sbt "-Dsbt.server.autostart=false" "syntax-rust-definition/Runtime/managedClasspath"
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - name: Generate the parser's Java sources
@@ -294,18 +286,12 @@ jobs:
         name: Build the ydoc native image
         run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all ydoc-server/buildNativeImage"
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - id: tests
         name: JVM tests
         run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test"
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
@@ -329,9 +315,6 @@ jobs:
         name: Compile the benchmarks, and run the runtime ones once
         run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
