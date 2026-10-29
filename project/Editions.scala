@@ -113,7 +113,7 @@ object Editions {
   ) {
 
     /** A library that should be uploaded is one that is hosted in a "jar:" repository
-      * and is not bundled with the engine for good (see [[alwaysBundled]]).
+      * and is listed in [[uploadedLibraries]].
       * See <a href="https://github.com/jdunkerley/enso/wiki/Libraries-Sharing">Libraries-Sharing</a> for details.
       * @return
       */
@@ -124,22 +124,17 @@ object Editions {
           repo.name == lib.repository
         }
       }
-      libs.map { _.name }.filterNot(alwaysBundled.contains)
+      libs.map { _.name }.filter(uploadedLibraries.contains)
     }
   }
 
-  /** The core libraries that are always bundled with the engine, so they are
-    * never uploaded. Every edition entry still names the `release` repository:
-    * the edition format has no way to say "bundled" (`repository: local` only
-    * searches the user's local library roots, not the engine's `lib`).
+  /** The libraries uploaded as release assets. Only `Standard.Image` is today,
+    * as before the edition template had a single repository; the library
+    * system work decides which others follow. Every edition entry names the
+    * `release` repository, so this list, not the repository, is what limits
+    * the upload (and the source archives, ~50 MB each for the large libraries).
     */
-  private val alwaysBundled: Set[String] = Set(
-    "Standard.Base",
-    "Standard.Table",
-    "Standard.Database",
-    "Standard.Visualization",
-    "Standard.Test"
-  )
+  private val uploadedLibraries: Set[String] = Set("Standard.Image")
 
   case class Repository(
     name: String,
