@@ -1,71 +1,76 @@
 # This file is a template and should not be used directly.
 # The processing replaces placeholders in double brackets with actual values.
 #
-# Every standard library listed here is bundled with the engine (`lib/Standard`
-# of the distribution), and the engine looks bundled libraries up before it
-# consults any repository. This fork runs no library repository, so the
-# `bundled` repository below is a placeholder that points at no archive: a
-# library that is not bundled fails with "library not found" instead of being
-# downloaded from the network. The `edition-providers` of the global
-# configuration is empty by default for the same reason.
+# See [Libraries-Editions](https://github.com/jdunkerley/enso/wiki/Libraries-Editions)
+# for the description of its contents.
+#
+# === Library upload ===
+# Some libraries may be uploaded during the (nightly) release.
+# Such libraries need to have an associated repository with URL with `jar` scheme.
+# See [Libraries-Sharing](https://github.com/jdunkerley/enso/wiki/Libraries-Sharing)
+#
+# The `release` repository is this fork's GitHub release. The release workflow
+# does not publish the zip yet; libraries that are not bundled with the engine
+# will be resolved from it.
+#
 
 engine-version: {{ENGINE_VERSION}}
 repositories:
-  - name: bundled
-    url: 'jar:file:///enso-no-library-repository.zip!/'
+  - name: release
+    url: 'jar:https://github.com/jdunkerley/enso/releases/download/{{ENGINE_VERSION}}/std_image_repo.zip!/'
 
 libraries:
   - name: Standard.Base
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Test
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Table
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Database
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.AWS
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Geo
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Visualization
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Examples
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Searcher
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Generic_JDBC
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Google
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Google_Api
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Snowflake
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Microsoft
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Tableau
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Saas
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.DuckDB
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}
   - name: Standard.Image
-    repository: bundled
+    repository: release
     version: {{LIBS_VERSION}}

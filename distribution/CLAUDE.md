@@ -25,13 +25,15 @@ Library versions and supported engine versions are grouped into **editions**
 The edition template in this directory is the source of truth for the layout a
 release artifact produces.
 
-The fork runs no library repository or edition provider, so nothing in the
-template points at upstream. Every standard library entry (`Standard.Image`
-included) names the placeholder `bundled` repository, which points at no
-archive: the engine finds the libraries in the distribution's own `lib/Standard`
-before it would consult a repository, and a library that is not bundled fails as
-"not found" rather than being downloaded. A library resolved from the
-placeholder is never uploaded; there is no `std_image_repo.zip`.
+The fork runs no upstream library repository or edition provider, so nothing in
+the template points at enso-org. Every library entry names the one repository,
+`release`: a `jar:` URL for `std_image_repo.zip` on the fork's GitHub release.
+It is the future home of libraries that are not bundled with the engine (the
+build marks every library in a `jar:` repository for upload, `librariesToUpload`
+in `build.sbt`). Nothing is uploaded yet: the release workflow does not publish
+the zip, so a library that is not bundled fails as not found. The engine looks
+bundled libraries (everything in `lib/Standard`, `Standard.Image` included) up
+in its own distribution before it consults the repository.
 
 ## Changing the standard library
 
