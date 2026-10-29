@@ -148,6 +148,7 @@ class OpenedProject {
     this.loadedDeferred.promise.catch(() => undefined)
     this.watcher = new WatchedChildProcess(spawner, {
       onChildStarted: (handle) => {
+        this.handleStdinErrors(handle)
         this.captureStderr(handle)
         this.startLoadingRoutine()
       },
@@ -211,6 +212,22 @@ class OpenedProject {
     handle.child.stderr?.on('data', (chunk: Buffer) => {
       echoToStderr(chunk)
       this.logSink?.engineStderr(chunk)
+    })
+  }
+
+  /**
+   * Listen for errors on the engine's stdin, so that none is ever unhandled. The newline of the
+   * graceful shutdown (see {@link gracefulShutdown}) fails asynchronously, with `EPIPE`, when the
+   * engine exits between the check that it is alive and the write: that means it has exited, and
+   * the wait for its exit is what ends the shutdown.
+   */
+  private handleStdinErrors(handle: ChildProcessHandle): void {
+    handle.child.stdin?.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EPIPE' || error.code === 'ERR_STREAM_DESTROYED') {
+        console.info('Language server of', this.path, 'closed its stdin; it has exited')
+      } else {
+        console.error('Error writing to the stdin of the language server of', this.path, error)
+      }
     })
   }
 

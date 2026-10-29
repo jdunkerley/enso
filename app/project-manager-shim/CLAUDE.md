@@ -61,6 +61,13 @@ own band (parallel workers), and each run starts at a random port inside it
 (another checkout's run at the same time). A new such file needs a band of its
 own there.
 
+## Child processes
+
+Always attach an `'error'` listener to a child's stdin (`EnsoRunner` does at
+spawn): a write to an exited child fails asynchronously with `EPIPE`, and with
+no listener that is an unhandled error that fails vitest runs and can crash the
+Electron main process (#401).
+
 ## Local secrets (`src/localSecrets/`)
 
 `LocalSecrets` is the Node side of `~/.enso/secrets.json` (`ENSO_SECRETS_FILE`
