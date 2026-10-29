@@ -164,8 +164,8 @@ runtime suite (out of scope, see Decisions) moves it.
 ### Merge order
 
 All tasks except 3 can be implemented at once, in separate worktrees (Sonnet
-implementers; Opus for the task 8 spike). Merge one at a time, merging `develop` into the next branch and
-letting its checks finish in between:
+implementers; Opus for the task 8 spike). Merge one at a time, merging `develop`
+into the next branch and letting its checks finish in between:
 
 1. **Task 6** — the largest saving on today's critical path.
 2. **Task 7** — adds steps next to task 6's in the same jobs.
