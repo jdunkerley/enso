@@ -211,7 +211,6 @@ object DistributionPackage {
     * compilation.
     * Compilation is done by invoking a single subprocess.
     * @param libRoot Root dir for all the libraries.
-    * @param libsToUpload Name of libraries that will be uploaded as release assets.
     */
   def indexStdLibs(
     stdLibVersion: String,
@@ -219,7 +218,6 @@ object DistributionPackage {
     libRoot: File,
     javaOpts: Seq[String],
     cacheFactory: CacheStoreFactory,
-    libsToUpload: Seq[String],
     log: Logger,
     env: Map[String, String] = Map.empty
   ): Unit = {
@@ -245,11 +243,10 @@ object DistributionPackage {
     if (modifiedLibs.nonEmpty) {
       try {
         invokeIndexStdLibs(
-          libRootDirs  = modifiedLibs,
-          javaOpts     = javaOpts,
-          libsToUpload = libsToUpload,
-          log          = log,
-          env          = env
+          libRootDirs = modifiedLibs,
+          javaOpts    = javaOpts,
+          log         = log,
+          env         = env
         )
       } catch {
         case e: Throwable =>
@@ -269,7 +266,6 @@ object DistributionPackage {
   private def invokeIndexStdLibs(
     libRootDirs: Seq[File],
     javaOpts: Seq[String],
-    libsToUpload: Seq[String],
     log: Logger,
     env: Map[String, String] = Map.empty
   ): Unit = {
@@ -299,7 +295,7 @@ object DistributionPackage {
         s"${command.mkString(" ").length} chars instead of " +
         s"${(javaCommand +: javaArgs).mkString(" ").length}."
       )
-      runIndexStdLibs(command, libRootDirs, libNames, libsToUpload, log, env)
+      runIndexStdLibs(command, libRootDirs, libNames, log, env)
     } finally {
       argFile.delete()
     }
@@ -358,7 +354,6 @@ object DistributionPackage {
     command: Seq[String],
     libRootDirs: Seq[File],
     libNames: String,
-    libsToUpload: Seq[String],
     log: Logger,
     env: Map[String, String]
   ): Unit = {
@@ -367,7 +362,7 @@ object DistributionPackage {
       "NO_COLOR" -> "true"
     )
     // Don't create source archives for standard libraries.
-    val noSrcArchivesSysProp = noSourceArchivesOpt(libRootDirs, libsToUpload)
+    val noSrcArchivesSysProp = noSourceArchivesOpt(libRootDirs)
     val allEnv = mapAppend(
       allEnv1,
       "JAVA_TOOL_OPTIONS" -> noSrcArchivesSysProp
@@ -431,26 +426,15 @@ object DistributionPackage {
 
   /** Constructs a system property that tells the compiler for which libraries there should
     * be no source archive created.
-    * A source archive is created only for libraries that will be uploaded.
+    * Nothing is uploaded from this distribution, so that is every library.
     * @param libRootDirs
-    * @param libsToUpload
     * @return
     */
-  private def noSourceArchivesOpt(
-    libRootDirs: Seq[File],
-    libsToUpload: Seq[String]
-  ): String = {
-    val noArchives = libRootDirs.filter { libRootDir =>
-      val libName      = libRootDir.getParentFile
-      val libNamespace = libName.getParentFile
-      val name         = libNamespace.getName + "." + libName.getName
-      val shouldUpload = libsToUpload.contains(name)
-      !shouldUpload
-    }
-    if (noArchives.isEmpty) {
+  private def noSourceArchivesOpt(libRootDirs: Seq[File]): String = {
+    if (libRootDirs.isEmpty) {
       ""
     } else {
-      val absPaths = noArchives.map { _.getAbsolutePath }
+      val absPaths = libRootDirs.map { _.getAbsolutePath }
       "-Dorg.enso.compiler.noSourceArchives=" + absPaths.mkString(",")
     }
   }
