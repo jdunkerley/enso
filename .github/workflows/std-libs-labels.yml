@@ -43,16 +43,23 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+        # `bash` runs with `-eo pipefail`: a failed `gh` call fails the step.
+        shell: bash
         run: |
+          # The label set is fetched once; if the call fails, so does the step.
+          existing=$(gh label list --repo "$REPO" --limit 500 --json name --jq '.[].name')
           # `distribution/lib/Standard/<Library>/...`: the library is the fourth path segment.
           libraries=$(for f in $FILES; do echo "$f" | cut -d/ -f4; done | sort -u)
           for library in $libraries; do
             label="-libs-API-change-$library"
             # Only libraries with a label are labelled (Examples, Geo, ... have none).
-            if gh api "repos/$REPO/labels/$label" --silent 2>/dev/null; then
-              echo "$label"
+            if grep -Fxq -- "$label" <<<"$existing"; then
               gh pr edit "$PR" --repo "$REPO" --add-label "$label"
+              echo "Added $label" | tee -a "$GITHUB_STEP_SUMMARY"
             else
-              echo "No label $label exists; skipped"
+              echo "No label $label exists; skipped" | tee -a "$GITHUB_STEP_SUMMARY"
             fi
-          done | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Note that no API file changed
+        if: steps.changed-files.outputs.any_changed != 'true'
+        run: echo "No standard library API file changed; no label to add." >> "$GITHUB_STEP_SUMMARY"
