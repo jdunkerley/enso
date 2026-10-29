@@ -108,7 +108,8 @@ jobs:
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
-          cache-key: enso4igv
+          cache-key: engine
+          cache-save: "false"
 
       - name: Publish Enso Libraries to Local Maven Repository
         run: sbt publishM2
