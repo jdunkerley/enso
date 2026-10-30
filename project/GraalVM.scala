@@ -22,6 +22,8 @@ object GraalVM {
     *  - `fast`: `native`, unoptimised, with only `Standard.Base`'s polyglot
     *    support in the image.
     *  - `-ls`: `native`, unoptimised, without the language server.
+    *  - `-ydoc`: `native`, unoptimised, without the ydoc server's native image
+    *    (`buildEngineDistributionNoIndex` leaves it out).
     *
     * Any other value fails the build.
     */
@@ -43,13 +45,14 @@ object GraalVM {
     }
 
     private lazy val parsed
-      : (Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) = {
+      : (Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean) = {
       var shell                 = false
       var native                = false
       var test                  = false
       var debug                 = false
       var fast                  = false
       var disableLanguageServer = false
+      var disableYdoc           = false
       toString().split(",").foreach {
         case "shell"  => shell  = true
         case "native" => native = true
@@ -69,6 +72,10 @@ object GraalVM {
           native                = true
           disableLanguageServer = true
         }
+        case "-ydoc" => {
+          native      = true
+          disableYdoc = true
+        }
         case v =>
           throw new IllegalStateException(s"Unexpected value of $VAR_NAME: $v")
       }
@@ -83,7 +90,8 @@ object GraalVM {
         test,
         debug,
         fast,
-        disableLanguageServer
+        disableLanguageServer,
+        disableYdoc
       )
     }
     def native                = parsed._2
@@ -91,8 +99,9 @@ object GraalVM {
     def debug                 = parsed._4
     def fast                  = parsed._5
     def disableLanguageServer = parsed._6
+    def disableYdoc           = parsed._7
     def release =
-      native && !test && !debug && !fast && !disableLanguageServer
+      native && !test && !debug && !fast && !disableLanguageServer && !disableYdoc
   }
 
   case class NativeImageSize(
