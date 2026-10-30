@@ -6,10 +6,10 @@ on:
   workflow_call:
     outputs:
       all_changed_files:
-        description: "Returns all changed files"
+        description: "Returns all changed files, deleted ones included"
         value: ${{ jobs.wasm-changed-files.outputs.all_changed_files }}
       any_changed:
-        description: "Returns `true` when any of the filenames have changed"
+        description: "Returns `true` when any of the filenames have changed or been deleted"
         value: ${{ jobs.wasm-changed-files.outputs.any_changed }}
 
 permissions:
@@ -21,8 +21,8 @@ jobs:
     timeout-minutes: 30
     name: Changed Files
     outputs:
-      all_changed_files: ${{ steps.wasm-changed-files.outputs.all_changed_files }}
-      any_changed: ${{ steps.wasm-changed-files.outputs.any_changed }}
+      all_changed_files: ${{ steps.wasm-changed-files.outputs.all_modified_files }}
+      any_changed: ${{ steps.wasm-changed-files.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -42,9 +42,9 @@ jobs:
             .github/workflows/wasm*
       - name: List all changed files
         env:
-          ALL_CHANGED_FILES: ${{ steps.wasm-changed-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.wasm-changed-files.outputs.all_modified_files }}
         run: |
-          if [[ "${{ steps.wasm-changed-files.outputs.any_changed }}" == "true" ]]; then
+          if [[ "${{ steps.wasm-changed-files.outputs.any_modified }}" == "true" ]]; then
             echo "Files changed:"
           fi
           for file in ${ALL_CHANGED_FILES}; do

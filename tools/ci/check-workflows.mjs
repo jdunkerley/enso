@@ -807,6 +807,37 @@ export function checkWorkflowsDeclarePermissions({ workflows }) {
 }
 
 /**
+ * The `changed-files` action's `any_changed` and `all_changed_files` cover added, copied, modified
+ * and renamed files (ACMR) and leave out deleted ones, so a pull request that only deletes files
+ * would start none of the checks gated on them (#441). A workflow reads `any_modified` and
+ * `all_modified_files` (ACMRD) from a `changed-files` step instead. Job and workflow outputs that
+ * are themselves named `any_changed` are the gates' public interface and stay.
+ */
+export function checkChangedFilesCountDeletions({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      const steps = Array.isArray(job?.steps) ? job.steps : []
+      const stepIds = steps
+        .filter((step) => /\bchanged-files@/.test(String(step?.uses ?? '')) && step.id)
+        .map((step) => String(step.id))
+      const text = JSON.stringify(job)
+      for (const stepId of stepIds) {
+        const escaped = stepId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        const read = new RegExp(`steps\\.${escaped}\\.outputs\\.(any_changed|all_changed_files)\\b`, 'g')
+        for (const output of new Set([...text.matchAll(read)].map((match) => match[1]))) {
+          const instead = output === 'any_changed' ? 'any_modified' : 'all_modified_files'
+          problems.push(
+            `${file}: job \`${id}\` reads \`${output}\` from the \`changed-files\` step \`${stepId}\`, which leaves out deleted files; use \`${instead}\` so deletions count`,
+          )
+        }
+      }
+    }
+  }
+  return problems
+}
+
+/**
  * The prebuilt `wasm-bindgen` CLI that jobs install must be the version `build-wasm.mjs` pins:
  * with another one, `build-wasm.mjs` falls back to `cargo install` (minutes), or, if versions
  * drift the other way, emits bindings against the wrong ABI (`app/rust-ffi/CLAUDE.md`).
@@ -945,6 +976,7 @@ export const CHECKS = [
   checkBuildScriptsSpawnSbtThroughHelper,
   checkJobsHaveTimeouts,
   checkWorkflowsDeclarePermissions,
+  checkChangedFilesCountDeletions,
   checkStdlibTestMap,
 ]
 

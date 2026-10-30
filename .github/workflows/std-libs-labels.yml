@@ -25,18 +25,20 @@ jobs:
         with:
           clean: false
           fetch-depth: 2
+      # `any_modified` and `all_modified_files` include deleted files: removing an API file changes
+      # the library's API too.
       - id: changed-files
         name: Changed API files
         uses: step-security/changed-files@v45
         with:
           files: distribution/lib/Standard/*/**/docs/api/**/**.md
       - name: Add the labels
-        if: steps.changed-files.outputs.any_changed == 'true'
+        if: steps.changed-files.outputs.any_modified == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
-          FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+          FILES: ${{ steps.changed-files.outputs.all_modified_files }}
         # `bash` runs with `-eo pipefail`: a failed `gh` call fails the step.
         shell: bash
         run: |
@@ -55,5 +57,5 @@ jobs:
             fi
           done
       - name: Note that no API file changed
-        if: steps.changed-files.outputs.any_changed != 'true'
+        if: steps.changed-files.outputs.any_modified != 'true'
         run: echo "No standard library API file changed; no label to add." >> "$GITHUB_STEP_SUMMARY"

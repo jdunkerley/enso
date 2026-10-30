@@ -11,6 +11,14 @@ settings. Every workflow is hand-written YAML (build simplification;
   `*-changed-files.yml` gate, calls the matching checks workflow, and ends in an
   aggregator job.
 - `workflows/*-changed-files.yml` — path gating: which files start which checks.
+  A deleted file counts: the gates read the `changed-files` action's
+  `any_modified` / `all_modified_files` (added, copied, modified, renamed and
+  deleted), never `any_changed` / `all_changed_files`, which leave deletions out
+  and would let a PR that only deletes files skip the checks (#441). The gates'
+  own outputs keep the `any_changed` names; `check-workflows.mjs` fails a
+  workflow that reads the ACMR outputs from a `changed-files` step.
+  `std-libs-labels.yml` follows the same rule: removing an API file is an API
+  change.
 - `workflows/engine-checks.yml` + `engine-checks-platform.yml`,
   `ide-packaging.yml`, `gui-checks.yml`, `wasm-checks.yml`, `macos-checks.yml` —
   the checks, callable (`workflow_call`) and mostly startable by hand
