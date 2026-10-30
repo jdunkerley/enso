@@ -40,13 +40,17 @@ from project.Nothing import all
    Gets the first format not returning Nothing from the callback
 get_format : Function -> Any | Nothing
 get_format callback =
-    types = File_Format_SPI.get_types
-    reader idx =
-        if idx >= types.length then Nothing else
-            format = callback (types.at idx)
-            if format.is_nothing.not then format else
-                @Tail_Call reader (idx + 1)
-    reader 0
+    first_format types =
+        reader idx =
+            if idx >= types.length then Nothing else
+                format = callback (types.at idx)
+                if format.is_nothing.not then format else
+                    @Tail_Call reader (idx + 1)
+        reader 0
+    # The loaded libraries' formats are tried first, so that reading a file of a
+    # known format loads no other library.
+    first_format (File_Format_SPI.get_types loaded_only=True) . if_nothing <|
+        first_format File_Format_SPI.get_types
 
 ## Automatically detects the file format based on the file extension or mime-type.
 type Auto_Detect
@@ -101,9 +105,8 @@ type File_Format
        advanced: true
        ---
        Gets all the currently available file formats.
-       The available file formats are ones provided by libraries which are
-       imported within the current project. Importing an new library may cause
-       more entries to show up on this list.
+       The available file formats are the ones provided by the libraries
+       installed for the current project, whether imported or not.
     all : Vector
     all = [Auto_Detect] + File_Format_SPI.get_types
 
@@ -114,13 +117,15 @@ type File_Format
     resolve : Function -> File_Format
     resolve constructor = case constructor of
         _ : Function ->
-            arr = File_Format_SPI.get_types
-            try_next idx =
-                if idx >= arr.length then Error.throw (Illegal_Argument.Error "Expected a file format, but got a function.") else
-                    format = arr.at idx
-                    resolved = format.resolve constructor
-                    if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
-            try_next 0
+            first_resolved arr =
+                try_next idx =
+                    if idx >= arr.length then Nothing else
+                        resolved = (arr.at idx).resolve constructor
+                        if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
+                try_next 0
+            (first_resolved (File_Format_SPI.get_types loaded_only=True)) . if_nothing <|
+                (first_resolved File_Format_SPI.get_types) . if_nothing <|
+                    Error.throw (Illegal_Argument.Error "Expected a file format, but got a function.")
         _ -> constructor
 
     ## ---
@@ -585,24 +590,30 @@ type File_Format_SPI
         File_Format_SPI.Few arr -> arr
         single -> [single]
 
-    private get_regs b:Boolean=False =
+    private get_regs b:Boolean=False loaded_only:Boolean=False =
         _ = b
-        reg = Meta.lookup_services File_Format_SPI
+        reg = Meta.lookup_services File_Format_SPI loaded_only=loaded_only
         reg.map .to_vector . flatten
 
     ## ---
        private: true
        ---
        Returns all registered file format types.
-    get_types b:Boolean=False =
-        File_Format_SPI.get_regs b . map .typ
+
+       ## Arguments
+        - `loaded_only`: only the formats of the libraries already loaded, so
+          nothing new is loaded.
+    get_types b:Boolean=False loaded_only:Boolean=False =
+        File_Format_SPI.get_regs b loaded_only . map .typ
 
     private find_format_for_data_link sub_type:Text =
-        all = File_Format_SPI.get_regs False
-        found = all.filter \spi -> spi.data_link_format_name == sub_type
-        if found.length > 0 then found.first . typ else
-            Error.throw <|
-                Illegal_State.Error "Unknown format "+sub_type
+        find loaded_only =
+            found = File_Format_SPI.get_regs False loaded_only . find if_missing=Nothing spi->
+                spi.data_link_format_name == sub_type
+            if found.is_nothing then Nothing else found.typ
+        (find True) . if_nothing <|
+            (find False) . if_nothing <|
+                Error.throw (Illegal_State.Error "Unknown format "+sub_type)
 
 private _is_plain_text_format content_type:Content_Type_Metadata -> Boolean =
     case content_type.base_type of

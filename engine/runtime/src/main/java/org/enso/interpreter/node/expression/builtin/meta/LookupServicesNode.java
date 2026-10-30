@@ -1,11 +1,15 @@
 package org.enso.interpreter.node.expression.builtin.meta;
 
 import com.oracle.truffle.api.CompilerDirectives;
+import com.oracle.truffle.api.TruffleFile;
 import com.oracle.truffle.api.exception.AbstractTruffleException;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.nodes.Node;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
+import java.util.logging.Level;
+import org.enso.compiler.core.CompilerError;
 import org.enso.interpreter.dsl.BuiltinMethod;
 import org.enso.interpreter.node.callable.InteropApplicationNode;
 import org.enso.interpreter.runtime.EnsoContext;
@@ -16,8 +20,25 @@ import org.enso.interpreter.runtime.data.text.Text;
 import org.enso.interpreter.runtime.data.vector.ArrayLikeHelpers;
 import org.enso.interpreter.runtime.error.DataflowError;
 import org.enso.interpreter.runtime.error.PanicException;
+import org.enso.pkg.Package;
 import org.enso.pkg.QualifiedName;
 import org.enso.scala.wrapper.ScalaConversions;
+
+/*
+ * Note [Service Discovery Over Installed Libraries]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * `Meta.lookup_services` returns the providers of every library the project can resolve without a
+ * download (`ResolvingLibraryProvider.findInstalledLibraries`), not only of the loaded ones, so a
+ * backend appears in `Database.connect`'s dropdown and a SQLite file reads without an import.
+ * - Order: the loaded libraries' providers first, in loading order, then the others by library
+ *   name, so results are stable.
+ * - Cost: the installed libraries' `package.yaml` files are read once per context
+ *   (`DefaultPackageRepository.installedPackages`); nothing is compiled until a provider of the
+ *   requested service is resolved, which loads its library and compiles the provider's module.
+ *   `loaded_only` skips the installed ones, for callers that stop at their first match.
+ * - Failures: a library that discovery loads and that fails to load or compile is skipped with a
+ *   logged warning; a loaded library's broken registration stays a dataflow error, as before.
+ */
 
 @BuiltinMethod(
     type = "Meta",
@@ -30,8 +51,8 @@ public abstract class LookupServicesNode extends Node {
   public static LookupServicesNode build() {
     return new LookupServicesNode() {
       @Override
-      protected Iterable<Supplier<Type>> findImplementationsFor(Type service) {
-        return super.defaultImplementationsFor(service);
+      protected Iterable<Supplier<Type>> findImplementationsFor(Type service, boolean loadedOnly) {
+        return super.defaultImplementationsFor(service, loadedOnly);
       }
     };
   }
@@ -88,38 +109,85 @@ public abstract class LookupServicesNode extends Node {
    * possible registrations and return them as {@link Iterable}. Each element of the iterable is
    * "supplier" that can either return the Type implementing the service or yield {@link
    * AbstractTruffleException} (like {@link PanicException}) to signal that the registration is
-   * there, but broken.
+   * there, but broken. A supplier may also return {@code null}: a provider of an installed library
+   * that could not be loaded, already logged and to be skipped.
    *
    * @param service the type to find implementations for
+   * @param loadedOnly only the libraries already loaded, so that nothing new is loaded
    * @return iterable with suppliers of types
    */
-  protected abstract Iterable<Supplier<Type>> findImplementationsFor(Type service);
+  protected abstract Iterable<Supplier<Type>> findImplementationsFor(
+      Type service, boolean loadedOnly);
 
-  private final Iterable<Supplier<Type>> defaultImplementationsFor(Type fqn) {
+  private Iterable<Supplier<Type>> defaultImplementationsFor(Type service, boolean loadedOnly) {
     var found = new ArrayList<Supplier<Type>>();
-    var ensoCtx = EnsoContext.get(this);
-    for (var p : ensoCtx.getPackageRepository().getLoadedPackagesJava()) {
-      var regs = ScalaConversions.asJava(p.getConfig().services());
-      for (var pw : regs) {
-        var spiTypeName = pw.provides();
-        if (spiTypeName == null || !spiTypeName.equals(fqn.getQualifiedName())) {
-          continue;
-        }
-        var with = pw.with();
+    var repository = EnsoContext.get(this).getPackageRepository();
+    var serviceName = service.getQualifiedName();
+    for (var p : repository.getLoadedPackagesJava()) {
+      for (var with : providersOf(p, serviceName)) {
         found.add(() -> findType(with, p.namespace(), p.name()));
+      }
+    }
+    if (!loadedOnly) {
+      for (var p : repository.getInstalledUnloadedPackagesJava()) {
+        for (var with : providersOf(p, serviceName)) {
+          found.add(() -> loadAndFindType(p, with));
+        }
       }
     }
     return found;
   }
 
+  private static List<QualifiedName> providersOf(Package<?> p, QualifiedName service) {
+    var providers = new ArrayList<QualifiedName>();
+    for (var registration : ScalaConversions.asJava(p.getConfig().services())) {
+      if (service.equals(registration.provides())) {
+        providers.add(registration.with());
+      }
+    }
+    return providers;
+  }
+
+  /**
+   * Loads {@code p} and finds the provider {@code with} in it.
+   *
+   * @return the provider's type, or {@code null} (logged) when the library cannot be loaded or the
+   *     type cannot be found or compiled
+   */
   @CompilerDirectives.TruffleBoundary
-  public final EnsoObject execute(Type fqn) {
+  private Type loadAndFindType(Package<TruffleFile> p, QualifiedName with) {
+    var ensoCtx = EnsoContext.get(this);
+    var logger = ensoCtx.getLogger(LookupServicesNode.class);
+    var loaded = ensoCtx.getPackageRepository().ensurePackageIsLoaded(p.libraryName());
+    if (loaded.isLeft()) {
+      logger.log(
+          Level.WARNING,
+          "Skipping the services of {0}: {1}",
+          new Object[] {p.libraryName(), loaded});
+      return null;
+    }
+    try {
+      return findType(with, p.namespace(), p.name());
+    } catch (AbstractTruffleException | CompilerError ex) {
+      logger.log(
+          Level.WARNING,
+          "Skipping the service provider {0}: {1}",
+          new Object[] {with, ex.getMessage()});
+      return null;
+    }
+  }
+
+  @CompilerDirectives.TruffleBoundary
+  public final EnsoObject execute(Type fqn, boolean loadedOnly) {
     var ensoCtx = EnsoContext.get(this);
     var collect = new ArrayList<Object>();
-    for (var supplierOfType : findImplementationsFor(fqn)) {
+    for (var supplierOfType : findImplementationsFor(fqn, loadedOnly)) {
       try {
         // the get() call may yield AbstractTruffleException
         var implType = supplierOfType.get();
+        if (implType == null) {
+          continue;
+        }
         var conversion = UnresolvedConversion.build(implType.getDefinitionScope());
         var state = ensoCtx.currentState();
         var node = InteropApplicationNode.getUncached();

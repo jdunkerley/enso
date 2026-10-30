@@ -166,15 +166,10 @@ add_specs suite_builder =
             r2.should_be_a Vector
             r2.should_equal [js_as_text.get, "Hello World!"]
 
-        group_builder.specify "would default to returning as merged Table, but will raise a helpful error if Standard.Table is not loaded" <|
-            is_table_imported = File_Format.all.map .to_text . contains "Delimited_Format"
-            Runtime.assert is_table_imported.not "This test assumes that Base_Tests does not import Standard.Table."
+        group_builder.specify "returns a merged Table by default, finding Standard.Table without an import" <|
             files = [enso_project.data / "sample.json"]
             r1 = Data.read_many files
-            r1.should_fail_with Illegal_Argument
-            r1.catch.to_display_text.should_contain "not imported"
-            r1.catch.to_display_text.should_contain "Standard.Table"
-            r1.catch.to_display_text.should_contain "As_Vector"
+            Meta.type_of r1 . to_text . should_equal "Table"
 
         group_builder.specify "should work with paths as Text" <|
             files = [enso_project.data / "sample.json", enso_project.data / "helloworld.txt"]

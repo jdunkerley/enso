@@ -143,6 +143,22 @@ object LibraryApi {
       }
   }
 
+  case object LibraryListPublicTypes extends Method("library/listPublicTypes") {
+    self =>
+
+    case class Result(publicTypes: Seq[LibraryPublicType])
+
+    implicit val hasParams: HasParams.Aux[this.type, Unused.type] =
+      new HasParams[this.type] {
+        type Params = Unused.type
+      }
+
+    implicit val hasResult: HasResult.Aux[this.type, self.Result] =
+      new HasResult[this.type] {
+        type Result = self.Result
+      }
+  }
+
   case object LibraryCreate extends Method("library/create") { self =>
 
     case class Params(

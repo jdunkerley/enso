@@ -29,6 +29,13 @@ trait ResolvingLibraryProvider {
     name: LibraryName,
     version: LibraryVersion
   ): Either[ResolvingLibraryProvider.Error, ResolvedLibrary]
+
+  /** Lists the libraries this provider can resolve without downloading
+    * anything ([[InstalledLibraries.find]]).
+    *
+    * @return the resolved libraries, sorted by name
+    */
+  def findInstalledLibraries(): Seq[ResolvedLibrary]
 }
 
 object ResolvingLibraryProvider {

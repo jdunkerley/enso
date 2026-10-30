@@ -17,6 +17,7 @@ import {
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
+  checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
   checkRepo,
@@ -28,6 +29,7 @@ import {
   checkWasmBindgenPins,
   checkWindowsInstallerSmokeTest,
   checkWorkflowsDeclarePermissions,
+  exportedTypes,
   loadRepo,
 } from './check-workflows.mjs'
 
@@ -988,6 +990,54 @@ describe('checkWasmBindgenPins', () => {
     assert.deepEqual(
       checkWasmBindgenPins(fixture({ 'workflows/a.yml': install('0.2.127') }, source)),
       ['a.yml: installs wasm-bindgen-cli@0.2.127, but app/rust-ffi/build-wasm.mjs pins 0.2.128'],
+    )
+  })
+})
+
+describe('exportedTypes', () => {
+  test('reads exports, aliases and lists, skipping functions and examples', () => {
+    assert.deepEqual(
+      exportedTypes(
+        [
+          'export project.DuckDB.DuckDB',
+          'export project.Table_Extensions.geo_distance',
+          'export project.S3.S3_File as File_On_S3',
+          'from project.Image export Image, Matrix',
+          '## Example',
+          '    export project.Not.Counted',
+          '',
+        ].join('\n'),
+      ),
+      ['DuckDB', 'File_On_S3', 'Image', 'Matrix'],
+    )
+  })
+})
+
+describe('checkPublicTypes', () => {
+  const lib = (yaml, main) => ({
+    'distribution/lib/Standard/Base/0.0.0-dev/package.yaml': 'name: Base\n',
+    'distribution/lib/Standard/Base/0.0.0-dev/src/Main.enso': 'export project.Any.Any\n',
+    'distribution/lib/Standard/Geo/0.0.0-dev/package.yaml': yaml,
+    'distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso': main,
+  })
+  const main = 'export project.Geo.Geo\nexport project.Table_Extensions.geo_distance\n'
+  const at = 'distribution/lib/Standard/Geo/0.0.0-dev/package.yaml:'
+
+  test('accepts a matching declaration, and ignores the core set', () => {
+    assert.deepEqual(
+      checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main))),
+      [],
+    )
+  })
+  test('requires the declaration outside the core set', () => {
+    assert.deepEqual(checkPublicTypes(fixture({}, lib('name: Geo\n', main))), [
+      `${at} no \`public-types:\` list (its Main.enso exports [Geo])`,
+    ])
+  })
+  test('reports a declaration that differs from the exports', () => {
+    assert.deepEqual(
+      checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo, Old]\n', main))),
+      [`${at} \`public-types\` is [Geo, Old] but Main.enso exports [Geo]`],
     )
   })
 })

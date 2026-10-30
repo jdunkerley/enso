@@ -801,6 +801,27 @@ class LibrariesTest extends BaseServerTest with ReportLogsOnFailure {
     }
   }
 
+  "library/listPublicTypes" should {
+    "answer with the installed libraries' declared types" in {
+      val client = getInitialisedWsClient()
+      client.send(json"""
+          { "jsonrpc": "2.0",
+            "method": "library/listPublicTypes",
+            "id": 0
+          }
+          """)
+      client.expectJson(
+        json"""
+          { "jsonrpc": "2.0",
+            "id": 0,
+            "result": { "publicTypes": [] }
+          }
+          """,
+        timeout = defaultTimeout
+      )
+    }
+  }
+
   "editions/resolve" should {
     "resolve the engine version associated with an edition" in {
       val currentVersion = BuildVersion.ensoVersion

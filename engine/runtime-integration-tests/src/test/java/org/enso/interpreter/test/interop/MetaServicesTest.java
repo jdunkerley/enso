@@ -73,7 +73,7 @@ public class MetaServicesTest {
     var impl = (Type) ctx.unwrapValue(arr.getArrayElement(1));
     node.toReturn = List.of(() -> impl);
 
-    var res = ctx.asValue(node.execute(spi));
+    var res = ctx.asValue(node.execute(spi, false));
 
     assertTrue("Returned an array", res.hasArrayElements());
     assertEquals("One registration found", 1, res.getArraySize());
@@ -108,7 +108,7 @@ public class MetaServicesTest {
     var impl = (Type) ctx.unwrapValue(arr.getArrayElement(1));
     node.toReturn = List.of(() -> impl);
 
-    var res = ctx.asValue(node.execute(spi));
+    var res = ctx.asValue(node.execute(spi, false));
 
     assertTrue("Returned an array", res.hasArrayElements());
     assertEquals("One registration found", 1, res.getArraySize());
@@ -144,7 +144,7 @@ public class MetaServicesTest {
               throw new PanicException(err, node);
             });
 
-    var res = ctx.asValue(node.execute(spi));
+    var res = ctx.asValue(node.execute(spi, false));
 
     assertTrue("Returned an array", res.hasArrayElements());
     assertEquals("One registration found", 1, res.getArraySize());
@@ -161,7 +161,7 @@ public class MetaServicesTest {
     List<Supplier<Type>> toReturn;
 
     @Override
-    protected Iterable<Supplier<Type>> findImplementationsFor(Type type) {
+    protected Iterable<Supplier<Type>> findImplementationsFor(Type type, boolean loadedOnly) {
       assertNotNull("The test has to tell us what to return first", toReturn);
       return toReturn;
     }

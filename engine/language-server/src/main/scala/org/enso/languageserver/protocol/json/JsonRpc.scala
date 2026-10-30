@@ -86,6 +86,7 @@ object JsonRpc {
     .registerRequest(EditionsListDefinedLibraries)
     .registerRequest(EditionsListDefinedComponents)
     .registerRequest(LibraryListLocal)
+    .registerRequest(LibraryListPublicTypes)
     .registerRequest(LibraryCreate)
     .registerRequest(LibraryGetMetadata)
     .registerRequest(LibrarySetMetadata)

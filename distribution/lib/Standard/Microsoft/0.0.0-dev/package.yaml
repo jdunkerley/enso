@@ -8,6 +8,13 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types:
+  - Azure
+  - Azure_Storage
+  - SQLServer_Details
+  - Microsoft365_Credential
+  - OneDrive
+  - OneDrive_File
 
 services:
   - provides: Standard.Base.System.File.File_System_SPI

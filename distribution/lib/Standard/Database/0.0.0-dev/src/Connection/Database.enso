@@ -78,22 +78,24 @@ type Database_Connection_Details_SPI
         single -> [single]
 
     private resolve_constructor constructor:Function =
-        types = Database_Connection_Details_SPI.get_types False
-        try_next idx =
-            if idx >= types.length then constructor else
-                db_type = types.at idx
-                resolved = db_type.resolve constructor
-                if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
-        try_next 0
+        first_resolved types =
+            try_next idx =
+                if idx >= types.length then Nothing else
+                    resolved = (types.at idx).resolve constructor
+                    if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
+            try_next 0
+        loaded = Database_Connection_Details_SPI.get_types False loaded_only=True
+        (first_resolved loaded) . if_nothing <|
+            (first_resolved (Database_Connection_Details_SPI.get_types False)) . if_nothing constructor
 
-    private get_simple_regs b:Boolean  -> Vector Database_Connection_Details_SPI =
+    private get_simple_regs b:Boolean loaded_only:Boolean=False -> Vector Database_Connection_Details_SPI =
         _ = b
-        reg = Meta.lookup_services Database_Connection_Details_SPI
+        reg = Meta.lookup_services Database_Connection_Details_SPI loaded_only=loaded_only
         arr = reg.map .to_vector
         arr.flatten
 
-    private get_types b:Boolean -> Vector =
-        flat = Database_Connection_Details_SPI.get_simple_regs b
+    private get_types b:Boolean loaded_only:Boolean=False -> Vector =
+        flat = Database_Connection_Details_SPI.get_simple_regs b loaded_only
         flat.map .typ
 
     ## Returns an array of pairs, where the first element is the user facing

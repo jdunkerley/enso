@@ -495,6 +495,30 @@ private class DefaultPackageRepository(
   def getLoadedPackagesJava: java.lang.Iterable[Package[TruffleFile]] =
     loadedPackages.flatMap(_._2).asJava
 
+  /** The installed libraries' packages: their `package.yaml` is read, nothing
+    * is registered or compiled. Computed once per context, on the first service
+    * lookup (Note [Service Discovery Over Installed Libraries] in
+    * `LookupServicesNode`).
+    */
+  private lazy val installedPackages: Seq[Package[TruffleFile]] =
+    libraryProvider.findInstalledLibraries().flatMap { library =>
+      packageManager.loadPackage(
+        context.findLibraryRootPath(library.root)
+      ) match {
+        case Success(pkg) => Some(pkg)
+        case Failure(error) =>
+          logger.warn(
+            s"Library ${library.name} is left out of service discovery: " +
+            error.getMessage
+          )
+          None
+      }
+    }
+
+  /** The installed libraries that are not loaded yet, sorted by name. */
+  def getInstalledUnloadedPackagesJava: java.util.List[Package[TruffleFile]] =
+    installedPackages.filterNot(pkg => isPackageLoaded(pkg.libraryName)).asJava
+
   /** @inheritdoc */
   override def getLoadedModule(
     qualifiedName: String

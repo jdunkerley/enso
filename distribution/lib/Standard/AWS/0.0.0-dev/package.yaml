@@ -8,6 +8,7 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [AWS, AWS_Credential, AWS_Region, Redshift_Details, S3, S3_File]
 
 services:
   - provides: Standard.Base.System.File.File_System_SPI

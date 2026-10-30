@@ -74,7 +74,7 @@ testProjects:
   Test_Tests: { imports: [Base, Test], testImports: [] }
   Visualization_Tests:
     imports:
-      [AWS, Base, Database, Examples, Geo, Image, Table, Test, Visualization]
+      [Base, Database, Examples, Geo, Image, Table, Test, Visualization]
     testImports: []
 
 # The jobs a standard library suite that runs "every project but …" splits into; a suite with an
