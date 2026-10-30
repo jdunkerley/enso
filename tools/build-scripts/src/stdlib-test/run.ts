@@ -16,7 +16,7 @@ import {
   runnerArguments,
   testEnvironment,
 } from './invocation.ts'
-import { readJUnitDir, summaryMarkdown } from './junit.ts'
+import { count, readJUnitDir, summaryMarkdown } from './junit.ts'
 import {
   discoverProjects,
   selectProjects,
@@ -100,6 +100,13 @@ export async function runStdlibTests(
   }
   const projects = selectProjects(discoverProjects(testDir), suite, options.only)
   if (projects.length === 0) throw new Error(`Suite ${name} selects no test project.`)
+  const groupFilter = env.ENSO_TEST_GROUP_FILTER ?? ''
+  if (groupFilter !== '' && projects.length !== 1)
+    throw new Error(
+      `ENSO_TEST_GROUP_FILTER (${groupFilter}) applies to one project; this run selects ` +
+        `${projects.length}. Narrow it with --only.`,
+    )
+  if (groupFilter !== '') context.log(`Test groups: ${groupFilter}`)
   const smallJdk = path.join(context.repoRoot, 'target', 'small-jdk')
   const runnerArgs = runnerArguments(suite, context.platform, smallJdk, env.GRAAL_EDITION)
   if (runnerArgs.includes(smallJdk) && !context.exists(smallJdk)) {
@@ -154,7 +161,16 @@ export async function runStdlibTests(
   } finally {
     httpbin.stop()
   }
-  context.appendSummary(summaryMarkdown(readJUnitDir(junitDir)))
+  const results = readJUnitDir(junitDir)
+  context.appendSummary(summaryMarkdown(results))
+  if (groupFilter !== '') {
+    for (const project of projects) {
+      const { pass, fail } = count(results.get(project) ?? [])
+      // A filter that matches no group still exits 0 (root CLAUDE.md): a typo would pass silently.
+      if (pass + fail === 0)
+        failures.push(`${project}: the group filter ${groupFilter} ran no test`)
+    }
+  }
   if (failures.length > 0) {
     context.log(
       `::error title=Failed Standard Library Tests::${failures.length} test suite(s) failed: ${failures.join(';%0A')}`,

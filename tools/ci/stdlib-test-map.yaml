@@ -81,7 +81,19 @@ testProjects:
 # allow list (AWS, Microsoft) stays one job. Each shard runs the listed projects the suite runs;
 # the last (`"*"`) runs the rest. Sized from the timings in
 # docs/superpowers/plans/2026-10-30-ci-speed-phase-2.md: Table_Tests alone is the longest.
+# A shard with one project may also `split` into parts that each run the groups (of
+# `ENSO_TEST_GROUP_FILTER`) whose names start with the part's `groups` regex; the last part has no
+# `groups` and runs every group the others leave out, so nothing is lost. A part with
+# `needs: postgres` is dropped for a suite entry without that database (its groups then run, and
+# skip, in the last part, as before).
 shards:
-  - { name: Table, projects: [Table_Tests] }
+  - name: Table
+    projects: [Table_Tests]
+    # One job per database backend (the backends take about a third of the time each). A part
+    # with `needs` runs only where its suite has that database; the last runs every other group.
+    split:
+      - { name: PostgreSQL, groups: '\[PostgreSQL\]', needs: postgres }
+      - { name: SQLite File, groups: '\[SQLite File\]' }
+      - { name: Rest }
   - { name: Base, projects: [Base_Tests, DuckDB_Tests, Cloud_Tests] }
   - { name: Others, projects: "*" }

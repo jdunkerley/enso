@@ -558,7 +558,10 @@ jobs:
   # projects importing it, and anything else selects every project. develop, hand-started runs and
   # the other callers pass no changed files and run every project. `tools/build-scripts`'
   # `stdlib-test-plan` decides, writes why in this job's summary, and returns the jobs as `matrix`;
-  # `stdlib-test --only` runs each job's projects. A new library or test project must be added to
+  # `stdlib-test --only` runs each job's projects. A split shard (Table_Tests, by database
+  # backend) is several jobs that each run a slice of that one project's test groups
+  # (`ENSO_TEST_GROUP_FILTER`, from the matrix's `group-filter`); `stdlib-test` fails a job whose
+  # filter ran no test, so a filter that matches nothing cannot pass silently. A new library or test project must be added to
   # the map (`tools/ci/check-workflows.mjs` fails until it is). The changed files must be every path
   # the pull request touched: deleted files, and both the old and the new path of a rename (the
   # `touched_files` output of `engine-changed-files.yml`, not `all_changed_files`, which has
@@ -724,6 +727,7 @@ jobs:
           ENSO_SQLSERVER_PORT: ${{ matrix.mssql && '1433' || '' }}
           ENSO_SQLSERVER_USER: ${{ matrix.mssql && 'sa' || '' }}
           ENSO_SQLSERVER_PASSWORD: ${{ matrix.mssql && 'enso_test_password_<YourStrong@Passw0rd>' || '' }}
+          ENSO_TEST_GROUP_FILTER: ${{ matrix.group-filter || '' }}
       # An entry is never overwritten, so a partial one would stick: save only when the numpy wheel
       # is actually there (not when pip was cancelled or never ran).
       - if: ${{ !cancelled() && github.ref == 'refs/heads/develop' && contains(format(',{0},', matrix.only), ',Examples_Tests,') }}
@@ -827,6 +831,7 @@ jobs:
           ENSO_LIB_S3_AWS_ACCESS_KEY_ID: ${{ secrets.ENSO_LIB_S3_AWS_ACCESS_KEY_ID }}
           ENSO_LIB_S3_AWS_REGION: ${{ secrets.ENSO_LIB_S3_AWS_REGION }}
           ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY: ${{ secrets.ENSO_LIB_S3_AWS_SECRET_ACCESS_KEY }}
+          ENSO_TEST_GROUP_FILTER: ${{ matrix.group-filter || '' }}
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Standard Library Test Reporter
         uses: dorny/test-reporter@v1

@@ -53,8 +53,10 @@ prints one.
   engine package, the small JDK for the JVM suite, and the databases
   (`ENSO_POSTGRES_*`, `ENSO_SQLSERVER_*`; empty ones are dropped).
   `--only A_Tests,B_Tests` narrows the suite (a name it does not run is a usage
-  error); `--dry-run` prints the commands. Do not run it for real on a machine
-  whose environment holds real credentials.
+  error); `--dry-run` prints the commands. `ENSO_TEST_GROUP_FILTER` (one project
+  only) runs the test groups whose names match; a run in which it ran no test
+  fails. Do not run it for real on a machine whose environment holds real
+  credentials.
 - `stdlib-test-plan` — CI's standard-library test jobs for one platform: which
   projects a pull request's changed files can affect
   (`tools/ci/stdlib-test-map.yaml`), split into the map's shards, as a `matrix`

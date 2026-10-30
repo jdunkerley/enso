@@ -109,6 +109,20 @@ describe('the environment', () => {
     expect(env.CI_TEST_FLAKY_ENABLE).toBe('true')
     expect(env.ENSO_HTTP_TEST_HTTPBIN_URL).toBeUndefined()
   })
+  test('an empty group filter is dropped, a set one kept', () => {
+    const environment = (filter: string) =>
+      testEnvironment({
+        base: { ENSO_TEST_GROUP_FILTER: filter },
+        platform: 'linux',
+        enginePackage: '/e',
+        nativeRunner: true,
+        runnerArgs: [],
+        junitDir: '/j',
+        httpbinUrl: null,
+      })
+    expect('ENSO_TEST_GROUP_FILTER' in environment('')).toBe(false)
+    expect(environment('^\\[SQLite File\\]').ENSO_TEST_GROUP_FILTER).toBe('^\\[SQLite File\\]')
+  })
   test('the time factors are absent on Linux, not empty', () => {
     const env = testEnvironment({
       base: {},
