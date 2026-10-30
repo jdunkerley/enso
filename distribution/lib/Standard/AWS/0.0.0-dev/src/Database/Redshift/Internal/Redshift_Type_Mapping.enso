@@ -8,7 +8,7 @@ from Standard.Table import Bits, Value_Type
 from Standard.Table.Errors import Inexact_Type_Coercion
 
 import Standard.Database.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
-import Standard.Database.Internal.Postgres.Postgres_Type_Mapping.Postgres_Type_Mapping
+import Standard.Database.Postgres_Family.Postgres_Type_Mapping.Postgres_Type_Mapping
 import Standard.Database.Internal.SQL_Type_Mapping
 import Standard.Database.Internal.SQL_Type_Reference.SQL_Type_Reference
 import Standard.Database.Internal.Statement_Setter.Statement_Setter

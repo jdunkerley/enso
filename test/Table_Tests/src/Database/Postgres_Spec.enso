@@ -15,7 +15,7 @@ import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
 import Standard.Database.Dialects.Feature.Feature
 import Standard.Database.Internal.Postgres.Pgpass
 from Standard.Database.Errors import all
-from Standard.Database.Internal.Postgres.Helpers import parse_postgres_encoding
+from Standard.Database.Postgres_Family.Helpers import parse_postgres_encoding
 
 from Standard.Test import all
 import Standard.Test.Test_Environment

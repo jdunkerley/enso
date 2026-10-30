@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Internal.Postgres.Postgres_Type_Mapping
+## module Standard.Database.Postgres_Family.Postgres_Type_Mapping
 - type Postgres_Type_Mapping
     - column_fetcher_factory -> Standard.Base.Any.Any
     - error_mapper self -> Standard.Base.Any.Any
