@@ -95,12 +95,21 @@ jobs:
             runner: windows-latest
     env:
       ENSO_LAUNCHER: native
+      # Note [The Engine's Cargo Target Directory] in `engine-checks-platform.yml`.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
         with:
           clean: false
       - uses: ./.github/actions/setup-node
+      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
+      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Set up the build scripts
@@ -111,6 +120,12 @@ jobs:
           cache-key: engine
           flatc: "true"
           rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - id: version
