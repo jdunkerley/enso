@@ -254,9 +254,8 @@ jobs:
   # - `CI_TEST_TIMEFACTOR=2` and `CI_TEST_FLAKY_ENABLE=true` are written to `GITHUB_ENV` on Windows
   #   only, so that on Linux they are absent rather than empty: an empty time factor breaks the
   #   language server's test configuration, and `FlakySpec` only asks whether the variable exists.
-  # - A failing `sbt test` does not stop the parser self-tests or the benchmark step: the retired
-  #   build CLI deferred that failure. A failure of any other step stops the job, as it stopped the
-  #   retired build CLI.
+  # - A failing `sbt test` does not stop the parser self-tests: the retired build CLI deferred that
+  #   failure. A failure of any other step stops the job, as it stopped the retired build CLI.
   # - Two things the retired build CLI appeared to do never took effect, and are not added: the Enso
   #   benchmark dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones)
   #   and the heap-dump `JAVA_TOOL_OPTIONS` (the retired build CLI passed them to the
@@ -371,15 +370,6 @@ jobs:
           deps=$(tr -d '\r\n' < lib/rust/parser/target/streams/runtime/managedClasspath/_global/streams/export)
           javac --class-path "lib/rust/parser/generate-java/java$sep$gen$sep$deps" -d "$gen" "$pkg/GeneratedFormatTests.java"
           java --class-path "$gen" org.enso.syntax2.GeneratedFormatTests
-      - if: ${{ runner.os == 'Linux' && !cancelled() && steps.parser-self-tests.outcome == 'success' }}
-        name: Compile the benchmarks, and run the runtime ones once
-        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
-        env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
-          LC_ALL: C.UTF-8
-          SBT_SERVER_FORCESTART: "true"
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Upload Heap Dumps
         uses: actions/upload-artifact@v5
@@ -399,6 +389,66 @@ jobs:
           path: target/test-results/*.xml
           path-replace-backslashes: true
           reporter: java-junit
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  # Note [The Benchmark Job]
+  # ========================
+  # The benchmark compile and the one run of the runtime benchmarks that the retired build CLI's
+  # `backend test jvm` ended with, in a job of its own so that it runs alongside the JVM tests
+  # instead of after them (5-7 min off that job). Linux only, as before. It no longer waits for the
+  # parser self-tests: it compiles what it needs itself. The distribution and its version are the
+  # build job's (`bench` depends on `buildEngineDistribution`). Its token is the workflow's
+  # (`contents: read`); a failure fails the platform leg, so "Engine Required Checks" still sees it.
+  jvm-benchmarks:
+    name: Benchmarks (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    if: inputs.jvm-tests && inputs.os == 'linux'
+    needs: [build-engine-distribution]
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
+      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
+          flatc: "true"
+          rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
+      - name: Compile the benchmarks, and run the runtime ones once
+        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean
