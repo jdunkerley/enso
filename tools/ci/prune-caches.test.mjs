@@ -41,6 +41,13 @@ describe('selectPrunable', () => {
     const other = cache(`sbt-deps-engine-Windows-${hash('a')}`, develop, '2026-10-25T00:00:00Z', accessed)
     assert.deepEqual(run([old, fresh, other]), [old.key])
   })
+  test('keeps only the newest rust-cache entry per ref and key', () => {
+    const develop = 'refs/heads/develop'
+    const old = cache('v0-rust-engine-Linux-x64-41224fa4-c5f6eaaa', develop, '2026-10-25T00:00:00Z', '2026-10-29T00:00:00Z')
+    const fresh = cache('v0-rust-engine-Linux-x64-41224fa4-f564551b', develop, '2026-10-28T00:00:00Z')
+    const windows = cache('v0-rust-engine-Windows-x64-41224fa4-c5f6eaaa', develop, '2026-10-25T00:00:00Z', '2026-10-29T00:00:00Z')
+    assert.deepEqual(run([old, fresh, windows]), ['v0-rust-engine-Linux-x64-41224fa4-c5f6eaaa'])
+  })
   test('lists an entry once when several rules match', () => {
     const old = cache(`node-cache-Linux-${hash('a')}`, 'refs/pull/5/merge', '2026-10-01T00:00:00Z')
     const fresh = cache(`node-cache-Linux-${hash('b')}`, 'refs/pull/5/merge', '2026-10-28T00:00:00Z')
