@@ -37,6 +37,8 @@ jobs:
       runner: '["self-hosted", "macOS"]'
       # One self-hosted runner: shards would only queue behind each other.
       stdlib-shards: false
+      # Nor does the JVM split help: two parts would each compile the whole engine.
+      jvm-tests-split: false
       jvm-tests: ${{ inputs.engine }}
       stdlib-suites: >-
         ${{ inputs.libraries && '[{"suite": "standard-library-in-native", "title": "Native", "small-jdk": false},

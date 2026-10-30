@@ -58,8 +58,8 @@ type Suite
         - `output`: A function to print out textual info about progress of execution.
           By default it uses `IO.println` output
         - `group_filter`: Only groups whose name matches this regex run, each
-          with all its specs; defaults to the `ENSO_TEST_GROUP_FILTER`
-          environment variable.
+          with all its specs. `Nothing` means: use the `ENSO_TEST_GROUP_FILTER`
+          environment variable if it is set, else run every group.
 
        ## Returns
        Boolean if `should_exit` is False, otherwise exits the process.

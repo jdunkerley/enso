@@ -271,7 +271,9 @@ export function planSummary(selection: Selection, matrix: readonly MatrixEntry[]
   lines.push('| Job | Projects | Groups |', '| --- | --- | --- |')
   for (const entry of matrix) {
     const projects = entry.only.split(',').join(', ')
-    lines.push(`| ${entry.title} | ${projects} | ${entry['group-filter'] ?? 'all'} |`)
+    // A `|` ends a GFM table cell, and a group filter is a regex full of them.
+    const groups = (entry['group-filter'] ?? 'all').replaceAll('|', '\\|')
+    lines.push(`| ${entry.title} | ${projects} | ${groups} |`)
   }
   return lines
 }

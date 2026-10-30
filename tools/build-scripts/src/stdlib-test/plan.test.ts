@@ -296,6 +296,24 @@ describe('planSummary', () => {
       '| JVM (Others) | Tableau_Tests | all |',
     ])
   })
+  test('escapes the | of a group filter, which would end the table cell', () => {
+    const selection = {
+      projects: new Set(['Table_Tests']),
+      reasons: ['a.enso: Standard.Table'],
+    }
+    const matrix = [
+      {
+        suite: 'standard-library',
+        title: 'JVM (Table Rest)',
+        'small-jdk': true,
+        only: 'Table_Tests',
+        'group-filter': '^(?!(?:\\[PostgreSQL\\]|\\[SQLite File\\]))',
+      },
+    ]
+    expect(planSummary(selection, matrix).at(-1)).toBe(
+      '| JVM (Table Rest) | Table_Tests | ^(?!(?:\\[PostgreSQL\\]\\|\\[SQLite File\\])) |',
+    )
+  })
   test('says when no job runs', () => {
     const selection = {
       projects: new Set<string>(),
