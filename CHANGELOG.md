@@ -317,6 +317,8 @@
 
 #### Enso Standard Library
 
+- [Redshift connections no longer read the PostgreSQL `.pgpass` file][NNN]: pass
+  credentials explicitly or use AWS credentials.
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the

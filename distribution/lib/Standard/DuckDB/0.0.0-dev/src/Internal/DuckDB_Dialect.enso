@@ -9,7 +9,7 @@ import Standard.Table.Internal.Problem_Builder.Problem_Builder
 from Standard.Table import Aggregate_Column, Column, Table, Value_Type
 from Standard.Table.Errors import Inexact_Type_Coercion
 
-import Standard.Database.Connection.Postgres_Connection.Postgres_Connection
+import Standard.Database.Postgres_Family.Postgres_Dialect
 import Standard.Database.DB_Column.DB_Column
 import Standard.Database.DB_Table.DB_Table
 import Standard.Database.Dialects.Dialect
@@ -40,7 +40,7 @@ import Standard.Database.SQL.SQL_Type
    The dialect of DuckDB built on top of PostgreSQL dialect.
 duckdb : DuckDB_Dialect
 duckdb =
-    parent = Postgres_Connection.get_dialect
+    parent = Postgres_Dialect.postgres
     with_overrides = parent.get_dialect_operations.extend_with duckdb_overrides
     DuckDB_Dialect.Value parent with_overrides
 

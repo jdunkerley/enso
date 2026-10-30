@@ -16,13 +16,13 @@ import project.Internal.Common.Connections_Helpers
 import project.Internal.Connection.Entity_Naming_Properties.Entity_Naming_Properties
 import project.Internal.Data_Link_Setup.Data_Link_Setup
 import project.Internal.JDBC_Connection
-import project.Internal.Postgres.Postgres_Dialect
-import project.Internal.Postgres.Postgres_Type_Mapping.Postgres_Type_Mapping
+import project.Postgres_Family.Postgres_Dialect
+import project.Postgres_Family.Postgres_Type_Mapping.Postgres_Type_Mapping
 import project.SQL.SQL_Statement
 import project.SQL_Query.SQL_Query
 from project.Connection.Connection import make_schema_selector, make_structure_creator, make_table_name_selector, make_table_types_selector
 from project.Errors import SQL_Error, Table_Already_Exists, Table_Not_Found
-from project.Internal.Postgres.Helpers import get_encoding_name, parse_postgres_encoding
+from project.Postgres_Family.Helpers import get_encoding_name, parse_postgres_encoding
 from project.Internal.Upload.Helpers.Default_Arguments import first_column_name_in_structure
 from project.Internal.Upload.Operations.Create import create_table_implementation
 

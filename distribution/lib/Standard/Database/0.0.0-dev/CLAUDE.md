@@ -43,6 +43,9 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 - `src/SQL_Query.enso` — query construction (`..Table_Name`, `..Raw_SQL`).
 - `src/SQL_Statement.enso` — prepared SQL statement.
 - `src/Dialect.enso` — dialect dispatch (each backend implements one).
+- `src/Postgres_Family/` — the PostgreSQL dialect, type mapping, error mapper
+  and encoding helpers that Postgres, DuckDB and Redshift share. Not exported
+  from `Main.enso`; other libraries import the modules directly.
 
 ## Things to avoid in generated code
 
