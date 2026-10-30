@@ -240,9 +240,12 @@ where they conflict, the amendment wins.
 2. **`SSL_Mode` and `Client_Certificate` stay in `Standard.Database`:** Redshift
    uses them too (section 1 said Postgres-only).
 3. **The Postgres-family base** is `Standard.Database.Postgres_Family` (not
-   exported from `Main.enso`), and takes `Pgpass` and the encoding helpers as
-   well, so AWS never depends on `Standard.Postgres` (resolves section 1's open
-   point).
+   exported from `Main.enso`) and takes the encoding helpers. `Pgpass` stays
+   with Postgres; Redshift stops reading `.pgpass` (user's decision, 2026-10-30:
+   `.pgpass` is a libpq client convention the Redshift driver does not use; Enso
+   read it for Redshift untested, and `AWS_Credential.Default` read it alongside
+   IAM). AWS still never depends on `Standard.Postgres` (resolves section 1's
+   open point).
 4. **Lookup order (section 2).** The builtin resolves every provider before
    returning, so "a caller that stops at its first match loads nothing more"
    cannot hold as written. `Meta.lookup_services` gains a `loaded_only`
