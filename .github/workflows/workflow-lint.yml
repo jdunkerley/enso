@@ -15,6 +15,8 @@ on:
       - "build-config.yaml"
       - "project/Dependencies.scala"
       - "project/build.properties"
+      # the `wasm-bindgen` pin
+      - "app/rust-ffi/build-wasm.mjs"
       # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
       - "distribution/lib/Standard/**/*.enso"
       - "distribution/lib/Standard/*/*/package.yaml"
@@ -32,6 +34,8 @@ on:
       - "build-config.yaml"
       - "project/Dependencies.scala"
       - "project/build.properties"
+      # the `wasm-bindgen` pin
+      - "app/rust-ffi/build-wasm.mjs"
       # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
       - "distribution/lib/Standard/**/*.enso"
       - "distribution/lib/Standard/*/*/package.yaml"

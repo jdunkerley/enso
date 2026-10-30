@@ -24,6 +24,7 @@ import {
   checkStdlibTestMap,
   checkNativeLibsFixtures,
   checkToolchainPins,
+  checkWasmBindgenPins,
   checkWindowsInstallerSmokeTest,
   checkWorkflowsDeclarePermissions,
   loadRepo,
@@ -890,4 +891,24 @@ test('the repository follows the policy', () => {
 test('checkSetupNodeCache fails when it finds nothing to check', () => {
   const repo = fixture({ 'workflows/a.yml': 'on: push\njobs: {}\n' })
   assert.equal(checkSetupNodeCache(repo).length, 1)
+})
+
+describe('checkWasmBindgenPins', () => {
+  const source = {
+    'app/rust-ffi/build-wasm.mjs': "const WASM_BINDGEN_VERSION = '0.2.128'\n",
+  }
+  const install = (version) =>
+    `on: push\njobs:\n  a:\n    runs-on: ubuntu-latest\n    timeout-minutes: 30\n    steps:\n      - uses: taiki-e/install-action@v2\n        with:\n          tool: wasm-bindgen-cli@${version}\n`
+  test('accepts installs at the pinned version', () => {
+    assert.deepEqual(
+      checkWasmBindgenPins(fixture({ 'workflows/a.yml': install('0.2.128') }, source)),
+      [],
+    )
+  })
+  test('rejects an install at another version', () => {
+    assert.deepEqual(
+      checkWasmBindgenPins(fixture({ 'workflows/a.yml': install('0.2.127') }, source)),
+      ['a.yml: installs wasm-bindgen-cli@0.2.127, but app/rust-ffi/build-wasm.mjs pins 0.2.128'],
+    )
+  })
 })

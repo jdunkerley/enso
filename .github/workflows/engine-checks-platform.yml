@@ -106,6 +106,13 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
+      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
+      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Set up the build scripts
@@ -248,6 +255,13 @@ jobs:
         with:
           clean: false
       - uses: ./.github/actions/setup-node
+      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
+      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
       - name: Download the engine distribution
