@@ -90,6 +90,8 @@ describe('selectTestProjects', () => {
     'engine/runtime/src/main/java/X.java',
     '.github/workflows/engine-checks-platform.yml',
     'tools/build-scripts/src/stdlib-test/run.ts',
+    'tools/http-test-helper/src/main/java/org/enso/shttp/HTTPTestHelperServer.java',
+    'tools/simple-library-server/package.json',
   ])('%s runs everything', (file) => {
     expect(
       sorted(['distribution/lib/Standard/Tableau/0.0.0-dev/src/Hyper_File.enso', file]),

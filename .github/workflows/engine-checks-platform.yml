@@ -361,10 +361,11 @@ jobs:
         shell: bash
         run: |-
           sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "buildEngineDistributionNoIndex; set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
-          # sbt colours its output on CI, which splits "[success]" with escape codes. Count rather
-          # than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail` reports as
-          # a failure. `grep -c` exits 1 on no match, hence `|| true`.
-          successes=$(sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
+          # sbt colours its output on CI, which splits "[success]" with escape codes. The escape
+          # character comes from `printf`: BSD sed (the self-hosted Mac) does not read `\x1b`. Count
+          # rather than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail`
+          # reports as a failure. `grep -c` exits 1 on no match, hence `|| true`.
+          successes=$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
           if [ "$successes" -ne 2 ]; then
             echo "::error::sbt reported '[success] Total time' $successes times, not 2: the run aborted or failed."
             exit 1

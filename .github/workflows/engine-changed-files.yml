@@ -50,6 +50,11 @@ jobs:
             build.sbt
             build-config.yaml
             tools/build-scripts/**
+            # Helpers the tests start: the standard library suites run `tools/http-test-helper`, and the
+            # JVM tests run `tools/simple-library-server`. Also bounds the standard library test
+            # selection: a path outside this list never reaches it.
+            tools/http-test-helper/**
+            tools/simple-library-server/**
             .cargo/**
             Cargo.lock
             Cargo.toml

@@ -104,10 +104,12 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **A reusable workflow called with a matrix has no `concurrency:`**: its legs
   would share the group and cancel each other.
 - **The standard library tests are sharded and selected** (Note [Standard
-  Library Test Selection]): each suite runs as the shards of
-  `tools/ci/stdlib-test-map.yaml`, and a pull request runs only the projects its
-  changed files can affect; develop runs all. Add a new library or test project
-  to the map.
+  Library Test Selection]): each suite that runs "every project but ..." runs as
+  the shards of `tools/ci/stdlib-test-map.yaml` (the AWS and Microsoft suites
+  stay one job each, and the self-hosted Mac passes `stdlib-shards: false` and
+  runs each suite whole), and a pull request runs only the projects its changed
+  files can affect; develop runs all. Add a new library or test project to the
+  map.
 - **Composite actions keep the shell a step had**: PowerShell on Windows, bash
   elsewhere, as two steps with `runner.os` conditions. A composite step must
   name its shell, and on Windows `tar` behaves differently under Git Bash.
@@ -127,8 +129,9 @@ settings. Every workflow is hand-written YAML (build simplification;
   `build.sbt`, `project/*.sbt`, `project/Dependencies.scala` and
   `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
   stdlib tests also cache GraalPy's pip wheels, `~/.cache/pip-graalpy`
-  (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the job that
-  runs `Examples_Tests` only; Note [GraalPy Wheel Cache] in
+  (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the jobs that
+  run `Examples_Tests` (on Linux, the JVM and Native "Others" shards; a job that
+  does not run it never saves); Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
   `graalpy-version` output. The engine jobs that compile Rust share a Rust cache
