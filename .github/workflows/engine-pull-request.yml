@@ -35,7 +35,7 @@ jobs:
     with:
       # A pull request runs only the standard library tests its files can affect; develop runs all
       # (Note [Standard Library Test Selection] in `engine-checks-platform.yml`).
-      changed-files: ${{ github.event_name == 'pull_request' && needs.engine-changed-files.outputs.all_changed_files || '' }}
+      changed-files: ${{ github.event_name == 'pull_request' && needs.engine-changed-files.outputs.touched_files || '' }}
     secrets: inherit
 
   stdlib-api-changes-label:

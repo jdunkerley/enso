@@ -413,7 +413,10 @@ jobs:
   # the other callers pass no changed files and run every project. `tools/build-scripts`'
   # `stdlib-test-plan` decides, writes why in this job's summary, and returns the jobs as `matrix`;
   # `stdlib-test --only` runs each job's projects. A new library or test project must be added to
-  # the map (`tools/ci/check-workflows.mjs` fails until it is).
+  # the map (`tools/ci/check-workflows.mjs` fails until it is). The changed files must be every path
+  # the pull request touched: deleted files, and both the old and the new path of a rename (the
+  # `touched_files` output of `engine-changed-files.yml`, not `all_changed_files`, which leaves
+  # them out), or a deletion in one library would not select the projects that import it.
   stdlib-plan:
     name: Standard Library test plan (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.stdlib-suites != '[]'
