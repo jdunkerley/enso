@@ -11,7 +11,15 @@ on:
         required: false
         type: boolean
         default: false
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      changed-files:
+        description: >-
+          The pull request's changed files, space-separated, for the standard library test
+          selection; empty runs every test project.
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-engine-checks
@@ -46,5 +54,6 @@ jobs:
       os: ${{ matrix.os }}
       runner: ${{ matrix.runner }}
       stdlib-suites: ${{ matrix.stdlib-suites }}
+      changed-files: ${{ inputs.changed-files || '' }}
       clean_build_required: ${{ inputs.clean_build_required == true }}
     secrets: inherit

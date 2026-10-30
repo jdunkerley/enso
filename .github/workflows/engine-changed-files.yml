@@ -8,6 +8,9 @@ on:
       all_changed_files:
         description: "Returns all changed files"
         value: ${{ jobs.engine-changed-files.outputs.all_changed_files }}
+      touched_files:
+        description: "Every touched path, space-separated: added, copied, modified and deleted files, and a renamed file under both its old and new path"
+        value: ${{ jobs.engine-changed-files.outputs.touched_files }}
       any_changed:
         description: "Returns `true` when any of the filenames have changed"
         value: ${{ jobs.engine-changed-files.outputs.any_changed }}
@@ -22,6 +25,7 @@ jobs:
     name: Changed Files
     outputs:
       all_changed_files: ${{ steps.engine-changed-files.outputs.all_changed_files }}
+      touched_files: ${{ steps.engine-changed-files.outputs.all_changed_and_modified_files }}
       any_changed: ${{ steps.engine-changed-files.outputs.any_changed }}
     steps:
       - uses: actions/checkout@v5
@@ -31,6 +35,11 @@ jobs:
         id: engine-changed-files
         uses: step-security/changed-files@v45
         with:
+          # A rename is reported as a deletion of the old path plus an addition of the new one, so
+          # `all_changed_and_modified_files` (ACMRDTUX: the `touched_files` output) holds both. The
+          # standard library test selection needs every path a pull request touched;
+          # `all_changed_files` leaves out deletions and old rename paths.
+          output_renamed_files_as_deleted_and_added: true
           files: |
             distribution/**
             engine/**

@@ -103,6 +103,11 @@ settings. Every workflow is hand-written YAML (build simplification;
   `ide-packaging.yml`).
 - **A reusable workflow called with a matrix has no `concurrency:`**: its legs
   would share the group and cancel each other.
+- **The standard library tests are sharded and selected** (Note [Standard
+  Library Test Selection]): each suite runs as the shards of
+  `tools/ci/stdlib-test-map.yaml`, and a pull request runs only the projects its
+  changed files can affect; develop runs all. Add a new library or test project
+  to the map.
 - **Composite actions keep the shell a step had**: PowerShell on Windows, bash
   elsewhere, as two steps with `runner.os` conditions. A composite step must
   name its shell, and on Windows `tar` behaves differently under Git Bash.
@@ -122,8 +127,8 @@ settings. Every workflow is hand-written YAML (build simplification;
   `build.sbt`, `project/*.sbt`, `project/Dependencies.scala` and
   `project/build.properties` (Note [The sbt Dependency Cache Key]). The Linux
   stdlib tests also cache GraalPy's pip wheels, `~/.cache/pip-graalpy`
-  (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the
-  `standard-library*` legs only; Note [GraalPy Wheel Cache] in
+  (`graalpy-pip-Linux-<GraalPy version>`, saved on `develop` by the job that
+  runs `Examples_Tests` only; Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
   `graalpy-version` output. The engine jobs that compile Rust share a Rust cache
@@ -151,25 +156,26 @@ needs more than one tool. A job that runs a distribution built by another job
 `0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
 `engine-checks-platform.yml`.
 
-| Workflow › job                                           | Step                                                                                                       | Set up by                                        |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `formatting.yml`, `enso4igv.yml`                         | `sbt …`                                                                                                    | `setup-jvm`                                      |
-| `engine-benchmark.yml`                                   | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)                                                        | `setup-jvm`                                      |
-| `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
-| `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (`buildEngineDistributionNoIndex; test` in one session; no wait for the build)               | `setup-jvm`, `setup-msvc`                        |
-| `engine-checks-platform.yml` › Benchmarks                | `sbt … runtime-benchmarks/bench` (version from the build job)                                              | `setup-jvm`                                      |
-| `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
-| `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | `setup-jvm` (GraalPy), `setup-build-scripts`     |
-| `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | —                                                |
-| `ide-packaging.yml` › Build Backend                      | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `ide-packaging.yml` › Find develop's backend             | `gh api` (artifact list, compare); no build                                                                | —                                                |
-| `ide-packaging.yml` › Package New IDE                    | `corepack pnpm --filter build-scripts run ide-build`                                                       | `setup-build-scripts`                            |
-| `release.yml`                                            | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `promote.yml`                                            | `release promote <designator>`                                                                             | `setup-build-scripts`                            |
-| `engine-checks-nightly.yml`, `macos-checks.yml`          | calls of `engine-checks-platform.yml`                                                                      | —                                                |
-| `extra-nightly-tests.yml`                                | `engine-checks-platform.yml`, then `stdlib-test <suite>`                                                   | `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| Workflow › job                                            | Step                                                                                                       | Set up by                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `formatting.yml`, `enso4igv.yml`                          | `sbt …`                                                                                                    | `setup-jvm`                                      |
+| `engine-benchmark.yml`                                    | `sbt runtime-benchmarks/bench` (`benchOnly <name>`)                                                        | `setup-jvm`                                      |
+| `std-libs-benchmark.yml`                                  | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Enso Code Lint             | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
+| `engine-checks-platform.yml` › Build Engine Distribution  | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `engine-checks-platform.yml` › JVM Tests                  | `sbt …` steps (`buildEngineDistributionNoIndex; test` in one session; no wait for the build)               | `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › Benchmarks                 | `sbt … runtime-benchmarks/bench` (version from the build job)                                              | `setup-jvm`                                      |
+| `engine-checks-platform.yml` › API check                  | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › Standard Library test plan | `corepack pnpm --filter build-scripts run stdlib-test-plan`                                                | `setup-build-scripts`                            |
+| `engine-checks-platform.yml` › stdlib tests               | `corepack pnpm --filter build-scripts run stdlib-test <suite> --only <projects>`                           | `setup-jvm` (GraalPy), `setup-build-scripts`     |
+| `changelog.yml`                                           | `actions/github-script` (`pulls.listFiles`)                                                                | —                                                |
+| `ide-packaging.yml` › Build Backend                       | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `ide-packaging.yml` › Find develop's backend              | `gh api` (artifact list, compare); no build                                                                | —                                                |
+| `ide-packaging.yml` › Package New IDE                     | `corepack pnpm --filter build-scripts run ide-build`                                                       | `setup-build-scripts`                            |
+| `release.yml`                                             | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
+| `promote.yml`                                             | `release promote <designator>`                                                                             | `setup-build-scripts`                            |
+| `engine-checks-nightly.yml`, `macos-checks.yml`           | calls of `engine-checks-platform.yml`                                                                      | —                                                |
+| `extra-nightly-tests.yml`                                 | `engine-checks-platform.yml`, then `stdlib-test <suite>`                                                   | `setup-jvm` (GraalPy), `setup-build-scripts`     |
 
 ## Checking a change
 
