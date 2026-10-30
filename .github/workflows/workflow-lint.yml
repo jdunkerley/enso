@@ -15,6 +15,14 @@ on:
       - "build-config.yaml"
       - "project/Dependencies.scala"
       - "project/build.properties"
+      # the `wasm-bindgen` pin
+      - "app/rust-ffi/build-wasm.mjs"
+      # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
+      - "distribution/lib/Standard/**/*.enso"
+      - "distribution/lib/Standard/*/*/package.yaml"
+      - "std-bits/**"
+      - "test/*/package.yaml"
+      - "test/**/*.enso"
   pull_request:
     # A whitelist: specs and plans (`docs/superpowers/**`) never match it.
     paths:
@@ -26,6 +34,14 @@ on:
       - "build-config.yaml"
       - "project/Dependencies.scala"
       - "project/build.properties"
+      # the `wasm-bindgen` pin
+      - "app/rust-ffi/build-wasm.mjs"
+      # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
+      - "distribution/lib/Standard/**/*.enso"
+      - "distribution/lib/Standard/*/*/package.yaml"
+      - "std-bits/**"
+      - "test/*/package.yaml"
+      - "test/**/*.enso"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-workflow-lint

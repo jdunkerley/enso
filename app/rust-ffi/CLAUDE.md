@@ -13,9 +13,12 @@ break the GUI build, so keep the two in lockstep and **never bump this with `~`
 or `^`**.
 
 CI installs the same CLI from a prebuilt binary, so the version is also written
-in the `wasm-bindgen-cli@…` steps of `.github/workflows/ide-packaging.yml` and
-`.github/workflows/gui-checks.yml`. `git grep` the old version before pushing a
-bump. The pin also constrains every other crate in the workspace that depends on
+in the `wasm-bindgen-cli@…` steps of
+`.github/workflows/engine-checks-platform.yml` (build, JVM tests),
+`.github/workflows/ide-packaging.yml` (GUI build, backend build) and
+`.github/workflows/gui-checks.yml`. `check-workflows.mjs` fails a step at
+another version; still `git grep` the old version before pushing a bump. The pin
+also constrains every other crate in the workspace that depends on
 `wasm-bindgen`, including wasm32-only dependencies of native crates (`reqwest` →
 `wasm-streams`), because Cargo resolves target-specific dependencies for all
 targets — a stale pin blocks unrelated upgrades.
