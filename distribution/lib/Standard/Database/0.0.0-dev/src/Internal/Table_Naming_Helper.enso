@@ -116,6 +116,16 @@ type Table_Naming_Helper
     ## ---
        private: true
        ---
+       A random name for something local to one query, such as a CTE binder: unlike
+       `generate_random_table_name`, it does not ask the database whether a table of that name
+       exists. A random UUID cannot plausibly clash with another name in the same query.
+    generate_random_local_name : Text -> Text
+    generate_random_local_name self prefix="enso-let-" =
+        self.truncate_if_needed (prefix + Random.uuid)
+
+    ## ---
+       private: true
+       ---
        Truncates the name to fit in the limit, if it is too long.
     truncate_if_needed : Text -> Text
     truncate_if_needed self name =
