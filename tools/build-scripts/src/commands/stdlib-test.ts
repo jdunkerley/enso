@@ -3,6 +3,8 @@
  * standard-library test suite against the engine package in `built-distribution/` (with
  * `ENSO_VERSION`, that version's). For the databases, export `ENSO_POSTGRES_*` and
  * `ENSO_SQLSERVER_*` (CI's service containers do); without them those groups are skipped.
+ * `ENSO_TEST_GROUP_FILTER` (one project only) runs the test groups whose names match; a run in
+ * which it ran no test fails.
  *
  *     corepack pnpm --filter build-scripts run stdlib-test -- standard-library-in-native
  */

@@ -153,6 +153,104 @@ describe('planMatrix', () => {
   })
 })
 
+const SPLIT_SHARDS: StdlibTestMap['shards'] = [
+  {
+    name: 'Table',
+    projects: ['Table_Tests'],
+    split: [
+      { name: 'PostgreSQL', groups: '\\[PostgreSQL\\]', needs: 'postgres' },
+      { name: 'SQLite File', groups: '\\[SQLite File\\]' },
+      { name: 'Rest' },
+    ],
+  },
+  { name: 'Others', projects: '*' },
+]
+const NATIVE_WITH_POSTGRES: SuiteEntry = {
+  suite: 'standard-library-in-native',
+  title: 'Native',
+  'small-jdk': false,
+  postgres: true,
+}
+const NATIVE_WITHOUT_POSTGRES: SuiteEntry = {
+  suite: 'standard-library-in-native',
+  title: 'Native',
+  'small-jdk': false,
+}
+const ALL = { projects: null, reasons: [] }
+
+describe('planMatrix with a split shard', () => {
+  test('a split shard is one job per part, with a group filter', () => {
+    const matrix = planMatrix(
+      [NATIVE_WITH_POSTGRES],
+      { ...MAP, shards: SPLIT_SHARDS },
+      PROJECTS,
+      ALL,
+      true,
+    )
+    expect(matrix.filter((m) => m.only === 'Table_Tests')).toEqual([
+      {
+        ...NATIVE_WITH_POSTGRES,
+        title: 'Native (Table PostgreSQL)',
+        only: 'Table_Tests',
+        'group-filter': '^(?:\\[PostgreSQL\\])',
+      },
+      {
+        ...NATIVE_WITH_POSTGRES,
+        title: 'Native (Table SQLite File)',
+        only: 'Table_Tests',
+        'group-filter': '^(?:\\[SQLite File\\])',
+      },
+      {
+        ...NATIVE_WITH_POSTGRES,
+        title: 'Native (Table Rest)',
+        only: 'Table_Tests',
+        'group-filter': '^(?!(?:\\[PostgreSQL\\]|\\[SQLite File\\]))',
+      },
+    ])
+  })
+  test('a part that needs postgres is dropped without it, and the rest covers its groups', () => {
+    const matrix = planMatrix(
+      [NATIVE_WITHOUT_POSTGRES],
+      { ...MAP, shards: SPLIT_SHARDS },
+      PROJECTS,
+      ALL,
+      true,
+    )
+    expect(
+      matrix.filter((m) => m.only === 'Table_Tests').map((m) => [m.title, m['group-filter']]),
+    ).toEqual([
+      ['Native (Table SQLite File)', '^(?:\\[SQLite File\\])'],
+      ['Native (Table Rest)', '^(?!(?:\\[SQLite File\\]))'],
+    ])
+  })
+  test('without sharding a split shard is not split', () => {
+    const matrix = planMatrix(
+      [NATIVE_WITH_POSTGRES],
+      { ...MAP, shards: SPLIT_SHARDS },
+      PROJECTS,
+      ALL,
+      false,
+    )
+    expect(matrix.some((m) => m['group-filter'] != null)).toBe(false)
+  })
+  test('a split shard must name exactly one project and end in one part without groups', () => {
+    const bad = [
+      { name: 'T', projects: ['Table_Tests', 'Base_Tests'], split: [{ name: 'Rest' }] },
+      { name: 'O', projects: '*' as const },
+    ]
+    expect(() =>
+      planMatrix([NATIVE_WITH_POSTGRES], { ...MAP, shards: bad }, PROJECTS, ALL, true),
+    ).toThrow(/one project/)
+    const noRest = [
+      { name: 'T', projects: ['Table_Tests'], split: [{ name: 'A', groups: 'x' }] },
+      { name: 'O', projects: '*' as const },
+    ]
+    expect(() =>
+      planMatrix([NATIVE_WITH_POSTGRES], { ...MAP, shards: noRest }, PROJECTS, ALL, true),
+    ).toThrow(/without `groups`/)
+  })
+})
+
 describe('planMatrix without a catch-all shard', () => {
   test('throws rather than dropping projects', () => {
     const map = { ...MAP, shards: [{ name: 'Table', projects: ['Table_Tests'] }] }
@@ -193,9 +291,9 @@ describe('planSummary', () => {
       '',
       '- a.enso: Standard.Tableau',
       '',
-      '| Job | Projects |',
-      '| --- | --- |',
-      '| JVM (Others) | Tableau_Tests |',
+      '| Job | Projects | Groups |',
+      '| --- | --- | --- |',
+      '| JVM (Others) | Tableau_Tests | all |',
     ])
   })
   test('says when no job runs', () => {

@@ -122,6 +122,51 @@ describe('runStdlibTests', () => {
       expect.stringContaining(path.join(root, 'test', 'Table_Tests')),
     ])
   })
+  describe('a group filter', () => {
+    const FILTER = '^\\[SQLite File\\]'
+    const only = ['Table_Tests']
+    /** A run whose Table_Tests report holds `cases` (`<testcase>` elements). */
+    function filtered(cases: string) {
+      const root = repository(['Table_Tests', 'Base_Tests'])
+      return context(root, {
+        env: { GITHUB_ACTIONS: 'true', ENSO_TEST_GROUP_FILTER: FILTER },
+        runProject: (file, args, env) => {
+          const dir = path.join(env.ENSO_TEST_JUNIT_DIR ?? '', 'Table_Tests')
+          mkdirSync(dir, { recursive: true })
+          writeFileSync(
+            path.join(dir, 'JUnit.xml'),
+            `<testsuites><testsuite name="[SQLite File] Select">${cases}</testsuite></testsuites>`,
+          )
+          return 0
+        },
+      })
+    }
+    test('a run in which it ran no test fails', async () => {
+      const { logged, context: c } = filtered(
+        '<testcase name="PENDING"><skipped message="x"/></testcase>',
+      )
+      expect(await runStdlibTests({ suite: 'stdlib', only, clean: false, dryRun: false }, c)).toBe(
+        1,
+      )
+      expect(logged.at(-1)).toContain('::error')
+      expect(logged.at(-1)).toContain('ran no test')
+    })
+    test('a run in which it ran a test passes', async () => {
+      const { context: c } = filtered('<testcase name="works"></testcase>')
+      expect(await runStdlibTests({ suite: 'stdlib', only, clean: false, dryRun: false }, c)).toBe(
+        0,
+      )
+    })
+    test('it applies to one project only', async () => {
+      const { context: c } = filtered('<testcase name="works"></testcase>')
+      await expect(
+        runStdlibTests(
+          { suite: 'stdlib', only: ['Table_Tests', 'Base_Tests'], clean: false, dryRun: false },
+          c,
+        ),
+      ).rejects.toThrow(/one project/)
+    })
+  })
   test('--only with a name the suite does not run is an error, before anything starts', async () => {
     const root = repository(['Base_Tests', 'AWS_Tests'])
     const { calls, context: c } = context(root)

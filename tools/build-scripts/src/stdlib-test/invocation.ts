@@ -69,6 +69,7 @@ export function testEnvironment(inputs: TestEnvironmentInputs): Record<string, s
   for (const name of SERVICE_VARIABLES) {
     if (env[name] === '') delete env[name]
   }
+  if (env.ENSO_TEST_GROUP_FILTER === '') delete env.ENSO_TEST_GROUP_FILTER
   const launcher =
     inputs.platform === 'win32' ?
       inputs.nativeRunner ?

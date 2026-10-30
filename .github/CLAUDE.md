@@ -115,9 +115,11 @@ settings. Every workflow is hand-written YAML (build simplification;
   Library Test Selection]): each suite that runs "every project but ..." runs as
   the shards of `tools/ci/stdlib-test-map.yaml` (the AWS and Microsoft suites
   stay one job each, and the self-hosted Mac passes `stdlib-shards: false` and
-  runs each suite whole), and a pull request runs only the projects its changed
-  files can affect; develop runs all. Add a new library or test project to the
-  map.
+  runs each suite whole; the Table shard is split again by database backend,
+  each job running a slice of the project's test groups through
+  `ENSO_TEST_GROUP_FILTER`), and a pull request runs only the projects its
+  changed files can affect; develop runs all. Add a new library or test project
+  to the map.
 - **Composite actions keep the shell a step had**: PowerShell on Windows, bash
   elsewhere, as two steps with `runner.os` conditions. A composite step must
   name its shell, and on Windows `tar` behaves differently under Git Bash.

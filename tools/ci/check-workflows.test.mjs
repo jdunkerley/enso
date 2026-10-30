@@ -924,6 +924,45 @@ shards:
   })
 })
 
+describe('checkStdlibTestMap: a split shard', () => {
+  const withShards = (shards) =>
+    fixture(
+      {},
+      {
+        ...STDLIB_FILES,
+        'tools/ci/stdlib-test-map.yaml': STDLIB_MAP_OK.replace(
+          /shards:[\s\S]*$/,
+          `shards:\n${shards}\n  - { name: Others, projects: "*" }\n`,
+        ),
+      },
+    )
+  const good = `  - name: Table
+    projects: [Table_Tests]
+    split:
+      - { name: PostgreSQL, groups: 'a', needs: postgres }
+      - { name: Rest }`
+  test('accepts one project, a last part without groups, and a known need', () => {
+    assert.deepEqual(checkStdlibTestMap(withShards(good)), [])
+  })
+  test('rejects a split of more than one project', () => {
+    const repo = withShards(good.replace('[Table_Tests]', '[Table_Tests, Base_Tests]'))
+    assert.ok(
+      checkStdlibTestMap(repo).some((p) => p.includes('does not name exactly one project')),
+    )
+  })
+  test('rejects a split that does not end in one part without groups', () => {
+    const noRest = good.replace('      - { name: Rest }', "      - { name: B, groups: 'b' }")
+    const twoRests = good.replace("groups: 'a', ", '')
+    for (const shards of [noRest, twoRests]) {
+      assert.ok(checkStdlibTestMap(withShards(shards)).some((p) => p.includes('must end in exactly one part')))
+    }
+  })
+  test('rejects a need other than postgres', () => {
+    const repo = withShards(good.replace('needs: postgres', 'needs: mssql'))
+    assert.ok(checkStdlibTestMap(repo).some((p) => p.includes('only `postgres` is known')))
+  })
+})
+
 test('the repository follows the policy', () => {
   assert.deepEqual(checkRepo(repoRoot), [])
 })

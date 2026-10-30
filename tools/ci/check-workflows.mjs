@@ -957,6 +957,25 @@ export function checkStdlibTestMap({ stdlib }) {
       }
     }
   }
+  for (const shard of shards) {
+    if (shard.split == null) continue
+    const parts = Array.isArray(shard.split) ? shard.split : []
+    if (!Array.isArray(shard.projects) || shard.projects.length !== 1) {
+      problems.push(`${at} shard \`${shard.name}\` has a \`split\` but does not name exactly one project`)
+    }
+    if (parts.length === 0 || parts.some((part, i) => (part?.groups == null) !== (i === parts.length - 1))) {
+      problems.push(
+        `${at} shard \`${shard.name}\`'s \`split\` must end in exactly one part without \`groups\`, and no other part may lack it`,
+      )
+    }
+    for (const part of parts) {
+      if (part?.needs != null && part.needs !== 'postgres') {
+        problems.push(
+          `${at} shard \`${shard.name}\`'s part \`${part.name}\` has \`needs: ${part.needs}\`; only \`postgres\` is known`,
+        )
+      }
+    }
+  }
   return problems
 }
 
