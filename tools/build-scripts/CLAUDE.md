@@ -55,6 +55,11 @@ prints one.
   `--only A_Tests,B_Tests` narrows the suite (a name it does not run is a usage
   error); `--dry-run` prints the commands. Do not run it for real on a machine
   whose environment holds real credentials.
+- `stdlib-test-plan` — CI's standard-library test jobs for one platform: which
+  projects a pull request's changed files can affect
+  (`tools/ci/stdlib-test-map.yaml`), split into the map's shards, as a `matrix`
+  output; every project outside a pull request. It must not start sbt (its job
+  has no `setup-jvm`).
 - `junit-compare <old> <new>` — compares two JUnit directories project by
   project (pass, fail, skip); the gate for moving the tests off the retired
   build CLI.
