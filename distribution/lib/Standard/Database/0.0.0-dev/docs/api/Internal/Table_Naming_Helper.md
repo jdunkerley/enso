@@ -4,6 +4,7 @@
     - Value connection:Standard.Base.Any.Any
     - create_unique_name_strategy self -> Standard.Base.Any.Any
     - generate_dry_run_table_name self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - generate_random_local_name self prefix:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - generate_random_table_name self prefix:Standard.Base.Any.Any= -> Standard.Base.Any.Any
     - is_table_name_valid self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - naming_properties self -> Standard.Base.Any.Any
