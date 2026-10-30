@@ -68,8 +68,8 @@ settings. Every workflow is hand-written YAML (build simplification;
 - **Every job sets `timeout-minutes`** (a hung job otherwise runs for GitHub's
   default of 6 hours): 90 for tests, 45 for builds, 30 otherwise, raised where a
   job's slowest recent run needs more than 1.5x headroom (the engine and backend
-  builds use 60). Windows JVM Tests stays at 90 although its slowest recent run
-  (62 min) gives only ~1.45x headroom: the spec caps a hung job at 1.5 h.
+  builds use 60). JVM Tests, split in two parts since #433, keeps 90: the slower
+  part's runs are well under 60 min, and the spec caps a hung job at 1.5 h.
   `check-workflows.mjs` fails a job without one; jobs that call a reusable
   workflow are exempt, as the called jobs carry it.
 - **Every workflow has a top-level `permissions:`** (`contents: read` at least;
@@ -174,7 +174,7 @@ needs more than one tool. A job that runs a distribution built by another job
 | `std-libs-benchmark.yml`                                  | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › Enso Code Lint             | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › Build Engine Distribution  | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `engine-checks-platform.yml` › JVM Tests                  | `sbt …` steps (`buildEngineDistributionNoIndex; test` in one session; no wait for the build)               | `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › JVM Tests                  | `sbt …` steps (`buildEngineDistributionNoIndex; …`, two parts, #433)                                       | `setup-jvm`, `setup-msvc`                        |
 | `engine-checks-platform.yml` › Benchmarks                 | `sbt … runtime-benchmarks/bench` (version from the build job)                                              | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › API check                  | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
 | `engine-checks-platform.yml` › Standard Library test plan | `corepack pnpm --filter build-scripts run stdlib-test-plan`                                                | `setup-build-scripts`                            |

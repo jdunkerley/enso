@@ -287,11 +287,39 @@ jobs:
   #   rebuilt (the retired build CLI did, 4-7 min on Linux): no test loads it. The ydoc server's
   #   JavaScript bundle, which the tests do use, is built by `sbt test` (`ydoc-server`'s resource
   #   generator).
+  #
+  # Note [The JVM Tests Are Split In Two] (#433)
+  # ============================================
+  # `runtime-integration-tests` (the interpreter's JUnit tests and the runtime's instrument specs)
+  # is most of `sbt test`: in the runs of #450 and #451 it ran ~25 of Windows' 36 minutes of tests
+  # and ~17 of Linux's 26, and the rest (every other project, language server and ydoc included)
+  # ~10 and ~9. So the job is a matrix of two parts, each of which builds the engine package in its
+  # own sbt session (both need it: `runtime-integration-tests` reads `component/` and `lib/`, the
+  # `std-benchmarks` compile in `rest` reads `bin*`) and runs one `sbt` call:
+  # - `runtime`: `runtime-integration-tests/test`;
+  # - `rest`: `test` with `runtime-integration-tests / Test / test := {}`. `set` replaces the
+  #   project's `test` task, which the aggregate `test` runs, so the part runs every other project
+  #   and so does anything added later: nothing falls between the parts. The parser self-tests run
+  #   in this part only.
+  # `successes` is the number of `[success] Total time` lines the part must print: the commands
+  # that are tasks (`set` prints none), see the check in the step. The parts' test counts must add
+  # up to what the one job reported (1882 passed / 49 skipped on Windows, 1888 / 43 on Linux, at
+  # #448). `fail-fast: false` lets the other part finish and report when one fails.
   jvm-tests:
-    name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }}) (${{ matrix.part }})
     if: inputs.jvm-tests
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: runtime
+            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; runtime-integration-tests/test
+            successes: 2
+          - part: rest
+            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; set runtime-integration-tests / Test / test := {}; test
+            successes: 2
     permissions:
       checks: write
       contents: read
@@ -360,14 +388,14 @@ jobs:
         # comes first.
         shell: bash
         run: |-
-          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "buildEngineDistributionNoIndex; set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
+          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "${{ matrix.tasks }}" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
           # sbt colours its output on CI, which splits "[success]" with escape codes. The escape
           # character comes from `printf`: BSD sed (the self-hosted Mac) does not read `\x1b`. Count
           # rather than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail`
           # reports as a failure. `grep -c` exits 1 on no match, hence `|| true`.
           successes=$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
-          if [ "$successes" -ne 2 ]; then
-            echo "::error::sbt reported '[success] Total time' $successes times, not 2: the run aborted or failed."
+          if [ "$successes" -ne ${{ matrix.successes }} ]; then
+            echo "::error::sbt reported '[success] Total time' $successes times, not ${{ matrix.successes }}: the run aborted or failed."
             exit 1
           fi
         env:
@@ -376,7 +404,7 @@ jobs:
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - id: parser-self-tests
-        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.part == 'rest' }}
         name: Parser self-tests
         shell: bash
         env:
@@ -396,7 +424,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           if-no-files-found: ignore
-          name: Heap dumps (JVM Tests, ${{ inputs.os }}, ${{ inputs.arch }})
+          name: Heap dumps (JVM Tests, ${{ inputs.os }}, ${{ inputs.arch }}, ${{ matrix.part }})
           path: |-
             test/**/*.hprof
             engine/**/*.hprof
@@ -406,7 +434,7 @@ jobs:
         uses: dorny/test-reporter@v1
         with:
           max-annotations: 50
-          name: Engine Tests Report (${{ inputs.edition }}, ${{ inputs.os }}, ${{ inputs.arch }})
+          name: Engine Tests Report (${{ inputs.edition }}, ${{ inputs.os }}, ${{ inputs.arch }}, ${{ matrix.part }})
           path: target/test-results/*.xml
           path-replace-backslashes: true
           reporter: java-junit
