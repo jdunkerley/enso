@@ -17,6 +17,9 @@ private run_inner group_filter =
     inner.run_with_filter should_exit=False output=(_->Nothing) group_filter=group_filter
     ran.get
 
+## These specs assume `ENSO_TEST_GROUP_FILTER` is unset: `run_with_filter` treats a
+   `group_filter` of `Nothing` as "use the environment variable", so with it set the
+   "without a group filter" run would be filtered too.
 add_specs suite_builder =
     suite_builder.group "group_filter" group_builder->
         group_builder.specify "runs every group without a group filter" <|

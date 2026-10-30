@@ -63,6 +63,14 @@ on:
         required: false
         type: boolean
         default: true
+      jvm-tests-split:
+        description: >-
+          Split the JVM tests into two parts (Note [The JVM Tests Are Split In Two]). The
+          self-hosted Mac passes false: it is one runner, so the parts would queue, and a clean
+          build between them would compile everything again.
+        required: false
+        type: boolean
+        default: true
       clean_build_required:
         description: Clean before and after each job.
         required: false
@@ -97,8 +105,9 @@ jobs:
   # threshold). The version comes from `tools/build-scripts` (`version`); its step keeps `id:
   # build`, so the job's outputs are what they were, and it exports the version to the later steps,
   # which is how sbt names the package. `ENSO_LAUNCHER` is `native,test` plus `-ydoc` (see the
-  # job's `env`); `native,test` was the value the retired build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
-  # native images link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build
+  # job's `env`); `native,test` was the value the retired build CLI forced. `setup-msvc` replaces
+  # the retired build CLI's MSVC environment on Windows: the native images link with it, and the
+  # runtime DLL copy reads `VCToolsRedistDir`. The build
   # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
   # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
@@ -120,8 +129,10 @@ jobs:
     timeout-minutes: 60
     env:
       # `-ydoc` leaves the ydoc server's native image out: no engine check starts the ydoc server
-      # (the consumers of this job's artifact are lint, benchmarks, the API check and the standard
-      # library tests, none of which does; `sbt test` builds the server's JavaScript bundle itself),
+      # (the consumers of this job's artifact are lint, benchmarks, the API check, the standard
+      # library tests and `gui-checks.yml`'s ProjectService tests, none of which does: those run
+      # ydoc in-process, through the language server, and need no native image; `sbt test` builds
+      # the server's JavaScript bundle itself),
       # and IDE packaging builds its own backend, ydoc image included (`buildEngineBundle`). The
       # job name and artifact name keep `(native,test)`: they are labels, not the value.
       ENSO_LAUNCHER: native,test,-ydoc
@@ -284,8 +295,8 @@ jobs:
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
   # - The job does not wait for the build job (#442). `buildEngineDistributionNoIndex` runs first in
-  #   the same sbt session as `test` and builds the engine package the tests run against, as a local
-  #   `sbt test` would; `ENSO_LAUNCHER: shell` keeps the native launcher out of it, whatever the
+  #   the same sbt session as the part's test command and builds the engine package the tests run
+  #   against, as a local `sbt test` would; `ENSO_LAUNCHER: shell` keeps the native launcher out of it, whatever the
   #   environment says about release mode. The job starts with the run instead of after the build,
   #   which takes Windows JVM Tests from ~78 to ~51 min after the start (the 2c finding,
   #   `docs/superpowers/specs/2026-10-30-ci-speed-2c-finding.md`). The ydoc native image is not
@@ -295,6 +306,9 @@ jobs:
   #
   # Note [The JVM Tests Are Split In Two] (#433)
   # ============================================
+  # (Two parts on the hosted runners. The self-hosted Mac passes `jvm-tests-split: false` and runs
+  # one part, `all`: see the end of this Note.)
+  #
   # `runtime-integration-tests` (the interpreter's JUnit tests and the runtime's instrument specs)
   # is most of `sbt test`: in the runs of #450 and #451 it ran ~25 of Windows' 36 minutes of tests
   # and ~17 of Linux's 26, and the rest (every other project, language server and ydoc included)
@@ -314,7 +328,12 @@ jobs:
   # up to what the one job reported (1882 passed / 49 skipped on Windows, 1888 / 43 on Linux, at
   # #448). `fail-fast: false` lets the other part finish and report when one fails. The tasks
   # reach the step through `env`, not the script text: they hold backticks. On the self-hosted Mac
-  # (one runner) the two parts run one after the other, each building the engine package.
+  # (one runner, with a clean build before and after each job on develop and the nightly) two parts
+  # would queue and the second would compile everything again, so `jvm-tests-split: false` gives
+  # one part, `all`: the package, then `test`, in one sbt session, with the steps that only `rest`
+  # needs (those conditioned `matrix.part != 'runtime'`). Only `rest` and `all` save the shared
+  # `engine` sbt cache: `runtime` resolves less than the full set, and the first job to save on
+  # develop decides the entry.
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }}) (${{ matrix.part }})
     if: inputs.jvm-tests
@@ -323,13 +342,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - part: runtime
-            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; runtime-integration-tests/test
-            successes: 2
-          - part: rest
-            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; set `runtime-integration-tests` / Test / test := {}; test
-            successes: 2
+        include: ${{ fromJSON(inputs.jvm-tests-split && '[{"part":"runtime","tasks":"buildEngineDistributionNoIndex; set Global / parallelExecution := false; runtime-integration-tests/test","successes":2},{"part":"rest","tasks":"buildEngineDistributionNoIndex; set Global / parallelExecution := false; set `runtime-integration-tests` / Test / test := {}; test","successes":2}]' || '[{"part":"all","tasks":"buildEngineDistributionNoIndex; set Global / parallelExecution := false; test","successes":2}]') }}
     permissions:
       checks: write
       contents: read
@@ -354,6 +367,8 @@ jobs:
         uses: ./.github/actions/setup-jvm
         with:
           cache-key: engine
+          # Only `rest` and `all` resolve the full set: Note [The JVM Tests Are Split In Two].
+          cache-save: ${{ matrix.part == 'runtime' && 'false' || 'true' }}
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
@@ -372,11 +387,11 @@ jobs:
         run: |-
           "CI_TEST_TIMEFACTOR=2" >> $env:GITHUB_ENV
           "CI_TEST_FLAKY_ENABLE=true" >> $env:GITHUB_ENV
-      - if: matrix.part == 'rest'
+      - if: matrix.part != 'runtime'
         name: Install the library server's dependencies
         working-directory: tools/simple-library-server
         run: corepack pnpm install
-      - if: matrix.part == 'rest'
+      - if: matrix.part != 'runtime'
         name: Resolve the parser's Java class path
         run: sbt "-Dsbt.server.autostart=false" "syntax-rust-definition/Runtime/managedClasspath"
         env:
@@ -387,7 +402,7 @@ jobs:
         # The retired build CLI reset the JUnit directory before the tests; stale reports would be
         # published.
         run: rm -rf target/test-results
-      - if: matrix.part == 'rest'
+      - if: matrix.part != 'runtime'
         name: Generate the parser's Java sources
         shell: bash
         run: |-
@@ -398,9 +413,9 @@ jobs:
         name: JVM tests
         # Bash, not the Windows default pwsh: `pipefail` carries sbt's status through `tee`. On
         # Windows a crash of the forked test JVM ended this step with exit code 0 (#443), so sbt
-        # must also have printed the closing line of each of its two commands (the package, then
-        # `test`), which an aborted command never does: one line is not enough, as the package's
-        # comes first.
+        # must also have printed the closing line of each of the part's task commands
+        # (`matrix.successes`: the package, then the part's test command), which an aborted command
+        # never does: one line is not enough, as the package's comes first.
         shell: bash
         run: |-
           sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "$SBT_TASKS" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
@@ -421,7 +436,7 @@ jobs:
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - id: parser-self-tests
-        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.part == 'rest' }}
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' && matrix.part != 'runtime' }}
         name: Parser self-tests
         shell: bash
         env:
@@ -561,11 +576,12 @@ jobs:
   # `stdlib-test --only` runs each job's projects. A split shard (Table_Tests, by database
   # backend) is several jobs that each run a slice of that one project's test groups
   # (`ENSO_TEST_GROUP_FILTER`, from the matrix's `group-filter`); `stdlib-test` fails a job whose
-  # filter ran no test, so a filter that matches nothing cannot pass silently. A new library or test project must be added to
-  # the map (`tools/ci/check-workflows.mjs` fails until it is). The changed files must be every path
-  # the pull request touched: deleted files, and both the old and the new path of a rename (the
-  # `touched_files` output of `engine-changed-files.yml`, not `all_changed_files`, which has
-  # no old rename path), or a deletion in one library would not select the projects that import it.
+  # filter ran no test, so a filter that matches nothing cannot pass silently. A new library or
+  # test project must be added to the map (`tools/ci/check-workflows.mjs` fails until it is). The
+  # changed files must be every path the pull request touched: deleted files, and both the old and
+  # the new path of a rename (the `touched_files` output of `engine-changed-files.yml`, not
+  # `all_changed_files`, which has no old rename path), or a deletion in one library would not
+  # select the projects that import it.
   stdlib-plan:
     name: Standard Library test plan (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.stdlib-suites != '[]'
