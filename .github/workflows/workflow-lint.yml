@@ -17,7 +17,8 @@ on:
       - "project/build.properties"
       # the `wasm-bindgen` pin
       - "app/rust-ffi/build-wasm.mjs"
-      # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
+      # `tools/ci/check-workflows.mjs` checks the standard library test map against these, and
+      # each library's `public-types:` (package.yaml) against its `Main.enso` exports.
       - "distribution/lib/Standard/**/*.enso"
       - "distribution/lib/Standard/*/*/package.yaml"
       - "std-bits/**"
@@ -36,7 +37,8 @@ on:
       - "project/build.properties"
       # the `wasm-bindgen` pin
       - "app/rust-ffi/build-wasm.mjs"
-      # `tools/ci/check-workflows.mjs` checks the standard library test map against these.
+      # `tools/ci/check-workflows.mjs` checks the standard library test map against these, and
+      # each library's `public-types:` (package.yaml) against its `Main.enso` exports.
       - "distribution/lib/Standard/**/*.enso"
       - "distribution/lib/Standard/*/*/package.yaml"
       - "std-bits/**"

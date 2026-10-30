@@ -1289,6 +1289,7 @@ type File_System_SPI
         find loaded_only =
             vec = Self.get_regs b loaded_only . filter \e -> (e.protocol == protocol)
             if vec . not_empty then vec.first.typ else Nothing
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
         (find True) . if_nothing (find False)
 
     private get_regs b:Boolean loaded_only:Boolean=False =

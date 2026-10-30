@@ -41,6 +41,7 @@ type Email_Provider
                     resolved = (types.at idx).resolve constructor
                     if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved:Email_Provider
             try_next 0
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
         (first_resolved (Email_Provider_SPI.get_known_email_providers loaded_only=True)) . if_nothing <|
             (first_resolved Email_Provider_SPI.get_known_email_providers) . if_nothing constructor
 

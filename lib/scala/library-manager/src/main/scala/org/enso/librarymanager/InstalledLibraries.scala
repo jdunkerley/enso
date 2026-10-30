@@ -8,7 +8,10 @@ import org.enso.librarymanager.published.PublishedLibraryCache
   * edition's libraries (with its parents') that are cached or bundled, and,
   * when the project prefers local libraries, the local ones. Used by the
   * runtime's service discovery and by the language server's
-  * `library/listPublicTypes`, so the two always agree.
+  * `library/listPublicTypes`, so the two apply the same rule. The runtime
+  * lists once per context and the language server on each request, so they
+  * can differ while a project is open (Note [Service Discovery Over Installed
+  * Libraries] in `LookupServicesNode`).
   */
 object InstalledLibraries {
 

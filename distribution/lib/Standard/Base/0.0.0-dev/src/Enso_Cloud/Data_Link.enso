@@ -247,5 +247,6 @@ type Data_Link_SPI
             found = Meta.lookup_services Data_Link_SPI loaded_only=loaded_only . find if_missing=Nothing spi->
                 spi.name == name
             if found.is_nothing then Nothing else found.typ
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
         (find True) . if_nothing (find False)
 

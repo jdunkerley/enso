@@ -161,9 +161,9 @@ public class MetaServicesTest {
     List<Supplier<Type>> toReturn;
 
     @Override
-    protected Iterable<Supplier<Type>> findImplementationsFor(Type type, boolean loadedOnly) {
+    protected Iterable<Implementation> findImplementationsFor(Type type, boolean loadedOnly) {
       assertNotNull("The test has to tell us what to return first", toReturn);
-      return toReturn;
+      return toReturn.stream().map(Implementation::loaded).toList();
     }
   }
 }

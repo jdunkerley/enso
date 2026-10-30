@@ -84,6 +84,7 @@ type Database_Connection_Details_SPI
                     resolved = (types.at idx).resolve constructor
                     if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
             try_next 0
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
         loaded = Database_Connection_Details_SPI.get_types False loaded_only=True
         (first_resolved loaded) . if_nothing <|
             (first_resolved (Database_Connection_Details_SPI.get_types False)) . if_nothing constructor

@@ -48,7 +48,8 @@ get_format callback =
                     @Tail_Call reader (idx + 1)
         reader 0
     # The loaded libraries' formats are tried first, so that reading a file of a
-    # known format loads no other library.
+    # known format loads no other library. The second pass repeats the loaded
+    # libraries' formats, which is negligible.
     first_format (File_Format_SPI.get_types loaded_only=True) . if_nothing <|
         first_format File_Format_SPI.get_types
 
@@ -123,6 +124,7 @@ type File_Format
                         resolved = (arr.at idx).resolve constructor
                         if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
                 try_next 0
+            # Loaded libraries first; the second pass repeats their providers, which is negligible.
             (first_resolved (File_Format_SPI.get_types loaded_only=True)) . if_nothing <|
                 (first_resolved File_Format_SPI.get_types) . if_nothing <|
                     Error.throw (Illegal_Argument.Error "Expected a file format, but got a function.")
@@ -611,6 +613,7 @@ type File_Format_SPI
             found = File_Format_SPI.get_regs False loaded_only . find if_missing=Nothing spi->
                 spi.data_link_format_name == sub_type
             if found.is_nothing then Nothing else found.typ
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
         (find True) . if_nothing <|
             (find False) . if_nothing <|
                 Error.throw (Illegal_State.Error "Unknown format "+sub_type)

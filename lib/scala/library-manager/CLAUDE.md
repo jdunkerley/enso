@@ -10,7 +10,8 @@ Resolves, downloads, caches and uploads Enso libraries (sbt project
   - `InstalledLibraries.find` — the libraries a project resolves without a
     download (cached or bundled edition libraries, plus local ones when the
     project prefers them). The runtime's service lookup and the language
-    server's `library/listPublicTypes` both use it, so they agree.
+    server's `library/listPublicTypes` both use it, so they apply the same rule
+    (the runtime lists once per context, the language server per request).
   - `published/repository/RepositoryHelper` — the URL layout of a library
     repository and the files it serves for each version: `package.yaml`,
     `manifest.yaml`, the archives the manifest lists, and an optional loose
