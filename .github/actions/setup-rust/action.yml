@@ -9,11 +9,25 @@ inputs:
       `Swatinem/rust-cache` key shared by the jobs that build the same crates (`wasm-parser` for
       the GUI's parser).
     required: true
+  save:
+    description: >-
+      Whether this job saves the cache on `develop` ("true", the default). Jobs sharing a key pass
+      "false" except the one that compiles the most, so that it decides the entry.
+    required: false
+    default: "true"
+  workspaces:
+    description: >-
+      `Swatinem/rust-cache`'s `workspaces`: the Cargo workspace and its target directory. The
+      engine jobs build into `../cargo-target` (Note [The Engine's Cargo Target Directory] in
+      `engine-checks-platform.yml`).
+    required: false
+    default: ". -> target"
 runs:
   using: composite
   steps:
     - name: Cache Rust build
       uses: Swatinem/rust-cache@v2
       with:
-        save-if: ${{ github.ref == 'refs/heads/develop' }}
+        save-if: ${{ github.ref == 'refs/heads/develop' && inputs.save == 'true' }}
         shared-key: ${{ inputs.shared-key }}
+        workspaces: ${{ inputs.workspaces }}

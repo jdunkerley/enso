@@ -126,7 +126,10 @@ settings. Every workflow is hand-written YAML (build simplification;
   `standard-library*` legs only; Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
-  `graalpy-version` output. A job whose sbt tasks compile the Rust parser passes
+  `graalpy-version` output. The engine jobs that compile Rust share a Rust cache
+  (`setup-rust`, key `engine`, `v0-rust-engine-<OS>-…`, saved on develop by the
+  build job only) and build into `../cargo-target` (Note [The Engine's Cargo
+  Target Directory]). A job whose sbt tasks compile the Rust parser passes
   `rust: "true"`. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`):
   on Windows, PowerShell splits an unquoted one at its first dot.
   `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
@@ -177,6 +180,10 @@ Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 
 - `node tools/ci/check-workflows.mjs` and `node --test tools/ci/*.test.mjs` —
   the workflow policy (the rules the generator's tests enforced) and its tests.
+- Workflow Lint also runs on standard library and test project changes: it
+  checks `tools/ci/stdlib-test-map.yaml` against their imports. A new library,
+  `std-bits` directory, test project or cross-library import needs an entry
+  there; the failure message says which.
 - A pull request from a branch of this repository runs **its own** workflow
   files and composite actions, so the PR's checks are the test of a workflow
   change. A workflow that only runs by hand is tested with
