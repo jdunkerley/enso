@@ -288,6 +288,14 @@ jobs:
         env:
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
+      # Spike run 2: the engine package (shell launcher, no native image, no indexes) at 0.0.0-dev,
+      # for runtime-integration-tests' language home and std-benchmarks' annotation processor.
+      - name: Build the engine package (shell launcher)
+        run: sbt "-Dsbt.server.autostart=false" "buildEngineDistributionNoIndex"
+        env:
+          ENSO_LAUNCHER: shell
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - id: tests
         name: JVM tests
         run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test"
