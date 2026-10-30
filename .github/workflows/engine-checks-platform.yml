@@ -339,13 +339,18 @@ jobs:
         name: JVM tests
         # Bash, not the Windows default pwsh: `pipefail` carries sbt's status through `tee`. On
         # Windows a crash of the forked test JVM ended this step with exit code 0 (#443), so sbt
-        # must also have printed its closing line, which an aborted session never does.
+        # must also have printed the closing line of each of its two commands (the package, then
+        # `test`), which an aborted command never does: one line is not enough, as the package's
+        # comes first.
         shell: bash
         run: |-
           sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "buildEngineDistributionNoIndex; set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
-          # sbt colours its output on CI, which splits "[success]" with escape codes.
-          if ! sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -qF '[success] Total time'; then
-            echo "::error::sbt did not report '[success] Total time': the run aborted or failed."
+          # sbt colours its output on CI, which splits "[success]" with escape codes. Count rather
+          # than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail` reports as
+          # a failure. `grep -c` exits 1 on no match, hence `|| true`.
+          successes=$(sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
+          if [ "$successes" -ne 2 ]; then
+            echo "::error::sbt reported '[success] Total time' $successes times, not 2: the run aborted or failed."
             exit 1
           fi
         env:
