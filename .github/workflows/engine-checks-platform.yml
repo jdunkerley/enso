@@ -88,12 +88,23 @@ jobs:
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
   # here or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy of
   # `ENSO_TEST_JUNIT_DIR`. (The standard library jobs still use GraalPy and `GRAAL_EDITION`.)
+  #
+  # Note [The Engine's Cargo Target Directory]
+  # ==========================================
+  # The jobs that compile Rust (the parser's WASM build and AST generator in the ydoc bundle, the
+  # Java generator, the syntax check) build into `../cargo-target`, next to the checkout, not into
+  # `.cargo/config.toml`'s `target/rust`: the build job starts with `sbt clean`, and on develop
+  # `git-clean` runs before the Rust cache's post-job save, and both delete `target/`. They share
+  # one cache entry per OS (`setup-rust`, key `engine`), which only the build job saves, on develop.
+  # The parser's JNI library is built by sbt into `lib/rust/parser/target` with its own
+  # `--target-dir` and is not cached (`sbt clean` deletes it).
   build-engine-distribution:
     name: Build Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 60
     env:
       ENSO_LAUNCHER: native,test
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
     # Version].
     outputs:
@@ -124,6 +135,12 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "true" # "false" in every job but build-engine-distribution
+          workspaces: ". -> ../cargo-target"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - id: build
@@ -174,6 +191,7 @@ jobs:
     timeout-minutes: 30
     env:
       ENSO_LINT_ENABLE_GITHUB_ANNOTATIONS: "true"
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -188,6 +206,12 @@ jobs:
           cache-key: engine
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       - name: Check syntax
         run: sbt "-Dsbt.server.autostart=false" checkEnsoSyntax
         env:
@@ -230,9 +254,8 @@ jobs:
   # - `CI_TEST_TIMEFACTOR=2` and `CI_TEST_FLAKY_ENABLE=true` are written to `GITHUB_ENV` on Windows
   #   only, so that on Linux they are absent rather than empty: an empty time factor breaks the
   #   language server's test configuration, and `FlakySpec` only asks whether the variable exists.
-  # - A failing `sbt test` does not stop the parser self-tests or the benchmark step: the retired
-  #   build CLI deferred that failure. A failure of any other step stops the job, as it stopped the
-  #   retired build CLI.
+  # - A failing `sbt test` does not stop the parser self-tests: the retired build CLI deferred that
+  #   failure. A failure of any other step stops the job, as it stopped the retired build CLI.
   # - Two things the retired build CLI appeared to do never took effect, and are not added: the Enso
   #   benchmark dry run (it only runs with Enso benchmarks; `test jvm` asked for the runtime ones)
   #   and the heap-dump `JAVA_TOOL_OPTIONS` (the retired build CLI passed them to the
@@ -240,6 +263,10 @@ jobs:
   # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call: sbt starts
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
+  # - The retired build CLI rebuilt the ydoc native image here on Linux (4-7 min). It is not
+  #   rebuilt: the downloaded distribution's `component/` holds the one the build job made, and no
+  #   test loads it. The ydoc server's JavaScript bundle, which the tests do use, is still built by
+  #   `sbt test` (`ydoc-server`'s resource generator).
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.jvm-tests
@@ -249,6 +276,8 @@ jobs:
     permissions:
       checks: write
       contents: read
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -275,6 +304,12 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       # `sbt test` builds native images on Windows too (os-environment's tests).
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
@@ -304,15 +339,6 @@ jobs:
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
           cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
-      - if: runner.os == 'Linux'
-        name: Build the ydoc native image
-        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all ydoc-server/buildNativeImage"
-        env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
-          LC_ALL: C.UTF-8
-          SBT_SERVER_FORCESTART: "true"
       - id: tests
         name: JVM tests
         # Bash, not the Windows default pwsh: `pipefail` carries sbt's status through `tee`. On
@@ -349,15 +375,6 @@ jobs:
           deps=$(tr -d '\r\n' < lib/rust/parser/target/streams/runtime/managedClasspath/_global/streams/export)
           javac --class-path "lib/rust/parser/generate-java/java$sep$gen$sep$deps" -d "$gen" "$pkg/GeneratedFormatTests.java"
           java --class-path "$gen" org.enso.syntax2.GeneratedFormatTests
-      - if: ${{ runner.os == 'Linux' && !cancelled() && steps.parser-self-tests.outcome == 'success' }}
-        name: Compile the benchmarks, and run the runtime ones once
-        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
-        env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
-          LC_ALL: C.UTF-8
-          SBT_SERVER_FORCESTART: "true"
       - if: (success() || failure()) && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         name: Upload Heap Dumps
         uses: actions/upload-artifact@v5
@@ -377,6 +394,66 @@ jobs:
           path: target/test-results/*.xml
           path-replace-backslashes: true
           reporter: java-junit
+      - name: Clean after
+        if: always()
+        uses: ./.github/actions/git-clean
+
+  # Note [The Benchmark Job]
+  # ========================
+  # The benchmark compile and the one run of the runtime benchmarks that the retired build CLI's
+  # `backend test jvm` ended with, in a job of its own so that it runs alongside the JVM tests
+  # instead of after them (5-7 min off that job). Linux only, as before. It no longer waits for the
+  # parser self-tests: it compiles what it needs itself. The distribution and its version are the
+  # build job's (`bench` depends on `buildEngineDistribution`). Its token is the workflow's
+  # (`contents: read`); a failure fails the platform leg, so "Engine Required Checks" still sees it.
+  jvm-benchmarks:
+    name: Benchmarks (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
+    if: inputs.jvm-tests && inputs.os == 'linux'
+    needs: [build-engine-distribution]
+    runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
+    steps:
+      - name: Checking out the repository
+        uses: actions/checkout@v5
+        with:
+          clean: false
+      - uses: ./.github/actions/setup-node
+      # The prebuilt CLI: otherwise the ydoc bundle's `postinstall` (`app/rust-ffi/build-wasm.mjs`)
+      # runs `cargo install wasm-bindgen-cli`, 1.2 min on Linux and 3 on Windows. The version must be
+      # `WASM_BINDGEN_VERSION` in `build-wasm.mjs` (`check-workflows.mjs` checks it).
+      - name: Install wasm-bindgen-cli
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli@0.2.128
+      - name: Clean before
+        uses: ./.github/actions/git-clean
+      - name: Download the engine distribution
+        uses: ./.github/actions/download-engine-distribution
+        with:
+          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
+      - name: Set up the JVM toolchain
+        uses: ./.github/actions/setup-jvm
+        with:
+          cache-key: engine
+          edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
+          flatc: "true"
+          rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
+      - name: Compile the benchmarks, and run the runtime ones once
+        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "all runtime-benchmarks/compile language-server/Benchmark/compile searcher/Benchmark/compile std-benchmarks/compile; runtime-benchmarks/bench"
+        env:
+          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
+          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
+          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          LC_ALL: C.UTF-8
+          SBT_SERVER_FORCESTART: "true"
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

@@ -95,6 +95,8 @@ jobs:
             runner: windows-latest
     env:
       ENSO_LAUNCHER: native
+      # Note [The Engine's Cargo Target Directory] in `engine-checks-platform.yml`.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     steps:
       - name: Checking out the repository
         uses: actions/checkout@v5
@@ -118,6 +120,12 @@ jobs:
           cache-key: engine
           flatc: "true"
           rust: "true"
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
+        with:
+          shared-key: engine
+          save: "false"
+          workspaces: ". -> ../cargo-target"
       - name: Set up MSVC
         uses: ./.github/actions/setup-msvc
       - id: version

@@ -126,7 +126,10 @@ settings. Every workflow is hand-written YAML (build simplification;
   `standard-library*` legs only; Note [GraalPy Wheel Cache] in
   `engine-checks-platform.yml`), so `Examples_Tests` stops compiling numpy for
   GraalPy (12-13 min); `setup-jvm` exposes the pinned version as its
-  `graalpy-version` output. A job whose sbt tasks compile the Rust parser passes
+  `graalpy-version` output. The engine jobs that compile Rust share a Rust cache
+  (`setup-rust`, key `engine`, `v0-rust-engine-<OS>-…`, saved on develop by the
+  build job only) and build into `../cargo-target` (Note [The Engine's Cargo
+  Target Directory]). A job whose sbt tasks compile the Rust parser passes
   `rust: "true"`. Quote `-D` arguments (`sbt "-Dsbt.server.autostart=false" …`):
   on Windows, PowerShell splits an unquoted one at its first dot.
   `tools/ci/check-workflows.mjs` fails a job that runs `sbt` before `setup-jvm`,
@@ -155,6 +158,7 @@ Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 | `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps                                                                                              | `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › Benchmarks                | `sbt … runtime-benchmarks/bench` (version from the build job)                                              | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
 | `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | `setup-jvm` (GraalPy), `setup-build-scripts`     |
 | `changelog.yml`                                          | `actions/github-script` (`pulls.listFiles`)                                                                | —                                                |
