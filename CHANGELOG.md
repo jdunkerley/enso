@@ -317,6 +317,8 @@
 
 #### Enso Standard Library
 
+- [Connection, file format, return type and e-mail dropdowns list the installed
+  libraries' choices, even those not imported yet][465]
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -354,6 +356,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116
 [276]: https://github.com/jdunkerley/enso/pull/276
 [262]: https://github.com/jdunkerley/enso/pull/262
