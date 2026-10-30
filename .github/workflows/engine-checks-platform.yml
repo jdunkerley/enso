@@ -297,14 +297,19 @@ jobs:
   # own sbt session (both need it: `runtime-integration-tests` reads `component/` and `lib/`, the
   # `std-benchmarks` compile in `rest` reads `bin*`) and runs one `sbt` call:
   # - `runtime`: `runtime-integration-tests/test`;
-  # - `rest`: `test` with `runtime-integration-tests / Test / test := {}`. `set` replaces the
+  # - `rest`: `test` with `` `runtime-integration-tests` / Test / test := {} `` (the project is a
+  #   backticked val in build.sbt, so `set` needs the backticks: without them `runtime-integration-
+  #   tests` reads as a subtraction and sbt fails with a type error). `set` replaces the
   #   project's `test` task, which the aggregate `test` runs, so the part runs every other project
   #   and so does anything added later: nothing falls between the parts. The parser self-tests run
-  #   in this part only.
+  #   in this part only, with the steps that only they use (the parser's class path and Java
+  #   sources, the library server's dependencies: no test of `runtime-integration-tests` uses them).
   # `successes` is the number of `[success] Total time` lines the part must print: the commands
   # that are tasks (`set` prints none), see the check in the step. The parts' test counts must add
   # up to what the one job reported (1882 passed / 49 skipped on Windows, 1888 / 43 on Linux, at
-  # #448). `fail-fast: false` lets the other part finish and report when one fails.
+  # #448). `fail-fast: false` lets the other part finish and report when one fails. The tasks
+  # reach the step through `env`, not the script text: they hold backticks. On the self-hosted Mac
+  # (one runner) the two parts run one after the other, each building the engine package.
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }}) (${{ matrix.part }})
     if: inputs.jvm-tests
@@ -318,7 +323,7 @@ jobs:
             tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; runtime-integration-tests/test
             successes: 2
           - part: rest
-            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; set runtime-integration-tests / Test / test := {}; test
+            tasks: buildEngineDistributionNoIndex; set Global / parallelExecution := false; set `runtime-integration-tests` / Test / test := {}; test
             successes: 2
     permissions:
       checks: write
@@ -362,20 +367,25 @@ jobs:
         run: |-
           "CI_TEST_TIMEFACTOR=2" >> $env:GITHUB_ENV
           "CI_TEST_FLAKY_ENABLE=true" >> $env:GITHUB_ENV
-      - name: Install the library server's dependencies
+      - if: matrix.part == 'rest'
+        name: Install the library server's dependencies
         working-directory: tools/simple-library-server
         run: corepack pnpm install
-      - name: Resolve the parser's Java class path
+      - if: matrix.part == 'rest'
+        name: Resolve the parser's Java class path
         run: sbt "-Dsbt.server.autostart=false" "syntax-rust-definition/Runtime/managedClasspath"
         env:
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
-      - name: Generate the parser's Java sources
+      - name: Reset the JUnit directory
+        shell: bash
+        # The retired build CLI reset the JUnit directory before the tests; stale reports would be
+        # published.
+        run: rm -rf target/test-results
+      - if: matrix.part == 'rest'
+        name: Generate the parser's Java sources
         shell: bash
         run: |-
-          # The retired build CLI reset the JUnit directory before the tests; stale reports would be
-          # published.
-          rm -rf target/test-results
           rm -rf target/generated-java/org/enso/syntax2
           mkdir -p target/generated-java/org/enso/syntax2
           cargo run --package enso-parser-generate-java --bin enso-parser-generate-java -- target/generated-java/org/enso/syntax2
@@ -388,17 +398,19 @@ jobs:
         # comes first.
         shell: bash
         run: |-
-          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "${{ matrix.tasks }}" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
+          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "$SBT_TASKS" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
           # sbt colours its output on CI, which splits "[success]" with escape codes. The escape
           # character comes from `printf`: BSD sed (the self-hosted Mac) does not read `\x1b`. Count
           # rather than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail`
           # reports as a failure. `grep -c` exits 1 on no match, hence `|| true`.
           successes=$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
-          if [ "$successes" -ne ${{ matrix.successes }} ]; then
-            echo "::error::sbt reported '[success] Total time' $successes times, not ${{ matrix.successes }}: the run aborted or failed."
+          if [ "$successes" -ne "$EXPECTED_SUCCESSES" ]; then
+            echo "::error::sbt reported '[success] Total time' $successes times, not $EXPECTED_SUCCESSES: the run aborted or failed."
             exit 1
           fi
         env:
+          SBT_TASKS: ${{ matrix.tasks }}
+          EXPECTED_SUCCESSES: ${{ matrix.successes }}
           ENSO_LAUNCHER: shell
           ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
           LC_ALL: C.UTF-8
