@@ -555,9 +555,8 @@ guard. Update `.github/CLAUDE.md`'s sharding sentence the same way. Run
 `node --test tools/ci/*.test.mjs`.
 
 - [ ] **Step 6: Local plan check.** Run the plan with the inputs of a Linux and
-      a Windows `pull_request` run that changes a Table file (`STDLIB_SUITES`
-      as in `engine-checks.yml`; for Windows drop the `postgres` and `mssql`
-      keys):
+      a Windows `pull_request` run that changes a Table file (`STDLIB_SUITES` as
+      in `engine-checks.yml`; for Windows drop the `postgres` and `mssql` keys):
 
 ```bash
 STDLIB_SUITES='[{"suite": "standard-library-in-native", "title": "Native", "small-jdk": false, "postgres": true, "mssql": false}, {"suite": "standard-library", "title": "JVM", "small-jdk": true, "postgres": true, "mssql": false}]' \
