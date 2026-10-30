@@ -315,7 +315,16 @@ jobs:
           SBT_SERVER_FORCESTART: "true"
       - id: tests
         name: JVM tests
-        run: sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test"
+        # Bash, not the Windows default pwsh: `pipefail` carries sbt's status through `tee`. On
+        # Windows a crash of the forked test JVM ended this step with exit code 0 (#443), so sbt
+        # must also have printed its closing line, which an aborted session never does.
+        shell: bash
+        run: |-
+          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
+          if ! grep -qF '[success] Total time' "$RUNNER_TEMP/sbt-test.log"; then
+            echo "::error::sbt did not report '[success] Total time': the run aborted or failed."
+            exit 1
+          fi
         env:
           ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
           ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
