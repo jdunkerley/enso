@@ -57,16 +57,19 @@ type Suite
           indicating whether some tests failed.
         - `output`: A function to print out textual info about progress of execution.
           By default it uses `IO.println` output
+        - `group_filter`: Only groups whose name matches this regex run, each
+          with all its specs; defaults to the `ENSO_TEST_GROUP_FILTER`
+          environment variable.
 
        ## Returns
        Boolean if `should_exit` is False, otherwise exits the process.
-    run_with_filter self (filter : (Text | Nothing) = Nothing) (should_exit : Boolean = True) (output:Text->Nothing=IO.println) -> (Boolean | Nothing) =
+    run_with_filter self (filter : (Text | Nothing) = Nothing) (should_exit : Boolean = True) (output:Text->Nothing=IO.println) (group_filter : (Text | Nothing) = Nothing) -> (Boolean | Nothing) =
         config = Suite_Config.from_environment
-        self.run_impl output config filter should_exit
+        self.run_impl output config filter should_exit (group_filter.if_nothing config.group_filter)
 
-    private run_impl self println config:Suite_Config (filter : (Text | Nothing) = Nothing) (should_exit : Boolean = True) -> (Boolean | Nothing) =
+    private run_impl self println config:Suite_Config (filter : (Text | Nothing) = Nothing) (should_exit : Boolean = True) (group_filter : (Text | Nothing) = Nothing) -> (Boolean | Nothing) =
         # List of pairs of groups and their specs that match the filter
-        matching_specs = self.groups.flat_map group->
+        matching_specs = (Helpers.groups_matching self.groups group_filter).flat_map group->
             group_matches = Helpers.name_matches group.name filter
             case group_matches of
                 True ->

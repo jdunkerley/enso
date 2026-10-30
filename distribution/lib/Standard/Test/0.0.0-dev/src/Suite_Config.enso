@@ -51,7 +51,9 @@ type Suite_Config
           no JUnit XML file will be written.
         - `use_ansi_colors`: Should ANSI colors be used in the output.
         - `caller_project_root`: The root project path of the caller.
-    Value (print_only_failures : Boolean) (output_path : (File | Nothing)) (use_ansi_colors : Boolean) (caller_project_root : File | Nothing)
+        - `group_filter`: A regex; only groups whose name matches it run. If
+          Nothing, all groups run.
+    Value (print_only_failures : Boolean) (output_path : (File | Nothing)) (use_ansi_colors : Boolean) (caller_project_root : File | Nothing) (group_filter : Text | Nothing)
 
     ## Creates an Suite_Config based off environment and caller location
     from_environment : Suite_Config
@@ -69,7 +71,9 @@ type Suite_Config
                 False ->
                     (File.new junit_folder) / project_root.name / "JUnit.xml"
 
-        Suite_Config.Value print_only_failures results_path use_ansi_colors project_root
+        group_filter_text = Environment.get "ENSO_TEST_GROUP_FILTER" . if_nothing ""
+        group_filter = if group_filter_text.is_empty then Nothing else group_filter_text
+        Suite_Config.Value print_only_failures results_path use_ansi_colors project_root group_filter
 
     ## Should the results be written to JUnit XML file.
     should_output_junit self =

@@ -1,0 +1,33 @@
+from Standard.Base import all
+from Standard.Test import all
+
+import Standard.Base.Runtime.Ref.Ref
+
+## Runs a small suite with `group_filter` and returns the names of the specs that ran.
+private run_inner group_filter =
+    ran = Ref.new []
+    record name = ran.modify (_ + [name])
+    inner = Test.build inner_builder->
+        inner_builder.group "[PostgreSQL] Rounding" group_builder->
+            group_builder.specify "[SQLite File] lookalike spec name" <| record "pg"
+        inner_builder.group "[SQLite File] Rounding" group_builder->
+            group_builder.specify "rounds" <| record "file"
+        inner_builder.group "In-Memory Rounding" group_builder->
+            group_builder.specify "rounds" <| record "memory"
+    inner.run_with_filter should_exit=False output=(_->Nothing) group_filter=group_filter
+    ran.get
+
+add_specs suite_builder =
+    suite_builder.group "group_filter" group_builder->
+        group_builder.specify "runs every group without a group filter" <|
+            run_inner Nothing . should_equal ["pg", "file", "memory"]
+
+        group_builder.specify "runs only the groups whose name matches" <|
+            run_inner "^\[SQLite File\]" . should_equal ["file"]
+
+        group_builder.specify "does not fall back to spec names" <|
+            # The PostgreSQL group's spec is named like a SQLite File group; it must not run.
+            run_inner "^\[SQLite File\]" . contains "pg" . should_be_false
+
+        group_builder.specify "takes a negative lookahead for the rest" <|
+            run_inner "^(?!(?:\[PostgreSQL\]|\[SQLite File\]))" . should_equal ["memory"]
