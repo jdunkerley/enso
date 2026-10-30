@@ -6,13 +6,13 @@ on:
   workflow_call:
     outputs:
       all_changed_files:
-        description: "Returns all changed files"
+        description: "Returns all changed files, deleted ones included"
         value: ${{ jobs.ide-changed-files.outputs.all_changed_files }}
       any_changed:
-        description: "Returns `true` when any of the filenames have changed"
+        description: "Returns `true` when any of the filenames have changed or been deleted"
         value: ${{ jobs.ide-changed-files.outputs.any_changed }}
       backend_changed:
-        description: "Returns `true` when a file the IDE's backend build reads outside the engine paths has changed"
+        description: "Returns `true` when a file the IDE's backend build reads outside the engine paths has changed or been deleted"
         value: ${{ jobs.ide-changed-files.outputs.backend_changed }}
 
 permissions:
@@ -28,9 +28,9 @@ jobs:
     timeout-minutes: 30
     name: Changed Files
     outputs:
-      all_changed_files: ${{ steps.ide-changed-files.outputs.all_changed_files }}
-      any_changed: ${{ steps.ide-changed-files.outputs.any_changed }}
-      backend_changed: ${{ steps.backend-changed-files.outputs.any_changed }}
+      all_changed_files: ${{ steps.ide-changed-files.outputs.all_modified_files }}
+      any_changed: ${{ steps.ide-changed-files.outputs.any_modified }}
+      backend_changed: ${{ steps.backend-changed-files.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -94,9 +94,9 @@ jobs:
             **/*.md
       - name: List all changed files
         env:
-          ALL_CHANGED_FILES: ${{ steps.ide-changed-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.ide-changed-files.outputs.all_modified_files }}
         run: |
-          if [[ "${{ steps.ide-changed-files.outputs.any_changed }}" == "true" ]]; then
+          if [[ "${{ steps.ide-changed-files.outputs.any_modified }}" == "true" ]]; then
             echo "Files changed:"
           fi
           for file in ${ALL_CHANGED_FILES}; do

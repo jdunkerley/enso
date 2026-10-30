@@ -6,13 +6,13 @@ on:
   workflow_call:
     outputs:
       all_changed_files:
-        description: "Returns all changed files"
+        description: "Returns all changed files, deleted ones included"
         value: ${{ jobs.engine-changed-files.outputs.all_changed_files }}
       touched_files:
         description: "Every touched path, space-separated: added, copied, modified and deleted files, and a renamed file under both its old and new path"
         value: ${{ jobs.engine-changed-files.outputs.touched_files }}
       any_changed:
-        description: "Returns `true` when any of the filenames have changed"
+        description: "Returns `true` when any of the filenames have changed or been deleted"
         value: ${{ jobs.engine-changed-files.outputs.any_changed }}
 
 permissions:
@@ -24,9 +24,9 @@ jobs:
     timeout-minutes: 30
     name: Changed Files
     outputs:
-      all_changed_files: ${{ steps.engine-changed-files.outputs.all_changed_files }}
+      all_changed_files: ${{ steps.engine-changed-files.outputs.all_modified_files }}
       touched_files: ${{ steps.engine-changed-files.outputs.all_changed_and_modified_files }}
-      any_changed: ${{ steps.engine-changed-files.outputs.any_changed }}
+      any_changed: ${{ steps.engine-changed-files.outputs.any_modified }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -37,8 +37,9 @@ jobs:
         with:
           # A rename is reported as a deletion of the old path plus an addition of the new one, so
           # `all_changed_and_modified_files` (ACMRDTUX: the `touched_files` output) holds both. The
-          # standard library test selection needs every path a pull request touched;
-          # `all_changed_files` leaves out deletions and old rename paths.
+          # standard library test selection needs every path a pull request touched. The gate
+          # itself reads `any_modified` and `all_modified_files` (ACMRD), not `any_changed` and
+          # `all_changed_files` (ACMR): a pull request that only deletes files must start the checks.
           output_renamed_files_as_deleted_and_added: true
           # The list also bounds the standard library test selection: a path outside it never
           # reaches it. It holds the helpers the tests start: the standard library suites run
@@ -76,9 +77,9 @@ jobs:
             test/**/CLAUDE.md
       - name: List all changed files
         env:
-          ALL_CHANGED_FILES: ${{ steps.engine-changed-files.outputs.all_changed_files }}
+          ALL_CHANGED_FILES: ${{ steps.engine-changed-files.outputs.all_modified_files }}
         run: |
-          if [[ "${{ steps.engine-changed-files.outputs.any_changed }}" == "true" ]]; then
+          if [[ "${{ steps.engine-changed-files.outputs.any_modified }}" == "true" ]]; then
             echo "Files changed:"
           fi
           for file in ${ALL_CHANGED_FILES}; do

@@ -11,6 +11,7 @@ import {
   buildScriptsSbtEntries,
   callsSbt,
   checkBuildScriptsSpawnSbtThroughHelper,
+  checkChangedFilesCountDeletions,
   checkIdePackagingNeedsNoCloudAccount,
   checkJobsHaveTimeouts,
   checkMacosChecksRunWhatIsRequested,
@@ -142,6 +143,45 @@ describe('checkWorkflowsDeclarePermissions', () => {
   })
 })
 
+describe('checkChangedFilesCountDeletions', () => {
+  const gate = (outputs, extraSteps = '') => `on: workflow_call
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+${outputs}
+    steps:
+      - id: files
+        uses: step-security/changed-files@v45
+${extraSteps}`
+  test('accepts the deletion-aware outputs, and job outputs named any_changed', () => {
+    const repo = fixture({
+      'workflows/a.yml': gate(
+        '      any_changed: ${{ steps.files.outputs.any_modified }}\n      all_changed_files: ${{ steps.files.outputs.all_modified_files }}',
+      ),
+      'workflows/b.yml': `on: workflow_call
+jobs:
+  use:
+    if: needs.gate.outputs.any_changed == 'true'
+    runs-on: ubuntu-latest
+    steps: []
+`,
+    })
+    assert.deepEqual(checkChangedFilesCountDeletions(repo), [])
+  })
+  test('rejects any_changed and all_changed_files read from a changed-files step', () => {
+    const repo = fixture({
+      'workflows/a.yml': gate(
+        '      any_changed: ${{ steps.files.outputs.any_changed }}',
+        "      - if: steps.files.outputs.any_changed_excluding_tests == 'true'\n        run: echo ${{ steps.files.outputs.all_changed_files }}\n",
+      ),
+    })
+    const problems = checkChangedFilesCountDeletions(repo)
+    assert.equal(problems.length, 2)
+    assert.match(problems[0], /^a\.yml: job `gate` reads `any_changed` .*use `any_modified` so deletions count$/)
+    assert.match(problems[1], /reads `all_changed_files` .*use `all_modified_files` so deletions count$/)
+  })
+})
 
 describe('checkPullRequestsIgnoreSpecs', () => {
   test('accepts paths-ignore with the spec paths, and a paths whitelist', () => {
