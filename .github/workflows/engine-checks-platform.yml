@@ -88,6 +88,7 @@ jobs:
   # `.github/actions/setup-jvm`). Gone from this job, because only the retired build CLI read them
   # here or nothing did: GraalPy, `GRAAL_EDITION`, `GITHUB_TOKEN` and the `GITHUB_ENV` copy of
   # `ENSO_TEST_JUNIT_DIR`. (The standard library jobs still use GraalPy and `GRAAL_EDITION`.)
+  #
   # Note [The Engine's Cargo Target Directory]
   # ==========================================
   # The jobs that compile Rust (the parser's WASM build and AST generator in the ydoc bundle, the
@@ -134,7 +135,8 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
-      - uses: ./.github/actions/setup-rust
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
         with:
           shared-key: engine
           save: "true" # "false" in every job but build-engine-distribution
@@ -204,7 +206,8 @@ jobs:
           cache-key: engine
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           rust: "true"
-      - uses: ./.github/actions/setup-rust
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
         with:
           shared-key: engine
           save: "false"
@@ -298,7 +301,8 @@ jobs:
           edition: ${{ inputs.edition == 'Oracle GraalVM' && 'oracle' || 'community' }}
           flatc: "true"
           rust: "true"
-      - uses: ./.github/actions/setup-rust
+      - name: Set up the Rust cache
+        uses: ./.github/actions/setup-rust
         with:
           shared-key: engine
           save: "false"
