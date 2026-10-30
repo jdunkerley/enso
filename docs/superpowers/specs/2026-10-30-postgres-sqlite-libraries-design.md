@@ -217,3 +217,53 @@ project using `SQLite.In_Memory` opens, gets its import, and runs.
 - Hooking the text code editor into the detector.
 - The rest of the library system: the core bundled set, release-zip publishing,
   the user's own library collection.
+
+## Amendments (2026-10-30, from planning)
+
+Writing the implementation plan against the code showed several statements above
+to be wrong or impossible. These amendments replace the statements they name;
+where they conflict, the amendment wins.
+
+1. **How the GUI learns which library defines a type (user's decision).** The
+   suggestion database holds only the types of libraries the engine has loaded,
+   so for an old project that uses `SQLite.In_Memory` without the import it has
+   no entry for `SQLite`. Every library outside the core set therefore
+   **declares its public types** in its `package.yaml`, in a new `public-types:`
+   list (for example `public-types: [SQLite, SQLite_Format]`). A check in
+   `tools/ci/check-workflows.mjs` fails a library whose list differs from the
+   types its `Main.enso` exports. The engine's discovery (section 2) reads the
+   list together with `services:`, and the language server gains one request
+   that returns, for every installed library, its declared types (name →
+   library). The GUI asks for it once per project open and caches it; the
+   detector (section 3) consults the suggestion database first and this map
+   second. No table of libraries lives in the GUI.
+2. **`SSL_Mode` and `Client_Certificate` stay in `Standard.Database`:** Redshift
+   uses them too (section 1 said Postgres-only).
+3. **The Postgres-family base** is `Standard.Database.Postgres_Family` (not
+   exported from `Main.enso`), and takes `Pgpass` and the encoding helpers as
+   well, so AWS never depends on `Standard.Postgres` (resolves section 1's open
+   point).
+4. **Lookup order (section 2).** The builtin resolves every provider before
+   returning, so "a caller that stops at its first match loads nothing more"
+   cannot hold as written. `Meta.lookup_services` gains a `loaded_only`
+   argument; callers that stop at a first match (format detection) ask the
+   loaded libraries first and the installed ones only when none matched. The
+   dropdown asks for all.
+5. **"Installed"** means resolvable without a download: libraries of the edition
+   present in the local cache or the bundle, plus local libraries when the
+   project prefers local ones.
+6. **Import form (section 3).** Imports are added in the form `requiredImports`
+   already produces, `from Standard.X import Name` (not `import all`). A name is
+   skipped when an existing import covers it (`covers`).
+7. **Project open (section 3)** checks `Main.enso` only: the GUI never opens
+   other modules.
+8. **Tests "without an import" (section 2)** run as a subprocess spec
+   (`Library_Discovery_Spec`), because other files of the same test project
+   import the libraries.
+9. **Test files to touch (section 1)** are about 20 (14 in `Table_Tests`, 3 in
+   `Visualization_Tests`, 1 in `Base_Tests`, 2 in `Generic_JDBC_Tests`), not
+   ~55.
+
+Amendment 1 adds work to PRs 1 (discovery reads `public-types:`; the language
+server request) and 2 (the GUI uses it), and to PRs 4 and 5 (the new libraries
+declare their types).
