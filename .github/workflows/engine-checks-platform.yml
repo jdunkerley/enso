@@ -321,7 +321,8 @@ jobs:
         shell: bash
         run: |-
           sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
-          if ! grep -qF '[success] Total time' "$RUNNER_TEMP/sbt-test.log"; then
+          # sbt colours its output on CI, which splits "[success]" with escape codes.
+          if ! sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -qF '[success] Total time'; then
             echo "::error::sbt did not report '[success] Total time': the run aborted or failed."
             exit 1
           fi
