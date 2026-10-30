@@ -40,6 +40,10 @@ jobs:
           # standard library test selection needs every path a pull request touched;
           # `all_changed_files` leaves out deletions and old rename paths.
           output_renamed_files_as_deleted_and_added: true
+          # The list also bounds the standard library test selection: a path outside it never
+          # reaches it. It holds the helpers the tests start: the standard library suites run
+          # `tools/http-test-helper`, the JVM tests `tools/simple-library-server`. (No comments
+          # inside `files:`: a block scalar would pass them on as patterns.)
           files: |
             distribution/**
             engine/**
@@ -50,6 +54,8 @@ jobs:
             build.sbt
             build-config.yaml
             tools/build-scripts/**
+            tools/http-test-helper/**
+            tools/simple-library-server/**
             .cargo/**
             Cargo.lock
             Cargo.toml
