@@ -6396,13 +6396,23 @@ lazy val buildEngineDistributionNoIndex =
   taskKey[Unit](
     "Builds the engine distribution without generating indexes and optionally generating native image"
   )
-buildEngineDistributionNoIndex := Def.taskIf {
+// `Def.taskDyn`, not `Def.taskIf`: an `if` inside a `taskIf` branch does not stop
+// `.value` from scheduling the ydoc image, so `ENSO_LAUNCHER=...,-ydoc` picks
+// the task to run.
+buildEngineDistributionNoIndex := Def.taskDyn {
   createEnginePackageNoIndex.value
-  if (shouldBuildNativeImage.value) {
-    (`ydoc-server` / buildNativeImage).value
-    (`engine-runner` / buildNativeImage).value
-    (`engine-runner` / checkNativeImageSize).value
-  }
+  if (!shouldBuildNativeImage.value) Def.task(())
+  else if (GraalVM.EnsoLauncher.disableYdoc)
+    Def.task {
+      (`engine-runner` / buildNativeImage).value
+      (`engine-runner` / checkNativeImageSize).value
+    }
+  else
+    Def.task {
+      (`ydoc-server` / buildNativeImage).value
+      (`engine-runner` / buildNativeImage).value
+      (`engine-runner` / checkNativeImageSize).value
+    }
 }.value
 
 // This makes the buildEngineDistribution task usable as a dependency

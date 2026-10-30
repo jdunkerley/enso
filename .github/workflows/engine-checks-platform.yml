@@ -96,8 +96,8 @@ jobs:
   # (`all` because a hosted runner has more memory than the retired build CLI's single-batch
   # threshold). The version comes from `tools/build-scripts` (`version`); its step keeps `id:
   # build`, so the job's outputs are what they were, and it exports the version to the later steps,
-  # which is how sbt names the package. `ENSO_LAUNCHER` stays `native,test`, the value the retired
-  # build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
+  # which is how sbt names the package. `ENSO_LAUNCHER` is `native,test` plus `-ydoc` (see the
+  # job's `env`); `native,test` was the value the retired build CLI forced. `setup-msvc` replaces the retired build CLI's MSVC environment on Windows: the
   # native images link with it, and the runtime DLL copy reads `VCToolsRedistDir`. The build
   # compiles the Rust parser with several `cargo` calls at once, so `setup-jvm` installs the Rust
   # toolchain first (`rust`; Note [Install The Rust Toolchain Before sbt] in
@@ -119,7 +119,12 @@ jobs:
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 60
     env:
-      ENSO_LAUNCHER: native,test
+      # `-ydoc` leaves the ydoc server's native image out: no engine check starts the ydoc server
+      # (the consumers of this job's artifact are lint, benchmarks, the API check and the standard
+      # library tests, none of which does; `sbt test` builds the server's JavaScript bundle itself),
+      # and IDE packaging builds its own backend, ydoc image included (`buildEngineBundle`). The
+      # job name and artifact name keep `(native,test)`: they are labels, not the value.
+      ENSO_LAUNCHER: native,test,-ydoc
       CARGO_TARGET_DIR: ${{ github.workspace }}/../cargo-target
     # The distribution's version, for the jobs that use it. See Note [Lint Reads The Distribution's
     # Version].
