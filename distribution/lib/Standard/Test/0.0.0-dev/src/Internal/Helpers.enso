@@ -76,6 +76,12 @@ private name_matches (name : Text) (filter : (Text | Nothing)) -> Boolean =
                 Panic.throw (Illegal_Argument.Error ("Filter " + text.pretty + " cannot be converted to regex"))
         Nothing -> True
 
+## Groups whose name matches `group_filter`: all of them when it is `Nothing`. A group that does
+   not match is dropped with all its specs (unlike `run_with_filter`'s `filter`, which falls back
+   to the specs' names).
+groups_matching (groups : Vector) (group_filter : (Text | Nothing)) -> Vector =
+    if group_filter.is_nothing then groups else
+        groups.filter group-> name_matches group.name group_filter
 
 ## ---
    private: true

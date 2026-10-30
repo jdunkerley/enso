@@ -3,11 +3,13 @@ from Standard.Base import all
 from Standard.Test import Test
 
 import project.Extensions_Spec
+import project.Group_Filter_Spec
 import project.Pending_Lazy_Spec
 import project.Teardown_Spec
 
 add_specs suite_builder =
     Extensions_Spec.add_specs suite_builder
+    Group_Filter_Spec.add_specs suite_builder
     Pending_Lazy_Spec.add_specs suite_builder
     Teardown_Spec.add_specs suite_builder
 
