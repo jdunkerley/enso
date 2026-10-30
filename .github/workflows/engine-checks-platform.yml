@@ -247,8 +247,7 @@ jobs:
   # The steps are what the retired build CLI's `backend test jvm` ran (its `context.rs`), in its
   # order, each sbt call as the retired build CLI made it (`LC_ALL=C.UTF-8
   # SBT_SERVER_FORCESTART=true sbt -Dbench.compileOnly=<…> -Dsbt.server.autostart=false "<tasks>"`),
-  # at the build job's version, from which sbt names the downloaded distribution. Its traps, kept on
-  # purpose:
+  # at sbt's default version (`0.0.0-dev`), as a local run has it. Its traps, kept on purpose:
   # - `ENSO_TEST_JUNIT_DIR` is set on the `sbt test` step only. The retired build CLI removed it for
   #   the benchmark step, and an empty value is not "unset": ScalaTest would get `-u ""`.
   # - `CI_TEST_TIMEFACTOR=2` and `CI_TEST_FLAKY_ENABLE=true` are written to `GITHUB_ENV` on Windows
@@ -263,14 +262,18 @@ jobs:
   # - `setup-jvm` installs the Rust toolchain (`rust`) before the first sbt call: sbt starts
   #   several `cargo` calls at once (Note [Install The Rust Toolchain Before sbt] in
   #   `.github/actions/setup-jvm`).
-  # - The retired build CLI rebuilt the ydoc native image here on Linux (4-7 min). It is not
-  #   rebuilt: the downloaded distribution's `component/` holds the one the build job made, and no
-  #   test loads it. The ydoc server's JavaScript bundle, which the tests do use, is still built by
-  #   `sbt test` (`ydoc-server`'s resource generator).
+  # - The job does not wait for the build job (#442). `buildEngineDistributionNoIndex` runs first in
+  #   the same sbt session as `test` and builds the engine package the tests run against, as a local
+  #   `sbt test` would; `ENSO_LAUNCHER: shell` keeps the native launcher out of it, whatever the
+  #   environment says about release mode. The job starts with the run instead of after the build,
+  #   which takes Windows JVM Tests from ~78 to ~51 min after the start (the 2c finding,
+  #   `docs/superpowers/specs/2026-10-30-ci-speed-2c-finding.md`). The ydoc native image is not
+  #   rebuilt (the retired build CLI did, 4-7 min on Linux): no test loads it. The ydoc server's
+  #   JavaScript bundle, which the tests do use, is built by `sbt test` (`ydoc-server`'s resource
+  #   generator).
   jvm-tests:
     name: JVM Tests (${{ inputs.edition }}) (${{ inputs.os }}, ${{ inputs.arch }})
     if: inputs.jvm-tests
-    needs: [build-engine-distribution]
     runs-on: ${{ startsWith(inputs.runner, '[') && fromJSON(inputs.runner) || inputs.runner }}
     timeout-minutes: 90
     permissions:
@@ -293,10 +296,6 @@ jobs:
           tool: wasm-bindgen-cli@0.2.128
       - name: Clean before
         uses: ./.github/actions/git-clean
-      - name: Download the engine distribution
-        uses: ./.github/actions/download-engine-distribution
-        with:
-          name: Engine Distribution (${{ inputs.edition }}) (native,test) (${{ inputs.os }}, ${{ inputs.arch }})
       - name: Set up the JVM toolchain
         uses: ./.github/actions/setup-jvm
         with:
@@ -325,9 +324,6 @@ jobs:
       - name: Resolve the parser's Java class path
         run: sbt "-Dsbt.server.autostart=false" "syntax-rust-definition/Runtime/managedClasspath"
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
       - name: Generate the parser's Java sources
@@ -343,19 +339,22 @@ jobs:
         name: JVM tests
         # Bash, not the Windows default pwsh: `pipefail` carries sbt's status through `tee`. On
         # Windows a crash of the forked test JVM ended this step with exit code 0 (#443), so sbt
-        # must also have printed its closing line, which an aborted session never does.
+        # must also have printed the closing line of each of its two commands (the package, then
+        # `test`), which an aborted command never does: one line is not enough, as the package's
+        # comes first.
         shell: bash
         run: |-
-          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
-          # sbt colours its output on CI, which splits "[success]" with escape codes.
-          if ! sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -qF '[success] Total time'; then
-            echo "::error::sbt did not report '[success] Total time': the run aborted or failed."
+          sbt "-Dbench.compileOnly=true" "-Dsbt.server.autostart=false" "buildEngineDistributionNoIndex; set Global / parallelExecution := false; test" 2>&1 | tee "$RUNNER_TEMP/sbt-test.log"
+          # sbt colours its output on CI, which splits "[success]" with escape codes. Count rather
+          # than `grep -q`: an early exit ends `sed` with a broken pipe, which `pipefail` reports as
+          # a failure. `grep -c` exits 1 on no match, hence `|| true`.
+          successes=$(sed 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/sbt-test.log" | grep -cF '[success] Total time' || true)
+          if [ "$successes" -ne 2 ]; then
+            echo "::error::sbt reported '[success] Total time' $successes times, not 2: the run aborted or failed."
             exit 1
           fi
         env:
-          ENSO_VERSION: ${{ needs.build-engine-distribution.outputs.ENSO_VERSION }}
-          ENSO_EDITION: ${{ needs.build-engine-distribution.outputs.ENSO_EDITION }}
-          ENSO_RELEASE_MODE: ${{ needs.build-engine-distribution.outputs.ENSO_RELEASE_MODE }}
+          ENSO_LAUNCHER: shell
           ENSO_TEST_JUNIT_DIR: ${{ github.workspace }}/target/test-results
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"

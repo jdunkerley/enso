@@ -147,8 +147,9 @@ settings. Every workflow is hand-written YAML (build simplification;
 
 Workflows call sbt directly for the engine, and `tools/build-scripts` for what
 needs more than one tool. A job that runs a distribution built by another job
-uses that job's version, from its outputs, not sbt's default `0.0.0-dev`: see
-Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
+(lint, benchmarks) uses that job's version, from its outputs, not sbt's default
+`0.0.0-dev`: see Note [Lint Reads The Distribution's Version] in
+`engine-checks-platform.yml`.
 
 | Workflow › job                                           | Step                                                                                                       | Set up by                                        |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
@@ -157,7 +158,7 @@ Note [Lint Reads The Distribution's Version] in `engine-checks-platform.yml`.
 | `std-libs-benchmark.yml`                                 | `sbt std-benchmarks/bench` (`benchOnly <name>`)                                                            | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › Enso Code Lint            | `sbt lintEnso` (version from the build job), `sbt checkEnsoSyntax`                                         | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › Build Engine Distribution | `version`, then `sbt "clean; all ciBuildEngineDistribution"`                                               | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
-| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps                                                                                              | `setup-jvm`, `setup-msvc`                        |
+| `engine-checks-platform.yml` › JVM Tests                 | `sbt …` steps (`buildEngineDistributionNoIndex; test` in one session; no wait for the build)               | `setup-jvm`, `setup-msvc`                        |
 | `engine-checks-platform.yml` › Benchmarks                | `sbt … runtime-benchmarks/bench` (version from the build job)                                              | `setup-jvm`                                      |
 | `engine-checks-platform.yml` › API check                 | `corepack pnpm --filter build-scripts run stdlib-api-check`                                                | `setup-build-scripts`                            |
 | `engine-checks-platform.yml` › stdlib tests              | `corepack pnpm --filter build-scripts run stdlib-test <suite>`                                             | `setup-jvm` (GraalPy), `setup-build-scripts`     |
