@@ -32,6 +32,10 @@ jobs:
     uses: ./.github/workflows/engine-checks.yml
     needs: [engine-changed-files]
     if: needs.engine-changed-files.outputs.any_changed == 'true' || github.ref == 'refs/heads/develop'
+    with:
+      # A pull request runs only the standard library tests its files can affect; develop runs all
+      # (Note [Standard Library Test Selection] in `engine-checks-platform.yml`).
+      changed-files: ${{ github.event_name == 'pull_request' && needs.engine-changed-files.outputs.all_changed_files || '' }}
     secrets: inherit
 
   stdlib-api-changes-label:

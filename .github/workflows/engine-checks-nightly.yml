@@ -91,6 +91,8 @@ jobs:
       os: macos
       arch: aarch64
       runner: '["self-hosted", "macOS"]'
+      # One self-hosted runner: shards would only queue behind each other.
+      stdlib-shards: false
       stdlib-suites: >-
         [{"suite": "standard-library-in-native", "title": "Native", "small-jdk": false},
         {"suite": "standard-library", "title": "JVM", "small-jdk": true},
