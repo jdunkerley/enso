@@ -169,6 +169,8 @@ class Compiler(
               s"starting at the root [${m.getName}]."
             )
 
+            context.compilingLibrary(pkg.libraryName)
+
             val packageModules = packageRepository.freezeModuleMap.collect {
               case (name, mod)
                   if name.startsWith(

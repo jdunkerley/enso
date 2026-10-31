@@ -52,6 +52,9 @@ and links the required Graal/Truffle background reading.
   `Meta.lookup_services` (`LookupServicesNode`) loads a library that is
   installed but not imported when it resolves that library's provider; see Note
   [Service Discovery Over Installed Libraries] there.
+- **Compiling a library writes its `catalogue.json`.** Next to `package.yaml`,
+  from the suggestions cache's list, filtered to what the component browser
+  shows; see Note [Library Catalogue] in `TruffleCompilerContext`.
 
 ## Language Server integration
 

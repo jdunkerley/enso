@@ -234,7 +234,18 @@ object DistributionPackage {
           .get()
           .toSet
         Tracked.diffInputs(cache, FileInfo.lastModified)(trackedFiles) { diff =>
-          if (diff.modified.nonEmpty) {
+          // A library indexed before catalogues existed has none: index it
+          // again (Note [Library Catalogue] in `TruffleCompilerContext`).
+          // A library that declines one (`catalogue: false`) is not. The line
+          // must be exactly `catalogue: false`; another spelling (quoted,
+          // spaced) re-indexes that library on every build, which is only
+          // slower, never wrong.
+          val hasCatalogue = (libRootDir / "catalogue.json").exists()
+          val packageYaml  = libRootDir / "package.yaml"
+          val declines = packageYaml.exists() && IO
+            .readLines(packageYaml)
+            .exists(_.trim == "catalogue: false")
+          if (diff.modified.nonEmpty || !(hasCatalogue || declines)) {
             modifiedLibs.append(libRootDir)
             modifiedCaches.append(cache)
           }
@@ -243,6 +254,15 @@ object DistributionPackage {
     }
 
     if (modifiedLibs.nonEmpty) {
+      // One process compiles all these libraries in turn, and an earlier one
+      // may load a later one's bindings cache as a dependency. A large cache
+      // is memory-mapped, and Windows cannot then overwrite it when the later
+      // library is serialised ("Unable to write cache data"). A library whose
+      // sources changed has no cache here (its directory was copied afresh);
+      // one re-indexed only for its missing catalogue does, so drop it.
+      modifiedLibs.foreach(dir =>
+        IO.delete(dir / ".enso" / "cache" / "bindings")
+      )
       try {
         invokeIndexStdLibs(
           libRootDirs  = modifiedLibs,

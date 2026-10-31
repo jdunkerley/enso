@@ -11,6 +11,8 @@ import java.io.PrintStream;
 import java.lang.ref.Reference;
 import java.lang.ref.WeakReference;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.StandardCopyOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,9 +62,11 @@ import org.enso.interpreter.runtime.util.CachingSupplier;
 import org.enso.interpreter.runtime.util.DiagnosticFormatter;
 import org.enso.pkg.Package;
 import org.enso.pkg.QualifiedName;
+import org.enso.polyglot.LibraryCatalogue;
 import org.enso.polyglot.Suggestion;
 import org.enso.polyglot.data.TypeGraph;
 import org.enso.scala.wrapper.ScalaConversions;
+import org.enso.version.BuildVersion;
 import scala.collection.immutable.ListSet;
 import scala.collection.immutable.Set;
 import scala.collection.immutable.SetOps;
@@ -496,9 +500,45 @@ final class TruffleCompilerContext implements CompilerContext {
 
   private final Map<LibraryName, MapToBindings> known = new HashMap<>();
 
+  /**
+   * The library {@link Compiler#compile} is compiling, if any. See Note [Compile Target Skips Its
+   * Bindings Cache].
+   */
+  private volatile LibraryName compileTarget;
+
+  @Override
+  public void compilingLibrary(LibraryName libraryName) {
+    compileTarget = libraryName;
+  }
+
+  /* Note [Compile Target Skips Its Bindings Cache]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `deserializeModule` normally restores a module's IR from its library's
+   * bindings cache (`ImportExportCache`) before trying the module's own IR
+   * cache. The bindings cache is not checked against the sources (its digest
+   * is derived from the library's name only), so after a source edit it hands
+   * out the old IR. For a dependency that is the accepted trade-off. For the
+   * library that `enso --compile` is compiling it is wrong: the compilation
+   * would rebuild the suggestions cache, the bindings cache and the library's
+   * `catalogue.json` from the old IR, and the catalogue would still record the
+   * new `Package.sourceHash` (Note [Library Catalogue]).
+   *
+   * So `Compiler.compile` names its target (`compilingLibrary`), and the
+   * target's modules skip the bindings cache (`deserializeModule`,
+   * `deserializeLibraryBindings`): they load from their IR caches,
+   * which `ModuleCache` checks against each module's source, or from source.
+   * `serializeLibrary` then writes the bindings cache afresh. Dependencies
+   * still use their bindings caches. The cost: `enso --compile` writes no
+   * per-module IR caches, so in practice it parses the target from source every
+   * time (a second compile of an unchanged Standard.Geo: ~1 s before, ~3 s
+   * after); dependencies are unaffected.
+   * The root fix, verifying the bindings and suggestions caches against the
+   * library's sources, is a separate change.
+   */
+
   @Override
   public boolean deserializeModule(Compiler compiler, CompilerContext.Module module) {
-    if (module.getPackage() != null) {
+    if (module.getPackage() != null && !module.getPackage().libraryName().equals(compileTarget)) {
       var library = module.getPackage().libraryName();
       var bindings = known.get(library);
       if (bindings == null) {
@@ -663,6 +703,8 @@ final class TruffleCompilerContext implements CompilerContext {
               })
           .foreach(suggestions::add);
 
+      // First: it never throws, and it holds even if the cache cannot be saved.
+      writeCatalogue(libraryName, suggestions);
       var cachedSuggestions = new SuggestionsCache.CachedSuggestions(libraryName, suggestions);
       var cache = SuggestionsCache.create(libraryName);
       var file = saveCache(cache, cachedSuggestions);
@@ -675,6 +717,73 @@ final class TruffleCompilerContext implements CompilerContext {
       throw e;
     }
   }
+
+  /**
+   * Writes the library's {@code catalogue.json} next to its {@code package.yaml}, from the
+   * suggestions that go into its suggestions cache. See Note [Library Catalogue].
+   */
+  private void writeCatalogue(LibraryName libraryName, List<Suggestion> suggestions) {
+    var pkg = context.getPackageRepository().getPackageForLibraryJava(libraryName);
+    if (pkg.isEmpty()) {
+      return;
+    }
+    var root = pkg.get().root();
+    try {
+      if (!pkg.get().getConfig().catalogue()) {
+        // `catalogue: false`: the library is internal to the IDE.
+        var stale = root.resolve(LibraryCatalogue.FileName());
+        if (stale.exists()) {
+          stale.delete();
+        }
+        return;
+      }
+      var catalogue =
+          LibraryCatalogue.create(
+              libraryName.qualifiedName(),
+              pkg.get().getConfig().version(),
+              BuildVersion.ensoVersion(),
+              pkg.get().sourceHash(),
+              suggestions);
+      var target = root.resolve(LibraryCatalogue.FileName());
+      var written = root.resolve(LibraryCatalogue.FileName() + ".tmp");
+      try (var out = written.newOutputStream()) {
+        out.write(catalogue.toJson().getBytes(StandardCharsets.UTF_8));
+      }
+      written.move(target, StandardCopyOption.REPLACE_EXISTING);
+      logSerializationManager(
+          Level.FINE,
+          "Written the catalogue of library [{0}]: {1} entries.",
+          libraryName,
+          catalogue.entries().size());
+    } catch (IOException | RuntimeException e) {
+      logSerializationManager(
+          Level.WARNING,
+          "Cannot write the catalogue of library `" + libraryName + "`: " + e.getMessage(),
+          e);
+    }
+  }
+
+  /* Note [Library Catalogue]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~
+   * Serialising a library (`enso --compile`, and so `indexStdLibs` for every
+   * standard library) also writes `catalogue.json` next to its `package.yaml`,
+   * from the same suggestions as the suggestions cache. The language
+   * server inserts the catalogues of the installed libraries that are not
+   * loaded when a project opens (`SuggestionsHandler`), so the component
+   * browser can offer their components before an import loads them.
+   *
+   * Unlike the cache, it is JSON in the language server's wire form
+   * (`SuggestionJson`), it holds only what the component browser shows (no
+   * `private: true` entries, no `Internal` modules: `LibraryCatalogue
+   * .isPublished`), and it records a hash of the library's sources
+   * (`Package.sourceHash`), so a reader can tell whether it still describes the
+   * library; for that claim to hold, the compiled library's IR never comes from
+   * its unchecked bindings cache (Note [Compile Target Skips Its Bindings
+   * Cache]). Failing to write it only logs a warning: the library still
+   * compiles, and its components appear once it is loaded, as without one.
+   * It is generated, never committed (`.gitignore`).
+   * Design: docs/superpowers/specs/2026-10-31-library-catalogue-design.md.
+   */
 
   @Override
   public scala.Option<Object> deserializeSuggestions(LibraryName libraryName)
@@ -706,6 +815,12 @@ final class TruffleCompilerContext implements CompilerContext {
 
   scala.Option<ImportExportCache.CachedBindings> deserializeLibraryBindings(LibraryName libraryName)
       throws InterruptedException {
+    if (libraryName.equals(compileTarget)) {
+      // Note [Compile Target Skips Its Bindings Cache]
+      logSerializationManager(
+          Level.FINE, "Not using the bindings cache of [{0}], the compile target.", libraryName);
+      return scala.Option.empty();
+    }
     var pool = serializationPool;
     if (pool.isWaitingForSerialization(toQualifiedName(libraryName))) {
       pool.abort(toQualifiedName(libraryName));
