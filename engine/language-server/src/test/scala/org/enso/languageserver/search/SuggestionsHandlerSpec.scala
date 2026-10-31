@@ -18,23 +18,28 @@ import org.enso.languageserver.search.SearchProtocol.{
   SuggestionsDatabaseUpdateNotification
 }
 import org.enso.languageserver.session.JsonSession
+import org.enso.logger.ObservedMessage
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
 import org.enso.polyglot.data.{Tree, TypeGraph}
 import org.enso.polyglot.runtime.Runtime.{Api, ApiRequest}
 import org.enso.polyglot.{ExportedSymbol, ModuleExports, Suggestion}
 import org.enso.searcher.SuggestionsRepo
+import org.enso.searcher.data.QueryResult
 import org.enso.searcher.memory.InMemorySuggestionsRepo
 import org.enso.testkit.{ReportLogsOnFailure, RetrySpec}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
+import org.slf4j.LoggerFactory
 
 import java.io.File
 import java.nio.file.Files
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import scala.collection.immutable.ListSet
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, Promise}
+import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success}
 
 class SuggestionsHandlerSpec
@@ -889,6 +894,265 @@ class SuggestionsHandlerSpec
       handler ! SearchProtocol.GetSuggestionsDatabaseVersion
       expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(2L))
     }
+
+    "hold module updates from one already running until the catalogues are in" taggedAs Retry in {
+      val repo       = new GatedRepo
+      val catalogues = new GatedCatalogues(Catalogue.bar)
+      withCatalogues(catalogues, repo) { (_, _, router, connector, handler) =>
+        val clientId = UUID.randomUUID()
+        acquireUpdates(handler, clientId)
+        val running = Promise[Unit]()
+        repo.gate = running.future
+        // An update of Foo.Bar is running when the database is cleared...
+        handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barType)
+        openDatabase(handler, connector)
+        // ...and another arrives while the catalogues are inserted.
+        handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barMethod)
+        router.expectNoMessage(300.millis)
+        running.success(())
+        // Give the running update, and any it releases, time to be applied.
+        TestProbe().expectNoMessage(500.millis)
+        catalogues.gate.success(())
+
+        val updates  = (1 to 3).flatMap(_ => nextUpdates(router))
+        val inserted = catalogueIdsOf(updates)
+        inserted should not be empty
+        val (_, entries) = Await.result(repo.getAll, Timeout)
+        entries.map(_.id).intersect(inserted) shouldEqual Seq()
+        assertDistinct(entries.map(_.suggestion))
+        val view = clientView(updates)
+        view.values.filter(_._2).toSeq shouldEqual Seq()
+        assertDistinct(view.values.map(_._1).toSeq)
+      }
+    }
+
+    "apply the module updates held during the insertion afterwards, in order" taggedAs Retry in {
+      val catalogues = new GatedCatalogues(Catalogue.bar, Catalogue.baz)
+      withCatalogues(catalogues) { (_, _, router, connector, handler) =>
+        val clientId = UUID.randomUUID()
+        acquireUpdates(handler, clientId)
+        openDatabase(handler, connector)
+        handler ! moduleUpdate("Foo.Baz.Main", Catalogue.bazType)
+        handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barType)
+        router.expectNoMessage(300.millis)
+        catalogues.gate.success(())
+
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              2L,
+              Seq(
+                SuggestionsDatabaseUpdate
+                  .Add(1L, Catalogue.barType, fromCatalogue = true),
+                SuggestionsDatabaseUpdate
+                  .Add(2L, Catalogue.barMethod, fromCatalogue = true),
+                SuggestionsDatabaseUpdate
+                  .Add(3L, Catalogue.bazType, fromCatalogue = true)
+              )
+            )
+          )
+        )
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              4L,
+              Seq(
+                SuggestionsDatabaseUpdate.Remove(3L),
+                SuggestionsDatabaseUpdate.Add(4L, Catalogue.bazType)
+              )
+            )
+          )
+        )
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              6L,
+              Seq(
+                SuggestionsDatabaseUpdate.Remove(1L),
+                SuggestionsDatabaseUpdate.Remove(2L),
+                SuggestionsDatabaseUpdate.Add(5L, Catalogue.barType)
+              )
+            )
+          )
+        )
+        expectStartBackgroundProcessing(connector)
+      }
+    }
+
+    "open the project without catalogues when they cannot be read" taggedAs Retry in {
+      val logs = new CopyOnWriteArrayList[ObservedMessage]()
+      val observing = ObservedMessage.observe(
+        LoggerFactory.getLogger(classOf[SuggestionsHandler]),
+        logs.add(_)
+      )
+      try {
+        val failing: CatalogueSource =
+          () => Future.failed(new RuntimeException("unreadable"))
+        withCatalogues(failing) { (_, _, router, connector, handler) =>
+          val clientId = UUID.randomUUID()
+          acquireUpdates(handler, clientId)
+          openDatabase(handler, connector)
+          expectStartBackgroundProcessing(connector)
+          router.expectNoMessage(300.millis)
+          handler ! Api.BackgroundJobsStartedNotification()
+
+          handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barType)
+          router.expectMsg(
+            DeliverToJsonController(
+              clientId,
+              SuggestionsDatabaseUpdateNotification(
+                1L,
+                Seq(SuggestionsDatabaseUpdate.Add(1L, Catalogue.barType))
+              )
+            )
+          )
+          handler ! SearchProtocol.GetSuggestionsDatabaseVersion
+          expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(1L))
+        }
+      } finally observing.close()
+      logs.asScala.map(_.getFormattedMessage) should contain(
+        "Cannot insert the library catalogues"
+      )
+    }
+
+    "skip a duplicate catalogue entry and insert the library's others" taggedAs Retry in {
+      val logs = new CopyOnWriteArrayList[ObservedMessage]()
+      val observing = ObservedMessage.observe(
+        LoggerFactory.getLogger(classOf[SuggestionsHandler]),
+        logs.add(_)
+      )
+      try {
+        val again   = Catalogue.barType.copy(documentation = Some(" Again."))
+        val entries = Seq(Catalogue.barType, again, Catalogue.barMethod)
+        withCatalogues(
+          catalogues(InstalledCatalogue(LibraryName("Foo", "Bar"), entries))
+        ) { (_, _, router, connector, handler) =>
+          val clientId = UUID.randomUUID()
+          acquireUpdates(handler, clientId)
+          openDatabase(handler, connector)
+          router.expectMsg(
+            DeliverToJsonController(
+              clientId,
+              SuggestionsDatabaseUpdateNotification(
+                1L,
+                Seq(
+                  SuggestionsDatabaseUpdate
+                    .Add(1L, Catalogue.barType, fromCatalogue = true),
+                  SuggestionsDatabaseUpdate
+                    .Add(2L, Catalogue.barMethod, fromCatalogue = true)
+                )
+              )
+            )
+          )
+          expectStartBackgroundProcessing(connector)
+        }
+      } finally observing.close()
+      logs.asScala.map(_.getFormattedMessage) should contain(
+        "A duplicate entry of the catalogue of library [Foo.Bar] is skipped: Bar."
+      )
+    }
+
+    "leave a loaded library out when the catalogues go in again" taggedAs Retry in withCatalogues(
+      catalogues(Catalogue.bar)
+    ) { (_, repo, router, connector, handler) =>
+      val clientId = UUID.randomUUID()
+      acquireUpdates(handler, clientId)
+      openDatabase(handler, connector)
+      router.expectMsgClass(classOf[DeliverToJsonController[_]])
+      expectStartBackgroundProcessing(connector)
+      handler ! Api.BackgroundJobsStartedNotification()
+      val loaded = Api.SuggestionsDatabaseSuggestionsLoadedNotification(
+        LibraryName("Foo", "Bar"),
+        Vector(Catalogue.barType, Catalogue.barMethod)
+      )
+      handler ! loaded
+      router.expectMsgClass(classOf[DeliverToJsonController[_]])
+
+      handler ! SearchProtocol.InvalidateSuggestionsDatabase
+      expectRequest(connector) { case Api.InvalidateModulesIndexRequest() => }
+      connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+      expectMsg(SearchProtocol.InvalidateSuggestionsDatabaseResult)
+      expectStartBackgroundProcessing(connector)
+      // Foo.Bar is loaded: no catalogue entries go in for it.
+      router.expectNoMessage(300.millis)
+      handler ! Api.BackgroundJobsStartedNotification()
+      // What the runtime re-sends for its loaded libraries.
+      handler ! loaded
+
+      router.expectMsg(
+        DeliverToJsonController(
+          clientId,
+          SuggestionsDatabaseUpdateNotification(
+            4L,
+            Seq(
+              SuggestionsDatabaseUpdate.Add(5L, Catalogue.barType),
+              SuggestionsDatabaseUpdate.Add(6L, Catalogue.barMethod)
+            )
+          )
+        )
+      )
+      val (_, entries) = Await.result(repo.getAll, Timeout)
+      entries.map(_.suggestion) should contain theSameElementsAs
+      Seq(Catalogue.barType, Catalogue.barMethod)
+    }
+
+    "swap the catalogue of a library that loads while the catalogues go in" taggedAs Retry in {
+      val catalogues = new GatedCatalogues(Catalogue.bar)
+      withCatalogues(catalogues) { (_, repo, router, connector, handler) =>
+        val clientId = UUID.randomUUID()
+        acquireUpdates(handler, clientId)
+        openDatabase(handler, connector)
+        val loaded = Api.SuggestionsDatabaseSuggestionsLoadedNotification(
+          LibraryName("Foo", "Bar"),
+          Vector(Catalogue.barType, Catalogue.barMethod)
+        )
+        handler ! Api.LibraryLoaded("Foo", "Bar", "1.0.0", new File("Bar"))
+        handler ! loaded
+        router.expectNoMessage(300.millis)
+        catalogues.gate.success(())
+
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              1L,
+              Seq(
+                SuggestionsDatabaseUpdate
+                  .Add(1L, Catalogue.barType, fromCatalogue = true),
+                SuggestionsDatabaseUpdate
+                  .Add(2L, Catalogue.barMethod, fromCatalogue = true)
+              )
+            )
+          )
+        )
+        expectStartBackgroundProcessing(connector)
+        handler ! Api.BackgroundJobsStartedNotification()
+        // The notification that arrived before background processing started
+        // was dropped, as before catalogues; the runtime sends it again.
+        handler ! loaded
+
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              3L,
+              Seq(
+                SuggestionsDatabaseUpdate.Remove(1L),
+                SuggestionsDatabaseUpdate.Remove(2L),
+                SuggestionsDatabaseUpdate.Add(3L, Catalogue.barType),
+                SuggestionsDatabaseUpdate.Add(4L, Catalogue.barMethod)
+              )
+            )
+          )
+        )
+        val (_, entries) = Await.result(repo.getAll, Timeout)
+        entries.map(_.suggestion) should contain theSameElementsAs
+        Seq(Catalogue.barType, Catalogue.barMethod)
+      }
+    }
   }
 
   private def fieldUpdate(value: String): SearchProtocol.FieldUpdate[String] =
@@ -1015,7 +1279,10 @@ class SuggestionsHandlerSpec
     }
   }
 
-  def withCatalogues(catalogues: CatalogueSource)(
+  def withCatalogues(
+    catalogues: CatalogueSource,
+    repo: => InMemorySuggestionsRepo = new InMemorySuggestionsRepo()
+  )(
     test: (
       Config,
       SuggestionsRepo[Future],
@@ -1032,10 +1299,9 @@ class SuggestionsHandlerSpec
         testContentRoot.toFile
       )
     )
-    val router    = TestProbe("session-router")
-    val connector = TestProbe("runtime-connector")
-    val suggestionsRepo =
-      new InMemorySuggestionsRepo()
+    val router          = TestProbe("session-router")
+    val connector       = TestProbe("runtime-connector")
+    val suggestionsRepo = repo
     val handler = newInitializedSuggestionsHandler(
       config,
       router,
@@ -1097,6 +1363,67 @@ class SuggestionsHandlerSpec
 
   private def catalogues(installed: InstalledCatalogue*): CatalogueSource =
     () => Future.successful(installed)
+
+  /** Catalogues that are read only once `gate` completes. */
+  private class GatedCatalogues(installed: InstalledCatalogue*)
+      extends CatalogueSource {
+    val gate: Promise[Unit] = Promise()
+    override def load(): Future[Seq[InstalledCatalogue]] =
+      gate.future.map(_ => installed)
+  }
+
+  /** A repository whose module updates wait for `gate`. */
+  private class GatedRepo extends InMemorySuggestionsRepo() {
+    @volatile var gate: Future[Unit] = Future.unit
+    override def applyTree(
+      tree: Seq[Api.SuggestionUpdate]
+    ): Future[Seq[QueryResult[Api.SuggestionUpdate]]] =
+      gate.flatMap(_ => super.applyTree(tree))
+  }
+
+  private def moduleUpdate(
+    module: String,
+    suggestions: Suggestion*
+  ): Api.SuggestionsDatabaseModuleUpdateNotification =
+    Api.SuggestionsDatabaseModuleUpdateNotification(
+      module,
+      Vector(),
+      Vector(),
+      Tree.Root(suggestions.toVector.map { suggestion =>
+        Tree.Node(
+          Api.SuggestionUpdate(suggestion, Api.SuggestionAction.Add()),
+          Vector()
+        )
+      })
+    )
+
+  private def nextUpdates(router: TestProbe): Seq[SuggestionsDatabaseUpdate] =
+    router.expectMsgClass(classOf[DeliverToJsonController[_]]).payload match {
+      case notification: SuggestionsDatabaseUpdateNotification =>
+        notification.updates
+      case other => fail(s"Unexpected payload: $other")
+    }
+
+  private def catalogueIdsOf(
+    updates: Seq[SuggestionsDatabaseUpdate]
+  ): Seq[Long] =
+    updates.collect { case SuggestionsDatabaseUpdate.Add(id, _, true) => id }
+
+  /** The entries a client holds after applying `updates` in order, by id,
+    * with their `fromCatalogue` flag.
+    */
+  private def clientView(
+    updates: Seq[SuggestionsDatabaseUpdate]
+  ): Map[Long, (Suggestion, Boolean)] =
+    updates.foldLeft(Map[Long, (Suggestion, Boolean)]()) {
+      case (view, SuggestionsDatabaseUpdate.Add(id, suggestion, catalogue)) =>
+        view + (id -> ((suggestion, catalogue)))
+      case (view, SuggestionsDatabaseUpdate.Remove(id)) => view - id
+      case (view, _)                                    => view
+    }
+
+  private def assertDistinct(suggestions: Seq[Suggestion]): Unit =
+    suggestions.diff(suggestions.distinct) shouldEqual Seq()
 
   private def acquireUpdates(handler: ActorRef, clientId: UUID): Unit = {
     handler ! AcquireCapability(

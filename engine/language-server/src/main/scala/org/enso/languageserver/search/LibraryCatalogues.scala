@@ -9,7 +9,8 @@ import org.enso.polyglot.{LibraryCatalogue, Suggestion}
 
 import java.nio.file.{Files, Path}
 import java.util.concurrent.ConcurrentHashMap
-import scala.concurrent.Future
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try, Using}
 
@@ -50,7 +51,9 @@ object CatalogueSource {
   * `catalogue: false` is skipped quietly. The outcome for a library is kept
   * until its `package.yaml`, its catalogue or one of its sources changes size
   * or modification time, so a project that is reopened does not hash the
-  * sources again.
+  * sources again. A load that starts while another runs shares its result,
+  * so the read when the runtime starts and the first fill of the database
+  * do not hash the same sources twice.
   *
   * @param installedLibraries the libraries the project resolves without a
   * download, in library name order
@@ -68,8 +71,25 @@ final class InstalledCatalogues(installedLibraries: () => Seq[ResolvedLibrary])
   private val checked =
     new ConcurrentHashMap[Path, (Stamp, Option[InstalledCatalogue])]()
 
+  private val running = new AtomicReference[Future[Seq[InstalledCatalogue]]]()
+
   /** @inheritdoc */
-  override def load(): Future[Seq[InstalledCatalogue]] =
+  override def load(): Future[Seq[InstalledCatalogue]] = {
+    val promise = Promise[Seq[InstalledCatalogue]]()
+    val current = running.compareAndExchange(null, promise.future)
+    if (current != null) current
+    else {
+      // Cleared before the result is published, so a load that follows it
+      // reads again.
+      readAll().onComplete { result =>
+        running.compareAndSet(promise.future, null)
+        promise.complete(result)
+      }(ExecutionContext.parasitic)
+      promise.future
+    }
+  }
+
+  private def readAll(): Future[Seq[InstalledCatalogue]] =
     BlockingOperation.run {
       Try(installedLibraries()) match {
         case Success(libraries) =>

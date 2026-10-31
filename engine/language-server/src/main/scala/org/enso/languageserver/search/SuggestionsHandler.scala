@@ -59,7 +59,18 @@ import scala.util.{Failure, Success}
  * that adds its real suggestions: the loaded-suggestions notification, or the
  * first module update of a library whose suggestions are analysed module by
  * module (no suggestions cache for this engine version). The GUI applies an
- * update as one batch, so nothing appears twice.
+ * update as one batch, so nothing appears twice. The first module update
+ * removes all of the library's catalogue entries, not only its module's: the
+ * other modules' real entries follow as they are analysed.
+ *
+ * Module updates are held from the clear until the catalogue ids are
+ * recorded (`State.updatesHeldForCatalogues`), and applied in order after.
+ * A module update already running when the clear arrives is waited for
+ * first; its entries go with the clear, and the runtime sends them again.
+ *
+ * `State.loadedLibraries` survives the clear: a library stays loaded in the
+ * runtime's context, and after the invalidation the runtime sends its
+ * suggestions again, so its catalogue is not inserted again.
  */
 
 /** The handler of search requests.
@@ -280,11 +291,23 @@ final class SuggestionsHandler(
         }
 
     case msg: Api.SuggestionsDatabaseModuleUpdateNotification
+        if state.updatesHeldForCatalogues =>
+      // The update `SuggestionUpdatesCompleted` released just before the hold
+      // keeps its place at the head of the queue.
+      if (state.dispatchedUpdate.exists(_ eq msg)) {
+        state.suggestionUpdatesQueue.prepend(msg)
+      } else {
+        state.suggestionUpdatesQueue.enqueue(msg)
+      }
+      state.dispatchedUpdate = None
+
+    case msg: Api.SuggestionsDatabaseModuleUpdateNotification
         if state.isSuggestionUpdatesRunning =>
       state.suggestionUpdatesQueue.enqueue(msg)
 
     case msg: Api.SuggestionsDatabaseModuleUpdateNotification =>
       logger.debug("Got module update [{}].", msg.module)
+      state.dispatchedUpdate = None
       val catalogueIds = libraryOf(msg.module)
         .flatMap(state.catalogueIds.remove)
         .getOrElse(Seq())
@@ -333,7 +356,15 @@ final class SuggestionsHandler(
 
     case ClearSuggestionsDatabase =>
       if (state.isSuggestionLoadingRunning) stash()
-      else {
+      else if (state.isSuggestionUpdatesRunning) {
+        // Wait for the running module update, holding the ones that arrive
+        // meanwhile; its `SuggestionUpdatesCompleted` unstashes this. Its
+        // entries are then cleared with the rest of the repository, and the
+        // runtime sends them again: the invalidation that led here reset its
+        // index.
+        state.updatesHeldForCatalogues = true
+        stash()
+      } else {
         context.become(
           initialized(
             projectName,
@@ -343,11 +374,11 @@ final class SuggestionsHandler(
           )
         )
         state.catalogueIds.clear()
-        // Hold module updates until the catalogue ids are recorded: one
-        // applied in between would remove nothing and duplicate a library's
-        // entries. One already running releases the hold when it completes.
-        state.updatesHeldForCatalogues = !state.isSuggestionUpdatesRunning
-        if (state.updatesHeldForCatalogues) state.suggestionUpdatesRunning()
+        // Hold module updates, in order, until the catalogue ids are
+        // recorded: one applied in between would remove nothing and duplicate
+        // a library's entries. None is running here (see above), and
+        // `CataloguesInserted` releases the hold.
+        state.updatesHeldForCatalogues = true
         val loaded = state.loadedLibraries.toSet
         suggestionsRepo.clean
           .flatMap(_ => insertCatalogues(loaded))
@@ -365,10 +396,9 @@ final class SuggestionsHandler(
           sessionRouter ! DeliverToJsonController(clientId, update)
         }
       }
-      if (state.updatesHeldForCatalogues) {
-        state.updatesHeldForCatalogues = false
-        self ! SuggestionUpdatesCompleted
-      }
+      // Release the hold: apply the held module updates, in order.
+      state.updatesHeldForCatalogues = false
+      self ! SuggestionUpdatesCompleted
       logger.trace(
         "ClearSuggestionsDatabase [{}]",
         state.suggestionLoadingQueue
@@ -473,8 +503,13 @@ final class SuggestionsHandler(
         LibraryName(libraryLoaded.namespace, libraryLoaded.name)
 
     case SuggestionUpdatesCompleted =>
-      if (state.suggestionUpdatesQueue.nonEmpty) {
-        self ! state.suggestionUpdatesQueue.dequeue()
+      if (state.updatesHeldForCatalogues) {
+        // A `ClearSuggestionsDatabase` waits for this update to complete.
+        unstashAll()
+      } else if (state.suggestionUpdatesQueue.nonEmpty) {
+        val next = state.suggestionUpdatesQueue.dequeue()
+        state.dispatchedUpdate = Some(next.asInstanceOf[AnyRef])
+        self ! next
       }
       context.become(
         initialized(
@@ -865,10 +900,16 @@ object SuggestionsHandler {
     val catalogueIds: mutable.Map[LibraryName, Seq[Long]] = mutable.Map.empty
   ) {
 
-    /** Whether `ClearSuggestionsDatabase` holds module updates until
-      * `CataloguesInserted`.
+    /** Whether module updates are held (queued, in order) for the
+      * catalogues: from a `ClearSuggestionsDatabase` that waits for a running
+      * update, or that clears the repository, until `CataloguesInserted`.
       */
     var updatesHeldForCatalogues: Boolean = false
+
+    /** The queued module update `SuggestionUpdatesCompleted` last sent to
+      * the handler, until it arrives.
+      */
+    var dispatchedUpdate: Option[AnyRef] = None
 
     /** @return `true` if suggestion updates actions are in progress. */
     def isSuggestionUpdatesRunning: Boolean =
