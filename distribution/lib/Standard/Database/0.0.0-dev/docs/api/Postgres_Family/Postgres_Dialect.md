@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Internal.Postgres.Postgres_Dialect
+## module Standard.Database.Postgres_Family.Postgres_Dialect
 - type Postgres_Dialect
     - adapt_unified_column self column:Standard.Base.Any.Any approximate_result_type:Standard.Base.Any.Any infer_result_type_from_database_callback:Standard.Base.Any.Any mapping:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - cast_aggregate_columns self op_kind:Standard.Base.Data.Text.Text columns:(Standard.Base.Data.Vector.Vector Standard.Database.Internal.IR.Internal_Column.Internal_Column) -> Standard.Base.Any.Any
@@ -12,12 +12,14 @@
     - generate_expression self base_gen:Standard.Base.Any.Any expr:(Standard.Database.Internal.IR.SQL_IR_Expression.SQL_IR_Expression|Standard.Database.Internal.IR.Order_Descriptor.Order_Descriptor|Standard.Database.Internal.IR.SQL_IR_Statement.SQL_IR_Statement) for_select:Standard.Base.Data.Boolean.Boolean -> Standard.Database.SQL.SQL_Builder
     - generate_sql self query:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - generate_truncate_table_sql self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - get_dialect_operations self -> Standard.Base.Any.Any
     - get_limit_sql_modifier self limit:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - get_part_order self part:Standard.Database.Internal.SQL_Part.SQL_Part -> Standard.Base.Data.Numbers.Integer
+    - get_supported_replace_params self -> Standard.Base.Any.Any
     - if_replace_params_supports self replace_params:Standard.Base.Any.Any ~action:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - is_feature_supported self feature:Standard.Database.Dialects.Feature.Feature -> Standard.Base.Data.Boolean.Boolean
     - is_operation_supported self operation:Standard.Base.Data.Text.Text -> Standard.Base.Data.Boolean.Boolean
-    - make_cast self column:Standard.Database.Internal.IR.Internal_Column.Internal_Column mapping:Standard.Base.Any.Any target_type:Standard.Database.SQL.SQL_Type infer_result_type_from_database_callback:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - make_cast self column:Standard.Database.Internal.IR.Internal_Column.Internal_Column mapping:Standard.Base.Any.Any target_type:Standard.Database.SQL.SQL_Type infer_result_type_from_database_callback:(Standard.Database.Internal.IR.SQL_IR_Expression.SQL_IR_Expression -> Standard.Database.Internal.SQL_Type_Reference.SQL_Type_Reference) -> Standard.Base.Any.Any
     - make_table_literal self vecs:Standard.Base.Any.Any column_names:Standard.Base.Any.Any as_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - name self -> Standard.Base.Any.Any
     - needs_execute_query_for_type_inference self statement:Standard.Base.Any.Any -> Standard.Base.Any.Any
@@ -48,15 +50,19 @@
 - decimal_div -> Standard.Base.Any.Any
 - decimal_mod -> Standard.Base.Any.Any
 - ends_with -> Standard.Base.Any.Any
+- exp -> Standard.Base.Any.Any
 - first_last_aggregators -> Standard.Base.Any.Any
 - floating_point_div -> Standard.Base.Any.Any
-- get_dialect_operations pg_dialect:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- index_of -> Standard.Base.Any.Any
 - is_empty -> Standard.Base.Any.Any
 - is_finite -> Standard.Base.Any.Any
 - is_inf -> Standard.Base.Any.Any
 - is_nan -> Standard.Base.Any.Any
 - is_null -> Standard.Base.Any.Any
+- last_index_of -> Standard.Base.Any.Any
 - left -> Standard.Base.Any.Any
+- ln -> Standard.Base.Any.Any
+- log10 -> Standard.Base.Any.Any
 - make_case_sensitive -> Standard.Base.Any.Any
 - make_contains_expr expr:Standard.Base.Any.Any substring:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_date_add arguments:Standard.Base.Any.Any metadata:Standard.Database.Internal.IR.Operation_Metadata.Date_Period_Metadata -> Standard.Base.Any.Any
@@ -64,18 +70,22 @@
 - make_date_trunc_to_day arguments:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_dialect_operations -> Standard.Base.Any.Any
 - make_distinct_extension expressions:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_end_of_month arguments:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_extract_as_int enso_name:Standard.Base.Any.Any sql_name:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - make_extract_fractional_as_int enso_name:Standard.Base.Any.Any sql_name:Standard.Base.Any.Any= modulus:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - make_first_aggregator reverse:Standard.Base.Any.Any ignore_null:Standard.Base.Any.Any args:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- make_first_of_month arguments:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_order_descriptor internal_column:Standard.Database.Internal.IR.Internal_Column.Internal_Column sort_direction:Standard.Base.Any.Any text_ordering:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - make_runtime_error_op arguments:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - mod_op -> Standard.Base.Any.Any
 - postgres -> Standard.Base.Any.Any
 - postgres_dialect_name -> Standard.Base.Any.Any
+- power -> Standard.Base.Any.Any
 - regex_match -> Standard.Base.Any.Any
 - replace args:Standard.Base.Any.Any metadata:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - represents_an_untyped_null_expression arg:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - right -> Standard.Base.Any.Any
+- sqrt -> Standard.Base.Any.Any
 - starts_with -> Standard.Base.Any.Any
 - supported_replace_params -> Standard.Base.Any.Any
 - trim_ops -> Standard.Base.Any.Any

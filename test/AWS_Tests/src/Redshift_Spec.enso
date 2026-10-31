@@ -1,4 +1,5 @@
 from Standard.Base import all
+import Standard.Base.Errors.Common.Type_Error
 import Standard.Base.Runtime.Ref.Ref
 
 from Standard.Table import Table, Value_Type, Bits
@@ -10,6 +11,7 @@ import Standard.Database.Dialects.Feature.Feature
 from Standard.AWS import Redshift_Details, AWS_Credential
 
 from Standard.Test import all
+import Standard.Test.Test_Environment
 
 import enso_dev.Table_Tests
 import enso_dev.Table_Tests.Database.Common.Common_Spec
@@ -145,7 +147,27 @@ uri_parse uri =
     db_name = if host_db_split.length == 1 then '' else host_db_split.at 1
     [db_host, db_port, db_name]
 
+add_credentials_specs suite_builder =
+    suite_builder.group "[Redshift] Credentials, without a server" group_builder->
+        group_builder.specify "AWS_Credential.Default passes the user and reads no .pgpass file" <|
+            pgpass = File.create_temporary_file "pgpass" ".conf"
+            "redshift.example.com:5439:*:someone:from-pgpass".write pgpass on_existing_file=..Overwrite
+            if Platform.is_unix then
+                Process.run "chmod" ["0600", pgpass.absolute.path] . exit_code . should_equal Exit_Code.Success
+            Test_Environment.unsafe_with_environment_override "PGPASSFILE" pgpass.absolute.path <|
+                details = Redshift_Details.Redshift "redshift.example.com" 5439 "dev" "someone" credentials=AWS_Credential.Default
+                properties = details.jdbc_properties
+                properties.map .first . should_equal ["user"]
+                properties.first.second . should_equal "someone"
+            pgpass.delete
+
+        group_builder.specify "credentials=Nothing fails when the details are built" <|
+            Test.expect_panic Type_Error <|
+                Redshift_Details.Redshift "redshift.example.com" credentials=Nothing
+
 add_specs suite_builder =
+    add_credentials_specs suite_builder
+
     db_host_port = Environment.get "ENSO_REDSHIFT_URI"
     connection_details = if db_host_port.is_nothing then connect_via_json_config else
         connect_via_aws_environment db_host_port

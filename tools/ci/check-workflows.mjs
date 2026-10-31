@@ -1042,6 +1042,33 @@ export function checkPublicTypes({ stdlib }) {
   return problems
 }
 
+/**
+ * The group filter reaches every standard library test job that the plan (`stdlib-test-plan`)
+ * builds: a step that runs `stdlib-test` for `matrix.only` must set `ENSO_TEST_GROUP_FILTER` from
+ * `matrix.group-filter`, or a split job (Table_Tests by database backend) would silently run its
+ * whole project and the parts would repeat each other's tests. The scope is the plan's matrix:
+ * `extra-nightly-tests.yml` runs `stdlib-test <suite>` from its own matrix, with no `--only`,
+ * and never splits a project, so it has no filter to pass.
+ */
+export function checkStdlibTestsGetTheGroupFilter({ workflows }) {
+  const wanted = "${{ matrix.group-filter || '' }}"
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      for (const step of job?.steps ?? []) {
+        const run = String(step?.run ?? '')
+        if (!/run stdlib-test\s/.test(run) || !run.includes('matrix.only')) continue
+        if (String(step.env?.ENSO_TEST_GROUP_FILTER ?? '').trim() !== wanted) {
+          problems.push(
+            `${file} › ${id}: the step that runs stdlib-test for the plan's \`matrix.only\` must set \`ENSO_TEST_GROUP_FILTER: ${wanted}\``,
+          )
+        }
+      }
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -1061,6 +1088,7 @@ export const CHECKS = [
   checkChangedFilesCountDeletions,
   checkStdlibTestMap,
   checkPublicTypes,
+  checkStdlibTestsGetTheGroupFilter,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

@@ -24,6 +24,7 @@ import {
   checkSbtRunsAfterSetupJvm,
   checkSetupNodeCache,
   checkStdlibTestMap,
+  checkStdlibTestsGetTheGroupFilter,
   checkNativeLibsFixtures,
   checkToolchainPins,
   checkWasmBindgenPins,
@@ -1039,5 +1040,32 @@ describe('checkPublicTypes', () => {
       checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo, Old]\n', main))),
       [`${at} \`public-types\` is [Geo, Old] but Main.enso exports [Geo]`],
     )
+  })
+})
+
+describe('checkStdlibTestsGetTheGroupFilter', () => {
+  const job = (env, args) => `on: workflow_call
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run the Standard Library tests
+        run: corepack pnpm --filter build-scripts run stdlib-test \${{ matrix.suite }}${args}
+${env}`
+  const only = ' --only "\${{ matrix.only }}"'
+  const filter = "        env:\n          ENSO_TEST_GROUP_FILTER: ${{ matrix.group-filter || '' }}"
+  test('accepts a plan job that passes the filter, and a suite run with no plan', () => {
+    const repo = fixture({
+      'workflows/a.yml': job(filter, only),
+      'workflows/extra-nightly-tests.yml': job('', ''),
+    })
+    assert.deepEqual(checkStdlibTestsGetTheGroupFilter(repo), [])
+  })
+  test('rejects a plan job without the filter, or with another value', () => {
+    const repo = fixture({
+      'workflows/a.yml': job('', only),
+      'workflows/b.yml': job('        env:\n          ENSO_TEST_GROUP_FILTER: x', only),
+    })
+    assert.equal(checkStdlibTestsGetTheGroupFilter(repo).length, 2)
   })
 })

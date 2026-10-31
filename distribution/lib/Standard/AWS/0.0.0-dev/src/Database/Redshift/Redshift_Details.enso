@@ -6,7 +6,6 @@ import Standard.Database.Connection.Client_Certificate.Client_Certificate
 import Standard.Database.Connection.Connection_Options.Connection_Options
 import Standard.Database.Connection.Credentials.Credentials
 import Standard.Database.Connection.SSL_Mode.SSL_Mode
-import Standard.Database.Internal.Postgres.Pgpass
 
 import project.AWS_Credential.AWS_Credential
 import project.Database.Redshift.Redshift_Connection.Redshift_Connection
@@ -22,7 +21,8 @@ type Redshift_Details
           default database will be used).
         - `db_user`: The user to connect to the database as.
         - `credentials`: The credentials to use for the connection (defaults
-          AWS_Profile).
+          AWS_Profile). `.pgpass` is not read; pass
+          `Credentials.Username_And_Password` or an `AWS_Credential`.
         - `use_ssl`: Whether to use SSL (defaults to `SSL_Mode.Require`).
         - `client_cert`: The client certificate to use or `Nothing` if not
           needed.
@@ -81,8 +81,9 @@ type Redshift_Details
     jdbc_properties : Vector (Pair Text Text)
     jdbc_properties self =
         credentials = case self.credentials of
-            Nothing -> Pgpass.read self.host self.port self.database
-            AWS_Credential.Default -> Pgpass.read self.host self.port self.database
+            ## The IAM URL and no keys or profile: the driver uses the default AWS
+               credential chain. `.pgpass` is not read (a libpq convention).
+            AWS_Credential.Default -> [Pair.new 'user' self.db_user]
             AWS_Credential.Profile profile ->
                 [Pair.new 'user' self.db_user] + (if profile == '' then [] else [Pair.new 'profile' profile])
             AWS_Credential.Key access_key_id secret_access_key ->

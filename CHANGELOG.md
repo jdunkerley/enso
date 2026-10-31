@@ -319,6 +319,8 @@
 
 - [Connection, file format, return type and e-mail dropdowns list the installed
   libraries' choices, even those not imported yet][465]
+- [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass
+  credentials explicitly or use AWS credentials.
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -427,6 +429,7 @@
 [39]: https://github.com/jdunkerley/enso/pull/39
 [384]: https://github.com/jdunkerley/enso/pull/384
 [412]: https://github.com/jdunkerley/enso/pull/412
+[464]: https://github.com/jdunkerley/enso/pull/464
 
 # Enso 2026.1
 
