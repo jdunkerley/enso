@@ -4,7 +4,7 @@
 
 - [New projects start with four imports (Base, Table, Database and
   Visualization) instead of a dozen. Components of other libraries stay in the
-  component browser, and using one adds its import.][NNN]
+  component browser, and using one adds its import.][482]
 - [The component browser finds the components of every installed library as soon
   as a project opens, whether or not the project imports the library, and
   picking one adds the import. Where two components match a search equally,
@@ -376,7 +376,7 @@
   now has a real bar-chart icon rather than falling back to the logo too.
 
 [476]: https://github.com/jdunkerley/enso/pull/476
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[482]: https://github.com/jdunkerley/enso/pull/482
 [466]: https://github.com/jdunkerley/enso/pull/466
 [465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116
