@@ -36,6 +36,7 @@ import java.io.File
 import java.nio.file.Files
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.ListSet
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
@@ -910,8 +911,8 @@ class SuggestionsHandlerSpec
         handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barMethod)
         router.expectNoMessage(300.millis)
         running.success(())
-        // Give the running update, and any it releases, time to be applied.
-        TestProbe().expectNoMessage(500.millis)
+        // The clear waited for the running update; the fill starts after it.
+        catalogues.awaitFilling()
         catalogues.gate.success(())
 
         val updates  = (1 to 3).flatMap(_ => nextUpdates(router))
@@ -932,6 +933,7 @@ class SuggestionsHandlerSpec
         val clientId = UUID.randomUUID()
         acquireUpdates(handler, clientId)
         openDatabase(handler, connector)
+        catalogues.awaitFilling()
         handler ! moduleUpdate("Foo.Baz.Main", Catalogue.bazType)
         handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barType)
         router.expectNoMessage(300.millis)
@@ -979,6 +981,55 @@ class SuggestionsHandlerSpec
           )
         )
         expectStartBackgroundProcessing(connector)
+      }
+    }
+
+    "apply a module update that arrives before the clear, then clear it" taggedAs Retry in {
+      val catalogues = new GatedCatalogues(Catalogue.bar, Catalogue.baz)
+      withCatalogues(catalogues) { (_, repo, router, connector, handler) =>
+        val clientId = UUID.randomUUID()
+        acquireUpdates(handler, clientId)
+        handler ! SearchProtocol.GetSuggestionsDatabase
+        expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(0, Seq()))
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        // The handler waits for the invalidation's result: the update is
+        // stashed ahead of the clear that comes with the result.
+        handler ! moduleUpdate("Foo.Baz.Main", Catalogue.bazType)
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              1L,
+              Seq(SuggestionsDatabaseUpdate.Add(1L, Catalogue.bazType))
+            )
+          )
+        )
+        catalogues.awaitFilling()
+        catalogues.gate.success(())
+        router.expectMsg(
+          DeliverToJsonController(
+            clientId,
+            SuggestionsDatabaseUpdateNotification(
+              3L,
+              Seq(
+                SuggestionsDatabaseUpdate
+                  .Add(2L, Catalogue.barType, fromCatalogue = true),
+                SuggestionsDatabaseUpdate
+                  .Add(3L, Catalogue.barMethod, fromCatalogue = true),
+                SuggestionsDatabaseUpdate
+                  .Add(4L, Catalogue.bazType, fromCatalogue = true)
+              )
+            )
+          )
+        )
+        expectStartBackgroundProcessing(connector)
+        // The clear removed the update's entry; the runtime, whose index the
+        // invalidation reset, sends it again.
+        val (_, entries) = Await.result(repo.getAll, Timeout)
+        entries.map(_.id) should contain theSameElementsAs Seq(2L, 3L, 4L)
       }
     }
 
@@ -1109,6 +1160,7 @@ class SuggestionsHandlerSpec
           LibraryName("Foo", "Bar"),
           Vector(Catalogue.barType, Catalogue.barMethod)
         )
+        catalogues.awaitFilling()
         handler ! Api.LibraryLoaded("Foo", "Bar", "1.0.0", new File("Bar"))
         handler ! loaded
         router.expectNoMessage(300.millis)
@@ -1364,12 +1416,28 @@ class SuggestionsHandlerSpec
   private def catalogues(installed: InstalledCatalogue*): CatalogueSource =
     () => Future.successful(installed)
 
-  /** Catalogues that are read only once `gate` completes. */
+  /** Catalogues that are read only once `gate` completes.
+    *
+    * `filling` completes when the handler reads them to fill the database:
+    * the second load, after the one when the Truffle context initialises. By
+    * then the handler has processed `ClearSuggestionsDatabase`, cleaned the
+    * repository and taken the hold on module updates. A message sent before
+    * that may reach the handler before the clear (it stashes messages until
+    * the invalidation's result, and the clear arrives with it), and is then
+    * applied before the clear, as it should be.
+    */
   private class GatedCatalogues(installed: InstalledCatalogue*)
       extends CatalogueSource {
-    val gate: Promise[Unit] = Promise()
-    override def load(): Future[Seq[InstalledCatalogue]] =
+    val gate: Promise[Unit]    = Promise()
+    val filling: Promise[Unit] = Promise()
+    private val loads          = new AtomicInteger()
+    override def load(): Future[Seq[InstalledCatalogue]] = {
+      if (loads.incrementAndGet() == 2) filling.success(())
       gate.future.map(_ => installed)
+    }
+
+    /** Wait until the handler reads the catalogues to fill the database. */
+    def awaitFilling(): Unit = Await.result(filling.future, Timeout)
   }
 
   /** A repository whose module updates wait for `gate`. */
