@@ -13,6 +13,7 @@ from Standard.Table.Errors import all
 import Standard.Table.Internal.Java_Exports
 
 from Standard.Database import all
+from Standard.SQLite import all
 from Standard.Database.Errors import all
 from Standard.Database.Internal.Upload.Helpers.Default_Arguments import default_key_columns
 

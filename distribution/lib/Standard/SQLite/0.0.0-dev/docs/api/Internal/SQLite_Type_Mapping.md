@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Internal.SQLite.SQLite_Type_Mapping
+## module Standard.SQLite.Internal.SQLite_Type_Mapping
 - type SQLite_Type_Mapping
     - column_fetcher_factory -> Standard.Base.Any.Any
     - error_mapper self -> Standard.Base.Any.Any

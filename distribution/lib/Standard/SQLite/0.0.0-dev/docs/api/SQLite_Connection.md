@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Connection.SQLite_Connection
+## module Standard.SQLite.SQLite_Connection
 - type SQLite_Connection
     - Value connection:Standard.Base.Any.Any
     - base_connection self -> Standard.Base.Any.Any
@@ -28,4 +28,4 @@
     - to_js_object self -> Standard.Base.Any.Any
     - truncate_table self table_name:Standard.Base.Any.Any -> Standard.Base.Any.Any
     - type_mapping self -> Standard.Base.Any.Any
-- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.Database.Connection.SQLite_Connection.SQLite_Connection -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+- Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data.from that:Standard.SQLite.SQLite_Connection.SQLite_Connection -> Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data

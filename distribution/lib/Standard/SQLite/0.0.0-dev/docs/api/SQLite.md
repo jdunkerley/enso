@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Connection.SQLite
+## module Standard.SQLite.SQLite
 - type SQLite
     - From_File location:Standard.Base.System.File.File=
     - In_Memory

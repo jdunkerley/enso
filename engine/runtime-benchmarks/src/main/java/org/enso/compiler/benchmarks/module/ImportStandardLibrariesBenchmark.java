@@ -70,6 +70,7 @@ public class ImportStandardLibrariesBenchmark {
 from Standard.Base import all
 from Standard.Table import all
 from Standard.Database import all
+from Standard.SQLite import all
 from Standard.Visualization import all
 """;
 

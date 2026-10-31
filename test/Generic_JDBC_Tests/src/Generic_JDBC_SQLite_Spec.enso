@@ -1,6 +1,8 @@
 from Standard.Base import all
 
 from Standard.Database import all
+# Loads the library, and with it the SQLite JDBC driver.
+from Standard.SQLite import all
 from Standard.Database.Errors import all
 
 from Standard.Test import all

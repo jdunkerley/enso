@@ -12,7 +12,8 @@ from Standard.Table import Table, Value_Type
 from Standard.Table.Errors import Invalid_Column_Names, Duplicate_Output_Column_Names
 
 from Standard.Database import all
-import Standard.Database.Connection.SQLite_Connection.SQLite_Connection
+from Standard.SQLite import all
+import Standard.SQLite.SQLite_Connection.SQLite_Connection
 import Standard.Database.Dialects.Feature.Feature
 from Standard.Database.Errors import SQL_Error, Unsupported_Database_Type
 import Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup

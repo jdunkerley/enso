@@ -21,12 +21,6 @@
         "name": "org.enso.database.dryrun.OperationSynchronizer"
       },
       {
-        "name": "org.sqlite.SQLiteErrorCode"
-      },
-      {
-        "name": "org.sqlite.SQLiteException"
-      },
-      {
         "name":"java.sql.Connection"
       },
       {
