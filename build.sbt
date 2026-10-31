@@ -2175,7 +2175,9 @@ lazy val `polyglot-api` = project
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % jsoniterVersion,
       "com.google.flatbuffers"                 % "flatbuffers-java"      % flatbuffersVersion,
       "org.scalatest"                         %% "scalatest"             % scalatestVersion          % Test,
-      "org.scalacheck"                        %% "scalacheck"            % scalacheckVersion         % Test
+      "org.scalacheck"                        %% "scalacheck"            % scalacheckVersion         % Test,
+      // `pkg` has it as `provided`; `ShippedCataloguesSpec` reads `package.yaml`.
+      "org.yaml" % "snakeyaml" % snakeyamlVersion % Test
     ),
     Compile / moduleDependencies ++= Seq(
       "com.google.flatbuffers" % "flatbuffers-java" % flatbuffersVersion,
