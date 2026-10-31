@@ -6,6 +6,10 @@ import org.enso.pkg.validation.NameValidation
 
 import java.io.{File, InputStream, OutputStream}
 import java.net.URI
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.util.HexFormat
 import scala.jdk.CollectionConverters._
 import scala.util.control.NonFatal
 import scala.util.{Failure, Try, Using}
@@ -236,6 +240,43 @@ final class Package[F](
       .filter(f => f.isRegularFile && f.getName.endsWith(".enso"))
       .map(path => SourceFile(moduleNameForFile(path), path))
       .collect(java.util.stream.Collectors.toList[SourceFile[F]])
+  }
+
+  /** A hash of this package's sources: what a library's `catalogue.json`
+    * records, so that a reader can tell whether the catalogue still describes
+    * the library (Note [Library Catalogue] in `TruffleCompilerContext`).
+    *
+    * SHA-256 over every `.enso` file under `src/`, in the order of their paths
+    * relative to `src/` with the segments joined by `/` (so that Windows and
+    * Linux agree); for each, the path in UTF-8, a zero byte, the content's
+    * length as an 8-byte big-endian number, and the content as it is on disk.
+    *
+    * @return `sha256:` followed by the lowercase hex digest
+    */
+  def sourceHash(): String = {
+    val digest = MessageDigest.getInstance("SHA-256")
+    if (sourceDir.isDirectory) {
+      val sources = Using.resource(sourceDir.walk) { files =>
+        files
+          .iterator()
+          .asScala
+          .filter(f => f.isRegularFile && f.getName.endsWith(".enso"))
+          .map(f =>
+            (sourceDir.relativize(f).getSegments.asScala.mkString("/"), f)
+          )
+          .toVector
+      }
+      sources.sortBy(_._1).foreach { case (path, file) =>
+        val content = Using.resource(file.newInputStream)(_.readAllBytes())
+        digest.update(path.getBytes(StandardCharsets.UTF_8))
+        digest.update(0.toByte)
+        digest.update(
+          ByteBuffer.allocate(8).putLong(content.length.toLong).array()
+        )
+        digest.update(content)
+      }
+    }
+    "sha256:" + HexFormat.of().formatHex(digest.digest())
   }
 
   /** Lists contents of the polyglot extensions directory for a given language.

@@ -234,7 +234,17 @@ object DistributionPackage {
           .get()
           .toSet
         Tracked.diffInputs(cache, FileInfo.lastModified)(trackedFiles) { diff =>
-          if (diff.modified.nonEmpty) {
+          // A library indexed before catalogues existed has none: index it
+          // again (Note [Library Catalogue] in `TruffleCompilerContext`).
+          // A library that declines one (`catalogue: false`) is not. The line
+          // must be exactly `catalogue: false`; another spelling (quoted,
+          // spaced) re-indexes that library on every build, which is only
+          // slower, never wrong.
+          val hasCatalogue = (libRootDir / "catalogue.json").exists()
+          val declines = IO
+            .readLines(libRootDir / "package.yaml")
+            .exists(_.trim == "catalogue: false")
+          if (diff.modified.nonEmpty || !(hasCatalogue || declines)) {
             modifiedLibs.append(libRootDir)
             modifiedCaches.append(cache)
           }

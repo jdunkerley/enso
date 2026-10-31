@@ -74,6 +74,18 @@ class ConfigSpec
       config.toYaml() should not include "public-types"
     }
 
+    "read catalogue: false and keep it through a round trip" in {
+      val config = Config.fromYaml("name: Example\ncatalogue: false\n").get
+      config.catalogue shouldBe false
+      Config.fromYaml(config.toYaml()).get.catalogue shouldBe false
+    }
+
+    "default to a catalogue and omit the field from the YAML" in {
+      val config = Config.fromYaml("name: example\n").get
+      config.catalogue shouldBe true
+      config.toYaml() should not include "catalogue"
+    }
+
     "deserialize the serialized representation to the original value" in {
       val config = Config(
         name           = "placeholder",

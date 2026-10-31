@@ -5,7 +5,7 @@ types here are serialized with `enso-persistance` (see `lib/java/persistance/`)
 and flow between `language-server/` (embedder-side) and the
 `RuntimeServerInstrument` inside `runtime/`.
 
-Everything in here must be:
+Every wire message here (the types that cross the boundary) must be:
 
 - **Serializable** by `enso-persistance`. Add a `@Persistable` annotation or
   matching `Persistance` instance.
@@ -13,6 +13,11 @@ Everything in here must be:
   capturing of `Value`s.
 - **Stable.** Removing or renaming a field breaks wire compat for in-flight
   sessions and for IR caches.
+
+The exceptions are two JSON helpers that are not wire messages. `SuggestionJson`
+is the one JSON form of `Suggestion`: the language server's `search/*` wire form
+and a library's `catalogue.json` (`LibraryCatalogue`) both use it (circe,
+`provided`, as in `pkg`). Change it and both change.
 
 ## Companion crate
 

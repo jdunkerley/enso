@@ -4,8 +4,8 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import io.circe.{Decoder, Encoder, Json}
 import org.enso.languageserver.filemanager.{FileSystemFailure, Path}
-import org.enso.pkg.QualifiedName
 import org.enso.polyglot.Suggestion
+import org.enso.polyglot.SuggestionJson
 import org.enso.searcher.SuggestionEntry
 
 object SearchProtocol {
@@ -15,24 +15,6 @@ object SearchProtocol {
   private object CodecField {
 
     val Type = "type"
-
-    val ExternalId = "externalId"
-
-    val Module = "module"
-
-    val Name = "name"
-
-    val Params = "params"
-
-    val ReturnType = "returnType"
-
-    val ParentType = "parentType"
-
-    val Documentation = "documentation"
-
-    val Reexport = "reexport"
-
-    val Reexports = "reexports"
   }
 
   private object CodecType {
@@ -44,190 +26,11 @@ object SearchProtocol {
     val Modify = "Modify"
   }
 
-  private object SuggestionType {
-
-    val Module = "module"
-
-    val Type = "type"
-
-    val Constructor = "constructor"
-
-    val Method = "method"
-
-    val Function = "function"
-
-    val Local = "local"
-  }
-
   implicit val suggestionEncoder: Encoder[Suggestion] =
-    Encoder.instance[Suggestion] {
-      case module: Suggestion.Module =>
-        Encoder[Suggestion.Module]
-          .apply(module)
-          .deepMerge(
-            Json.obj(
-              CodecField.Type     -> SuggestionType.Module.asJson,
-              CodecField.Reexport -> module.reexports.headOption.asJson
-            )
-          )
-
-      case tpe: Suggestion.Type =>
-        Encoder[Suggestion.Type]
-          .apply(tpe)
-          .deepMerge(
-            Json.obj(
-              CodecField.Type       -> SuggestionType.Type.asJson,
-              CodecField.ReturnType -> Json.Null,
-              CodecField.Reexport   -> tpe.reexports.headOption.asJson
-            )
-          )
-          .dropNullValues
-
-      case constructor: Suggestion.Constructor =>
-        Encoder[Suggestion.Constructor]
-          .apply(constructor)
-          .deepMerge(
-            Json.obj(
-              CodecField.Type     -> SuggestionType.Constructor.asJson,
-              CodecField.Reexport -> constructor.reexports.headOption.asJson
-            )
-          )
-          .dropNullValues
-
-      case conversion: Suggestion.Conversion =>
-        Encoder[Suggestion.DefinedMethod]
-          .apply(conversionToMethod(conversion))
-          .deepMerge(
-            Json.obj(
-              CodecField.Type     -> SuggestionType.Method.asJson,
-              CodecField.Reexport -> conversion.reexports.headOption.asJson
-            )
-          )
-          .dropNullValues
-
-      case getter: Suggestion.Getter =>
-        Encoder[Suggestion.DefinedMethod]
-          .apply(getterToMethod(getter))
-          .deepMerge(
-            Json.obj(
-              CodecField.Type     -> SuggestionType.Method.asJson,
-              CodecField.Reexport -> getter.reexports.headOption.asJson
-            )
-          )
-          .dropNullValues
-
-      case method: Suggestion.DefinedMethod =>
-        Encoder[Suggestion.DefinedMethod]
-          .apply(method)
-          .deepMerge(
-            Json.obj(
-              CodecField.Type     -> SuggestionType.Method.asJson,
-              CodecField.Reexport -> method.reexports.headOption.asJson
-            )
-          )
-          .dropNullValues
-
-      case function: Suggestion.Function =>
-        Encoder[Suggestion.Function]
-          .apply(function)
-          .deepMerge(
-            Json.obj(CodecField.Type -> SuggestionType.Function.asJson)
-          )
-          .dropNullValues
-
-      case local: Suggestion.Local =>
-        Encoder[Suggestion.Local]
-          .apply(local)
-          .deepMerge(Json.obj(CodecField.Type -> SuggestionType.Local.asJson))
-          .dropNullValues
-    }
-
-  private def conversionToMethod(
-    conversion: Suggestion.Conversion
-  ): Suggestion.DefinedMethod =
-    Suggestion.DefinedMethod(
-      conversion.externalId,
-      conversion.module,
-      conversion.name,
-      conversion.arguments,
-      conversion.selfType,
-      conversion.returnType,
-      conversion.isStatic,
-      conversion.documentation,
-      conversion.annotations,
-      conversion.reexports
-    )
-
-  private def getterToMethod(
-    getter: Suggestion.Getter
-  ): Suggestion.DefinedMethod =
-    Suggestion.DefinedMethod(
-      getter.externalId,
-      getter.module,
-      getter.name,
-      getter.arguments,
-      getter.selfType,
-      getter.returnType,
-      getter.isStatic,
-      getter.documentation,
-      getter.annotations,
-      getter.reexports
-    )
-
-  private val suggestionTypeDecoder: Decoder[Suggestion.Type] =
-    Decoder.instance { cursor =>
-      for {
-        externalId <- cursor
-          .downField(CodecField.ExternalId)
-          .as[Option[Suggestion.ExternalID]]
-        module <- cursor.downField(CodecField.Module).as[String]
-        name   <- cursor.downField(CodecField.Name).as[String]
-        params <- cursor
-          .downField(CodecField.Params)
-          .as[Seq[Suggestion.Argument]]
-        parentType <- cursor.downField(CodecField.ParentType).as[Option[String]]
-        documentation <- cursor
-          .downField(CodecField.Documentation)
-          .as[Option[String]]
-        reexports <- cursor.downField(CodecField.Reexports).as[Set[String]]
-      } yield {
-        val returnType =
-          QualifiedName.fromString(module).createChild(name).toString
-        Suggestion.Type(
-          externalId,
-          module,
-          name,
-          params,
-          returnType,
-          parentType,
-          documentation,
-          reexports
-        )
-      }
-    }
+    SuggestionJson.suggestionEncoder
 
   implicit val suggestionDecoder: Decoder[Suggestion] =
-    Decoder.instance { cursor =>
-      cursor.downField(CodecField.Type).as[String].flatMap {
-        case SuggestionType.Module =>
-          Decoder[Suggestion.Module].tryDecode(cursor)
-
-        case SuggestionType.Type =>
-          suggestionTypeDecoder.tryDecode(cursor)
-
-        case SuggestionType.Constructor =>
-          Decoder[Suggestion.Constructor].tryDecode(cursor)
-
-        case SuggestionType.Method =>
-          Decoder[Suggestion.Method].tryDecode(cursor)
-
-        case SuggestionType.Function =>
-          Decoder[Suggestion.Function].tryDecode(cursor)
-
-        case SuggestionType.Local =>
-          Decoder[Suggestion.Local].tryDecode(cursor)
-      }
-    }
+    SuggestionJson.suggestionDecoder
 
   /** The object representing a field modification.
     *

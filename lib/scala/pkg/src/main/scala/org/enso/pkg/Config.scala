@@ -156,6 +156,10 @@ object Contact {
   * @param publicTypes the types the library's `Main.enso` exports, for tools
   *                    that look a type up without loading the library
   *                    (`public-types:`)
+  * @param catalogue whether `enso --compile` writes a `catalogue.json` for the
+  *                  library and the language server reads it (`catalogue:`,
+  *                  default `true`; `false` for libraries that are internal
+  *                  to the IDE)
   */
 case class Config(
   name: String,
@@ -171,7 +175,8 @@ case class Config(
   services: List[ProvidesWith],
   jvm: Option[Boolean],
   labels: List[String]      = Nil,
-  publicTypes: List[String] = Nil
+  publicTypes: List[String] = Nil,
+  catalogue: Boolean        = true
 ) {
 
   /** Converts the configuration into a YAML representation.
@@ -227,6 +232,7 @@ object Config {
     val Jvm: String            = "jvm"
     val Labels: String         = "labels"
     val PublicTypes: String    = "public-types"
+    val Catalogue: String      = "catalogue"
   }
 
   implicit val yamlDecoder: YamlDecoder[Config] =
@@ -321,6 +327,10 @@ object Config {
               .get(JsonFields.PublicTypes)
               .map(implicitly[YamlDecoder[List[String]]].decode)
               .getOrElse(Right(Nil))
+            catalogue <- clazzMap
+              .get(JsonFields.Catalogue)
+              .map(booleanDecoder.decode)
+              .getOrElse(Right(true))
           } yield Config(
             name,
             normalizedName,
@@ -335,7 +345,8 @@ object Config {
             services,
             jvmMode,
             labels,
-            publicTypes
+            publicTypes,
+            catalogue
           )
       }
     }
@@ -413,6 +424,10 @@ object Config {
               implicitly[YamlEncoder[List[String]]].encode(value.publicTypes)
             )
           )
+        }
+
+        if (!value.catalogue) {
+          elements.add((JsonFields.Catalogue, booleanEncoder.encode(false)))
         }
 
         toMap(elements)

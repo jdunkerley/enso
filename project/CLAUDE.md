@@ -20,7 +20,9 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   `flatbuffersVersion`, `project/Dependencies.scala`) to generate the LS
   binary-protocol bindings.
 - `Distribution.scala` + `DistributionPackage.scala` — Produces the engine
-  distribution directory layout (matches `distribution/`).
+  distribution directory layout (matches `distribution/`). `indexStdLibs`
+  re-indexes a library whose sources changed or that has no `catalogue.json`
+  (unless its `package.yaml` says `catalogue: false`).
 - `Editions.scala` — Edition-manifest generation (fills in the versions of
   `distribution/edition.template.yaml`).
 - `GatherLicenses.scala` — Drives the legal-review report and checks
