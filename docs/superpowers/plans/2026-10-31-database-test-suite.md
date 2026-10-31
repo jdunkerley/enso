@@ -358,9 +358,10 @@ the installer (ruling above), so there is no installer test. Task 1 merges after
 step 1's Task 5 (`Standard.Postgres`) has merged, so its baseline includes the
 move. It can start before: branched from `develop`, it overlaps Task 5 only in
 `test/Table_Tests/src/Database/Postgres_Spec.enso`, and at different lines (Task
-5 the imports at 12–16, Task 1 the setup at 790–805); rebase on `develop` once
-Task 5 merges and take the proof's baseline from that merge. Each later task
-branches from `develop` after the previous one merges.
+5 the imports at 12–16, Task 1 the setup at 790–805); merge `develop` in (a
+merge commit, never a rebase or force-push) once Task 5 merges and take the
+proof's baseline from that merge. Each later task branches from `develop` after
+the previous one merges.
 
 ---
 
