@@ -43,11 +43,11 @@ import org.enso.languageserver.protocol.json.{
 import org.enso.languageserver.requesthandler.monitoring.PingHandler
 import org.enso.languageserver.runtime._
 import org.enso.languageserver.runtime.events.RuntimeEventsMonitor
-import org.enso.languageserver.search.SuggestionsHandler
+import org.enso.languageserver.search.{InstalledCatalogues, SuggestionsHandler}
 import org.enso.languageserver.session.SessionRouter
 import org.enso.languageserver.text.BufferRegistry
 import org.enso.languageserver.util.binary.BinaryEncoder
-import org.enso.librarymanager.LibraryLocations
+import org.enso.librarymanager.{InstalledLibraries, LibraryLocations}
 import org.enso.librarymanager.local.DefaultLocalLibraryProvider
 import org.enso.librarymanager.published.PublishedLibraryCache
 import org.enso.lockmanager.server.LockManagerService
@@ -260,6 +260,20 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
       "file-event-registry"
     )
 
+  /** The installed libraries' catalogues, for the suggestions handler. The
+    * listing is the one `library/listPublicTypes` uses.
+    */
+  lazy val libraryCatalogues = new InstalledCatalogues(() =>
+    InstalledLibraries.find(
+      editionReferenceResolver
+        .resolveEdition(EditionReference.CurrentProjectEdition)
+        .get,
+      editionReferenceResolver.getCurrentProjectConfig.get.preferLocalLibraries,
+      libraryConfig.localLibraryProvider,
+      libraryConfig.publishedLibraryCache
+    )
+  )
+
   lazy val suggestionsHandler =
     system.actorOf(
       SuggestionsHandler
@@ -268,7 +282,8 @@ class MainModule(serverConfig: LanguageServerConfig, logLevel: Level) {
           contentRootManagerWrapper,
           suggestionsRepo,
           sessionRouter,
-          runtimeConnector
+          runtimeConnector,
+          libraryCatalogues
         ),
       "suggestions-handler"
     )

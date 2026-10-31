@@ -3,6 +3,7 @@ package org.enso.languageserver.search
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import org.apache.commons.io.FileUtils
+import org.enso.editions.LibraryName
 import org.enso.runner.common.ProfilingConfig
 import org.enso.languageserver.boot.StartupConfig
 import org.enso.languageserver.capability.CapabilityProtocol.{
@@ -12,10 +13,14 @@ import org.enso.languageserver.capability.CapabilityProtocol.{
 import org.enso.languageserver.data._
 import org.enso.languageserver.event.InitializedEvent
 import org.enso.languageserver.filemanager._
+import org.enso.languageserver.search.SearchProtocol.{
+  SuggestionsDatabaseUpdate,
+  SuggestionsDatabaseUpdateNotification
+}
 import org.enso.languageserver.session.JsonSession
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
 import org.enso.polyglot.data.{Tree, TypeGraph}
-import org.enso.polyglot.runtime.Runtime.Api
+import org.enso.polyglot.runtime.Runtime.{Api, ApiRequest}
 import org.enso.polyglot.{ExportedSymbol, ModuleExports, Suggestion}
 import org.enso.searcher.SuggestionsRepo
 import org.enso.searcher.memory.InMemorySuggestionsRepo
@@ -24,6 +29,7 @@ import org.scalatest.BeforeAndAfterAll
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
 
+import java.io.File
 import java.nio.file.Files
 import java.util.UUID
 import scala.collection.immutable.ListSet
@@ -742,6 +748,147 @@ class SuggestionsHandlerSpec
 
         expectMsg(SearchProtocol.InvalidateSuggestionsDatabaseResult)
     }
+
+    "insert the catalogues of the libraries that are not loaded" taggedAs Retry in withCatalogues(
+      catalogues(Catalogue.bar, Catalogue.baz)
+    ) { (_, repo, router, connector, handler) =>
+      val clientId = UUID.randomUUID()
+      acquireUpdates(handler, clientId)
+      handler ! Api.LibraryLoaded("Foo", "Baz", "1.0.0", new File("Baz"))
+
+      openDatabase(handler, connector)
+
+      router.expectMsg(
+        DeliverToJsonController(
+          clientId,
+          SuggestionsDatabaseUpdateNotification(
+            1L,
+            Seq(
+              SuggestionsDatabaseUpdate
+                .Add(1L, Catalogue.barType, fromCatalogue = true),
+              SuggestionsDatabaseUpdate
+                .Add(2L, Catalogue.barMethod, fromCatalogue = true)
+            )
+          )
+        )
+      )
+      expectStartBackgroundProcessing(connector)
+      val (_, entries) = Await.result(repo.getAll, Timeout)
+      entries.map(_.suggestion) should contain theSameElementsAs
+      Seq(Catalogue.barType, Catalogue.barMethod)
+    }
+
+    "swap a library's catalogue entries for its suggestions when it loads" taggedAs Retry in withCatalogues(
+      catalogues(Catalogue.bar)
+    ) { (_, repo, router, connector, handler) =>
+      val clientId = UUID.randomUUID()
+      acquireUpdates(handler, clientId)
+      openDatabase(handler, connector)
+      router.expectMsgClass(classOf[DeliverToJsonController[_]])
+      expectStartBackgroundProcessing(connector)
+      handler ! Api.BackgroundJobsStartedNotification()
+
+      handler ! Api.SuggestionsDatabaseSuggestionsLoadedNotification(
+        LibraryName("Foo", "Bar"),
+        Vector(Catalogue.barType, Catalogue.barMethod)
+      )
+
+      router.expectMsg(
+        DeliverToJsonController(
+          clientId,
+          SuggestionsDatabaseUpdateNotification(
+            3L,
+            Seq(
+              SuggestionsDatabaseUpdate.Remove(1L),
+              SuggestionsDatabaseUpdate.Remove(2L),
+              SuggestionsDatabaseUpdate.Add(3L, Catalogue.barType),
+              SuggestionsDatabaseUpdate.Add(4L, Catalogue.barMethod)
+            )
+          )
+        )
+      )
+      val (_, entries) = Await.result(repo.getAll, Timeout)
+      entries.map(_.id) should contain theSameElementsAs Seq(3L, 4L)
+    }
+
+    "remove a library's catalogue entries with its first module update" taggedAs Retry in withCatalogues(
+      catalogues(Catalogue.bar)
+    ) { (_, _, router, connector, handler) =>
+      val clientId = UUID.randomUUID()
+      acquireUpdates(handler, clientId)
+      openDatabase(handler, connector)
+      router.expectMsgClass(classOf[DeliverToJsonController[_]])
+      expectStartBackgroundProcessing(connector)
+
+      handler ! Api.SuggestionsDatabaseModuleUpdateNotification(
+        "Foo.Bar.Main",
+        Vector(),
+        Vector(),
+        Tree.Root(
+          Vector(
+            Tree.Node(
+              Api.SuggestionUpdate(
+                Catalogue.barType,
+                Api.SuggestionAction.Add()
+              ),
+              Vector()
+            )
+          )
+        )
+      )
+
+      router.expectMsg(
+        DeliverToJsonController(
+          clientId,
+          SuggestionsDatabaseUpdateNotification(
+            3L,
+            Seq(
+              SuggestionsDatabaseUpdate.Remove(1L),
+              SuggestionsDatabaseUpdate.Remove(2L),
+              SuggestionsDatabaseUpdate.Add(3L, Catalogue.barType)
+            )
+          )
+        )
+      )
+    }
+
+    "insert the catalogues again when the database is invalidated" taggedAs Retry in withCatalogues(
+      catalogues(Catalogue.bar)
+    ) { (_, _, router, connector, handler) =>
+      val clientId = UUID.randomUUID()
+      acquireUpdates(handler, clientId)
+      openDatabase(handler, connector)
+      router.expectMsgClass(classOf[DeliverToJsonController[_]])
+      expectStartBackgroundProcessing(connector)
+      // What the runtime answers to `StartBackgroundProcessing`. It ends the
+      // first loading (`SuggestionLoadingCompleted`); without it the second
+      // `ClearSuggestionsDatabase` stays stashed (`isSuggestionLoadingRunning`).
+      handler ! Api.BackgroundJobsStartedNotification()
+
+      handler ! SearchProtocol.InvalidateSuggestionsDatabase
+      expectRequest(connector) { case Api.InvalidateModulesIndexRequest() => }
+      connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+      expectMsg(SearchProtocol.InvalidateSuggestionsDatabaseResult)
+
+      router.expectMsg(
+        DeliverToJsonController(
+          clientId,
+          SuggestionsDatabaseUpdateNotification(
+            2L,
+            Seq(
+              SuggestionsDatabaseUpdate
+                .Add(3L, Catalogue.barType, fromCatalogue = true),
+              SuggestionsDatabaseUpdate
+                .Add(4L, Catalogue.barMethod, fromCatalogue = true)
+            )
+          )
+        )
+      )
+      expectStartBackgroundProcessing(connector)
+      // The handler is no longer stuck waiting for the invalidation's result.
+      handler ! SearchProtocol.GetSuggestionsDatabaseVersion
+      expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(2L))
+    }
   }
 
   private def fieldUpdate(value: String): SearchProtocol.FieldUpdate[String] =
@@ -754,7 +901,8 @@ class SuggestionsHandlerSpec
     config: Config,
     sessionRouter: TestProbe,
     runtimeConnector: TestProbe,
-    suggestionsRepo: SuggestionsRepo[Future]
+    suggestionsRepo: SuggestionsRepo[Future],
+    catalogues: CatalogueSource = CatalogueSource.Empty
   ): ActorRef = {
     val contentRootManagerActor =
       system.actorOf(ContentRootManagerActor.props(config))
@@ -766,7 +914,8 @@ class SuggestionsHandlerSpec
         contentRootManagerWrapper,
         suggestionsRepo,
         sessionRouter.ref,
-        runtimeConnector.ref
+        runtimeConnector.ref,
+        catalogues
       )
     )
   }
@@ -775,14 +924,16 @@ class SuggestionsHandlerSpec
     config: Config,
     sessionRouter: TestProbe,
     runtimeConnector: TestProbe,
-    suggestionsRepo: SuggestionsRepo[Future]
+    suggestionsRepo: SuggestionsRepo[Future],
+    catalogues: CatalogueSource = CatalogueSource.Empty
   ): ActorRef = {
     val handler =
       newSuggestionsHandler(
         config,
         sessionRouter,
         runtimeConnector,
-        suggestionsRepo
+        suggestionsRepo,
+        catalogues
       )
 
     handler ! SuggestionsHandler.ProjectNameUpdated("Test")
@@ -864,7 +1015,7 @@ class SuggestionsHandlerSpec
     }
   }
 
-  def withDb(
+  def withCatalogues(catalogues: CatalogueSource)(
     test: (
       Config,
       SuggestionsRepo[Future],
@@ -889,7 +1040,8 @@ class SuggestionsHandlerSpec
       config,
       router,
       connector,
-      suggestionsRepo
+      suggestionsRepo,
+      catalogues
     )
 
     try test(config, suggestionsRepo, router, connector, handler)
@@ -897,6 +1049,84 @@ class SuggestionsHandlerSpec
       system.stop(handler)
     }
   }
+
+  def withDb(
+    test: (
+      Config,
+      SuggestionsRepo[Future],
+      TestProbe,
+      TestProbe,
+      ActorRef
+    ) => Any
+  ): Unit = withCatalogues(CatalogueSource.Empty)(test)
+
+  object Catalogue {
+    val barType: Suggestion.Type = Suggestion.Type(
+      None,
+      "Foo.Bar.Main",
+      "Bar",
+      Seq(),
+      "Foo.Bar.Main.Bar",
+      None,
+      Some(" A bar.")
+    )
+    val barMethod: Suggestion.DefinedMethod = Suggestion.DefinedMethod(
+      None,
+      "Foo.Bar.Main",
+      "make",
+      Seq(),
+      "Foo.Bar.Main.Bar",
+      "Foo.Bar.Main.Bar",
+      isStatic      = true,
+      documentation = Some(" Makes a bar."),
+      annotations   = Seq()
+    )
+    val bazType: Suggestion.Type = Suggestion.Type(
+      None,
+      "Foo.Baz.Main",
+      "Baz",
+      Seq(),
+      "Foo.Baz.Main.Baz",
+      None,
+      None
+    )
+    val bar =
+      InstalledCatalogue(LibraryName("Foo", "Bar"), Seq(barType, barMethod))
+    val baz = InstalledCatalogue(LibraryName("Foo", "Baz"), Seq(bazType))
+  }
+
+  private def catalogues(installed: InstalledCatalogue*): CatalogueSource =
+    () => Future.successful(installed)
+
+  private def acquireUpdates(handler: ActorRef, clientId: UUID): Unit = {
+    handler ! AcquireCapability(
+      newJsonSession(clientId),
+      CapabilityRegistration(ReceivesSuggestionsDatabaseUpdates())
+    )
+    expectMsg(CapabilityAcquired)
+  }
+
+  /** What the GUI does when a project opens: ask for the database, which
+    * invalidates the runtime's index and clears the repository.
+    */
+  private def openDatabase(handler: ActorRef, connector: TestProbe): Unit = {
+    handler ! SearchProtocol.GetSuggestionsDatabase
+    expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(0, Seq()))
+    expectRequest(connector) { case Api.InvalidateModulesIndexRequest() => }
+    connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+  }
+
+  private def expectRequest(connector: TestProbe)(
+    expected: PartialFunction[ApiRequest, Unit]
+  ): Unit =
+    connector.expectMsgClass(classOf[Api.Request]) match {
+      case Api.Request(_, msg) if expected.isDefinedAt(msg) =>
+      case Api.Request(_, msg) =>
+        fail(s"Runtime connector received unexpected message: $msg")
+    }
+
+  private def expectStartBackgroundProcessing(connector: TestProbe): Unit =
+    expectRequest(connector) { case Api.StartBackgroundProcessing() => }
 
   object TestSuggestion {
 

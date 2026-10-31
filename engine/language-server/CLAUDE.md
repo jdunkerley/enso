@@ -23,6 +23,20 @@ the full protocol and design notes.
   channel. Visualization attach/detach/modify and one-shot expression evaluation
   go through a Yjs subdoc synced by the ydoc server, not JSON-RPC.
 
+## Library catalogues
+
+When the suggestion database is filled (project open, or
+`search/invalidateSuggestionsDatabase`), `SuggestionsHandler` first inserts the
+`catalogue.json` entries of every installed library the project resolves that
+the runtime has not loaded (`InstalledCatalogues`, the listing of
+`InstalledLibraries.find`), marked `fromCatalogue: true`, and swaps them for the
+real suggestions when the library loads. See Note [Catalogue Entries In The
+Suggestions Database] in `SuggestionsHandler` and Note [Library Catalogue] in
+`TruffleCompilerContext`. A stale, corrupt or missing catalogue is skipped with
+a warning in the log, an undecodable or duplicate entry likewise (the rest of
+the library's entries still go in), and a library declaring `catalogue: false`
+in its `package.yaml` (Visualization) is skipped quietly.
+
 ## Source layout
 
 - `src/main/java/` — Java code: JSON-RPC endpoints, handlers, data-link
