@@ -157,6 +157,9 @@ distribution/editions
 distribution/lib/Standard/Table/*/polyglot/
 distribution/lib/Standard/Database/*/polyglot/
 distribution/lib/Standard/SQLite/*/polyglot/
+# `enso --compile` on a source library writes its archive and manifest there.
+distribution/lib/Standard/*/0.0.0-dev/main.tgz
+distribution/lib/Standard/*/0.0.0-dev/manifest.yaml
 distribution/lib/Standard/Microsoft/*/polyglot/
 distribution/lib/Standard/Examples/*/data/spreadsheet.xls
 distribution/lib/Standard/Examples/*/data/spreadsheet.xlsx

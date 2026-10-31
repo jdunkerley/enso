@@ -29,7 +29,9 @@ add_specs suite_builder =
             main_src = 'from Standard.Base import all\n\nmain =\n    connection = Data.read (File.new "' + db_file.path + '")\n    IO.println (Meta.type_of connection . to_text)\n    IO.println (connection.query "t" . read . row_count)\n'
             output = run_project main_src
             output.should_contain "SQLite_Connection"
-            output.should_contain "3"
+            ## The launcher may print log lines before the two the project prints.
+            lines = output.lines.map .trim . filter (l-> l.is_empty.not)
+            lines.take (..Last 2) . should_equal ["SQLite_Connection", "3"]
             db_file.delete
 
         group_builder.specify "Database.connect's dropdown lists SQLite" <|
