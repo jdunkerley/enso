@@ -7,6 +7,8 @@ from Standard.Base.Metadata.Widget import File_Browse, Single_Choice, Text_Input
 import Standard.Table.Rows_To_Read.Rows_To_Read
 from Standard.Table import Table
 
+import project.Internal.Postgres_Type_Mapping.Postgres_Type_Mapping
+
 import Standard.Database.Column_Description.Column_Description
 import Standard.Database.Connection.Connection.Connection
 import Standard.Database.DB_Table as DB_Table_Module
@@ -17,7 +19,6 @@ import Standard.Database.Internal.Connection.Entity_Naming_Properties.Entity_Nam
 import Standard.Database.Internal.Data_Link_Setup.Data_Link_Setup
 import Standard.Database.Internal.JDBC_Connection
 import Standard.Database.Postgres_Family.Postgres_Dialect
-import Standard.Database.Postgres_Family.Postgres_Type_Mapping.Postgres_Type_Mapping
 import Standard.Database.SQL.SQL_Statement
 import Standard.Database.SQL_Query.SQL_Query
 from Standard.Database.Connection.Connection import make_schema_selector, make_structure_creator, make_table_name_selector, make_table_types_selector
@@ -51,7 +52,7 @@ type Postgres_Connection
         types_record = JDBCDriverTypes.create "Postgres"
         jdbc_connection = JDBC_Connection.create types_record url properties
 
-        encoding = parse_postgres_encoding (get_encoding_name jdbc_connection)
+        encoding = parse_postgres_encoding (get_encoding_name jdbc_connection Postgres_Type_Mapping.column_fetcher_factory)
 
         ## Postgres column/table names may be lower-cased if unquoted, but when
            quoted we have full case sensitivity and can distinguish columns
