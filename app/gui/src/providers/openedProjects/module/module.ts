@@ -25,8 +25,8 @@ import {
   analyzeImports,
   type DetectedConflict,
   detectImportConflicts,
-  entryPathFromRequiredImport,
   filterOutRedundantImports,
+  importsWithoutConflicts,
   missingImports,
   printRequiredImport,
   type RequiredImport,
@@ -355,9 +355,7 @@ export async function createModuleStore(
       )
       if (found.length === 0) return []
       const conflicts = addMissingImports(edit, found) ?? []
-      return found.filter(
-        (imp) => !conflicts.some((c) => c.fullyQualified.equals(entryPathFromRequiredImport(imp))),
-      )
+      return importsWithoutConflicts(found, conflicts)
     }
 
     function onBeforeEdit(f: (transaction: Y.Transaction) => void): { unregister: () => void } {

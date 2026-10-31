@@ -22,7 +22,7 @@ import type { QualifiedName } from '@/util/qualifiedName'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
 import { computed, markRaw, readonly, ref, shallowRef } from 'vue'
-import { LanguageServer } from 'ydoc-shared/languageServer'
+import { LanguageServer, type LsRpcError } from 'ydoc-shared/languageServer'
 import type { SuggestionDatabaseUpdates } from 'ydoc-shared/languageServerTypes'
 import * as lsTypes from 'ydoc-shared/languageServerTypes/suggestions'
 import { exponentialBackoff } from 'ydoc-shared/util/net'
@@ -343,6 +343,26 @@ async function loadGroups(lsRpc: LanguageServer, firstExecution: Promise<unknown
   }))
 }
 
+/** How long the open-time import check waits for the libraries' declared types. */
+const PUBLIC_TYPES_TIMEOUT_MS = 30_000
+
+/** JSON-RPC's "method not found" code. */
+const METHOD_NOT_FOUND = -32601
+
+function isMethodNotFound(error: LsRpcError): boolean {
+  const cause = error.cause
+  return typeof cause === 'object' && 'code' in cause && (cause.code as number) === METHOD_NOT_FOUND
+}
+
+/** `undefined` if `promise` has not settled within `ms`. */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => resolve(undefined), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 /**
  * The types the installed libraries declare, by name: how the import detector finds the library of
  * a type whose library the engine has not loaded, so the suggestion database has no entry for it.
@@ -351,10 +371,26 @@ async function loadLibraryPublicTypes(
   lsRpc: LanguageServer,
   projectNames: ProjectNameStore,
 ): Promise<ReadonlyMap<string, readonly ProjectPath[]>> {
-  const result = await exponentialBackoff(() => lsRpc.listLibraryPublicTypes())
+  const result = await withTimeout(
+    exponentialBackoff(() => lsRpc.listLibraryPublicTypes(), {
+      // An engine older than the method will never answer it: do not retry.
+      onBeforeRetry: (error) => !isMethodNotFound(error.payload),
+    }),
+    PUBLIC_TYPES_TIMEOUT_MS,
+  )
+  if (result == null) {
+    console.error("Timed out reading the libraries' public types. Continuing without them")
+    return new Map()
+  }
   if (!result.ok) {
     if (!lsRpc.isDisposed) {
-      result.error.log("Cannot read the libraries' public types. Continuing without them")
+      if (isMethodNotFound(result.error.payload)) {
+        console.warn(
+          "The engine does not know the libraries' public types (it is older than this IDE). Continuing without them",
+        )
+      } else {
+        result.error.log("Cannot read the libraries' public types. Continuing without them")
+      }
     }
     return new Map()
   }
@@ -405,10 +441,16 @@ export function createSuggestionDbStore(
   /** The installed libraries' declared types, read once when the project opens. */
   const libraryPublicTypes = shallowRef<ReadonlyMap<string, readonly ProjectPath[]>>(new Map())
   const publicTypesLoaded = ref(false)
-  loadLibraryPublicTypes(projectStore.lsRpcConnection, projectNames).then((byName) => {
-    libraryPublicTypes.value = byName
-    publicTypesLoaded.value = true
-  })
+  loadLibraryPublicTypes(projectStore.lsRpcConnection, projectNames)
+    .catch((error) => {
+      console.error("Cannot read the libraries' public types. Continuing without them", error)
+      return new Map<string, readonly ProjectPath[]>()
+    })
+    .then((byName) => {
+      // Whatever happened, the open-time import check must not wait for ever.
+      libraryPublicTypes.value = byName
+      publicTypesLoaded.value = true
+    })
 
   return proxyRefs({
     entries: markRaw(entries),

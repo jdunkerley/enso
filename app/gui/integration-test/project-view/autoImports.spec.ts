@@ -111,8 +111,20 @@ test.describe('opening a project that uses SQLite without importing it', () => {
   test('adds the SQLite import and says so', async ({ editorPage, page }) => {
     await editorPage
     await expect(page.getByTestId('toast-host')).toContainText('from Standard.SQLite import SQLite')
-    // The import is not part of the undo history.
+    // The import is not part of the undo history: there is nothing to undo after opening ...
+    const undoButton = page.getByTestId('action:graph.undo')
+    await expect(undoButton).toBeDisabled()
+    // ... and once the user does something, Ctrl+Z (shown to work) stops at that, keeping the import.
+    const nodesCount = await locate.graphNode(page).count()
+    await locate.addNewNodeButton(page).click()
+    await expect(locate.componentBrowserInput(page)).toBeFocused()
+    await page.keyboard.insertText('foo')
+    await page.keyboard.press('ControlOrMeta+Enter')
+    await expect(locate.graphNode(page)).toHaveCount(nodesCount + 1)
+    await expect(undoButton).toBeEnabled()
     await page.keyboard.press('ControlOrMeta+Z')
+    await expect(locate.graphNode(page)).toHaveCount(nodesCount)
+    await expect(undoButton).toBeDisabled()
     expect(await moduleCode(page)).toContain('from Standard.SQLite import SQLite')
   })
 })

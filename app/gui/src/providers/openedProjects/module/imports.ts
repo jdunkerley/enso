@@ -392,6 +392,8 @@ function boundNames(moduleRoot: Ast.BodyBlock, existingImports: readonly Abstrac
     }
   }
   Ast.visitRecursive(moduleRoot, (ast) => {
+    const definedType = definedTypeName(ast)
+    if (definedType) bound.add(definedType)
     if (ast instanceof Ast.Assignment && ast.pattern instanceof Ast.Ident) {
       bound.add(ast.pattern.code())
     } else if (ast instanceof Ast.FunctionDef && ast.name instanceof Ast.Ident) {
@@ -400,6 +402,30 @@ function boundNames(moduleRoot: Ast.BodyBlock, existingImports: readonly Abstrac
     return true
   })
   return bound
+}
+
+/**
+ * The name of the type that `ast` defines (`type Foo` and its members), if it is such a definition.
+ * The AST has no class of its own for it: it is a generic node starting with `type` and the name.
+ */
+function definedTypeName(ast: Ast.Ast): string | undefined {
+  if (!(ast instanceof Ast.Generic)) return undefined
+  const [keyword, name] = ast.children()
+  if (keyword && Ast.isToken(keyword) && keyword.code() === 'type' && name && Ast.isToken(name)) {
+    const code = name.code()
+    if (TYPE_NAME.test(code)) return code
+  }
+  return undefined
+}
+
+/** The `imports` that were really added: those not in conflict with an existing import. */
+export function importsWithoutConflicts(
+  imports: readonly RequiredImport[],
+  conflicts: readonly DetectedConflict[],
+): RequiredImport[] {
+  return imports.filter(
+    (imp) => !conflicts.some((c) => c.fullyQualified.equals(entryPathFromRequiredImport(imp))),
+  )
 }
 
 function importsForTypeName(

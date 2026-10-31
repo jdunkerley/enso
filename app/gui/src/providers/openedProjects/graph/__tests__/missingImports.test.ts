@@ -1,5 +1,7 @@
 import {
   analyzeImports,
+  detectImportConflicts,
+  importsWithoutConflicts,
   missingImports,
   type RequiredImport,
 } from '$/providers/openedProjects/module/imports'
@@ -114,6 +116,30 @@ test('nothing for a type several libraries declare', () => {
     ['SQLite', [projectPath('Standard.SQLite'), projectPath('Other.SQLite')]],
   ])
   expect(detect(SQLITE_CODE, db(), declared)).toEqual([])
+})
+
+test('nothing for a type the module defines, though the database does not know it yet', () => {
+  const declared = new Map([['Postgres', [projectPath('Standard.Postgres')]]])
+  const code = "type Postgres\n    Server host\n\nmain =\n    x = Postgres.Server 'localhost'\n"
+  expect(detect(code, db(), declared)).toEqual([])
+})
+
+test('an import that conflicts with an existing one is not reported as added', () => {
+  // `Vector` is already brought in from Standard.Postgres, so Standard.Database's one conflicts.
+  const suggestions = db(makeType('Standard.Postgres.Vector'), makeType('Standard.Database.Vector'))
+  const existing = [
+    {
+      from: projectPath('Standard.Postgres'),
+      imported: { kind: 'List' as const, names: ['Vector' as Identifier] },
+    },
+  ]
+  const wanted = unqualified('Standard.Database', 'Vector')
+  const harmless = unqualified('Standard.Postgres', 'Postgres')
+  const conflict = detectImportConflicts(suggestions, existing, wanted)
+  expect(conflict?.detected).toBe(true)
+  expect(importsWithoutConflicts([wanted, harmless], conflict ? [conflict] : [])).toEqual([
+    harmless,
+  ])
 })
 
 test('only the given scope is looked at', () => {
