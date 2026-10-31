@@ -155,11 +155,11 @@ async function ensoPackageSignables(resourcesDir: string): Promise<Signable[]> {
     ],
     ['lib/Standard/Tableau/*/polyglot/java/jna-*.jar', ['com/sun/jna/*/libjnidispatch.jnilib']],
   ]
-  // SQLite's driver is a thin jar (no natives inside); its native library sits next to the jar in
-  // `polyglot/lib` and is loaded from there by the guest JVM.
+  // SQLite's driver is a thin jar (no natives inside); its native library is under
+  // `polyglot/lib/<arch>/macos` and is loaded from there by the guest JVM.
   const binariesPatterns = [
     'lib/Standard/Image/*/polyglot/lib/*.dylib',
-    'lib/Standard/SQLite/*/polyglot/lib/*.dylib',
+    'lib/Standard/SQLite/*/polyglot/lib/*/macos/*.dylib',
   ]
 
   const binaries = await BinaryToSign.lookupMany(engineDir, binariesPatterns)
