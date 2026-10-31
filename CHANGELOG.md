@@ -213,6 +213,10 @@
   files in your own folders (the same files `Data.read` opens) from the drive's
   New Datalink button and context menu, and pick them in the graph editor's file
   widget.
+- [The IDE adds the imports your code needs][466]: when a new or edited
+  component, or a dropdown choice, uses a type from a library the project does
+  not import, the import is added with it. Opening a project adds any imports
+  its code is missing, and a notice says which.
 
 #### Enso Language & Runtime
 
@@ -358,6 +362,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[466]: https://github.com/jdunkerley/enso/pull/466
 [465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116
 [276]: https://github.com/jdunkerley/enso/pull/276
