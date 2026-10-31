@@ -9,7 +9,8 @@ The suggestions repository behind the language server's `search/*` endpoints
 ## Layout
 
 - `SuggestionsRepo.scala` — the repository interface; `SuggestionEntry`,
-  `Database`, `data/QueryResult` are its value types.
+  `Database`, `data/QueryResult` are its value types. `removeAll(ids)` removes
+  entries by id (the language server's catalogue entries).
 - `memory/InMemorySuggestionsRepo.scala` — the only implementation. The database
   is held in memory; there is no SQLite (or other) persistence.
 - `sql/Tables.scala` — despite the package name, not SQL: it holds

@@ -16,13 +16,17 @@ import org.enso.languageserver.data.{
   Config,
   ReceivesSuggestionsDatabaseUpdates
 }
+import org.enso.editions.LibraryName
 import org.enso.languageserver.event.InitializedEvent
 import org.enso.languageserver.filemanager.{
   ContentRootManager,
   FileDeletedEvent,
   Path
 }
-import org.enso.languageserver.runtime.RuntimeFailureMapper
+import org.enso.languageserver.runtime.{
+  ContextRegistryProtocol,
+  RuntimeFailureMapper
+}
 import org.enso.languageserver.search.SearchProtocol._
 import org.enso.languageserver.search.handler.InvalidateModulesIndexHandler
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
@@ -37,7 +41,54 @@ import org.enso.searcher.SuggestionsRepo
 
 import scala.collection.mutable
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+
+/* Note [Catalogue Entries In The Suggestions Database]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Each time the database is cleared (`ClearSuggestionsDatabase`, which both
+ * `search/getSuggestionsDatabase` at project open and
+ * `search/invalidateSuggestionsDatabase` lead to), the handler inserts the
+ * catalogues of the installed libraries the runtime has not loaded
+ * (`CatalogueSource`, Note [Library Catalogue] in `TruffleCompilerContext`).
+ * It does so after the first execution completes (`Api.ExecutionComplete`)
+ * or fails (`Api.ExecutionFailed`), or right after the clear if one already
+ * did, so the catalogues neither delay the first execution nor include the
+ * libraries it loads; measured, inserting at the clear sent ~4,100 entries
+ * (3 MB) ahead of the first execution and cost ~500 ms, most of them
+ * libraries the project imports and swapped out moments later. They are
+ * also read only then, not while the runtime starts: reading them hashes
+ * every installed library's sources and decodes the catalogues, which
+ * competed with the project's first compilation. If no
+ * execution finishes within `firstExecutionTimeout` of the clear (a client
+ * that never runs the project), they are inserted then. The entries go out
+ * in one update, marked `fromCatalogue`, and their ids are kept by library
+ * in `State.catalogueIds`; the repository is in memory and cleared with them.
+ *
+ * "Loaded" (`State.loadedLibraries`) means named by `Api.LibraryLoaded` or a
+ * loaded-suggestions notification, or the library of an applied module
+ * update.
+ *
+ * When a library loads, its catalogue entries are removed in the same update
+ * that adds its real suggestions: the loaded-suggestions notification, or the
+ * first module update of a library whose suggestions are analysed module by
+ * module (no suggestions cache for this engine version). The GUI applies an
+ * update as one batch, so nothing appears twice. The first module update
+ * removes all of the library's catalogue entries, not only its module's: the
+ * other modules' real entries follow as they are analysed.
+ *
+ * Module updates are held (`State.updatesHeldForCatalogues`) while the
+ * repository is cleaned and while the catalogues are inserted, and applied in
+ * order after; loaded-suggestions notifications are queued during the
+ * insertion (it runs as a suggestion loading) and applied after, swapping
+ * out the entries just inserted. A module update already running when the
+ * clear or the insertion starts is waited for first. One running at the
+ * clear has its entries go with the clean; the runtime sends them again.
+ *
+ * `State.loadedLibraries` survives the clear: a library stays loaded in the
+ * runtime's context, and after the invalidation the runtime sends its
+ * suggestions again, so its catalogue is not inserted again.
+ */
 
 /** The handler of search requests.
   *
@@ -76,13 +127,20 @@ import scala.util.{Failure, Success}
   * @param suggestionsRepo the suggestions repo
   * @param sessionRouter the session router
   * @param runtimeConnector the runtime connector
+  * @param catalogues the installed libraries' catalogues (Note [Catalogue
+  * Entries In The Suggestions Database])
+  * @param firstExecutionTimeout how long after the database is cleared the
+  * catalogues are inserted if no execution has finished
   */
 final class SuggestionsHandler(
   config: Config,
   contentRootManager: ContentRootManager,
   suggestionsRepo: SuggestionsRepo[Future],
   sessionRouter: ActorRef,
-  runtimeConnector: ActorRef
+  runtimeConnector: ActorRef,
+  catalogues: CatalogueSource = CatalogueSource.Empty,
+  firstExecutionTimeout: FiniteDuration =
+    SuggestionsHandler.DefaultFirstExecutionTimeout
 ) extends Actor
     with Stash
     with LazyLogging
@@ -107,6 +165,8 @@ final class SuggestionsHandler(
       .subscribe(self, classOf[Api.LibraryLoaded])
     context.system.eventStream
       .subscribe(self, classOf[Api.BackgroundJobsStartedNotification])
+    context.system.eventStream.subscribe(self, classOf[Api.ExecutionComplete])
+    context.system.eventStream.subscribe(self, classOf[Api.ExecutionFailed])
     context.system.eventStream.subscribe(self, classOf[FileDeletedEvent])
     context.system.eventStream
       .subscribe(self, InitializedEvent.SuggestionsRepoInitialized.getClass)
@@ -161,18 +221,15 @@ final class SuggestionsHandler(
     projectName: String,
     graph: TypeGraph,
     clients: Set[ClientId],
-    state: State
+    state: State,
+    requester: Option[ActorRef]
   ): Receive = {
     case SearchProtocol.InvalidateSuggestionsDatabaseResult =>
+      requester.foreach(_ ! SearchProtocol.InvalidateSuggestionsDatabaseResult)
       unstashAll()
-      context.become(
-        initialized(
-          projectName,
-          graph,
-          clients,
-          state
-        )
-      )
+      context.become(initialized(projectName, graph, clients, state))
+    case failure: ContextRegistryProtocol.Failure =>
+      requester.foreach(_ ! failure)
     case _ => stash()
   }
 
@@ -217,6 +274,9 @@ final class SuggestionsHandler(
         "Starting loading suggestions for library [{}]",
         msg.libraryName
       )
+      state.loadedLibraries += msg.libraryName
+      val catalogueIds =
+        state.catalogueIds.remove(msg.libraryName).getOrElse(Seq())
       context.become(
         initialized(
           projectName,
@@ -225,7 +285,7 @@ final class SuggestionsHandler(
           state.suggestionLoadingRunning()
         )
       )
-      applyLoadedSuggestions(msg.suggestions)
+      applyLoadedSuggestions(msg.suggestions, catalogueIds)
         .onComplete {
           case Success(notification) =>
             logger.debug(
@@ -249,12 +309,29 @@ final class SuggestionsHandler(
         }
 
     case msg: Api.SuggestionsDatabaseModuleUpdateNotification
+        if state.updatesHeldForCatalogues =>
+      // The update `SuggestionUpdatesCompleted` released just before the hold
+      // keeps its place at the head of the queue.
+      if (state.dispatchedUpdate.exists(_ eq msg)) {
+        state.suggestionUpdatesQueue.prepend(msg)
+      } else {
+        state.suggestionUpdatesQueue.enqueue(msg)
+      }
+      state.dispatchedUpdate = None
+
+    case msg: Api.SuggestionsDatabaseModuleUpdateNotification
         if state.isSuggestionUpdatesRunning =>
       state.suggestionUpdatesQueue.enqueue(msg)
 
     case msg: Api.SuggestionsDatabaseModuleUpdateNotification =>
       logger.debug("Got module update [{}].", msg.module)
-      applyDatabaseUpdates(msg)
+      state.dispatchedUpdate = None
+      val library = libraryOf(msg.module)
+      state.loadedLibraries ++= library
+      val catalogueIds = library
+        .flatMap(state.catalogueIds.remove)
+        .getOrElse(Seq())
+      applyDatabaseUpdates(msg, catalogueIds)
         .onComplete {
           case Success(notification) =>
             logger.debug("Complete module update [{}]", msg.module)
@@ -299,7 +376,15 @@ final class SuggestionsHandler(
 
     case ClearSuggestionsDatabase =>
       if (state.isSuggestionLoadingRunning) stash()
-      else {
+      else if (state.isSuggestionUpdatesRunning) {
+        // Wait for the running module update, holding the ones that arrive
+        // meanwhile; its `SuggestionUpdatesCompleted` unstashes this. Its
+        // entries are then cleared with the rest of the repository, and the
+        // runtime sends them again: the invalidation that led here reset its
+        // index.
+        state.updatesHeldForCatalogues = true
+        stash()
+      } else {
         context.become(
           initialized(
             projectName,
@@ -308,17 +393,94 @@ final class SuggestionsHandler(
             state.suggestionLoadingRunning()
           )
         )
-        for {
-          _ <- suggestionsRepo.clean
-        } yield {
-          logger.trace(
-            "ClearSuggestionsDatabase [{}]",
-            state.suggestionLoadingQueue
+        state.catalogueIds.clear()
+        // A pending insertion of an earlier clear is dropped: this one
+        // schedules its own.
+        state.cataloguesPending = false
+        state.fill += 1
+        // Hold module updates, in order, until the repository is clean: one
+        // applied meanwhile would be cleaned away. `Cleaned` releases them.
+        state.updatesHeldForCatalogues = true
+        suggestionsRepo.clean
+          .recover { case error =>
+            logger.error("Cannot clean the suggestions database", error)
+          }
+          .map(_ => Cleaned)
+          .pipeTo(self)
+      }
+
+    case Cleaned =>
+      state.updatesHeldForCatalogues = false
+      self ! SuggestionUpdatesCompleted
+      logger.trace(
+        "ClearSuggestionsDatabase [{}]",
+        state.suggestionLoadingQueue
+      )
+      state.suggestionLoadingQueue.clear()
+      runtimeConnector ! Api.Request(Api.StartBackgroundProcessing())
+      state.cataloguesPending = true
+      if (state.executionFinished) self ! InsertCatalogues(state.fill)
+      else {
+        context.system.scheduler.scheduleOnce(
+          firstExecutionTimeout,
+          self,
+          InsertCatalogues(state.fill)
+        )
+      }
+
+    case _: Api.ExecutionComplete | _: Api.ExecutionFailed =>
+      if (!state.executionFinished) {
+        logger.debug("The first execution finished.")
+        state.executionFinished = true
+        if (state.cataloguesPending) self ! InsertCatalogues(state.fill)
+      }
+
+    case InsertCatalogues(fill)
+        if fill == state.fill && state.cataloguesPending =>
+      if (state.isSuggestionLoadingRunning) stash()
+      else if (state.isSuggestionUpdatesRunning) {
+        // Wait for the running module update, holding the ones that arrive
+        // meanwhile; its `SuggestionUpdatesCompleted` unstashes this, and its
+        // library then counts as loaded.
+        state.updatesHeldForCatalogues = true
+        stash()
+      } else {
+        state.cataloguesPending = false
+        // The insertion runs as a suggestion loading: loaded-suggestions
+        // notifications are queued, and module updates held, until the
+        // catalogue ids are recorded. Applied in between, they would remove
+        // nothing and their library's catalogue would go in on top of them.
+        context.become(
+          initialized(
+            projectName,
+            graph,
+            clients,
+            state.suggestionLoadingRunning()
           )
-          state.suggestionLoadingQueue.clear()
-          runtimeConnector ! Api.Request(Api.StartBackgroundProcessing())
+        )
+        state.updatesHeldForCatalogues = true
+        insertCatalogues(state.loadedLibraries.toSet)
+          .recover { case error =>
+            logger.error("Cannot insert the library catalogues", error)
+            CataloguesInserted(Map(), None)
+          }
+          .pipeTo(self)
+      }
+
+    case InsertCatalogues(_) =>
+    // Inserted already, or superseded by a later clear.
+
+    case CataloguesInserted(entries, notification) =>
+      state.catalogueIds ++= entries
+      notification.foreach { update =>
+        clients.foreach { clientId =>
+          sessionRouter ! DeliverToJsonController(clientId, update)
         }
       }
+      // Release the hold and the loading: apply what waited, in order.
+      state.updatesHeldForCatalogues = false
+      self ! SuggestionUpdatesCompleted
+      self ! SuggestionLoadingCompleted
 
     case GetSuggestionsDatabase =>
       val handler = context.system.actorOf(
@@ -338,7 +500,8 @@ final class SuggestionsHandler(
           projectName,
           graph,
           clients,
-          state.backgroundProcessingStopped()
+          state.backgroundProcessingStopped(),
+          None
         )
       )
 
@@ -380,20 +543,27 @@ final class SuggestionsHandler(
         }
 
     case InvalidateSuggestionsDatabase =>
-      val action = for {
-        _ <- suggestionsRepo.clean
-      } yield SearchProtocol.InvalidateModulesIndex
-
-      val runtimeFailureMapper = RuntimeFailureMapper(contentRootManager)
+      // The handler is the invalidation's `replyTo`, as for
+      // `GetSuggestionsDatabase`, and forwards the result to the requester.
+      // The repository is cleared by the `ClearSuggestionsDatabase` that a
+      // successful invalidation sends.
       val handler = context.system.actorOf(
         InvalidateModulesIndexHandler.props(
-          runtimeFailureMapper,
+          RuntimeFailureMapper(contentRootManager),
           runtimeConnector,
           self
         )
       )
-      action.pipeTo(handler)(sender())
-      context.become(invalidatingModules(projectName, graph, clients, state))
+      handler ! SearchProtocol.InvalidateModulesIndex
+      context.become(
+        invalidatingModules(
+          projectName,
+          graph,
+          clients,
+          state.backgroundProcessingStopped(),
+          Some(sender())
+        )
+      )
 
     case ProjectNameUpdated(name, updates) =>
       updates.foreach(sessionRouter ! _)
@@ -405,10 +575,18 @@ final class SuggestionsHandler(
         libraryLoaded.namespace,
         libraryLoaded.name
       )
+      state.loadedLibraries +=
+        LibraryName(libraryLoaded.namespace, libraryLoaded.name)
 
     case SuggestionUpdatesCompleted =>
-      if (state.suggestionUpdatesQueue.nonEmpty) {
-        self ! state.suggestionUpdatesQueue.dequeue()
+      if (state.updatesHeldForCatalogues) {
+        // A `ClearSuggestionsDatabase` or `InsertCatalogues` waits for this
+        // update to complete.
+        unstashAll()
+      } else if (state.suggestionUpdatesQueue.nonEmpty) {
+        val next = state.suggestionUpdatesQueue.dequeue()
+        state.dispatchedUpdate = Some(next.asInstanceOf[AnyRef])
+        self ! next
       }
       context.become(
         initialized(
@@ -450,24 +628,109 @@ final class SuggestionsHandler(
 
   /** Handle the suggestions of the loaded library.
     *
-    * Adds the new suggestions to the suggestions database and returns the
-    * appropriate notification message.
+    * Removes the library's catalogue entries, adds the new suggestions to the
+    * suggestions database and returns the appropriate notification message.
     *
     * @param suggestions the loaded suggestions
+    * @param catalogueIds the ids of the library's catalogue entries
     * @return the API suggestions database update notification
     */
   private def applyLoadedSuggestions(
-    suggestions: Vector[Suggestion]
-  ): Future[SuggestionsDatabaseUpdateNotification] = {
+    suggestions: Vector[Suggestion],
+    catalogueIds: Seq[Long]
+  ): Future[SuggestionsDatabaseUpdateNotification] =
     for {
+      removals       <- removeCatalogueEntries(catalogueIds)
       (version, ids) <- suggestionsRepo.insertAll(suggestions)
     } yield {
-      val updates = ids
-        .zip(suggestions)
-        .map(SuggestionsDatabaseUpdate.Add.tupled)
-      SuggestionsDatabaseUpdateNotification(version, updates)
+      val additions = ids.zip(suggestions).map { case (id, suggestion) =>
+        SuggestionsDatabaseUpdate.Add(id, suggestion)
+      }
+      SuggestionsDatabaseUpdateNotification(version, removals ++ additions)
+    }
+
+  /** Insert the catalogues of the installed libraries that are not loaded,
+    * each library's entries marked `fromCatalogue`, as one notification.
+    *
+    * @param loaded the libraries whose suggestions the runtime sends itself
+    */
+  private def insertCatalogues(
+    loaded: Set[LibraryName]
+  ): Future[CataloguesInserted] = {
+    val started = System.nanoTime()
+    catalogues.load().flatMap { installed =>
+      val wanted = installed.filterNot(c => loaded.contains(c.library))
+      val start = Future.successful(
+        (Map[LibraryName, Seq[Long]](), Vector[SuggestionsDatabaseUpdate](), 0L)
+      )
+      wanted
+        .foldLeft(start) { (previous, catalogue) =>
+          previous.flatMap { case (entries, updates, version) =>
+            // `insertAll` rejects a whole batch with a duplicate in it, so
+            // the duplicates (and only they) are left out.
+            val (distinct, duplicates) =
+              SuggestionsRepo.partitionDuplicates(catalogue.entries)
+            duplicates.foreach { duplicate =>
+              logger.warn(
+                "A duplicate entry of the catalogue of library [{}] is skipped: {}.",
+                catalogue.library,
+                duplicate.name
+              )
+            }
+            suggestionsRepo
+              .insertAll(distinct)
+              .map { case (newVersion, ids) =>
+                val added = ids.zip(distinct).map { case (id, s) =>
+                  SuggestionsDatabaseUpdate.Add(id, s, fromCatalogue = true)
+                }
+                (
+                  entries + (catalogue.library -> ids),
+                  updates ++ added,
+                  newVersion
+                )
+              }
+              .recover { case error =>
+                logger.warn(
+                  s"The catalogue of library [${catalogue.library}] is skipped",
+                  error
+                )
+                (entries, updates, version)
+              }
+          }
+        }
+        .map { case (entries, updates, version) =>
+          logger.info(
+            "Inserted {} catalogue entries of {} libraries in {} ms.",
+            updates.size,
+            entries.size,
+            (System.nanoTime() - started) / 1000000
+          )
+          CataloguesInserted(
+            entries,
+            Option.when(updates.nonEmpty)(
+              SuggestionsDatabaseUpdateNotification(version, updates)
+            )
+          )
+        }
     }
   }
+
+  /** Remove catalogue entries, as `Remove` updates. */
+  private def removeCatalogueEntries(
+    ids: Seq[Long]
+  ): Future[Seq[SuggestionsDatabaseUpdate]] =
+    if (ids.isEmpty) Future.successful(Seq())
+    else
+      suggestionsRepo.removeAll(ids).map { case (_, removed) =>
+        removed.map(SuggestionsDatabaseUpdate.Remove)
+      }
+
+  /** @return the library of a module's qualified name */
+  private def libraryOf(module: String): Option[LibraryName] =
+    module.split('.') match {
+      case Array(namespace, name, _*) => Some(LibraryName(namespace, name))
+      case _                          => None
+    }
 
   /** Handle the suggestions database update.
     *
@@ -475,12 +738,16 @@ final class SuggestionsHandler(
     * builds the notification to the user
     *
     * @param msg the suggestions database update notification from runtime
+    * @param catalogueIds the ids of the module's library's catalogue entries,
+    * to remove first
     * @return the API suggestions database update notification
     */
   private def applyDatabaseUpdates(
-    msg: Api.SuggestionsDatabaseModuleUpdateNotification
+    msg: Api.SuggestionsDatabaseModuleUpdateNotification,
+    catalogueIds: Seq[Long]
   ): Future[SuggestionsDatabaseUpdateNotification] =
     for {
+      removals      <- removeCatalogueEntries(catalogueIds)
       actionResults <- suggestionsRepo.applyActions(msg.actions)
       treeResults   <- suggestionsRepo.applyTree(msg.updates.toVector)
       exportResults <- suggestionsRepo.getExportedSymbols(msg.exports)
@@ -543,7 +810,7 @@ final class SuggestionsHandler(
       }
       SuggestionsDatabaseUpdateNotification(
         version,
-        actionUpdates ++ treeUpdates ++ exportUpdates
+        removals ++ actionUpdates ++ treeUpdates ++ exportUpdates
       )
     }
 
@@ -650,6 +917,30 @@ object SuggestionsHandler {
   /** The notification that the suggestions loading is complete. */
   private case object SuggestionLoadingCompleted
 
+  /** How long after the database is cleared the catalogues are inserted if
+    * no execution has finished.
+    */
+  val DefaultFirstExecutionTimeout: FiniteDuration = 30.seconds
+
+  /** The repository is clean after `ClearSuggestionsDatabase`. */
+  private case object Cleaned
+
+  /** Insert the catalogues, for the `fill`th clear of the database.
+    *
+    * @param fill the clear this insertion belongs to
+    */
+  private case class InsertCatalogues(fill: Long)
+
+  /** The catalogues inserted after the database was cleared.
+    *
+    * @param entries the ids of each library's catalogue entries
+    * @param notification the update to send, if anything was inserted
+    */
+  private case class CataloguesInserted(
+    entries: Map[LibraryName, Seq[Long]],
+    notification: Option[SuggestionsDatabaseUpdateNotification]
+  )
+
   /** The initialization state of the handler.
     *
     * @param project the project name
@@ -683,6 +974,10 @@ object SuggestionsHandler {
     * @param _isSuggestionLoadingRunning a flag for a running suggestion loading action
     * @param _shouldStartBackgroundProcessing a flag for starting a background
     * processing action
+    * @param loadedLibraries the libraries the runtime has loaded, whose
+    * suggestions it sends itself
+    * @param catalogueIds the ids of the catalogue entries in the database, by
+    * library
     */
   final private class State(
     val suggestionUpdatesQueue: mutable.Queue[Any] = mutable.Queue.empty,
@@ -691,8 +986,32 @@ object SuggestionsHandler {
     ]                                                     = mutable.Queue.empty,
     private var _isSuggestionUpdatesRunning: Boolean      = false,
     private var _isSuggestionLoadingRunning: Boolean      = false,
-    private var _shouldStartBackgroundProcessing: Boolean = true
+    private var _shouldStartBackgroundProcessing: Boolean = true,
+    val loadedLibraries: mutable.Set[LibraryName]         = mutable.Set.empty,
+    val catalogueIds: mutable.Map[LibraryName, Seq[Long]] = mutable.Map.empty
   ) {
+
+    /** Whether module updates are held (queued, in order) for the
+      * catalogues: from a `ClearSuggestionsDatabase` that waits for a running
+      * update, or that clears the repository, until `CataloguesInserted`.
+      */
+    var updatesHeldForCatalogues: Boolean = false
+
+    /** The queued module update `SuggestionUpdatesCompleted` last sent to
+      * the handler, until it arrives.
+      */
+    var dispatchedUpdate: Option[AnyRef] = None
+
+    /** Whether an execution has completed or failed since the server
+      * started.
+      */
+    var executionFinished: Boolean = false
+
+    /** Whether the catalogues wait to be inserted after a clear. */
+    var cataloguesPending: Boolean = false
+
+    /** How many times the database has been cleared. */
+    var fill: Long = 0
 
     /** @return `true` if suggestion updates actions are in progress. */
     def isSuggestionUpdatesRunning: Boolean =
@@ -750,13 +1069,19 @@ object SuggestionsHandler {
     * @param suggestionsRepo the suggestions repo
     * @param sessionRouter the session router
     * @param runtimeConnector the runtime connector
+    * @param catalogues the installed libraries' catalogues (Note [Catalogue
+    * Entries In The Suggestions Database])
+    * @param firstExecutionTimeout how long after the database is cleared the
+    * catalogues are inserted if no execution has finished
     */
   def props(
     config: Config,
     contentRootManager: ContentRootManager,
     suggestionsRepo: SuggestionsRepo[Future],
     sessionRouter: ActorRef,
-    runtimeConnector: ActorRef
+    runtimeConnector: ActorRef,
+    catalogues: CatalogueSource           = CatalogueSource.Empty,
+    firstExecutionTimeout: FiniteDuration = DefaultFirstExecutionTimeout
   ): Props =
     Props(
       new SuggestionsHandler(
@@ -764,7 +1089,9 @@ object SuggestionsHandler {
         contentRootManager,
         suggestionsRepo,
         sessionRouter,
-        runtimeConnector
+        runtimeConnector,
+        catalogues,
+        firstExecutionTimeout
       )
     )
 }
