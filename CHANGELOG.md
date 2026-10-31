@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [The component browser finds the components of every installed library as soon
+  as a project opens, whether or not the project imports the library, and
+  picking one adds the import. Where two components match a search equally,
+  those of the libraries the project imports come first.][476]
 - [The Windows installer is a standard installer: it can install silently (`/S`)
   and shows a single entry under installed apps.][255]
 - [Enso updates itself: when a new version is out, it offers to download it and
@@ -368,6 +372,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[476]: https://github.com/jdunkerley/enso/pull/476
 [466]: https://github.com/jdunkerley/enso/pull/466
 [465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116

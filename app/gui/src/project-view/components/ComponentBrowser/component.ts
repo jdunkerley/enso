@@ -12,7 +12,7 @@ import { isSome } from '@/util/data/opt'
 import { displayedIconOf } from '@/util/getIconName'
 import type { Icon } from '@/util/iconMetadata/iconName'
 import { ProjectPath } from '@/util/projectPath'
-import { qnLastSegment } from '@/util/qualifiedName'
+import { qnLastSegment, type QualifiedName } from '@/util/qualifiedName'
 import * as map from 'lib0/map'
 import { Range } from 'ydoc-shared/util/data/range'
 
@@ -107,10 +107,21 @@ export interface MatchedSuggestion {
   match: MatchResult
 }
 
-/** A suggestion comparator. The "lower" suggestion should be first in Component Browser's list. */
-export function compareSuggestions(a: MatchedSuggestion, b: MatchedSuggestion): number {
+/**
+ * A suggestion comparator. The "lower" suggestion should be first in Component Browser's list.
+ * @param inUse when given, on an equal score the entries it accepts come first.
+ */
+export function compareSuggestions(
+  a: MatchedSuggestion,
+  b: MatchedSuggestion,
+  inUse?: (entry: SuggestionEntry) => boolean,
+): number {
   const matchCompare = a.match.score - b.match.score
   if (matchCompare !== 0) return matchCompare
+  if (inUse) {
+    const inUseCompare = +!inUse(a.entry) - +!inUse(b.entry)
+    if (inUseCompare !== 0) return inUseCompare
+  }
   const groupCompare = compareOpt(a.entry.groupIndex, b.entry.groupIndex, 1)
   if (groupCompare !== 0) return groupCompare
   const kindCompare =
@@ -142,11 +153,26 @@ export function makeComponent({ id, entry, match }: MatchedSuggestion): Componen
  */
 export type GroupId = 'all' | 'suggestions' | number
 
-/** Create {@link Component} list for each displayed group from filtered suggestions. */
+/** Whether the two sets have the same members. */
+export function sameMembers<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  return a.size === b.size && [...a].every((member) => b.has(member))
+}
+
+/**
+ * Create {@link Component} list for each displayed group from filtered suggestions.
+ * @param importedLibraries the libraries the module imports: while searching, on an equal match
+ * their entries (and the current project's) come before those of other libraries.
+ */
 export function makeComponentLists(
   db: SuggestionDb,
   filtering: Filtering,
+  importedLibraries: ReadonlySet<QualifiedName> = new Set(),
 ): Map<GroupId, ReadonlyArray<Component>> {
+  const inUse =
+    filtering.pattern != null ?
+      (entry: SuggestionEntry) =>
+        entry.definedIn.project == null || importedLibraries.has(entry.definedIn.project)
+    : undefined
   function* matchSuggestions() {
     for (const [id, entry] of db.entries()) {
       if (!entry) continue
@@ -157,7 +183,7 @@ export function makeComponentLists(
       }
     }
   }
-  const matched = Array.from(matchSuggestions()).sort(compareSuggestions)
+  const matched = Array.from(matchSuggestions()).sort((a, b) => compareSuggestions(a, b, inUse))
   const groups = new Map<GroupId, Component[]>()
   const suggested: SuggestedComponent[] = []
   if (filtering.pattern == null) {
