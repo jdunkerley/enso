@@ -7,8 +7,6 @@ export project.Connection.Connection_Options.Connection_Options
 export project.Connection.Credentials.Credentials
 export project.Connection.Database
 export project.Connection.Postgres.Postgres
-export project.Connection.SQLite.SQLite
-export project.Connection.SQLite_Format.SQLite_Format
 export project.Connection.SSL_Mode.SSL_Mode
 
 export project.DB_Column.DB_Column

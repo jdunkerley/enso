@@ -10,8 +10,3 @@ Copyright notices related to this dependency can be found in the directory `org.
 The license information can be found along with the copyright notices.
 Copyright notices related to this dependency can be found in the directory `org.postgresql.postgresql-42.7.13`.
 
-
-'sqlite-jdbc', licensed under the The Apache Software License, Version 2.0, is distributed with the Database.
-The license information can be found along with the copyright notices.
-Copyright notices related to this dependency can be found in the directory `org.xerial.sqlite-jdbc-3.53.4.0`.
-

@@ -1,8 +1,8 @@
 # std-bits/database
 
 Java helpers for `Standard.Database` (`distribution/lib/Standard/Database/`),
-also used by the other database libraries (DuckDB, Microsoft, Snowflake, AWS
-Redshift, Generic_JDBC). Packaged as `std-database.jar`.
+also used by the other database libraries (SQLite, DuckDB, Microsoft, Snowflake,
+AWS Redshift, Generic_JDBC). Packaged as `std-database.jar`.
 
 ## Layout
 

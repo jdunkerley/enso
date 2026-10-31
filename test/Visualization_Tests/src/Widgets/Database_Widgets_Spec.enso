@@ -5,6 +5,7 @@ import Standard.Base.Metadata.Widget
 import Standard.Base.Metadata.Display
 
 from Standard.Database import all
+from Standard.SQLite import all
 from Standard.Base.Metadata.Choice import Option
 
 import Standard.Visualization.Widgets

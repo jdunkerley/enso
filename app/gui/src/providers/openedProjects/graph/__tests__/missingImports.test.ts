@@ -102,12 +102,12 @@ test('a type of a library the engine has not loaded comes from the declared type
 })
 
 test('the suggestion database wins over the declared types', () => {
-  const sqlite = makeType('Standard.Database.SQLite.SQLite', {
-    reexport: 'Standard.Database',
+  const sqlite = makeType('Standard.SQLite.SQLite.SQLite', {
+    reexport: 'Standard.SQLite',
   })
-  const declared = new Map([['SQLite', [projectPath('Standard.SQLite')]]])
+  const declared = new Map([['SQLite', [projectPath('Standard.Elsewhere')]]])
   expect(detect(SQLITE_CODE, db(sqlite), declared)).toEqual([
-    unqualified('Standard.Database', 'SQLite'),
+    unqualified('Standard.SQLite', 'SQLite'),
   ])
 })
 

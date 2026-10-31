@@ -1,7 +1,8 @@
 from Standard.Base import all
 
 import Standard.Database.Connection.Database
-from Standard.Database import SQLite, SQL_Query
+from Standard.Database import SQL_Query
+from Standard.SQLite import SQLite
 
 import Standard.Visualization.SQL.Visualization
 

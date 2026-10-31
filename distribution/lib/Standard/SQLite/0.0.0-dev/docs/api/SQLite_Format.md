@@ -1,5 +1,5 @@
 ## Enso Signatures 1.0
-## module Standard.Database.Connection.SQLite_Format
+## module Standard.SQLite.SQLite_Format
 - type SQLite_Format
     - For_File
     - SQLite
