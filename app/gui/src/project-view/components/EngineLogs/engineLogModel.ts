@@ -178,6 +178,7 @@ export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
   'org.enso.nativeimage',
   'org.enso.saas',
   'org.enso.snowflake',
+  'org.enso.sqlite',
   'org.enso.table',
   'org.enso.tableau',
 ]

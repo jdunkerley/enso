@@ -245,13 +245,26 @@ private class DefaultPackageRepository(
         )
       }
 
+    // Note [Package Registered Before Notification]
+    // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    // The package must be in `loadedPackages` before `addedLibrary` is called.
+    // The language server reacts to that notification by queueing a job that
+    // loads the library's suggestions, and the job looks the library up with
+    // `getPackageForLibrary`. When background jobs are already running it can
+    // run before this method returns; with the old order it found no package,
+    // loaded no suggestions, and a library loaded mid-session never reached the
+    // GUI. The native library path is set first, as it must precede anything
+    // that could load native code.
     if (isLibrary) {
-      val root = Path.of(pkg.root.toString)
-      notificationHandler.addedLibrary(libraryName, libraryVersion, root)
       addNativeLibPath(pkg)
     }
 
     loadedPackages.put(libraryName, Some(pkg))
+
+    if (isLibrary) {
+      val root = Path.of(pkg.root.toString)
+      notificationHandler.addedLibrary(libraryName, libraryVersion, root)
+    }
   }
 
   /** If the package contains any native libraries, their parent directories are added to the

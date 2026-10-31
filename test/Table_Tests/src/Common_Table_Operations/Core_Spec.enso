@@ -10,6 +10,7 @@ from Standard.Table.Errors import all
 import Standard.Table.Expression.Expression_Error
 
 from Standard.Database import all
+from Standard.SQLite import all
 import Standard.Database.Internal.Internals_Access
 from Standard.Database.Errors import Implicit_DB_Table_Read, Integrity_Error
 import Standard.Database.Dialects.Feature.Feature

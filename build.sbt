@@ -121,6 +121,7 @@ GatherLicenses.distributions := Seq(
   ),
   makeStdLibDistribution("Table", Distribution.sbtProjects(`std-table`)),
   makeStdLibDistribution("Database", Distribution.sbtProjects(`std-database`)),
+  makeStdLibDistribution("SQLite", Distribution.sbtProjects(`std-sqlite`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
   // A JAR wrapper whose output a library ships (`extraJars`,
@@ -257,7 +258,7 @@ ciBuildEngineDistribution := Def
           configRoot / "engine",
           root / "THIRD-PARTY"
         )
-        for (lib <- Seq("Base", "Table", "Image", "Database")) {
+        for (lib <- Seq("Base", "Table", "Image", "Database", "SQLite")) {
           GatherLicenses.verifyPackageAt(
             log,
             configRoot / lib,
@@ -492,6 +493,7 @@ lazy val enso = (project in file("."))
     `std-tests`,
     `std-tableau`,
     `std-saas`,
+    `std-sqlite`,
     `std-duckdb`,
     `sqlite-wrapper`,
     `syntax-rust-definition`,
@@ -2809,6 +2811,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-image` / Compile / packageBin)
       .dependsOn(`std-microsoft` / Compile / packageBin)
       .dependsOn(`std-saas` / Compile / packageBin)
+      .dependsOn(`std-sqlite` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
       .dependsOn(`std-table` / Compile / packageBin)
       .dependsOn(`std-tableau` / Compile / packageBin)
@@ -3878,11 +3881,11 @@ lazy val `engine-runner` = project
       ).distinct
       def stdLibsJars = {
         val log = streams.value.log
-        // databaseCp needs to be included in class-path because of
+        // sqliteCp needs to be included in class-path because of
         // the patched SqliteJdbcFeature. It is not enough to include just
-        // the jars from `database-polyglot-root`.
-        val databaseCp =
-          (`std-database` / Compile / fullClasspath).value
+        // the jars from `sqlite-polyglot-root`.
+        val sqliteCp =
+          (`std-sqlite` / Compile / fullClasspath).value
             .map(_.data.getAbsolutePath)
         val base =
           `base-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath())
@@ -3893,9 +3896,12 @@ lazy val `engine-runner` = project
           base
         } else {
           base ++
-          databaseCp ++
+          sqliteCp ++
           `table-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath()) ++
           `database-polyglot-root`
+            .listFiles("*.jar")
+            .map(_.getAbsolutePath()) ++
+          `sqlite-polyglot-root`
             .listFiles("*.jar")
             .map(_.getAbsolutePath()) ++
           `std-duckdb-polyglot-root`
@@ -3922,8 +3928,8 @@ lazy val `engine-runner` = project
           sys.env.get("CI").isDefined && Platform.isMacOS && Platform.isArm64
         val maxLimit           = if (macArmOnCI) Some(14336) else Some(15608)
         val areStdlibsIncluded = !GraalVM.EnsoLauncher.fast
-        val databaseFeature =
-          "org.enso.database.nativeimage.SqliteJdbcPatchedFeature"
+        val sqliteFeature =
+          "org.enso.sqlite.nativeimage.SqliteJdbcPatchedFeature"
         // Features from gax-grpc-2.31.0
         val grpcFeatures =
           "com.google.api.gax.grpc.nativeimage.ProtobufMessageFeature," +
@@ -3932,7 +3938,7 @@ lazy val `engine-runner` = project
           "org.enso.interpreter.runtime.nativeimage.NativeLibraryFeature"
         )
         if (areStdlibsIncluded) {
-          features = features ++ Seq(databaseFeature)
+          features = features ++ Seq(sqliteFeature)
         }
         // heapdump monitoring is not supported on Windows
         val enableHeapDumpOpts =
@@ -4972,8 +4978,10 @@ val `google-native-libs` =
   stdLibComponentRoot("Google") / "polyglot" / "lib"
 val `database-polyglot-root` =
   stdLibComponentRoot("Database") / "polyglot" / "java"
-val `database-native-libs` =
-  stdLibComponentRoot("Database") / "polyglot" / "lib"
+val `sqlite-polyglot-root` =
+  stdLibComponentRoot("SQLite") / "polyglot" / "java"
+val `sqlite-native-libs` =
+  stdLibComponentRoot("SQLite") / "polyglot" / "lib"
 val `std-aws-polyglot-root` =
   stdLibComponentRoot("AWS") / "polyglot" / "java"
 val `std-snowflake-polyglot-root` =
@@ -5260,6 +5268,7 @@ lazy val `std-tests` = project
   .dependsOn(`std-base`)
   .dependsOn(`std-table`)
   .dependsOn(`std-database`)
+  .dependsOn(`std-sqlite`)
   .dependsOn(`runtime-language-arrow`)
   .dependsOn(`test-utils`)
 
@@ -5835,21 +5844,56 @@ lazy val `std-database` = project
     Compile / packageBin / artifactPath :=
       `database-polyglot-root` / "std-database.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion % "provided",
-      "org.xerial"           % "sqlite-jdbc" % sqliteVersion,
-      "org.postgresql"       % "postgresql"  % postgresVersion
+      "org.graalvm.polyglot" % "polyglot"   % graalMavenPackagesVersion % "provided",
+      "org.postgresql"       % "postgresql" % postgresVersion
     ),
-    // Extract native libraries from sqlite-jdbc-**.jar and put them under
-    // Standard/Database/polyglot/lib directory. The minimized jar will be
-    // put under Standard/Database/polyglot/java directory.
     Compile / packageBin := {
-      val logger            = streams.value.log
+      val result            = (Compile / packageBin).value
       val cacheStoreFactory = streams.value.cacheStoreFactory
-      val stdDatabaseJar    = (Compile / packageBin).value
       StdBits
         .copyDependencies(
           `database-polyglot-root`,
           Seq("std-database.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedClasspath).value,
+          logger             = streams.value.log,
+          cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`database-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`std-base` % "provided")
+  .dependsOn(`std-table` % "provided")
+
+lazy val `std-sqlite` = project
+  .in(file("std-bits") / "sqlite")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `sqlite-polyglot-root` / "std-sqlite.jar",
+    libraryDependencies ++= Seq(
+      "org.graalvm.polyglot" % "polyglot"    % graalMavenPackagesVersion % "provided",
+      "org.xerial"           % "sqlite-jdbc" % sqliteVersion
+    ),
+    // Extract native libraries from sqlite-jdbc-**.jar and put them under
+    // Standard/SQLite/polyglot/lib directory. The minimized jar will be
+    // put under Standard/SQLite/polyglot/java directory.
+    Compile / packageBin := {
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      val stdSqliteJar      = (Compile / packageBin).value
+      StdBits
+        .copyDependencies(
+          `sqlite-polyglot-root`,
+          Seq("std-sqlite.jar"),
           ignoreScalaLibrary = true,
           ignoreDependencyIncludeTransitive =
             Some(s"sqlite-jdbc-${sqliteVersion}"),
@@ -5857,7 +5901,7 @@ lazy val `std-database` = project
           logger             = streams.value.log,
           cacheStoreFactory  = cacheStoreFactory,
           unmanagedClasspath = (Compile / unmanagedJars).value,
-          polyglotLibDir     = Some(`database-native-libs`),
+          polyglotLibDir     = Some(`sqlite-native-libs`),
           extractedNativeLibsDirs = Seq(
             (`sqlite-wrapper` / extractedFilesDir).value
           ),
@@ -5865,16 +5909,17 @@ lazy val `std-database` = project
             (`sqlite-wrapper` / thinJarOutput).value
           )
         )
-      stdDatabaseJar
+      stdSqliteJar
     },
     clean := Def.task {
       val _ = clean.value
-      IO.delete(`database-polyglot-root`)
-      IO.delete(`database-native-libs`)
+      IO.delete(`sqlite-polyglot-root`)
+      IO.delete(`sqlite-native-libs`)
     }.value
   )
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-table` % "provided")
+  .dependsOn(`std-database` % "provided")
 
 lazy val `std-aws` = project
   .in(file("std-bits") / "aws")

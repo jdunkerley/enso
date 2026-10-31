@@ -26,9 +26,11 @@ the full protocol and design notes.
 ## Library catalogues
 
 When the suggestion database is filled (project open, or
-`search/invalidateSuggestionsDatabase`), `SuggestionsHandler` first inserts the
+`search/invalidateSuggestionsDatabase`), `SuggestionsHandler` inserts the
 `catalogue.json` entries of every installed library the project resolves that
-the runtime has not loaded (`InstalledCatalogues`, the listing of
+the runtime has not loaded, once the first execution has completed or failed (or
+30 s after the clear, if none does), so they neither delay it nor include the
+libraries it loads (`InstalledCatalogues`, the listing of
 `InstalledLibraries.find`), marked `fromCatalogue: true`, and swaps them for the
 real suggestions when the library loads. See Note [Catalogue Entries In The
 Suggestions Database] in `SuggestionsHandler` and Note [Library Catalogue] in

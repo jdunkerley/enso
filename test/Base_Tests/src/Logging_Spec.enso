@@ -137,6 +137,7 @@ add_specs suite_builder = suite_builder.group "Logging" group_builder->
             from Standard.Base import all
             from Standard.Table import Table
             from Standard.Database import all
+            from Standard.SQLite import all
 
             main secret="no-secret" =
                 connection = Database.connect SQLite.In_Memory
