@@ -1468,8 +1468,7 @@ class SuggestionsHandlerSpec
 
   /** Catalogues that are read only once `gate` completes.
     *
-    * `filling` completes when the handler reads them to insert them: the
-    * second load, after the one when the Truffle context initialises. By then
+    * `filling` completes when the handler reads them to insert them. By then
     * the handler has started the insertion: module updates are held and
     * loaded-suggestions notifications queued. A message sent before that may
     * reach the handler before the insertion starts, and is then applied
@@ -1481,7 +1480,7 @@ class SuggestionsHandlerSpec
     val filling: Promise[Unit] = Promise()
     private val loads          = new AtomicInteger()
     override def load(): Future[Seq[InstalledCatalogue]] = {
-      if (loads.incrementAndGet() == 2) filling.success(())
+      if (loads.incrementAndGet() == 1) filling.success(())
       gate.future.map(_ => installed)
     }
 

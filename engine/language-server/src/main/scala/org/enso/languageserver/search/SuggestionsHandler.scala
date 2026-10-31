@@ -56,7 +56,10 @@ import scala.util.{Failure, Success}
  * did, so the catalogues neither delay the first execution nor include the
  * libraries it loads; measured, inserting at the clear sent ~4,100 entries
  * (3 MB) ahead of the first execution and cost ~500 ms, most of them
- * libraries the project imports and swapped out moments later. If no
+ * libraries the project imports and swapped out moments later. They are
+ * also read only then, not while the runtime starts: reading them hashes
+ * every installed library's sources and decodes the catalogues, which
+ * competed with the project's first compilation. If no
  * execution finishes within `firstExecutionTimeout` of the clear (a client
  * that never runs the project), they are inserted then. The entries go out
  * in one update, marked `fromCatalogue`, and their ids are kept by library
@@ -203,11 +206,6 @@ final class SuggestionsHandler(
         )
       val requestId = UUID.randomUUID()
       runtimeConnector ! Api.Request(requestId, Api.GetTypeGraphRequest())
-      // Read and check the catalogues while the runtime starts, so that the
-      // first insertion finds them in the loader's cache.
-      catalogues.load().failed.foreach { error =>
-        logger.warn("Cannot read the library catalogues", error)
-      }
 
     case Api.Response(_, Api.GetTypeGraphResponse(g)) =>
       logger.trace("Initializing: got type graph response")

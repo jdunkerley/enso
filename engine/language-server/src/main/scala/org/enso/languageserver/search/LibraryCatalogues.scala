@@ -51,9 +51,8 @@ object CatalogueSource {
   * `catalogue: false` is skipped quietly. The outcome for a library is kept
   * until its `package.yaml`, its catalogue or one of its sources changes size
   * or modification time, so a project that is reopened does not hash the
-  * sources again. A load that starts while another runs shares its result,
-  * so the read when the runtime starts and the first fill of the database
-  * do not hash the same sources twice.
+  * sources again. A load that starts while another runs shares its result
+  * rather than hashing the same sources again.
   *
   * @param installedLibraries the libraries the project resolves without a
   * download, in library name order
