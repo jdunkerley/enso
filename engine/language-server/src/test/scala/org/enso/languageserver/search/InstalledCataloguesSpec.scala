@@ -12,6 +12,8 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.io.File
 import java.nio.file.attribute.FileTime
 import java.nio.file.{Files, Path}
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -130,6 +132,30 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         FileTime.fromMillis(Files.getLastModifiedTime(main).toMillis + 2000)
       )
       Await.result(catalogues.load(), Timeout) shouldEqual Seq()
+    }
+
+    "share one reading between loads that overlap" in {
+      val root    = Files.createTempDirectory("catalogues")
+      val good    = library(root, "Good", Some(valid("Good") _))
+      val calls   = new AtomicInteger()
+      val release = new CountDownLatch(1)
+      val catalogues = new InstalledCatalogues(() => {
+        calls.incrementAndGet()
+        release.await()
+        Seq(good)
+      })
+      val first  = catalogues.load()
+      val second = catalogues.load()
+      release.countDown()
+      val expected =
+        Seq(InstalledCatalogue(LibraryName("Foo", "Good"), entries("Good")))
+      Await.result(first, Timeout) shouldEqual expected
+      Await.result(second, Timeout) shouldEqual expected
+      calls.get shouldEqual 1
+
+      // A load after the first completed reads the listing again.
+      Await.result(catalogues.load(), Timeout) shouldEqual expected
+      calls.get shouldEqual 2
     }
 
     "skip a library that declines a catalogue" in {
