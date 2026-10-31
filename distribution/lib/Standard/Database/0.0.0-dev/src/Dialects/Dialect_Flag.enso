@@ -199,3 +199,23 @@ type Dialect_Flag
        ---
        Can perform a regular expression match
     Supports_Regex_Match
+    ## ---
+       private: true
+       ---
+       Specifies if `First` and `Last` without `order_by` take the rows in
+       their order. If `False`, they require an ordering and report
+       `Aggregation_Requires_Order` without one.
+    First_Last_Respects_Row_Order
+    ## ---
+       private: true
+       ---
+       Specifies if an aggregation reports problems found in individual values
+       (`Invalid_Aggregation`, for example values `Minimum` cannot compare), as
+       the in-memory backend does.
+    Reports_Aggregation_Problems
+    ## ---
+       private: true
+       ---
+       Specifies if `Concatenate` joins the values in the order of the rows.
+       If `False`, the order of the parts is unspecified.
+    Concatenate_Follows_Row_Order

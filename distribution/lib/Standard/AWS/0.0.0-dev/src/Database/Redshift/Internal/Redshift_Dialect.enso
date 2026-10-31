@@ -522,6 +522,9 @@ type Redshift_Dialect
             Dialect_Flag.Supports_Mixed_Columns -> False
             Dialect_Flag.Supports_Date_Time_Without_Timezone -> False
             Dialect_Flag.Supports_Regex_Match -> False
+            Dialect_Flag.First_Last_Respects_Row_Order -> False
+            Dialect_Flag.Reports_Aggregation_Problems -> False
+            Dialect_Flag.Concatenate_Follows_Row_Order -> True
 
     ## ---
        private: true

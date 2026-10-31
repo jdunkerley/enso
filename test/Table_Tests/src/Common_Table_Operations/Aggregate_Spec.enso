@@ -16,8 +16,38 @@ import project.Common_Table_Operations.Util
 
 polyglot java import java.lang.Double
 
-type Test_Selection
-    Config problem_handling=True advanced_stats=True text_concat=True text_shortest_longest=True first_last=True first_last_row_order=True first_last_multi_order=True first_last_ignore_nothing=True std_dev=True multi_distinct=True aggregation_problems=True nan=True date_support=True
+## The aggregates the backend under test supports, and how they behave, asked
+   of the backend: see Note [Aggregate Capabilities].
+type Aggregate_Support
+    private Value advanced_stats:Boolean text_concat:Boolean concatenate:Boolean text_shortest_longest:Boolean first_last:Boolean first_last_row_order:Boolean first_last_multi_order:Boolean first_last_ignore_nothing:Boolean std_dev:Boolean multi_distinct:Boolean aggregation_problems:Boolean date_support:Boolean
+
+    ## Asks the backend of `setup` what it supports.
+    from_setup setup -> Aggregate_Support =
+        supports aggregate = setup.is_aggregate_supported aggregate
+        concatenate = supports (Aggregate_Column.Concatenate "A")
+        advanced_stats = (supports (Aggregate_Column.Median "A")) && (supports (Aggregate_Column.Mode "A")) && (supports (Aggregate_Column.Percentile 0.5 "A"))
+        text_shortest_longest = (supports (Aggregate_Column.Shortest "A")) && (supports (Aggregate_Column.Longest "A"))
+        first_last = supports (Aggregate_Column.First "A" ignore_nothing=False order_by=["B"])
+        first_last_multi_order = supports (Aggregate_Column.First "A" ignore_nothing=False order_by=["B", "C"])
+        first_last_ignore_nothing = supports (Aggregate_Column.First "A" ignore_nothing=True order_by=["B"])
+        std_dev = supports (Aggregate_Column.Standard_Deviation "A")
+        multi_distinct = supports (Aggregate_Column.Count_Distinct ["A", "B"])
+        Aggregate_Support.Value advanced_stats=advanced_stats text_concat=(concatenate && (setup.flagged ..Concatenate_Follows_Row_Order)) concatenate=concatenate text_shortest_longest=text_shortest_longest first_last=first_last first_last_row_order=(setup.flagged ..First_Last_Respects_Row_Order) first_last_multi_order=first_last_multi_order first_last_ignore_nothing=first_last_ignore_nothing std_dev=std_dev multi_distinct=multi_distinct aggregation_problems=(setup.flagged ..Reports_Aggregation_Problems) date_support=(setup.flagged ..Date_Time)
+
+## Note [Aggregate Capabilities]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   Whether an aggregate runs at all is asked as the product asks it:
+   `make_aggregate_column` (Database's `Internal/Aggregate_Helper.enso`) first
+   calls the dialect's `check_aggregate_support`, and so does
+   `setup.is_aggregate_supported`. The SQL generator's
+   `is_operation_supported` is not the same question: SQL Server's generator
+   has `SHORTEST` and `LONGEST`, and Redshift's `MODE`, `MEDIAN` and
+   `PERCENTILE`, while their `check_aggregate_support` rejects them. How a
+   supported aggregate behaves is a `Dialect_Flag`: `First_Last_Respects_Row_Order`,
+   `Reports_Aggregation_Problems`, `Concatenate_Follows_Row_Order`, `Date_Time`.
+   The column names are placeholders: `check_aggregate_support` looks only at
+   the kind of aggregate, the number of columns, `ignore_nothing` and whether
+   there is an `order_by`.
 
 main filter=Nothing =
     run_default_backend add_specs filter
@@ -52,7 +82,7 @@ add_aggregate_specs suite_builder setup =
     empty_table_fn = setup.empty_table_fn
     materialize = setup.materialize
     is_database = setup.is_database
-    test_selection = setup.aggregate_test_selection
+    test_selection = Aggregate_Support.from_setup setup
     table_builder = setup.table_builder
     data = Data.setup table_fn empty_table_fn
 
@@ -1339,7 +1369,7 @@ add_aggregate_specs suite_builder setup =
             expect_null_or_nan <| m1.columns.first.at 0
             expect_null_or_nan <| m1.columns.second.at 0
 
-    if setup.flagged ..Supports_Separate_NaN then suite_builder.group prefix+"Table.aggregate should correctly handle NaN" pending=(resolve_pending test_selection.nan) group_builder->
+    if setup.flagged ..Supports_Separate_NaN then suite_builder.group prefix+"Table.aggregate should correctly handle NaN" group_builder->
         nan = 0.log 0
         group_builder.specify "on Average" <|
             t1 = table_builder [["X", [Nothing, nan, 0, 1, 2]]]

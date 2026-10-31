@@ -86,7 +86,6 @@ add_database_specs suite_builder create_connection_fn =
     materialize = .read
 
     common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=Redshift_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=False
-    aggregate_selection = Common_Table_Operations.Aggregate_Spec.Test_Selection.Config advanced_stats=False first_last_row_order=False aggregation_problems=False date_support=False multi_distinct=False
     agg_in_memory_table = ((Project_Description.new enso_dev.Table_Tests).data / "data.csv") . read
     agg_table_fn = _->
         agg_in_memory_table.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
@@ -97,8 +96,9 @@ add_database_specs suite_builder create_connection_fn =
     is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
     is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
     flagged_fn = default_connection.get.dialect.flagged
+    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
 
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection aggregate_test_selection=aggregate_selection create_connection_func=create_connection_fn light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
+    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_fn light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
 
     Common_Spec.add_specs suite_builder prefix create_connection_fn default_connection setup
     add_redshift_specific_specs suite_builder create_connection_fn setup

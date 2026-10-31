@@ -62,5 +62,9 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 - `src/DB_Table.enso` — deferred table operations.
 - `test/Table_Tests/src/Common_Table_Operations/` — the same suite runs against
   both in-memory and database backends.
+- Which aggregates a backend runs is its dialect's `check_aggregate_support`;
+  how they behave, its `flagged` answers (`First_Last_Respects_Row_Order`,
+  `Reports_Aggregation_Problems`, `Concatenate_Follows_Row_Order`): a new
+  `Dialect_Flag` must be answered by every dialect, whose `case` has no default.
 - `test/DuckDB_Tests/`, `test/Snowflake_Tests/`, `test/Microsoft_Tests/` —
   backend-specific examples.
