@@ -88,6 +88,19 @@ class DefaultLibraryProvider(
         .left
         .map(ResolvingLibraryProvider.Error.DownloadFailed(version, _))
   }
+
+  /** @inheritdoc */
+  override def findInstalledLibraries(): Seq[ResolvedLibrary] =
+    publishedLibraryProvider match {
+      case cache: PublishedLibraryCache =>
+        InstalledLibraries.find(
+          edition,
+          preferLocalLibraries,
+          localLibraryProvider,
+          cache
+        )
+      case _ => Nil
+    }
 }
 
 object DefaultLibraryProvider {

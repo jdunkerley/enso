@@ -7,6 +7,7 @@ import project.Meta
 import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
+from project.Data.Boolean import Boolean, False, True
 from project.Metadata.Widget import Single_Choice
 from project.Nothing import all
 
@@ -34,13 +35,15 @@ type Email_Provider
        ---
        Resolve the implementation of this email provider.
     private resolve constructor:Function -> Email_Provider =
-        types = Email_Provider_SPI.get_known_email_providers
-        try_next idx =
-            if idx >= types.length then constructor else
-                db_type = types.at idx
-                resolved = db_type.resolve constructor
-                if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved:Email_Provider
-        try_next 0
+        first_resolved types =
+            try_next idx =
+                if idx >= types.length then Nothing else
+                    resolved = (types.at idx).resolve constructor
+                    if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved:Email_Provider
+            try_next 0
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
+        (first_resolved (Email_Provider_SPI.get_known_email_providers loaded_only=True)) . if_nothing <|
+            (first_resolved Email_Provider_SPI.get_known_email_providers) . if_nothing constructor
 
 ## ---
    private: true
@@ -62,5 +65,5 @@ type Email_Provider_SPI
        ---
     new typ -> Email_Provider_SPI = Email_Provider_SPI.Value typ
 
-    private get_known_email_providers -> Vector =
-        Meta.lookup_services Email_Provider_SPI . map .typ
+    private get_known_email_providers (loaded_only:Boolean=False) -> Vector =
+        Meta.lookup_services Email_Provider_SPI loaded_only=loaded_only . map .typ

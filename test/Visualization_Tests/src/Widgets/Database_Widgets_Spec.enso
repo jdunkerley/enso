@@ -6,8 +6,6 @@ import Standard.Base.Metadata.Display
 
 from Standard.Database import all
 from Standard.Base.Metadata.Choice import Option
-# This ensures that the Redshift connection details are available in the widget.
-from Standard.AWS import all
 
 import Standard.Visualization.Widgets
 
@@ -49,11 +47,15 @@ add_specs suite_builder =
             Widgets.get_widget_json mock_table .filter ["column"] . should_equal expect
 
     suite_builder.group "Widgets for Database" group_builder->
-        group_builder.specify "works for `connect`" <|
+        group_builder.specify "works for `connect`, listing every installed backend" <|
             result = Widgets.get_widget_json Database .connect ["details"]
             result.should_contain "SQLite"
             result.should_contain "Postgres"
+            # No file of this project imports these libraries: discovery finds them.
             result.should_contain "Redshift"
+            result.should_contain "DuckDB"
+            result.should_contain "Snowflake"
+            result.should_contain "Microsoft SQL Server"
 
 main filter=Nothing =
     suite = Test.build suite_builder->

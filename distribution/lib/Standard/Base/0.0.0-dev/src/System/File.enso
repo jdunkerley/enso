@@ -100,7 +100,7 @@ type File
         _ : File_Like -> File.new path.underlying
         _ ->
             ## Check to see if a valid "File" type.
-            if ((File_System_SPI.get_types False).any file_type-> path.is_a file_type) then path else
+            if ((File_System_SPI.get_types False loaded_only=True).any file_type-> path.is_a file_type) then path else
                 types = (File_System_SPI.get_types False).map _.to_display_text . join ", "
                 Error.throw (Illegal_Argument.Error "The provided path is neither a Text, nor any recognized File-like type ("+types+").")
 
@@ -1286,13 +1286,15 @@ type File_System_SPI
     new protocol:Text typ = File_System_SPI.Entry protocol typ
 
     private get_type protocol:Text b:Boolean =
-        all = Self.get_regs b
-        vec = all . filter \e -> (e.protocol == protocol)
-        if vec . not_empty then vec.first.typ else Nothing
+        find loaded_only =
+            vec = Self.get_regs b loaded_only . filter \e -> (e.protocol == protocol)
+            if vec . not_empty then vec.first.typ else Nothing
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
+        (find True) . if_nothing (find False)
 
-    private get_regs b:Boolean =
+    private get_regs b:Boolean loaded_only:Boolean=False =
         _ = b
-        Meta.lookup_services File_System_SPI
+        Meta.lookup_services File_System_SPI loaded_only=loaded_only
 
-    private get_types b:Boolean =
-        Self.get_regs b . map .typ
+    private get_types b:Boolean loaded_only:Boolean=False =
+        Self.get_regs b loaded_only . map .typ

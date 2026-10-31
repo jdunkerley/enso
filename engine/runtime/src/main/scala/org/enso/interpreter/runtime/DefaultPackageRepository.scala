@@ -38,6 +38,7 @@ import scala.jdk.CollectionConverters.{
   SeqHasAsJava
 }
 import scala.util.{Failure, Success, Try, Using}
+import scala.util.control.NonFatal
 import org.enso.distribution.locking.ResourceManager
 import org.enso.distribution.{DistributionManager, LanguageHome}
 import org.enso.editions.updater.EditionManager
@@ -494,6 +495,56 @@ private class DefaultPackageRepository(
 
   def getLoadedPackagesJava: java.lang.Iterable[Package[TruffleFile]] =
     loadedPackages.flatMap(_._2).asJava
+
+  /** The installed libraries' packages, set once by [[installedPackages]]. */
+  private val installedPackagesRef =
+    new java.util.concurrent.atomic.AtomicReference[Seq[Package[TruffleFile]]]()
+
+  /** The installed libraries' packages: their `package.yaml` is read, nothing
+    * is registered or compiled. Computed once per context, on the first service
+    * lookup (Note [Service Discovery Over Installed Libraries] in
+    * `LookupServicesNode`).
+    *
+    * Not a `lazy val`: that would initialise under this object's monitor, which
+    * `ensurePackageIsLoaded` also takes, while the listing takes cache locks and
+    * reads every installed `package.yaml`. Two threads may compute it at once;
+    * the first result is kept. A failure is logged and yields no packages.
+    */
+  private def installedPackages: Seq[Package[TruffleFile]] =
+    Option(installedPackagesRef.get()).getOrElse {
+      val computed =
+        try {
+          libraryProvider.findInstalledLibraries().flatMap { library =>
+            Try(
+              packageManager
+                .loadPackage(context.findLibraryRootPath(library.root))
+                .get
+            ) match {
+              case Success(pkg) => Some(pkg)
+              case Failure(error) =>
+                logger.warn(
+                  s"Library ${library.name} is left out of service discovery: " +
+                  error.getMessage
+                )
+                None
+            }
+          }
+        } catch {
+          case NonFatal(error) =>
+            logger.warn(
+              "Service discovery cannot list the installed libraries: " +
+              error.getMessage,
+              error
+            )
+            Nil
+        }
+      installedPackagesRef.compareAndSet(null, computed)
+      installedPackagesRef.get()
+    }
+
+  /** The installed libraries that are not loaded yet, sorted by name. */
+  def getInstalledUnloadedPackagesJava: java.util.List[Package[TruffleFile]] =
+    installedPackages.filterNot(pkg => isPackageLoaded(pkg.libraryName)).asJava
 
   /** @inheritdoc */
   override def getLoadedModule(

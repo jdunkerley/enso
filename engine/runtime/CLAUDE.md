@@ -48,6 +48,10 @@ and links the required Graal/Truffle background reading.
   call should poll safepoints. See `runtime/ThreadManager.java`.
 - **No `System.out.println`.** Use `TruffleLogger` in language code; the
   embedder configures sinks.
+- **Service lookup covers installed libraries, not only loaded ones.**
+  `Meta.lookup_services` (`LookupServicesNode`) loads a library that is
+  installed but not imported when it resolves that library's provider; see Note
+  [Service Discovery Over Installed Libraries] there.
 
 ## Language Server integration
 

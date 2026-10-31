@@ -588,6 +588,12 @@ class JsonConnectionController(
         .props(requestTimeout, libraryConfig.localLibraryManager),
       LibraryListLocal -> LibraryListLocalHandler
         .props(requestTimeout, libraryConfig.localLibraryManager),
+      LibraryListPublicTypes -> LibraryListPublicTypesHandler
+        .props(
+          libraryConfig.editionReferenceResolver,
+          libraryConfig.localLibraryProvider,
+          libraryConfig.publishedLibraryCache
+        ),
       LibraryGetMetadata -> LibraryGetMetadataHandler
         .props(
           requestTimeout,

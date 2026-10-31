@@ -153,6 +153,9 @@ object Contact {
   *                        package,
   * @param jvm determines whether JVM mode should be enabled for the project
   * @param labels names of the labels the IDE shows on the project
+  * @param publicTypes the types the library's `Main.enso` exports, for tools
+  *                    that look a type up without loading the library
+  *                    (`public-types:`)
   */
 case class Config(
   name: String,
@@ -167,7 +170,8 @@ case class Config(
   componentGroups: Option[ComponentGroups],
   services: List[ProvidesWith],
   jvm: Option[Boolean],
-  labels: List[String] = Nil
+  labels: List[String]      = Nil,
+  publicTypes: List[String] = Nil
 ) {
 
   /** Converts the configuration into a YAML representation.
@@ -222,6 +226,7 @@ object Config {
     val Services: String       = "services"
     val Jvm: String            = "jvm"
     val Labels: String         = "labels"
+    val PublicTypes: String    = "public-types"
   }
 
   implicit val yamlDecoder: YamlDecoder[Config] =
@@ -312,6 +317,10 @@ object Config {
               )
               .map(Right(_))
               .getOrElse(Right(Nil))
+            publicTypes <- clazzMap
+              .get(JsonFields.PublicTypes)
+              .map(implicitly[YamlDecoder[List[String]]].decode)
+              .getOrElse(Right(Nil))
           } yield Config(
             name,
             normalizedName,
@@ -325,7 +334,8 @@ object Config {
             componentGroups,
             services,
             jvmMode,
-            labels
+            labels,
+            publicTypes
           )
       }
     }
@@ -392,6 +402,15 @@ object Config {
             (
               JsonFields.Labels,
               implicitly[YamlEncoder[List[String]]].encode(value.labels)
+            )
+          )
+        }
+
+        if (value.publicTypes.nonEmpty) {
+          elements.add(
+            (
+              JsonFields.PublicTypes,
+              implicitly[YamlEncoder[List[String]]].encode(value.publicTypes)
             )
           )
         }

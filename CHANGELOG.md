@@ -317,6 +317,8 @@
 
 #### Enso Standard Library
 
+- [Connection, file format, return type and e-mail dropdowns list the installed
+  libraries' choices, even those not imported yet][465]
 - [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass
   credentials explicitly or use AWS credentials.
 - [Every database connection can log its SQL queries][344], not only one opened
@@ -356,6 +358,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116
 [276]: https://github.com/jdunkerley/enso/pull/276
 [262]: https://github.com/jdunkerley/enso/pull/262

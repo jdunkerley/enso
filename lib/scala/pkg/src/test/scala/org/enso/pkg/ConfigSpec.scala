@@ -54,6 +54,26 @@ class ConfigSpec
       Config.fromYaml(updated.toYaml()).get.labels shouldEqual List("a")
     }
 
+    "keep public types through a round trip" in {
+      val yaml =
+        """name: Example
+          |namespace: Standard
+          |public-types:
+          |  - Example
+          |  - Example_Format
+          |""".stripMargin
+      val config = Config.fromYaml(yaml).get
+      config.publicTypes shouldEqual List("Example", "Example_Format")
+      Config.fromYaml(config.toYaml()).get.publicTypes shouldEqual
+      List("Example", "Example_Format")
+    }
+
+    "default to no public types and omit them from the YAML" in {
+      val config = Config.fromYaml("name: example\n").get
+      config.publicTypes shouldEqual Nil
+      config.toYaml() should not include "public-types"
+    }
+
     "deserialize the serialized representation to the original value" in {
       val config = Config(
         name           = "placeholder",

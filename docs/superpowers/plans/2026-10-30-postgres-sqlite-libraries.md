@@ -148,8 +148,12 @@ Made while planning, with the evidence:
   of `DefaultLibraryProvider` into `InstalledLibraries.find` (library-manager),
   which both the runtime (`DefaultLibraryProvider.findInstalledLibraries`) and
   the handler call, and reads each installed library's `package.yaml` with
-  `PackageManager.Default`. Cost if wrong: none; the two listings cannot
-  diverge.
+  `PackageManager.Default`. The two use the same rule for what is installed, but
+  not the same moment: the runtime lists once per context, the language server
+  on each request, so a library created while a project is open shows in
+  `library/listPublicTypes` at once and in service discovery after the project
+  is reopened (Note [Service Discovery Over Installed Libraries]). Cost if
+  wrong: that window.
 - **The GUI's map is loaded beside the suggestion database (Task 2).**
   `createSuggestionDbStore` asks `library/listPublicTypes` once per project open
   and keeps `libraryPublicTypes` (name → the libraries declaring it) and

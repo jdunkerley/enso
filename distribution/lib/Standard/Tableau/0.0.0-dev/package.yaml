@@ -8,6 +8,7 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [Hyper_Column, Hyper_File, Hyper_Table]
 
 services:
   - provides: Standard.Base.System.File_Format.File_Format_SPI

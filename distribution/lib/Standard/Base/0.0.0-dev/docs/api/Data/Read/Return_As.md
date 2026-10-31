@@ -12,7 +12,6 @@
     - resolve value:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - type Return_As_Table_Mock
 - type SPI
-    - _get_known_return_classes -> Standard.Base.Data.Vector.Vector
     - new typ:Standard.Base.Any.Any -> Standard.Base.Data.Read.Return_As.SPI
 - replace_with_nothing_and_propagate vector:(Standard.Base.Data.Vector.Vector Standard.Base.Any.Any) on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior -> Standard.Base.Any.Any
 - Standard.Base.Data.Read.Return_As.Return_As.from that:Standard.Base.Data.Read.Return_As.Return_As_Base -> Standard.Base.Data.Read.Return_As.Return_As

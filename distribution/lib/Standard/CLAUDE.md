@@ -135,6 +135,20 @@ services:
     with: Standard.Base.Data.XML.XML_Format.XML_Format
 ```
 
+`Meta.lookup_services` finds the providers of every installed library, imported
+or not (a library is loaded when its provider is first resolved), so a new
+backend or format shows in the dropdowns without an import.
+
+## Public types
+
+A library outside the core set (Base, Table, Database, Visualization, Test)
+lists in `package.yaml`'s `public-types:` the capitalised names its `Main.enso`
+exports. The IDE uses the list to add an import for a library the engine has not
+loaded; `tools/ci/check-workflows.mjs` (`checkPublicTypes`) fails when it
+differs from `Main.enso`. So that the check can read them, such a `Main.enso`
+exports each name explicitly, one export per line: no `export all`, and no list
+split over several lines.
+
 ## Versions
 
 `0.0.0-dev` is rewritten at release time (see

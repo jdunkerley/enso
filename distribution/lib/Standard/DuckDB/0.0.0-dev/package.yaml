@@ -8,6 +8,7 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [DuckDB]
 
 services:
   - provides: Standard.Database.Connection.Database.Database_Connection_Details_SPI

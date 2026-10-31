@@ -17,6 +17,7 @@ import {
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
+  checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
   checkRepo,
@@ -29,6 +30,8 @@ import {
   checkWasmBindgenPins,
   checkWindowsInstallerSmokeTest,
   checkWorkflowsDeclarePermissions,
+  exportedTypes,
+  unreadableExports,
   loadRepo,
 } from './check-workflows.mjs'
 
@@ -989,6 +992,102 @@ describe('checkWasmBindgenPins', () => {
     assert.deepEqual(
       checkWasmBindgenPins(fixture({ 'workflows/a.yml': install('0.2.127') }, source)),
       ['a.yml: installs wasm-bindgen-cli@0.2.127, but app/rust-ffi/build-wasm.mjs pins 0.2.128'],
+    )
+  })
+})
+
+describe('exportedTypes', () => {
+  test('reads exports, aliases and lists, skipping functions and examples', () => {
+    assert.deepEqual(
+      exportedTypes(
+        [
+          'export project.DuckDB.DuckDB',
+          'export project.Table_Extensions.geo_distance',
+          'export project.S3.S3_File as File_On_S3',
+          'from project.Image export Image, Matrix',
+          '## Example',
+          '    export project.Not.Counted',
+          '',
+        ].join('\n'),
+      ),
+      ['DuckDB', 'File_On_S3', 'Image', 'Matrix'],
+    )
+  })
+})
+
+describe('unreadableExports', () => {
+  test('accepts the forms exportedTypes reads', () => {
+    assert.deepEqual(
+      unreadableExports(
+        [
+          'export project.DuckDB.DuckDB',
+          'export project.S3.S3_File as File_On_S3',
+          'from project.Image export Image, Matrix',
+          '## Example',
+          '    export project.Not.Counted',
+          '',
+        ].join('\n'),
+      ),
+      [],
+    )
+  })
+  test('rejects `export all`, a split list and any other export', () => {
+    assert.deepEqual(
+      unreadableExports(
+        [
+          'from project.Geo export all',
+          'from project.Image export Image,',
+          '    Matrix',
+          'from project.Image export Image',
+          '    , Matrix',
+          'from project.Image export all hiding Matrix',
+          'export project.Geo.Geo hiding x',
+        ].join('\n'),
+      ),
+      [
+        '1: `export all` (list the exported names)',
+        '2: an export list split over several lines (keep it on one line)',
+        '4: an export list split over several lines (keep it on one line)',
+        '6: `export all` (list the exported names)',
+        '7: an export the check cannot read',
+      ],
+    )
+  })
+})
+
+describe('checkPublicTypes', () => {
+  const lib = (yaml, main) => ({
+    'distribution/lib/Standard/Base/0.0.0-dev/package.yaml': 'name: Base\n',
+    'distribution/lib/Standard/Base/0.0.0-dev/src/Main.enso': 'export project.Any.Any\n',
+    'distribution/lib/Standard/Geo/0.0.0-dev/package.yaml': yaml,
+    'distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso': main,
+  })
+  const main = 'export project.Geo.Geo\nexport project.Table_Extensions.geo_distance\n'
+  const at = 'distribution/lib/Standard/Geo/0.0.0-dev/package.yaml:'
+
+  test('accepts a matching declaration, and ignores the core set', () => {
+    assert.deepEqual(
+      checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main))),
+      [],
+    )
+  })
+  test('requires the declaration outside the core set', () => {
+    assert.deepEqual(checkPublicTypes(fixture({}, lib('name: Geo\n', main))), [
+      `${at} no \`public-types:\` list (its Main.enso exports [Geo])`,
+    ])
+  })
+  test('reports a declaration that differs from the exports', () => {
+    assert.deepEqual(
+      checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo, Old]\n', main))),
+      [`${at} \`public-types\` is [Geo, Old] but Main.enso exports [Geo]`],
+    )
+  })
+  test('reports an export of Main.enso it cannot read', () => {
+    assert.deepEqual(
+      checkPublicTypes(
+        fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main + 'from project.X export all\n')),
+      ),
+      ['distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso:3: `export all` (list the exported names)'],
     )
   })
 })

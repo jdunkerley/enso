@@ -8,6 +8,7 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [Image, Matrix, Read_Flag, Write_Flag]
 
 services:
   - provides: Standard.Base.System.File_Format.File_Format_SPI

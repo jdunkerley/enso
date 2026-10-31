@@ -8,3 +8,4 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [Google_Analytics, Google_Credential, Google_Sheets]

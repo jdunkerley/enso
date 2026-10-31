@@ -46,6 +46,49 @@ export const STDLIB_TEST_MAP = 'tools/ci/stdlib-test-map.yaml'
  */
 const ENSO_IMPORT = /^(?:from|import)\s+(?:Standard\.(\w+)|enso_dev\.(\w+))/gm
 
+/** The standard libraries every project gets; the others declare `public-types:`. */
+export const CORE_LIBRARIES = ['Base', 'Database', 'Table', 'Test', 'Visualization']
+
+/**
+ * A top-level export of `Main.enso`: `export a.b.C`, `export a.b.C as D` or `from a.b export C, D`.
+ * Indented lines are examples in doc comments and do not count.
+ */
+const ENSO_EXPORT =
+  /^(?:export\s+(?:[\w.]*\.)?(\w+)(?:\s+as\s+(\w+))?|from\s+[\w.]+\s+export\s+([\w, ]+?))\s*$/gm
+
+/** The capitalised names a `Main.enso` exports: what its library declares in `public-types:`. */
+export function exportedTypes(mainSource) {
+  const names = new Set()
+  for (const [, last, alias, list] of mainSource.matchAll(ENSO_EXPORT)) {
+    const exported = list != null ? list.split(',').map((name) => name.trim()) : [alias ?? last]
+    for (const name of exported) if (/^[A-Z]/.test(name)) names.add(name)
+  }
+  return [...names].sort()
+}
+
+/**
+ * The top-level exports of a `Main.enso` that `exportedTypes` cannot read, as `<line>: <reason>`:
+ * `export all` (the names it exports are not in the source), a list split over several lines
+ * (only the first would be read), and any other form. Without this they would be skipped, and a
+ * library could export a type its `public-types:` does not list.
+ */
+export function unreadableExports(mainSource) {
+  const lines = mainSource.split('\n')
+  const problems = []
+  lines.forEach((line, i) => {
+    if (!/^(?:export\s|from\s+\S+\s+export\b)/.test(line)) return
+    const continued = line.trimEnd().endsWith(',') || /^\s+[^\s#]/.test(lines[i + 1] ?? '')
+    if (/\bexport\s+all\b/.test(line)) {
+      problems.push(`${i + 1}: \`export all\` (list the exported names)`)
+    } else if (continued) {
+      problems.push(`${i + 1}: an export list split over several lines (keep it on one line)`)
+    } else if (!new RegExp(ENSO_EXPORT.source).test(line)) {
+      problems.push(`${i + 1}: an export the check cannot read`)
+    }
+  })
+  return problems
+}
+
 /** Every `.ts` file under `dir`, as paths relative to `base` with `/` separators. */
 function typeScriptFiles(dir, base) {
   if (!existsSync(dir)) return []
@@ -115,12 +158,26 @@ function loadStdlib(root) {
   const map = existsSync(mapFile) ? parse(readFileSync(mapFile, 'utf8')) : null
   const standard = path.join(root, 'distribution', 'lib', 'Standard')
   const libraries = {}
+  const publicTypes = {}
   for (const name of subdirectories(standard)) {
     const version = subdirectories(path.join(standard, name)).find((dir) =>
       existsSync(path.join(standard, name, dir, 'package.yaml')),
     )
     libraries[name] =
       version == null ? [] : ensoImports(path.join(standard, name, version, 'src'), name).libraries
+    const dir = version == null ? null : path.join(standard, name, version)
+    const main = dir == null ? null : path.join(dir, 'src', 'Main.enso')
+    const mainSource = main != null && existsSync(main) ? readFileSync(main, 'utf8') : ''
+    publicTypes[name] =
+      dir == null ?
+        null
+      : {
+          declared: parse(readFileSync(path.join(dir, 'package.yaml'), 'utf8'))?.['public-types'],
+          exported: exportedTypes(mainSource),
+          unreadable: unreadableExports(mainSource),
+          source: path.posix.join('distribution/lib/Standard', name, version, 'package.yaml'),
+          mainSource: path.posix.join('distribution/lib/Standard', name, version, 'src/Main.enso'),
+        }
   }
   const testDir = path.join(root, 'test')
   const testProjects = {}
@@ -128,7 +185,13 @@ function loadStdlib(root) {
     if (!name.endsWith('_Tests') || !existsSync(path.join(testDir, name, 'package.yaml'))) continue
     testProjects[name] = ensoImports(path.join(testDir, name, 'src'), name)
   }
-  return { map, libraries, stdBits: subdirectories(path.join(root, 'std-bits')), testProjects }
+  return {
+    map,
+    libraries,
+    publicTypes,
+    stdBits: subdirectories(path.join(root, 'std-bits')),
+    testProjects,
+  }
 }
 
 /**
@@ -980,6 +1043,33 @@ export function checkStdlibTestMap({ stdlib }) {
 }
 
 /**
+ * Every library outside the core set declares, in `package.yaml`'s `public-types:`, exactly the
+ * capitalised names its `Main.enso` exports, so that the IDE can find a type's library without
+ * loading it (spec 2026-10-30-postgres-sqlite-libraries, Amendment 1).
+ */
+export function checkPublicTypes({ stdlib }) {
+  const problems = []
+  for (const [name, entry] of Object.entries(stdlib.publicTypes ?? {})) {
+    if (entry == null || CORE_LIBRARIES.includes(name)) continue
+    const { declared, exported, unreadable, source, mainSource } = entry
+    for (const problem of unreadable ?? []) problems.push(`${mainSource}:${problem}`)
+    if (!Array.isArray(declared)) {
+      problems.push(
+        `${source}: no \`public-types:\` list (its Main.enso exports [${exported.join(', ')}])`,
+      )
+      continue
+    }
+    const sorted = [...declared].map(String).sort()
+    if (sorted.join(',') !== exported.join(',')) {
+      problems.push(
+        `${source}: \`public-types\` is [${sorted.join(', ')}] but Main.enso exports [${exported.join(', ')}]`,
+      )
+    }
+  }
+  return problems
+}
+
+/**
  * The group filter reaches every standard library test job that the plan (`stdlib-test-plan`)
  * builds: a step that runs `stdlib-test` for `matrix.only` must set `ENSO_TEST_GROUP_FILTER` from
  * `matrix.group-filter`, or a split job (Table_Tests by database backend) would silently run its
@@ -1024,6 +1114,7 @@ export const CHECKS = [
   checkWorkflowsDeclarePermissions,
   checkChangedFilesCountDeletions,
   checkStdlibTestMap,
+  checkPublicTypes,
   checkStdlibTestsGetTheGroupFilter,
 ]
 

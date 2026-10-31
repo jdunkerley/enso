@@ -7,7 +7,6 @@ import project.Errors.File_Error.File_Error
 import project.Errors.Illegal_Argument.Illegal_Argument
 import project.Errors.Illegal_State.Illegal_State
 import project.Meta
-import project.Nothing.Nothing
 import project.Panic.Panic
 import project.System.File.Data_Link_Access.Data_Link_Access
 import project.System.File.File
@@ -19,6 +18,7 @@ from project.Data.Boolean import Boolean, False, True
 from project.Data.Text.Extensions import all
 from project.Enso_Cloud.Data_Link_Helpers import all
 from project.Error import all
+from project.Nothing import all
 
 ## Helper methods allowing to manipulate the raw configuration of data links.
 type Data_Link
@@ -243,8 +243,10 @@ type Data_Link_SPI
         Data_Link_SPI.Value typ link_type_name
 
     private find_data_link_type name =
-        all = Meta.lookup_services Data_Link_SPI
-        found = all . filter (\spi -> spi.name == name)
-        if found.length == 0 then Nothing else
-            found.first.typ
+        find loaded_only =
+            found = Meta.lookup_services Data_Link_SPI loaded_only=loaded_only . find if_missing=Nothing spi->
+                spi.name == name
+            if found.is_nothing then Nothing else found.typ
+        # Loaded libraries first; the second pass repeats their providers, which is negligible.
+        (find True) . if_nothing (find False)
 

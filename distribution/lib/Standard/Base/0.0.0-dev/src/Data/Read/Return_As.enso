@@ -12,7 +12,7 @@ import project.Meta
 import project.Metadata.Display
 import project.Metadata.Widget
 import project.Panic.Panic
-from project.Data.Boolean import False, True
+from project.Data.Boolean import Boolean, False, True
 from project.Metadata.Choice import Option
 from project.Metadata.Widget import Single_Choice
 from project.Nothing import all
@@ -52,12 +52,15 @@ type Return_As
                         Error.throw (Illegal_Argument.Error "The method returns a merged Table by default, but Standard.Table is not imported. Add an import, or use `As_Vector`.")
                     False ->
                         Error.throw (Illegal_Argument.Error "Expected Return_As, but got a function.")
-            types = SPI._get_known_return_classes
-            try_next idx =
-                if idx >= types.length then symbol_not_found else
-                    resolved = (types.at idx).resolve value
-                    if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
-            try_next 0
+            first_resolved types =
+                try_next idx =
+                    if idx >= types.length then Nothing else
+                        resolved = (types.at idx).resolve value
+                        if resolved.is_nothing then @Tail_Call try_next (idx + 1) else resolved
+                try_next 0
+            # Loaded libraries first; the second pass repeats their providers, which is negligible.
+            (first_resolved (SPI._get_known_return_classes loaded_only=True)) . if_nothing <|
+                (first_resolved SPI._get_known_return_classes) . if_nothing symbol_not_found
         _ : Return_As -> value
         _ -> Panic.throw (Type_Error.Error Return_As value "Expected `return` to be a Return_As type, but got {got}.")
 
@@ -136,6 +139,6 @@ type SPI
        ---
     new typ -> SPI = SPI.Value typ
 
-    private _get_known_return_classes -> Vector =
-        Meta.lookup_services SPI . map .typ
+    private _get_known_return_classes (loaded_only:Boolean=False) -> Vector =
+        Meta.lookup_services SPI loaded_only=loaded_only . map .typ
 

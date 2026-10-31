@@ -8,6 +8,7 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
+public-types: [Strava, Salesforce]
 
 services:
   # Email_Provider_SPI definitions
