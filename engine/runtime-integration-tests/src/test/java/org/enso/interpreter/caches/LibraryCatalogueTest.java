@@ -94,34 +94,31 @@ public class LibraryCatalogueTest {
   }
 
   @Test
-  public void changingASourceChangesTheHash() throws IOException {
+  public void changingASourceChangesTheCatalogue() throws IOException {
     var projDir = createLibrary();
     compile(projDir);
-    var before = readCatalogue(projDir).sourceHash();
+    var before = readCatalogue(projDir);
+    assertTrue(
+        "the first compilation wrote the library's bindings cache",
+        Files.isDirectory(projDir.resolve(".enso").resolve("cache").resolve("bindings")));
 
+    // Recompiled with the caches of the first compilation in place, as
+    // `enso --compile` after an edit is (Note [Compile Target Skips Its
+    // Bindings Cache] in `TruffleCompilerContext`).
     Files.writeString(
         projDir.resolve("src").resolve("Main.enso"), MAIN + "\n## Another.\nother = 1\n");
-    // The library's bindings cache is not checked against the sources: with it,
-    // the second compilation would reuse the old modules' IR
-    // (`TruffleCompilerContext.deserializeModule`), so drop the caches.
-    deleteRecursively(projDir.resolve(".enso"));
     compile(projDir);
 
     var after = readCatalogue(projDir);
-    assertNotEquals(before, after.sourceHash());
+    assertNotEquals(before.sourceHash(), after.sourceHash());
     assertEquals(sourceHash(projDir), after.sourceHash());
+    assertFalse(
+        entryNames(before).toString(), entryNames(before).contains("local.Catalogued.Main.other"));
     assertTrue(
         entryNames(after).toString(), entryNames(after).contains("local.Catalogued.Main.other"));
-  }
-
-  private static void deleteRecursively(Path dir) throws IOException {
-    if (Files.exists(dir)) {
-      try (var paths = Files.walk(dir)) {
-        for (var path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
-          Files.delete(path);
-        }
-      }
-    }
+    var added = new java.util.HashSet<>(entryNames(after));
+    added.removeAll(entryNames(before));
+    assertEquals(Set.of("local.Catalogued.Main.other"), added);
   }
 
   @Test
