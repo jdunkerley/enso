@@ -2,7 +2,7 @@ package org.enso.searcher.sql
 
 import org.enso.polyglot.{ExportedSymbol, ModuleExports, Suggestion}
 import org.enso.polyglot.runtime.Runtime.Api
-import org.enso.searcher.SuggestionEntry
+import org.enso.searcher.{SuggestionEntry, SuggestionsRepo}
 import org.enso.searcher.data.QueryResult
 import org.enso.searcher.memory.InMemorySuggestionsRepo
 import org.enso.searcher.sql.equality.SuggestionsEquality
@@ -111,6 +111,42 @@ class SuggestionsRepoTest
         val (v1, v2, removed) = Await.result(action, Timeout)
         v1 shouldEqual v2
         removed shouldEqual Seq()
+    }
+
+    "remove suggestions by ids" taggedAs Retry in withRepo { repo =>
+      val action = for {
+        (v1, ids)     <- repo.insertAll(suggestion.all)
+        (v2, removed) <- repo.removeAll(ids.take(2) :+ 999L)
+        all           <- repo.getAll
+      } yield (ids, v1, v2, removed, all._2)
+
+      val (ids, v1, v2, removed, entries) = Await.result(action, Timeout)
+      removed shouldEqual ids.take(2)
+      v2 shouldEqual v1 + 1
+      entries.map(_.id) should contain theSameElementsAs ids.drop(2)
+    }
+
+    "remove no suggestions by an empty list of ids" taggedAs Retry in withRepo {
+      repo =>
+        val action = for {
+          (v1, _)       <- repo.insertAll(suggestion.all)
+          (v2, removed) <- repo.removeAll(Seq())
+        } yield (v1, v2, removed)
+
+        val (v1, v2, removed) = Await.result(action, Timeout)
+        v1 shouldEqual v2
+        removed shouldEqual Seq()
+    }
+
+    "partition out the duplicates insertAll would reject" taggedAs Retry in withRepo {
+      repo =>
+        val again = suggestion.method.copy(documentation = Some(" Again."))
+        val (kept, duplicates) = SuggestionsRepo.partitionDuplicates(
+          Seq(suggestion.method, suggestion.tpe, again)
+        )
+        kept shouldEqual Seq(suggestion.method, suggestion.tpe)
+        duplicates shouldEqual Seq(again)
+        Await.result(repo.insertAll(kept), Timeout)._2.size shouldEqual 2
     }
 
     "get version" taggedAs Retry in withRepo { repo =>

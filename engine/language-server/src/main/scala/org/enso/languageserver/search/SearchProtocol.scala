@@ -14,6 +14,12 @@ object SearchProtocol {
 
   private object CodecField {
 
+    val FromCatalogue = "fromCatalogue"
+
+    val Id = "id"
+
+    val Suggestion = "suggestion"
+
     val Type = "type"
   }
 
@@ -133,9 +139,15 @@ object SearchProtocol {
       *
       * @param id the suggestion id
       * @param suggestion the new suggestion
+      * @param fromCatalogue whether the entry comes from the catalogue of an
+      * installed library that is not loaded yet; sent as `fromCatalogue: true`
+      * on the suggestion, and left out when false
       */
-    case class Add(id: SuggestionId, suggestion: Suggestion)
-        extends SuggestionsDatabaseUpdate
+    case class Add(
+      id: SuggestionId,
+      suggestion: Suggestion,
+      fromCatalogue: Boolean = false
+    ) extends SuggestionsDatabaseUpdate
 
     /** Remove the database entry.
       *
@@ -171,7 +183,20 @@ object SearchProtocol {
       Decoder.instance { cursor =>
         cursor.downField(CodecField.Type).as[String].flatMap {
           case CodecType.Add =>
-            Decoder[SuggestionsDatabaseUpdate.Add].tryDecode(cursor)
+            for {
+              id <- cursor.downField(CodecField.Id).as[SuggestionId]
+              suggestion <- cursor
+                .downField(CodecField.Suggestion)
+                .as[Suggestion]
+              fromCatalogue <- cursor
+                .downField(CodecField.Suggestion)
+                .downField(CodecField.FromCatalogue)
+                .as[Option[Boolean]]
+            } yield SuggestionsDatabaseUpdate.Add(
+              id,
+              suggestion,
+              fromCatalogue.contains(true)
+            )
 
           case CodecType.Remove =>
             Decoder[SuggestionsDatabaseUpdate.Remove].tryDecode(cursor)
@@ -184,10 +209,18 @@ object SearchProtocol {
     implicit val encoder: Encoder[SuggestionsDatabaseUpdate] =
       Encoder.instance[SuggestionsDatabaseUpdate] {
         case add: SuggestionsDatabaseUpdate.Add =>
-          Encoder[SuggestionsDatabaseUpdate.Add]
-            .apply(add)
-            .deepMerge(Json.obj(CodecField.Type -> CodecType.Add.asJson))
-            .dropNullValues
+          val suggestion = Encoder[Suggestion].apply(add.suggestion)
+          Json.obj(
+            CodecField.Id -> add.id.asJson,
+            CodecField.Suggestion -> (
+              if (add.fromCatalogue)
+                suggestion.deepMerge(
+                  Json.obj(CodecField.FromCatalogue -> Json.True)
+                )
+              else suggestion
+            ),
+            CodecField.Type -> CodecType.Add.asJson
+          )
 
         case remove: SuggestionsDatabaseUpdate.Remove =>
           Encoder[SuggestionsDatabaseUpdate.Remove]

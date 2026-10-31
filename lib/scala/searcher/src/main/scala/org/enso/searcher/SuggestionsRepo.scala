@@ -7,6 +7,9 @@ import org.enso.polyglot.runtime.Runtime.Api.{
   SuggestionsDatabaseAction
 }
 import org.enso.searcher.data.QueryResult
+import org.enso.searcher.sql.SuggestionRowUniqueIndex
+
+import scala.collection.mutable
 
 /** The object for accessing the suggestions database. */
 trait SuggestionsRepo[F[_]] {
@@ -71,6 +74,29 @@ trait SuggestionsRepo[F[_]] {
     */
   def removeModules(modules: Seq[String]): F[(Long, Seq[Long])]
 
+  /** Remove suggestions by their ids.
+    *
+    * @param ids the ids of the suggestions to remove
+    * @return the current database version and the ids that were removed
+    */
+  def removeAll(ids: Seq[Long]): F[(Long, Seq[Long])]
+
   /** Cleans the repo resetting the version. */
   def clean: F[Unit]
+}
+
+object SuggestionsRepo {
+
+  /** Splits `suggestions` into those `insertAll` accepts together and the
+    * duplicates it would reject: a suggestion whose
+    * [[SuggestionRowUniqueIndex]] an earlier one has.
+    *
+    * @return the first suggestion of each index, in order, and the rest
+    */
+  def partitionDuplicates(
+    suggestions: Seq[Suggestion]
+  ): (Seq[Suggestion], Seq[Suggestion]) = {
+    val seen = mutable.HashSet[SuggestionRowUniqueIndex]()
+    suggestions.partition(s => seen.add(SuggestionRowUniqueIndex(s)))
+  }
 }

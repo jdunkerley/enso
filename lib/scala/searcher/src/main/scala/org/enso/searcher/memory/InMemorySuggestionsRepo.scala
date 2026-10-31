@@ -247,6 +247,20 @@ class InMemorySuggestionsRepo(implicit ec: ExecutionContext)
       }
     }
 
+  /** Remove suggestions by their ids.
+    *
+    * @param ids the ids of the suggestions to remove
+    * @return the current database version and the ids that were removed
+    */
+  override def removeAll(ids: Seq[Long]): Future[(Long, Seq[Long])] =
+    Future {
+      db.synchronized {
+        val removed = ids.filter(id => db.remove(id).isDefined)
+        condVersionIncrement(removed.nonEmpty)
+        (version, removed)
+      }
+    }
+
   private def versionIncrement(): Unit = {
     version += 1
   }

@@ -47,6 +47,11 @@ export interface SuggestionEntryCommon extends DocumentationData {
   returnType(projectNames: ProjectNameStore): Typename
   /** The fully qualified name of the `SuggestionEntry`, disregarding reexports. */
   definitionPath: ProjectPath
+  /**
+   * The entry comes from the catalogue of a library the engine has not loaded yet: the language
+   * server swaps it for the real one when the library loads.
+   */
+  fromCatalogue: boolean
 }
 
 interface Reexportable {

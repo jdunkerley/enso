@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import {
+  useCurrentProject,
   useProjectNames,
   useProjectStore,
   useSuggestionDbStore,
 } from '$/components/WithCurrentProject.vue'
-import { makeComponentLists, type Component } from '@/components/ComponentBrowser/component'
+import { importedLibraries } from '$/providers/openedProjects/module/imports'
+import {
+  makeComponentLists,
+  sameMembers,
+  type Component,
+} from '@/components/ComponentBrowser/component'
 import ComponentEntry from '@/components/ComponentBrowser/ComponentEntry.vue'
 import { Filtering, type Filter } from '@/components/ComponentBrowser/filtering'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -13,6 +19,7 @@ import { groupColorStyle } from '@/composables/nodeColors'
 import { Ast } from '@/util/ast'
 import { unqualifyQualifiedNames } from '@/util/ast/abstract'
 import { tryGetIndex } from '@/util/data/array'
+import type { QualifiedName } from '@/util/qualifiedName'
 import * as map from 'lib0/map'
 import { computed, ref, watch } from 'vue'
 import type { ComponentExposed } from 'vue-component-type-helpers'
@@ -63,8 +70,18 @@ watch(selectedGroupIndex, () => (selectedComponentIndex.value = 0))
 
 const suggestionDbStore = useSuggestionDbStore()
 const projectNames = useProjectNames()
+const { module } = useCurrentProject()
+// The module's AST is replaced on every edit: keep the previous set while the imports are the same,
+// so the lists are not rebuilt for nothing.
+const libraries = computed<ReadonlySet<QualifiedName>>((previous) => {
+  const current =
+    module.value.root ?
+      importedLibraries(module.value.root, projectNames)
+    : new Set<QualifiedName>()
+  return previous && sameMembers(previous, current) ? previous : current
+})
 const components = computed(() => {
-  const lists = makeComponentLists(suggestionDbStore.entries, filtering.value)
+  const lists = makeComponentLists(suggestionDbStore.entries, filtering.value, libraries.value)
   if (props.literal != null) {
     map
       .setIfUndefined(lists, 'all', (): Component[] => [])
