@@ -58,7 +58,7 @@ export interface NodeCreationOptions<Placement extends PlacementStrategy = Place
 
 /** TODO: Add docs */
 export function useNodeCreation(
-  moduleStore: ToValue<Pick<ModuleStore, 'edit' | 'addMissingImports'>>,
+  moduleStore: ToValue<Pick<ModuleStore, 'edit' | 'addMissingImports' | 'addDetectedImports'>>,
   graphStore: ToValue<GraphStore>,
   viewport: ToValue<GraphNavigator['viewport']>,
   sceneMousePos: ToValue<GraphNavigator['sceneMousePos']>,
@@ -181,6 +181,7 @@ export function useNodeCreation(
       // https://github.com/enso-org/enso/issues/9356
       // substituteQualifiedNameByPattern(assignment, conflict.pattern, conflict.fullyQualified)
     }
+    toValue(moduleStore).addDetectedImports(edit, assignment)
   }
 
   let delayedNodesToCreate: NodeCreationOptions[] = []

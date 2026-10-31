@@ -305,6 +305,14 @@ export interface LibraryComponentGroup {
   exports: LibraryComponent[]
 }
 
+/** A type an installed library declares in its `package.yaml` (`public-types:`). */
+export interface LibraryPublicType {
+  /** The type's name, as the library's `Main.enso` exports it. */
+  name: string
+  /** The library's qualified name, e.g. `Standard.SQLite`. */
+  library: string
+}
+
 export interface VisualizationConfiguration {
   /** An execution context of the visualization. */
   executionContextId: ContextId
@@ -429,6 +437,10 @@ export namespace response {
 
   export interface GetComponentGroups {
     componentGroups: LibraryComponentGroup[]
+  }
+
+  export interface ListLibraryPublicTypes {
+    publicTypes: LibraryPublicType[]
   }
 
   export interface RenameSymbol {

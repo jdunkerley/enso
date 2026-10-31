@@ -17,6 +17,7 @@ function mockLanguageServer() {
     acquireCapability: async () => Ok(undefined),
     getComponentGroups: async () =>
       Ok({ componentGroups: [{ library: 'Standard.Base', name: 'Input', exports: [] }] }),
+    listLibraryPublicTypes: async () => Ok({ publicTypes: [] }),
     getSuggestionsDatabase: () => database,
     on: ((_event: unknown, callback: unknown) => callback) as LanguageServer['on'],
     off: (() => {}) as LanguageServer['off'],

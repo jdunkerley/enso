@@ -21,7 +21,7 @@ import { ProjectPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import { Err, Ok, type Result } from 'enso-common/src/utilities/data/result'
-import { computed, markRaw, readonly, ref } from 'vue'
+import { computed, markRaw, readonly, ref, shallowRef } from 'vue'
 import { LanguageServer } from 'ydoc-shared/languageServer'
 import type { SuggestionDatabaseUpdates } from 'ydoc-shared/languageServerTypes'
 import * as lsTypes from 'ydoc-shared/languageServerTypes/suggestions'
@@ -343,6 +343,29 @@ async function loadGroups(lsRpc: LanguageServer, firstExecution: Promise<unknown
   }))
 }
 
+/**
+ * The types the installed libraries declare, by name: how the import detector finds the library of
+ * a type whose library the engine has not loaded, so the suggestion database has no entry for it.
+ */
+async function loadLibraryPublicTypes(
+  lsRpc: LanguageServer,
+  projectNames: ProjectNameStore,
+): Promise<ReadonlyMap<string, readonly ProjectPath[]>> {
+  const result = await exponentialBackoff(() => lsRpc.listLibraryPublicTypes())
+  if (!result.ok) {
+    if (!lsRpc.isDisposed) {
+      result.error.log("Cannot read the libraries' public types. Continuing without them")
+    }
+    return new Map()
+  }
+  const byName = new Map<string, ProjectPath[]>()
+  for (const { name, library } of result.value.publicTypes) {
+    const path = projectNames.parseProjectPath(library as QualifiedName)
+    if (path.ok) byName.set(name, [...(byName.get(name) ?? []), path.value])
+  }
+  return byName
+}
+
 /** {@link useSuggestionDbStore} composable object */
 export type SuggestionDbStore = ReturnType<typeof createSuggestionDbStore>
 /**
@@ -379,9 +402,19 @@ export function createSuggestionDbStore(
   /** Whether the initial suggestion database (and so the component groups) has been loaded. */
   const loaded = ref(false)
   _synchronizer.initialized.then(() => (loaded.value = true))
+  /** The installed libraries' declared types, read once when the project opens. */
+  const libraryPublicTypes = shallowRef<ReadonlyMap<string, readonly ProjectPath[]>>(new Map())
+  const publicTypesLoaded = ref(false)
+  loadLibraryPublicTypes(projectStore.lsRpcConnection, projectNames).then((byName) => {
+    libraryPublicTypes.value = byName
+    publicTypesLoaded.value = true
+  })
+
   return proxyRefs({
     entries: markRaw(entries),
     groups: readonly(groups),
+    libraryPublicTypes,
+    publicTypesLoaded: readonly(publicTypesLoaded),
     loaded: readonly(loaded),
     _synchronizer,
     mockSuggestion,

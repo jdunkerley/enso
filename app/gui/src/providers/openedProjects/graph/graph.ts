@@ -363,20 +363,10 @@ export function createGraphStore(
       const editExpr = edit.getVersion(node.innerExpr)
       editExpr.syncToCode(content)
       if (withImports) {
-        const conflicts = module.addMissingImports(edit, withImports)
-        if (conflicts == null) return Ok()
-        const wholeAssignment = editExpr.mutableParent()
-        if (wholeAssignment == null) {
-          console.error('Cannot find parent of the node expression. Conflict resolution failed.')
-          // We still want to commit change.
-          return Ok()
-        }
-        for (const _conflict of conflicts) {
-          // TODO: Substitution does not work, because we interpret imports wrongly. To be fixed in
-          // https://github.com/enso-org/enso/issues/9356
-          // substituteQualifiedNameByPattern(wholeAssignment, conflict.pattern, conflict.fullyQualified)
-        }
+        // TODO: substituting conflicting names does not work (enso-org/enso#9356).
+        module.addMissingImports(edit, withImports)
       }
+      module.addDetectedImports(edit, editExpr)
       return Ok()
     })
   }

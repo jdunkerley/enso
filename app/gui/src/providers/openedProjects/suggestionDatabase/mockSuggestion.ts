@@ -50,7 +50,10 @@ export function makeModule(
 }
 
 /** Mock a type suggestion entry. */
-export function makeType(fqn: string, opts: CommonOptions = {}): SuggestionEntry {
+export function makeType(
+  fqn: string,
+  opts: CommonOptions & { reexport?: string } = {},
+): SuggestionEntry {
   assert(isQualifiedName(fqn))
   const [definedIn, name] = qnSplit(fqn)
   assert(definedIn != null)
@@ -60,6 +63,7 @@ export function makeType(fqn: string, opts: CommonOptions = {}): SuggestionEntry
       module: definedIn,
       name,
       params: [],
+      ...(opts.reexport ? { reexport: opts.reexport } : {}),
     },
     opts.projectNames,
   )

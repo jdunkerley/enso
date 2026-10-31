@@ -266,7 +266,8 @@ function definedInEntry(db: SuggestionDb, entry: SuggestionEntry): SuggestionEnt
   return db.getEntryByProjectPath(entry.definedIn)
 }
 
-function entryPathFromRequiredImport(importStatement: RequiredImport): ProjectPath {
+/** The project path of the entry that a required import brings in. */
+export function entryPathFromRequiredImport(importStatement: RequiredImport): ProjectPath {
   return importStatement.kind === 'Qualified' ?
       importStatement.module
     : importStatement.from.append(importStatement.import)
@@ -321,6 +322,103 @@ export function filterOutRedundantImports(
   required: RequiredImport[],
 ): RequiredImport[] {
   return required.filter((info) => !existing.some((existing) => covers(existing, info)))
+}
+
+// =======================
+// === Missing imports ===
+// =======================
+
+const TYPE_NAME = /^[A-Z][A-Za-z0-9_]*$/
+
+/**
+ * The imports that the type names used in `scope` need and the module lacks (the design is
+ * `docs/superpowers/specs/2026-10-30-postgres-sqlite-libraries-design.md`, section 3 and its
+ * Amendments 1 and 6).
+ *
+ * A name counts when it is capitalised and starts an expression or a qualified access (`Postgres`
+ * in `Postgres.Server 'h' 5432`). It is skipped when the module binds it (an assignment, a
+ * function, a name an import brings in), when an existing import covers it, and when it is
+ * autoscoped (`..Server`). Otherwise it is looked up among the suggestion database's types: one
+ * match gives that entry's {@link requiredImports}; a type of the current project, or several
+ * matches, give nothing. With no match, `libraryPublicTypes` (the types the installed libraries
+ * declare) gives the import when exactly one library declares the name.
+ * @param moduleRoot - The module's top-level block, for its bindings.
+ * @param scope - The part of the module to look at, such as a node's expression.
+ */
+export function missingImports(
+  moduleRoot: Ast.BodyBlock,
+  db: SuggestionDb,
+  existingImports: readonly AbstractImport[],
+  scope: Ast.Ast = moduleRoot,
+  libraryPublicTypes: ReadonlyMap<string, readonly ProjectPath[]> = new Map(),
+): RequiredImport[] {
+  const bound = boundNames(moduleRoot, existingImports)
+  const result: RequiredImport[] = []
+  for (const name of new Set(referencedTypeNames(scope))) {
+    if (bound.has(name)) continue
+    for (const required of importsForTypeName(db, name, libraryPublicTypes)) {
+      const covered = existingImports.some((existing) => covers(existing, required))
+      if (!covered && !result.some((r) => requiredImportEquals(r, required))) result.push(required)
+    }
+  }
+  return result
+}
+
+/** Capitalised names that start an expression or a qualified access, as `Ast.visitRecursive` finds them. */
+function referencedTypeNames(scope: Ast.Ast): string[] {
+  const names: string[] = []
+  Ast.visitRecursive(scope, (ast) => {
+    if (ast instanceof Ast.Import || ast instanceof Ast.AutoscopedIdentifier) return false
+    if (ast instanceof Ast.PropertyAccess) return ast.lhs ? [ast.lhs] : false
+    if (ast instanceof Ast.Ident && TYPE_NAME.test(ast.code())) names.push(ast.code())
+    return true
+  })
+  return names
+}
+
+/** Names the module binds: assignments, functions, and what its imports bring in by name. */
+function boundNames(moduleRoot: Ast.BodyBlock, existingImports: readonly AbstractImport[]) {
+  const bound = new Set<string>()
+  for (const { from, imported } of existingImports) {
+    if (imported.kind === 'Module') {
+      const name =
+        imported.alias ??
+        (from.path ? qnLastSegment(from.path)
+        : from.project ? qnLastSegment(from.project)
+        : undefined)
+      if (name) bound.add(name)
+    } else if (imported.kind === 'List') {
+      for (const name of imported.names) bound.add(name)
+    }
+  }
+  Ast.visitRecursive(moduleRoot, (ast) => {
+    if (ast instanceof Ast.Assignment && ast.pattern instanceof Ast.Ident) {
+      bound.add(ast.pattern.code())
+    } else if (ast instanceof Ast.FunctionDef && ast.name instanceof Ast.Ident) {
+      bound.add(ast.name.code())
+    }
+    return true
+  })
+  return bound
+}
+
+function importsForTypeName(
+  db: SuggestionDb,
+  name: string,
+  libraryPublicTypes: ReadonlyMap<string, readonly ProjectPath[]>,
+): RequiredImport[] {
+  const types: SuggestionEntry[] = []
+  for (const id of db.conflictingNames.lookup(name as Identifier)) {
+    const entry = db.get(id)
+    if (entry?.kind === SuggestionKind.Type) types.push(entry)
+  }
+  if (types.some((entry) => entry.definedIn.project == null)) return []
+  if (types.length === 1) return requiredImports(db, types[0]!)
+  if (types.length > 1) return []
+  const libraries = libraryPublicTypes.get(name) ?? []
+  return libraries.length === 1 ?
+      [{ kind: 'Unqualified', from: libraries[0]!, import: name as Identifier }]
+    : []
 }
 
 /* Information about detected conflict import, and advisory on resolution. */
