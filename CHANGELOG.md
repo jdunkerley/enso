@@ -325,7 +325,7 @@
   libraries' choices, even those not imported yet][465]
 - [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass
   credentials explicitly or use AWS credentials.
-- [PostgreSQL][PGNUM] and [SQLite][468] are now their own libraries,
+- [PostgreSQL][481] and [SQLite][468] are now their own libraries,
   `Standard.Postgres` and `Standard.SQLite`: the IDE adds their imports where
   code uses them and fixes older projects when they open, and
   `Database.connect`'s list, `Data.read` of a SQLite file and saved PostgreSQL
@@ -444,7 +444,7 @@
 [412]: https://github.com/jdunkerley/enso/pull/412
 [464]: https://github.com/jdunkerley/enso/pull/464
 [468]: https://github.com/jdunkerley/enso/pull/468
-[PGNUM]: https://github.com/jdunkerley/enso/pull/PGNUM
+[481]: https://github.com/jdunkerley/enso/pull/481
 
 # Enso 2026.1
 
