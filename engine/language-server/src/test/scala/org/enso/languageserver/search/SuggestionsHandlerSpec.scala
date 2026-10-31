@@ -17,6 +17,7 @@ import org.enso.languageserver.search.SearchProtocol.{
   SuggestionsDatabaseUpdate,
   SuggestionsDatabaseUpdateNotification
 }
+import org.enso.languageserver.runtime.ContextRegistryProtocol
 import org.enso.languageserver.session.JsonSession
 import org.enso.logger.ObservedMessage
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
@@ -1089,6 +1090,49 @@ class SuggestionsHandlerSpec
       entries.map(_.id) should contain theSameElementsAs Seq(2L, 3L)
     }
 
+    "remove a library's catalogue entries even if its suggestions cannot be inserted" taggedAs Retry in {
+      val repo = new FailingInsertRepo
+      withCatalogues(catalogues(Catalogue.bar), repo) {
+        (_, _, router, connector, handler) =>
+          val clientId = UUID.randomUUID()
+          acquireUpdates(handler, clientId)
+          fill(handler, connector)
+          router.expectMsgClass(classOf[DeliverToJsonController[_]])
+          repo.failInsert = true
+
+          handler ! Api.SuggestionsDatabaseSuggestionsLoadedNotification(
+            LibraryName("Foo", "Bar"),
+            Vector(Catalogue.barType, Catalogue.barMethod)
+          )
+          router.expectMsg(
+            DeliverToJsonController(
+              clientId,
+              SuggestionsDatabaseUpdateNotification(
+                2L,
+                Seq(
+                  SuggestionsDatabaseUpdate.Remove(1L),
+                  SuggestionsDatabaseUpdate.Remove(2L)
+                )
+              )
+            )
+          )
+      }
+    }
+
+    "report a failed invalidation as a failure only" taggedAs Retry in withDb {
+      (_, _, _, connector, handler) =>
+        val contextId = UUID.randomUUID()
+        handler ! SearchProtocol.InvalidateSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.ContextNotExistError(contextId)))
+        expectMsg(ContextRegistryProtocol.ContextNotFound(contextId))
+        expectNoMessage(300.millis)
+        // The handler is not left waiting for a result.
+        handler ! SearchProtocol.GetSuggestionsDatabaseVersion
+        expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(0L))
+    }
+
     "open the project without catalogues when they cannot be read" taggedAs Retry in {
       val logs = new CopyOnWriteArrayList[ObservedMessage]()
       val observing = ObservedMessage.observe(
@@ -1098,7 +1142,7 @@ class SuggestionsHandlerSpec
       def logged = logs.asScala.map(_.getFormattedMessage)
       try {
         val failing: CatalogueSource =
-          () => Future.failed(new RuntimeException("unreadable"))
+          _ => Future.failed(new RuntimeException("unreadable"))
         withCatalogues(failing) { (_, _, router, connector, handler) =>
           val clientId = UUID.randomUUID()
           acquireUpdates(handler, clientId)
@@ -1464,7 +1508,7 @@ class SuggestionsHandlerSpec
   }
 
   private def catalogues(installed: InstalledCatalogue*): CatalogueSource =
-    () => Future.successful(installed)
+    _ => Future.successful(installed)
 
   /** Catalogues that are read only once `gate` completes.
     *
@@ -1479,13 +1523,25 @@ class SuggestionsHandlerSpec
     val gate: Promise[Unit]    = Promise()
     val filling: Promise[Unit] = Promise()
     private val loads          = new AtomicInteger()
-    override def load(): Future[Seq[InstalledCatalogue]] = {
+    override def load(
+      exclude: Set[LibraryName]
+    ): Future[Seq[InstalledCatalogue]] = {
       if (loads.incrementAndGet() == 1) filling.success(())
       gate.future.map(_ => installed)
     }
 
     /** Wait until the handler reads the catalogues to insert them. */
     def awaitFilling(): Unit = Await.result(filling.future, Timeout)
+  }
+
+  /** A repository whose `insertAll` fails while `failInsert` is set. */
+  private class FailingInsertRepo extends InMemorySuggestionsRepo() {
+    @volatile var failInsert: Boolean = false
+    override def insertAll(
+      suggestions: Seq[Suggestion]
+    ): Future[(Long, Seq[Long])] =
+      if (failInsert) Future.failed(new RuntimeException("insert failed"))
+      else super.insertAll(suggestions)
   }
 
   /** A repository whose module updates wait for `gate`. */
