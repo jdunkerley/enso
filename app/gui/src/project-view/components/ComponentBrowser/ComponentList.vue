@@ -6,7 +6,11 @@ import {
   useSuggestionDbStore,
 } from '$/components/WithCurrentProject.vue'
 import { importedLibraries } from '$/providers/openedProjects/module/imports'
-import { makeComponentLists, type Component } from '@/components/ComponentBrowser/component'
+import {
+  makeComponentLists,
+  sameMembers,
+  type Component,
+} from '@/components/ComponentBrowser/component'
 import ComponentEntry from '@/components/ComponentBrowser/ComponentEntry.vue'
 import { Filtering, type Filter } from '@/components/ComponentBrowser/filtering'
 import SvgIcon from '@/components/SvgIcon.vue'
@@ -67,9 +71,15 @@ watch(selectedGroupIndex, () => (selectedComponentIndex.value = 0))
 const suggestionDbStore = useSuggestionDbStore()
 const projectNames = useProjectNames()
 const { module } = useCurrentProject()
-const libraries = computed(() =>
-  module.value.root ? importedLibraries(module.value.root, projectNames) : new Set<QualifiedName>(),
-)
+// The module's AST is replaced on every edit: keep the previous set while the imports are the same,
+// so the lists are not rebuilt for nothing.
+const libraries = computed<ReadonlySet<QualifiedName>>((previous) => {
+  const current =
+    module.value.root ?
+      importedLibraries(module.value.root, projectNames)
+    : new Set<QualifiedName>()
+  return previous && sameMembers(previous, current) ? previous : current
+})
 const components = computed(() => {
   const lists = makeComponentLists(suggestionDbStore.entries, filtering.value, libraries.value)
   if (props.literal != null) {

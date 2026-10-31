@@ -153,6 +153,11 @@ export function makeComponent({ id, entry, match }: MatchedSuggestion): Componen
  */
 export type GroupId = 'all' | 'suggestions' | number
 
+/** Whether the two sets have the same members. */
+export function sameMembers<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
+  return a.size === b.size && [...a].every((member) => b.has(member))
+}
+
 /**
  * Create {@link Component} list for each displayed group from filtered suggestions.
  * @param importedLibraries the libraries the module imports: while searching, on an equal match

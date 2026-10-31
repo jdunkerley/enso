@@ -12,6 +12,7 @@ import {
   labelOfEntry,
   makeComponent,
   makeComponentLists,
+  sameMembers,
   type Component,
   type MatchedSuggestion,
 } from '@/components/ComponentBrowser/component'
@@ -33,6 +34,12 @@ test('On an equal match, entries of the imported libraries come first', () => {
       .map((component) => component.suggestionId)
   expect(ids()).toEqual([0, 1])
   expect(ids(new Set(['Standard.Base' as QualifiedName]))).toEqual([1, 0])
+})
+
+test('sameMembers compares sets by their members', () => {
+  expect(sameMembers(new Set([1, 2]), new Set([2, 1]))).toBe(true)
+  expect(sameMembers(new Set([1, 2]), new Set([1]))).toBe(false)
+  expect(sameMembers(new Set([1, 2]), new Set([1, 3]))).toBe(false)
 })
 
 test('The main view keeps its order whatever the module imports', () => {
