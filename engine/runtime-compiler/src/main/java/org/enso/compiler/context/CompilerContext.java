@@ -101,6 +101,15 @@ public interface CompilerContext {
 
   boolean deserializeModule(Compiler compiler, Module module);
 
+  /**
+   * Tells the context which library {@link Compiler#compile} is compiling (the main project package
+   * of {@code enso --compile}), before it loads any of its modules. The context then restores none
+   * of that library's modules from the library's bindings cache.
+   *
+   * @param libraryName the library being compiled
+   */
+  default void compilingLibrary(LibraryName libraryName) {}
+
   void shutdown(boolean waitForPendingJobCompletion);
 
   RuntimeException throwAbortedException();
