@@ -11,6 +11,8 @@ Each subdir mirrors a standard-library module name.
   parsers).
 - `database/` — `Standard.Database`. JDBC plumbing used by `Generic_JDBC`,
   Postgres, etc.
+- `postgres/` — `Standard.Postgres`. The `postgresql` JDBC driver; no Java of
+  its own.
 - `sqlite/` — `Standard.SQLite`. The `sqlite-jdbc` driver and its native-image
   feature.
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`

@@ -1,6 +1,6 @@
 {
   "type": "Postgres_Connection",
-  "libraryName": "Standard.Database",
+  "libraryName": "Standard.Postgres",
   "host": "example.com",
   "port": 12345,
   "database_name": "DBNAME",

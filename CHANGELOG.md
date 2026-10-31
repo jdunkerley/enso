@@ -325,12 +325,14 @@
   libraries' choices, even those not imported yet][465]
 - [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass
   credentials explicitly or use AWS credentials.
-- [SQLite is now its own library, `Standard.SQLite`][468]: the IDE adds
-  `from Standard.SQLite import SQLite` where code uses it, and fixes older
-  projects when they open; `Database.connect`'s list and `Data.read` of a SQLite
-  file work without the import. Code run outside the IDE (`enso --run`), and
-  `Generic_JDBC` connections to a `jdbc:sqlite:` URL, need
-  `from Standard.SQLite import all` added by hand.
+- [PostgreSQL][PGNUM] and [SQLite][468] are now their own libraries,
+  `Standard.Postgres` and `Standard.SQLite`: the IDE adds their imports where
+  code uses them and fixes older projects when they open, and
+  `Database.connect`'s list, `Data.read` of a SQLite file and saved PostgreSQL
+  data links work without the import. Code run outside the IDE (`enso --run`),
+  and `Generic_JDBC` connections to their URLs, need
+  `from Standard.Postgres import all` or `from Standard.SQLite import all` added
+  by hand.
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -442,6 +444,7 @@
 [412]: https://github.com/jdunkerley/enso/pull/412
 [464]: https://github.com/jdunkerley/enso/pull/464
 [468]: https://github.com/jdunkerley/enso/pull/468
+[PGNUM]: https://github.com/jdunkerley/enso/pull/PGNUM
 
 # Enso 2026.1
 

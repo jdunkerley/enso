@@ -36,7 +36,15 @@ add_specs suite_builder =
 
         group_builder.specify "Database.connect's dropdown lists SQLite" <|
             main_src = 'from Standard.Base import all\nfrom Standard.Database import all\nimport Standard.Visualization.Widgets\n\nmain =\n    IO.println (Widgets.get_widget_json Database .connect ["details"])\n'
-            run_project main_src . should_contain "SQLite.From_File"
+            output = run_project main_src
+            output.should_contain "SQLite.From_File"
+            output.should_contain "Postgres.Server"
+
+        group_builder.specify "a saved Postgres data link resolves" <|
+            link = enso_project.data / "datalinks" / "postgres-db.datalink"
+            main_src = 'from Standard.Base import all\n\nmain =\n    r = Data.read (File.new "' + link.path + '")\n    IO.println (r.catch . to_display_text)\n'
+            # The link's server does not exist: what matters is that the type is found.
+            run_project main_src . should_not_contain "Missing_Data_Link_Library"
 
 main filter=Nothing =
     suite = Test.build suite_builder->

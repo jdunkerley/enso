@@ -487,7 +487,7 @@ add_specs suite_builder =
         # Postgres one, only the credentials go through the real code.
         setup = Data_Link_Setup.Available destination->
             credentials = Data_Link_Setup.save_credentials_for_data_link destination (Credentials.Username_And_Password "me" "hunter2-pw")
-            JS_Object.from_pairs [["type", "Postgres_Connection"], ["libraryName", "Standard.Database"], ["host", "localhost"], ["port", 5432], ["database_name", "db"], ["credentials", credentials]]
+            JS_Object.from_pairs [["type", "Postgres_Connection"], ["libraryName", "Standard.Postgres"], ["host", "localhost"], ["port", 5432], ["database_name", "db"], ["credentials", credentials]]
 
         with_temp_dir action =
             temp_dir = File.create_temporary_file "local-link" ".dir"
