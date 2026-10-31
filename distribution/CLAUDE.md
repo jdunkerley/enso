@@ -38,7 +38,7 @@ bundled fails as not found. The engine looks bundled libraries (everything in
 repository. `repository: local` cannot name a bundled library: it resolves only
 the user's local library roots, not the engine's `lib/`. Source archives
 (`main.tgz`) are created for the uploaded libraries only: one, about 51 MB.
-Adding a library to the set adds its archive to every bundle (the other thirteen
+Adding a library to the set adds its archive to every bundle (the other eleven
 non-core libraries would add about 190 MB).
 
 ## Changing the standard library
