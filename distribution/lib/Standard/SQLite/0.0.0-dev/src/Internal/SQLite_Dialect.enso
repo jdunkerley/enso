@@ -181,7 +181,7 @@ type SQLite_Dialect
         table_name_deduplicator = table_connection.base_connection.table_naming_helper.create_unique_name_strategy
         table_name_deduplicator.mark_used table.name
         inner_table_alias = table_name_deduplicator.make_unique table.name+"_inner"
-        setup = (Internals_Access.get_context table).as_subquery inner_table_alias [table.internal_columns]
+        setup = (Internals_Access.get_context table).as_subquery inner_table_alias [Internals_Access.internal_columns table]
         new_columns = setup.new_columns.first
         column_mapping = Dictionary.from_vector <| new_columns.map c-> [c.name, c]
         new_key_columns = key_columns.map c-> column_mapping.at c.name
@@ -642,7 +642,7 @@ trim_ops =
             _ ->
                 case chars.is_constant of
                     True ->
-                        const = chars.fragments.vec.first.object
+                        const = chars.extract_constant
                         if const.is_nothing || const.is_empty then SQL_Builder.code fn_name+"(" ++ input ++ ", " ++ whitespace ++ ")" else
                             SQL_Builder.code fn_name+"(" ++ input ++ ", " ++ chars ++ ")"
                     False ->
