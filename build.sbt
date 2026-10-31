@@ -2156,6 +2156,7 @@ lazy val `polyglot-api` = project
       "-Dpolyglot.engine.WarnInterpreterOnly=false",
       "-Dpolyglotimpl.DisableClassPathIsolation=true"
     ),
+    libraryDependencies ++= circe.map(_ % "provided"),
     libraryDependencies ++= Seq(
       "org.graalvm.sdk"                        % "polyglot-tck"          % graalMavenPackagesVersion % "provided",
       "org.graalvm.truffle"                    % "truffle-api"           % graalMavenPackagesVersion % "provided",

@@ -88,6 +88,12 @@ Every library follows the same shape:
 └── THIRD-PARTY           # license notices for transitive third-party deps
 ```
 
+A built distribution also has a generated `catalogue.json` next to each
+`package.yaml` (`enso --compile` writes it; the IDE offers the library's
+components from it before the library is imported). It is git-ignored: never
+write or commit one here. A library internal to the IDE declares
+`catalogue: false` in its `package.yaml` (Visualization does), and gets none.
+
 Per-library `Layout` sections describe only the library-specific subdirs and
 notable files, not these universal entries.
 
