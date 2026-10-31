@@ -11,8 +11,8 @@ Each subdir mirrors a standard-library module name.
   parsers).
 - `database/` — `Standard.Database`. JDBC plumbing used by `Generic_JDBC`,
   Postgres, etc.
-- `sqlite/` — `Standard.SQLite`. The `sqlite-jdbc` driver and its native-image
-  feature.
+- `sqlite/` — `Standard.SQLite`. Packaging only: the `sqlite-jdbc` driver and
+  its native library (it runs in the guest JVM, not in the native image).
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`
   — SDK integrations.
 - `image/` — OpenCV-backed image helpers (pair with `lib/java/opencv-wrapper`).
