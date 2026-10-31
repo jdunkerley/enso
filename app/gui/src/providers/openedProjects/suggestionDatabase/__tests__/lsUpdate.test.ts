@@ -311,6 +311,65 @@ test('Removing Arguments', () => {
   test.check(db)
 })
 
+test('An entry from a catalogue keeps the flag', () => {
+  const db = new SuggestionDb()
+  applyUpdates(
+    db,
+    [
+      {
+        type: 'Add',
+        id: 1,
+        suggestion: {
+          type: 'type',
+          module: 'Standard.AWS.S3.S3',
+          name: 'S3',
+          params: [],
+          reexport: 'Standard.AWS.Main',
+          fromCatalogue: true,
+        },
+      },
+      {
+        type: 'Add',
+        id: 2,
+        suggestion: {
+          type: 'type',
+          module: 'Standard.Base.Data.Text',
+          name: 'Text',
+          params: [],
+        },
+      },
+    ],
+    { groups: [] },
+  )
+  expect(db.get(1)?.fromCatalogue).toBe(true)
+  expect(db.get(2)?.fromCatalogue).toBe(false)
+})
+
+test('Swapping a catalogue entry for the loaded one leaves one entry', () => {
+  const db = new SuggestionDb()
+  const s3: lsTypes.SuggestionEntry.Type = {
+    type: 'type',
+    module: 'Standard.AWS.S3.S3',
+    name: 'S3',
+    params: [],
+    reexport: 'Standard.AWS.Main',
+  }
+  applyUpdates(db, [{ type: 'Add', id: 1, suggestion: { ...s3, fromCatalogue: true } }], {
+    groups: [],
+  })
+  applyUpdates(
+    db,
+    [
+      { type: 'Remove', id: 1 },
+      { type: 'Add', id: 2, suggestion: s3 },
+    ],
+    { groups: [] },
+  )
+  expect([...db.keys()]).toEqual([2])
+  expect(db.get(2)?.fromCatalogue).toBe(false)
+  expect(db.findByProjectPath(stdPath('Standard.AWS.S3.S3.S3'))).toBe(2)
+})
+
 function suggestionEntry<T>(data: SuggestionEntry & { kind: T }): SuggestionEntry & { kind: T } {
   return data
 }
@@ -363,6 +422,7 @@ class Fixture {
     documentationSummary: 'A base module',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedType = suggestionEntry<SuggestionKind.Type>({
     kind: SuggestionKind.Type,
@@ -382,6 +442,7 @@ class Fixture {
     documentationSummary: 'Type',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedCon = suggestionEntry<SuggestionKind.Constructor>({
     kind: SuggestionKind.Constructor,
@@ -402,6 +463,7 @@ class Fixture {
     documentationSummary: 'A Constructor',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedMethod = suggestionEntry<SuggestionKind.Method>({
     kind: SuggestionKind.Method,
@@ -423,6 +485,7 @@ class Fixture {
     documentationSummary: 'An instance method',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedStaticMethod = suggestionEntry<SuggestionKind.Method>({
     kind: SuggestionKind.Method,
@@ -444,6 +507,7 @@ class Fixture {
     documentationSummary: 'A static method',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedFunction = suggestionEntry<SuggestionKind.Function>({
     kind: SuggestionKind.Function,
@@ -462,6 +526,7 @@ class Fixture {
     documentationSummary: 'A local function',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedLocal = suggestionEntry<SuggestionKind.Local>({
     kind: SuggestionKind.Local,
@@ -479,6 +544,7 @@ class Fixture {
     documentationSummary: 'A local variable',
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
   expectedLocalStaticMethod = suggestionEntry<SuggestionKind.Method>({
     kind: SuggestionKind.Method,
@@ -509,6 +575,7 @@ class Fixture {
     documentationSummary: undefined,
     macros: {},
     suggestedRank: undefined,
+    fromCatalogue: false,
   })
 
   addUpdatesForExpected(): lsTypes.SuggestionsDatabaseUpdate[] {

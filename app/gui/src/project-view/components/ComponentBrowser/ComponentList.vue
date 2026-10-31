@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import {
+  useCurrentProject,
   useProjectNames,
   useProjectStore,
   useSuggestionDbStore,
 } from '$/components/WithCurrentProject.vue'
+import { importedLibraries } from '$/providers/openedProjects/module/imports'
 import { makeComponentLists, type Component } from '@/components/ComponentBrowser/component'
 import ComponentEntry from '@/components/ComponentBrowser/ComponentEntry.vue'
 import { Filtering, type Filter } from '@/components/ComponentBrowser/filtering'
@@ -13,6 +15,7 @@ import { groupColorStyle } from '@/composables/nodeColors'
 import { Ast } from '@/util/ast'
 import { unqualifyQualifiedNames } from '@/util/ast/abstract'
 import { tryGetIndex } from '@/util/data/array'
+import type { QualifiedName } from '@/util/qualifiedName'
 import * as map from 'lib0/map'
 import { computed, ref, watch } from 'vue'
 import type { ComponentExposed } from 'vue-component-type-helpers'
@@ -63,8 +66,12 @@ watch(selectedGroupIndex, () => (selectedComponentIndex.value = 0))
 
 const suggestionDbStore = useSuggestionDbStore()
 const projectNames = useProjectNames()
+const { module } = useCurrentProject()
+const libraries = computed(() =>
+  module.value.root ? importedLibraries(module.value.root, projectNames) : new Set<QualifiedName>(),
+)
 const components = computed(() => {
-  const lists = makeComponentLists(suggestionDbStore.entries, filtering.value)
+  const lists = makeComponentLists(suggestionDbStore.entries, filtering.value, libraries.value)
   if (props.literal != null) {
     map
       .setIfUndefined(lists, 'all', (): Component[] => [])

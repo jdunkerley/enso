@@ -11,6 +11,7 @@ import {
   compareSuggestions,
   labelOfEntry,
   makeComponent,
+  makeComponentLists,
   type Component,
   type MatchedSuggestion,
 } from '@/components/ComponentBrowser/component'
@@ -20,6 +21,32 @@ import { ProjectPath, stdPath } from '@/util/projectPath'
 import type { QualifiedName } from '@/util/qualifiedName'
 import shuffleSeed from 'shuffle-seed'
 import { expect, test } from 'vitest'
+
+test('On an equal match, entries of the imported libraries come first', () => {
+  const db = SuggestionDb.createMock([
+    makeModuleMethod('Standard.AWS.Data.read'),
+    makeModuleMethod('Standard.Base.Data.read'),
+  ])
+  const ids = (imported?: ReadonlySet<QualifiedName>) =>
+    makeComponentLists(db, new Filtering({ pattern: 'read' }), imported)
+      .get('all')!
+      .map((component) => component.suggestionId)
+  expect(ids()).toEqual([0, 1])
+  expect(ids(new Set(['Standard.Base' as QualifiedName]))).toEqual([1, 0])
+})
+
+test('The main view keeps its order whatever the module imports', () => {
+  const db = SuggestionDb.createMock([
+    makeModuleMethod('Standard.AWS.read'),
+    makeModuleMethod('Standard.Base.read'),
+  ])
+  const ids = (imported?: ReadonlySet<QualifiedName>) =>
+    makeComponentLists(db, new Filtering({}), imported)
+      .get('all')!
+      .map((component) => component.suggestionId)
+  expect(ids()).toEqual([0, 1])
+  expect(ids(new Set(['Standard.Base' as QualifiedName]))).toEqual([0, 1])
+})
 
 test.each([
   [makeModuleMethod('Standard.Base.Data.read'), 'Data.read'],
