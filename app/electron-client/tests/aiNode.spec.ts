@@ -42,9 +42,9 @@ env.ENSO_AI_SOFT_CONTEXT_THRESHOLD = '5000'
 env.ENSO_AI_HARD_CONTEXT_THRESHOLD = '50000'
 
 const FIRST_AI_PROMPT = "count 'a' letters in all cells of the table"
-// Deterministic expected output for `FIRST_AI_PROMPT` against the template's welcome table.
-// Update this alongside the welcome sample if it ever changes.
-const EXPECTED_COUNT = '2'
+// Deterministic expected output for `FIRST_AI_PROMPT` against `Examples.welcome`. Update this
+// alongside the welcome sample if it ever changes.
+const EXPECTED_COUNT = '23'
 // Unique sentinel that only ever appears in the manually-added `Table.input` node, so the
 // final assertion is unambiguous (won't collide with any letter-count output).
 const CROSS_JOIN_SENTINEL = 'cross_join_ok'

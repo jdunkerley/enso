@@ -3,7 +3,7 @@
  *
  * Warms the engine's IR cache once, before any spec runs. Every spec launches a fresh Electron
  * process whose Language Server, on first project open, compiles the standard-library
- * closure that the new-project template imports (Base, Table and Database). On a cold machine — most of all a Windows CI runner,
+ * closure that the new-project template imports (Base, Table, Database, Examples and Visualization). On a cold machine — most of all a Windows CI runner,
  * where real-time antivirus scans every JAR and native library as it is first loaded — that first
  * compile can take minutes, and since each spec starts cold none of them ever amortise it.
  *
@@ -29,6 +29,7 @@ const TEMPLATE_MAIN = `\
 from Standard.Base import all
 from Standard.Table import all
 from Standard.Database import all
+import Standard.Examples
 import Standard.Visualization
 
 main = 42

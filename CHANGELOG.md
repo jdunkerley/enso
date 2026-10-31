@@ -2,8 +2,8 @@
 
 #### Enso IDE
 
-- [New projects start with four imports (Base, Table, Database and
-  Visualization) instead of a dozen. Components of other libraries stay in the
+- [New projects import only Base, Table, Database, Examples and Visualization
+  instead of a dozen libraries. Components of other libraries stay in the
   component browser, and using one adds its import.][482]
 - [The component browser finds the components of every installed library as soon
   as a project opens, whether or not the project imports the library, and
