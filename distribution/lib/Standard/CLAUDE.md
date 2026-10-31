@@ -19,6 +19,7 @@ there.
 - `Table/` — Columnar in-memory and database-backed table operations.
 - `Database/` — Generic SQL abstractions (`DB_Table`); backends below ship in
   their own libraries.
+- `SQLite/` — SQLite backend (in-memory or file) and the `.db` file format.
 - `DuckDB/` — In-process analytical SQL backend (in-memory or `.duckdb` file).
 - `Snowflake/` — Snowflake cloud data warehouse backend.
 - `Microsoft/` — SQL Server / Azure SQL backend, plus OneDrive and Azure Blob.

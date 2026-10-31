@@ -1,0 +1,6 @@
+archives:
+- main.tgz
+dependencies:
+- Standard.Base
+- Standard.Database
+- Standard.Table

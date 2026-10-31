@@ -1,0 +1,42 @@
+from Standard.Base import all
+
+from Standard.Database import all
+from Standard.SQLite import all
+
+from Standard.Test import all
+
+import enso_dev.Base_Tests.Enso_Bin_Utils
+
+## Runs `main_src` as the `Main.enso` of a new project and returns what it
+   printed. The project imports only what `main_src` says, unlike this test
+   project, which imports `Standard.SQLite` and so has it loaded.
+private run_project main_src:Text -> Text =
+    parent = Enso_Bin_Utils.create_tmp_dir
+    Panic.with_finalizer (parent.delete recursive=True) <|
+        project = Enso_Bin_Utils.create_new_project parent "discovery_check" main_src
+        jvm_args = if Enso_Bin_Utils.runs_in_aot then [] else ["--jvm"]
+        Enso_Bin_Utils.enso_run jvm_args+["--run", project.path] parent.path
+
+add_specs suite_builder =
+    suite_builder.group "Library discovery without an import" group_builder->
+        group_builder.specify "Data.read recognises a SQLite file" <|
+            db_file = File.create_temporary_file "discovery" ".db"
+            db_file.delete
+            connection = Database.connect (SQLite.From_File db_file)
+            connection.execute_update 'CREATE TABLE "t" ("x" INTEGER)'
+            connection.execute_update 'INSERT INTO "t" VALUES (1), (2), (3)'
+            connection.close
+            main_src = 'from Standard.Base import all\n\nmain =\n    connection = Data.read (File.new "' + db_file.path + '")\n    IO.println (Meta.type_of connection . to_text)\n    IO.println (connection.query "t" . read . row_count)\n'
+            output = run_project main_src
+            output.should_contain "SQLite_Connection"
+            output.should_contain "3"
+            db_file.delete
+
+        group_builder.specify "Database.connect's dropdown lists SQLite" <|
+            main_src = 'from Standard.Base import all\nfrom Standard.Database import all\nimport Standard.Visualization.Widgets\n\nmain =\n    IO.println (Widgets.get_widget_json Database .connect ["details"])\n'
+            run_project main_src . should_contain "SQLite.From_File"
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

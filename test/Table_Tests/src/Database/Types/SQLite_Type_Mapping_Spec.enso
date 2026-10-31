@@ -5,11 +5,12 @@ from Standard.Table import Aggregate_Column, Value_Type, Table, Bits
 from Standard.Table.Errors import Invalid_Value_Type, Inexact_Type_Coercion
 
 import Standard.Database.Connection.Database
-import Standard.Database.Connection.SQLite_Connection.SQLite_Connection
+import Standard.SQLite.SQLite_Connection.SQLite_Connection
 import Standard.Database.Dialects.Dialect
 import Standard.Database.Extensions.Upload_Table
-import Standard.Database.Internal.SQLite.SQLite_Type_Mapping
-from Standard.Database import SQLite, SQL_Query
+import Standard.SQLite.Internal.SQLite_Type_Mapping
+from Standard.Database import SQL_Query
+from Standard.SQLite import SQLite
 
 from Standard.Test import all
 

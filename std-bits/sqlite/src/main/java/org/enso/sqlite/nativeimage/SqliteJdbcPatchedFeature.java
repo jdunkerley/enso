@@ -1,4 +1,4 @@
-package org.enso.database.nativeimage;
+package org.enso.sqlite.nativeimage;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;

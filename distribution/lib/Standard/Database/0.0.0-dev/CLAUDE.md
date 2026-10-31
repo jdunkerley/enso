@@ -3,8 +3,9 @@
 SQL abstraction for relational databases. Returns a deferred `DB_Table` (query
 plan, not data) that mirrors the in-memory `Table` API; call `.read` to
 materialize. Backends (SQLite, Postgres, DuckDB, Snowflake, SQL Server, …) ship
-in their own libraries — `Standard.DuckDB`, `Standard.Snowflake`,
-`Standard.Microsoft`, etc.
+in their own libraries — `Standard.SQLite`, `Standard.DuckDB`,
+`Standard.Snowflake`, `Standard.Microsoft`, etc. (SQLite is no longer in
+`Standard.Database`: `from Standard.SQLite import all`.)
 
 ## Main entry points
 

@@ -6,6 +6,7 @@ from Standard.Table import all
 from Standard.Table.Errors import all
 
 from Standard.Database import all
+from Standard.SQLite import all
 import Standard.Database.Dialects.Feature.Feature
 from Standard.Database.Errors import all
 

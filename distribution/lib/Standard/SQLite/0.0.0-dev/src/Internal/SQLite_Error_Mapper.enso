@@ -1,6 +1,6 @@
 from Standard.Base import all
 
-from project.Errors import Invariant_Violation, SQL_Error
+from Standard.Database.Errors import Invariant_Violation, SQL_Error
 
 polyglot java import org.sqlite.SQLiteErrorCode
 polyglot java import org.sqlite.SQLiteException

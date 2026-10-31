@@ -109,7 +109,7 @@ async function ensoPackageSignables(resourcesDir: string): Promise<Signable[]> {
       ],
     ],
     [
-      'lib/Standard/Database/*/polyglot/java/sqlite-jdbc-*.jar',
+      'lib/Standard/SQLite/*/polyglot/java/sqlite-jdbc-*.jar',
       [
         'org/sqlite/native/Mac/aarch64/libsqlitejdbc.jnilib',
         'org/sqlite/native/Mac/x86_64/libsqlitejdbc.jnilib',
