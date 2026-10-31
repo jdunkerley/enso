@@ -114,7 +114,7 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         new InstalledCatalogues(() =>
           Seq(corrupt, good, misnamed, missing, stale)
         )
-      Await.result(catalogues.load(), Timeout) shouldEqual
+      Await.result(catalogues.load(Set()), Timeout) shouldEqual
       Seq(InstalledCatalogue(LibraryName("Foo", "Good"), entries("Good")))
     }
 
@@ -122,7 +122,7 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
       val root       = Files.createTempDirectory("catalogues")
       val good       = library(root, "Good", Some(valid("Good") _))
       val catalogues = new InstalledCatalogues(() => Seq(good))
-      Await.result(catalogues.load(), Timeout).map(_.library) shouldEqual
+      Await.result(catalogues.load(Set()), Timeout).map(_.library) shouldEqual
       Seq(LibraryName("Foo", "Good"))
 
       val main = good.root.location.resolve("src").resolve("Main.enso")
@@ -131,7 +131,7 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         main,
         FileTime.fromMillis(Files.getLastModifiedTime(main).toMillis + 2000)
       )
-      Await.result(catalogues.load(), Timeout) shouldEqual Seq()
+      Await.result(catalogues.load(Set()), Timeout) shouldEqual Seq()
     }
 
     "share one reading between loads that overlap" in {
@@ -144,8 +144,8 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         release.await()
         Seq(good)
       })
-      val first  = catalogues.load()
-      val second = catalogues.load()
+      val first  = catalogues.load(Set())
+      val second = catalogues.load(Set())
       release.countDown()
       val expected =
         Seq(InstalledCatalogue(LibraryName("Foo", "Good"), entries("Good")))
@@ -154,8 +154,37 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
       calls.get shouldEqual 1
 
       // A load after the first completed reads the listing again.
-      Await.result(catalogues.load(), Timeout) shouldEqual expected
+      Await.result(catalogues.load(Set()), Timeout) shouldEqual expected
       calls.get shouldEqual 2
+    }
+
+    "not read the catalogues of excluded libraries" in {
+      val root       = Files.createTempDirectory("catalogues")
+      val good       = library(root, "Good", Some(valid("Good") _))
+      val corrupt    = library(root, "Corrupt", Some((_: Package[File]) => "{"))
+      val catalogues = new InstalledCatalogues(() => Seq(corrupt, good))
+      Await.result(
+        catalogues.load(Set(LibraryName("Foo", "Good"))),
+        Timeout
+      ) shouldEqual Seq()
+      Await.result(catalogues.load(Set()), Timeout) shouldEqual
+      Seq(InstalledCatalogue(LibraryName("Foo", "Good"), entries("Good")))
+    }
+
+    "decode a valid catalogue again on every load" in {
+      val root       = Files.createTempDirectory("catalogues")
+      val good       = library(root, "Good", Some(valid("Good") _))
+      val catalogues = new InstalledCatalogues(() => Seq(good))
+      val expected =
+        Seq(InstalledCatalogue(LibraryName("Foo", "Good"), entries("Good")))
+      val first  = Await.result(catalogues.load(Set()), Timeout)
+      val second = Await.result(catalogues.load(Set()), Timeout)
+      first shouldEqual expected
+      second shouldEqual expected
+      // Not the same objects: nothing is kept between loads.
+      first.head.entries.head should not be theSameInstanceAs(
+        second.head.entries.head
+      )
     }
 
     "skip a library that declines a catalogue" in {
@@ -167,7 +196,7 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         "catalogue: false\n"
       )
       Await.result(
-        new InstalledCatalogues(() => Seq(declined)).load(),
+        new InstalledCatalogues(() => Seq(declined)).load(Set()),
         Timeout
       ) shouldEqual Seq()
     }
@@ -183,7 +212,7 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
         }
       )
       Await.result(
-        new InstalledCatalogues(() => Seq(bad)).load(),
+        new InstalledCatalogues(() => Seq(bad)).load(Set()),
         Timeout
       ) shouldEqual
       Seq(InstalledCatalogue(LibraryName("Foo", "Bad"), entries("Bad")))
@@ -194,7 +223,10 @@ class InstalledCataloguesSpec extends AnyWordSpec with Matchers {
       val conv =
         library(root, "Conv", Some(valid("Conv", Some(conversions("Conv"))) _))
       val loaded =
-        Await.result(new InstalledCatalogues(() => Seq(conv)).load(), Timeout)
+        Await.result(
+          new InstalledCatalogues(() => Seq(conv)).load(Set()),
+          Timeout
+        )
       loaded.flatMap(_.entries) shouldEqual conversions("Conv")
 
       val repo = new InMemorySuggestionsRepo()

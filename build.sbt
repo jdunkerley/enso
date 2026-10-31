@@ -236,7 +236,10 @@ checkIRCacheSizes := Def
  * DLL copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
  * then, not on Windows, `verifyGeneratedPackage` for the engine and for Base, Table, Image and
  * Database at the package's versioned paths (the retired build CLI skipped it on Windows: "FIXME
- * ... CRLF issues?"). CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
+ * ... CRLF issues?"). Before those, on every platform, `ShippedCataloguesSpec` checks the standard
+ * libraries' `catalogue.json` files with the language server's own rule, so a catalogue the
+ * language server would skip fails the build instead of turning the feature off silently.
+ * CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
  * own, not a CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and
  * `CI` is set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
  */
@@ -247,6 +250,12 @@ lazy val ciBuildEngineDistribution = taskKey[Unit](
 ciBuildEngineDistribution := Def
   .sequential(
     buildEngineDistribution,
+    Def.taskDyn {
+      val lib = engineDistributionRoot.value / "lib"
+      (`polyglot-api` / Test / testOnly).toTask(
+        s" org.enso.polyglot.ShippedCataloguesSpec -- -Dlib=${lib.getAbsolutePath}"
+      )
+    },
     Def.task {
       val log  = streams.value.log
       val root = engineDistributionRoot.value
