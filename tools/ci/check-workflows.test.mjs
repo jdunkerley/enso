@@ -31,6 +31,7 @@ import {
   checkWindowsInstallerSmokeTest,
   checkWorkflowsDeclarePermissions,
   exportedTypes,
+  unreadableExports,
   loadRepo,
 } from './check-workflows.mjs'
 
@@ -1014,6 +1015,46 @@ describe('exportedTypes', () => {
   })
 })
 
+describe('unreadableExports', () => {
+  test('accepts the forms exportedTypes reads', () => {
+    assert.deepEqual(
+      unreadableExports(
+        [
+          'export project.DuckDB.DuckDB',
+          'export project.S3.S3_File as File_On_S3',
+          'from project.Image export Image, Matrix',
+          '## Example',
+          '    export project.Not.Counted',
+          '',
+        ].join('\n'),
+      ),
+      [],
+    )
+  })
+  test('rejects `export all`, a split list and any other export', () => {
+    assert.deepEqual(
+      unreadableExports(
+        [
+          'from project.Geo export all',
+          'from project.Image export Image,',
+          '    Matrix',
+          'from project.Image export Image',
+          '    , Matrix',
+          'from project.Image export all hiding Matrix',
+          'export project.Geo.Geo hiding x',
+        ].join('\n'),
+      ),
+      [
+        '1: `export all` (list the exported names)',
+        '2: an export list split over several lines (keep it on one line)',
+        '4: an export list split over several lines (keep it on one line)',
+        '6: `export all` (list the exported names)',
+        '7: an export the check cannot read',
+      ],
+    )
+  })
+})
+
 describe('checkPublicTypes', () => {
   const lib = (yaml, main) => ({
     'distribution/lib/Standard/Base/0.0.0-dev/package.yaml': 'name: Base\n',
@@ -1039,6 +1080,14 @@ describe('checkPublicTypes', () => {
     assert.deepEqual(
       checkPublicTypes(fixture({}, lib('name: Geo\npublic-types: [Geo, Old]\n', main))),
       [`${at} \`public-types\` is [Geo, Old] but Main.enso exports [Geo]`],
+    )
+  })
+  test('reports an export of Main.enso it cannot read', () => {
+    assert.deepEqual(
+      checkPublicTypes(
+        fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main + 'from project.X export all\n')),
+      ),
+      ['distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso:3: `export all` (list the exported names)'],
     )
   })
 })

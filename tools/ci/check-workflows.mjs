@@ -66,6 +66,29 @@ export function exportedTypes(mainSource) {
   return [...names].sort()
 }
 
+/**
+ * The top-level exports of a `Main.enso` that `exportedTypes` cannot read, as `<line>: <reason>`:
+ * `export all` (the names it exports are not in the source), a list split over several lines
+ * (only the first would be read), and any other form. Without this they would be skipped, and a
+ * library could export a type its `public-types:` does not list.
+ */
+export function unreadableExports(mainSource) {
+  const lines = mainSource.split('\n')
+  const problems = []
+  lines.forEach((line, i) => {
+    if (!/^(?:export\s|from\s+\S+\s+export\b)/.test(line)) return
+    const continued = line.trimEnd().endsWith(',') || /^\s+[^\s#]/.test(lines[i + 1] ?? '')
+    if (/\bexport\s+all\b/.test(line)) {
+      problems.push(`${i + 1}: \`export all\` (list the exported names)`)
+    } else if (continued) {
+      problems.push(`${i + 1}: an export list split over several lines (keep it on one line)`)
+    } else if (!new RegExp(ENSO_EXPORT.source).test(line)) {
+      problems.push(`${i + 1}: an export the check cannot read`)
+    }
+  })
+  return problems
+}
+
 /** Every `.ts` file under `dir`, as paths relative to `base` with `/` separators. */
 function typeScriptFiles(dir, base) {
   if (!existsSync(dir)) return []
@@ -144,13 +167,16 @@ function loadStdlib(root) {
       version == null ? [] : ensoImports(path.join(standard, name, version, 'src'), name).libraries
     const dir = version == null ? null : path.join(standard, name, version)
     const main = dir == null ? null : path.join(dir, 'src', 'Main.enso')
+    const mainSource = main != null && existsSync(main) ? readFileSync(main, 'utf8') : ''
     publicTypes[name] =
       dir == null ?
         null
       : {
           declared: parse(readFileSync(path.join(dir, 'package.yaml'), 'utf8'))?.['public-types'],
-          exported: exportedTypes(existsSync(main) ? readFileSync(main, 'utf8') : ''),
+          exported: exportedTypes(mainSource),
+          unreadable: unreadableExports(mainSource),
           source: path.posix.join('distribution/lib/Standard', name, version, 'package.yaml'),
+          mainSource: path.posix.join('distribution/lib/Standard', name, version, 'src/Main.enso'),
         }
   }
   const testDir = path.join(root, 'test')
@@ -1025,7 +1051,8 @@ export function checkPublicTypes({ stdlib }) {
   const problems = []
   for (const [name, entry] of Object.entries(stdlib.publicTypes ?? {})) {
     if (entry == null || CORE_LIBRARIES.includes(name)) continue
-    const { declared, exported, source } = entry
+    const { declared, exported, unreadable, source, mainSource } = entry
+    for (const problem of unreadable ?? []) problems.push(`${mainSource}:${problem}`)
     if (!Array.isArray(declared)) {
       problems.push(
         `${source}: no \`public-types:\` list (its Main.enso exports [${exported.join(', ')}])`,

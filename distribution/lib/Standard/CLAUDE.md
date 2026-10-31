@@ -145,7 +145,9 @@ A library outside the core set (Base, Table, Database, Visualization, Test)
 lists in `package.yaml`'s `public-types:` the capitalised names its `Main.enso`
 exports. The IDE uses the list to add an import for a library the engine has not
 loaded; `tools/ci/check-workflows.mjs` (`checkPublicTypes`) fails when it
-differs from `Main.enso`.
+differs from `Main.enso`. So that the check can read them, such a `Main.enso`
+exports each name explicitly, one export per line: no `export all`, and no list
+split over several lines.
 
 ## Versions
 
