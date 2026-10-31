@@ -44,9 +44,6 @@ libraries:
   - name: Standard.Examples
     repository: release
     version: {{LIBS_VERSION}}
-  - name: Standard.Searcher
-    repository: release
-    version: {{LIBS_VERSION}}
   - name: Standard.Generic_JDBC
     repository: release
     version: {{LIBS_VERSION}}

@@ -35,7 +35,6 @@ there.
 - `Test/` — Testing framework used in `test/` projects.
 - `Visualization/` — IDE-only visualisation preprocessors. **Do not import in
   user code.**
-- `Searcher/` — IDE searcher metadata. **Do not import in user code.**
 
 ## Universal conventions
 

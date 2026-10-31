@@ -28,7 +28,6 @@ libraries:
   Image: { stdBits: [image], dependsOn: [Base] }
   Microsoft: { stdBits: [microsoft], dependsOn: [Base, Database, Table] }
   Saas: { stdBits: [saas], dependsOn: [Base, Table] }
-  Searcher: { stdBits: [], dependsOn: [Base] }
   Snowflake: { stdBits: [snowflake], dependsOn: [Base, Database, Table] }
   Table: { stdBits: [table], dependsOn: [Base] }
   Tableau: { stdBits: [tableau], dependsOn: [Base, Table] }
