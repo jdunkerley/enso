@@ -109,15 +109,6 @@ async function ensoPackageSignables(resourcesDir: string): Promise<Signable[]> {
       ],
     ],
     [
-      'lib/Standard/SQLite/*/polyglot/java/sqlite-jdbc-*.jar',
-      [
-        'org/sqlite/native/Mac/aarch64/libsqlitejdbc.jnilib',
-        'org/sqlite/native/Mac/x86_64/libsqlitejdbc.jnilib',
-        'org/sqlite/native/Mac/aarch64/libsqlitejdbc.dylib',
-        'org/sqlite/native/Mac/x86_64/libsqlitejdbc.dylib',
-      ],
-    ],
-    [
       'lib/Standard/Snowflake/*/polyglot/java/conscrypt-openjdk-uber-*.jar',
       ['META-INF/native/libconscrypt_openjdk_jni-osx-*.dylib'],
     ],
@@ -164,9 +155,14 @@ async function ensoPackageSignables(resourcesDir: string): Promise<Signable[]> {
     ],
     ['lib/Standard/Tableau/*/polyglot/java/jna-*.jar', ['com/sun/jna/*/libjnidispatch.jnilib']],
   ]
-  const binariesPattern = 'lib/Standard/Image/*/polyglot/lib/*.dylib'
+  // SQLite's driver is a thin jar (no natives inside); its native library sits next to the jar in
+  // `polyglot/lib` and is loaded from there by the guest JVM.
+  const binariesPatterns = [
+    'lib/Standard/Image/*/polyglot/lib/*.dylib',
+    'lib/Standard/SQLite/*/polyglot/lib/*.dylib',
+  ]
 
-  const binaries = await BinaryToSign.lookupMany(engineDir, [binariesPattern])
+  const binaries = await BinaryToSign.lookupMany(engineDir, binariesPatterns)
   const archives = await ArchiveToSign.lookupMany(engineDir, archivePatterns)
   return [...archives, ...binaries]
 }
