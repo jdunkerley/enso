@@ -5,10 +5,10 @@ import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 from Standard.Base.Enso_Cloud.Data_Link_Helpers import Data_Link_Source_Metadata, parse_secure_value
 from Standard.Base.Enso_Cloud.Public_Utils import get_optional_field, get_required_field
 
-import project.Connection.Credentials.Credentials
-import project.Connection.Postgres.Postgres
-import project.Internal.Data_Link_Setup.DB_Data_Link_Type
-import project.Internal.DB_Data_Link_Helpers
+import Standard.Database.Connection.Credentials.Credentials
+import project.Postgres.Postgres
+import Standard.Database.Internal.Data_Link_Setup.DB_Data_Link_Type
+import Standard.Database.Internal.DB_Data_Link_Helpers
 
 ## ---
    private: true

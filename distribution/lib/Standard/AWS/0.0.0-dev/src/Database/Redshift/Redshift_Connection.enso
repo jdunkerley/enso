@@ -66,7 +66,7 @@ type Redshift_Connection
         jdbc_connection.with_prepared_statement "SET enable_case_sensitive_identifier TO true" Redshift_Type_Mapping.statement_setter skip_log=True stmt->
             stmt.execute
 
-        encoding = parse_postgres_encoding (get_encoding_name jdbc_connection)
+        encoding = parse_postgres_encoding (get_encoding_name jdbc_connection Redshift_Type_Mapping.column_fetcher_factory)
         entity_naming_properties = Entity_Naming_Properties.from_jdbc_connection jdbc_connection encoding is_case_sensitive=False
 
         Redshift_Connection.Value (Connection.new jdbc_connection Redshift_Connection.get_dialect Redshift_Type_Mapping entity_naming_properties) make_new
