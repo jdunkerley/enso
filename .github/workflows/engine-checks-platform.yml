@@ -725,6 +725,15 @@ jobs:
           exit 1
         env:
           ID: ${{ job.services.sqlserver.id }}
+      # Note [Memory Map Limit For Guest Libraries]
+      # The native launcher runs a library kept out of the image (Standard.Microsoft,
+      # Standard.SQLite) in the guest JVM, which maps far more memory than the image does. A long
+      # run, the Table SQLite groups, died with "Failed to modify protection of code memory ...
+      # vm.max_map_count" (exit code 99) at the default limit of 65530. The Linux runners are
+      # ours to configure, so raise the limit. Linux only: this job runs on Linux only (the
+      # other platforms' job below has no such limit to raise).
+      - name: Raise the memory map limit
+        run: sudo sysctl -w vm.max_map_count=262144
       - name: Run the Standard Library tests
         run: corepack pnpm --filter build-scripts run stdlib-test ${{ matrix.suite }} --only "${{ matrix.only }}"
         env:

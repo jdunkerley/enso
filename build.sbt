@@ -3881,12 +3881,6 @@ lazy val `engine-runner` = project
       ).distinct
       def stdLibsJars = {
         val log = streams.value.log
-        // sqliteCp needs to be included in class-path because of
-        // the patched SqliteJdbcFeature. It is not enough to include just
-        // the jars from `sqlite-polyglot-root`.
-        val sqliteCp =
-          (`std-sqlite` / Compile / fullClasspath).value
-            .map(_.data.getAbsolutePath)
         val base =
           `base-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath())
         if (GraalVM.EnsoLauncher.fast) {
@@ -3896,12 +3890,8 @@ lazy val `engine-runner` = project
           base
         } else {
           base ++
-          sqliteCp ++
           `table-polyglot-root`.listFiles("*.jar").map(_.getAbsolutePath()) ++
           `database-polyglot-root`
-            .listFiles("*.jar")
-            .map(_.getAbsolutePath()) ++
-          `sqlite-polyglot-root`
             .listFiles("*.jar")
             .map(_.getAbsolutePath()) ++
           `std-duckdb-polyglot-root`
@@ -3926,20 +3916,14 @@ lazy val `engine-runner` = project
         // Limit max memory limit
         val macArmOnCI =
           sys.env.get("CI").isDefined && Platform.isMacOS && Platform.isArm64
-        val maxLimit           = if (macArmOnCI) Some(14336) else Some(15608)
-        val areStdlibsIncluded = !GraalVM.EnsoLauncher.fast
-        val sqliteFeature =
-          "org.enso.sqlite.nativeimage.SqliteJdbcPatchedFeature"
+        val maxLimit = if (macArmOnCI) Some(14336) else Some(15608)
         // Features from gax-grpc-2.31.0
         val grpcFeatures =
           "com.google.api.gax.grpc.nativeimage.ProtobufMessageFeature," +
           "com.google.api.gax.grpc.nativeimage.GrpcNettyFeature"
-        var features = Seq(
+        val features = Seq(
           "org.enso.interpreter.runtime.nativeimage.NativeLibraryFeature"
         )
-        if (areStdlibsIncluded) {
-          features = features ++ Seq(sqliteFeature)
-        }
         // heapdump monitoring is not supported on Windows
         val enableHeapDumpOpts =
           if (!GraalVM.EnsoLauncher.release && !Platform.isWindows)
@@ -3980,11 +3964,7 @@ lazy val `engine-runner` = project
             buildMemoryLimitMegabytes = maxLimit,
             targetDir                 = engineDistributionRoot.value / "bin",
             staticOnLinux             = false,
-            // sqlite-jdbc includes `--enable-url-protocols=jar` in its native-image.properites file,
-            // which breaks all our class loading. We still want to run `SqliteJdbcFeature` which extracts a proper
-            // native library from the jar.
             excludeConfigs = Seq(
-              s".*sqlite-jdbc-.*\\.jar,META-INF/native-image/org\\.xerial/sqlite-jdbc/native-image\\.properties",
               ".*gax-grpc-.*\\.jar,META-INF/native-image/com.google.api/gax-grpc/native-image.properties"
             ),
             modulePath = mp,
@@ -3993,7 +3973,6 @@ lazy val `engine-runner` = project
               "-H:+AddAllCharsets",
               "-H:+IncludeAllLocales",
               "-R:-InstallSegfaultHandler",
-              "-Dorg.sqlite.lib.exportPath=" + (engineDistributionRoot.value / "bin"),
               "--features=" + features.mkString(","),
               // Needed for the NativeLibraryFeature
               "--add-opens=org.graalvm.nativeimage.builder/com.oracle.svm.core.jdk=ALL-UNNAMED",
