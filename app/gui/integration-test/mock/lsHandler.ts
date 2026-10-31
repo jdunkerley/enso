@@ -102,10 +102,29 @@ main =
 # To test for regressions in #12476, this line is really long and we test that the code editor doesn't resize to fit it. This line is really really long. This line is really REALLY long.
 `
 
+let mainFileOverride: string | undefined
+let mockPublicTypes: { name: string; library: string }[] = []
+
+/** Serve `code` as the mock project's `Main.enso` until {@link restoreMockMainFile}. */
+export function setMockMainFile(code: string) {
+  mainFileOverride = code
+}
+
+/** Answer `library/listPublicTypes` with `types` until {@link restoreMockMainFile}. */
+export function setMockPublicTypes(types: { name: string; library: string }[]) {
+  mockPublicTypes = types
+}
+
+/** Serve the standard mock `Main.enso` and no declared types again. */
+export function restoreMockMainFile() {
+  mainFileOverride = undefined
+  mockPublicTypes = []
+}
+
 const fileTree = {
   src: {
     get 'Main.enso'() {
-      return mainFile
+      return mainFileOverride ?? mainFile
     },
   },
   images: {
@@ -465,6 +484,8 @@ export const mockLSHandler = async (
       } satisfies response.GetSuggestionsDatabase
     case 'runtime/getComponentGroups':
       return { componentGroups: placeholderGroups() } satisfies response.GetComponentGroups
+    case 'library/listPublicTypes':
+      return { publicTypes: mockPublicTypes } satisfies response.ListLibraryPublicTypes
     case 'capability/acquire':
       return {}
     case 'file/list': {

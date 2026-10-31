@@ -36,7 +36,7 @@ import type { NodeCreationOptions } from '@/components/GraphEditor/nodeCreation'
 import { selectionActionHandlers } from '@/components/GraphEditor/selectionActions'
 import { createSelectionAlignmentHandlers } from '@/components/GraphEditor/selectionAlignment'
 import { useGraphTidy } from '@/components/GraphEditor/tidy/useGraphTidy'
-import { useGraphEditorToasts } from '@/components/GraphEditor/toasts'
+import { useGraphEditorToasts, useImportsAddedOnOpenToast } from '@/components/GraphEditor/toasts'
 import { uploadedExpression, Uploader } from '@/components/GraphEditor/upload'
 import GraphMissingView from '@/components/GraphMissingView.vue'
 import GraphMouse from '@/components/GraphMouse.vue'
@@ -173,6 +173,7 @@ const graphMissing = computed(() => module.value.root != null && !graphStore.cur
 // === Toasts ===
 
 const toasts = useGraphEditorToasts(projectStore)
+useImportsAddedOnOpenToast(module, projectNames)
 
 // === Selection ===
 

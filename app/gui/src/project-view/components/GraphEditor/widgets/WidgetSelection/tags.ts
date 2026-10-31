@@ -144,16 +144,13 @@ export class ExpressionTag {
    */
   resolveExpression(edit: Ast.MutableModule, module: ModuleStore) {
     if (this.requiredImports) {
-      const conflicts = module.addMissingImports(edit, this.requiredImports)
-      if (conflicts != null && conflicts.length > 0) {
-        // TODO: Substitution does not work, because we interpret imports wrongly. To be fixed in
-        // https://github.com/enso-org/enso/issues/9356
-        // And here it was wrong anyway: we should replace only conflicting name, not entire expression!
-        // // Is there is a conflict, it would be a single one, because we only ask about a single entry.
-        // return conflicts[0]?.fullyQualified!
-      }
+      // TODO: substituting conflicting names does not work (enso-org/enso#9356).
+      module.addMissingImports(edit, this.requiredImports)
+    } else {
+      // A value that is not a suggestion entry, like `Database.connect`'s
+      // `(Postgres.Server 'localhost' 5432)`: find what its names need.
+      module.addDetectedImports(edit, this.expressionAst)
     }
-    // Unless a conflict occurs, we use the selected expression as is.
     return this.expression
   }
 }

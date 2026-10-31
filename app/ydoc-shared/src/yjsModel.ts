@@ -200,11 +200,16 @@ export const localUserActionOrigins = [
 ] as const
 export type LocalUserActionOrigin = (typeof localUserActionOrigins)[number]
 /**
- * `'local:autoLayout'` and `'local:derivedMetadata'` are local changes the user did not make
- * directly (node placement, cached node appearance). They are not user actions, so the undo
- * manager does not track them.
+ * `'local:autoLayout'`, `'local:derivedMetadata'` and `'local:autoImport'` are local changes the
+ * user did not make directly (node placement, cached node appearance, imports the IDE added when
+ * a project opened). They are not user actions, so the undo manager does not track them.
  */
-export type Origin = LocalUserActionOrigin | 'remote' | 'local:autoLayout' | 'local:derivedMetadata'
+export type Origin =
+  | LocalUserActionOrigin
+  | 'remote'
+  | 'local:autoLayout'
+  | 'local:derivedMetadata'
+  | 'local:autoImport'
 /** Locally-originated changes not otherwise specified. */
 export const defaultLocalOrigin: LocalUserActionOrigin = 'local:userAction'
 /** TODO: Add docs */
@@ -217,6 +222,7 @@ export function tryAsOrigin(origin: string): Origin | undefined {
   if (isLocalUserActionOrigin(origin)) return origin
   if (origin === 'local:autoLayout') return origin
   if (origin === 'local:derivedMetadata') return origin
+  if (origin === 'local:autoImport') return origin
   if (origin === 'remote') return origin
 }
 

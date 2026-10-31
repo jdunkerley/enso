@@ -33,3 +33,8 @@ test('derived metadata origin is known but is not a user action', () => {
   expect(tryAsOrigin('local:derivedMetadata')).toBe('local:derivedMetadata')
   expect(isLocalUserActionOrigin('local:derivedMetadata')).toBe(false)
 })
+
+test('auto import origin is known but is not a user action', () => {
+  expect(tryAsOrigin('local:autoImport')).toBe('local:autoImport')
+  expect(isLocalUserActionOrigin('local:autoImport')).toBe(false)
+})

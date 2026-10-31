@@ -431,6 +431,11 @@ export class LanguageServer extends ObservableV2<Notifications & TransportEvents
     return this.request('runtime/getComponentGroups', {})
   }
 
+  /** The types the project's installed libraries declare (`public-types:` in their `package.yaml`). */
+  listLibraryPublicTypes(): Promise<LsRpcResult<response.ListLibraryPublicTypes>> {
+    return this.request('library/listPublicTypes', {})
+  }
+
   /** [Documentation](https://github.com/jdunkerley/enso/wiki/Language-Server-Protocol-Language-Server#refactoringrenamesymbol) */
   renameSymbol(
     module: string,

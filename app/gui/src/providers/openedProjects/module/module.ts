@@ -26,8 +26,12 @@ import {
   type DetectedConflict,
   detectImportConflicts,
   filterOutRedundantImports,
+  importsWithoutConflicts,
+  missingImports,
+  printRequiredImport,
   type RequiredImport,
 } from './imports'
+import { whenReadyOnce } from './openImportCheck'
 
 /**
  * How long to wait for the module's first AST before giving up with "Failed to open project".
@@ -333,6 +337,27 @@ export async function createModuleStore(
       addImports(topLevel, importsToAdd, projectNames)
     }
 
+    /**
+     * Add, in `edit`, the imports that the type names used in `scope` (the whole module by
+     * default) need, so they are one undoable step with the change that needed them.
+     * @returns the imports added.
+     */
+    function addDetectedImports(edit: MutableModule, scope?: Ast.Ast): RequiredImport[] {
+      if (!root.value) return []
+      const topLevel = edit.getVersion(root.value)
+      const existingImports = [...analyzeImports(topLevel, projectNames)]
+      const found = missingImports(
+        topLevel,
+        suggestionDb.entries,
+        existingImports,
+        scope ?? topLevel,
+        suggestionDb.libraryPublicTypes,
+      )
+      if (found.length === 0) return []
+      const conflicts = addMissingImports(edit, found) ?? []
+      return importsWithoutConflicts(found, conflicts)
+    }
+
     function onBeforeEdit(f: (transaction: Y.Transaction) => void): { unregister: () => void } {
       const m = moduleModel.value
       if (m) {
@@ -342,6 +367,36 @@ export async function createModuleStore(
         return { unregister: () => {} }
       }
     }
+
+    /** The imports added when the module was opened, for the graph editor's notice. */
+    const importsAddedOnOpen = ref<RequiredImport[]>([])
+    whenReadyOnce(
+      () => (suggestionDb.loaded && suggestionDb.publicTypesLoaded ? root.value : undefined),
+      (openedRoot) => {
+        const needed = missingImports(
+          openedRoot,
+          suggestionDb.entries,
+          [...analyzeImports(openedRoot, projectNames)],
+          openedRoot,
+          suggestionDb.libraryPublicTypes,
+        )
+        if (needed.length === 0) return
+        let added: RequiredImport[] = []
+        // Not a user action: the undo manager does not track this origin, so Ctrl+Z after
+        // opening does not take the imports away.
+        edit(
+          (edit) => {
+            added = addDetectedImports(edit)
+            return Ok()
+          },
+          { origin: 'local:autoImport' },
+        )
+        if (added.length > 0) {
+          console.info('Added the imports this module needed:', added.map(printRequiredImport))
+          importsAddedOnOpen.value = added
+        }
+      },
+    )
 
     return Ok(
       proxyRefs({
@@ -357,6 +412,8 @@ export async function createModuleStore(
         mutableNodeMetadata,
         setWidgetMetadata,
         addMissingImports,
+        addDetectedImports,
+        importsAddedOnOpen,
         undoManager,
         stopCapturingUndo,
       }),
