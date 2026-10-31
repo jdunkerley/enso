@@ -3916,7 +3916,7 @@ lazy val `engine-runner` = project
         // Limit max memory limit
         val macArmOnCI =
           sys.env.get("CI").isDefined && Platform.isMacOS && Platform.isArm64
-        val maxLimit           = if (macArmOnCI) Some(14336) else Some(15608)
+        val maxLimit = if (macArmOnCI) Some(14336) else Some(15608)
         // Features from gax-grpc-2.31.0
         val grpcFeatures =
           "com.google.api.gax.grpc.nativeimage.ProtobufMessageFeature," +
