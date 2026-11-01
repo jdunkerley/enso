@@ -22,7 +22,9 @@ settings. Every workflow is hand-written YAML (build simplification;
 - `workflows/engine-checks.yml` + `engine-checks-platform.yml`,
   `ide-packaging.yml`, `gui-checks.yml`, `wasm-checks.yml`, `macos-checks.yml` —
   the checks, callable (`workflow_call`) and mostly startable by hand
-  (`workflow_dispatch`).
+  (`workflow_dispatch`). `ide-packaging.yml` also measures the open time, with
+  `app/electron-client/perf/openTime.ts`, after the package tests (Note [Open
+  Time In CI]).
 - `workflows/changelog.yml`, `std-libs-labels.yml` (called from
   `engine-pull-request.yml`), `formatting.yml`, `enso4igv.yml`,
   `workflow-lint.yml`, `build-scripts.yml` — single-purpose pull-request
@@ -103,6 +105,15 @@ settings. Every workflow is hand-written YAML (build simplification;
   always do. The ydoc list is the `workspace:` closure of
   `ydoc-server-polyglot`; keep it in step with those `package.json` files (Note
   [The Backend Reads The ydoc Server]).
+- **The `CI: Open perf` label measures the open time.** On a pull request to
+  `ide-pull-request.yml` it makes the packaging run (as `CI: Build IDE` does)
+  and passes `open_perf: true`; develop pushes measure it too, and a
+  hand-started `ide-packaging.yml` with `open_perf` (and `open_perf_jvm` for the
+  JVM beside native). Adding or removing the label starts a run, and removing it
+  cancels a packaging run in progress, so every unrelated-label test in
+  `ide-pull-request.yml` names both labels (`checkOpenPerf` in
+  `tools/ci/check-workflows.mjs` fails one that does not). The measuring steps
+  continue on error: they warn and never fail, as shared runners are noisy.
 - **One OS/arch set is one `strategy.matrix`**, with `fail-fast: false`. Where a
   platform's failure must not skip or delay the other platform's jobs, the
   platform is a reusable workflow called with a matrix (`engine-checks.yml`);
@@ -185,6 +196,7 @@ needs more than one tool. A job that runs a distribution built by another job
 | `ide-packaging.yml` › Build Backend                       | `version`, then `sbt "clean; all buildEngineBundle"`                                                       | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `ide-packaging.yml` › Find develop's backend              | `gh api` (artifact list, compare); no build                                                                | —                                                |
 | `ide-packaging.yml` › Package New IDE                     | `corepack pnpm --filter build-scripts run ide-build`                                                       | `setup-build-scripts`                            |
+| `ide-packaging.yml` › Package New IDE                     | `corepack pnpm --filter enso run perf:open` (develop, `CI: Open perf`, by hand)                            | —                                                |
 | `release.yml`                                             | `release create-draft`, `upload-ide`, `publish`, `update-latest-version`; `buildEngineBundle`; `ide-build` | `setup-jvm`, `setup-msvc`, `setup-build-scripts` |
 | `promote.yml`                                             | `release promote <designator>`                                                                             | `setup-build-scripts`                            |
 | `engine-checks-nightly.yml`, `macos-checks.yml`           | calls of `engine-checks-platform.yml`                                                                      | —                                                |

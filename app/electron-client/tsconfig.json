@@ -9,5 +9,5 @@
     "types": ["node"]
   },
   "extends": "../../tsconfig.json",
-  "include": ["../vitest.node.base.ts", "./*.ts", "./src", "./tasks", "./tests"]
+  "include": ["../vitest.node.base.ts", "./*.ts", "./src", "./tasks", "./tests", "./perf"]
 }

@@ -18,6 +18,18 @@ on:
         required: false
         type: boolean
         default: true
+      open_perf:
+        description: Measure the open time (app/electron-client/perf/openTime.ts).
+        required: false
+        type: boolean
+        default: false
+      open_perf_jvm:
+        description: >-
+          Measure the open time on the JVM too (with an AOT cache), after native, on the same
+          build.
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       build_backend:
@@ -26,6 +38,12 @@ on:
           backend of the newest develop run whose commit is an ancestor of the commit being packaged (the PR's merge commit).
         type: boolean
         default: true
+      open_perf:
+        description: >-
+          Measure the open time: every develop push, and pull requests with the `CI: Open perf`
+          label.
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-ide-packaging
@@ -268,7 +286,12 @@ jobs:
     # when the backend is built; when it ran and failed, there is no backend to package.
     if: ${{ !cancelled() && needs.gui-build.result == 'success' && needs.find-backend.result != 'failure' }}
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
+    # 30 as before; only a run that measures gets more (the measuring steps have timeouts of their
+    # own, which `continue-on-error` absorbs, so a runaway never reaches this one).
+    timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_jvm && 120 || 75) || 30 }}
+    env:
+      OPEN_PERF: ${{ inputs.open_perf == true || inputs.open_perf == 'true' }}
+      OPEN_PERF_ENGINES: ${{ inputs.open_perf_jvm && 'native,jvm' || 'native' }}
     strategy:
       fail-fast: false
       matrix:
@@ -354,6 +377,75 @@ jobs:
         env:
           DEBUG: "pw:browser log:"
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Note [Open Time In CI]
+      # ======================
+      # `app/electron-client/perf/openTime.ts` opens two new projects per launch, five launches,
+      # and records when each phase of an open ends (spec
+      # docs/superpowers/specs/2026-11-01-project-open-performance-design.md, section 2). It runs on
+      # develop pushes, on pull requests with the `CI: Open perf` label and when started by hand
+      # (`open_perf`, and `open_perf_jvm` for the JVM beside native). It compares with the newest
+      # develop run's `open-perf-<os>` artifact and warns, never fails: shared runners are noisy,
+      # so these steps continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs).
+      - if: env.OPEN_PERF == 'true'
+        name: Find develop's last open time
+        id: open-perf-baseline
+        continue-on-error: true
+        timeout-minutes: 5
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OS: ${{ matrix.os }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          run_id=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name="open-perf-$OS" -f per_page=50 \
+            --jq "[.artifacts[] | select(.expired | not)
+                   | select(.workflow_run.head_branch == \"develop\" and .workflow_run.head_repository_id == .workflow_run.repository_id)
+                   | select(.workflow_run.id != $RUN_ID)] | .[0].workflow_run.id // empty")
+          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
+      - if: env.OPEN_PERF == 'true' && steps.open-perf-baseline.outputs.run-id != ''
+        name: Download develop's last open time
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/download-artifact@v5
+        with:
+          name: open-perf-${{ matrix.os }}
+          path: open-perf-baseline
+          run-id: ${{ steps.open-perf-baseline.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - if: env.OPEN_PERF == 'true' && matrix.os == 'linux'
+        name: Measure the open time
+        continue-on-error: true
+        timeout-minutes: ${{ inputs.open_perf_jvm && 60 || 25 }}
+        run: >-
+          xvfb-run corepack pnpm --filter enso run perf:open --out
+          "$GITHUB_WORKSPACE/open-perf" --runs 5 --engines "$OPEN_PERF_ENGINES"
+          --budget-minutes 12 --baseline
+          "$GITHUB_WORKSPACE/open-perf-baseline/open-time.json" --summary
+          "$GITHUB_STEP_SUMMARY"
+      - if: env.OPEN_PERF == 'true' && matrix.os == 'windows'
+        name: Measure the open time
+        continue-on-error: true
+        timeout-minutes: ${{ inputs.open_perf_jvm && 60 || 25 }}
+        run: >-
+          corepack pnpm --filter enso run perf:open --out
+          "$env:GITHUB_WORKSPACE/open-perf" --runs 5 --engines
+          "$env:OPEN_PERF_ENGINES" --budget-minutes 12 --baseline
+          "$env:GITHUB_WORKSPACE/open-perf-baseline/open-time.json" --summary
+          "$env:GITHUB_STEP_SUMMARY"
+      - if: env.OPEN_PERF == 'true' && !cancelled()
+        name: Upload the open time
+        continue-on-error: true
+        timeout-minutes: 5
+        uses: actions/upload-artifact@v5
+        with:
+          name: open-perf-${{ matrix.os }}
+          path: |
+            open-perf/open-time.json
+            open-perf/open-time.md
+            open-perf/*/marks.json
+            open-perf/*/logs
+          if-no-files-found: warn
       - if: failure()
         name: Upload Test Traces
         uses: actions/upload-artifact@v5

@@ -1096,6 +1096,65 @@ export function checkStdlibTestsGetTheGroupFilter({ workflows }) {
   return problems
 }
 
+/**
+ * The open-time steps (Note [Open Time In CI] in `ide-packaging.yml`) warn and never fail, and run
+ * after the package tests; and the IDE pull-request workflow treats `CI: Open perf` as a related
+ * label wherever it treats `CI: Build IDE` as one, or adding the label would start an inert run.
+ */
+export function checkOpenPerf({ workflows }) {
+  const problems = []
+  const job = workflows['ide-packaging.yml']?.doc?.jobs?.['package-ide']
+  const steps = job?.steps ?? []
+  const lastTests = steps.findLastIndex((s) => String(s?.name ?? '') === 'Run Package Tests')
+  const measures = steps.some((s) => String(s?.run ?? '').includes('perf:open'))
+  if (measures && lastTests < 0) {
+    problems.push(
+      'ide-packaging.yml › package-ide: measures the open time but has no "Run Package Tests" step',
+    )
+  }
+  // An open-time step is one that measures, or one that only serves the measuring (it is gated on
+  // `env.OPEN_PERF`): finding, downloading and uploading the baseline.
+  const isOpenTime = (step) =>
+    String(step?.run ?? '').includes('perf:open') || String(step?.if ?? '').includes('env.OPEN_PERF')
+  steps.forEach((step, index) => {
+    if (!isOpenTime(step)) return
+    const name = step.name ?? `step ${index}`
+    if (step['continue-on-error'] !== true) {
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" must continue on error`,
+      )
+    }
+    // A step's own timeout is absorbed by `continue-on-error`; the job's would fail packaging.
+    if (step['timeout-minutes'] == null) {
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" needs its own timeout-minutes`,
+      )
+    }
+    if (String(step?.run ?? '').includes('perf:open') && index < lastTests) {
+      problems.push(
+        'ide-packaging.yml › package-ide: the open time is measured after the package tests',
+      )
+    }
+  })
+  // Measuring is not allowed to lengthen the runs that do not measure.
+  if (measures && !/inputs\.open_perf/.test(String(job?.['timeout-minutes'] ?? ''))) {
+    problems.push(
+      'ide-packaging.yml › package-ide: the job timeout must be raised only when measuring (an expression on inputs.open_perf)',
+    )
+  }
+  const text = workflows['ide-pull-request.yml']?.text ?? ''
+  const buildIde = (text.match(/!= 'CI: Build IDE'/g) ?? []).length
+  const both = (
+    text.match(/!= 'CI: Build IDE' && github\.event\.label\.name != 'CI: Open perf'/g) ?? []
+  ).length
+  if (buildIde !== both) {
+    problems.push(
+      `ide-pull-request.yml: ${buildIde - both} unrelated-label test(s) do not exempt 'CI: Open perf'`,
+    )
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -1116,6 +1175,7 @@ export const CHECKS = [
   checkStdlibTestMap,
   checkPublicTypes,
   checkStdlibTestsGetTheGroupFilter,
+  checkOpenPerf,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

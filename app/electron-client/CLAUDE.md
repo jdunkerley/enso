@@ -699,3 +699,80 @@ challenges plus app-demo workflows like Colorado COVID and FX Rates History).
 It's gated on `ENSO_TEST_AI_CHALLENGES_DIR=/abs/path` pointing at
 manually-downloaded inputs (see `tests/README.md` for the expected layout)
 because the inputs aren't checked in and the agent budget is real.
+
+## Open-time harness
+
+`perf/openTime.ts` measures how long opening a project takes in the packaged IDE
+(spec `docs/superpowers/specs/2026-11-01-project-open-performance-design.md`,
+section 2). It is not a Playwright Test run: it drives Electron through
+`playwright`'s `_electron` and is started with
+
+```
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json>] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
+```
+
+It needs a built `dist/ide/` (or `--exe`), and under Linux a display
+(`xvfb-run`). The IDE allows one instance per user profile, so a launch quits at
+once ("Target page, context or browser has been closed") while another IDE of
+the same name runs; close it first, or point `--exe` at a copy whose `app.asar`
+`package.json` `name` has been changed (same length), which has a profile of its
+own. Each launch creates two new projects with the bundled launcher
+(`enso --new`), starts the IDE, opens the first from the dashboard (the cold
+open), waits for the welcome table, opens the component browser and the `format`
+dropdown, closes the project, and does the same with the second. Times are
+milliseconds from the click on the project's row:
+
+| Phase            | Ends at                                                                      |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `engineUp`       | the launcher's first stdout line, else the Language Server log's first line  |
+| `lsReady`        | the Language Server log's `Started server at json`                           |
+| `openAnswered`   | the response to `project/open`                                               |
+| `guiConnected`   | the GUI opens the `/project/index` WebSocket                                 |
+| `firstNode`      | the first `.GraphNode` is visible                                            |
+| `firstExecution` | the log's `The first execution finished.` (INFO, `SuggestionsHandler`)       |
+| `welcomeShown`   | the table visualisation shows `Welcome To Enso!` (the headline)              |
+| extras           | after the headline: component browser entries, `format` widget, its dropdown |
+
+The Language Server's log times carry no offset and are read as local time (Note
+[Language Server Log Times Are Local] in `perf/openTimeReport.ts`). A launch
+that misses a phase or an extra records it in `notMeasured`, and the report
+warns about it; nothing is silently skipped.
+
+Output in `--out`: `open-time.json` (an `OpenTimeReport`), `open-time.md` (the
+medians table, with develop's first-open medians when `--baseline` is a report
+of the same template) and, per launch, `<engine>-<n>/` with `marks.json`,
+`electron-out.log` and `logs/` (and with `--profile` a renderer
+`first.cpuprofile` and `second.cpuprofile`). Warnings: a median over 4 s, more
+than 15% worse than the baseline, or fewer than 3 successful first opens. They
+are printed (as `::warning` under GitHub Actions) and never change the exit
+code.
+
+Every child process starts without credentials: `credentialFreeEnv` drops the
+`ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*`, `DATABRICKS*`,
+`ANTHROPIC*`, `OPENAI*`, `PG*` and `ACTIONS_*` variables, the GitHub tokens, and
+any variable named `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_KEY` or
+`*_CREDENTIALS`, whatever the caller's environment holds. It also drops
+`JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS` and `JDK_JAVA_OPTIONS`, so a native
+measurement is not changed by them. Still unset the credentials in the shell
+before a manual run.
+
+`--engines jvm` runs the engine on the bundled JDK instead of the native image
+(`ENSO_ENGINE_ARGS=--jvm`). It first builds a JDK AOT cache under `<out>/aot/`
+(`perf/jvmAotCache.ts`: a training launch, `-XX:AOTMode=create` with the
+bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
+it: with `on` a JVM that cannot use the cache fails to start, and so does every
+measured launch). So a JVM run takes several minutes longer than a native one.
+The report says how the cache was made (`jvmAot`): `ide-trained` (the training
+is a launch of the IDE), `launcher-trained` (where the IDE kills the engine, as
+on Windows, the JVM never writes the training file, so it is `enso --jvm --run`
+of an empty project: it never loads the Language Server or `project/open`
+classes, so those JVM numbers are pessimistic and not comparable with
+`ide-trained` ones) or `uncached` (the JVM refused the cache; the numbers are
+those of a JVM with no AOT cache, and the report warns). `LAUNCHER_JVM_OPTIONS`
+copies the options of `Main.launchJvm`; a unit test fails when they drift.
+
+`tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
+`java` and its engine component are; the Playwright specs, `globalSetup.ts` and
+the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
+unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
+runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).

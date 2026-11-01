@@ -17,6 +17,7 @@ import {
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
+  checkOpenPerf,
   checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
@@ -495,6 +496,71 @@ ${steps}
   test('rejects packaging with no smoke test at all', () => {
     const repo = fixture({ 'workflows/ide-packaging.yml': windowsJob(upload) })
     assert.match(checkWindowsInstallerSmokeTest(repo)[0], /no step runs/)
+  })
+})
+
+describe('open time', () => {
+  const measure = (continueOnError, timeout = true) =>
+    `      - name: Measure the open time\n        if: env.OPEN_PERF == 'true'\n        ${continueOnError ? 'continue-on-error: true\n        ' : ''}${timeout ? 'timeout-minutes: 25\n        ' : ''}run: corepack pnpm --filter enso run perf:open --out x`
+  // The other open-time steps (find, download and upload the baseline) have no `run: perf:open`.
+  const baselineStep = (continueOnError, timeout = true) =>
+    `      - name: Find develop's last open time\n        if: env.OPEN_PERF == 'true'\n        ${continueOnError ? 'continue-on-error: true\n        ' : ''}${timeout ? 'timeout-minutes: 5\n        ' : ''}uses: actions/download-artifact@v5`
+  const tests =
+    '      - name: Run Package Tests\n        run: corepack pnpm -r --filter enso ide-integration-test'
+  const conditionalJobTimeout = "${{ inputs.open_perf == true && 60 || 30 }}"
+  const packagingWith = (steps, jobTimeout = conditionalJobTimeout) => `
+on: workflow_call
+jobs:
+  package-ide:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${jobTimeout}
+    steps:
+${steps.join('\n')}
+`
+  const label = (name) => `github.event.label.name != '${name}'`
+  const pullRequest = (conditions) => `
+on: pull_request
+jobs:
+${conditions.map((c, i) => `  job${i}:\n    if: "\${{ ${c} }}"\n`).join('')}`
+  const both = `${label('CI: Build IDE')} && ${label('CI: Open perf')}`
+  const repoWith = (steps, conditions = [both], jobTimeout) =>
+    fixture({
+      'workflows/ide-packaging.yml': packagingWith(steps, jobTimeout),
+      'workflows/ide-pull-request.yml': pullRequest(conditions),
+    })
+  test('accepts a step after the package tests that continues on error', () => {
+    assert.deepEqual(checkOpenPerf(repoWith([tests, measure(true)])), [])
+  })
+  test('rejects a step before the package tests, and one that can fail the job', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true), tests])).length, 1)
+    assert.equal(checkOpenPerf(repoWith([tests, measure(false)])).length, 1)
+  })
+  test('accepts the baseline steps too, when they continue on error with a timeout', () => {
+    assert.deepEqual(checkOpenPerf(repoWith([tests, baselineStep(true), measure(true)])), [])
+  })
+  test('rejects an open-time step with no timeout, so a hang cannot reach the job timeout', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true, false)]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /timeout-minutes/)
+    assert.equal(checkOpenPerf(repoWith([tests, baselineStep(true, false), measure(true)])).length, 1)
+  })
+  test('rejects a baseline step that can fail the job', () => {
+    const problems = checkOpenPerf(repoWith([tests, baselineStep(false), measure(true)]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /continue on error/)
+  })
+  test('rejects a job timeout raised for every run, not only the measuring ones', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true)], [both], '90'))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /job timeout/)
+  })
+  test('rejects a step with no package tests at all', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true)])).length, 1)
+  })
+  test('rejects a label test that does not exempt the open-time label', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true)], [both, label('CI: Build IDE')]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /1 unrelated-label test/)
   })
 })
 

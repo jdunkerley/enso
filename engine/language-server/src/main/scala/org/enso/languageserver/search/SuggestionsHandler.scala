@@ -439,7 +439,8 @@ final class SuggestionsHandler(
 
     case _: Api.ExecutionComplete | _: Api.ExecutionFailed =>
       if (!state.executionFinished) {
-        logger.debug("The first execution finished.")
+        // Read by the open-time harness (`app/electron-client/perf/openTime.ts`): once per project.
+        logger.info("The first execution finished.")
         state.executionFinished = true
         if (state.cataloguesPending) self ! InsertCatalogues(state.fill)
       }
