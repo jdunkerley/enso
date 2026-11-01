@@ -21,7 +21,6 @@ import project.Database.Helpers.Name_Generator
 import project.Database.Transaction_Spec
 import project.Database.Upload_Spec
 import project.Known_Issue.Known_Issue
-import project.Pending.Pending
 import project.Suite_Part.Suite_Part
 
 ## ---
