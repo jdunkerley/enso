@@ -82,6 +82,30 @@ spawn): a write to an exited child fails asynchronously with `EPIPE`, and with
 no listener that is an unhandled error that fails vitest runs and can crash the
 Electron main process (#401).
 
+## A second project's engine start on Windows (measured, no fix)
+
+The project-open performance spec expected a Windows engine start of ~780 ms for
+the second project of a session. The open-time harness (release build
+2026.1.1-rc.1, native engine, `core` template, 10 launches, Windows 11) does not
+show it: `engineUp` (click to the launcher's first output) has a median of 171
+ms for the first open and **130 ms for the second**, and `lsReady` 227 / 192 ms.
+The second is faster at the median (the first pays for cold file caches) and by
+the mean it is 94 ms slower (164 vs 258 ms), under the 150 ms bar for tracing
+it. The same Windows build's earlier 5-launch run gave 159 / 114 ms.
+
+What is real is intermittent: 3 of the 10 second opens took 414 to 652 ms
+(`engineUp`), the other seven 109 to 223 ms; the first opens stayed within 136
+to 199 ms. Those slow ones are about 300 to 500 ms later than the rest. The
+cause was not traced (the stage timing in `EnsoRunner` was not instrumented,
+since the median does not call for a fix); the candidates are the first
+project's engine still shutting down while the second is spawned (the port
+search steps over its ports) and antivirus scanning of the launcher after a
+recent run. If a future report shows a consistently slow second open, instrument
+`EnsoRunner.openProject` (before `loadingProjects`, around `findServerPorts`,
+before `spawn`, at the child's `spawn` event) and `OpenedProject.close` around
+`gracefulShutdown` to split it before changing anything. Reproduce with
+`perf:open --runs 10` (`app/electron-client/CLAUDE.md`, "Open-time harness").
+
 ## Local secrets (`src/localSecrets/`)
 
 `LocalSecrets` is the Node side of `~/.enso/secrets.json` (`ENSO_SECRETS_FILE`
