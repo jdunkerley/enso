@@ -19,4 +19,4 @@ add_specs suite_builder backend:Backend -> Test_Setup =
     Setups.add_specs suite_builder backend
 
 ## The suite's `data` directory, with `data.csv`.
-data_directory -> File = enso_project.data
+data_directory -> File = (Project_Description.new Standard.Database_Test_Suite.Main).data

@@ -34,5 +34,11 @@ offers it, and it is in the engine distribution but not in the IDE installer
   otherwise.
 - A new `Dialect_Flag` is answered by every dialect: their `case` has no
   default, so a missing branch panics at run time.
+- `enso_project` in the suite names the project that runs it, not the suite: the
+  suite's own files are reached through `Database_Test_Suite.data_directory`
+  (`Project_Description.new Standard.Database_Test_Suite.Main`).
+- A lambda whose whole body is an ascription (`x-> (x:Numeric_Column)`) cannot
+  be written to the IR cache (`No persistance for … Type$Ascription`), so
+  library indexing fails; bind it first (`refined = (x:T)`, then `refined`).
 - The suite imports no test project (`enso_dev.*`) and writes no file into
   itself: it uses `File.create_temporary_file`.

@@ -70,9 +70,17 @@ add_specs suite_builder backend:Backend -> Test_Setup =
 ## ---
    private: true
    ---
+   The suite's `data.csv`. `enso_project` would name the project that runs
+   the suite, not this library.
+data_csv -> File =
+    (Project_Description.new Standard.Database_Test_Suite.Main).data / "data.csv"
+
+## ---
+   private: true
+   ---
    The setup of the in-memory table.
 in_memory_setup -> Test_Setup =
-    agg_table_fn _ = (enso_project.data / "data.csv") . read
+    agg_table_fn _ = data_csv . read
     empty_table_fn _ =
         table = agg_table_fn Nothing
         table.take 0
@@ -119,7 +127,7 @@ database_setup backend:Backend -> Test_Setup =
     light_table_builder columns =
         if backend.has_known_issue Known_Issue.No_Literal_Tables then table_builder columns else
             default_connection.get.create_literal_table (Table.new columns) "literal_table"
-    agg_in_memory_table = Lazy_Ref.Value ((enso_project.data / "data.csv") . read)
+    agg_in_memory_table = Lazy_Ref.Value (data_csv . read)
     agg_table_fn _ =
         agg_in_memory_table.get.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
     empty_agg_table_fn _ =
