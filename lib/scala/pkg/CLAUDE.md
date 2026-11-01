@@ -18,6 +18,12 @@ and loads packages. Used by the compiler, the runtime and every CLI tool.
   changing the definition makes every existing catalogue stale (they are skipped
   until recompiled). The definition is in its doc comment.
 
+- **The new-project template ships its full id map.**
+  `src/main/resources/default/src/Main.enso` names every AST's id, so the first
+  open of a new project needs no id-assigning edit (which would re-execute it).
+  Regenerate the map with `UPDATE_TEMPLATE_ID_MAP=1` (see
+  `app/ydoc-server/CLAUDE.md`) after changing the template's code.
+
 ## Testing
 
 `sbt pkg/test`.

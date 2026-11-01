@@ -1,9 +1,10 @@
 import type { Result } from 'enso-common/src/utilities/data/result'
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { YjsChannel as Channel, type YjsChannel, type YjsChannelServer } from 'ydoc-channel'
 import * as Ast from 'ydoc-shared/ast'
+import { combineFileParts, splitFileContents } from 'ydoc-shared/ensoFile'
 import { computeTextChecksum } from 'ydoc-shared/languageServer'
 import { createModuleFlusher } from 'ydoc-shared/moduleFlusher'
 import {
@@ -16,6 +17,7 @@ import {
 import type { ExternalId } from 'ydoc-shared/yjsModel'
 import * as Y from 'yjs'
 import { LanguageServerSession, ModulePersistence } from '../languageServerSession'
+import { deserializeIdMap, serializeIdMap } from '../serialization'
 import type { JavaByteBufferClass } from '../YjsBinaryChannel'
 
 // Polyfill DOM event types that are missing from some Node.js versions.
@@ -128,7 +130,7 @@ function fakeLanguageServerWithModules(
   content: string = MAIN,
 ) {
   const saves: { path: string; currentVersion: string }[] = []
-  const edits: { path: string; newVersion: string }[] = []
+  const edits: { path: string; newVersion: string; execute: boolean }[] = []
   const fileInfos: string[] = []
   const state = {
     modifiedTime: '2026-10-16T10:00:00Z',
@@ -197,6 +199,7 @@ function fakeLanguageServerWithModules(
             edits.push({
               path: message.params.edit.path.segments.join('/'),
               newVersion: message.params.edit.newVersion,
+              execute: message.params.execute,
             })
             if (state.failNextEdit) {
               state.failNextEdit = false
@@ -550,4 +553,34 @@ describe('the new-project template', () => {
     expect(welcome?.code()).toBe('Data.read Examples.welcome')
     expect(welcome?.nodeMetadata.get('visualization')?.visible).toBe(true)
   })
+
+  // The template carries every AST's id, so the server has none to assign and sends no edit: the
+  // engine's first compile already has every id, and nothing aborts it (spec section 1, fix 3).
+  test('opens without an edit to the Language Server', async () => {
+    const ls = fakeLanguageServerWithModules(['Main.enso'], readFileSync(TEMPLATE_MAIN, 'utf8'))
+    const gui = await openWithGui('ws://template-no-edit', ls)
+    templateSession = gui.session
+    await sleep(200)
+    expect(ls.edits).toEqual([])
+  })
+
+  // `UPDATE_TEMPLATE_ID_MAP=1` rewrites the template's id map with every AST's id, exactly as
+  // `syncFileContents` would assign them; the ids the file already has are kept.
+  test.runIf(process.env.UPDATE_TEMPLATE_ID_MAP === '1')(
+    'writes the template’s full id map',
+    () => {
+      const { code, idMapJson, metadataJson } = splitFileContents(
+        readFileSync(TEMPLATE_MAIN, 'utf8'),
+      )
+      const module = new Ast.MutableModule(new Y.Doc())
+      const { root, spans } = Ast.parseModuleWithSpans(code, module)
+      module.setRoot(root)
+      Ast.setExternalIds(module, spans, deserializeIdMap(idMapJson!))
+      const idMap = Ast.spanMapToIdMap(spans)
+      writeFileSync(
+        TEMPLATE_MAIN,
+        combineFileParts({ code, idMapJson: serializeIdMap(idMap), metadataJson: metadataJson! }),
+      )
+    },
+  )
 })
