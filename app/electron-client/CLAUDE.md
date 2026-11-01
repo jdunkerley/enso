@@ -699,3 +699,63 @@ challenges plus app-demo workflows like Colorado COVID and FX Rates History).
 It's gated on `ENSO_TEST_AI_CHALLENGES_DIR=/abs/path` pointing at
 manually-downloaded inputs (see `tests/README.md` for the expected layout)
 because the inputs aren't checked in and the agent budget is real.
+
+## Open-time harness
+
+`perf/openTime.ts` measures how long opening a project takes in the packaged IDE
+(spec `docs/superpowers/specs/2026-11-01-project-open-performance-design.md`,
+section 2). It is not a Playwright Test run: it drives Electron through
+`playwright`'s `_electron` and is started with
+
+```
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json>] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
+```
+
+It needs a built `dist/ide/` (or `--exe`), and under Linux a display
+(`xvfb-run`). Each launch creates two new projects with the bundled launcher
+(`enso --new`), starts the IDE, opens the first from the dashboard (the cold
+open), waits for the welcome table, opens the component browser and the `format`
+dropdown, closes the project, and does the same with the second. Times are
+milliseconds from the click on the project's row:
+
+| Phase            | Ends at                                                                      |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `engineUp`       | the launcher's first stdout line, else the Language Server log's first line  |
+| `lsReady`        | the Language Server log's `Started server at json`                           |
+| `openAnswered`   | the response to `project/open`                                               |
+| `guiConnected`   | the GUI opens the `/project/index` WebSocket                                 |
+| `firstNode`      | the first `.GraphNode` is visible                                            |
+| `firstExecution` | the log's `The first execution finished.` (INFO, `SuggestionsHandler`)       |
+| `welcomeShown`   | the table visualisation shows `Welcome To Enso!` (the headline)              |
+| extras           | after the headline: component browser entries, `format` widget, its dropdown |
+
+The Language Server's log times carry no offset and are read as local time (Note
+[Language Server Log Times Are Local] in `perf/openTimeReport.ts`). A launch
+that misses a phase or an extra records it in `notMeasured`, and the report
+warns about it; nothing is silently skipped.
+
+Output in `--out`: `open-time.json` (an `OpenTimeReport`), `open-time.md` (the
+medians table, with develop's first-open medians when `--baseline` is a report
+of the same template) and, per launch, `<engine>-<n>/` with `marks.json`,
+`electron-out.log` and `logs/` (and with `--profile` a renderer
+`first.cpuprofile` and `second.cpuprofile`). Warnings: a median over 4 s, more
+than 15% worse than the baseline, or fewer than 3 successful first opens. They
+are printed (as `::warning` under GitHub Actions) and never change the exit
+code.
+
+Every child process starts without credentials: `credentialFreeEnv` drops the
+`ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*` and
+`DATABRICKS*` variables and the GitHub tokens, whatever the caller's environment
+holds. Still unset them in the shell before a manual run.
+
+`--engines jvm` runs the engine on the bundled JDK instead of the native image
+(`ENSO_ENGINE_ARGS=--jvm`). It first builds a JDK AOT cache under `<out>/aot/`
+(`perf/jvmAotCache.ts`: a training launch, `-XX:AOTMode=create` with the
+bundle's `java`, then a launch that checks the JVM accepted it), so a JVM run
+takes several minutes longer than a native one.
+
+`tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
+`java` and its engine component are; the Playwright specs, `globalSetup.ts` and
+the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
+unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
+runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).

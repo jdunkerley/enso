@@ -22,7 +22,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { electronExecutablePath } from './tests/electronTest'
+import { electronExecutablePath, findEngineLauncher } from './tests/packagedIde'
 
 /** The libraries `Standard.Base`'s new-project template imports; keep in sync with it. */
 const TEMPLATE_MAIN = `\
@@ -37,31 +37,9 @@ main = 42
 
 const WARMUP_TIMEOUT_MS = 600_000
 
-/** Locate the packaged engine launcher next to the Electron binary. */
-function findEngineLauncher(): string | undefined {
-  const unpackedDir = path.dirname(electronExecutablePath)
-  const launcherNames = process.platform === 'win32' ? ['enso.bat', 'enso.exe'] : ['enso']
-  for (const resources of ['resources', 'Resources']) {
-    const binParent = path.join(unpackedDir, resources, 'enso', 'dist')
-    let versions: string[]
-    try {
-      versions = fs.readdirSync(binParent)
-    } catch {
-      continue
-    }
-    for (const version of versions) {
-      for (const name of launcherNames) {
-        const candidate = path.join(binParent, version, 'bin', name)
-        if (fs.existsSync(candidate)) return candidate
-      }
-    }
-  }
-  return undefined
-}
-
 /** Pre-compile the standard library once so the per-spec Language Server starts warm. */
 export default async function globalSetup() {
-  const launcher = findEngineLauncher()
+  const launcher = findEngineLauncher(electronExecutablePath)
   if (!launcher) {
     console.warn('[globalSetup] Could not find the packaged engine launcher; skipping warm-up.')
     return

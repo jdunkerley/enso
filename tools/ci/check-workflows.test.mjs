@@ -17,6 +17,7 @@ import {
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
+  checkOpenPerf,
   checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
@@ -495,6 +496,47 @@ ${steps}
   test('rejects packaging with no smoke test at all', () => {
     const repo = fixture({ 'workflows/ide-packaging.yml': windowsJob(upload) })
     assert.match(checkWindowsInstallerSmokeTest(repo)[0], /no step runs/)
+  })
+})
+
+describe('open time', () => {
+  const measure = (continueOnError) =>
+    `      - name: Measure the open time\n        ${continueOnError ? 'continue-on-error: true\n        ' : ''}run: corepack pnpm --filter enso run perf:open --out x`
+  const tests =
+    '      - name: Run Package Tests\n        run: corepack pnpm -r --filter enso ide-integration-test'
+  const packagingWith = (steps) => `
+on: workflow_call
+jobs:
+  package-ide:
+    runs-on: ubuntu-latest
+    steps:
+${steps.join('\n')}
+`
+  const label = (name) => `github.event.label.name != '${name}'`
+  const pullRequest = (conditions) => `
+on: pull_request
+jobs:
+${conditions.map((c, i) => `  job${i}:\n    if: "\${{ ${c} }}"\n`).join('')}`
+  const both = `${label('CI: Build IDE')} && ${label('CI: Open perf')}`
+  const repoWith = (steps, conditions = [both]) =>
+    fixture({
+      'workflows/ide-packaging.yml': packagingWith(steps),
+      'workflows/ide-pull-request.yml': pullRequest(conditions),
+    })
+  test('accepts a step after the package tests that continues on error', () => {
+    assert.deepEqual(checkOpenPerf(repoWith([tests, measure(true)])), [])
+  })
+  test('rejects a step before the package tests, and one that can fail the job', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true), tests])).length, 1)
+    assert.equal(checkOpenPerf(repoWith([tests, measure(false)])).length, 1)
+  })
+  test('rejects a step with no package tests at all', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true)])).length, 1)
+  })
+  test('rejects a label test that does not exempt the open-time label', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true)], [both, label('CI: Build IDE')]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /1 unrelated-label test/)
   })
 })
 
