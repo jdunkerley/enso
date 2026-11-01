@@ -22,6 +22,9 @@ type Launch = (
   opens: readonly OpenTag[],
 ) => Promise<RunResult & { readonly stdout: string }>
 
+/** Runs a new project to its end with the launcher, under the given environment. */
+type TrainDirect = (env: Record<string, string>) => Promise<void>
+
 /** `JAVA_TOOL_OPTIONS` for a measured launch: the cache, and no JVM logging on stdout. */
 export function measuredJvmToolOptions(cache: string): string {
   return `-XX:AOTCache=${cache} -Xlog:disable -Xlog:all=off`
@@ -35,17 +38,27 @@ const CREATE_TIMEOUT_MS = 5 * 60_000
  * rejected cache is made once more: every JVM that exits during the training launch writes the
  * configuration, and the last writer wins.
  */
-export async function createJvmAotCache(out: string, exe: string, launch: Launch): Promise<string> {
+export async function createJvmAotCache(
+  out: string,
+  exe: string,
+  launch: Launch,
+  trainDirect: TrainDirect,
+): Promise<string> {
   try {
-    return await prepareJvmAotCache(out, exe, launch)
+    return await prepareJvmAotCache(out, exe, launch, trainDirect)
   } catch (e) {
     if (!String(e).includes('rejected the AOT cache')) throw e
     console.warn(`Open time: ${String(e)}; preparing the AOT cache once more.`)
-    return await prepareJvmAotCache(out, exe, launch)
+    return await prepareJvmAotCache(out, exe, launch, trainDirect)
   }
 }
 
-async function prepareJvmAotCache(out: string, exe: string, launch: Launch): Promise<string> {
+async function prepareJvmAotCache(
+  out: string,
+  exe: string,
+  launch: Launch,
+  trainDirect: TrainDirect,
+): Promise<string> {
   const java = findBundledJava(exe)
   const component = findEngineComponent(exe)
   if (!java || !component) throw new Error(`No bundled JDK or engine component next to ${exe}`)
@@ -62,6 +75,17 @@ async function prepareJvmAotCache(out: string, exe: string, launch: Launch): Pro
     },
     ['first'],
   )
+  if (!fs.existsSync(config)) {
+    // The JVM writes the configuration as it exits. Where the IDE ends the engine by killing it
+    // (Windows) it never does, so the training is a project run to its end through the launcher.
+    console.warn(
+      `Open time: the IDE training launch wrote no AOT configuration (${training.error ?? 'no error'}); training with the launcher instead.`,
+    )
+    await trainDirect({
+      ENSO_ENGINE_ARGS: '--jvm',
+      JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config}`,
+    })
+  }
   if (!fs.existsSync(config)) {
     throw new Error(
       `The JVM wrote no AOT configuration (training launch: ${training.error ?? 'no error'})`,

@@ -712,7 +712,11 @@ corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines nati
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
-(`xvfb-run`). Each launch creates two new projects with the bundled launcher
+(`xvfb-run`). The IDE allows one instance per user profile, so a launch quits at
+once ("Target page, context or browser has been closed") while another IDE of
+the same name runs; close it first, or point `--exe` at a copy whose `app.asar`
+`package.json` `name` has been changed (same length), which has a profile of its
+own. Each launch creates two new projects with the bundled launcher
 (`enso --new`), starts the IDE, opens the first from the dashboard (the cold
 open), waits for the welcome table, opens the component browser and the `format`
 dropdown, closes the project, and does the same with the second. Times are

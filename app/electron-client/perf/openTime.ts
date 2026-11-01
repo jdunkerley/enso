@@ -95,25 +95,60 @@ async function poll(check: () => Promise<boolean>, timeoutMs: number): Promise<b
   }
 }
 
-/** Run the bundled launcher's `--new`, as the dashboard's New Project button does. */
-async function createProject(launcher: string, projectsDir: string, name: string) {
-  fs.mkdirSync(projectsDir, { recursive: true })
-  const target = path.join(projectsDir, name)
+/** Run the bundled launcher to the end, without credentials; resolves with its exit code. */
+async function runLauncher(
+  launcher: string,
+  args: readonly string[],
+  cwd: string,
+  extraEnv: Record<string, string> = {},
+  timeoutMs = 600_000,
+): Promise<number | null> {
   // The Windows launcher may be `enso.bat`, which Node spawns only through a shell.
   const useShell = launcher.endsWith('.bat')
   const quote = (s: string) => (useShell ? `"${s}"` : s)
-  const code = await new Promise<number | null>((resolve, reject) => {
-    const child = spawn(quote(launcher), ['--new', quote(target), '--new-project-name', name], {
-      cwd: projectsDir,
+  return await new Promise<number | null>((resolve, reject) => {
+    const child = spawn(quote(launcher), args.map(quote), {
+      cwd,
       // The repo types `ProcessEnv` as closed; a spawned process takes any variable.
-      env: credentialFreeEnv(process.env) as NodeJS.ProcessEnv,
+      env: { ...credentialFreeEnv(process.env), ...extraEnv } as NodeJS.ProcessEnv,
       shell: useShell,
       stdio: 'ignore',
+      timeout: timeoutMs,
     })
     child.on('error', reject)
     child.on('exit', resolve)
   })
+}
+
+/** Run the bundled launcher's `--new`, as the dashboard's New Project button does. */
+async function createProject(launcher: string, projectsDir: string, name: string) {
+  fs.mkdirSync(projectsDir, { recursive: true })
+  const target = path.join(projectsDir, name)
+  const code = await runLauncher(
+    launcher,
+    ['--new', target, '--new-project-name', name],
+    projectsDir,
+  )
   if (code !== 0) throw new Error(`enso --new ${name} exited with ${code}`)
+}
+
+/**
+ * Run a new project to its end with the launcher (`--jvm --run`), so that the JVM exits by itself.
+ * The AOT cache training needs that where the IDE ends the engine by killing it (Windows).
+ */
+async function runProjectOnJvm(options: Options, env: Record<string, string>): Promise<void> {
+  const launcher = findEngineLauncher(options.exe)
+  if (!launcher) throw new Error(`No engine launcher next to ${options.exe}`)
+  const dir = path.join(options.out, 'aot-training')
+  fs.rmSync(dir, { recursive: true, force: true })
+  await createProject(launcher, dir, 'OpenTimeTraining')
+  const code = await runLauncher(
+    launcher,
+    ['--jvm', '--run', path.join(dir, 'OpenTimeTraining')],
+    dir,
+    env,
+  )
+  if (code !== 0) throw new Error(`enso --jvm --run exited with ${code}`)
 }
 
 async function openProject(
@@ -288,7 +323,7 @@ async function measureLaunch(
       await page.waitForTimeout(2000)
     }
   } catch (e) {
-    error = String(e).slice(0, 500)
+    error = String(e).slice(0, 2000)
   } finally {
     await Promise.race([app?.close(), new Promise((resolve) => setTimeout(resolve, 20_000))]).catch(
       () => {},
@@ -366,8 +401,11 @@ async function main() {
     if (engine === 'jvm') {
       let cache: string
       try {
-        cache = await createJvmAotCache(options.out, options.exe, (env, opens) =>
-          measureLaunch(options, 'jvm', 0, env, opens),
+        cache = await createJvmAotCache(
+          options.out,
+          options.exe,
+          (env, opens) => measureLaunch(options, 'jvm', 0, env, opens),
+          (env) => runProjectOnJvm(options, env),
         )
       } catch (e) {
         console.warn(`Open time: no JVM runs, the AOT cache could not be made: ${String(e)}`)
