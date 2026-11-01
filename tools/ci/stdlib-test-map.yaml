@@ -59,8 +59,14 @@ testProjects:
   Microsoft_Tests:
     imports: [Base, Database, Database_Test_Suite, Microsoft, Table, Test]
     testImports: [Base_Tests, Cloud_Tests]
+  Postgres_Tests:
+    imports: [Base, Database, Database_Test_Suite, Postgres, SQLite, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests]
   Saas_Tests:
     imports: [Base, Database_Test_Suite, Saas, Table, Test]
+    testImports: [Base_Tests]
+  SQLite_Tests:
+    imports: [Base, Database, Database_Test_Suite, SQLite, Table, Test]
     testImports: [Base_Tests]
   Snowflake_Tests:
     imports: [Base, Database, Database_Test_Suite, Snowflake, Table, Test]
@@ -75,7 +81,6 @@ testProjects:
         Database,
         Database_Test_Suite,
         Examples,
-        Postgres,
         SQLite,
         Table,
         Test,
@@ -93,21 +98,14 @@ testProjects:
 
 # The jobs a standard library suite that runs "every project but …" splits into; a suite with an
 # allow list (AWS, Microsoft) stays one job. Each shard runs the listed projects the suite runs;
-# the last (`"*"`) runs the rest. Sized from the timings in
-# docs/superpowers/plans/2026-10-30-ci-speed-phase-2.md: Table_Tests alone is the longest.
-# A shard with one project may also `split` into parts that each run the groups (of
-# `ENSO_TEST_GROUP_FILTER`) whose names start with the part's `groups` regex; the last part has no
-# `groups` and runs every group the others leave out, so nothing is lost. A part with
-# `needs: postgres` is dropped for a suite entry without that database (its groups then run, and
-# skip, in the last part, as before).
+# the last (`"*"`) runs the rest. A shard with `needs: postgres` runs only for a suite entry with
+# that database; without it, its projects run (and their database groups are pending) in the last
+# shard. A shard with one project may also `split` into parts by the groups of
+# `ENSO_TEST_GROUP_FILTER` (none does now): each part runs the groups whose names start with its
+# `groups` regex, and the last part, without `groups`, the rest.
 shards:
-  - name: Table
-    projects: [Table_Tests]
-    # One job per database backend (the backends take about a third of the time each). A part
-    # with `needs` runs only where its suite has that database; the last runs every other group.
-    split:
-      - { name: PostgreSQL, groups: '\[PostgreSQL\]', needs: postgres }
-      - { name: SQLite File, groups: '\[SQLite File\]' }
-      - { name: Rest }
+  - { name: Table, projects: [Table_Tests] }
+  - { name: SQLite, projects: [SQLite_Tests] }
+  - { name: Postgres, projects: [Postgres_Tests], needs: postgres }
   - { name: Base, projects: [Base_Tests, DuckDB_Tests, Cloud_Tests] }
   - { name: Others, projects: "*" }

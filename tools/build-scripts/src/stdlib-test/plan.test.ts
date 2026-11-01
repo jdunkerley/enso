@@ -251,6 +251,42 @@ describe('planMatrix with a split shard', () => {
   })
 })
 
+const PROJECT_SHARDS: StdlibTestMap['shards'] = [
+  { name: 'Table', projects: ['Table_Tests'] },
+  { name: 'Postgres', projects: ['Postgres_Tests'], needs: 'postgres' },
+  { name: 'Others', projects: '*' },
+]
+
+describe('planMatrix with a shard that needs a database', () => {
+  // standard-library-in-native denies AWS_Tests and Microsoft_Tests (suites.ts NOT_SEPARATE).
+  const projects = [...PROJECTS, 'Postgres_Tests'].sort()
+  test('runs the shard where the suite has the database', () => {
+    const matrix = planMatrix(
+      [NATIVE_WITH_POSTGRES],
+      { ...MAP, shards: PROJECT_SHARDS },
+      projects,
+      ALL,
+      true,
+    )
+    expect(matrix.map((m) => [m.title, m.only])).toEqual([
+      ['Native (Table)', 'Table_Tests'],
+      ['Native (Postgres)', 'Postgres_Tests'],
+      ['Native (Others)', 'Base_Tests,DuckDB_Tests,Geo_Tests,Tableau_Tests,Visualization_Tests'],
+    ])
+  })
+  test('without the database its projects run in the "*" shard', () => {
+    const matrix = planMatrix(
+      [NATIVE_WITHOUT_POSTGRES],
+      { ...MAP, shards: PROJECT_SHARDS },
+      projects,
+      ALL,
+      true,
+    )
+    expect(matrix.map((m) => m.title)).toEqual(['Native (Table)', 'Native (Others)'])
+    expect(matrix[1]?.only.split(',')).toContain('Postgres_Tests')
+  })
+})
+
 describe('planMatrix without a catch-all shard', () => {
   test('throws rather than dropping projects', () => {
     const map = { ...MAP, shards: [{ name: 'Table', projects: ['Table_Tests'] }] }

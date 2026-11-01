@@ -12,7 +12,8 @@ offers it, and it is in the engine distribution but not in the IDE installer
 - `Database_Test_Suite.add_specs suite_builder backend` — adds the parts of the
   suite `backend` runs and returns their `Test_Setup`.
 - `Backend.Value name connect …` — a database backend; `Backend.In_Memory` is
-  the in-memory table (`Table_Tests` runs it).
+  the in-memory table (`Table_Tests` runs it; `SQLite_Tests` and
+  `Postgres_Tests` run theirs).
 - `Known_Issue` — the closed set of known failures, each with its issue.
 - `Suite_Part` — `Common`, `Table_Operations`, `Upload`, `IR`, `Transactions`.
 - `Util`, `Common_Table_Operations.Util`, `Database.Helpers.Name_Generator`,

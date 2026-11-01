@@ -1,0 +1,12 @@
+from Standard.Base import all
+
+from Standard.Test import Test
+
+import project.Library_Discovery_Spec
+import project.Postgres_Spec
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        Postgres_Spec.add_specs suite_builder
+        Library_Discovery_Spec.add_specs suite_builder
+    suite.run_with_filter filter

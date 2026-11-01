@@ -40,6 +40,8 @@ export const SUITES: Readonly<Record<string, Suite>> = {
       'Base_Tests',
       'Base_Internal_Tests',
       'Table_Tests',
+      'Postgres_Tests',
+      'SQLite_Tests',
       'AWS_Tests',
       'Image_Tests',
       'Microsoft_Tests',

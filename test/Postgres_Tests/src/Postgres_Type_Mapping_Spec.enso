@@ -9,7 +9,7 @@ from Standard.Test import all
 
 
 import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
-from project.Database.Postgres_Spec import create_connection_builder
+from project.Postgres_Spec import create_connection_builder
 
 type Data
     Value ~connection

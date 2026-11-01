@@ -70,5 +70,5 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
   how they behave, its `flagged` answers (`First_Last_Respects_Row_Order`,
   `Reports_Aggregation_Problems`, `Concatenate_Follows_Row_Order`): a new
   `Dialect_Flag` must be answered by every dialect, whose `case` has no default.
-- `test/DuckDB_Tests/`, `test/Snowflake_Tests/`, `test/Microsoft_Tests/` —
-  backend-specific examples.
+- `test/SQLite_Tests/`, `test/Postgres_Tests/`, `test/DuckDB_Tests/`,
+  `test/Snowflake_Tests/`, `test/Microsoft_Tests/` — one project per backend.

@@ -3,7 +3,15 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { compareRuns, comparisonMarkdown, count, parseJUnit, readJUnitDir } from './junit.ts'
+import {
+  byGroupPrefix,
+  compareRuns,
+  comparisonMarkdown,
+  count,
+  groupPrefix,
+  parseJUnit,
+  readJUnitDir,
+} from './junit.ts'
 
 /** The shape `Test_Reporter.enso` writes: a passing, a failing and a pending case, and a pending group. */
 const REPORT = `<?xml version="1.0" encoding="UTF-8"?>
@@ -74,5 +82,47 @@ describe('compareRuns', () => {
       ['B_Tests', false],
     ])
     expect(comparisonMarkdown(rows)[2]).toBe('| A_Tests | 1 / 1 / 2 | missing | **DIFFERS** |')
+  })
+})
+
+describe('byGroupPrefix', () => {
+  const testCase = (suite: string, status: 'pass' | 'skip' = 'pass') => ({
+    suite,
+    name: 'x',
+    status,
+  })
+  test('pools the projects by the backend that starts each group name', () => {
+    const before = new Map([
+      [
+        'Table_Tests',
+        [
+          testCase('[PostgreSQL] Join'),
+          testCase('[In-Memory] Join'),
+          testCase('Library discovery'),
+        ],
+      ],
+    ])
+    const after = new Map([
+      ['Table_Tests', [testCase('[In-Memory] Join')]],
+      ['Postgres_Tests', [testCase('[PostgreSQL] Join'), testCase('Library discovery')]],
+    ])
+    const rows = compareRuns(byGroupPrefix(before), byGroupPrefix(after))
+    expect(rows.map((row) => [row.project, row.same])).toEqual([
+      ['(no prefix)', true],
+      ['[In-Memory]', true],
+      ['[PostgreSQL]', true],
+    ])
+  })
+  test('a group that changed status still differs', () => {
+    const rows = compareRuns(
+      byGroupPrefix(new Map([['A_Tests', [testCase('[SQLite File] X')]]])),
+      byGroupPrefix(new Map([['B_Tests', [testCase('[SQLite File] X', 'skip')]]])),
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.same).toBe(false)
+  })
+  test('names the prefix, or none', () => {
+    expect(groupPrefix('[SQLite In-Memory] Table.aggregate')).toBe('[SQLite In-Memory]')
+    expect(groupPrefix('Library discovery without an import')).toBe('(no prefix)')
   })
 })

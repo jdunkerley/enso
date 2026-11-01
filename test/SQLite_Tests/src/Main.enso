@@ -1,0 +1,12 @@
+from Standard.Base import all
+
+from Standard.Test import Test
+
+import project.Codegen_Spec
+import project.SQLite_Spec
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        Codegen_Spec.add_specs suite_builder
+        SQLite_Spec.add_specs suite_builder
+    suite.run_with_filter filter

@@ -995,6 +995,29 @@ shards:
   })
 })
 
+describe('checkStdlibTestMap: a shard that needs a database', () => {
+  test('accepts a shard that needs postgres, and rejects another database or a "*" shard with needs', () => {
+    const map = (shards) => STDLIB_MAP_OK.replace(/^shards:[\s\S]*$/m, `shards:\n${shards}`)
+    const ok =
+      '  - { name: Table, projects: [Table_Tests], needs: postgres }\n  - { name: Others, projects: "*" }\n'
+    assert.deepEqual(
+      checkStdlibTestMap(fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': map(ok) })),
+      [],
+    )
+    const bad =
+      '  - { name: Table, projects: [Table_Tests], needs: mysql }\n  - { name: Others, projects: "*", needs: postgres }\n'
+    assert.deepEqual(
+      checkStdlibTestMap(
+        fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': map(bad) }),
+      ),
+      [
+        `${at} shard \`Table\` has \`needs: mysql\`; only \`postgres\` is known`,
+        `${at} the "*" shard cannot have \`needs\` (its projects would run nowhere)`,
+      ],
+    )
+  })
+})
+
 describe('checkStdlibTestMap: a split shard', () => {
   const withShards = (shards) =>
     fixture(

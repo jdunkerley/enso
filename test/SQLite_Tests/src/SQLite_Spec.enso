@@ -22,7 +22,7 @@ import Standard.Database_Test_Suite
 from Standard.Database_Test_Suite import Backend
 import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
 
-import project.Database.Types.SQLite_Type_Mapping_Spec
+import project.SQLite_Type_Mapping_Spec
 
 from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets
 

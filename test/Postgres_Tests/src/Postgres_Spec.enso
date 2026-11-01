@@ -23,8 +23,8 @@ import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
 import Standard.Database_Test_Suite.Database.JSON_Table_Data.JSON_Table_Data
 from Standard.Database_Test_Suite.Common_Table_Operations.Util import all
 
-import project.Database.Types.Postgres_Type_Mapping_Spec
-from project.Database.Types.Postgres_Type_Mapping_Spec import default_text
+import project.Postgres_Type_Mapping_Spec
+from project.Postgres_Type_Mapping_Spec import default_text
 
 import enso_dev.Base_Tests.Network.Http.Http_Test_Setup
 from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets

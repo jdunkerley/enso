@@ -42,6 +42,8 @@ export interface StdlibTestMap {
     readonly name: string
     readonly projects: readonly string[] | '*'
     readonly split?: readonly SplitPart[]
+    /** The shard runs only for a suite entry with this database; otherwise its projects run in the "*" shard. */
+    readonly needs?: 'postgres'
   }[]
 }
 
@@ -230,6 +232,9 @@ export function planMatrix(
     const taken = new Set<string>()
     for (const shard of map.shards) {
       const { name, projects: listed } = shard
+      // Without its database the shard's projects stay untaken, so the "*" shard runs them
+      // and their database groups are pending there, as a split part's are.
+      if (shard.needs != null && entry[shard.needs] !== true) continue
       const shardProjects =
         listed === '*' ?
           inSuite.filter((project) => !taken.has(project))

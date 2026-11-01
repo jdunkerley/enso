@@ -52,5 +52,5 @@ no JDBC driver: each backend library carries its own (`std-bits/postgres`,
 
 No test sources here: Java tests live in `std-bits/tests`
 (`org.enso.database.audit`, run with `sbt "std-tests/testOnly ..."`), and the
-behaviour through Enso is covered by `test/Table_Tests` (SQLite, Postgres) and
-the other database test projects.
+behaviour through Enso is covered by `test/SQLite_Tests`, `test/Postgres_Tests`
+and the other database test projects.

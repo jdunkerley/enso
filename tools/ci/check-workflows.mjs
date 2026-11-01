@@ -1044,6 +1044,17 @@ export function checkStdlibTestMap({ stdlib }) {
     }
   }
   for (const shard of shards) {
+    if (shard.needs == null) continue
+    if (shard.needs !== 'postgres') {
+      problems.push(
+        `${at} shard \`${shard.name}\` has \`needs: ${shard.needs}\`; only \`postgres\` is known`,
+      )
+    }
+    if (shard.projects === '*') {
+      problems.push(`${at} the "*" shard cannot have \`needs\` (its projects would run nowhere)`)
+    }
+  }
+  for (const shard of shards) {
     if (shard.split == null) continue
     const parts = Array.isArray(shard.split) ? shard.split : []
     if (!Array.isArray(shard.projects) || shard.projects.length !== 1) {

@@ -20,7 +20,11 @@ One directory per suite, typically:
 
 - `Base_Tests/`, `Base_Internal_Tests/` — `Standard.Base`. Requires
   `http-test-helper/` running (see `Base_Tests/README.md`).
-- `Table_Tests/`, `Table_Internal_Tests/` — `Standard.Table`.
+- `Table_Tests/`, `Table_Internal_Tests/` — `Standard.Table`, and the shared
+  suite against the in-memory table.
+- `SQLite_Tests/`, `Postgres_Tests/` — the SQLite and PostgreSQL backends: the
+  shared suite and their own specs. `Postgres_Tests` needs a server
+  (`README.md`), and holds the library discovery spec, which needs none.
 - `AWS_Tests/`, `Snowflake_Tests/`, `Microsoft_Tests/`, `Google_Test/`,
   `Tableau_Tests/`, `DuckDB_Tests/`, `Generic_JDBC_Tests/`, `Cloud_Tests/`,
   `Saas_Tests/` — provider suites. Most need live credentials via env vars.

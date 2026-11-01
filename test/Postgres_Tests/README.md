@@ -1,7 +1,6 @@
-This is a set of tests for the `Database` library for Enso.
-
-By default, the tests are run only for the SQLite backend since it requires no
-additional setup.
+The PostgreSQL backend's tests: the shared suite
+(`Standard.Database_Test_Suite`) and the Postgres-specific specs. Without a
+server they are pending.
 
 ## Testing Postgres
 
