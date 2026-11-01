@@ -55,6 +55,6 @@ helpers in this library's modules, not in `Standard.Database`.
 
 ## Where to read more
 
-- `test/Table_Tests/src/Database/Postgres_Spec.enso` — the Postgres test suite
-  (needs a running server).
+- `test/Postgres_Tests/` — the Postgres test project (the shared suite and
+  `Postgres_Spec.enso`; needs a running server).
 - `distribution/lib/Standard/Database/CLAUDE.md` — `DB_Table` semantics.
