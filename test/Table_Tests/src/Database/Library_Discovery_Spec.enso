@@ -43,8 +43,13 @@ add_specs suite_builder =
         group_builder.specify "a saved Postgres data link resolves" <|
             link = enso_project.data / "datalinks" / "postgres-db.datalink"
             main_src = 'from Standard.Base import all\n\nmain =\n    r = Data.read (File.new "' + link.path + '")\n    IO.println (r.catch . to_display_text)\n'
-            # The link's server does not exist: what matters is that the type is found.
-            run_project main_src . should_not_contain "Missing_Data_Link_Library"
+            # The link's server does not exist, so reading it ends in a
+            # connection error. Getting that far proves the `Postgres_Connection`
+            # type was found in `Standard.Postgres`, which this project does
+            # not import, and that the link was parsed and connected.
+            output = run_project main_src
+            output.should_contain "There was an SQL error"
+            output.should_not_contain "which is not loaded"
 
 main filter=Nothing =
     suite = Test.build suite_builder->

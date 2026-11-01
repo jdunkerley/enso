@@ -14,8 +14,8 @@ DuckDB and Redshift share stays here, in `Postgres_Family`, with `SSL_Mode` and
 ## Main entry points
 
 - `Database.connect <details>` — open a connection. `<details>` is a backend
-  type, e.g. `DuckDB.In_Memory`, `Postgres.Postgres host port db creds`,
-  `SQLServer_Details.SQLServer …`.
+  type, e.g. `DuckDB.In_Memory`, `Postgres.Server host port db creds` (from
+  `Standard.Postgres`), `SQLServer_Details.SQLServer …`.
 - `connection.tables` — list tables in the connection.
 - `connection.query "table_name"` — get a deferred `DB_Table` for an existing
   table.
