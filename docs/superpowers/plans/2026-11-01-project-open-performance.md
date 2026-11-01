@@ -1784,7 +1784,7 @@ scratchpad). Expected:
   are within about 15% of the spec's "Windows core" and "Linux core" columns
   (6811 / 6198 ms). The INFO level makes `firstExecution` earlier than the
   spike's debug runs, and nothing else should move. If the branch predates
-  #482's merge, rebase it on develop first.
+  #482's merge, merge `develop` into it first (a merge commit, never a rebase).
 - The JVM stage either completes, or fails naming the stage, inside its own
   budget. If the JVM training launch writes no configuration, the PR says so,
   and `--engines jvm` is fixed before Task 1 merges: the spec's comparison needs
