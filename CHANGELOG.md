@@ -329,8 +329,10 @@
 #### Enso Standard Library
 
 - [Standard.Database_Test_Suite: a conformance suite for database backends. A
-  library that adds a database describes its backend in a few lines and runs the
-  same table and database tests as the built-in ones.][492]
+  backend describes itself in a few lines and runs the same table and database
+  tests as the built-in ones. The suite is not in the IDE installer; for now it
+  can be used only from a source build of the repository, and publishing it for
+  libraries outside the repository is tracked in #502.][492]
 - [Connection, file format, return type and e-mail dropdowns list the installed
   libraries' choices, even those not imported yet][465]
 - [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass

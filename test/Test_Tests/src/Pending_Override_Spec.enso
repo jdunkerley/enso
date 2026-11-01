@@ -1,0 +1,41 @@
+from Standard.Base import all
+from Standard.Test import all
+
+import Standard.Base.Runtime.Ref.Ref
+
+## Runs a suite built by `build` and returns what it printed.
+run_output build -> Text =
+    lines = Ref.new []
+    suite = Test.build build
+    suite.run_with_filter should_exit=False output=(line-> lines.modify (_ + [line]))
+    lines.get.join '\n'
+
+add_specs suite_builder =
+    suite_builder.group "with_pending_override" group_builder->
+        group_builder.specify "makes a named group pending" <|
+            override group spec = if group == "A group" && spec.is_nothing then "group reason" else Nothing
+            output = run_output suite_builder->
+                suite_builder.with_pending_override override . group "A group" g->
+                    g.specify "never run" <| Test.fail "pending group"
+                suite_builder.with_pending_override override . group "Another group" g->
+                    g.specify "runs" <| Nothing
+            output.contains "[PENDING] A group" . should_be_true
+            output.contains "group reason" . should_be_true
+            output.contains "[PENDING] Another group" . should_be_false
+
+        group_builder.specify "makes a named spec pending, and only that one" <|
+            override group spec = if group == "G" && spec == "one" then "spec reason" else Nothing
+            output = run_output suite_builder->
+                suite_builder.with_pending_override override . group "G" g->
+                    g.specify "one" <| Test.fail "pending spec"
+                    g.specify "two" <| Nothing
+            output.contains "[PENDING] one" . should_be_true
+            output.contains "spec reason" . should_be_true
+            output.contains "[PENDING] two" . should_be_false
+
+        group_builder.specify "leaves the declared pending reason when it names nothing" <|
+            override _ _ = Nothing
+            output = run_output suite_builder->
+                suite_builder.with_pending_override override . group "G" g->
+                    g.specify "declared" pending="declared reason" <| Test.fail "pending spec"
+            output.contains "declared reason" . should_be_true

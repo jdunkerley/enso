@@ -3,7 +3,9 @@ from Standard.Base import all
 ## A known failure of a backend: a bug, with the issue that tracks it. A backend
    lists its known issues in `Backend.Value`'s `known_failures`; a spec that one
    affects is pending for that backend, or works around it. The set is closed:
-   a misspelt issue does not compile.
+   a misspelt issue fails with `No_Such_Method` when the descriptor is used,
+   not when it is compiled. A backend outside this repository, which cannot add
+   a constructor here, uses `Backend.Value`'s `extra_pending` with `Pending`.
 type Known_Issue
     ## A `Full` join with a `Between` condition is not supported (PostgreSQL).
     Full_Join_With_Between

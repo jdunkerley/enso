@@ -9,7 +9,6 @@
 - cleanup_sentinel ref:Standard.Base.Any.Any _:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - database_table_builder name_prefix:Standard.Base.Any.Any args:Standard.Base.Any.Any primary_key:Standard.Base.Any.Any= connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - in_memory_table_builder args:Standard.Base.Any.Any primary_key:Standard.Base.Any.Any= connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
-- main filter:Standard.Base.Any.Any= -> Standard.Base.Any.Any
 - make_mock_column name:Standard.Base.Any.Any values:Standard.Base.Any.Any exploding_index:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - test_table_append setup:Standard.Base.Any.Any group_builder:Standard.Base.Any.Any data:Standard.Database_Test_Suite.Database.Upload_Spec.Data source_table_builder:Standard.Base.Any.Any target_table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
 - test_table_delete group_builder:Standard.Base.Any.Any data:Standard.Database_Test_Suite.Database.Upload_Spec.Data source_table_builder:Standard.Base.Any.Any target_table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
