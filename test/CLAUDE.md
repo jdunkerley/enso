@@ -63,6 +63,8 @@ variables — skipped tests are visible in the report, not silently dropped.
    `Test.build suite_builder-> ...`, by calling
    `Your_Spec.add_specs suite_builder`. `main filter=Nothing` ends with
    `suite.run_with_filter filter`.
+5. A database backend runs the shared suite: see "Testing a database backend" in
+   `distribution/lib/Standard/Database_Test_Suite/0.0.0-dev/CLAUDE.md`.
 
 ## Changing Java helpers
 

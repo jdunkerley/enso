@@ -1,7 +1,9 @@
 from Standard.Base import all
+import Standard.Base.Errors.Common.Inexhaustive_Pattern_Match
 import Standard.Base.Runtime.Ref.Ref
 
 from Standard.Table import Aggregate_Column, Table
+from Standard.Test import Test
 
 # `select_into_database_table` and `create_literal_table` are Database's
 # extensions of `Table`, in scope only with Database imported.
@@ -45,7 +47,10 @@ type Dummy_Connection
    private: true
    ---
    Adds the parts of the suite that `backend` runs; returns their setup.
-add_specs suite_builder backend:Backend -> Test_Setup =
+add_specs real_builder backend:Backend -> Test_Setup =
+    entries = backend.pending_entries
+    matched = Ref.new []
+    suite_builder = real_builder.with_pending_override (pending_override entries backend.prefix matched)
     setup = case backend of
         Backend.In_Memory -> in_memory_setup
         _ -> database_setup backend
@@ -65,7 +70,53 @@ add_specs suite_builder backend:Backend -> Test_Setup =
                 IR_Spec.add_specs suite_builder setup prefix setup.default_connection.get
             if runs Suite_Part.Transactions then
                 Transaction_Spec.add_specs suite_builder backend.connect prefix
+    report_unmatched real_builder backend entries matched.get
     setup
+
+## ---
+   private: true
+   ---
+   The answer of `dialect` to `flag`. A dialect written before `flag` existed
+   (one whose `flagged` has no default branch) panics; it is taken to answer
+   `False`, as `_ -> False` would.
+flag_answer dialect flag:Dialect_Flag -> Boolean =
+    Panic.catch Inexhaustive_Pattern_Match (dialect.flagged flag) _-> False
+
+## ---
+   private: true
+   ---
+   The reason the group `group` (or its spec `spec`) is pending because of an
+   entry of `entries`, or `Nothing`; records the entries it used in `matched`.
+   Names are compared exactly, after the backend's group prefix is dropped from
+   both. An entry without a `spec` makes the whole group pending.
+pending_override entries:Vector group_prefix:Text matched:Ref group:Text spec:(Text | Nothing) -> Text | Nothing =
+    bare name:Text = if name.starts_with group_prefix then name.drop group_prefix.length else name
+    group_name = bare group
+    hits = (0.up_to entries.length).to_vector.filter index->
+        entry = entries.at index
+        group_matches = (bare entry.group) == group_name
+        spec_matches = (entry.spec == spec) || (entry.spec.is_nothing && spec.is_nothing.not)
+        group_matches && spec_matches
+    if hits.is_empty then Nothing else
+        matched.modify (_ + hits)
+        (entries.at hits.first).message
+
+## ---
+   private: true
+   ---
+   Adds a group with a failing spec for each entry of `entries` that matched no
+   group or spec, so that a misspelt name cannot silently do nothing.
+report_unmatched suite_builder backend:Backend entries:Vector matched:Vector -> Nothing =
+    unmatched = (0.up_to entries.length).to_vector.filter index-> (matched.contains index).not
+    if unmatched.not_empty then
+        suite_builder.group backend.prefix+"extra_pending entries" group_builder->
+            unmatched.each index->
+                entry = entries.at index
+                what = case entry.spec of
+                    Nothing -> 'group "' + entry.group + '"'
+                    spec -> 'spec "' + spec + '" of group "' + entry.group + '"'
+                group_builder.specify ("extra_pending: " + what) <|
+                    Test.fail ("extra_pending names " + what + ", which this backend does not run (check the spelling: names are exact and omit the " + backend.prefix + " prefix; a group the backend does not run cannot be marked pending).")
 
 ## ---
    private: true
@@ -136,7 +187,7 @@ database_setup backend:Backend -> Test_Setup =
     # Ascribed, so that the specs' `setup.flagged ..Variant` resolves against
     # `Dialect_Flag` (as the backends' `flagged_fn flag:Dialect_Flag` did).
     is_feature_supported_fn feature:Feature = dialect.get.is_feature_supported feature
-    flagged_fn flag:Dialect_Flag = dialect.get.flagged flag
+    flagged_fn flag:Dialect_Flag = flag_answer dialect.get flag
     is_operation_supported_fn operation:Text = dialect.get.is_operation_supported operation
     is_aggregate_supported_fn aggregate:Aggregate_Column = (dialect.get.check_aggregate_support aggregate).is_error.not
     Test_Setup.Config backend.prefix agg_table_fn empty_agg_table_fn table_builder (.read) is_database=True test_selection=test_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=backend.connect light_table_builder=light_table_builder is_integer_type=backend.is_integer_type is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn backend=backend default_connection=default_connection
