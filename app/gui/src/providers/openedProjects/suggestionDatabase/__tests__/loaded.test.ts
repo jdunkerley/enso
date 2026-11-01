@@ -114,11 +114,27 @@ test('the store is loaded only once the initial suggestion database is, not mere
     createSuggestionDbStore(projectStore as ProjectStore, mockProjectNameStore()),
   )!
   expect(store.loaded).toBe(false)
-  // Groups arrive first; the database is requested after them.
+  // Groups arrive first; the database answers after them.
   await vi.waitFor(() => expect(store.groups).toHaveLength(1))
   await new Promise((resolve) => setTimeout(resolve, 10))
   expect(store.loaded).toBe(false)
   sendDatabase()
   await vi.waitFor(() => expect(store.loaded).toBe(true))
+  scope.stop()
+})
+
+test('the suggestion database is requested before the first execution', async () => {
+  const getSuggestionsDatabase = vi.fn(() => new Promise<never>(() => {}))
+  const { lsRpc } = mockLanguageServer({ getSuggestionsDatabase })
+  const projectStore: Partial<ProjectStore> = {
+    lsRpcConnection: lsRpc,
+    // Never settles: the first execution has not finished.
+    firstExecution: new Promise<never>(
+      () => {},
+    ) as Promise<unknown> as ProjectStore['firstExecution'],
+  }
+  const scope = effectScope()
+  scope.run(() => createSuggestionDbStore(projectStore as ProjectStore, mockProjectNameStore()))
+  await vi.waitFor(() => expect(getSuggestionsDatabase).toHaveBeenCalledTimes(1))
   scope.stop()
 })
