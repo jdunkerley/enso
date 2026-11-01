@@ -226,6 +226,18 @@ export interface GroupInfo {
   project: QualifiedName
 }
 
+/* Note [The Suggestion Database Is Requested At Connect Time]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * `search/getSuggestionsDatabase` makes the language server invalidate its modules index and
+ * start the runtime's background jobs. Sent after the first execution (when the component groups
+ * arrive), those jobs ran while the welcome table waited, so it is sent as soon as the update
+ * capability is held. The component groups still wait for the first execution: the runtime
+ * reports only the groups of the libraries it has loaded. Updates that arrive before the groups
+ * are queued by `#setupUpdateHandler` (registered before the request goes out) and applied after
+ * the initial database, as before. The catalogue holds its entries back until the first execution
+ * (Note [Catalogue Entries In The Suggestions Database] in the language server).
+ */
+
 /**
  * Keeps a {@link SuggestionDb} in step with the language server's suggestion database.
  *
@@ -251,7 +263,9 @@ export class Synchronizer {
         capability.error.log('Will not receive database updates')
       }
       this.#setupUpdateHandler(lsRpc, updateProcessor) // Do not await
-      return Synchronizer.loadDatabase(entries, lsRpc, await updateProcessor)
+      // Note [The Suggestion Database Is Requested At Connect Time]
+      const initialDbRequest = exponentialBackoff(() => lsRpc.getSuggestionsDatabase())
+      return Synchronizer.loadDatabase(entries, lsRpc, await updateProcessor, initialDbRequest)
     })
 
     this.initialized = initState
@@ -263,8 +277,9 @@ export class Synchronizer {
     entries: SuggestionDb,
     lsRpc: LanguageServer,
     updateProcessor: SuggestionUpdateProcessor,
+    initialDbRequest = exponentialBackoff(() => lsRpc.getSuggestionsDatabase()),
   ): Promise<{ currentVersion: number }> {
-    const initialDb = await exponentialBackoff(() => lsRpc.getSuggestionsDatabase())
+    const initialDb = await initialDbRequest
     if (!initialDb.ok) {
       initialDb.error.log(
         'Cannot load initial suggestion database. Continuing with empty suggestion database',
