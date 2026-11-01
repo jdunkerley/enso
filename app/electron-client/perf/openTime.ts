@@ -10,8 +10,9 @@ import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
-import { createJvmAotCache, measuredJvmToolOptions } from './jvmAotCache'
+import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
 import {
+  classifyTemplate,
   comparable,
   credentialFreeEnv,
   notMeasured,
@@ -20,6 +21,7 @@ import {
   regressionWarnings,
   renderMarkdown,
   type Engine,
+  type JvmAot,
   type LsLogLine,
   type Mark,
   type OpenTag,
@@ -113,10 +115,24 @@ async function runLauncher(
       env: { ...credentialFreeEnv(process.env), ...extraEnv } as NodeJS.ProcessEnv,
       shell: useShell,
       stdio: 'ignore',
-      timeout: timeoutMs,
     })
-    child.on('error', reject)
-    child.on('exit', resolve)
+    // Node's own `timeout` kills only the launcher (`cmd.exe` for an `enso.bat`), not the JVM it
+    // started: on Windows the whole tree goes.
+    const timer = setTimeout(() => {
+      if (process.platform === 'win32' && child.pid != null) {
+        spawn('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+      } else {
+        child.kill('SIGKILL')
+      }
+    }, timeoutMs)
+    child.on('error', (e) => {
+      clearTimeout(timer)
+      reject(e)
+    })
+    child.on('exit', (code) => {
+      clearTimeout(timer)
+      resolve(code)
+    })
   })
 }
 
@@ -381,12 +397,21 @@ async function packagedTemplate(options: Options): Promise<Template> {
   fs.rmSync(dir, { recursive: true, force: true })
   await createProject(launcher, dir, 'OpenTimeTemplate')
   const main = fs.readFileSync(path.join(dir, 'OpenTimeTemplate', 'src', 'Main.enso'), 'utf8')
-  return /^from Standard\.AWS import/m.test(main) ? 'full' : 'core'
+  return classifyTemplate(main)
 }
 
+/** The baseline report; an unreadable or foreign one is no baseline, and is said to be ignored. */
 function readReport(file: string | undefined): OpenTimeReport | undefined {
   if (!file || !fs.existsSync(file)) return undefined
-  return JSON.parse(fs.readFileSync(file, 'utf8')) as OpenTimeReport
+  try {
+    const report = JSON.parse(fs.readFileSync(file, 'utf8')) as OpenTimeReport
+    if (report.version !== 1 || !Array.isArray(report.runs))
+      throw new Error('not an open-time report')
+    return report
+  } catch (e) {
+    console.warn(`Open time: the baseline ${file} is unusable and is ignored: ${String(e)}`)
+    return undefined
+  }
 }
 
 async function main() {
@@ -394,14 +419,15 @@ async function main() {
   fs.mkdirSync(options.out, { recursive: true })
   const template = await packagedTemplate(options)
   const runs: RunResult[] = []
+  let jvmAot: JvmAot | undefined
   for (const engine of options.engines) {
     // Each engine has its own budget, which a JVM run's AOT preparation counts against.
     const deadline = Date.now() + options.budgetMinutes * 60_000
     let extraEnv: Record<string, string> = {}
     if (engine === 'jvm') {
-      let cache: string
+      let aot: JvmAotCache
       try {
-        cache = await createJvmAotCache(
+        aot = await createJvmAotCache(
           options.out,
           options.exe,
           (env, opens) => measureLaunch(options, 'jvm', 0, env, opens),
@@ -419,9 +445,17 @@ async function main() {
         })
         continue
       }
-      extraEnv = {
-        ENSO_ENGINE_ARGS: '--jvm',
-        JAVA_TOOL_OPTIONS: measuredJvmToolOptions(cache),
+      if (aot.cache != null) {
+        jvmAot = aot.training
+        extraEnv = {
+          ENSO_ENGINE_ARGS: '--jvm',
+          JAVA_TOOL_OPTIONS: measuredJvmToolOptions(aot.cache),
+        }
+      } else {
+        // Said in the report: these are the numbers of a JVM with no AOT cache.
+        console.warn(`Open time: measuring the JVM without an AOT cache. ${aot.rejection}`)
+        jvmAot = 'uncached'
+        extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
       }
     }
     for (let run = 1; run <= options.runs; run++) {
@@ -442,12 +476,14 @@ async function main() {
     platform: process.platform,
     commit: process.env.GITHUB_SHA ?? null,
     template,
+    ...(jvmAot ? { jvmAot } : {}),
     runs,
   }
+  // First: whatever the baseline holds, the measurement is kept (and becomes the next baseline).
+  fs.writeFileSync(path.join(options.out, 'open-time.json'), JSON.stringify(report, null, 1))
   const baseline = readReport(options.baseline)
   const markdown = renderMarkdown(report, baseline)
   const warnings = regressionWarnings(report, baseline)
-  fs.writeFileSync(path.join(options.out, 'open-time.json'), JSON.stringify(report, null, 1))
   fs.writeFileSync(path.join(options.out, 'open-time.md'), markdown)
   console.log(markdown)
   for (const warning of warnings) {

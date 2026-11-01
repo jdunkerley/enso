@@ -60,14 +60,27 @@ export interface RunResult {
   readonly error?: string
 }
 
-/** `core` when the new-project template has no `Standard.AWS` import (#482), `full` otherwise. */
-export type Template = 'core' | 'full'
+/**
+ * `core` when the new-project template imports only the core libraries (#482), `full` when it also
+ * imports `Standard.AWS`, `other` for anything else (compared with nothing).
+ */
+export type Template = 'core' | 'full' | 'other'
+
+/**
+ * How the JVM runs got their AOT cache: `ide-trained` by a launch of the IDE, `launcher-trained` by
+ * `enso --jvm --run` of an empty project (it never loads the Language Server, so its numbers are
+ * pessimistic and not comparable with `ide-trained` ones), `uncached` when the JVM could not use
+ * the cache it was given, so the numbers are those of a JVM with no AOT cache.
+ */
+export type JvmAot = 'ide-trained' | 'launcher-trained' | 'uncached'
 
 export interface OpenTimeReport {
   readonly version: 1
   readonly platform: string
   readonly commit: string | null
   readonly template: Template
+  /** Present when the report has JVM runs. */
+  readonly jvmAot?: JvmAot
   readonly runs: readonly RunResult[]
 }
 
@@ -76,7 +89,7 @@ export function comparable(
   report: OpenTimeReport,
   baseline: OpenTimeReport | undefined,
 ): baseline is OpenTimeReport {
-  return baseline != null && baseline.template === report.template
+  return baseline != null && baseline.template === report.template && report.template !== 'other'
 }
 
 export interface LsLogLine {
@@ -207,7 +220,7 @@ export function renderMarkdown(
   })
   const counts = ours.map((s) => `${s.engine}: ${s.succeeded} of ${s.launches} launches`).join(', ')
   return [
-    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts}).`,
+    `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.jvmAot ? `; JVM AOT cache: ${report.jvmAot}` : ''}.`,
     '',
     `| ${header.join(' | ')} |`,
     `| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`,
@@ -239,6 +252,18 @@ export function regressionWarnings(
       warnings.push(`${engine}: not measured in some launches: ${[...missing].join(', ')}`)
     }
   }
+  if (report.jvmAot === 'uncached') {
+    warnings.push(
+      'jvm: the JVM could not use the AOT cache, so the JVM numbers are those of an uncached JVM',
+    )
+  }
+  // A launch that reached the welcome table but failed later (the second open) still counts in the
+  // medians, so its failure is said here.
+  for (const run of report.runs) {
+    if (run.error != null && run.first[HEADLINE] != null) {
+      warnings.push(`${run.engine} launch ${run.run} failed after its first open: ${run.error}`)
+    }
+  }
   for (const s of summarise(report)) {
     if (s.succeeded < MIN_SUCCESSFUL) {
       warnings.push(
@@ -252,7 +277,10 @@ export function regressionWarnings(
         `${s.engine}: the cold open takes ${Math.round(ours)} ms, over ${limits.limitMs} ms`,
       )
     }
-    const theirs = previous.find((p) => p.engine === s.engine)?.first[HEADLINE]
+    // JVM numbers are comparable only when the cache was made the same way.
+    const jvmComparable = s.engine !== 'jvm' || baseline?.jvmAot === report.jvmAot
+    const theirs =
+      jvmComparable ? previous.find((p) => p.engine === s.engine)?.first[HEADLINE] : undefined
     if (theirs != null && ours > theirs * (1 + limits.tolerance)) {
       const worse = Math.round((ours / theirs - 1) * 100)
       warnings.push(
@@ -263,16 +291,61 @@ export function regressionWarnings(
   return warnings
 }
 
-const CREDENTIALS =
-  /^(ENSO_|AWS_|SNOWFLAKE|GOOGLE_|AZURE_|GCP_|DATABRICKS|GITHUB_TOKEN$|GH_TOKEN$)/i
+/** Variables of services that hold credentials, by prefix: everything of theirs is dropped. */
+const CREDENTIAL_PREFIXES =
+  /^(ENSO_|AWS_|SNOWFLAKE|GOOGLE_|AZURE_|GCP_|DATABRICKS|ANTHROPIC|OPENAI|PG[A-Z_]*$|ACTIONS_|GITHUB_TOKEN$|GH_TOKEN$)/i
+/** Any variable that is named like a secret, whoever owns it. */
+const CREDENTIAL_SUFFIXES = /(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIALS?|_KEY|APIKEY)S?$/i
+/** The JVM reads these from the environment. A measured launch sets its own. */
+const JVM_OPTION_VARIABLES = /^(JAVA_TOOL_OPTIONS|_JAVA_OPTIONS|JDK_JAVA_OPTIONS)$/
 
-/** `env` without the credential variables (the spec: every run starts without them). */
+/**
+ * `env` without the credential variables (the spec: every run starts without them), and without
+ * the variables that give the JVM options, which would leak into a native measurement or replace
+ * a JVM one's AOT cache.
+ */
 export function credentialFreeEnv(
   env: Readonly<Record<string, string | undefined>>,
 ): Record<string, string> {
   return Object.fromEntries(
     Object.entries(env).filter(
-      (entry): entry is [string, string] => entry[1] != null && !CREDENTIALS.test(entry[0]),
+      (entry): entry is [string, string] =>
+        entry[1] != null &&
+        !CREDENTIAL_PREFIXES.test(entry[0]) &&
+        !CREDENTIAL_SUFFIXES.test(entry[0]) &&
+        !JVM_OPTION_VARIABLES.test(entry[0]),
     ),
   )
+}
+
+/** The options the launcher gives the JVM it starts through JNI (`Main.launchJvm`). */
+export const LAUNCHER_JVM_OPTIONS = [
+  '--sun-misc-unsafe-memory-access=allow',
+  '--enable-native-access=org.graalvm.truffle',
+  '--add-opens=java.base/java.nio=ALL-UNNAMED',
+] as const
+
+const AOT_PROBLEM =
+  /\[(?:error|warning)\]\[(?:aot|cds)[^\]]*\]|mismatch|Unable to use|unable to map|AOT cache.*(?:different|invalid|failed|disabled)/i
+
+/**
+ * The first line of the JVM's output that says the AOT cache could not be used (the JVM reports
+ * these as `[cds]` or `[aot]` records, or as a mismatch), or `undefined`.
+ */
+export function aotRejection(output: string): string | undefined {
+  return output.split(/\r?\n/).find((line) => AOT_PROBLEM.test(line))
+}
+
+/** The libraries the new-project template may import for `core`. */
+const CORE_LIBRARIES = new Set(['Base', 'Table', 'Database', 'Examples', 'Visualization'])
+
+/**
+ * Which template a new project's `Main.enso` comes from: `full` when it imports `Standard.AWS`
+ * (before #482), `core` when it imports only the core libraries, and `other` otherwise, so that
+ * a later change of the template is never compared with an earlier one.
+ */
+export function classifyTemplate(main: string): Template {
+  const libraries = [...main.matchAll(/^(?:from|import)\s+Standard\.(\w+)/gm)].map((m) => m[1]!)
+  if (libraries.includes('AWS')) return 'full'
+  return libraries.every((l) => CORE_LIBRARIES.has(l)) ? 'core' : 'other'
 }

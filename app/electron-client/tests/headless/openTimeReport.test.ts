@@ -1,7 +1,12 @@
 /** @file The open-time harness's pure logic: log lines, phases, medians, warnings. */
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, test } from 'vitest'
 import {
+  aotRejection,
+  classifyTemplate,
   credentialFreeEnv,
+  LAUNCHER_JVM_OPTIONS,
   median,
   notMeasured,
   openTimes,
@@ -176,5 +181,112 @@ describe('credentialFreeEnv', () => {
         LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local',
       }),
     ).toEqual({ PATH: '/bin', LOCALAPPDATA: 'C:\\Users\\u\\AppData\\Local' })
+  })
+  test('drops by name and by suffix', () => {
+    const dropped = {
+      ANTHROPIC_API_KEY: 'x',
+      OPENAI_API_KEY: 'x',
+      PGPASSWORD: 'x',
+      PGHOST: 'x',
+      PGUSER: 'x',
+      ACTIONS_RUNTIME_TOKEN: 'x',
+      ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'x',
+      ACTIONS_ID_TOKEN_REQUEST_URL: 'x',
+      GH_TOKEN: 'x',
+      MY_SERVICE_SECRET: 'x',
+      DB_PASSWORD: 'x',
+      STRIPE_KEY: 'x',
+      SOME_CREDENTIALS: 'x',
+      NPM_TOKEN: 'x',
+    }
+    const kept = {
+      PATH: '/bin',
+      HOME: '/home/u',
+      USERPROFILE: 'C:\\Users\\u',
+      DISPLAY: ':0',
+      TEMP: '/tmp',
+      LANG: 'C.UTF-8',
+      XAUTHORITY: '/x',
+      KEYBOARD: 'us',
+    }
+    expect(credentialFreeEnv({ ...dropped, ...kept })).toEqual(kept)
+  })
+  test('drops the JVM option variables, which a measured launch sets for itself', () => {
+    expect(
+      credentialFreeEnv({
+        JAVA_TOOL_OPTIONS: '-Xmx1g',
+        _JAVA_OPTIONS: '-Xmx1g',
+        JDK_JAVA_OPTIONS: '-Xmx1g',
+        PATH: '/bin',
+      }),
+    ).toEqual({ PATH: '/bin' })
+  })
+})
+
+describe('classifyTemplate', () => {
+  const core = [
+    'from Standard.Base import all',
+    'from Standard.Table import all',
+    'from Standard.Database import all',
+    'import Standard.Examples',
+    'import Standard.Visualization',
+  ].join('\n')
+  const main = (imports: string) => `${imports}\n\nmain = 42\n`
+  test('core is the core libraries only', () => expect(classifyTemplate(main(core))).toBe('core'))
+  test('full imports AWS', () =>
+    expect(classifyTemplate(main(`${core}\nfrom Standard.AWS import all`))).toBe('full'))
+  test('anything else is other, so it is compared with nothing', () => {
+    expect(classifyTemplate(main(`${core}\nimport Standard.Image`))).toBe('other')
+    expect(classifyTemplate(main(`${core}\nimport Standard.Snowflake`))).toBe('other')
+  })
+})
+
+describe('LAUNCHER_JVM_OPTIONS', () => {
+  test('are the options the launcher gives the JVM it starts (Main.launchJvm)', () => {
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../../../engine/runner/src/main/java/org/enso/runner/Main.java'),
+      'utf8',
+    )
+    for (const option of LAUNCHER_JVM_OPTIONS) {
+      expect(source).toContain(`commandAndArgs.add("${option}")`)
+    }
+  })
+})
+
+describe('aotRejection', () => {
+  test('finds a cds or aot problem, a mismatch, or an unusable cache', () => {
+    expect(aotRejection('[0.1s][warning][cds] shared class paths mismatch')).toContain('mismatch')
+    expect(aotRejection('[0.1s][error][aot] An error has occurred')).toContain('[aot]')
+    expect(aotRejection('Unable to use AOT cache.')).toContain('Unable to use')
+    expect(
+      aotRejection('[0.1s][warning][cds] The AOT cache was created by a different VM'),
+    ).toBeDefined()
+  })
+  test('ignores other output', () => {
+    expect(aotRejection('[LOG] started\n[0.1s][warning][gc] something')).toBeUndefined()
+  })
+})
+
+describe('JVM cache state', () => {
+  test('is in the table caption and warned about when uncached', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'uncached' as const }
+    expect(renderMarkdown(base, undefined)).toContain('uncached')
+    expect(regressionWarnings(base, undefined)).toEqual(
+      expect.arrayContaining([expect.stringContaining('uncached')]),
+    )
+  })
+  test('says how the cache was trained', () => {
+    const base = { ...report([3000, 3000, 3000], 'jvm'), jvmAot: 'launcher-trained' as const }
+    expect(renderMarkdown(base, undefined)).toContain('launcher-trained')
+  })
+})
+
+describe('a launch whose second open failed', () => {
+  test('is warned about', () => {
+    const ok = report([3000, 3000, 3000])
+    const runs = ok.runs.map((r, i) => (i === 1 ? { ...r, error: 'second: no welcome table' } : r))
+    expect(regressionWarnings({ ...ok, runs }, undefined)).toEqual([
+      expect.stringContaining('second: no welcome table'),
+    ])
   })
 })

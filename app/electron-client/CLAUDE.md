@@ -748,15 +748,28 @@ are printed (as `::warning` under GitHub Actions) and never change the exit
 code.
 
 Every child process starts without credentials: `credentialFreeEnv` drops the
-`ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*` and
-`DATABRICKS*` variables and the GitHub tokens, whatever the caller's environment
-holds. Still unset them in the shell before a manual run.
+`ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*`, `DATABRICKS*`,
+`ANTHROPIC*`, `OPENAI*`, `PG*` and `ACTIONS_*` variables, the GitHub tokens, and
+any variable named `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_KEY` or
+`*_CREDENTIALS`, whatever the caller's environment holds. It also drops
+`JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS` and `JDK_JAVA_OPTIONS`, so a native
+measurement is not changed by them. Still unset the credentials in the shell
+before a manual run.
 
 `--engines jvm` runs the engine on the bundled JDK instead of the native image
 (`ENSO_ENGINE_ARGS=--jvm`). It first builds a JDK AOT cache under `<out>/aot/`
 (`perf/jvmAotCache.ts`: a training launch, `-XX:AOTMode=create` with the
-bundle's `java`, then a launch that checks the JVM accepted it), so a JVM run
-takes several minutes longer than a native one.
+bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
+it: with `on` a JVM that cannot use the cache fails to start, and so does every
+measured launch). So a JVM run takes several minutes longer than a native one.
+The report says how the cache was made (`jvmAot`): `ide-trained` (the training
+is a launch of the IDE), `launcher-trained` (where the IDE kills the engine, as
+on Windows, the JVM never writes the training file, so it is `enso --jvm --run`
+of an empty project: it never loads the Language Server or `project/open`
+classes, so those JVM numbers are pessimistic and not comparable with
+`ide-trained` ones) or `uncached` (the JVM refused the cache; the numbers are
+those of a JVM with no AOT cache, and the report warns). `LAUNCHER_JVM_OPTIONS`
+copies the options of `Main.launchJvm`; a unit test fails when they drift.
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and

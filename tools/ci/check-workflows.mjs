@@ -1112,17 +1112,36 @@ export function checkOpenPerf({ workflows }) {
       'ide-packaging.yml › package-ide: measures the open time but has no "Run Package Tests" step',
     )
   }
+  // An open-time step is one that measures, or one that only serves the measuring (it is gated on
+  // `env.OPEN_PERF`): finding, downloading and uploading the baseline.
+  const isOpenTime = (step) =>
+    String(step?.run ?? '').includes('perf:open') || String(step?.if ?? '').includes('env.OPEN_PERF')
   steps.forEach((step, index) => {
-    if (!String(step?.run ?? '').includes('perf:open')) return
+    if (!isOpenTime(step)) return
+    const name = step.name ?? `step ${index}`
     if (step['continue-on-error'] !== true) {
-      problems.push('ide-packaging.yml › package-ide: an open-time step must continue on error')
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" must continue on error`,
+      )
     }
-    if (index < lastTests) {
+    // A step's own timeout is absorbed by `continue-on-error`; the job's would fail packaging.
+    if (step['timeout-minutes'] == null) {
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" needs its own timeout-minutes`,
+      )
+    }
+    if (String(step?.run ?? '').includes('perf:open') && index < lastTests) {
       problems.push(
         'ide-packaging.yml › package-ide: the open time is measured after the package tests',
       )
     }
   })
+  // Measuring is not allowed to lengthen the runs that do not measure.
+  if (measures && !/inputs\.open_perf/.test(String(job?.['timeout-minutes'] ?? ''))) {
+    problems.push(
+      'ide-packaging.yml › package-ide: the job timeout must be raised only when measuring (an expression on inputs.open_perf)',
+    )
+  }
   const text = workflows['ide-pull-request.yml']?.text ?? ''
   const buildIde = (text.match(/!= 'CI: Build IDE'/g) ?? []).length
   const both = (

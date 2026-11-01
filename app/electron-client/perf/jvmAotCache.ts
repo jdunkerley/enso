@@ -8,14 +8,13 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { findBundledJava, findEngineComponent } from '../tests/packagedIde'
-import { credentialFreeEnv, type OpenTag, type RunResult } from './openTimeReport'
-
-/** The options the launcher gives the JVM it starts through JNI (`Main.launchJvm`). */
-const LAUNCHER_JVM_OPTIONS = [
-  '--sun-misc-unsafe-memory-access=allow',
-  '--enable-native-access=org.graalvm.truffle',
-  '--add-opens=java.base/java.nio=ALL-UNNAMED',
-]
+import {
+  aotRejection,
+  credentialFreeEnv,
+  LAUNCHER_JVM_OPTIONS,
+  type OpenTag,
+  type RunResult,
+} from './openTimeReport'
 
 type Launch = (
   env: Record<string, string>,
@@ -25,9 +24,23 @@ type Launch = (
 /** Runs a new project to its end with the launcher, under the given environment. */
 type TrainDirect = (env: Record<string, string>) => Promise<void>
 
-/** `JAVA_TOOL_OPTIONS` for a measured launch: the cache, and no JVM logging on stdout. */
+/**
+ * `JAVA_TOOL_OPTIONS` for a measured launch: the cache, and no JVM logging on stdout. `AOTMode=on`
+ * makes the JVM fail to start when it cannot use the cache, instead of running without it (the
+ * default, `auto`), so a measured launch is never an uncached one by accident.
+ */
 export function measuredJvmToolOptions(cache: string): string {
-  return `-XX:AOTCache=${cache} -Xlog:disable -Xlog:all=off`
+  return `-XX:AOTMode=on -XX:AOTCache=${cache} -Xlog:disable -Xlog:all=off`
+}
+
+/** What `createJvmAotCache` made. */
+export interface JvmAotCache {
+  /** The cache to measure with; `undefined` when the JVM could not use the cache it was given. */
+  readonly cache: string | undefined
+  /** Where the training ran, which decides what the cache holds. */
+  readonly training: 'ide-trained' | 'launcher-trained'
+  /** Why the JVM refused the cache, when `cache` is `undefined`. */
+  readonly rejection?: string
 }
 
 /** How long `-XX:AOTMode=create` may take. */
@@ -43,14 +56,11 @@ export async function createJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
-): Promise<string> {
-  try {
-    return await prepareJvmAotCache(out, exe, launch, trainDirect)
-  } catch (e) {
-    if (!String(e).includes('rejected the AOT cache')) throw e
-    console.warn(`Open time: ${String(e)}; preparing the AOT cache once more.`)
-    return await prepareJvmAotCache(out, exe, launch, trainDirect)
-  }
+): Promise<JvmAotCache> {
+  const first = await prepareJvmAotCache(out, exe, launch, trainDirect)
+  if (first.cache != null) return first
+  console.warn(`Open time: ${first.rejection}; preparing the AOT cache once more.`)
+  return await prepareJvmAotCache(out, exe, launch, trainDirect)
 }
 
 async function prepareJvmAotCache(
@@ -58,7 +68,7 @@ async function prepareJvmAotCache(
   exe: string,
   launch: Launch,
   trainDirect: TrainDirect,
-): Promise<string> {
+): Promise<JvmAotCache> {
   const java = findBundledJava(exe)
   const component = findEngineComponent(exe)
   if (!java || !component) throw new Error(`No bundled JDK or engine component next to ${exe}`)
@@ -75,7 +85,9 @@ async function prepareJvmAotCache(
     },
     ['first'],
   )
+  let trained: JvmAotCache['training'] = 'ide-trained'
   if (!fs.existsSync(config)) {
+    trained = 'launcher-trained'
     // The JVM writes the configuration as it exits. Where the IDE ends the engine by killing it
     // (Windows) it never does, so the training is a project run to its end through the launcher.
     console.warn(
@@ -116,13 +128,24 @@ async function prepareJvmAotCache(
     )
   }
 
-  // A cache the JVM cannot use is reported on stdout as an `[aot]` error or warning, and the JVM
-  // then runs without it, so this launch keeps the JVM's logging on.
+  // With `AOTMode=on` a JVM that cannot use the cache fails to start, so the check launch fails to
+  // open the project; one that can prints nothing. This launch keeps the JVM's logging on, so the
+  // reason (a `[cds]` or `[aot]` record, a mismatch) is found in the output too.
   const check = await launch(
-    { ENSO_ENGINE_ARGS: '--jvm', JAVA_TOOL_OPTIONS: `-XX:AOTCache=${cache}` },
+    { ENSO_ENGINE_ARGS: '--jvm', JAVA_TOOL_OPTIONS: `-XX:AOTMode=on -XX:AOTCache=${cache}` },
     ['first'],
   )
-  const rejected = check.stdout.split('\n').find((line) => /\[(error|warning)\]\[aot/.test(line))
-  if (rejected) throw new Error(`The JVM rejected the AOT cache: ${rejected}`)
-  return cache
+  const reason =
+    aotRejection(check.stdout) ??
+    (check.first.welcomeShown == null ?
+      `the check launch did not open the project (${check.error ?? 'no error'})`
+    : undefined)
+  if (reason != null) {
+    return {
+      cache: undefined,
+      training: trained,
+      rejection: `The JVM rejected the AOT cache: ${reason}`,
+    }
+  }
+  return { cache, training: trained }
 }
