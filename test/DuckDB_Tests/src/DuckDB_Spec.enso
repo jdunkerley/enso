@@ -44,7 +44,6 @@ duckdb_spec suite_builder prefix create_connection_func =
     materialize = .read
 
     common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=DuckDB_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=True
-    aggregate_selection = Common_Table_Operations.Aggregate_Spec.Test_Selection.Config first_last_row_order=False aggregation_problems=False
     agg_in_memory_table = ((Project_Description.new enso_dev.Table_Tests).data / "data.csv") . read
 
     agg_table_fn = _->
@@ -56,8 +55,9 @@ duckdb_spec suite_builder prefix create_connection_func =
     is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
     is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
     flagged_fn = default_connection.get.dialect.flagged
+    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
 
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection aggregate_test_selection=aggregate_selection create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
+    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
     Common_Spec.add_specs suite_builder prefix create_connection_func default_connection setup
     Common_Table_Operations.Main.add_specs suite_builder setup
 

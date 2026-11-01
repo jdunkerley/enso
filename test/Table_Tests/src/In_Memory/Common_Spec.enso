@@ -19,7 +19,6 @@ type Dummy_Connection
 
 in_memory_setup =
     selection = Common_Table_Operations.Main.Test_Selection.Config
-    aggregate_selection = Common_Table_Operations.Aggregate_Spec.Test_Selection.Config
 
     agg_table_fn _ = (enso_project.data / "data.csv") . read
     empty_table_fn _ =
@@ -39,13 +38,15 @@ in_memory_setup =
         True
     is_operation_supported_fn _ =
         True
+    is_aggregate_supported_fn _ =
+        True
     flagged_fn flag:Dialect_Flag =
         case flag of
             Dialect_Flag.Case_Insensitive_Ordering_By_Default -> False
             Dialect_Flag.Removes_Trailing_Whitespace_Casting_From_Char_To_Varchar -> False
             _ -> True
 
-    Common_Table_Operations.Main.Test_Setup.Config "[In-Memory] " agg_table_fn empty_table_fn table_builder materialize is_database=False test_selection=selection aggregate_test_selection=aggregate_selection create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
+    Common_Table_Operations.Main.Test_Setup.Config "[In-Memory] " agg_table_fn empty_table_fn table_builder materialize is_database=False test_selection=selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
 
 add_specs suite_builder =
     Common_Table_Operations.Main.add_specs suite_builder in_memory_setup

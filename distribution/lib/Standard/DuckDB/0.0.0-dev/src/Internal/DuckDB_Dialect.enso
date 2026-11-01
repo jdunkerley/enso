@@ -301,6 +301,9 @@ type DuckDB_Dialect
             Dialect_Flag.Supports_Time_Duration -> False
             Dialect_Flag.Supports_Mixed_Columns -> False
             Dialect_Flag.Supports_Regex_Match -> True
+            Dialect_Flag.First_Last_Respects_Row_Order -> False
+            Dialect_Flag.Reports_Aggregation_Problems -> False
+            Dialect_Flag.Concatenate_Follows_Row_Order -> True
 
     ## ---
        private: true

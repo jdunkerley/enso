@@ -66,9 +66,9 @@ type Test_Setup
          backend.
        - test_selection: A selection of which suites should be run. Can be used
          to skip checks for backends which do not support particular features.
-       - aggregate_test_selection: A selection of which aggregate test suites
-         should be run. Can be used to skip checks for backends which do not
-         support particular features.
+       - is_aggregate_supported: A function that takes an `Aggregate_Column`
+         and returns whether the backend can compute it (a database answers
+         with its dialect's `check_aggregate_support`).
        - create_connection_func: A function that takes Nothing and creates a related
          database connection or Nothing for in-memory tests.
        - light_table_builder: Like `table_builder`, but for Database backends it
@@ -80,7 +80,7 @@ type Test_Setup
          boolean indicating if the feature is supported by the backend.
        - flagged: A function that takes a `Dialect_Flag` and returns a boolean indicating if the 
          flag is set for the backend.
-    Config prefix table_fn empty_table_fn (table_builder : (Vector Any -> (Any|Nothing)) -> Any) materialize is_database test_selection aggregate_test_selection create_connection_func light_table_builder is_integer_type=(.is_integer) is_feature_supported flagged is_operation_supported
+    Config prefix table_fn empty_table_fn (table_builder : (Vector Any -> (Any|Nothing)) -> Any) materialize is_database test_selection is_aggregate_supported create_connection_func light_table_builder is_integer_type=(.is_integer) is_feature_supported flagged is_operation_supported
 
     ## Specifies if the given Table backend supports custom Enso types.
 

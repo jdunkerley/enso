@@ -344,15 +344,6 @@ sqlite_spec suite_builder prefix create_connection_func persistent_connector =
 
     common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=SQLite_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=True
 
-    ## For now `advanced_stats`, `text_shortest_longest` and
-       `multi_distinct` remain disabled, because SQLite does not provide the
-       needed aggregate functions and emulating them is highly problematic.
-       We can rethink in the future how these could be emulated. Two of the
-       possible solutions are:
-       - creating complex nested queries using NTILE to compute the stats,
-       - compiling SQLite library on our own and adding native extensions for
-         the missing statistics.
-    aggregate_selection = Common_Table_Operations.Aggregate_Spec.Test_Selection.Config advanced_stats=False text_shortest_longest=False first_last_row_order=False first_last_ignore_nothing=False multi_distinct=False aggregation_problems=False nan=False date_support=False
     agg_in_memory_table = (enso_project.data / "data.csv") . read
 
     agg_table_fn = _ ->
@@ -364,8 +355,9 @@ sqlite_spec suite_builder prefix create_connection_func persistent_connector =
     is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
     is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
     flagged_fn = default_connection.get.dialect.flagged
+    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
 
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection aggregate_test_selection=aggregate_selection create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
+    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
     
     Common_Spec.add_specs suite_builder prefix create_connection_func default_connection setup
     sqlite_specific_spec suite_builder prefix create_connection_func setup

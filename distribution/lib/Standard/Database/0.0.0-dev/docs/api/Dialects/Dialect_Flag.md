@@ -5,9 +5,11 @@
     - Case_Insensitive_Ordering_By_Default
     - Case_Sensitive_Text_Comparison
     - Char_Max_Size_After_Substring_Kept
+    - Concatenate_Follows_Row_Order
     - Date_Time
     - Different_Size_Integer_Types
     - Distinct_Returns_First_Row_From_Group_If_Ordered
+    - First_Last_Respects_Row_Order
     - Fixed_Length_Text_Columns
     - Length_Restricted_Text_Columns
     - NaN_Non_Comparable
@@ -15,6 +17,7 @@
     - Order_By_Unicode_Normalization_When_Case_Insensitive
     - Primary_Key_Allows_Nulls
     - Removes_Trailing_Whitespace_Casting_From_Char_To_Varchar
+    - Reports_Aggregation_Problems
     - Supports_8bit_Integer
     - Supports_Case_Insensitive_Ordering
     - Supports_Case_Sensitive_Columns
