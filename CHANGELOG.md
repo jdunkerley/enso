@@ -223,7 +223,7 @@
 - [The IDE adds the imports your code needs][466]: when a new or edited
   component, or a dropdown choice, uses a type from a library the project does
   not import, the import is added with it. Opening a project adds any imports
-  its code is missing, and a notice says which.
+  its `Main.enso` is missing, and a notice says which.
 
 #### Enso Language & Runtime
 
@@ -334,7 +334,7 @@
   credentials explicitly or use AWS credentials.
 - [PostgreSQL][481] and [SQLite][468] are now their own libraries,
   `Standard.Postgres` and `Standard.SQLite`: the IDE adds their imports where
-  code uses them and fixes older projects when they open, and
+  code uses them and fixes a project's `Main.enso` when it opens, and
   `Database.connect`'s list, `Data.read` of a SQLite file and saved PostgreSQL
   data links work without the import. Code run outside the IDE (`enso --run`),
   and `Generic_JDBC` connections to their URLs, need

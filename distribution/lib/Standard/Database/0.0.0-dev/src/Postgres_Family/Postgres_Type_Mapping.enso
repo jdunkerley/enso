@@ -9,13 +9,17 @@ import project.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
 import project.Postgres_Family.Postgres_Error_Mapper.Postgres_Error_Mapper
 import project.Internal.SQL_Type_Mapping
 import project.Internal.SQL_Type_Reference.SQL_Type_Reference
-import project.Internal.Statement_Setter.Statement_Setter
 import project.SQL.SQL_Type
 from project.Errors import Unsupported_Database_Type
 
 polyglot java import java.sql.Types
-polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
-polyglot java import org.enso.database.JDBCValueSetter
+
+## Note [Postgres family mappings carry no JDBC helpers]
+   This mapping deliberately has no `column_fetcher_factory`, `statement_setter`
+   or `value_setter`. Those are Java objects that must come from the JVM that
+   owns the driver, so each backend supplies its own (`Standard.Postgres` and
+   `Standard.AWS` in the guest JVM, `Standard.DuckDB` in the image) and
+   delegates only the pure type logic here.
 ## ---
    private: true
    ---
@@ -98,15 +102,6 @@ type Postgres_Type_Mapping
 
     ## ---
        private: true
-       advanced: true
-       ---
-       Gets the ColumnFetcherFactory to be used for Postgres.
-    column_fetcher_factory : Any
-    column_fetcher_factory =
-        ColumnFetcherFactory.DEFAULT
-
-    ## ---
-       private: true
        ---
     sql_type_to_text : SQL_Type -> Text
     sql_type_to_text sql_type =
@@ -165,20 +160,6 @@ type Postgres_Type_Mapping
        ---
     is_same_type (value_type1 : Value_Type) (value_type2 : Value_Type) -> Boolean =
         value_type1.is_same_type value_type2
-
-    ## ---
-       private: true
-       ---
-       Creates a Statement_Setter for Postgres.
-    statement_setter =
-        fill_home = Statement_Setter.create_fill_hole Postgres_Type_Mapping.value_setter
-        Statement_Setter.for_fill_hole fill_home
-
-    ## ---
-       private: true
-       ---
-    value_setter =
-        JDBCValueSetter.create "Postgres"
 
     ## ---
        private: true
