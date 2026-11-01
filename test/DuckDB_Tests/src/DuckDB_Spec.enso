@@ -9,7 +9,10 @@ import Standard.DuckDB.DuckDB.DuckDB
 import Standard.Database_Test_Suite
 from Standard.Database_Test_Suite import Backend, Known_Issue, Suite_Part
 
-## DuckDB in memory, as the suite runs it.
+## DuckDB in memory, as the suite runs it: the worked example of
+   "Testing a database backend" (Standard.Database_Test_Suite's CLAUDE.md).
+   DuckDB runs the common database specs and the table operations, builds
+   ordinary tables, and has one known issue.
 duckdb_backend =
     Backend.Value "DuckDB In-Memory" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False known_failures=[Known_Issue.Filter_After_Distinct] parts=[Suite_Part.Common, Suite_Part.Table_Operations]
 
