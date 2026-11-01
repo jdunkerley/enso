@@ -14,6 +14,22 @@ import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
+/* Note [Start-up Health Polling]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A native engine answers `/_health` some 200 ms after it is spawned, and the open waits for that
+ * answer. Polling every 250 ms (the first check 250 ms after the spawn) added up to 250 ms to every
+ * open, so the first second polls every 25 ms; a slow start (the JVM, a cold machine) then falls
+ * back to 250 ms, so the checks never pile up.
+ */
+const LOAD_HEALTHCHECK_FAST_INTERVAL = 25
+const LOAD_HEALTHCHECK_FAST_PERIOD_MS = 1000
+
+/** The delay before the next start-up health check, `elapsedMs` after the engine was spawned. */
+export function loadHealthcheckDelay(elapsedMs: number): number {
+  return elapsedMs < LOAD_HEALTHCHECK_FAST_PERIOD_MS ?
+      LOAD_HEALTHCHECK_FAST_INTERVAL
+    : LOAD_HEALTHCHECK_INTERVAL
+}
 const WATCHDOG_HEALTHCHECK_INTERVAL = 3000
 const LANGUAGE_SERVER_CRASH_LOOP_MAX = 5
 const LANGUAGE_SERVER_CRASH_LOOP_WINDOW_MS = 60_000
@@ -281,6 +297,7 @@ class OpenedProject {
     // respawn doesn't kill the new child or reject the new deferred.
     const handle = this.watcher.current
     let resolved = false
+    const startedAt = Date.now()
 
     // Over once this attempt has an answer, or its engine is gone: a health check of the port after
     // that could be answered by another engine, and must not count as this one starting.
@@ -297,9 +314,9 @@ class OpenedProject {
         return
       }
       // Not using setInterval to not pile slow-responding healthchecks.
-      setTimeout(healthCheck, LOAD_HEALTHCHECK_INTERVAL)
+      setTimeout(healthCheck, loadHealthcheckDelay(Date.now() - startedAt))
     }
-    setTimeout(healthCheck, 250)
+    setTimeout(healthCheck, loadHealthcheckDelay(0))
 
     // Timeout if server doesn't start (skip timeout in debug mode)
     const javaToolOptions = process.env.JAVA_TOOL_OPTIONS
