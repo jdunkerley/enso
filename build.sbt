@@ -122,6 +122,7 @@ GatherLicenses.distributions := Seq(
   makeStdLibDistribution("Table", Distribution.sbtProjects(`std-table`)),
   makeStdLibDistribution("Database", Distribution.sbtProjects(`std-database`)),
   makeStdLibDistribution("SQLite", Distribution.sbtProjects(`std-sqlite`)),
+  makeStdLibDistribution("Postgres", Distribution.sbtProjects(`std-postgres`)),
   makeStdLibDistribution("Image", Distribution.sbtProjects(`std-image`)),
   makeStdLibDistribution("AWS", Distribution.sbtProjects(`std-aws`)),
   // A JAR wrapper whose output a library ships (`extraJars`,
@@ -236,7 +237,10 @@ checkIRCacheSizes := Def
  * DLL copy into the engine package (`MsvcRuntime`, which needs `setup-msvc` or a Developer Prompt);
  * then, not on Windows, `verifyGeneratedPackage` for the engine and for Base, Table, Image and
  * Database at the package's versioned paths (the retired build CLI skipped it on Windows: "FIXME
- * ... CRLF issues?"). CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
+ * ... CRLF issues?"). Before those, on every platform, `ShippedCataloguesSpec` checks the standard
+ * libraries' `catalogue.json` files with the language server's own rule, so a catalogue the
+ * language server would skip fails the build instead of turning the feature off silently.
+ * CI calls `sbt "clean; all ciBuildEngineDistribution"`. It is a task of its
  * own, not a CI flag on `buildEngineDistribution`: `checkIRCacheSizes` depends on that task, and
  * `CI` is set in every job that reaches it (lint, benchmarks, JVM tests, the IDE bundle).
  */
@@ -247,6 +251,12 @@ lazy val ciBuildEngineDistribution = taskKey[Unit](
 ciBuildEngineDistribution := Def
   .sequential(
     buildEngineDistribution,
+    Def.taskDyn {
+      val lib = engineDistributionRoot.value / "lib"
+      (`polyglot-api` / Test / testOnly).toTask(
+        s" org.enso.polyglot.ShippedCataloguesSpec -- -Dlib=${lib.getAbsolutePath}"
+      )
+    },
     Def.task {
       val log  = streams.value.log
       val root = engineDistributionRoot.value
@@ -258,7 +268,16 @@ ciBuildEngineDistribution := Def
           configRoot / "engine",
           root / "THIRD-PARTY"
         )
-        for (lib <- Seq("Base", "Table", "Image", "Database", "SQLite")) {
+        for (
+          lib <- Seq(
+            "Base",
+            "Table",
+            "Image",
+            "Database",
+            "SQLite",
+            "Postgres"
+          )
+        ) {
           GatherLicenses.verifyPackageAt(
             log,
             configRoot / lib,
@@ -494,6 +513,7 @@ lazy val enso = (project in file("."))
     `std-tableau`,
     `std-saas`,
     `std-sqlite`,
+    `std-postgres`,
     `std-duckdb`,
     `sqlite-wrapper`,
     `syntax-rust-definition`,
@@ -2166,7 +2186,9 @@ lazy val `polyglot-api` = project
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % jsoniterVersion,
       "com.google.flatbuffers"                 % "flatbuffers-java"      % flatbuffersVersion,
       "org.scalatest"                         %% "scalatest"             % scalatestVersion          % Test,
-      "org.scalacheck"                        %% "scalacheck"            % scalacheckVersion         % Test
+      "org.scalacheck"                        %% "scalacheck"            % scalacheckVersion         % Test,
+      // `pkg` has it as `provided`; `ShippedCataloguesSpec` reads `package.yaml`.
+      "org.yaml" % "snakeyaml" % snakeyamlVersion % Test
     ),
     Compile / moduleDependencies ++= Seq(
       "com.google.flatbuffers" % "flatbuffers-java" % flatbuffersVersion,
@@ -2812,6 +2834,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-microsoft` / Compile / packageBin)
       .dependsOn(`std-saas` / Compile / packageBin)
       .dependsOn(`std-sqlite` / Compile / packageBin)
+      .dependsOn(`std-postgres` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
       .dependsOn(`std-table` / Compile / packageBin)
       .dependsOn(`std-tableau` / Compile / packageBin)
@@ -4039,11 +4062,7 @@ lazy val `engine-runner` = project
               // See https://github.com/HarrDevY/native-register-bouncy-castle
               "org.bouncycastle.jcajce.provider.drbg.DRBG$Default",
               "org.bouncycastle.jcajce.provider.drbg.DRBG$NonceAndIV",
-              "org.duckdb",
-              // pgjdbc 42.6+ holds a java.lang.ref.Cleaner in a static field
-              // (org.postgresql.util.LazyCleanerImpl), which cannot live in the
-              // image heap.
-              "org.postgresql"
+              "org.duckdb"
             ),
             initializeAtBuildtime = NativeImage.defaultBuildTimeInitClasses ++
               Seq(
@@ -4982,6 +5001,8 @@ val `sqlite-polyglot-root` =
   stdLibComponentRoot("SQLite") / "polyglot" / "java"
 val `sqlite-native-libs` =
   stdLibComponentRoot("SQLite") / "polyglot" / "lib"
+val `postgres-polyglot-root` =
+  stdLibComponentRoot("Postgres") / "polyglot" / "java"
 val `std-aws-polyglot-root` =
   stdLibComponentRoot("AWS") / "polyglot" / "java"
 val `std-snowflake-polyglot-root` =
@@ -5844,8 +5865,7 @@ lazy val `std-database` = project
     Compile / packageBin / artifactPath :=
       `database-polyglot-root` / "std-database.jar",
     libraryDependencies ++= Seq(
-      "org.graalvm.polyglot" % "polyglot"   % graalMavenPackagesVersion % "provided",
-      "org.postgresql"       % "postgresql" % postgresVersion
+      "org.graalvm.polyglot" % "polyglot" % graalMavenPackagesVersion % "provided"
     ),
     Compile / packageBin := {
       val result            = (Compile / packageBin).value
@@ -5869,6 +5889,44 @@ lazy val `std-database` = project
   )
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-table` % "provided")
+
+lazy val `std-postgres` = project
+  .in(file("std-bits") / "postgres")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `postgres-polyglot-root` / "std-postgres.jar",
+    libraryDependencies ++= Seq(
+      "org.graalvm.polyglot" % "polyglot"   % graalMavenPackagesVersion % "provided",
+      "org.postgresql"       % "postgresql" % postgresVersion
+    ),
+    Compile / packageBin := {
+      val result            = (Compile / packageBin).value
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      StdBits
+        .copyDependencies(
+          `postgres-polyglot-root`,
+          Seq("std-postgres.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedClasspath).value,
+          logger             = streams.value.log,
+          cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`postgres-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`std-base` % "provided")
+  .dependsOn(`std-table` % "provided")
+  .dependsOn(`std-database` % "provided")
 
 lazy val `std-sqlite` = project
   .in(file("std-bits") / "sqlite")

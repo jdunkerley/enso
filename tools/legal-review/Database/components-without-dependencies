@@ -1,0 +1,2 @@
+# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
+std-database: depends only on the GraalVM polyglot API, which the runtime provides, and on other standard libraries; the JDBC drivers ship with Standard.Postgres, Standard.SQLite and the other backend libraries.

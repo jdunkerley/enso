@@ -17,8 +17,9 @@ there.
 - `Base/` — Core types, I/O, HTTP, errors, file system, datetime, Enso Cloud
   integration. Every other library imports from `Base`.
 - `Table/` — Columnar in-memory and database-backed table operations.
-- `Database/` — Generic SQL abstractions (`DB_Table`); backends below ship in
-  their own libraries.
+- `Database/` — Generic SQL abstractions (`DB_Table`) and the Postgres-family
+  dialect base; backends below ship in their own libraries.
+- `Postgres/` — PostgreSQL backend.
 - `SQLite/` — SQLite backend (in-memory or file) and the `.db` file format.
 - `DuckDB/` — In-process analytical SQL backend (in-memory or `.duckdb` file).
 - `Snowflake/` — Snowflake cloud data warehouse backend.

@@ -769,8 +769,12 @@ final class TruffleCompilerContext implements CompilerContext {
    * standard library) also writes `catalogue.json` next to its `package.yaml`,
    * from the same suggestions as the suggestions cache. The language
    * server inserts the catalogues of the installed libraries that are not
-   * loaded when a project opens (`SuggestionsHandler`), so the component
-   * browser can offer their components before an import loads them.
+   * loaded once a project's first execution has finished (or 30 s after
+   * opening it, if none does; Note [Catalogue Entries In The Suggestions
+   * Database] in `SuggestionsHandler`), so the component browser can offer
+   * their components before an import loads them. CI checks the standard
+   * libraries' catalogues with the language server's rule
+   * (`ShippedCataloguesSpec`, run by `ciBuildEngineDistribution`).
    *
    * Unlike the cache, it is JSON in the language server's wire form
    * (`SuggestionJson`), it holds only what the component browser shows (no

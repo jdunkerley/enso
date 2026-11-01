@@ -105,6 +105,17 @@ v.test('correctly validates example Database .datalink files with the schema', (
   }
 })
 
+v.test('validates Postgres data links of both library names', () => {
+  const current = loadDataLinkFile(
+    path.resolve(REPO_ROOT, 'tools/http-test-helper/www-files/some-postgres.datalink'),
+  )
+  v.expect((current as { libraryName: string }).libraryName).toBe('Standard.Postgres')
+  testSchema(current, 'some-postgres.datalink')
+  const old = loadDataLinkFile(path.resolve(TABLE_DATA_LINKS_ROOT, 'postgres-db.datalink'))
+  v.expect((old as { libraryName: string }).libraryName).toBe('Standard.Database')
+  testSchema(old, 'postgres-db.datalink')
+})
+
 v.test('correctly validates example Snowflake .datalink files with the schema', () => {
   const schemas = ['snowflake-db.datalink']
   for (const schema of schemas) {

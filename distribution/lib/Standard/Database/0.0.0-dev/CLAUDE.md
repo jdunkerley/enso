@@ -2,10 +2,14 @@
 
 SQL abstraction for relational databases. Returns a deferred `DB_Table` (query
 plan, not data) that mirrors the in-memory `Table` API; call `.read` to
-materialize. Backends (SQLite, Postgres, DuckDB, Snowflake, SQL Server, …) ship
-in their own libraries — `Standard.SQLite`, `Standard.DuckDB`,
-`Standard.Snowflake`, `Standard.Microsoft`, etc. (SQLite is no longer in
-`Standard.Database`: `from Standard.SQLite import all`.)
+materialize. Database has no backend of its own: backends (Postgres, SQLite,
+DuckDB, Snowflake, SQL Server, …) ship in their own libraries —
+`Standard.Postgres`, `Standard.SQLite`, `Standard.DuckDB`, `Standard.Snowflake`,
+`Standard.Microsoft`, etc. (Postgres and SQLite are no longer in
+`Standard.Database`: `from Standard.Postgres import all`,
+`from Standard.SQLite import all`.) The PostgreSQL dialect base that Postgres,
+DuckDB and Redshift share stays here, in `Postgres_Family`, with `SSL_Mode` and
+`Client_Certificate`.
 
 ## Main entry points
 
