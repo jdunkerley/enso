@@ -395,9 +395,21 @@ final class TruffleCompilerContext implements CompilerContext {
   @SuppressWarnings("unchecked")
   @Override
   public Future<Boolean> serializeLibrary(Compiler compiler, LibraryName libraryName) {
+    // Note [One Bindings Cache Read Per Library]: before the request is logged, so that a test can
+    // hold the request there (`LibraryBindingsInvalidationTest`).
+    invalidateLibraryBindings(libraryName);
     logSerializationManager(Level.INFO, "Requesting serialization for library [{0}].", libraryName);
 
-    var task = doSerializeLibrary(compiler, libraryName);
+    var write = doSerializeLibrary(compiler, libraryName);
+    Callable<Boolean> task =
+        () -> {
+          try {
+            return write.call();
+          } finally {
+            // Note [One Bindings Cache Read Per Library]: a read during the write is not kept.
+            invalidateLibraryBindings(libraryName);
+          }
+        };
 
     return serializationPool.submitTask(
         task, isCreateThreadAllowed(), toQualifiedName(libraryName));
@@ -498,7 +510,74 @@ final class TruffleCompilerContext implements CompilerContext {
     };
   }
 
-  private final Map<LibraryName, MapToBindings> known = new HashMap<>();
+  /* Note [One Bindings Cache Read Per Library]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Import resolution (`DefaultPackageRepository.getLibraryBindings`) and module loading
+   * (`deserializeModule`) both need a library's bindings cache, and each kept its own map, so each
+   * read the same file (Base's and Table's take ~250 ms each). `libraryBindings` reads it once and
+   * both use it. It remembers every answer that came from the file, found or not; it does not
+   * remember the compile target's skip (Note [Compile Target Skips Its Bindings Cache]), the abort
+   * of a library waiting to be serialised, or an interrupt, which are asked again.
+   *
+   * Writing a library's cache (`serializeLibrary`) bumps the library's generation twice: before the
+   * task is submitted and in the task's `finally`, after the file is written. A read stores its
+   * answer only if the generation it started under is still the current one, so a read that
+   * overlaps a write never leaves its stale answer behind; remembering "absent" (which `known`
+   * never did) is safe because of that. `shutdown` forgets everything.
+   */
+  private record Remembered(
+      long generation, scala.Option<ImportExportCache.CachedBindings> bindings) {}
+
+  private final Map<LibraryName, Remembered> libraryBindings =
+      new java.util.concurrent.ConcurrentHashMap<>();
+  private final Map<LibraryName, java.util.concurrent.atomic.AtomicLong> bindingsGenerations =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  private java.util.concurrent.atomic.AtomicLong bindingsGeneration(LibraryName libraryName) {
+    return bindingsGenerations.computeIfAbsent(
+        libraryName, n -> new java.util.concurrent.atomic.AtomicLong());
+  }
+
+  /** Forget the library's answer: its cache is being (re)written. */
+  private void invalidateLibraryBindings(LibraryName libraryName) {
+    bindingsGeneration(libraryName).incrementAndGet();
+    libraryBindings.remove(libraryName);
+  }
+
+  /** Forget every answer. Also called by `DefaultPackageRepository.shutdown`. */
+  void clearLibraryBindings() {
+    bindingsGenerations.values().forEach(java.util.concurrent.atomic.AtomicLong::incrementAndGet);
+    libraryBindings.clear();
+  }
+
+  /**
+   * The library's bindings cache, read at most once per generation. See Note [One Bindings Cache
+   * Read Per Library].
+   *
+   * @throws InterruptedException as `deserializeLibraryBindings` did; nothing is remembered then
+   */
+  scala.Option<ImportExportCache.CachedBindings> libraryBindings(LibraryName libraryName)
+      throws InterruptedException {
+    var generation = bindingsGeneration(libraryName);
+    var startedUnder = generation.get();
+    var known = libraryBindings.get(libraryName);
+    if (known != null && known.generation() == startedUnder) {
+      return known.bindings();
+    }
+    var read = readLibraryBindings(libraryName);
+    if (read.remember()) {
+      libraryBindings.compute(
+          libraryName,
+          (name, current) ->
+              generation.get() == startedUnder
+                  ? new Remembered(startedUnder, read.bindings())
+                  : current);
+    }
+    return read.bindings();
+  }
+
+  private record BindingsRead(
+      scala.Option<ImportExportCache.CachedBindings> bindings, boolean remember) {}
 
   /**
    * The library {@link Compiler#compile} is compiling, if any. See Note [Compile Target Skips Its
@@ -525,7 +604,7 @@ final class TruffleCompilerContext implements CompilerContext {
    *
    * So `Compiler.compile` names its target (`compilingLibrary`), and the
    * target's modules skip the bindings cache (`deserializeModule`,
-   * `deserializeLibraryBindings`): they load from their IR caches,
+   * `readLibraryBindings`): they load from their IR caches,
    * which `ModuleCache` checks against each module's source, or from source.
    * `serializeLibrary` then writes the bindings cache afresh. Dependencies
    * still use their bindings caches. The cost: `enso --compile` writes no
@@ -540,17 +619,13 @@ final class TruffleCompilerContext implements CompilerContext {
   public boolean deserializeModule(Compiler compiler, CompilerContext.Module module) {
     if (module.getPackage() != null && !module.getPackage().libraryName().equals(compileTarget)) {
       var library = module.getPackage().libraryName();
-      var bindings = known.get(library);
-      if (bindings == null) {
-        try {
-          var cached = deserializeLibraryBindings(library);
-          if (cached.isDefined()) {
-            bindings = cached.get().bindings();
-            known.put(library, bindings);
-          }
-        } catch (InterruptedException ex) {
-          // proceed
-        }
+      MapToBindings bindings = null;
+      try {
+        // Note [One Bindings Cache Read Per Library]
+        var cached = libraryBindings(library);
+        bindings = cached.isDefined() ? cached.get().bindings() : null;
+      } catch (InterruptedException ex) {
+        // proceed
       }
       if (bindings != null) {
         var ir = bindings.findForModule(module.getName());
@@ -817,35 +892,35 @@ final class TruffleCompilerContext implements CompilerContext {
     }
   }
 
-  scala.Option<ImportExportCache.CachedBindings> deserializeLibraryBindings(LibraryName libraryName)
-      throws InterruptedException {
+  private BindingsRead readLibraryBindings(LibraryName libraryName) throws InterruptedException {
     if (libraryName.equals(compileTarget)) {
       // Note [Compile Target Skips Its Bindings Cache]
       logSerializationManager(
           Level.FINE, "Not using the bindings cache of [{0}], the compile target.", libraryName);
-      return scala.Option.empty();
+      return new BindingsRead(scala.Option.empty(), false);
     }
     var pool = serializationPool;
     if (pool.isWaitingForSerialization(toQualifiedName(libraryName))) {
       pool.abort(toQualifiedName(libraryName));
-      return scala.Option.empty();
+      return new BindingsRead(scala.Option.empty(), false);
     } else {
       pool.waitWhileSerializing(toQualifiedName(libraryName));
       var cache = ImportExportCache.create(libraryName);
       var loaded = loadCache(cache);
       if (loaded.isPresent()) {
         logSerializationManager(Level.FINE, "Restored bindings for library [{0}].", libraryName);
-        return scala.Option.apply(loaded.get());
+        return new BindingsRead(scala.Option.apply(loaded.get()), true);
       } else {
         logSerializationManager(
             Level.FINEST, "Unable to load bindings for library [{0}].", libraryName);
-        return scala.Option.empty();
+        return new BindingsRead(scala.Option.empty(), true);
       }
     }
   }
 
   @Override
   public void shutdown(boolean waitForPendingJobCompletion) {
+    clearLibraryBindings();
     try {
       serializationPool.shutdown(waitForPendingJobCompletion);
     } catch (InterruptedException ex) {
