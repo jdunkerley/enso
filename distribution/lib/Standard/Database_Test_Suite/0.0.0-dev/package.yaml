@@ -8,5 +8,5 @@ authors:
 maintainers:
   - name: Enso Team
     email: contact@enso.org
-public-types: [Backend, Known_Issue, Suite_Part]
+public-types: [Backend, Known_Issue, Pending, Suite_Part, Test_Setup]
 catalogue: false

@@ -1,0 +1,80 @@
+from Standard.Base import all
+
+from Standard.Database import all
+
+from Standard.Test import all
+
+import Standard.Base.Runtime.Ref.Ref
+import Standard.DuckDB.DuckDB.DuckDB
+
+import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
+import Standard.Database_Test_Suite
+import Standard.Database_Test_Suite.Internal.Setups
+from Standard.Database_Test_Suite import Backend, Pending, Suite_Part
+
+## DuckDB with `extra_pending` entries; only the groups the filter names run.
+backend extra_pending =
+    Backend.Value "Extra" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False parts=[Suite_Part.Common] extra_pending=extra_pending
+
+## Registers the suite for `backend`, runs the groups matching `filter`, and
+   returns what was printed and whether every test passed.
+run_filtered backend filter =
+    lines = Ref.new []
+    suite = Test.build suite_builder->
+        Database_Test_Suite.add_specs suite_builder backend
+    passed = suite.run_with_filter filter should_exit=False output=(line-> lines.modify (_ + [line]))
+    [lines.get.join '\n', passed]
+
+## A dialect written before most `Dialect_Flag`s existed: its `flagged` answers
+   one flag and has no default branch.
+type Old_Dialect
+    Value
+
+    flagged self flag:Dialect_Flag -> Boolean = case flag of
+        Dialect_Flag.Supports_Infinity -> True
+
+spec_name = "should allow to materialize tables and columns into local memory"
+
+add_specs suite_builder =
+    suite_builder.group "[DuckDB] extra_pending" group_builder->
+        group_builder.specify "makes a named spec pending, with its reason and url" <|
+            entry = Pending.Value "Basic Table Access" reason="A bug in this backend" url="https://example.com/issues/1" spec=spec_name
+            result = run_filtered (backend [entry]) "Basic Table Access"
+            result.at 0 . contains "[PENDING] "+spec_name . should_be_true
+            result.at 0 . contains "A bug in this backend (https://example.com/issues/1)." . should_be_true
+            result.at 1 . should_be_true
+
+        group_builder.specify "makes a whole group pending, with or without the backend's prefix" <|
+            ["Basic Table Access", "[Extra] Basic Table Access"].each name->
+                entry = Pending.Value name reason="Group reason"
+                result = run_filtered (backend [entry]) "Basic Table Access"
+                result.at 0 . contains "[PENDING] [Extra] Basic Table Access" . should_be_true
+                result.at 0 . contains "Group reason" . should_be_true
+                result.at 1 . should_be_true
+
+        group_builder.specify "leaves other specs and groups alone" <|
+            entry = Pending.Value "Basic Table Access" reason="r" spec="no such spec"
+            result = run_filtered (backend [entry]) "Basic Table Access"
+            result.at 0 . contains "[PENDING] "+spec_name . should_be_false
+
+        group_builder.specify "fails the run for an entry that matches nothing" <|
+            typo = Pending.Value "Basic Table Acess" reason="r"
+            result = run_filtered (backend [typo]) "extra_pending|Basic Table Access"
+            result.at 0 . contains 'extra_pending names group "Basic Table Acess"' . should_be_true
+            result.at 1 . should_be_false
+
+        group_builder.specify "fails the run for a spec entry whose spec does not exist" <|
+            typo = Pending.Value "Basic Table Access" reason="r" spec="should allow to materialise"
+            result = run_filtered (backend [typo]) "extra_pending|Basic Table Access"
+            result.at 0 . contains 'extra_pending names spec "should allow to materialise"' . should_be_true
+            result.at 1 . should_be_false
+
+        group_builder.specify "takes a flag a dialect has no branch for as False" <|
+            dialect = Old_Dialect.Value
+            Setups.flag_answer dialect ..Supports_Infinity . should_be_true
+            Setups.flag_answer dialect ..Supports_Separate_NaN . should_be_false
+
+        group_builder.specify "adds no group when every entry matched" <|
+            entry = Pending.Value "Basic Table Access" reason="r"
+            result = run_filtered (backend [entry]) "extra_pending|Basic Table Access"
+            result.at 0 . contains "extra_pending entries" . should_be_false

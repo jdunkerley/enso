@@ -1,6 +1,7 @@
 from Standard.Base import all
 
 import project.Known_Issue.Known_Issue
+import project.Pending.Pending
 import project.Suite_Part.Suite_Part
 
 ## The backend the suite runs against: the only thing a backend's test project
@@ -22,17 +23,27 @@ type Backend
        - `parts`: The parts of the suite to run.
        - `is_integer_type`: Whether the backend treats a `Value_Type` as an
          integer type.
-    Value name:Text connect temporary_tables:Boolean=True persistent_connections:Boolean=True known_failures:Vector=[] run_advanced_edge_cases:Boolean=True parts:Vector=Suite_Part.all is_integer_type=(.is_integer)
+       - `extra_pending`: Groups and specs of the suite that are pending for
+         this backend for a reason of its own, as `Pending`s. This is the open
+         list: a backend outside this repository uses it where one inside adds
+         a `Known_Issue`. An entry that matches no group or spec fails a
+         test, so a misspelt name is not silently ignored.
+    Value name:Text connect temporary_tables:Boolean=True persistent_connections:Boolean=True known_failures:Vector=[] run_advanced_edge_cases:Boolean=True parts:Vector=Suite_Part.all is_integer_type=(.is_integer) extra_pending:Vector=[]
 
     ## The in-memory table: the reference backend, which `Table_Tests` runs.
     In_Memory
 
     ## The text the backend's test groups start with.
     prefix self -> Text = case self of
-        Backend.Value name _ _ _ _ _ _ _ -> "[" + name + "] "
+        Backend.Value name _ _ _ _ _ _ _ _ -> "[" + name + "] "
         Backend.In_Memory -> "[In-Memory] "
 
     ## Whether the backend lists `issue` among its known failures.
     has_known_issue self issue:Known_Issue -> Boolean = case self of
-        Backend.Value _ _ _ _ known_failures _ _ _ -> known_failures.contains issue
+        Backend.Value _ _ _ _ known_failures _ _ _ _ -> known_failures.contains issue
         Backend.In_Memory -> False
+
+    ## The backend's `Pending` groups and specs (none for the in-memory table).
+    pending_entries self -> Vector Pending = case self of
+        Backend.Value _ _ _ _ _ _ _ _ extra_pending -> extra_pending
+        Backend.In_Memory -> []

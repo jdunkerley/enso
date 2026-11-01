@@ -487,8 +487,3 @@ add_specs suite_builder prefix create_connection_func setup =
                 Test.with_clue "transpose test will have to be amended once it is implemented: " <|
                     db_table.transpose attribute_column_name=name_a . should_fail_with Unsupported_Database_Operation
                     db_table.transpose value_column_name=name_a . should_fail_with Unsupported_Database_Operation
-
-main filter=Nothing =
-    suite = Test.build suite_builder->
-        add_specs suite_builder "[SQLite]" (_-> Database.connect (SQLite.In_Memory))
-    suite.run_with_filter filter

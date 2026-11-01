@@ -5,7 +5,9 @@ import project.Common_Table_Operations.Main.Test_Setup
 import project.Internal.Setups
 
 export project.Backend.Backend
+export project.Common_Table_Operations.Main.Test_Setup
 export project.Known_Issue.Known_Issue
+export project.Pending.Pending
 export project.Suite_Part.Suite_Part
 
 ## Adds the parts of the suite that `backend` runs to `suite_builder`, and
