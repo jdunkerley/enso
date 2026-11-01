@@ -1,4 +1,6 @@
 import type { Result } from 'enso-common/src/utilities/data/result'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { YjsChannel as Channel, type YjsChannel, type YjsChannelServer } from 'ydoc-channel'
 import * as Ast from 'ydoc-shared/ast'
@@ -11,6 +13,7 @@ import {
   YDOC_CONTROL_CHANNEL,
   type ModuleState,
 } from 'ydoc-shared/ydocControl'
+import type { ExternalId } from 'ydoc-shared/yjsModel'
 import * as Y from 'yjs'
 import { LanguageServerSession, ModulePersistence } from '../languageServerSession'
 import type { JavaByteBufferClass } from '../YjsBinaryChannel'
@@ -117,10 +120,13 @@ describe('LanguageServerSession', () => {
 const MAIN = 'main = 1\n'
 
 /**
- * A Language Server with the modules `src/<name>` (each `MAIN`), that records edits and saves, and
+ * A Language Server with the modules `src/<name>` (each `content`, by default `MAIN`), that records edits and saves, and
  * lets a test hold edits or `file/info` back, or fail an edit or a save.
  */
-function fakeLanguageServerWithModules(names: readonly string[] = ['Main.enso']) {
+function fakeLanguageServerWithModules(
+  names: readonly string[] = ['Main.enso'],
+  content: string = MAIN,
+) {
   const saves: { path: string; currentVersion: string }[] = []
   const edits: { path: string; newVersion: string }[] = []
   const fileInfos: string[] = []
@@ -166,8 +172,8 @@ function fakeLanguageServerWithModules(names: readonly string[] = ['Main.enso'])
               reply({
                 result: {
                   writeCapability: { method: 'text/canEdit', registerOptions: { path } },
-                  content: MAIN,
-                  currentVersion: computeTextChecksum(MAIN),
+                  content,
+                  currentVersion: computeTextChecksum(content),
                 },
               }),
             )
@@ -182,7 +188,7 @@ function fakeLanguageServerWithModules(names: readonly string[] = ['Main.enso'])
                     lastAccessTime: state.modifiedTime,
                     lastModifiedTime: state.modifiedTime,
                     kind: { type: 'File', name: path.segments.at(-1), path },
-                    byteSize: MAIN.length,
+                    byteSize: content.length,
                   },
                 },
               }),
@@ -510,5 +516,38 @@ describe('flush', () => {
     } finally {
       flusher.close()
     }
+  })
+})
+
+/** The new-project template, as the Project Manager copies it into every new project. */
+const TEMPLATE_MAIN = fileURLToPath(
+  new URL('../../../../lib/scala/pkg/src/main/resources/default/src/Main.enso', import.meta.url),
+)
+/** The id the template's idMap gives the welcome node, `Data.read Examples.welcome`. */
+const WELCOME_NODE = 'fcf199e6-d2b1-44b7-be92-a47545d6a593' as ExternalId
+
+describe('the new-project template', () => {
+  let templateSession: LanguageServerSession | undefined
+  afterEach(async () => {
+    await templateSession?.release()
+    templateSession = undefined
+  })
+
+  // The idMap's spans are resolved against the code in the metadata's `snapshot` whenever that
+  // differs from the file's code, so a template whose code changes without a regenerated
+  // snapshot loses the welcome node's id, and with it the open visualization the getting-started
+  // tests wait for (#482).
+  test('opens with the welcome node’s id and its visualization shown', async () => {
+    const template = readFileSync(TEMPLATE_MAIN, 'utf8')
+    const ls = fakeLanguageServerWithModules(['Main.enso'], template)
+    const gui = await openWithGui('ws://new-project-template', ls)
+    templateSession = gui.session
+    const module = new Ast.MutableModule(gui.session.model.modules.get('Main.enso')!)
+    let welcome: Ast.Ast | undefined
+    Ast.visitRecursive(module.root()!, (ast) => {
+      if (ast.externalId === WELCOME_NODE) welcome ??= ast
+    })
+    expect(welcome?.code()).toBe('Data.read Examples.welcome')
+    expect(welcome?.nodeMetadata.get('visualization')?.visible).toBe(true)
   })
 })

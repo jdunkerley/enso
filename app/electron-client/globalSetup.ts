@@ -2,10 +2,9 @@
  * @file Playwright global setup for the packaged-IDE integration tests.
  *
  * Warms the engine's IR cache once, before any spec runs. Every spec launches a fresh Electron
- * process whose Language Server, on first project open, compiles the whole standard-library
- * closure that the new-project template imports (a dozen libraries, several with large polyglot
- * Java / native dependencies). On a cold machine — most of all a Windows CI runner, where
- * real-time antivirus scans every JAR and native library as it is first loaded — that first
+ * process whose Language Server, on first project open, compiles the standard-library
+ * closure that the new-project template imports (Base, Table, Database, Examples and Visualization). On a cold machine — most of all a Windows CI runner,
+ * where real-time antivirus scans every JAR and native library as it is first loaded — that first
  * compile can take minutes, and since each spec starts cold none of them ever amortise it.
  *
  * Running the packaged engine here once with `--run` on a project that imports the same closure
@@ -30,13 +29,6 @@ const TEMPLATE_MAIN = `\
 from Standard.Base import all
 from Standard.Table import all
 from Standard.Database import all
-from Standard.DuckDB import all
-from Standard.AWS import all
-from Standard.Geo import all
-from Standard.Google import all
-from Standard.Microsoft import all
-from Standard.Snowflake import all
-from Standard.Tableau import all
 import Standard.Examples
 import Standard.Visualization
 
