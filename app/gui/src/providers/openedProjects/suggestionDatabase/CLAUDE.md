@@ -5,10 +5,12 @@ component browser, the documentation panel and the widgets.
 
 - `index.ts` — `SuggestionDb` (a `ReactiveDb` with indexes by path, owner, kind
   and constructor field) and `createSuggestionDbStore`, whose `Synchronizer`
-  acquires `search/receivesSuggestionsDatabaseUpdates`, loads
-  `search/getSuggestionsDatabase` and applies every
-  `search/suggestionsDatabaseUpdates` notification in order. The store also
-  loads the component groups and the libraries' declared public types.
+  acquires `search/receivesSuggestionsDatabaseUpdates`, requests
+  `search/getSuggestionsDatabase` as soon as it holds that capability (Note [The
+  Suggestion Database Is Requested At Connect Time]) and applies every
+  `search/suggestionsDatabaseUpdates` notification in order. The store loads the
+  component groups after the first execution, and the libraries' declared public
+  types.
 - `lsUpdate.ts` — `SuggestionUpdateProcessor`: turns the language server's
   entries into `SuggestionEntry` objects and applies `Add`, `Remove` and
   `Modify` updates. A notification is applied as one batch.
