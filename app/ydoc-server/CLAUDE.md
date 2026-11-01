@@ -75,6 +75,14 @@ This server:
   dead channel, so uploads and downloads went unanswered (#396). A
   per-connection channel, like `YjsServerTransport`'s, would not do here: two
   channels on one array would each receive, and answer, the same requests.
+- A file whose id map names fewer ASTs than the module has gets an id-assigning
+  edit on open, which re-executes the project (`execute: true`; `execute: false`
+  would lose the subexpressions' values, since the engine compiled without their
+  ids). The new-project template
+  (`lib/scala/pkg/src/main/resources/default/src/Main.enso`) ships its full id
+  map so a new project gets none: regenerate it with
+  `UPDATE_TEMPLATE_ID_MAP=1 corepack pnpm --filter ydoc-server exec vitest run src/__tests__/languageServerSession.test.ts -t "full id map"`
+  after changing the template's code.
 - The Polyglot variant runs on GraalJS — only a subset of Node APIs is
   available. Check that any new dep works in both `node` and `graaljs` before
   importing.
