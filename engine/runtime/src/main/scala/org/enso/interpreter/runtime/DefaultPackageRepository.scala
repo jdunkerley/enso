@@ -10,7 +10,6 @@ import com.typesafe.scalalogging.Logger
 import org.apache.commons.lang3.StringUtils
 import org.enso.common.MethodNames
 import org.enso.editions.LibraryVersion
-import org.enso.interpreter.caches.ImportExportCache
 import org.enso.interpreter.runtime.util.TruffleFileSystem
 import org.enso.librarymanager.published.repository.LibraryManifest
 import org.enso.librarymanager.resolved.LibraryRoot
@@ -118,12 +117,9 @@ private class DefaultPackageRepository(
     collection.mutable.LinkedHashMap(builtinsName -> ComponentGroups.empty)
   }
 
-  /** The mapping between the library and its cached bindings, if already loaded. */
-  private val loadedLibraryBindings: collection.mutable.Map[
-    LibraryName,
-    Option[ImportExportCache.CachedBindings]
-  ] =
-    collection.mutable.LinkedHashMap()
+  /** The libraries whose dependencies `getLibraryBindings` has loaded. */
+  private val dependenciesLoaded: collection.mutable.Set[LibraryName] =
+    collection.mutable.Set()
 
   private def getComponentModules: ListSet[CompilerContext.Module] = {
     val modules = for {
@@ -685,17 +681,15 @@ private class DefaultPackageRepository(
     context: CompilerContext
   ): Option[IRModule] = {
     val cache = ensurePackageIsLoaded(libraryName).toOption.flatMap { _ =>
-      if (!loadedLibraryBindings.contains(libraryName)) {
+      if (dependenciesLoaded.add(libraryName)) {
         loadedPackages.get(libraryName).flatten.foreach(loadDependencies(_))
-        val cachedBindingOption =
-          context
-            .asInstanceOf[TruffleCompilerContext]
-            .deserializeLibraryBindings(libraryName)
-        loadedLibraryBindings.addOne((libraryName, cachedBindingOption))
       }
-      loadedLibraryBindings.get(libraryName)
+      // Note [One Bindings Cache Read Per Library] in TruffleCompilerContext.
+      context
+        .asInstanceOf[TruffleCompilerContext]
+        .libraryBindings(libraryName)
     }
-    cache.flatMap(_.map(_.bindings.findForModule(moduleName)))
+    cache.map(_.bindings.findForModule(moduleName))
   }
 
   private def loadDependencies(pkg: Package[TruffleFile]): Unit = {
@@ -719,7 +713,12 @@ private class DefaultPackageRepository(
     loadedPackages.clear()
     loadedModules.clear()
     loadedComponents.clear()
-    loadedLibraryBindings.clear()
+    dependenciesLoaded.clear()
+    // Note [One Bindings Cache Read Per Library] in TruffleCompilerContext.
+    context.getCompiler.context match {
+      case truffle: TruffleCompilerContext => truffle.clearLibraryBindings()
+      case _                               =>
+    }
   }
 }
 
