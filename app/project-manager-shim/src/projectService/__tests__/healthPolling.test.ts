@@ -46,15 +46,33 @@ process.stdin.on('end', stop)
  * `NoYdoc` never listens on it.
  */
 const FAKE_ENSO_LATE_YDOC = `
+import * as fs from 'node:fs'
 import * as http from 'node:http'
 import * as net from 'node:net'
 import * as path from 'node:path'
 const args = process.argv.slice(2)
 const value = (flag) => args[args.indexOf(flag) + 1]
+const project = value('--path')
+const name = path.basename(project)
 const port = Number(value('--rpc-port'))
-http.createServer((_request, response) => response.end('ok')).listen(port, '127.0.0.1')
-if (path.basename(value('--path')) !== 'NoYdoc')
-  setTimeout(() => net.createServer().listen(Number(process.env.LANGUAGE_SERVER_YDOC_PORT), '127.0.0.1'), 400)
+const started = Date.now()
+// SlowHealth answers 503 for its first second, so that health passes near a short startup timeout.
+const healthyAfter = name === 'SlowHealth' ? 1000 : 0
+http
+  .createServer((_request, response) => {
+    response.statusCode = Date.now() - started < healthyAfter ? 503 : 200
+    response.end('ok')
+  })
+  .listen(port, '127.0.0.1')
+// NoYdoc and SlowHealth never listen on the ydoc port. Otherwise the time at which it does is
+// written down, so that a test can compare it with the moment the open resolved.
+if (name !== 'NoYdoc' && name !== 'SlowHealth')
+  setTimeout(() => {
+    const server = net.createServer()
+    server.listen(Number(process.env.LANGUAGE_SERVER_YDOC_PORT), '127.0.0.1', () =>
+      fs.writeFileSync(project + '.listening', String(Date.now())),
+    )
+  }, 400)
 const stop = () => process.exit(0)
 process.stdin.on('data', stop)
 process.stdin.on('end', stop)
@@ -107,34 +125,58 @@ function accepts(port: number): Promise<boolean> {
   })
 }
 
-test('answers an open only once the ydoc port accepts connections', async () => {
-  const lateRunner = new EnsoRunner(await fakeEnso(root, FAKE_ENSO_LATE_YDOC), {
+/** A runner on the late-ydoc fake. */
+async function lateYdocRunner(options: {
+  startupTimeoutMs: number
+  ydocWaitMs: number
+}): Promise<EnsoRunner> {
+  return new EnsoRunner(await fakeEnso(root, FAKE_ENSO_LATE_YDOC), {
     firstPort: HEALTH_POLLING_PORT,
-    startupTimeoutMs: 30_000,
-    ydocWaitMs: 10_000,
+    ...options,
   })
+}
+
+test('answers an open only once the ydoc port accepts connections', async () => {
+  const lateRunner = await lateYdocRunner({ startupTimeoutMs: 30_000, ydocWaitMs: 10_000 })
   const project = Path(path.join(root, 'Project'))
   try {
     const sockets = await lateRunner.openProject(project, 'id')
-    // A GUI that connects now is not refused: on Windows a refused loopback connect is retried
-    // only after 500 ms, which was the whole gap between `project/open` and the ydoc socket.
+    const resolvedAt = Date.now()
+    // The fake writes down the moment its ydoc port started listening (400 ms after it is
+    // healthy): an open that did not wait would have resolved before it.
+    const listeningAt = Number(await fs.readFile(`${project}.listening`, 'utf8'))
+    expect(resolvedAt).toBeGreaterThanOrEqual(listeningAt)
+    // A GUI that connects now is not refused: a refused loopback connect is what made the gap
+    // between `project/open` and the ydoc socket ~525 ms on Windows.
     expect(await accepts(sockets.ydocSocket.port)).toBe(true)
   } finally {
     await lateRunner.closeProject(project).catch(() => undefined)
   }
 }, 30_000)
 
-test('stops waiting for a ydoc port that never listens', async () => {
-  const lateRunner = new EnsoRunner(await fakeEnso(root, FAKE_ENSO_LATE_YDOC), {
-    firstPort: HEALTH_POLLING_PORT,
-    startupTimeoutMs: 30_000,
-    ydocWaitMs: 500,
-  })
+test('gives up waiting for a ydoc port that never listens, after ydocWaitMs', async () => {
+  const lateRunner = await lateYdocRunner({ startupTimeoutMs: 30_000, ydocWaitMs: 600 })
   const project = Path(path.join(root, 'NoYdoc'))
   try {
     const started = Date.now()
-    await expect(lateRunner.openProject(project, 'id')).resolves.toBeDefined()
-    expect(Date.now() - started).toBeLessThan(10_000)
+    const sockets = await lateRunner.openProject(project, 'id')
+    // The wait ran (it alone takes 600 ms after the health check) and then ended.
+    expect(Date.now() - started).toBeGreaterThanOrEqual(600)
+    expect(await accepts(sockets.ydocSocket.port)).toBe(false)
+  } finally {
+    await lateRunner.closeProject(project).catch(() => undefined)
+  }
+}, 30_000)
+
+test('the startup timeout does not kill an engine that is healthy and waited for', async () => {
+  // Healthy after ~1 s, startup timeout at 1.7 s, and a ydoc wait of 2.5 s that never ends early:
+  // the timeout falls inside the wait.
+  const lateRunner = await lateYdocRunner({ startupTimeoutMs: 1700, ydocWaitMs: 2500 })
+  const project = Path(path.join(root, 'SlowHealth'))
+  try {
+    const sockets = await lateRunner.openProject(project, 'id')
+    const health = await fetch(`http://127.0.0.1:${sockets.jsonSocket.port}/_health`)
+    expect(health.ok).toBe(true)
   } finally {
     await lateRunner.closeProject(project).catch(() => undefined)
   }

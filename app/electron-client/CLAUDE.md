@@ -788,9 +788,10 @@ of ours above 2 ms self time, so no work and no timer in the GUI. A hook on
 TCP probe of the ydoc port from the harness was refused when `project/open` was
 answered and accepted ~300 ms later. The engine's ydoc server (GraalJS) listens
 after the Language Server passes `/_health`, which is when the shim answered;
-Windows retries a refused loopback connect only after 500 ms, Linux at once. The
-fix is in the shim, which now also waits for the ydoc port to accept before
-answering (Note [Open Waits For The Ydoc Port] in
+that is consistent with Windows retrying a refused loopback connect after ~500
+ms (inferred from the constant 510 to 525 ms gap, not observed; Linux fails at
+once). The fix is in the shim, which now also waits for the ydoc port to accept
+before answering (Note [Open Waits For The Ydoc Port] in
 `project-manager-shim/src/projectService/ensoRunner.ts`): the gap is ~27 ms on
 Windows, `guiConnected` 769 to 588 ms. `openAnswered` moves later by the wait,
 so read `guiConnected`, not the gap, to judge the open. To trace a gap like this

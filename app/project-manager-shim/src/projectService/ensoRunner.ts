@@ -35,15 +35,19 @@ export function loadHealthcheckDelay(elapsedMs: number): number {
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  * The ydoc server runs inside the engine and starts listening some 300 ms after the Language
  * Server passes its health check, which is when `project/open` used to be answered. The GUI
- * connects to the ydoc port as soon as it has the answer, and was refused. On Linux a refused
- * connect fails at once and is retried at once; on Windows the TCP stack retries a refused loopback
- * connect only after 500 ms, so the ydoc socket opened ~525 ms after the answer (Linux ~35 ms), and
- * the renderer sat idle all that time (a profile shows ~80% `(idle)` and nothing waiting in the
- * GUI's code). So the open also waits until the ydoc port accepts a connection, polling it as
- * the health check is. It is bounded: an engine without a ydoc server (a fake one in a test)
- * only delays the answer by `ydocWaitMs`.
+ * connects to the ydoc port as soon as it has the answer. Measured: the port was refused at the
+ * answer and accepted about 300 ms later, the ydoc socket opened ~525 ms after the answer on
+ * Windows (Linux ~35 ms), and the renderer sat idle all that time (a profile shows ~80% `(idle)`
+ * and nothing waiting in the GUI's code). That is consistent with Windows retrying a refused
+ * loopback connect after ~500 ms (inferred from the constant 510-525 ms gap, not observed). So the
+ * open also waits until the ydoc port accepts a connection, polling it as the health check is. It
+ * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
+ * delays the answer by that), and the startup timeout does not apply once the health check has
+ * passed, so the wait can never get a healthy engine killed.
  */
 const YDOC_POLL_INTERVAL = 10
+/** How long one connection attempt to the ydoc port may take. */
+const YDOC_CONNECT_TIMEOUT_MS = 250
 
 /** The default for how long an open waits for the engine's ydoc port to accept connections. */
 export const DEFAULT_YDOC_WAIT_MS = 5000
@@ -52,9 +56,14 @@ export const DEFAULT_YDOC_WAIT_MS = 5000
 function acceptsConnections(socket: Socket): Promise<boolean> {
   return new Promise((resolve) => {
     const connection = net.connect(socket.port, socket.host)
+    connection.setTimeout(YDOC_CONNECT_TIMEOUT_MS)
     connection.once('connect', () => {
       connection.destroy()
       resolve(true)
+    })
+    connection.once('timeout', () => {
+      connection.destroy()
+      resolve(false)
     })
     connection.once('error', () => resolve(false))
   })
@@ -328,6 +337,7 @@ class OpenedProject {
     // respawn doesn't kill the new child or reject the new deferred.
     const handle = this.watcher.current
     let resolved = false
+    let passedHealth = false
     const startedAt = Date.now()
 
     // Over once this attempt has an answer, or its engine is gone: a health check of the port after
@@ -338,6 +348,9 @@ class OpenedProject {
       const healthy = await this.checkServerHealth()
       if (over()) return
       if (healthy) {
+        // The engine has started: the startup timeout below no longer applies, and must not kill
+        // it while the (bounded) wait for its ydoc port runs.
+        passedHealth = true
         await this.waitForYdocPort(over)
         if (over()) return
         resolved = true
@@ -356,7 +369,7 @@ class OpenedProject {
     const isDebugMode = javaToolOptions?.includes('jdwp')
     if (!isDebugMode) {
       setTimeout(() => {
-        if (resolved || this.closed) return
+        if (resolved || passedHealth || this.closed) return
         resolved = true
         // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
         // whether to respawn: not while the project is still opening, by default after.
