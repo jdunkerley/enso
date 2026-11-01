@@ -15,6 +15,7 @@ import { EngineLogHub } from '../engineLogs/hub.js'
 import type { ProjectLifecycleListener } from '../localMetadata/index.js'
 import { withinVersioningTimeout, type LocalVersioning } from '../localVersioning/index.js'
 import {
+  DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
   type LanguageServerSockets,
@@ -113,7 +114,7 @@ export class ProjectService {
     if (!ensoPath) {
       throw new Error(`${PRODUCT_NAME} executable not found`)
     }
-    const runner = new EnsoRunner(ensoPath)
+    const runner = new EnsoRunner(ensoPath, { ydocWaitMs: DEFAULT_YDOC_WAIT_MS })
 
     // Read extra arguments from environment variable
     const envArgs = process.env.ENSO_ENGINE_ARGS

@@ -776,3 +776,25 @@ copies the options of `Main.launchJvm`; a unit test fails when they drift.
 the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
 unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
 runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).
+
+**The connect gap (`openAnswered` to `guiConnected`) was a refused connect.** On
+Windows it was ~525 ms against ~25 ms on Linux (medians of 5 launches, native
+release build, develop at `b0bb59fee2`). A renderer profile of the window
+(`first.cpuprofile`, three launches) showed the renderer ~80% `(idle)` (404 to
+422 ms of ~525) and the rest almost all `(program)` (92 to 101 ms): no function
+of ours above 2 ms self time, so no work and no timer in the GUI. A hook on
+`WebSocket` in the page showed the GUI calling `new WebSocket` for
+`/project/index` 15 ms after the answer, and the socket opening 510 ms later; a
+TCP probe of the ydoc port from the harness was refused when `project/open` was
+answered and accepted ~300 ms later. The engine's ydoc server (GraalJS) listens
+after the Language Server passes `/_health`, which is when the shim answered;
+that is consistent with Windows retrying a refused loopback connect after ~500
+ms (inferred from the constant 510 to 525 ms gap, not observed; Linux fails at
+once). The fix is in the shim, which now also waits for the ydoc port to accept
+before answering (Note [Open Waits For The Ydoc Port] in
+`project-manager-shim/src/projectService/ensoRunner.ts`): the gap is ~27 ms on
+Windows, `guiConnected` 769 to 588 ms. `openAnswered` moves later by the wait,
+so read `guiConnected`, not the gap, to judge the open. To trace a gap like this
+again: hook `WebSocket`, `fetch` and `setTimeout` in the page with
+`page.evaluate`, and log every `response` (the harness records only the project
+service's).

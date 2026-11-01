@@ -75,6 +75,16 @@ before the engine has failed to bind. The start-up checks run every 25 ms for
 the first second and every 250 ms after (Note [Start-up Health Polling] in
 `ensoRunner.ts`).
 
+`project/open` is also answered only once the engine's ydoc port accepts a
+connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
+`ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
+listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
+refused (measured). That is consistent with Windows retrying a refused loopback
+connect after ~500 ms (inferred from the constant 510 to 525 ms gap). The wait
+is bounded, the startup timeout stops applying once `/_health` has passed, and
+`EnsoRunner` defaults to none, because the fake engines of the tests have no
+ydoc server (`healthPolling.test.ts` has the one that does).
+
 ## Child processes
 
 Always attach an `'error'` listener to a child's stdin (`EnsoRunner` does at
