@@ -71,7 +71,9 @@ exits while starting with a bind failure on stderr (`Address already in use`,
 `BindException`, `EADDRINUSE`) makes the open probe again and start another
 engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
 (#336). Not covered: another program that answers `/_health` with a success
-before the engine has failed to bind.
+before the engine has failed to bind. The start-up checks run every 25 ms for
+the first second and every 250 ms after (Note [Start-up Health Polling] in
+`ensoRunner.ts`).
 
 ## Child processes
 
