@@ -37,6 +37,7 @@ import {
   newVisRequestId,
   type VisRequestId,
   type VisRequestPreprocessor,
+  type VisSlotStatus,
   type VisualizationId,
   type VisualizationSlotSpec,
 } from 'ydoc-shared/visualizations'
@@ -85,6 +86,46 @@ export function visualizationConfigPreprocessorEqual(
             typeof b.expression === 'object' &&
             methodPointerEquals(a.expression, b.expression)))))
   )
+}
+
+/* Note [Widget Queries After Visible Visualizations]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The engine runs each attached visualization as its own job, and a widget query that loads
+ * libraries (the `format` dropdown's `File_Format.all` loads Image and SQLite, ~0.7 s cold) holds
+ * the compilation lock ahead of the welcome table's visualization. So the visualizations attached
+ * for widgets (`background`) wait until every visible one this context attached has answered or
+ * failed, or `BACKGROUND_RELEASE_AFTER_EXECUTION_MS` after the first execution ended, whichever
+ * comes first. After that they are attached as soon as they are configured: the hold is once per
+ * context, at open.
+ */
+
+/** How long after the first execution held widget queries are attached regardless. */
+export const BACKGROUND_RELEASE_AFTER_EXECUTION_MS = 1000
+
+/** The configurations to attach, visible ones first; widget queries only once released. */
+export function visualizationsToAttach<K>(
+  configs: ReadonlyMap<K, NodeVisualizationConfiguration>,
+  background: ReadonlySet<K>,
+  backgroundReleased: boolean,
+): [K, NodeVisualizationConfiguration][] {
+  const all = [...configs]
+  const foreground = all.filter(([id]) => !background.has(id))
+  return backgroundReleased ?
+      [...foreground, ...all.filter(([id]) => background.has(id))]
+    : foreground
+}
+
+/** Whether at least one visible visualization is attached and none of them is still pending. */
+export function foregroundSettled(
+  slots: Iterable<VisRequestId>,
+  statusOf: (requestId: VisRequestId) => VisSlotStatus | undefined,
+): boolean {
+  let any = false
+  for (const requestId of slots) {
+    any = true
+    if (statusOf(requestId) === 'pending') return false
+  }
+  return any
 }
 
 type ExecutionContextState =
@@ -151,6 +192,14 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
   private visualizations: Visualizations | null = null
   private unobserveVisDoc: (() => void) | null = null
 
+  /** Visualizations attached for widgets: see Note [Widget Queries After Visible Visualizations]. */
+  private backgroundVisualizations = new Set<Uuid>()
+  private backgroundReleased = false
+  private releaseTimer: ReturnType<typeof setTimeout> | undefined
+  /** The slots of the attached visible visualizations. */
+  private foregroundSlots = new Set<VisRequestId>()
+  private unobserveSlots: (() => void) | null = null
+
   /** TODO: Add docs */
   constructor(
     private lsRpc: LanguageServer,
@@ -171,6 +220,8 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
   private subscribeToVisualizationsDoc(projectModel: DistributedProject) {
     this.unobserveVisDoc = projectModel.observeVisualizationsDoc((doc) => {
       if (!doc) {
+        this.unobserveSlots?.()
+        this.unobserveSlots = null
         this.visualizations = null
         return
       }
@@ -182,6 +233,11 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
       // open a dedicated WebSocket for the subdoc.
       doc.load()
       this.visualizations = new Visualizations(doc)
+      const vis = this.visualizations
+      const onSlots = () => this.releaseBackgroundIfSettled()
+      this.unobserveSlots?.()
+      vis.slots.observeDeep(onSlots)
+      this.unobserveSlots = () => vis.slots.unobserveDeep(onSlots)
       this.sync()
     })
   }
@@ -191,10 +247,16 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
       if (event.contextId == this.id) this.emit('expressionUpdates', [event.updates])
     })
     this.abort.handleObserve(this.lsRpc, 'executionContext/executionFailed', (event) => {
-      if (event.contextId == this.id) this.emit('executionFailed', [event.message])
+      if (event.contextId == this.id) {
+        this.startReleaseTimer()
+        this.emit('executionFailed', [event.message])
+      }
     })
     this.abort.handleObserve(this.lsRpc, 'executionContext/executionComplete', (event) => {
-      if (event.contextId == this.id) this.emit('executionComplete', [])
+      if (event.contextId == this.id) {
+        this.startReleaseTimer()
+        this.emit('executionComplete', [])
+      }
     })
     this.abort.handleObserve(this.lsRpc, 'executionContext/executionStatus', (event) => {
       if (event.contextId == this.id) this.emit('executionStatus', [event.diagnostics])
@@ -218,6 +280,28 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
         this.clearScheduled = true
       }
     })
+  }
+
+  private startReleaseTimer() {
+    if (this.backgroundReleased || this.releaseTimer != null) return
+    this.releaseTimer = setTimeout(
+      () => this.releaseBackground(),
+      BACKGROUND_RELEASE_AFTER_EXECUTION_MS,
+    )
+  }
+
+  private releaseBackgroundIfSettled() {
+    const vis = this.visualizations
+    if (this.backgroundReleased || !vis) return
+    if (foregroundSettled(this.foregroundSlots, (rid) => vis.getSlot(rid)?.status))
+      this.releaseBackground()
+  }
+
+  private releaseBackground() {
+    if (this.backgroundReleased) return
+    this.backgroundReleased = true
+    clearTimeout(this.releaseTimer)
+    if (this.backgroundVisualizations.size > 0) this.sync()
   }
 
   private pushItem(item: StackItem) {
@@ -258,8 +342,17 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
     this.sync()
   }
 
-  /** TODO: Add docs */
-  setVisualization(id: Uuid, configuration: Opt<NodeVisualizationConfiguration>) {
+  /**
+   * Set (or, with a null configuration, remove) the visualization `id`. A `background` one (a widget
+   * query) is held back at open: see Note [Widget Queries After Visible Visualizations].
+   */
+  setVisualization(
+    id: Uuid,
+    configuration: Opt<NodeVisualizationConfiguration>,
+    options: { background?: boolean } = {},
+  ) {
+    if (configuration != null && options.background) this.backgroundVisualizations.add(id)
+    else this.backgroundVisualizations.delete(id)
     if (configuration == null) {
       this.visualizationConfigs.delete(id)
     } else {
@@ -316,6 +409,9 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
   dispose() {
     this.unobserveVisDoc?.()
     this.unobserveVisDoc = null
+    clearTimeout(this.releaseTimer)
+    this.unobserveSlots?.()
+    this.unobserveSlots = null
     this.queue.pushTask(async (state) => {
       // Detach any still-live visualization slots this context owned. The
       // server would otherwise hold the runtime attachments until it notices
@@ -337,6 +433,7 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
       if (!this.lsRpc.isDisposed) {
         this.lsRpc.release()
       }
+      this.foregroundSlots.clear()
       return { status: 'not-created' }
     })
   }
@@ -460,13 +557,17 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
           }
           const requestId = newVisRequestId()
           vis.createSlot(spec, requestId)
+          if (!this.backgroundVisualizations.has(visId)) this.foregroundSlots.add(requestId)
           state.visualizationSlotByVisId.set(visId, requestId)
           state.visualizations.set(visId, config)
         }
 
         const detach = (visId: Uuid) => {
           const requestId = state.visualizationSlotByVisId.get(visId)
-          if (requestId != null) vis.removeSlot(requestId)
+          if (requestId != null) {
+            this.foregroundSlots.delete(requestId)
+            vis.removeSlot(requestId)
+          }
           state.visualizationSlotByVisId.delete(visId)
           state.visualizations.delete(visId)
         }
@@ -474,7 +575,11 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
         // Attach new and update existing visualizations. Modify is always a
         // detach+attach: every change gets a new slot with a new request id so
         // the response is unambiguously paired with its preprocessor.
-        for (const [id, config] of this.visualizationConfigs) {
+        for (const [id, config] of visualizationsToAttach(
+          this.visualizationConfigs,
+          this.backgroundVisualizations,
+          this.backgroundReleased,
+        )) {
           const previousConfig = state.visualizations.get(id)
           if (previousConfig == null) {
             attach(id, config)
@@ -502,6 +607,7 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
           error.payload.cause.code === ErrorCode.CONTEXT_NOT_FOUND
         ) {
           this.sync()
+          this.foregroundSlots.clear()
           return { status: 'not-created' }
         } else {
           return newState

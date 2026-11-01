@@ -14,6 +14,11 @@ caches and visualizations.
 - Not every command needs a job: `StartBackgroundProcessingCmd` calls
   `JobControlPlane.startBackgroundJobs()` directly. Before adding a `Job`
   subclass, check something will actually submit it.
+- A visualisation is never evaluated beside a running execution of its context.
+  It is evaluated alone (with the context write lock and the compilation read
+  lock) when no execution or compile runs. Otherwise the execution evaluates it
+  before releasing its locks (Note [Visualisations Evaluated Alone Or By Their
+  Execution]).
 
 ## Testing
 

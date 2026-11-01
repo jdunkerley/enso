@@ -176,8 +176,13 @@ export function createProjectStore(
     diagnostics.value = newDiagnostics
   })
 
+  /**
+   * The data of a visualization of `configuration`. Pass `background` for a widget query: see Note
+   * [Widget Queries After Visible Visualizations] in `executionContext.ts`.
+   */
   function useVisualizationData(
     configuration: WatchSource<Opt<NodeVisualizationConfiguration>>,
+    options: { background?: boolean } = {},
   ): Ref<Result<unknown> | null> {
     const visId = ref<Uuid>()
 
@@ -194,7 +199,7 @@ export function createProjectStore(
         }
 
         const id = visId.value!
-        executionContext.setVisualization(id, config)
+        executionContext.setVisualization(id, config, options)
         onCleanup(() => executionContext.setVisualization(id, null))
       },
       // Make sure to flush this watch in 'post', otherwise it might cause operations on stale

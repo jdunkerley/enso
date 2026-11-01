@@ -181,7 +181,9 @@ export function useWidgetFunctionCallInfo(
 
   // TODO[ao]: This does not work with project change. Either useVisualizationData API must
   //  change, or useCurrentRef should not return ref.
-  const visualizationData = toValue(project).useVisualizationData(visualizationConfig)
+  const visualizationData = toValue(project).useVisualizationData(visualizationConfig, {
+    background: true,
+  })
 
   const widgetConfiguration = computed(() => {
     const data = visualizationData.value

@@ -23,7 +23,7 @@ export function useTableColumns(options: TableColumnsOptions) {
 
   const visConfig = useColumnNamesVisConfig({ project, projectNames, expressionId })
 
-  const data = project.useVisualizationData(visConfig)
+  const data = project.useVisualizationData(visConfig, { background: true })
   return computed((): string[] | undefined =>
     unwrapOr(andThen(data.value, parseColumnNames), undefined),
   )

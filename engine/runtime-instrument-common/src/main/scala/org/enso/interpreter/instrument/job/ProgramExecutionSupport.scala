@@ -282,6 +282,21 @@ object ProgramExecutionSupport {
     }
   }
 
+  /** Evaluates, from the cache of the context's top frame, the visualisations deferred while the
+    * current execution ran. Called by `ExecuteJob` before it releases its locks: see Note
+    * [Visualisations Evaluated Alone Or By Their Execution] in `UpsertVisualizationJob`.
+    */
+  final def processPendingVisualizations(
+    contextId: Api.ContextId
+  )(implicit ctx: RuntimeContext): Unit =
+    ctx.contextManager.getStack(contextId).headOption.foreach { frame =>
+      processAllUnevaluatedVisualizations(
+        contextId,
+        frame.cache,
+        frame.syncState
+      )
+    }
+
   /** Runs the program.
     *
     * @param contextId an identifier of an execution context
