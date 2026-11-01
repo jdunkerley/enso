@@ -3,7 +3,6 @@ import Standard.Base.Enso_Cloud.Data_Link.Data_Link
 import Standard.Base.Errors.File_Error.File_Error
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
-import Standard.Base.Runtime.Ref.Ref
 import Standard.Base.System.File.Data_Link_Access.Data_Link_Access
 
 from Standard.Table import Table, Value_Type, Aggregate_Column, Bits, expr
@@ -11,9 +10,6 @@ from Standard.Table.Errors import Inexact_Type_Coercion, Duplicate_Output_Column
 
 from Standard.Database import all
 from Standard.Postgres import all
-import Standard.Postgres.Postgres_Connection.Postgres_Connection
-import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
-import Standard.Database.Dialects.Feature.Feature
 import Standard.Postgres.Internal.Pgpass
 from Standard.Database.Errors import all
 from Standard.Database.Postgres_Family.Helpers import parse_postgres_encoding
@@ -21,51 +17,25 @@ from Standard.Database.Postgres_Family.Helpers import parse_postgres_encoding
 from Standard.Test import all
 import Standard.Test.Test_Environment
 
-import project.Database.Common.Audit_Spec
-import project.Database.Common.Common_Spec
-import project.Database.Common.IR_Spec
-import project.Database.Common.Save_Connection_Data_Link
-import project.Database.Helpers.Name_Generator
-import project.Database.Transaction_Spec
+import Standard.Database_Test_Suite
+from Standard.Database_Test_Suite import Backend, Known_Issue
+import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
+import Standard.Database_Test_Suite.Database.JSON_Table_Data.JSON_Table_Data
+from Standard.Database_Test_Suite.Common_Table_Operations.Util import all
+
 import project.Database.Types.Postgres_Type_Mapping_Spec
-import project.Database.Upload_Spec
-import project.Common_Table_Operations
-from project.Common_Table_Operations.Util import all
 from project.Database.Types.Postgres_Type_Mapping_Spec import default_text
 
 import enso_dev.Base_Tests.Network.Http.Http_Test_Setup
 from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets
-import enso_dev.Generic_JDBC_Tests.Generic_JDBC_Connection_Spec
-import enso_dev.Table_Tests
+import enso_dev.Cloud_Tests.Database.Audit_Spec
+import enso_dev.Cloud_Tests.Database.Save_Connection_Data_Link
 
 type Basic_Test_Data
     Value ~connection
 
     setup create_connection_fn =
         Basic_Test_Data.Value (create_connection_fn Nothing)
-
-    teardown self =
-        self.connection.close
-
-type JSON_Table_Data
-    Value ~connection
-
-    expected self =
-        _ = self
-        ['{"defaultMargin": 22}', 'null', 'true', 'false', '123', '"string value"', '{"defaultMargin": 22, "otherValue": "test", "nestedObject": {"nestedKey": "nestedValue"}}', '[1, 2, 3, 4, 5]', '["string1", "string2", "string3"]', '[{"key1": "value1"}, {"key2": "value2"}, {"key3": "value3"}]', '3.14159267', Nothing]
-
-    expected_objects self =
-        self.expected.map e-> if e.is_nothing then e else e.parse_json
-
-    setup create_connection_fn types =
-        make_connection =
-            connection = create_connection_fn Nothing
-            types.each type_name->
-                table_name = 'tbl_' + type_name + '_test'
-                make_table_sql = 'DROP TABLE IF EXISTS ' + table_name + '; CREATE TEMPORARY TABLE ' + table_name + '(id INTEGER PRIMARY KEY, payload ' + type_name + '); INSERT INTO ' + table_name + ' VALUES (0, \'{"defaultMargin": 22}\'), (1, \'null\'), (2, \'true\'), (3, \'false\'), (4, \'123\'), (5, \'"string value"\'), (6, \'{"defaultMargin": 22, "otherValue": "test", "nestedObject": {"nestedKey": "nestedValue"}}\'), (7, \'[1, 2, 3, 4, 5]\'), (8, \'["string1", "string2", "string3"]\'), (9, \'[{"key1": "value1"}, {"key2": "value2"}, {"key3": "value3"}]\'), (10, \'3.14159267\'), (11, null);'
-                connection.execute_update make_table_sql
-            connection
-        JSON_Table_Data.Value make_connection
 
     teardown self =
         self.connection.close
@@ -768,47 +738,10 @@ postgres_specific_spec suite_builder create_connection_fn db_name setup =
             do_round data 231 . should_be_a Float
             do_round data 231 -1 . should_be_a Decimal
 
-type Lazy_Ref
-   Value ~get
-
 add_postgres_specs suite_builder create_connection_fn db_name =
-    prefix = "[PostgreSQL] "
-    name_counter = Ref.new 0
-
-    default_connection = Lazy_Ref.Value (create_connection_fn Nothing)
-    table_builder columns connection=Nothing =
-        ix = name_counter.get
-        name_counter . put ix+1
-        name = Name_Generator.random_name "table_"+ix.to_text
-
-        in_mem_table = Table.new columns
-        in_mem_table.select_into_database_table (connection.if_nothing default_connection.get) name primary_key=Nothing temporary=True
-    light_table_builder columns =
-        default_connection.get.create_literal_table (Table.new columns) "literal_table"
-
-    materialize = .read
-
-    common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=Postgres_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=True
-    agg_in_memory_table = (enso_project.data / "data.csv") . read
-
-    agg_table_fn = _->
-        agg_in_memory_table.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
-
-    empty_agg_table_fn = _->
-        (agg_in_memory_table.take (..First 0)).select_into_database_table default_connection.get (Name_Generator.random_name "Agg_Empty") primary_key=Nothing temporary=True
-
-    is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
-    is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
-    flagged_fn = default_connection.get.dialect.flagged
-    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
-
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_fn light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
-
-    Common_Spec.add_specs suite_builder prefix create_connection_fn default_connection setup
+    backend = Backend.Value "PostgreSQL" create_connection_fn known_failures=[Known_Issue.Full_Join_With_Between]
+    setup = Database_Test_Suite.add_specs suite_builder backend
     postgres_specific_spec suite_builder create_connection_fn db_name setup
-    Common_Table_Operations.Main.add_specs suite_builder setup
-    Upload_Spec.add_specs suite_builder setup create_connection_fn
-    IR_Spec.add_specs suite_builder setup prefix default_connection.get
 
 add_table_specs suite_builder =
     db_name = Environment.get "ENSO_POSTGRES_DATABASE"
@@ -859,7 +792,6 @@ add_table_specs suite_builder =
         connection_builder ->
             add_postgres_specs suite_builder connection_builder db_name
             Postgres_Type_Mapping_Spec.add_specs suite_builder connection_builder
-            Transaction_Spec.add_specs suite_builder connection_builder "[PostgreSQL] "
 
             suite_builder.group "[PostgreSQL] Secrets in connection settings" group_builder->
                 # The secrets are local ones (a temporary store with a fixture

@@ -1,55 +1,12 @@
 from Standard.Base import all
 
-from Standard.Table import Table
-
 from Standard.Test import Test
 
-import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
-
-import project.Common_Table_Operations
-
-type Dummy_Connection
-    Value
-
-    close self = Nothing
-
-    drop_table self table =
-        _ = table
-        Nothing
-
-in_memory_setup =
-    selection = Common_Table_Operations.Main.Test_Selection.Config
-
-    agg_table_fn _ = (enso_project.data / "data.csv") . read
-    empty_table_fn _ =
-        table = agg_table_fn Nothing
-        table.take 0
-
-    materialize = x->x
-
-    table_builder cols connection=Nothing =
-        _ = connection
-        Table.new cols
-    light_table_builder columns =
-        Table.new columns
-    create_connection_func _ =
-        Dummy_Connection.Value
-    is_feature_supported_fn _ =
-        True
-    is_operation_supported_fn _ =
-        True
-    is_aggregate_supported_fn _ =
-        True
-    flagged_fn flag:Dialect_Flag =
-        case flag of
-            Dialect_Flag.Case_Insensitive_Ordering_By_Default -> False
-            Dialect_Flag.Removes_Trailing_Whitespace_Casting_From_Char_To_Varchar -> False
-            _ -> True
-
-    Common_Table_Operations.Main.Test_Setup.Config "[In-Memory] " agg_table_fn empty_table_fn table_builder materialize is_database=False test_selection=selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
+import Standard.Database_Test_Suite
+from Standard.Database_Test_Suite import Backend
 
 add_specs suite_builder =
-    Common_Table_Operations.Main.add_specs suite_builder in_memory_setup
+    Database_Test_Suite.add_specs suite_builder Backend.In_Memory
 
 main filter=Nothing =
     suite = Test.build suite_builder->

@@ -14,7 +14,7 @@ import Standard.AWS.Internal.S3_Path.S3_Path
 # Needed for custom formats test
 from Standard.Table import Table
 # Needed for correct `Table.should_equal`
-import enso_dev.Table_Tests.Util
+import Standard.Database_Test_Suite.Util
 
 from Standard.Test import all
 

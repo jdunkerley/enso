@@ -1,24 +1,19 @@
 from Standard.Base import all
 import Standard.Base.Errors.Common.Type_Error
-import Standard.Base.Runtime.Ref.Ref
 
 from Standard.Table import Table, Value_Type, Bits
-import Standard.AWS.Database.Redshift.Redshift_Connection.Redshift_Connection
 
 from Standard.Database import all
-import Standard.Database.Dialects.Feature.Feature
 
 from Standard.AWS import Redshift_Details, AWS_Credential
 
 from Standard.Test import all
 import Standard.Test.Test_Environment
 
-import enso_dev.Table_Tests
-import enso_dev.Table_Tests.Database.Common.Common_Spec
-import enso_dev.Table_Tests.Database.Common.IR_Spec
-import enso_dev.Table_Tests.Database.Helpers.Name_Generator
-import enso_dev.Table_Tests.Common_Table_Operations
-import enso_dev.Table_Tests.Util
+import Standard.Database_Test_Suite
+from Standard.Database_Test_Suite import Backend, Suite_Part
+import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
+import Standard.Database_Test_Suite.Util
 
 type Data
     Value ~data
@@ -67,43 +62,10 @@ add_redshift_specific_specs suite_builder create_connection_fn setup =
             i2 = t2.read.column_info . remove_columns ["Minimum", "Maximum"]
             i1.should_equal i2
 
-type Lazy_Ref
-   Value ~get
-
 add_database_specs suite_builder create_connection_fn =
-    prefix = "[Redshift] "
-    name_counter = Ref.new 0
-    default_connection = Lazy_Ref.Value (create_connection_fn Nothing)
-    table_builder columns connection=Nothing =
-        ix = name_counter.get
-        name_counter . put ix+1
-        name = Name_Generator.random_name "table_"+ix.to_text
-
-        in_mem_table = Table.new columns
-        in_mem_table.select_into_database_table (connection.if_nothing default_connection.get) name primary_key=Nothing temporary=True
-    light_table_builder columns =
-        default_connection.get.create_literal_table (Table.new columns) "literal_table"
-    materialize = .read
-
-    common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=Redshift_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=False
-    agg_in_memory_table = ((Project_Description.new enso_dev.Table_Tests).data / "data.csv") . read
-    agg_table_fn = _->
-        agg_in_memory_table.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
-
-    empty_agg_table_fn = _->
-        (agg_in_memory_table.take (..First 0)).select_into_database_table default_connection.get (Name_Generator.random_name "Agg_Empty") primary_key=Nothing temporary=True
-
-    is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
-    is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
-    flagged_fn = default_connection.get.dialect.flagged
-    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
-
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_fn light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
-
-    Common_Spec.add_specs suite_builder prefix create_connection_fn default_connection setup
+    backend = Backend.Value "Redshift" create_connection_fn run_advanced_edge_cases=False parts=[Suite_Part.Common, Suite_Part.Table_Operations, Suite_Part.IR]
+    setup = Database_Test_Suite.add_specs suite_builder backend
     add_redshift_specific_specs suite_builder create_connection_fn setup
-    Common_Table_Operations.Main.add_specs suite_builder setup
-    IR_Spec.add_specs suite_builder setup prefix default_connection.get
 
 connect_via_json_config =
     credentials = enso_project.data / 'redshift_credentials.json'

@@ -9,6 +9,7 @@
     - Date_Time
     - Different_Size_Integer_Types
     - Distinct_Returns_First_Row_From_Group_If_Ordered
+    - Enforces_Primary_Key_Uniqueness
     - First_Last_Respects_Row_Order
     - Fixed_Length_Text_Columns
     - Length_Restricted_Text_Columns
@@ -16,8 +17,10 @@
     - Order_By_Unicode_Normalization_By_Default
     - Order_By_Unicode_Normalization_When_Case_Insensitive
     - Primary_Key_Allows_Nulls
+    - Reads_Rows_In_Insertion_Order
     - Removes_Trailing_Whitespace_Casting_From_Char_To_Varchar
     - Reports_Aggregation_Problems
+    - Row_Min_Max_Ignores_Nothing
     - Supports_8bit_Integer
     - Supports_Case_Insensitive_Ordering
     - Supports_Case_Sensitive_Columns
@@ -29,6 +32,7 @@
     - Supports_Nanoseconds_In_Time
     - Supports_Negative_Decimal_Places
     - Supports_Nested_With_Clause
+    - Supports_Null_Typed_Columns
     - Supports_Proper_Casing
     - Supports_Regex_Match
     - Supports_Separate_NaN
@@ -37,5 +41,6 @@
     - Supports_Unicode_Casing
     - Supports_Unicode_Normalization
     - Text_Length_Limited_Columns
+    - Text_Reverse_Keeps_Grapheme_Clusters
     - Use_Builtin_Bankers
     - Use_SQL_Type_Hints_For_Null_Values

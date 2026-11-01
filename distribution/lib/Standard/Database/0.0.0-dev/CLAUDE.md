@@ -64,8 +64,8 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 
 - `src/Connection/Connection.enso` — connection methods.
 - `src/DB_Table.enso` — deferred table operations.
-- `test/Table_Tests/src/Common_Table_Operations/` — the same suite runs against
-  both in-memory and database backends.
+- `distribution/lib/Standard/Database_Test_Suite/` — the same suite runs against
+  the in-memory table and every database backend.
 - Which aggregates a backend runs is its dialect's `check_aggregate_support`;
   how they behave, its `flagged` answers (`First_Last_Respects_Row_Order`,
   `Reports_Aggregation_Problems`, `Concatenate_Follows_Row_Order`): a new

@@ -368,6 +368,11 @@ type SQLServer_Dialect
             Dialect_Flag.First_Last_Respects_Row_Order -> False
             Dialect_Flag.Reports_Aggregation_Problems -> False
             Dialect_Flag.Concatenate_Follows_Row_Order -> False
+            Dialect_Flag.Supports_Null_Typed_Columns -> False
+            Dialect_Flag.Row_Min_Max_Ignores_Nothing -> True
+            Dialect_Flag.Text_Reverse_Keeps_Grapheme_Clusters -> True
+            Dialect_Flag.Reads_Rows_In_Insertion_Order -> True
+            Dialect_Flag.Enforces_Primary_Key_Uniqueness -> True
 
     ## ---
        private: true

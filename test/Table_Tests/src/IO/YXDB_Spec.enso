@@ -78,7 +78,7 @@ add_specs suite_builder =
             data_read.catch.message . should_equal "Reading AMP YXDB files is not supported."
 
         group_builder.specify "Should error gracefully when reading a non-YXDB file" <|
-            data_file = enso_project.data / 'data.csv'
+            data_file = enso_project.data / 'one_row.csv'
 
             yxdb_read = Data.read data_file ..YXDB_Format
             yxdb_read.should_fail_with Illegal_Argument

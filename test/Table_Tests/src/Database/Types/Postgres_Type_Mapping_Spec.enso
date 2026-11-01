@@ -8,7 +8,7 @@ from Standard.Database import all
 from Standard.Test import all
 
 
-import project.Database.Helpers.Name_Generator
+import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
 from project.Database.Postgres_Spec import create_connection_builder
 
 type Data

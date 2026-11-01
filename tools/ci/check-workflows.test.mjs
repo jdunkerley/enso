@@ -25,6 +25,7 @@ import {
   checkSetupNodeCache,
   checkStdlibTestMap,
   checkStdlibTestsGetTheGroupFilter,
+  checkSuiteIgnoresBackendNames,
   checkNativeLibsFixtures,
   checkToolchainPins,
   checkWasmBindgenPins,
@@ -1088,6 +1089,52 @@ describe('checkPublicTypes', () => {
         fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main + 'from project.X export all\n')),
       ),
       ['distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso:3: `export all` (list the exported names)'],
+    )
+  })
+})
+
+describe('checkSuiteIgnoresBackendNames', () => {
+  const at = 'distribution/lib/Standard/Database_Test_Suite/0.0.0-dev/src/X_Spec.enso'
+  const repo = (code) => fixture({}, { [at]: code })
+  const why =
+    "decides by the backend's name; ask the setup (`flagged`, `is_feature_supported`, `is_operation_supported`, `is_aggregate_supported`) or list a `Known_Issue`"
+
+  test('accepts the prefix used as a name, questions to the setup, comments, docs and text', () => {
+    const code = [
+      '## Adds a group with the given `prefix` as its name prefix.',
+      '   The prefix. is prose here, in a doc block.',
+      'add_specs suite_builder prefix setup =',
+      '    prefix_text = setup.prefix',
+      '    suite_builder.group prefix+"Table.aggregate" group_builder->',
+      '    # Snowflake once needed setup.prefix.contains "Snowflake" here.',
+      '    if setup.flagged ..Date_Time then group_builder.specify "x" <| 1',
+      '    group_builder.specify "reads the prefix. of a name" <| 1',
+      '    in_file_prefix = "[SQLite File] "',
+    ].join('\n')
+    assert.deepEqual(checkSuiteIgnoresBackendNames(repo(code)), [])
+  })
+  test('rejects a test of the prefix, the group name, the dialect name and the backend name', () => {
+    const code = [
+      '    if setup.prefix.contains "SQLite" then 1',
+      '    if prefix == "[SQLite] " then 1',
+      '    if group_builder.name.contains "Snowflake" then 1',
+      '    if t.dialect_name != "DuckDB" then 1',
+      '    n = backend.name',
+    ].join('\n')
+    assert.deepEqual(
+      checkSuiteIgnoresBackendNames(repo(code)),
+      [1, 2, 3, 4, 5].map((line) => `${at}:${line}: ${why}`),
+    )
+  })
+  test('checks the code after a doc block ends', () => {
+    const code = ['## A spec.', '   More prose.', 'x = if prefix == "a" then 1'].join('\n')
+    assert.deepEqual(checkSuiteIgnoresBackendNames(repo(code)), [`${at}:3: ${why}`])
+  })
+  test('looks only at the suite', () => {
+    const other = 'distribution/lib/Standard/Table/0.0.0-dev/src/X.enso'
+    assert.deepEqual(
+      checkSuiteIgnoresBackendNames(fixture({}, { [other]: 'if prefix == "x" then 1\n' })),
+      [],
     )
   })
 })

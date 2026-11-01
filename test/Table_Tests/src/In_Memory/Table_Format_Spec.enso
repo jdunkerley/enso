@@ -8,7 +8,7 @@ from Standard.Table.Errors import Missing_Input_Columns
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 type Data
     Value ~table

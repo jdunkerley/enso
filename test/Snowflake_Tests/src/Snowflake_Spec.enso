@@ -2,34 +2,25 @@ from Standard.Base import all
 import Standard.Base.Enso_Cloud.Data_Link.Data_Link
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 import Standard.Base.Errors.Illegal_State.Illegal_State
-import Standard.Base.Runtime.Ref.Ref
 
 from Standard.Table import Table, Value_Type, Aggregate_Column, Bits, expr
 from Standard.Table.Errors import Inexact_Type_Coercion, Duplicate_Output_Column_Names
 
-import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
-import Standard.Database.Dialects.Feature.Feature
 from Standard.Database import all
 from Standard.Database.Errors import all
 
 from Standard.Snowflake import all
-import Standard.Snowflake.Snowflake_Connection.Snowflake_Connection
 
 from Standard.Test import all
-import Standard.Test.Test_Environment
 
-import enso_dev.Table_Tests
-import enso_dev.Table_Tests.Database.Common.Audit_Spec
-import enso_dev.Table_Tests.Database.Common.Common_Spec
-import enso_dev.Table_Tests.Database.Common.IR_Spec
-import enso_dev.Table_Tests.Database.Common.Save_Connection_Data_Link
-import enso_dev.Table_Tests.Database.Transaction_Spec
-import enso_dev.Table_Tests.Database.Upload_Spec
-import enso_dev.Table_Tests.Database.Helpers.Name_Generator
-import enso_dev.Table_Tests.Common_Table_Operations
-from enso_dev.Table_Tests.Common_Table_Operations.Util import all
+import Standard.Database_Test_Suite
+from Standard.Database_Test_Suite import Backend, Known_Issue
+import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
+from Standard.Database_Test_Suite.Common_Table_Operations.Util import all
 
 from enso_dev.Base_Tests.Network.Local_Secrets_Setup import with_local_secrets
+import enso_dev.Cloud_Tests.Database.Audit_Spec
+import enso_dev.Cloud_Tests.Database.Save_Connection_Data_Link
 
 import project.Auth_Spec
 
@@ -514,47 +505,10 @@ snowflake_specific_spec suite_builder default_connection db_name setup =
                 do_op Number.negative_infinity op . should_equal Number.negative_infinity
 
 add_snowflake_specs suite_builder create_connection_fn db_name =
-    prefix = "[Snowflake] "
-    name_counter = Ref.new 0
-
-    ## We prefer to keep a single connection for most tests, to avoid the overhead of initializing a new connection multiple times.
-       It is initialized lazily, so that it is actually established only if actually used. Merely listing the tests to run should not establish the connection.
-    default_connection = Ref.new (create_connection_fn Nothing) lazy=True
-    table_builder columns connection=Nothing =
-        ix = name_counter.get
-        name_counter . put ix+1
-        name = Name_Generator.random_name "table_"+ix.to_text
-        in_mem_table = Table.new columns
-        in_mem_table.select_into_database_table (connection.if_nothing default_connection.get) name primary_key=Nothing temporary=True
-    light_table_builder columns =
-        default_connection.get.create_literal_table (Table.new columns) "literal_table"
-    materialize = .read
-
-    common_selection = Common_Table_Operations.Main.Test_Selection.Config supported_replace_params=Snowflake_Connection.get_dialect.get_supported_replace_params run_advanced_edge_case_tests_by_default=False
-    agg_in_memory_table_ref = Ref.new lazy=True <|
-        ((Project_Description.new enso_dev.Table_Tests).data / "data.csv") . read
-    agg_in_memory_table =
-        agg_in_memory_table_ref.get
-
-    agg_table_fn = _->
-        agg_in_memory_table.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
-
-    empty_agg_table_fn = _->
-        (agg_in_memory_table.take (..First 0)).select_into_database_table default_connection.get (Name_Generator.random_name "Agg_Empty") primary_key=Nothing temporary=True
-
-    is_feature_supported_fn feature:Feature = default_connection.get.dialect.is_feature_supported feature
-    is_operation_supported_fn operation:Text = default_connection.get.dialect.is_operation_supported operation
-    flagged_fn = default_connection.get.dialect.flagged
-    is_aggregate_supported_fn aggregate = (default_connection.get.dialect.check_aggregate_support aggregate).is_error.not
-
-    setup = Common_Table_Operations.Main.Test_Setup.Config prefix agg_table_fn empty_agg_table_fn table_builder materialize is_database=True test_selection=common_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_fn light_table_builder=light_table_builder is_integer_type=is_snowflake_integer is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn
-
-    Common_Spec.add_specs suite_builder prefix create_connection_fn default_connection setup
-    snowflake_specific_spec suite_builder default_connection db_name setup
-    Common_Table_Operations.Main.add_specs suite_builder setup
-    Upload_Spec.add_specs suite_builder setup create_connection_fn
-    IR_Spec.add_specs suite_builder setup prefix default_connection.get
-    Auth_Spec.add_specs suite_builder default_connection.get
+    backend = Backend.Value "Snowflake" create_connection_fn known_failures=[Known_Issue.Unordered_Concatenate] run_advanced_edge_cases=False is_integer_type=is_snowflake_integer
+    setup = Database_Test_Suite.add_specs suite_builder backend
+    snowflake_specific_spec suite_builder setup.default_connection db_name setup
+    Auth_Spec.add_specs suite_builder setup.default_connection.get
 
 ## ---
    private: true
@@ -597,7 +551,6 @@ add_table_specs suite_builder =
             connection_builder = _ -> Database.connect connection_details
             add_snowflake_specs suite_builder connection_builder db_name
             prefix = "[Snowflake] "
-            Transaction_Spec.add_specs suite_builder connection_builder prefix
 
             data_link_file = Temporary_Data_Link_File.make connection_details
             Audit_Spec.add_specs suite_builder prefix data_link_file.get database_pending=Nothing

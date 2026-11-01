@@ -4,7 +4,7 @@ from Standard.Table.Extensions.Table_Conversions import all
 
 from Standard.Test import all
 
-import project.Util
+import Standard.Database_Test_Suite.Util
 
 type Data
     Value ~clothes

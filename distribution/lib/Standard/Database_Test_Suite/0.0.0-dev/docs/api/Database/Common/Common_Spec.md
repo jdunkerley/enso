@@ -1,0 +1,41 @@
+## Enso Signatures 1.0
+## module Standard.Database_Test_Suite.Database.Common.Common_Spec
+- type Aggregation_Data
+    - Value ~data:Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - setup ~connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t9 self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- type Basic_Data
+    - Value ~data:Standard.Base.Any.Any
+    - big_size self -> Standard.Base.Any.Any
+    - big_table self -> Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - setup ~connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t1 self -> Standard.Base.Any.Any
+    - t2 self -> Standard.Base.Any.Any
+    - t4 self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- type Lazy_Ref
+    - Value ~get:Standard.Base.Any.Any
+- type Missing_Values_Data
+    - Value ~data:Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - setup ~connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t4 self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- type Sorting_Data
+    - Value ~data:Standard.Base.Any.Any
+    - bools self -> Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - df self -> Standard.Base.Any.Any
+    - ints self -> Standard.Base.Any.Any
+    - reals self -> Standard.Base.Any.Any
+    - setup ~connection:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t8 self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+    - texts self -> Standard.Base.Any.Any
+- add_commmon_specs suite_builder:Standard.Test.Suite.Suite_Builder prefix:Standard.Base.Data.Text.Text create_connection_fn:(Standard.Base.Nothing.Nothing -> Standard.Base.Any.Any) default_connection:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- add_specs suite_builder:Standard.Test.Suite.Suite_Builder prefix:Standard.Base.Data.Text.Text create_connection_fn:(Standard.Base.Nothing.Nothing -> Standard.Base.Any.Any) default_connection:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- drop_table connection:Standard.Base.Any.Any name:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- upload connection:Standard.Base.Any.Any prefix:Standard.Base.Any.Any data:Standard.Base.Any.Any temporary:Standard.Base.Any.Any= -> Standard.Base.Any.Any

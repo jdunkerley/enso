@@ -19,6 +19,7 @@ libraries:
   AWS: { stdBits: [aws], dependsOn: [Base, Database, Table] }
   Base: { stdBits: [base], dependsOn: [] }
   Database: { stdBits: [database], dependsOn: [Base, Table] }
+  Database_Test_Suite: { stdBits: [database-test-suite], dependsOn: [Base, Database, SQLite, Table, Test] }
   DuckDB: { stdBits: [duckdb], dependsOn: [Base, Database, Table] }
   Examples: { stdBits: [], dependsOn: [Base, Table] }
   Generic_JDBC: { stdBits: [], dependsOn: [Base, Database, Table] }
@@ -38,40 +39,52 @@ libraries:
 
 testProjects:
   AWS_Tests:
-    imports: [AWS, Base, Database, Table, Test]
-    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+    imports: [AWS, Base, Database, Database_Test_Suite, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests]
   Base_Internal_Tests: { imports: [Base, Test], testImports: [Cloud_Tests] }
   Base_Tests: { imports: [AWS, Base, Test], testImports: [Helpers] }
   Cloud_Tests:
-    imports: [Base, Table, Test]
-    testImports: [Base_Tests, Table_Tests]
+    imports: [Base, Database, Database_Test_Suite, Table, Test]
+    testImports: [Base_Tests]
   DuckDB_Tests:
-    imports: [Base, Database, DuckDB, Table, Test]
-    testImports: [Table_Tests]
+    imports: [Base, Database, Database_Test_Suite, DuckDB, Table, Test]
+    testImports: []
   Examples_Tests: { imports: [Base, Examples, Test], testImports: [Base_Tests] }
   Generic_JDBC_Tests:
-    imports: [Base, Database, Generic_JDBC, Postgres, SQLite, Test]
-    testImports: [Table_Tests]
+    imports:
+      [Base, Database, Database_Test_Suite, Generic_JDBC, Postgres, SQLite, Test]
+    testImports: []
   Geo_Tests: { imports: [Base, Geo, Table, Test], testImports: [] }
   Image_Tests: { imports: [Base, Image, Test], testImports: [Cloud_Tests] }
   Microsoft_Tests:
-    imports: [Base, Database, Microsoft, Table, Test]
-    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+    imports: [Base, Database, Database_Test_Suite, Microsoft, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests]
   Saas_Tests:
-    imports: [Base, Saas, Table, Test]
-    testImports: [Base_Tests, Table_Tests]
+    imports: [Base, Database_Test_Suite, Saas, Table, Test]
+    testImports: [Base_Tests]
   Snowflake_Tests:
-    imports: [Base, Database, Snowflake, Table, Test]
-    testImports: [Base_Tests, Cloud_Tests, Table_Tests]
+    imports: [Base, Database, Database_Test_Suite, Snowflake, Table, Test]
+    testImports: [Base_Tests, Cloud_Tests]
   Table_Internal_Tests:
     imports: [Base, Database, Table, Test, Visualization]
     testImports: []
   Table_Tests:
-    imports: [Base, Database, Examples, Postgres, SQLite, Table, Test, Visualization]
-    testImports: [Base_Tests, Cloud_Tests, Generic_JDBC_Tests, Test_Tests]
+    imports:
+      [
+        Base,
+        Database,
+        Database_Test_Suite,
+        Examples,
+        Postgres,
+        SQLite,
+        Table,
+        Test,
+        Visualization,
+      ]
+    testImports: [Base_Tests, Cloud_Tests, Test_Tests]
   Tableau_Tests:
-    imports: [Base, Table, Tableau, Test]
-    testImports: [Table_Tests]
+    imports: [Base, Database_Test_Suite, Table, Tableau, Test]
+    testImports: []
   Test_Tests: { imports: [Base, Test], testImports: [] }
   Visualization_Tests:
     imports:

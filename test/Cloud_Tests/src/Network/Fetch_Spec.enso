@@ -17,7 +17,7 @@ import Standard.Test.Test_Environment
 
 import project.Network.Enso_Cloud.Cloud_Tests_Setup.Cloud_Tests_Setup
 
-import enso_dev.Table_Tests.Util
+import Standard.Database_Test_Suite.Util
 from enso_dev.Base_Tests.Network.Http.Http_Test_Setup import base_url_with_slash, pending_has_url
 
 polyglot java import java.io.File as Java_File

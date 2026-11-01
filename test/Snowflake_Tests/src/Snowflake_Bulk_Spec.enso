@@ -11,6 +11,8 @@ from Standard.Snowflake import all
 from Standard.Test import all
 import Standard.Test.Test_Environment
 
+import Standard.Database_Test_Suite
+
 from project.Snowflake_Spec import get_configured_connection_details
 
 add_specs suite_builder = case get_configured_connection_details of
@@ -22,7 +24,7 @@ add_specs suite_builder = case get_configured_connection_details of
 
         default_connection = Ref.new (connection_builder Nothing) lazy=True
 
-        file = (Project_Description.new enso_dev.Table_Tests).data / "data.csv"
+        file = Database_Test_Suite.data_directory / "data.csv"
         file_url = 'file://' + (file.path.replace "\" "/")
 
         suite_builder.group "[Snowflake] Bulk load tests" group_builder->
