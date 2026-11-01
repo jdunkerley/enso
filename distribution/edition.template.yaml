@@ -38,6 +38,9 @@ libraries:
   - name: Standard.Postgres
     repository: release
     version: {{LIBS_VERSION}}
+  - name: Standard.Database_Test_Suite
+    repository: release
+    version: {{LIBS_VERSION}}
   - name: Standard.AWS
     repository: release
     version: {{LIBS_VERSION}}

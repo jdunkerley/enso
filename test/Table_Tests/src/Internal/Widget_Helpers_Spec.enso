@@ -7,7 +7,7 @@ from Standard.Table import Value_Type
 from Standard.Test import all
 from Standard.Table import Table
 
-import project.Util
+import Standard.Database_Test_Suite.Util
 
 main filter=Nothing =
     suite = Test.build suite_builder->

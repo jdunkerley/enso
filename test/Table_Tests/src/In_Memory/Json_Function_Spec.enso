@@ -4,7 +4,7 @@ from Standard.Table import all
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 type Data
     Value ~table raw_data

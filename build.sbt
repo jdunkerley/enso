@@ -503,6 +503,7 @@ lazy val enso = (project in file("."))
     `std-base`,
     `std-benchmarks`,
     `std-database`,
+    `std-database-test-suite`,
     `std-generic-jdbc`,
     `std-google`,
     `std-image`,
@@ -2827,6 +2828,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-aws` / Compile / packageBin)
       .dependsOn(`std-base` / Compile / packageBin)
       .dependsOn(`std-database` / Compile / packageBin)
+      .dependsOn(`std-database-test-suite` / Compile / packageBin)
       .dependsOn(`std-duckdb` / Compile / packageBin)
       .dependsOn(`std-generic-jdbc` / Compile / packageBin)
       .dependsOn(`std-google` / Compile / packageBin)
@@ -5003,6 +5005,8 @@ val `sqlite-native-libs` =
   stdLibComponentRoot("SQLite") / "polyglot" / "lib"
 val `postgres-polyglot-root` =
   stdLibComponentRoot("Postgres") / "polyglot" / "java"
+val `database-test-suite-polyglot-root` =
+  stdLibComponentRoot("Database_Test_Suite") / "polyglot" / "java"
 val `std-aws-polyglot-root` =
   stdLibComponentRoot("AWS") / "polyglot" / "java"
 val `std-snowflake-polyglot-root` =
@@ -5787,6 +5791,20 @@ lazy val `std-generic-jdbc` = project
   )
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-database` % "provided")
+  .dependsOn(`std-table` % "provided")
+
+lazy val `std-database-test-suite` = project
+  .in(file("std-bits") / "database-test-suite")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / packageBin / artifactPath :=
+      `database-test-suite-polyglot-root` / "std-database-test-suite.jar",
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`database-test-suite-polyglot-root`)
+    }.value
+  )
   .dependsOn(`std-table` % "provided")
 
 lazy val `std-google` = project

@@ -1,0 +1,36 @@
+from Standard.Base import all
+
+## A known failure of a backend: a bug, with the issue that tracks it. A backend
+   lists its known issues in `Backend.Value`'s `known_failures`; a spec that one
+   affects is pending for that backend, or works around it. The set is closed:
+   a misspelt issue does not compile.
+type Known_Issue
+    ## A `Full` join with a `Between` condition is not supported (PostgreSQL).
+    Full_Join_With_Between
+
+    ## `Concatenate` joins the values in no fixed order (Snowflake).
+    Unordered_Concatenate
+
+    ## A literal table cannot carry the type of a `Nothing` value (SQL Server).
+    No_Literal_Tables
+
+    ## A filter after `distinct` changes which rows the `distinct` kept (DuckDB).
+    Filter_After_Distinct
+
+    ## What goes wrong.
+    description self -> Text = case self of
+        Known_Issue.Full_Join_With_Between -> "a Full join with a Between condition is not supported"
+        Known_Issue.Unordered_Concatenate -> "Concatenate joins the values in no fixed order"
+        Known_Issue.No_Literal_Tables -> "a literal table cannot carry the type of a Nothing value"
+        Known_Issue.Filter_After_Distinct -> "a filter after distinct changes which rows the distinct kept"
+
+    ## The issue that tracks it.
+    issue_url self -> Text = case self of
+        Known_Issue.Full_Join_With_Between -> "https://github.com/enso-org/enso/issues/8243"
+        Known_Issue.Unordered_Concatenate -> "https://github.com/enso-org/enso/issues/10412"
+        Known_Issue.No_Literal_Tables -> "https://github.com/enso-org/enso/issues/11487"
+        Known_Issue.Filter_After_Distinct -> "https://github.com/jdunkerley/enso/issues/491"
+
+    ## The reason a spec it affects is pending.
+    pending self -> Text =
+        "Known issue: " + self.description + " (" + self.issue_url + ")."

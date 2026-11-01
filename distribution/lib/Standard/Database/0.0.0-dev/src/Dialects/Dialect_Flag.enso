@@ -219,3 +219,34 @@ type Dialect_Flag
        Specifies if `Concatenate` joins the values in the order of the rows.
        If `False`, the order of the parts is unspecified.
     Concatenate_Follows_Row_Order
+    ## ---
+       private: true
+       ---
+       Specifies if the backend can hold a column of `Nothing` with no other
+       type, as an expression like `Nothing IS NULL` makes.
+    Supports_Null_Typed_Columns
+    ## ---
+       private: true
+       ---
+       Specifies if `min` and `max` over several columns ignore `Nothing`
+       values. If `False`, any `Nothing` argument makes the result `Nothing`.
+    Row_Min_Max_Ignores_Nothing
+    ## ---
+       private: true
+       ---
+       Specifies if `reverse` keeps grapheme clusters together, as
+       `Text.reverse` does. If `False`, it reverses code points.
+    Text_Reverse_Keeps_Grapheme_Clusters
+    ## ---
+       private: true
+       ---
+       Specifies if reading a table without an ordering returns its rows in the
+       order they were inserted. SQL does not promise it; most backends do it
+       for small tables, Snowflake does not.
+    Reads_Rows_In_Insertion_Order
+    ## ---
+       private: true
+       ---
+       Specifies if the database rejects rows that break the uniqueness of a
+       `PRIMARY KEY`. Snowflake accepts them.
+    Enforces_Primary_Key_Uniqueness

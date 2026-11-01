@@ -1,0 +1,25 @@
+from Standard.Base import all
+
+## A part of the suite, which a backend runs or not (`Backend.Value`'s `parts`).
+type Suite_Part
+    ## The specs every database shares: connections, queries, column
+       information, name length limits, default ordering (`Database/Common`).
+    Common
+
+    ## The table operations, which the in-memory table runs too
+       (`Common_Table_Operations`).
+    Table_Operations
+
+    ## Creating, uploading to, appending to and deleting from tables
+       (`Upload_Spec`).
+    Upload
+
+    ## The internal representation of queries (`IR_Spec`).
+    IR
+
+    ## Transactions (`Transaction_Spec`).
+    Transactions
+
+    ## Every part: what a new backend runs.
+    all -> Vector Suite_Part =
+        [Suite_Part.Common, Suite_Part.Table_Operations, Suite_Part.Upload, Suite_Part.IR, Suite_Part.Transactions]

@@ -1,0 +1,8 @@
+from Standard.Base import all
+
+polyglot java import org.enso.base_test_helpers.FileSystemHelper
+
+## Makes `file` writable or read-only.
+set_writable file writable =
+    path = file.absolute.path
+    FileSystemHelper.setWritable path writable

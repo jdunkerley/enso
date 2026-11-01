@@ -1,7 +1,7 @@
 from Standard.Base import all
 import Standard.Base.Runtime.Debug
 
-import project.Util
+import Standard.Database_Test_Suite.Util
 
 import Standard.Base.Data.Vector.Map_Error
 import Standard.Base.Errors.Common.Arithmetic_Error

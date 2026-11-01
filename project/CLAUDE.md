@@ -25,6 +25,9 @@ Every non-trivial build concern the engine has lives here as a Scala file.
   (unless its `package.yaml` says `catalogue: false`), and drops those
   libraries' bindings caches first: on Windows a memory-mapped one cannot be
   overwritten later in the same indexing process.
+  `EngineBundle.librariesNotBundled` names the standard libraries the IDE bundle
+  leaves out (and `IRCaches.checkCacheSizes` does not count):
+  `Database_Test_Suite`.
 - `Editions.scala` — Edition-manifest generation (fills in the versions of
   `distribution/edition.template.yaml`).
 - `GatherLicenses.scala` — Drives the legal-review report and checks

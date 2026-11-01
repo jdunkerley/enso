@@ -5,7 +5,7 @@ from Standard.Table.Errors import Arithmetic_Overflow, Conversion_Failure, Inval
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 polyglot java import java.lang.Byte as Java_Byte
 polyglot java import java.lang.Short as Java_Short

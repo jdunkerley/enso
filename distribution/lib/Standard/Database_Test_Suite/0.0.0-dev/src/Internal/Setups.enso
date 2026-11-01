@@ -1,0 +1,142 @@
+from Standard.Base import all
+import Standard.Base.Runtime.Ref.Ref
+
+from Standard.Table import Aggregate_Column, Table
+
+# `select_into_database_table` and `create_literal_table` are Database's
+# extensions of `Table`, in scope only with Database imported.
+from Standard.Database import all
+import Standard.Database.Dialects.Dialect_Flag.Dialect_Flag
+import Standard.Database.Dialects.Feature.Feature
+
+import project.Backend.Backend
+import project.Common_Table_Operations
+import project.Common_Table_Operations.Main.Test_Selection
+import project.Common_Table_Operations.Main.Test_Setup
+import project.Database.Common.Common_Spec
+import project.Database.Common.IR_Spec
+import project.Database.Helpers.Name_Generator
+import project.Database.Transaction_Spec
+import project.Database.Upload_Spec
+import project.Known_Issue.Known_Issue
+import project.Suite_Part.Suite_Part
+
+## ---
+   private: true
+   ---
+   A value computed when first asked for, then kept.
+type Lazy_Ref
+    Value ~get
+
+## ---
+   private: true
+   ---
+   The connection of the in-memory backend, which has none.
+type Dummy_Connection
+    Value
+
+    close self = Nothing
+
+    drop_table self table =
+        _ = table
+        Nothing
+
+## ---
+   private: true
+   ---
+   Adds the parts of the suite that `backend` runs; returns their setup.
+add_specs suite_builder backend:Backend -> Test_Setup =
+    setup = case backend of
+        Backend.In_Memory -> in_memory_setup
+        _ -> database_setup backend
+    case backend of
+        Backend.In_Memory ->
+            Common_Table_Operations.Main.add_specs suite_builder setup
+        _ ->
+            runs part = backend.parts.contains part
+            prefix = setup.prefix
+            if runs Suite_Part.Common then
+                Common_Spec.add_specs suite_builder prefix backend.connect setup.default_connection setup
+            if runs Suite_Part.Table_Operations then
+                Common_Table_Operations.Main.add_specs suite_builder setup
+            if runs Suite_Part.Upload then
+                Upload_Spec.add_specs suite_builder setup backend.connect persistent_connector=backend.persistent_connections
+            if runs Suite_Part.IR then
+                IR_Spec.add_specs suite_builder setup prefix setup.default_connection.get
+            if runs Suite_Part.Transactions then
+                Transaction_Spec.add_specs suite_builder backend.connect prefix
+    setup
+
+## ---
+   private: true
+   ---
+   The suite's `data.csv`. `enso_project` would name the project that runs
+   the suite, not this library.
+data_csv -> File =
+    (Project_Description.new Standard.Database_Test_Suite.Main).data / "data.csv"
+
+## ---
+   private: true
+   ---
+   The setup of the in-memory table.
+in_memory_setup -> Test_Setup =
+    agg_table_fn _ = data_csv . read
+    empty_table_fn _ =
+        table = agg_table_fn Nothing
+        table.take 0
+    materialize = x->x
+    table_builder cols connection=Nothing =
+        _ = connection
+        Table.new cols
+    light_table_builder columns =
+        Table.new columns
+    create_connection_func _ =
+        Dummy_Connection.Value
+    flagged_fn flag:Dialect_Flag =
+        case flag of
+            Dialect_Flag.Case_Insensitive_Ordering_By_Default -> False
+            Dialect_Flag.Removes_Trailing_Whitespace_Casting_From_Char_To_Varchar -> False
+            _ -> True
+    is_feature_supported_fn feature:Feature =
+        _ = feature
+        True
+    is_operation_supported_fn operation:Text =
+        _ = operation
+        True
+    is_aggregate_supported_fn aggregate:Aggregate_Column =
+        _ = aggregate
+        True
+    Test_Setup.Config Backend.In_Memory.prefix agg_table_fn empty_table_fn table_builder materialize is_database=False test_selection=Test_Selection.Config is_aggregate_supported=is_aggregate_supported_fn create_connection_func=create_connection_func light_table_builder=light_table_builder is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn backend=Backend.In_Memory default_connection=(Lazy_Ref.Value Dummy_Connection.Value)
+
+## ---
+   private: true
+   ---
+   The setup of a database backend: a lazy default connection the specs
+   share, the table builders, the `data.csv` tables, and the capabilities,
+   asked of the connection's dialect.
+database_setup backend:Backend -> Test_Setup =
+    default_connection = Lazy_Ref.Value (backend.connect Nothing)
+    dialect = Lazy_Ref.Value default_connection.get.dialect
+    name_counter = Ref.new 0
+    table_builder columns connection=Nothing =
+        ix = name_counter.get
+        name_counter . put ix+1
+        name = Name_Generator.random_name "table_"+ix.to_text
+        in_mem_table = Table.new columns
+        in_mem_table.select_into_database_table (connection.if_nothing default_connection.get) name primary_key=Nothing temporary=backend.temporary_tables
+    light_table_builder columns =
+        if backend.has_known_issue Known_Issue.No_Literal_Tables then table_builder columns else
+            default_connection.get.create_literal_table (Table.new columns) "literal_table"
+    agg_in_memory_table = Lazy_Ref.Value (data_csv . read)
+    agg_table_fn _ =
+        agg_in_memory_table.get.select_into_database_table default_connection.get (Name_Generator.random_name "Agg1") primary_key=Nothing temporary=True
+    empty_agg_table_fn _ =
+        (agg_in_memory_table.get.take (..First 0)).select_into_database_table default_connection.get (Name_Generator.random_name "Agg_Empty") primary_key=Nothing temporary=True
+    test_selection = Test_Selection.Config supported_replace_params=dialect.get.get_supported_replace_params run_advanced_edge_case_tests_by_default=backend.run_advanced_edge_cases
+    # Ascribed, so that the specs' `setup.flagged ..Variant` resolves against
+    # `Dialect_Flag` (as the backends' `flagged_fn flag:Dialect_Flag` did).
+    is_feature_supported_fn feature:Feature = dialect.get.is_feature_supported feature
+    flagged_fn flag:Dialect_Flag = dialect.get.flagged flag
+    is_operation_supported_fn operation:Text = dialect.get.is_operation_supported operation
+    is_aggregate_supported_fn aggregate:Aggregate_Column = (dialect.get.check_aggregate_support aggregate).is_error.not
+    Test_Setup.Config backend.prefix agg_table_fn empty_agg_table_fn table_builder (.read) is_database=True test_selection=test_selection is_aggregate_supported=is_aggregate_supported_fn create_connection_func=backend.connect light_table_builder=light_table_builder is_integer_type=backend.is_integer_type is_feature_supported=is_feature_supported_fn flagged=flagged_fn is_operation_supported=is_operation_supported_fn backend=backend default_connection=default_connection

@@ -8,7 +8,7 @@ import Standard.Test.Extensions
 from Standard.Table import Table, Bits, Value_Type
 from Standard.Table.Extensions.Table_Conversions import all
 from Standard.Test import all
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 add_specs suite_builder =
     suite_builder.group "Text.parse_to_table" group_builder->

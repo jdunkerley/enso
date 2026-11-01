@@ -57,5 +57,5 @@ pivot = (Table.new [['Id', ['A','A']], ['B', ['Name','Country']], ['C', ['Ada','
 - `src/Table.enso` — type definition with method docs.
 - `src/Aggregate_Column.enso` — list of aggregation constructors.
 - `test/Table_Tests/src/In_Memory/` — comprehensive in-memory examples.
-- `test/Table_Tests/src/Common_Table_Operations/` — operations that work on both
-  in-memory and database tables.
+- `distribution/lib/Standard/Database_Test_Suite/0.0.0-dev/src/Common_Table_Operations/`
+  — operations that work on both in-memory and database tables.

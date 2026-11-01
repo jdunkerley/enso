@@ -24,6 +24,8 @@ One directory per suite, typically:
 - `AWS_Tests/`, `Snowflake_Tests/`, `Microsoft_Tests/`, `Google_Test/`,
   `Tableau_Tests/`, `DuckDB_Tests/`, `Generic_JDBC_Tests/`, `Cloud_Tests/`,
   `Saas_Tests/` — provider suites. Most need live credentials via env vars.
+- Database backends run `Standard.Database_Test_Suite` with a `Backend`
+  descriptor; see that library's `CLAUDE.md`.
 - `Geo_Tests/`, `Image_Tests/` — media suites.
 - `Examples_Tests/` — runs the `Standard.Examples` workflows and asserts their
   outputs.

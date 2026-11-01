@@ -35,6 +35,8 @@ there.
 - `Geo/` — Latitude/longitude, distance, GeoJSON to table.
 - `Examples/` — Sample data referenced by `## Examples` doc blocks.
 - `Test/` — Testing framework used in `test/` projects.
+- `Database_Test_Suite/` — The conformance suite database backends run against
+  themselves (test-only; `catalogue: false`).
 - `Visualization/` — IDE-only visualisation preprocessors. **Do not import in
   user code.**
 

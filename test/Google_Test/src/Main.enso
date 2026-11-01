@@ -7,7 +7,7 @@ import Standard.Google.Google_Sheets_Workbook.Google_API_Error
 
 from Standard.Test import all
 from Standard.Table import Table
-from enso_dev.Table_Tests.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 ## The `GoogleSheets` credential lives in Enso Cloud (see README.md); a
    secret named without a parent would be looked up in the local store.

@@ -1,0 +1,38 @@
+from Standard.Base import all
+
+import project.Known_Issue.Known_Issue
+import project.Suite_Part.Suite_Part
+
+## The backend the suite runs against: the only thing a backend's test project
+   writes. What it supports is asked of its connection's dialect.
+type Backend
+    ## A database backend.
+
+       ## Arguments
+       - `name`: The backend's name. Its test groups start with it in brackets
+         (`"PostgreSQL"` gives `"[PostgreSQL] "`); specs never read it.
+       - `connect`: Opens a new connection to the database under test; it is
+         called with `Nothing`.
+       - `temporary_tables`: Whether the tables the specs build are temporary.
+       - `persistent_connections`: Whether a new connection sees the tables an
+         earlier one made (`False` for SQLite in memory).
+       - `known_failures`: The backend's known issues.
+       - `run_advanced_edge_cases`: Whether the slower edge-case specs run;
+         `ENSO_ADVANCED_EDGE_CASE_TESTS` runs them anyway.
+       - `parts`: The parts of the suite to run.
+       - `is_integer_type`: Whether the backend treats a `Value_Type` as an
+         integer type.
+    Value name:Text connect temporary_tables:Boolean=True persistent_connections:Boolean=True known_failures:Vector=[] run_advanced_edge_cases:Boolean=True parts:Vector=Suite_Part.all is_integer_type=(.is_integer)
+
+    ## The in-memory table: the reference backend, which `Table_Tests` runs.
+    In_Memory
+
+    ## The text the backend's test groups start with.
+    prefix self -> Text = case self of
+        Backend.Value name _ _ _ _ _ _ _ -> "[" + name + "] "
+        Backend.In_Memory -> "[In-Memory] "
+
+    ## Whether the backend lists `issue` among its known failures.
+    has_known_issue self issue:Known_Issue -> Boolean = case self of
+        Backend.Value _ _ _ _ known_failures _ _ _ -> known_failures.contains issue
+        Backend.In_Memory -> False

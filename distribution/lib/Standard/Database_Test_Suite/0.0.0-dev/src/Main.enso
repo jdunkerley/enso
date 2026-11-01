@@ -1,0 +1,22 @@
+from Standard.Base import all
+
+import project.Backend.Backend
+import project.Common_Table_Operations.Main.Test_Setup
+import project.Internal.Setups
+
+export project.Backend.Backend
+export project.Known_Issue.Known_Issue
+export project.Suite_Part.Suite_Part
+
+## Adds the parts of the suite that `backend` runs to `suite_builder`, and
+   returns the `Test_Setup` they use, so that the backend's own specs can share
+   its connection and table builders.
+
+   ## Arguments
+   - `suite_builder`: The builder the specs are added to.
+   - `backend`: The backend under test.
+add_specs suite_builder backend:Backend -> Test_Setup =
+    Setups.add_specs suite_builder backend
+
+## The suite's `data` directory, with `data.csv`.
+data_directory -> File = (Project_Description.new Standard.Database_Test_Suite.Main).data
