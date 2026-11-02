@@ -328,7 +328,12 @@ async function measureLaunch(
         })
       }
     })
-    page.on('websocket', (ws) => marks.add('wsOpen', { u: ws.url() }))
+    page.on('websocket', (ws) => {
+      marks.add('wsOpen', { u: ws.url() })
+      // The first frame sent: the socket is open (Note [The GUI Is Connected When Its Socket Is
+      // Open] in `openTimeReport.ts`).
+      ws.once('framesent', () => marks.add('wsUp', { u: ws.url() }))
+    })
     page.on('console', (m) =>
       out.write(`${Date.now()} console.${m.type()} ${m.text().slice(0, 400)}\n`),
     )

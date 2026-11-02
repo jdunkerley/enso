@@ -47,6 +47,7 @@ describe('openTimes', () => {
     { k: 'resp', t: t0 + 395, u: 'project/open' },
     { k: 'wsOpen', t: t0 + 420, u: 'ws://127.0.0.1:30617/project/other' },
     { k: 'wsOpen', t: t0 + 921, u: 'ws://127.0.0.1:30617/project/index?ls=x' },
+    { k: 'wsUp', t: t0 + 923, u: 'ws://127.0.0.1:30617/project/index?ls=x' },
     { k: 'first:firstNode', t: t0 + 1449 },
     { k: 'first:welcomeShown', t: t0 + 6811 },
     { k: 'second:click', t: t0 + 20_000 },
@@ -63,7 +64,7 @@ describe('openTimes', () => {
       engineUp: 190,
       lsReady: 260,
       openAnswered: 395,
-      guiConnected: 921,
+      guiConnected: 923,
       firstNode: 1449,
       firstExecution: 4574,
       welcomeShown: 6811,
@@ -71,6 +72,21 @@ describe('openTimes', () => {
   })
   test('takes the second open’s marks after its own click', () => {
     expect(openTimes(marks, 'second', undefined).openAnswered).toBe(400)
+  })
+  test('is connected when the ydoc socket is open, not when a refused attempt was made', () => {
+    // PR #504's Linux run: the port refused the first three sockets, and y-websocket retried after
+    // 200, 400 and 800 ms. Only the fourth opened (and sent its first frame).
+    const index = 'ws://127.0.0.1:30617/project/index?ls=x'
+    const retried: Mark[] = [
+      { k: 'first:click', t: t0 },
+      { k: 'resp', t: t0 + 276, u: 'project/open' },
+      { k: 'wsOpen', t: t0 + 327, u: index },
+      { k: 'wsOpen', t: t0 + 531, u: index },
+      { k: 'wsOpen', t: t0 + 940, u: index },
+      { k: 'wsOpen', t: t0 + 1743, u: index },
+      { k: 'wsUp', t: t0 + 1745, u: index },
+    ]
+    expect(openTimes(retried, 'first', undefined).guiConnected).toBe(1745)
   })
   test('falls back to the log’s first line when the launcher printed nothing', () => {
     const quiet = marks.filter((m) => m.k !== 'engineStdout')

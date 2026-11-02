@@ -120,6 +120,17 @@ export function parseLsLogLine(line: string): LsLogLine | null {
   }
 }
 
+/* Note [The GUI Is Connected When Its Socket Is Open]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Playwright's `websocket` event (the driver's `wsOpen` mark) fires when the page creates a
+ * WebSocket, before it connects, and again for every retry. When the ydoc port refuses the GUI,
+ * y-websocket retries after 200, 400 and 800 ms (`2 ** failures * 100`), so the first `wsOpen`
+ * is a refused attempt. On Linux, before the shim waited for the port, every open went so: four
+ * `/project/index` sockets, the first ~50 ms after the answer and the one that opened ~1.4 s
+ * later (PR #504's CI run), and `guiConnected` read the first. `guiConnected` is therefore the
+ * first frame the page sends on the socket (`wsUp`): y-websocket sends its sync step 1 in
+ * `onopen`, and a browser cannot send on a socket that is not open.
+ */
 const LS_MARKS = {
   lsReady: /^Started server at json/,
   firstExecution: /^The first execution finished\./,
@@ -141,7 +152,8 @@ export function openTimes(
     engineUp: rel(after((m) => m.k === 'engineStdout') ?? ls?.[0]?.time),
     lsReady: rel(logged(LS_MARKS.lsReady)),
     openAnswered: rel(after((m) => m.k === 'resp' && m.u === 'project/open')),
-    guiConnected: rel(after((m) => m.k === 'wsOpen' && (m.u ?? '').includes('/project/index'))),
+    // Note [The GUI Is Connected When Its Socket Is Open]
+    guiConnected: rel(after((m) => m.k === 'wsUp' && (m.u ?? '').includes('/project/index'))),
     firstExecution: rel(logged(LS_MARKS.firstExecution)),
   }
   for (const key of ['firstNode', 'welcomeShown', ...EXTRAS] as const) {
