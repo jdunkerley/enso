@@ -383,11 +383,14 @@ jobs:
       # and records when each phase of an open ends (spec
       # docs/superpowers/specs/2026-11-01-project-open-performance-design.md, section 2). It runs on
       # develop pushes, on pull requests with the `CI: Open perf` label and when started by hand
-      # (`open_perf`, and `open_perf_jvm` for the JVM beside native). It compares with the newest
-      # develop run's `open-perf-<os>` artifact and warns, never fails: shared runners are noisy,
-      # so these steps continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs).
+      # (`open_perf`, and `open_perf_jvm` for the JVM beside native). It compares with the median
+      # of the last five develop runs' `open-perf-<os>` artifacts (Note [Noisy Medians] in
+      # openTimeReport.ts) and warns, never fails: shared runners are noisy, so these steps
+      # continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs). The extras
+      # (component browser, `format` widget) share a 15 s budget per open (Note [Extras Are
+      # Bounded] in openTime.ts), so that five launches fit the 12-minute budget on Windows too.
       - if: env.OPEN_PERF == 'true'
-        name: Find develop's last open time
+        name: Download develop's last open times
         id: open-perf-baseline
         continue-on-error: true
         timeout-minutes: 5
@@ -398,21 +401,14 @@ jobs:
           OS: ${{ matrix.os }}
           RUN_ID: ${{ github.run_id }}
         run: |
-          run_id=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name="open-perf-$OS" -f per_page=50 \
+          run_ids=$(gh api -X GET "repos/$REPO/actions/artifacts" -f name="open-perf-$OS" -f per_page=50 \
             --jq "[.artifacts[] | select(.expired | not)
                    | select(.workflow_run.head_branch == \"develop\" and .workflow_run.head_repository_id == .workflow_run.repository_id)
-                   | select(.workflow_run.id != $RUN_ID)] | .[0].workflow_run.id // empty")
-          echo "run-id=$run_id" >> "$GITHUB_OUTPUT"
-      - if: env.OPEN_PERF == 'true' && steps.open-perf-baseline.outputs.run-id != ''
-        name: Download develop's last open time
-        continue-on-error: true
-        timeout-minutes: 5
-        uses: actions/download-artifact@v5
-        with:
-          name: open-perf-${{ matrix.os }}
-          path: open-perf-baseline
-          run-id: ${{ steps.open-perf-baseline.outputs.run-id }}
-          github-token: ${{ github.token }}
+                   | select(.workflow_run.id != $RUN_ID)] | .[0:5][].workflow_run.id")
+          for id in $run_ids; do
+            gh run download "$id" --repo "$REPO" --name "open-perf-$OS" --dir "open-perf-baseline/$id" \
+              || echo "Open time: no baseline from run $id"
+          done
       - if: env.OPEN_PERF == 'true' && matrix.os == 'linux'
         name: Measure the open time
         continue-on-error: true
@@ -421,7 +417,7 @@ jobs:
           xvfb-run corepack pnpm --filter enso run perf:open --out
           "$GITHUB_WORKSPACE/open-perf" --runs 5 --engines "$OPEN_PERF_ENGINES"
           --budget-minutes 12 --baseline
-          "$GITHUB_WORKSPACE/open-perf-baseline/open-time.json" --summary
+          "$GITHUB_WORKSPACE/open-perf-baseline" --summary
           "$GITHUB_STEP_SUMMARY"
       - if: env.OPEN_PERF == 'true' && matrix.os == 'windows'
         name: Measure the open time
@@ -431,7 +427,7 @@ jobs:
           corepack pnpm --filter enso run perf:open --out
           "$env:GITHUB_WORKSPACE/open-perf" --runs 5 --engines
           "$env:OPEN_PERF_ENGINES" --budget-minutes 12 --baseline
-          "$env:GITHUB_WORKSPACE/open-perf-baseline/open-time.json" --summary
+          "$env:GITHUB_WORKSPACE/open-perf-baseline" --summary
           "$env:GITHUB_STEP_SUMMARY"
       - if: env.OPEN_PERF == 'true' && !cancelled()
         name: Upload the open time
@@ -444,6 +440,7 @@ jobs:
             open-perf/open-time.json
             open-perf/open-time.md
             open-perf/*/marks.json
+            open-perf/*/*.png
             open-perf/*/logs
           if-no-files-found: warn
       - if: failure()

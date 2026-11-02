@@ -6,6 +6,7 @@ import {
   aotRejection,
   classifyTemplate,
   credentialFreeEnv,
+  developMedians,
   LAUNCHER_JVM_OPTIONS,
   median,
   notMeasured,
@@ -133,9 +134,75 @@ describe('regressionWarnings', () => {
     expect(warnings[0]).toContain('4200 ms')
   })
   test('one more than 15% worse than develop', () => {
-    const warnings = regressionWarnings(report([3500, 3500, 3500]), report([3000, 3000, 3000]))
-    expect(warnings).toHaveLength(1)
-    expect(warnings[0]).toContain('17%')
+    const warnings = regressionWarnings(
+      report([14500, 14500, 14500]),
+      report([12000, 12000, 12000]),
+    )
+    expect(warnings).toHaveLength(2) // over 4 s as well
+    expect(warnings[1]).toContain('21%')
+  })
+  test('none for a rise under the absolute delta, however large in percent', () => {
+    // 1000 ms is 33%, but no more than the noise of a launch.
+    expect(regressionWarnings(report([4000, 4000, 4000]), report([3000, 3000, 3000]))).toEqual([])
+  })
+  test('compares with the median of develop’s last runs, not the newest', () => {
+    // The newest develop run was lucky (8 s); the others sit near 11 s.
+    const develop = [8000, 11000, 12000, 10500, 11500].map((m) => report([m, m, m]))
+    expect(regressionWarnings(report([12500, 12500, 12500]), develop)).toEqual([
+      expect.stringContaining('over 4000 ms'),
+    ])
+    expect(regressionWarnings(report([12500, 12500, 12500]), develop[0])).toHaveLength(2)
+  })
+  test('says the spread of the launches and how many develop runs it compared with', () => {
+    const develop = [8000, 8000, 8000].map((m) => report([m, m, m]))
+    const warnings = regressionWarnings(report([12000, 14000, 16000]), develop)
+    expect(warnings[1]).toContain('launches 12000 to 16000 ms')
+    expect(warnings[1]).toContain("median of develop's last 3 runs")
+  })
+  test('uses only the newest five develop runs', () => {
+    const old = [1000, 1000, 1000].map((m) => report([m, m, m]))
+    const recent = [9000, 9000, 9000, 9000, 9000].map((m) => report([m, m, m]))
+    expect(developMedians(report([9000, 9000, 9000]), [...recent, ...old])[0]?.reports).toBe(5)
+  })
+  test('ignores a develop run with too few successful opens', () => {
+    const windows = report([9000, undefined]) // 2 launches: Windows CI before the extras were bounded
+    expect(developMedians(report([9000, 9000, 9000]), windows)).toEqual([])
+  })
+  // The seven develop runs of the open-performance review (I1), Linux, native, core template:
+  // their per-run medians span 8114 to 12608 ms with no relevant change between them.
+  const REVIEW_LINUX = [
+    [8509, 11550, 13830, 11239, 10795],
+    [15904, 9960, 8867, 14765, 6568],
+    [11787, 13667, 13105, 10297, 12358],
+    [6778, 8114, 8801, 7730, 8743],
+    [13506, 12509, 12363, 10244, 11761],
+    [9636, 15184, 14664, 11218, 12608],
+    [10522, 10895, 13272, 11771, 14856],
+  ].map((launches) => report(launches))
+  const worseThanDevelop = (warnings: string[]) => warnings.filter((w) => w.includes('worse'))
+  test('replayed: the docs-only PR (#508) is not a regression', () => {
+    // #508 measured 11963 ms; develop's newest run was 8114 ms, hence "47% worse". Develop's
+    // runs before it, newest first:
+    const before = [REVIEW_LINUX[3]!, REVIEW_LINUX[2]!, REVIEW_LINUX[1]!, REVIEW_LINUX[0]!]
+    const pr = report([13146, 14693, 11316, 11963, 11651])
+    expect(worseThanDevelop(regressionWarnings(pr, before))).toEqual([])
+    // The old rule, against the newest run alone, did warn.
+    expect(worseThanDevelop(regressionWarnings(pr, before[0]))).toHaveLength(1)
+  })
+  test('replayed: no later develop run is a regression against the runs before it', () => {
+    for (let i = 4; i < REVIEW_LINUX.length; i++) {
+      const before = REVIEW_LINUX.slice(0, i).reverse()
+      expect(worseThanDevelop(regressionWarnings(REVIEW_LINUX[i]!, before))).toEqual([])
+    }
+  })
+  test('replayed: a real slowdown of 3 s on top of the noise is still found', () => {
+    const last = REVIEW_LINUX[6]!
+    const slow = last.runs.map((r) => ({
+      ...r,
+      first: { welcomeShown: r.first.welcomeShown! + 3000 },
+    }))
+    const warnings = regressionWarnings({ ...last, runs: slow }, [...REVIEW_LINUX].reverse())
+    expect(worseThanDevelop(warnings)).toHaveLength(1)
   })
   test('one when fewer than 3 first opens succeeded', () => {
     const warnings = regressionWarnings(report([3000, undefined, undefined]), undefined)
@@ -177,6 +244,14 @@ describe('notMeasured', () => {
 })
 
 describe('renderMarkdown', () => {
+  test('names the number of develop runs and the spread of the launches', () => {
+    const text = renderMarkdown(report([3000, 3100, 3200]), [
+      report([2900, 2900, 2900]),
+      report([3100, 3100, 3100]),
+    ])
+    expect(text).toContain('first, develop (median of 2 runs)')
+    expect(text).toContain('welcome table from 3000 to 3200 ms')
+  })
   test('has a row per phase and the develop column when there is a baseline', () => {
     const text = renderMarkdown(report([3000, 3100, 3200]), report([2900, 2900, 2900]))
     expect(text).toContain('| **Welcome table visualisation shown** |')

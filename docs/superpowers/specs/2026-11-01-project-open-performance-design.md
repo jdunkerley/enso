@@ -131,3 +131,15 @@ and gives the before and after medians in its description.
   lookup is deferred.
 - Making the template not need `Standard.Visualization` (#474).
 - Performance after the project is open (editing, execution of large data).
+
+## Outcome (2026-11-02)
+
+What shipped differs from this document in two places; the text above is left as
+written.
+
+- Section 1.3: id-only edits do **not** go out with `execute: false` (#504). The
+  engine compiled without those ids, so their values would be lost; the template
+  carries its full id map instead (see `app/ydoc-server/CLAUDE.md`).
+- The table row "GUI opens the ydoc socket" for Linux (434 and 424 ms) is the
+  first, refused socket attempt, not the real connection (~1.75 s on CI). The
+  harness reads `guiConnected` from the first frame sent since #511.

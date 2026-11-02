@@ -13,8 +13,8 @@ import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde
 import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
 import {
   classifyTemplate,
-  comparable,
   credentialFreeEnv,
+  developMedians,
   notMeasured,
   openTimes,
   parseLsLogLine,
@@ -37,11 +37,12 @@ interface Options {
   readonly out: string
   readonly runs: number
   readonly engines: readonly Engine[]
-  readonly baseline: string | undefined
+  readonly baseline: readonly string[]
   readonly summary: string | undefined
   readonly exe: string
   readonly profile: boolean
   readonly budgetMinutes: number
+  readonly extrasMs: number
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -51,11 +52,12 @@ function parseOptions(argv: readonly string[]): Options {
       out: { type: 'string' },
       runs: { type: 'string', default: '5' },
       engines: { type: 'string', default: 'native' },
-      baseline: { type: 'string' },
+      baseline: { type: 'string', multiple: true },
       summary: { type: 'string' },
       exe: { type: 'string' },
       profile: { type: 'boolean', default: false },
       'budget-minutes': { type: 'string', default: '12' },
+      'extras-seconds': { type: 'string', default: '15' },
     },
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
@@ -68,11 +70,12 @@ function parseOptions(argv: readonly string[]): Options {
     out: path.resolve(values.out),
     runs: Number(values.runs ?? '5'),
     engines: engines as Engine[],
-    baseline: values.baseline,
+    baseline: values.baseline ?? [],
     summary: values.summary,
     exe: values.exe ?? electronExecutablePath,
     profile: values.profile ?? false,
     budgetMinutes: Number(values['budget-minutes'] ?? '12'),
+    extrasMs: Number(values['extras-seconds'] ?? '15') * 1000,
   }
 }
 
@@ -81,6 +84,9 @@ class Marks {
   readonly list: Mark[] = []
   add(k: string, extra: Record<string, unknown> = {}) {
     this.list.push({ k, t: Date.now(), ...extra })
+  }
+  has(k: string) {
+    return this.list.some((m) => m.k === k)
   }
 }
 
@@ -174,6 +180,7 @@ async function openProject(
   marks: Marks,
   dir: string,
   profile: boolean,
+  extrasMs: number,
 ) {
   const row = page.getByTestId('drive-view').getByText(name, { exact: true })
   await row.waitFor({ state: 'visible', timeout: 60_000 })
@@ -201,35 +208,66 @@ async function openProject(
     fs.writeFileSync(path.join(dir, `${tag}.cpuprofile`), JSON.stringify(cpuProfile))
     await cdp.detach()
   }
+  await measureExtras(page, tag, marks, dir, extrasMs)
+}
+
+/* Note [Extras Are Bounded]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The extras (component browser, `format` widget, dropdown) come after the headline and are driven
+ * by selectors. On the Windows runner none of them was ever reached, and each waited out its own
+ * timeout (60, 60, 30 and 60 s): ~212 s per open, so only 2 launches fitted the budget and the
+ * run had no median. All the extras of one open now share one budget (`--extras-seconds`, 15 s by
+ * default; a working extra needs ~5 s), after which the rest are skipped and recorded as not
+ * measured. A screenshot of the page is saved when one is missed (`<tag>-extras.png`), so the next
+ * run shows why the selector does not match.
+ */
+async function measureExtras(
+  page: Page,
+  tag: OpenTag,
+  marks: Marks,
+  dir: string,
+  extrasMs: number,
+) {
+  const end = Date.now() + extrasMs
+  const left = () => Math.max(1, end - Date.now())
   // After the headline: the component browser and the `format` dropdown, as the spike did.
   await page.waitForTimeout(300)
   const node = page.locator('.GraphNode').first()
-  await node.click({ position: { x: 10, y: 10 } }).catch(() => {})
+  await node.click({ position: { x: 10, y: 10 }, timeout: 5000 }).catch(() => {})
   await page.keyboard.press('Enter')
   await page
     .locator('.ComponentBrowser')
-    .waitFor({ state: 'visible', timeout: 60_000 })
+    .waitFor({ state: 'visible', timeout: left() })
     .catch(() => {})
   // The spike's three alternatives (`drive.cjs`), so a renamed class costs one, not the mark.
   const entries = page.locator(
     '.ComponentBrowser .ComponentList .component, .ComponentBrowser [class*="ComponentEntry"], .ComponentBrowser .list-variant .component',
   )
-  if (await poll(async () => (await entries.count()) > 5, 60_000)) marks.add(`${tag}:cbEntries`)
+  if (await poll(async () => (await entries.count()) > 5, left())) marks.add(`${tag}:cbEntries`)
   await page.keyboard.press('Escape')
-  await page.waitForTimeout(500)
-  await node.click({ position: { x: 10, y: 10 } }).catch(() => {})
-  const format = page.locator('.WidgetSelection', { hasText: /^format$/ })
-  if (await poll(async () => (await format.count()) > 0, 30_000)) {
-    marks.add(`${tag}:formatWidget`)
-    await format
-      .first()
-      .click()
+  if (Date.now() < end) {
+    await page.waitForTimeout(500)
+    await node.click({ position: { x: 10, y: 10 }, timeout: 5000 }).catch(() => {})
+    const format = page.locator('.WidgetSelection', { hasText: /^format$/ })
+    if (await poll(async () => (await format.count()) > 0, left())) {
+      marks.add(`${tag}:formatWidget`)
+      await format
+        .first()
+        .click()
+        .catch(() => {})
+      const items = page.locator(
+        '.DropdownWidget .item, .DropdownWidget li, .DropdownWidget [role="option"]',
+      )
+      if (await poll(async () => (await items.count()) > 3, Math.max(left(), 3000))) {
+        marks.add(`${tag}:dropdownItems`)
+      }
+      await page.keyboard.press('Escape')
+    }
+  }
+  if (!['cbEntries', 'formatWidget', 'dropdownItems'].every((k) => marks.has(`${tag}:${k}`))) {
+    await page
+      .screenshot({ path: path.join(dir, `${tag}-extras.png`), timeout: 5000 })
       .catch(() => {})
-    const items = page.locator(
-      '.DropdownWidget .item, .DropdownWidget li, .DropdownWidget [role="option"]',
-    )
-    if (await poll(async () => (await items.count()) > 3, 60_000)) marks.add(`${tag}:dropdownItems`)
-    await page.keyboard.press('Escape')
   }
 }
 
@@ -339,7 +377,7 @@ async function measureLaunch(
     )
     await page.getByTestId('drive-view').waitFor({ state: 'visible', timeout: 120_000 })
     for (const tag of opens) {
-      await openProject(page, names[tag], tag, marks, dir, options.profile)
+      await openProject(page, names[tag], tag, marks, dir, options.profile, options.extrasMs)
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
     }
@@ -405,18 +443,36 @@ async function packagedTemplate(options: Options): Promise<Template> {
   return classifyTemplate(main)
 }
 
-/** The baseline report; an unreadable or foreign one is no baseline, and is said to be ignored. */
-function readReport(file: string | undefined): OpenTimeReport | undefined {
-  if (!file || !fs.existsSync(file)) return undefined
-  try {
-    const report = JSON.parse(fs.readFileSync(file, 'utf8')) as OpenTimeReport
-    if (report.version !== 1 || !Array.isArray(report.runs))
-      throw new Error('not an open-time report')
-    return report
-  } catch (e) {
-    console.warn(`Open time: the baseline ${file} is unusable and is ignored: ${String(e)}`)
-    return undefined
-  }
+/** The `open-time.json` files at `target`: itself, or those in a directory, newest run id first. */
+function reportFiles(target: string): string[] {
+  if (!fs.existsSync(target)) return []
+  if (!fs.statSync(target).isDirectory()) return [target]
+  // One sub-directory per develop run, named by its (increasing) run id; or the report itself.
+  const direct = path.join(target, 'open-time.json')
+  if (fs.existsSync(direct)) return [direct]
+  return fs
+    .readdirSync(target)
+    .sort((a, b) => (Number(b) || 0) - (Number(a) || 0))
+    .map((d) => path.join(target, d, 'open-time.json'))
+    .filter((f) => fs.existsSync(f))
+}
+
+/**
+ * The baseline reports (Note [Noisy Medians] in `openTimeReport.ts`); an unreadable or foreign one
+ * is no baseline, and is said to be ignored.
+ */
+function readReports(targets: readonly string[]): OpenTimeReport[] {
+  return targets.flatMap(reportFiles).flatMap((file) => {
+    try {
+      const report = JSON.parse(fs.readFileSync(file, 'utf8')) as OpenTimeReport
+      if (report.version !== 1 || !Array.isArray(report.runs))
+        throw new Error('not an open-time report')
+      return [report]
+    } catch (e) {
+      console.warn(`Open time: the baseline ${file} is unusable and is ignored: ${String(e)}`)
+      return []
+    }
+  })
 }
 
 async function main() {
@@ -486,7 +542,7 @@ async function main() {
   }
   // First: whatever the baseline holds, the measurement is kept (and becomes the next baseline).
   fs.writeFileSync(path.join(options.out, 'open-time.json'), JSON.stringify(report, null, 1))
-  const baseline = readReport(options.baseline)
+  const baseline = readReports(options.baseline)
   const markdown = renderMarkdown(report, baseline)
   const warnings = regressionWarnings(report, baseline)
   fs.writeFileSync(path.join(options.out, 'open-time.md'), markdown)
@@ -501,7 +557,7 @@ async function main() {
       '## Open time',
       '',
       markdown,
-      ...(comparable(report, baseline) ?
+      ...(developMedians(report, baseline).length > 0 ?
         []
       : [`No develop baseline of the ${template} template to compare with.`, '']),
       ...warnings.map((w) => `- ⚠️ ${w}`),
