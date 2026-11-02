@@ -93,14 +93,71 @@ export function visualizationConfigPreprocessorEqual(
  * The engine runs each attached visualization as its own job, and a widget query that loads
  * libraries (the `format` dropdown's `File_Format.all` loads Image and SQLite, ~0.7 s cold) holds
  * the compilation lock ahead of the welcome table's visualization. So the visualizations attached
- * for widgets (`background`) wait until every visible one this context attached has answered or
- * failed, or `BACKGROUND_RELEASE_AFTER_EXECUTION_MS` after the first execution ended, whichever
- * comes first. After that they are attached as soon as they are configured: the hold is once per
- * context, at open.
+ * for widgets (`background`) wait while a visible one is pending: configured but not yet attached,
+ * or attached and not yet answered. Nothing is held when no visible visualization is pending, so a
+ * project with none waits for nothing. The hold ends, for good, at the first of: every visible one
+ * this context attached has answered or failed; `BACKGROUND_RELEASE_AFTER_EXECUTION_MS` after the
+ * first execution ended; `BACKGROUND_HOLD_CAP_MS` after the hold began, so that a long or
+ * never-ending first execution does not keep the widgets empty. After that widget queries are
+ * attached as soon as they are configured: the hold is once per context, at open.
+ *
+ * The cap: the hold begins when the first widget query is held, about when the first node is drawn
+ * (~1 s after the click on Windows, release build), and the welcome table shows ~2.9 s after that
+ * (median `welcomeShown` 3.9 s). 3 s therefore lets the welcome table go first on a typical open
+ * and bounds the wait for widgets everywhere else.
  */
 
 /** How long after the first execution held widget queries are attached regardless. */
 export const BACKGROUND_RELEASE_AFTER_EXECUTION_MS = 1000
+
+/** How long after the hold began held widget queries are attached regardless. */
+export const BACKGROUND_HOLD_CAP_MS = 3000
+
+/**
+ * The once-per-context hold on widget queries: see Note [Widget Queries After Visible
+ * Visualizations].
+ */
+export class BackgroundHold {
+  private released = false
+  private capTimer: ReturnType<typeof setTimeout> | undefined
+  private afterExecutionTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** @param onRelease Called once, when the hold ends. */
+  constructor(private readonly onRelease: () => void) {}
+
+  /**
+   * Whether to hold widget queries now, given whether a visible visualization is pending. The
+   * first hold starts the cap.
+   */
+  holds(foregroundPending: boolean): boolean {
+    if (this.released || !foregroundPending) return false
+    this.capTimer ??= setTimeout(() => this.release(), BACKGROUND_HOLD_CAP_MS)
+    return true
+  }
+
+  /** The first execution ended (completed or failed). */
+  executionEnded() {
+    if (this.released || this.afterExecutionTimer != null) return
+    this.afterExecutionTimer = setTimeout(
+      () => this.release(),
+      BACKGROUND_RELEASE_AFTER_EXECUTION_MS,
+    )
+  }
+
+  /** End the hold. */
+  release() {
+    if (this.released) return
+    this.released = true
+    this.dispose()
+    this.onRelease()
+  }
+
+  /** Stop the timers. */
+  dispose() {
+    clearTimeout(this.capTimer)
+    clearTimeout(this.afterExecutionTimer)
+  }
+}
 
 /** The configurations to attach, visible ones first; widget queries only once released. */
 export function visualizationsToAttach<K>(
@@ -194,8 +251,9 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
 
   /** Visualizations attached for widgets: see Note [Widget Queries After Visible Visualizations]. */
   private backgroundVisualizations = new Set<Uuid>()
-  private backgroundReleased = false
-  private releaseTimer: ReturnType<typeof setTimeout> | undefined
+  private backgroundHold = new BackgroundHold(() => {
+    if (this.backgroundVisualizations.size > 0) this.sync()
+  })
   /** The slots of the attached visible visualizations. */
   private foregroundSlots = new Set<VisRequestId>()
   private unobserveSlots: (() => void) | null = null
@@ -248,13 +306,13 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
     })
     this.abort.handleObserve(this.lsRpc, 'executionContext/executionFailed', (event) => {
       if (event.contextId == this.id) {
-        this.startReleaseTimer()
+        this.backgroundHold.executionEnded()
         this.emit('executionFailed', [event.message])
       }
     })
     this.abort.handleObserve(this.lsRpc, 'executionContext/executionComplete', (event) => {
       if (event.contextId == this.id) {
-        this.startReleaseTimer()
+        this.backgroundHold.executionEnded()
         this.emit('executionComplete', [])
       }
     })
@@ -282,26 +340,11 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
     })
   }
 
-  private startReleaseTimer() {
-    if (this.backgroundReleased || this.releaseTimer != null) return
-    this.releaseTimer = setTimeout(
-      () => this.releaseBackground(),
-      BACKGROUND_RELEASE_AFTER_EXECUTION_MS,
-    )
-  }
-
   private releaseBackgroundIfSettled() {
     const vis = this.visualizations
-    if (this.backgroundReleased || !vis) return
+    if (!vis) return
     if (foregroundSettled(this.foregroundSlots, (rid) => vis.getSlot(rid)?.status))
-      this.releaseBackground()
-  }
-
-  private releaseBackground() {
-    if (this.backgroundReleased) return
-    this.backgroundReleased = true
-    clearTimeout(this.releaseTimer)
-    if (this.backgroundVisualizations.size > 0) this.sync()
+      this.backgroundHold.release()
   }
 
   private pushItem(item: StackItem) {
@@ -409,7 +452,7 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
   dispose() {
     this.unobserveVisDoc?.()
     this.unobserveVisDoc = null
-    clearTimeout(this.releaseTimer)
+    this.backgroundHold.dispose()
     this.unobserveSlots?.()
     this.unobserveSlots = null
     this.queue.pushTask(async (state) => {
@@ -575,10 +618,20 @@ export class ExecutionContext extends ObservableV2<ExecutionContextNotification>
         // Attach new and update existing visualizations. Modify is always a
         // detach+attach: every change gets a new slot with a new request id so
         // the response is unambiguously paired with its preprocessor.
+        // Note [Widget Queries After Visible Visualizations]
+        const foregroundPending = [...this.visualizationConfigs].some(([id, config]) => {
+          if (this.backgroundVisualizations.has(id)) return false
+          const previousConfig = state.visualizations.get(id)
+          const requestId = state.visualizationSlotByVisId.get(id)
+          if (previousConfig == null || requestId == null) return true
+          if (!visualizationConfigEqual(previousConfig, config)) return true
+          return vis.getSlot(requestId)?.status === 'pending'
+        })
+        const held = this.backgroundHold.holds(foregroundPending)
         for (const [id, config] of visualizationsToAttach(
           this.visualizationConfigs,
           this.backgroundVisualizations,
-          this.backgroundReleased,
+          !held,
         )) {
           const previousConfig = state.visualizations.get(id)
           if (previousConfig == null) {

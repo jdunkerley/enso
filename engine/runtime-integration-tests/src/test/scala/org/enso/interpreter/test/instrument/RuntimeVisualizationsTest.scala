@@ -696,7 +696,8 @@ class RuntimeVisualizationsTest
       )
     )
 
-  // Note [Visualisations Evaluated Alone Or By Their Execution] in UpsertVisualizationJob. The
+  // A visualisation attached during an execution is deferred and evaluated by that execution's own
+  // pass over the unevaluated visualisations (ProgramExecutionSupport), never beside it. The
   // commands run concurrently, as in the IDE, so the attach arrives while `main` sleeps.
   it should "evaluate a visualisation attached during an execution in that execution, not beside it" in withContext(
     sequentialExecution   = false,

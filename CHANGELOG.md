@@ -2,8 +2,7 @@
 
 #### Enso IDE
 
-- [Projects open faster: a new project shows its first table in up to half the
-  time it took.][509]
+- [Projects open faster: a new project shows its first table sooner.][509]
 - [New projects import only Base, Table, Database, Examples and Visualization
   instead of a dozen libraries. Components of other libraries stay in the
   component browser, and using one adds its import.][482]
