@@ -465,6 +465,7 @@ jobs:
         name: Measure the open time
         continue-on-error: true
         timeout-minutes: ${{ inputs.open_perf_engines && 180 || inputs.open_perf_jvm && 60 || 25 }}
+        shell: pwsh
         run: |
           $extra = @()
           if ($env:OPEN_PERF_DIAGNOSTICS -eq 'true') { $extra += '--jvm-diagnostics' }
