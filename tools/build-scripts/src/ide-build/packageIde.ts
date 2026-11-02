@@ -12,6 +12,7 @@ import {
   retryDelays,
   targetOs,
 } from './ideBuild.ts'
+import { verifyDmgs } from './verifyDmg.ts'
 
 /** `dist/<name>` under the repository: the packaging's inputs (`gui`, `backend`) and output (`ide`). */
 export function distDir(name: 'gui' | 'backend' | 'ide'): string {
@@ -57,7 +58,8 @@ export interface PackageOptions {
 /**
  * Runs `build:ide` and `dist:ide` over `dist/gui` and `dist/backend`, with the variables
  * electron-builder reads, leaving the installer and its `.sha256` in `dist/ide`. Throws when a step
- * fails, or when `dist/backend` holds no engine.
+ * fails, when `dist/backend` holds no engine, or (on macOS) when a dmg's app fails its signature
+ * check.
  */
 export function packageIde(options: PackageOptions): void {
   const backendDir = distDir('backend')
@@ -85,4 +87,5 @@ export function packageIde(options: PackageOptions): void {
       throw new Error(`\`corepack pnpm ${step.args.join(' ')}\` failed (exit ${status}).`)
     }
   }
+  if (targetOs(process.platform) === 'macos') verifyDmgs(distDir('ide'))
 }
