@@ -76,5 +76,19 @@ trait UniqueJob[A] { self: Job[A] =>
   * in the queue, as decided by the `equalsTo` method. Unlike regular
   * [[UniqueJob]] which cancels previous duplicates, this trait prevents
   * the new job from being scheduled at all.
+  *
+  * On the regular queue, a duplicate that is already past the point where it
+  * would see the new request's cause does not absorb it: the new job then
+  * runs once that duplicate ends (Note [A Duplicate Must Not Drop A Needed
+  * Job] in `JobExecutionEngine`).
   */
-trait SkipSchedulingUniqueJob { self: UniqueJob[java.lang.Void] => }
+trait SkipSchedulingUniqueJob {
+  self: Job[java.lang.Void] with UniqueJob[java.lang.Void] =>
+
+  /** Whether this job, queued or running, will still do all the work of an
+    * equal job requested now, so that the new one can be dropped.
+    *
+    * The default holds until the job has started.
+    */
+  def coversJobsRequestedNow(): Boolean = !hasStarted()
+}

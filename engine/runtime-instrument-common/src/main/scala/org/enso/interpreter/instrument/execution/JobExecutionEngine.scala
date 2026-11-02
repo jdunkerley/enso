@@ -204,14 +204,85 @@ final class JobExecutionEngine(
   /** @inheritdoc */
   override def run[A](job: Job[A]): Future[A] =
     synchronized {
-      if (handleDuplicateJobs(job, runningJobsRef)) {
-        logger.trace("Skipping duplicate job [{}].", job)
-        return Future.successful(null.asInstanceOf[A])
+      job match {
+        case _: SkipSchedulingUniqueJob =>
+          val duplicates = runningDuplicates(
+            job.asInstanceOf[UniqueJob[_]],
+            runningJobsRef
+          )
+          if (duplicates.exists(coversJobsRequestedNow)) {
+            logger.trace("Skipping duplicate job [{}].", job)
+            return Future.successful(null.asInstanceOf[A])
+          }
+          duplicates.headOption match {
+            case Some(running) =>
+              if (runAfter.putIfAbsent(running.id, job) == null) {
+                logger.debug(
+                  "Running duplicate job [{}] after job {} ends.",
+                  job,
+                  running.id
+                )
+              } else {
+                logger.trace(
+                  "Skipping duplicate job [{}]: one already runs after job {}.",
+                  job,
+                  running.id
+                )
+              }
+              return Future.successful(null.asInstanceOf[A])
+            case None =>
+          }
+        case _ =>
+          cancelDuplicateJobs(job, runningJobsRef)
       }
       val executor =
         if (job.highPriority) highPriorityJobExecutor else jobExecutor
       runInternal(job, executor, runningJobsRef, "regular")
     }
+
+  /* Note [A Duplicate Must Not Drop A Needed Job]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * A `SkipSchedulingUniqueJob` is not scheduled while an equal job is in the
+   * queue, because that job will do the same work. That only holds while the
+   * equal job has not yet passed the point where it would see what the new
+   * request is about. An `ExecuteJob` evaluates the visualizations deferred to
+   * it in passes during and at the end of its program; a visualization
+   * deferred after the last pass, while the job is still sending
+   * `ExecutionComplete` and releasing its locks, was dropped with the
+   * `ExecuteJob` its attach asked for, and waited for whatever execution came
+   * next (#510: the welcome table at project open, 150 ms to 2.7 s, or never).
+   *
+   * So on the regular queue a duplicate is dropped only when an equal job
+   * still `coversJobsRequestedNow` (for `ExecuteJob`: it has not started its
+   * program, so it may be waiting for its locks, which is the case the skip
+   * was made for). Otherwise the new job runs once the equal job ends, from
+   * `runInternal`, and at most one such job waits per running job. It is
+   * never run beside the equal job, and it takes its locks as any job does.
+   */
+
+  /** Jobs to run once the running job of the given id has ended. Guarded by
+    * `this`.
+    */
+  private val runAfter = new util.HashMap[UUID, Job[_]]()
+
+  private def coversJobsRequestedNow(runningJob: RunningJob): Boolean =
+    runningJob.job match {
+      case job: SkipSchedulingUniqueJob => job.coversJobsRequestedNow()
+      case _                            => false
+    }
+
+  private def runningDuplicates(
+    job: UniqueJob[_],
+    runningJobsRef: AtomicReference[Vector[RunningJob]]
+  ): Vector[RunningJob] =
+    runningJobsRef
+      .updateAndGet(_.filterNot(_.future.isCancelled))
+      .filter { runningJob =>
+        runningJob.job match {
+          case jobRef: UniqueJob[_] => jobRef.equalsTo(job)
+          case _                    => false
+        }
+      }
 
   /** Returns `true` if the job should be skipped (not scheduled).
     * For [[SkipSchedulingUniqueJob]], checks if a duplicate exists.
@@ -332,12 +403,29 @@ final class JobExecutionEngine(
           logger.error(s"Error executing $job", err)
           throw err
       } finally {
-        val remaining = runningJobsRef.updateAndGet(_.filterNot(_.id == jobId))
-        logger.trace(
-          "Number of remaining pending {} jobs: {}",
-          queueName,
-          remaining.size
-        )
+        val next = JobExecutionEngine.this.synchronized {
+          val remaining =
+            runningJobsRef.updateAndGet(_.filterNot(_.id == jobId))
+          logger.trace(
+            "Number of remaining pending {} jobs: {}",
+            queueName,
+            remaining.size
+          )
+          Option(runAfter.remove(jobId))
+        }
+        next.foreach { nextJob =>
+          logger.debug(
+            "Running job [{}] now that job {} ended.",
+            nextJob,
+            jobId
+          )
+          try {
+            run(nextJob)
+          } catch {
+            case NonFatal(ex) =>
+              logger.warn(s"Could not run $nextJob after job $jobId", ex)
+          }
+        }
       }
     })
 
