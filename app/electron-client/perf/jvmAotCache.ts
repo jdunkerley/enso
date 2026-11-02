@@ -51,6 +51,18 @@ export interface JvmAotCache {
  */
 const AOT_LOGGING = '-Xlog:aot=info,cds=info'
 
+/* Note [The Training Launch Needs A Longer Start-up Timeout]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The project service kills an engine that has not passed its first health check within 30 s.
+ * The training launch is a JVM with no class data sharing at all (the bundled runtime has no
+ * default CDS archive) that also records every class it loads; on the Windows runner it was still
+ * starting the Language Server after 30 s (run 41509148874: "Language server startup timeout",
+ * the engine killed at 30.0 s), so it never exited by itself, wrote no configuration, and every
+ * Windows JVM run fell back to a `launcher-trained` cache. The training launch gives the engine
+ * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `ProjectService.default`).
+ */
+const TRAINING_STARTUP_TIMEOUT_MS = 180_000
+
 /** How long `-XX:AOTMode=create` may take. */
 const CREATE_TIMEOUT_MS = 5 * 60_000
 
@@ -90,6 +102,7 @@ async function prepareJvmAotCache(
     {
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config} ${AOT_LOGGING}`,
+      ENSO_ENGINE_STARTUP_TIMEOUT_MS: String(TRAINING_STARTUP_TIMEOUT_MS),
     },
     ['first'],
     'jvm-aot-train',

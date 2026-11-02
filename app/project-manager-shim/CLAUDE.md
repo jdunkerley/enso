@@ -73,7 +73,11 @@ engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
 (#336). Not covered: another program that answers `/_health` with a success
 before the engine has failed to bind. The start-up checks run every 25 ms for
 the first second and every 250 ms after (Note [Start-up Health Polling] in
-`ensoRunner.ts`).
+`ensoRunner.ts`). An engine that has not passed `/_health` within 30 s is
+killed; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens that in
+`ProjectService.default` (the open-time harness's JDK AOT training launch needs
+it on Windows, where a `--jvm` engine with no class data sharing, recording its
+classes, took longer).
 
 `project/open` is also answered only once the engine's ydoc port accepts a
 connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in

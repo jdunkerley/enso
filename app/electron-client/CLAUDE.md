@@ -775,16 +775,21 @@ bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
 it: with `on` a JVM that cannot use the cache fails to start, and so does every
 measured launch). So a JVM run takes several minutes longer than a native one.
 The report says how the cache was made (`jvmAot`): `ide-trained` (the training
-is a launch of the IDE), `launcher-trained` (where the IDE kills the engine, as
-on Windows, the JVM never writes the training file, so it is `enso --jvm --run`
-of an empty project: it never loads the Language Server or `project/open`
-classes, so those JVM numbers are pessimistic and not comparable with
-`ide-trained` ones) or `uncached` (the JVM refused the cache; the numbers are
-those of a JVM with no AOT cache, and the report warns). `LAUNCHER_JVM_OPTIONS`
-copies the options of `Main.launchJvm`; a unit test fails when they drift. The
-training and check launches keep their own directories (`jvm-aot-train/`,
-`jvm-aot-check/`, with the JVM's `aot` and `cds` records at `info` in
-`electron-out.log`), and a launch that fails saves `failed.png`.
+is a launch of the IDE), `launcher-trained` (when the IDE training launch wrote
+no training file, it is `enso --jvm --run` of an empty project: it never loads
+the Language Server or `project/open` classes, so those JVM numbers are
+pessimistic and not comparable with `ide-trained` ones) or `uncached` (the JVM
+refused the cache; the numbers are those of a JVM with no AOT cache, and the
+report warns). `LAUNCHER_JVM_OPTIONS` copies the options of `Main.launchJvm`; a
+unit test fails when they drift. The training and check launches keep their own
+directories (`jvm-aot-train/`, `jvm-aot-check/`, with the JVM's `aot` and `cds`
+records at `info` in `electron-out.log`), and a launch that fails saves
+`failed.png`. On Windows the IDE training launch was always `launcher-trained`:
+the recording JVM, which has no class data sharing at all (the bundled runtime
+has no default CDS archive), had not passed its first health check after 30 s,
+so the project service killed it before it could write the file. The training
+launch now gives it 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`; Note [The Training
+Launch Needs A Longer Start-up Timeout] in `perf/jvmAotCache.ts`).
 
 `--engines jvm-nocache` is the JVM with no AOT cache of ours, what `--jvm` gives
 a user, so `native,jvm-nocache,jvm` measures what the cache is worth. Every JVM
