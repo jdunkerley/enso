@@ -271,6 +271,27 @@ async function measureExtras(
   }
 }
 
+/* Note [The Window Must Be Big Enough]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * On the Windows runner the window is ~1008 x 681 (the screenshot of a missed extra shows it): the
+ * layout then leaves the graph editor no room (the drive and the documentation panels fill the
+ * page), the node cannot be clicked, and the component browser never opens, so every extra timed
+ * out. A window under 1200 x 800 is made 1600 x 1000 before the first open; its size is recorded
+ * (`window` mark).
+ */
+async function ensureWindowSize(app: ElectronApplication, page: Page, marks: Marks) {
+  const size = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  marks.add('window', size)
+  if (size.w >= 1200 && size.h >= 800) return
+  await app
+    .evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setContentSize(1600, 1000)
+    })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  marks.add('window', await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight })))
+}
+
 async function closeProject(page: Page, name: string) {
   await page.getByRole('tab', { name }).locator('.CloseButton').click()
   // "Keep versions of your projects with git?" may ask first (see `answerRepositoryPrompt`).
@@ -376,6 +397,7 @@ async function measureLaunch(
       out.write(`${Date.now()} console.${m.type()} ${m.text().slice(0, 400)}\n`),
     )
     await page.getByTestId('drive-view').waitFor({ state: 'visible', timeout: 120_000 })
+    await ensureWindowSize(app, page, marks)
     for (const tag of opens) {
       await openProject(page, names[tag], tag, marks, dir, options.profile, options.extrasMs)
       await closeProject(page, names[tag])
