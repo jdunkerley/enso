@@ -708,7 +708,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm-nocache,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm-nocache,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -793,9 +793,11 @@ and initialisation time, classes from the AOT cache, HotSpot compiler and GC
 time) when the first node and the welcome table show and after the extras (Note
 [JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
 engine, outside the medians (`<engine>-diag/`), that traces Truffle's
-compilations (Note [Truffle Diagnostics]). CI uploads `electron-out.log` and
-`hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
-`open_perf_runs`, `open_perf_budget` and `open_perf_diagnostics`.
+compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
+to the measured JVM launches, for an experiment. CI uploads `electron-out.log`
+and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
+`open_perf_runs`, `open_perf_budget`, `open_perf_diagnostics` and
+`open_perf_jvm_options`.
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and

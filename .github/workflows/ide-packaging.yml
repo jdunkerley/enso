@@ -54,6 +54,13 @@ on:
         required: false
         type: boolean
         default: false
+      open_perf_jvm_options:
+        description: >-
+          JVM options added to the measured JVM launches, for an experiment (e.g.
+          `-XX:TieredStopAtLevel=1`).
+        required: false
+        type: string
+        default: ""
   workflow_call:
     inputs:
       build_backend:
@@ -319,6 +326,7 @@ jobs:
       OPEN_PERF_RUNS: ${{ inputs.open_perf_runs || '5' }}
       OPEN_PERF_BUDGET: ${{ inputs.open_perf_budget || '12' }}
       OPEN_PERF_DIAGNOSTICS: ${{ inputs.open_perf_diagnostics == true }}
+      OPEN_PERF_JVM_OPTIONS: ${{ inputs.open_perf_jvm_options }}
     strategy:
       fail-fast: false
       matrix:
@@ -418,7 +426,8 @@ jobs:
       # Bounded] in openTime.ts), so that five launches fit the 12-minute budget on Windows too.
       # By hand, `open_perf_engines`, `open_perf_runs`, `open_perf_budget` and
       # `open_perf_diagnostics` choose the engines, the launches and minutes per engine, and the
-      # Truffle diagnostics launch; a run that names the engines gets 180 minutes to measure.
+      # Truffle diagnostics launch, and `open_perf_jvm_options` adds JVM options to the measured
+      # JVM launches; a run that names the engines gets 180 minutes to measure.
       - if: env.OPEN_PERF == 'true'
         name: Download develop's last open times
         id: open-perf-baseline
@@ -446,6 +455,7 @@ jobs:
         run: |
           extra=()
           if [ "$OPEN_PERF_DIAGNOSTICS" = true ]; then extra+=(--jvm-diagnostics); fi
+          if [ -n "$OPEN_PERF_JVM_OPTIONS" ]; then extra+=("--jvm-options=$OPEN_PERF_JVM_OPTIONS"); fi
           xvfb-run corepack pnpm --filter enso run perf:open --out \
             "$GITHUB_WORKSPACE/open-perf" --runs "$OPEN_PERF_RUNS" --engines "$OPEN_PERF_ENGINES" \
             --budget-minutes "$OPEN_PERF_BUDGET" --baseline \
@@ -458,6 +468,7 @@ jobs:
         run: |
           $extra = @()
           if ($env:OPEN_PERF_DIAGNOSTICS -eq 'true') { $extra += '--jvm-diagnostics' }
+          if ($env:OPEN_PERF_JVM_OPTIONS) { $extra += "--jvm-options=$env:OPEN_PERF_JVM_OPTIONS" }
           corepack pnpm --filter enso run perf:open --out `
             "$env:GITHUB_WORKSPACE/open-perf" --runs "$env:OPEN_PERF_RUNS" --engines `
             "$env:OPEN_PERF_ENGINES" --budget-minutes "$env:OPEN_PERF_BUDGET" --baseline `

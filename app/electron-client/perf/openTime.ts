@@ -45,6 +45,7 @@ interface Options {
   readonly budgetMinutes: number
   readonly extrasMs: number
   readonly jvmDiagnostics: boolean
+  readonly jvmOptions: string
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -61,6 +62,7 @@ function parseOptions(argv: readonly string[]): Options {
       'budget-minutes': { type: 'string', default: '12' },
       'extras-seconds': { type: 'string', default: '15' },
       'jvm-diagnostics': { type: 'boolean', default: false },
+      'jvm-options': { type: 'string', default: '' },
     },
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
@@ -82,6 +84,7 @@ function parseOptions(argv: readonly string[]): Options {
     budgetMinutes: Number(values['budget-minutes'] ?? '12'),
     extrasMs: Number(values['extras-seconds'] ?? '15') * 1000,
     jvmDiagnostics: values['jvm-diagnostics'] ?? false,
+    jvmOptions: values['jvm-options'] ?? '',
   }
 }
 
@@ -616,6 +619,17 @@ async function main() {
       }
     } else if (engine === 'jvm-nocache') {
       extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
+    }
+    if (engine !== 'native' && options.jvmOptions.trim() !== '') {
+      // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): the measured launches
+      // only, not the AOT cache's training. Said in the log, as the report does not record it.
+      console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
+      extraEnv = {
+        ...extraEnv,
+        JAVA_TOOL_OPTIONS: [extraEnv.JAVA_TOOL_OPTIONS, options.jvmOptions]
+          .filter((o) => o != null)
+          .join(' '),
+      }
     }
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
