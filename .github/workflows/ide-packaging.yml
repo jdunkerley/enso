@@ -30,6 +30,30 @@ on:
         required: false
         type: boolean
         default: false
+      open_perf_engines:
+        description: >-
+          The engines to measure, overriding open_perf_jvm: `native`, `jvm` (with an AOT cache),
+          `jvm-nocache`, comma-separated.
+        required: false
+        type: string
+        default: ""
+      open_perf_runs:
+        description: Launches per engine.
+        required: false
+        type: string
+        default: "5"
+      open_perf_budget:
+        description: Minutes per engine (a JVM engine's AOT cache counts against its own).
+        required: false
+        type: string
+        default: "12"
+      open_perf_diagnostics:
+        description: >-
+          One more launch per JVM engine, not in the medians, tracing Truffle's compilations
+          (Note [Truffle Diagnostics] in openTime.ts).
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       build_backend:
@@ -288,10 +312,13 @@ jobs:
     runs-on: ${{ matrix.runner }}
     # 30 as before; only a run that measures gets more (the measuring steps have timeouts of their
     # own, which `continue-on-error` absorbs, so a runaway never reaches this one).
-    timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_jvm && 120 || 75) || 30 }}
+    timeout-minutes: ${{ (inputs.open_perf == true || inputs.open_perf == 'true') && (inputs.open_perf_engines && 240 || inputs.open_perf_jvm && 120 || 75) || 30 }}
     env:
       OPEN_PERF: ${{ inputs.open_perf == true || inputs.open_perf == 'true' }}
-      OPEN_PERF_ENGINES: ${{ inputs.open_perf_jvm && 'native,jvm' || 'native' }}
+      OPEN_PERF_ENGINES: ${{ inputs.open_perf_engines || (inputs.open_perf_jvm && 'native,jvm' || 'native') }}
+      OPEN_PERF_RUNS: ${{ inputs.open_perf_runs || '5' }}
+      OPEN_PERF_BUDGET: ${{ inputs.open_perf_budget || '12' }}
+      OPEN_PERF_DIAGNOSTICS: ${{ inputs.open_perf_diagnostics == true }}
     strategy:
       fail-fast: false
       matrix:
@@ -389,6 +416,9 @@ jobs:
       # continue on error (`checkOpenPerf` in tools/ci/check-workflows.mjs). The extras
       # (component browser, `format` widget) share a 15 s budget per open (Note [Extras Are
       # Bounded] in openTime.ts), so that five launches fit the 12-minute budget on Windows too.
+      # By hand, `open_perf_engines`, `open_perf_runs`, `open_perf_budget` and
+      # `open_perf_diagnostics` choose the engines, the launches and minutes per engine, and the
+      # Truffle diagnostics launch; a run that names the engines gets 180 minutes to measure.
       - if: env.OPEN_PERF == 'true'
         name: Download develop's last open times
         id: open-perf-baseline
@@ -412,23 +442,27 @@ jobs:
       - if: env.OPEN_PERF == 'true' && matrix.os == 'linux'
         name: Measure the open time
         continue-on-error: true
-        timeout-minutes: ${{ inputs.open_perf_jvm && 60 || 25 }}
-        run: >-
-          xvfb-run corepack pnpm --filter enso run perf:open --out
-          "$GITHUB_WORKSPACE/open-perf" --runs 5 --engines "$OPEN_PERF_ENGINES"
-          --budget-minutes 12 --baseline
-          "$GITHUB_WORKSPACE/open-perf-baseline" --summary
-          "$GITHUB_STEP_SUMMARY"
+        timeout-minutes: ${{ inputs.open_perf_engines && 180 || inputs.open_perf_jvm && 60 || 25 }}
+        run: |
+          extra=()
+          if [ "$OPEN_PERF_DIAGNOSTICS" = true ]; then extra+=(--jvm-diagnostics); fi
+          xvfb-run corepack pnpm --filter enso run perf:open --out \
+            "$GITHUB_WORKSPACE/open-perf" --runs "$OPEN_PERF_RUNS" --engines "$OPEN_PERF_ENGINES" \
+            --budget-minutes "$OPEN_PERF_BUDGET" --baseline \
+            "$GITHUB_WORKSPACE/open-perf-baseline" --summary \
+            "$GITHUB_STEP_SUMMARY" "${extra[@]}"
       - if: env.OPEN_PERF == 'true' && matrix.os == 'windows'
         name: Measure the open time
         continue-on-error: true
-        timeout-minutes: ${{ inputs.open_perf_jvm && 60 || 25 }}
-        run: >-
-          corepack pnpm --filter enso run perf:open --out
-          "$env:GITHUB_WORKSPACE/open-perf" --runs 5 --engines
-          "$env:OPEN_PERF_ENGINES" --budget-minutes 12 --baseline
-          "$env:GITHUB_WORKSPACE/open-perf-baseline" --summary
-          "$env:GITHUB_STEP_SUMMARY"
+        timeout-minutes: ${{ inputs.open_perf_engines && 180 || inputs.open_perf_jvm && 60 || 25 }}
+        run: |
+          $extra = @()
+          if ($env:OPEN_PERF_DIAGNOSTICS -eq 'true') { $extra += '--jvm-diagnostics' }
+          corepack pnpm --filter enso run perf:open --out `
+            "$env:GITHUB_WORKSPACE/open-perf" --runs "$env:OPEN_PERF_RUNS" --engines `
+            "$env:OPEN_PERF_ENGINES" --budget-minutes "$env:OPEN_PERF_BUDGET" --baseline `
+            "$env:GITHUB_WORKSPACE/open-perf-baseline" --summary `
+            "$env:GITHUB_STEP_SUMMARY" @extra
       - if: env.OPEN_PERF == 'true' && !cancelled()
         name: Upload the open time
         continue-on-error: true
@@ -442,6 +476,8 @@ jobs:
             open-perf/*/marks.json
             open-perf/*/*.png
             open-perf/*/logs
+            open-perf/*/electron-out.log
+            open-perf/*/hsperf
           if-no-files-found: warn
       - if: failure()
         name: Upload Test Traces

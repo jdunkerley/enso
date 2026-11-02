@@ -16,9 +16,11 @@ import {
   type RunResult,
 } from './openTimeReport'
 
+/** A launch of the IDE; `label` names its directory under `<out>`, so that its logs are kept. */
 type Launch = (
   env: Record<string, string>,
   opens: readonly OpenTag[],
+  label: string,
 ) => Promise<RunResult & { readonly stdout: string }>
 
 /** Runs a new project to its end with the launcher, under the given environment. */
@@ -42,6 +44,12 @@ export interface JvmAotCache {
   /** Why the JVM refused the cache, when `cache` is `undefined`. */
   readonly rejection?: string
 }
+
+/**
+ * The training and check launches log what the JVM does with the cache (`info` records, which
+ * `aotRejection` ignores) to the engine's output, kept in their `electron-out.log`.
+ */
+const AOT_LOGGING = '-Xlog:aot=info,cds=info'
 
 /** How long `-XX:AOTMode=create` may take. */
 const CREATE_TIMEOUT_MS = 5 * 60_000
@@ -81,9 +89,10 @@ async function prepareJvmAotCache(
   const training = await launch(
     {
       ENSO_ENGINE_ARGS: '--jvm',
-      JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config}`,
+      JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config} ${AOT_LOGGING}`,
     },
     ['first'],
+    'jvm-aot-train',
   )
   let trained: JvmAotCache['training'] = 'ide-trained'
   if (!fs.existsSync(config)) {
@@ -132,8 +141,12 @@ async function prepareJvmAotCache(
   // open the project; one that can prints nothing. This launch keeps the JVM's logging on, so the
   // reason (a `[cds]` or `[aot]` record, a mismatch) is found in the output too.
   const check = await launch(
-    { ENSO_ENGINE_ARGS: '--jvm', JAVA_TOOL_OPTIONS: `-XX:AOTMode=on -XX:AOTCache=${cache}` },
+    {
+      ENSO_ENGINE_ARGS: '--jvm',
+      JAVA_TOOL_OPTIONS: `-XX:AOTMode=on -XX:AOTCache=${cache} ${AOT_LOGGING}`,
+    },
     ['first'],
+    'jvm-aot-check',
   )
   const reason =
     aotRejection(check.stdout) ??

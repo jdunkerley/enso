@@ -38,7 +38,12 @@ export const HEADLINE: Phase = 'welcomeShown'
 
 /** Milliseconds from the click on the project's row. */
 export type OpenTimes = Partial<Record<Phase | Extra, number>>
-export type Engine = 'native' | 'jvm'
+/**
+ * `native` is the native image, `jvm` the bundled JDK with the harness's AOT cache, `jvm-nocache`
+ * the bundled JDK with no AOT cache of ours (the JDK's own CDS archive still applies): what
+ * `--jvm` gives a user.
+ */
+export type Engine = 'native' | 'jvm' | 'jvm-nocache'
 /** The first open of a launch is cold; the second opens another project in the same session. */
 export type OpenTag = 'first' | 'second'
 
@@ -421,8 +426,17 @@ const AOT_PROBLEM =
  * these as `[cds]` or `[aot]` records, or as a mismatch), or `undefined`.
  */
 export function aotRejection(output: string): string | undefined {
-  return output.split(/\r?\n/).find((line) => AOT_PROBLEM.test(line))
+  return output
+    .split(/\r?\n/)
+    .find((line) => !UNIFIED_LOG_INFO.test(line) && AOT_PROBLEM.test(line))
 }
+
+/**
+ * A unified-logging record below `warning` (`[0.1s][info][aot] ...`). The check launch logs `aot`
+ * and `cds` at `info`, so that its output says what the JVM did with the cache; such a record can
+ * name a feature of a cache in use as "disabled".
+ */
+const UNIFIED_LOG_INFO = /^(?:\[[^\]]*\])*?\[(?:info|debug|trace)\]\[/
 
 /** The libraries the new-project template may import for `core`. */
 const CORE_LIBRARIES = new Set(['Base', 'Table', 'Database', 'Examples', 'Visualization'])

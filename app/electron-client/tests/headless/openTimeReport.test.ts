@@ -356,6 +356,12 @@ describe('aotRejection', () => {
   test('ignores other output', () => {
     expect(aotRejection('[LOG] started\n[0.1s][warning][gc] something')).toBeUndefined()
   })
+  test('ignores info records, which can name a feature of a cache in use as disabled', () => {
+    expect(
+      aotRejection('[0.1s][info][cds] full module graph: disabled\n[0.2s][info][aot] mismatch'),
+    ).toBeUndefined()
+    expect(aotRejection('[0.1s][info][aot] ok\n[0.2s][error][aot] bad')).toContain('[error][aot]')
+  })
 })
 
 describe('JVM cache state', () => {
