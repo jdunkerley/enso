@@ -43,9 +43,10 @@ class RuntimeVisualizationsTest
     * deterministically.
     */
   final class ExecutionCompleteGate {
-    @volatile private var armed = false
-    private val reachedLatch    = new CountDownLatch(1)
-    private val releasedLatch   = new CountDownLatch(1)
+    @volatile private var armed  = false
+    private val reachedLatch     = new CountDownLatch(1)
+    private val releasedLatch    = new CountDownLatch(1)
+    private val interruptedLatch = new CountDownLatch(1)
 
     /** Holds the next `ExecutionComplete`. */
     def arm(): Unit = armed = true
@@ -56,13 +57,22 @@ class RuntimeVisualizationsTest
     /** Lets the held `ExecutionComplete` (and anything after it) through. */
     def release(): Unit = releasedLatch.countDown()
 
+    /** Waits until the held job was interrupted, i.e. aborted. */
+    def awaitInterrupted(): Boolean =
+      interruptedLatch.await(30, TimeUnit.SECONDS)
+
     private[RuntimeVisualizationsTest] def onResponse(data: ByteBuffer): Unit =
       if (armed) {
         ApiSerde.deserializeApiEnvelope(data.duplicate()) match {
           case Success(Api.Response(_, Api.ExecutionComplete(_))) =>
             armed = false
             reachedLatch.countDown()
-            releasedLatch.await(60, TimeUnit.SECONDS)
+            try releasedLatch.await(60, TimeUnit.SECONDS)
+            catch {
+              case e: InterruptedException =>
+                interruptedLatch.countDown()
+                throw e
+            }
           case _ =>
         }
       }
@@ -5828,22 +5838,27 @@ class RuntimeVisualizationsTest
       new String(dataUpdated, StandardCharsets.UTF_8) shouldEqual "[]"
   }
 
-  it should "evaluate a visualization attached while an execution is finishing" in withContext(
-    sequentialExecution = false
-  ) { context =>
-    // #510: a visualization attached after the execution's end-of-run pass,
-    // but before that execution has ended, is deferred and asks for an
-    // ExecuteJob. That job must run, although an equal one is still running.
+  /** Pushes `main` with its `ExecutionComplete` held (so after its end-of-run
+    * pass, while it still runs and holds its locks), attaches one
+    * visualization per expression in `on`, and waits until the scheduler has
+    * decided what to do with each `ExecuteJob` the attaches ask for. The held
+    * execution is not released.
+    *
+    * @return the context id, the request id and the visualization ids
+    */
+  private def attachWhileTheFirstExecutionIsHeld(
+    context: TestContext,
+    on: Seq[UUID]
+  ): (UUID, UUID, Seq[UUID]) = {
     val contents   = context.Main.code
     val mainFile   = context.writeMain(contents)
     val moduleName = "Enso_Test.Test.Main"
     val visualizationFile =
       context.writeInSrcDir("Visualization", context.Visualization.code)
 
-    val contextId       = UUID.randomUUID()
-    val requestId       = UUID.randomUUID()
-    val visualizationId = UUID.randomUUID()
-    val idMainX         = context.Main.idMainX
+    val contextId        = UUID.randomUUID()
+    val requestId        = UUID.randomUUID()
+    val visualizationIds = on.map(_ => UUID.randomUUID())
 
     context.send(
       Api.Request(
@@ -5883,8 +5898,9 @@ class RuntimeVisualizationsTest
     )
     context.executionCompleteGate.awaitReached() shouldBe true
 
-    // The scheduler logs, at trace level, what it did with the ExecuteJob the
-    // attach asks for: submitted it, or found a duplicate of it running.
+    // The scheduler logs, at trace level, what it did with the ExecuteJob an
+    // attach asks for: submitted it, or found a duplicate of it running. The
+    // log sites in JobExecutionEngine say that this test relies on them.
     val schedulerLogger = LoggerFactory.getLogger(
       "org.enso.interpreter.instrument.execution.JobExecutionEngine"
     ) match {
@@ -5893,7 +5909,7 @@ class RuntimeVisualizationsTest
         fail(s"Expected a logback logger, got ${other.getClass}")
     }
     val previousLevel = schedulerLogger.getLevel
-    val scheduled     = new CountDownLatch(1)
+    val scheduled     = new CountDownLatch(on.size)
     val observing = ObservedMessage.observe(
       schedulerLogger,
       { message: ObservedMessage =>
@@ -5908,50 +5924,152 @@ class RuntimeVisualizationsTest
     )
     schedulerLogger.setLevel(ch.qos.logback.classic.Level.TRACE)
     try {
-      context.send(
-        Api.Request(
-          requestId,
-          Api.AttachVisualization(
-            visualizationId,
-            idMainX,
-            Api.VisualizationConfiguration(
-              contextId,
-              Api.VisualizationExpression.Text(
-                "Enso_Test.Test.Visualization",
-                "x -> encode x",
-                Vector()
-              ),
-              "Enso_Test.Test.Visualization"
+      on.zip(visualizationIds).foreach { case (expressionId, visualizationId) =>
+        context.send(
+          Api.Request(
+            requestId,
+            Api.AttachVisualization(
+              visualizationId,
+              expressionId,
+              Api.VisualizationConfiguration(
+                contextId,
+                Api.VisualizationExpression.Text(
+                  "Enso_Test.Test.Visualization",
+                  "x -> encode x",
+                  Vector()
+                ),
+                "Enso_Test.Test.Visualization"
+              )
             )
           )
         )
-      )
+      }
       scheduled.await(30, TimeUnit.SECONDS) shouldBe true
     } finally {
-      context.executionCompleteGate.release()
       schedulerLogger.setLevel(previousLevel)
       observing.close()
     }
+    (contextId, requestId, visualizationIds)
+  }
+
+  /** Every response until none arrives for `quietSeconds`. */
+  private def receiveUntilQuiet(
+    context: TestContext,
+    quietSeconds: Long
+  ): List[Api.Response] =
+    Iterator
+      .continually(context.receiveWithTimeout(quietSeconds))
+      .takeWhile(_.isDefined)
+      .flatten
+      .toList
+
+  private def visualizationUpdates(
+    responses: Seq[Api.Response],
+    visualizationId: UUID
+  ): Seq[String] =
+    responses.collect {
+      case Api.Response(
+            None,
+            Api.VisualizationUpdate(
+              Api.VisualizationContext(`visualizationId`, _, _),
+              data
+            )
+          ) =>
+        new String(data, StandardCharsets.UTF_8)
+    }
+
+  it should "evaluate a visualization attached while an execution is finishing" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    // #510: a visualization attached after the execution's end-of-run pass,
+    // but before that execution has ended, is deferred and asks for an
+    // ExecuteJob. That job must run, although an equal one is still running.
+    val (_, _, Seq(visualizationId)) =
+      try attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+      finally context.executionCompleteGate.release()
 
     val update = Iterator
       .continually(context.receiveWithTimeout(20))
       .takeWhile(_.isDefined)
       .flatten
-      .collectFirst {
-        case Api.Response(
-              None,
-              Api.VisualizationUpdate(
-                Api.VisualizationContext(
-                  `visualizationId`,
-                  `contextId`,
-                  `idMainX`
-                ),
-                data
-              )
-            ) =>
-          new String(data, StandardCharsets.UTF_8)
-      }
+      .flatMap(response => visualizationUpdates(Seq(response), visualizationId))
+      .nextOption()
     update shouldEqual Some("6")
+  }
+
+  it should "run one execution for all visualizations attached while an execution is finishing" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, _, visualizationIds) =
+      try attachWhileTheFirstExecutionIsHeld(
+        context,
+        Seq(context.Main.idMainX, context.Main.idMainZ)
+      )
+      finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    visualizationUpdates(responses, visualizationIds(0)) shouldEqual Seq("6")
+    visualizationUpdates(responses, visualizationIds(1)) shouldEqual Seq("50")
+    // The held execution's ExecutionComplete, and one for the single
+    // execution that ran after it.
+    responses.count(
+      _ == context.executionComplete(contextId)
+    ) shouldEqual 2
+  }
+
+  it should "not run the execution a deferred visualization asked for after the context is pushed" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, requestId, Seq(visualizationId)) =
+      attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+    try {
+      // Entering `foo` aborts the held execution of `main`.
+      context.send(
+        Api.Request(
+          requestId,
+          Api.PushContextRequest(
+            contextId,
+            Api.StackItem.LocalCall(context.Main.idMainY)
+          )
+        )
+      )
+      context.executionCompleteGate.awaitInterrupted() shouldBe true
+    } finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    responses should contain(
+      Api.Response(requestId, Api.PushContextResponse(contextId))
+    )
+    // An execution of the stack the user left would evaluate it.
+    visualizationUpdates(responses, visualizationId) shouldBe empty
+  }
+
+  it should "not run the execution a deferred visualization asked for after the context is destroyed" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, requestId, Seq(visualizationId)) =
+      attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+    try {
+      context.send(
+        Api.Request(requestId, Api.DestroyContextRequest(contextId))
+      )
+      context.executionCompleteGate.awaitInterrupted() shouldBe true
+    } finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    val destroyed = responses.indexOf(
+      Api.Response(requestId, Api.DestroyContextResponse(contextId))
+    )
+    destroyed should be >= 0
+    // An execution of the destroyed context would evaluate it, report on the
+    // context, and re-create its lock (`getOrCreateContextLock`).
+    visualizationUpdates(responses, visualizationId) shouldBe empty
+    // (The aborted execution may still report its failure after the response.)
+    responses.drop(destroyed + 1).filter {
+      case Api.Response(_, Api.ExecutionComplete(`contextId`))    => true
+      case Api.Response(_, Api.ExpressionUpdates(`contextId`, _)) => true
+      case _                                                      => false
+    } shouldBe empty
   }
 
 }

@@ -134,9 +134,11 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
   /**
    * An execution covers an equal one requested now until it starts running the program: the
    * program's passes over deferred visualizations, after each computed value and once at the end,
-   * all come after that. A job waiting for its locks still covers it.
+   * all come after that. A job waiting for its locks still covers it. (Note [A Duplicate Must Not
+   * Drop A Needed Job] in {@code JobExecutionEngine}.)
+   *
+   * @return whether an equal job requested now can be dropped
    */
-  @Override
   public boolean coversJobsRequestedNow() {
     return !programStarted;
   }

@@ -210,6 +210,9 @@ final class JobExecutionEngine(
             job.asInstanceOf[UniqueJob[_]],
             runningJobsRef
           )
+          // RuntimeVisualizationsTest waits for these three messages, and for
+          // `Submitting job:` in `runInternal`; keep it in step when
+          // rewording them.
           if (duplicates.exists(coversJobsRequestedNow)) {
             logger.trace("Skipping duplicate job [{}].", job)
             return Future.successful(null.asInstanceOf[A])
@@ -258,6 +261,13 @@ final class JobExecutionEngine(
    * was made for). Otherwise the new job runs once the equal job ends, from
    * `runInternal`, and at most one such job waits per running job. It is
    * never run beside the equal job, and it takes its locks as any job does.
+   *
+   * A waiting job carries the stack it was asked for. So it is dropped when
+   * the job it waits for was cancelled, and by every abort that covers it
+   * (push, pop, destroy, recompute, edit, stop), whether or not the running
+   * job itself can be cancelled: whoever aborts schedules the execution the
+   * context now needs, and that execution's passes cover what the waiting
+   * job was for.
    */
 
   /** Jobs to run once the running job of the given id has ended. Guarded by
@@ -265,10 +275,31 @@ final class JobExecutionEngine(
     */
   private val runAfter = new util.HashMap[UUID, Job[_]]()
 
+  /** Drops the jobs waiting in [[runAfter]] that `drop` selects. */
+  private def dropFollowers(reason: String, drop: Job[_] => Boolean): Unit =
+    synchronized {
+      val entries = runAfter.entrySet().iterator()
+      while (entries.hasNext) {
+        val entry = entries.next()
+        if (drop(entry.getValue)) {
+          logger.debug(
+            "Dropping job [{}], which waited for job {}, because {}.",
+            entry.getValue,
+            entry.getKey,
+            reason
+          )
+          entries.remove()
+        }
+      }
+    }
+
+  /** Whether the running (or queued) job will still do all the work of an
+    * equal job requested now, so that the new one can be dropped.
+    */
   private def coversJobsRequestedNow(runningJob: RunningJob): Boolean =
     runningJob.job match {
-      case job: SkipSchedulingUniqueJob => job.coversJobsRequestedNow()
-      case _                            => false
+      case job: ExecuteJob => job.coversJobsRequestedNow()
+      case job             => !job.hasStarted()
     }
 
   private def runningDuplicates(
@@ -375,6 +406,7 @@ final class JobExecutionEngine(
   ): Future[A] = {
     val jobId   = UUID.randomUUID()
     val promise = Promise[A]()
+    // RuntimeVisualizationsTest waits for this message.
     logger.trace(
       s"Submitting job: {} with {} id...",
       job,
@@ -404,6 +436,11 @@ final class JobExecutionEngine(
           throw err
       } finally {
         val next = JobExecutionEngine.this.synchronized {
+          val cancelled = runningJobsRef
+            .get()
+            .exists(running =>
+              running.id == jobId && running.future.isCancelled
+            )
           val remaining =
             runningJobsRef.updateAndGet(_.filterNot(_.id == jobId))
           logger.trace(
@@ -411,7 +448,17 @@ final class JobExecutionEngine(
             queueName,
             remaining.size
           )
-          Option(runAfter.remove(jobId))
+          val follower = Option(runAfter.remove(jobId))
+          if (cancelled) {
+            follower.foreach(
+              logger.debug(
+                "Dropping job [{}]: job {}, which it waited for, was cancelled.",
+                _,
+                jobId
+              )
+            )
+            None
+          } else follower
         }
         next.foreach { nextJob =>
           logger.debug(
@@ -446,6 +493,7 @@ final class JobExecutionEngine(
     reason: String,
     ignoredJobs: Class[_ <: Job[_]]*
   ): Unit = {
+    dropFollowers(reason, job => !ignoredJobs.contains(job.getClass))
     val allJobs = runningJobsRef.updateAndGet(_.filterNot(_.future.isCancelled))
     val cancellableJobs = allJobs
       .filter { runningJob =>
@@ -472,6 +520,12 @@ final class JobExecutionEngine(
     softAbortFirst: Boolean,
     toAbort: Class[_ <: Job[_]]*
   ): Unit = {
+    dropFollowers(
+      reason,
+      job =>
+        job.contextIds.contains(contextId) &&
+        (toAbort.isEmpty || toAbort.contains(job.getClass))
+    )
     val allJobs     = runningJobsRef.get()
     val contextJobs = allJobs.filter(_.job.contextIds.contains(contextId))
     val pending = contextJobs
@@ -498,6 +552,10 @@ final class JobExecutionEngine(
     reason: String,
     accept: java.util.function.Function[Job[_], java.lang.Boolean]
   ): Unit = {
+    dropFollowers(
+      reason,
+      job => job.contextIds.contains(contextId) && accept.apply(job)
+    )
     val allJobs     = runningJobsRef.get()
     val contextJobs = allJobs.filter(_.job.contextIds.contains(contextId))
     val pending = contextJobs
@@ -557,6 +615,7 @@ final class JobExecutionEngine(
 
   /** @inheritdoc */
   override def stop(): Unit = {
+    dropFollowers("stop", _ => true)
     val allJobs = runningJobsRef.get()
     allJobs.foreach(_.future.cancel(true))
     runtimeContext.executionService.getContext.getThreadManager
