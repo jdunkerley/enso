@@ -506,17 +506,25 @@ public final class EnsoContext {
   public Optional<Module> findModuleByExpressionId(UUID expressionId) {
     var modules = getTopScope().getModules();
     var mainPackage = getPackageRepository().getMainProjectPackage();
-    if (mainPackage.isDefined()) {
-      var projectPackage = mainPackage.get();
-      var inProject =
-          modules.stream()
-              .filter(m -> m.getPackage() == projectPackage && m.containsUUID(expressionId))
-              .findFirst();
-      if (inProject.isPresent()) {
-        return inProject;
-      }
+    if (mainPackage.isEmpty()) {
+      return modules.stream().filter(m -> m.containsUUID(expressionId)).findFirst();
     }
-    return modules.stream().filter(m -> m.containsUUID(expressionId)).findFirst();
+    var projectName = mainPackage.get().libraryName();
+    var inProject =
+        modules.stream()
+            .filter(m -> isInLibrary(m, projectName) && m.containsUUID(expressionId))
+            .findFirst();
+    if (inProject.isPresent()) {
+      return inProject;
+    }
+    return modules.stream()
+        .filter(m -> !isInLibrary(m, projectName) && m.containsUUID(expressionId))
+        .findFirst();
+  }
+
+  private static boolean isInLibrary(Module module, LibraryName libraryName) {
+    var pkg = module.getPackage();
+    return pkg != null && libraryName.equals(pkg.libraryName());
   }
 
   /* Note [Look For An Expression Id In The Project First]
@@ -528,8 +536,10 @@ public final class EnsoContext {
    * project's `Main` late took 0.3 to 4 s on Linux (#510): long enough for a
    * visualization attached during the first execution to be deferred after
    * that execution's last pass, and for one attached just after it to show
-   * that much later. The project's own modules are searched first; the
-   * libraries only when the id is not there.
+   * that much later. The project's own modules (matched by library name) are
+   * searched first; the other modules only when the id is not there. An id in
+   * no module (say, a node an edit removed) still walks every library module
+   * the first time.
    */
 
   /**
