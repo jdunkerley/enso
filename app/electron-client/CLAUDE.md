@@ -807,3 +807,58 @@ so read `guiConnected`, not the gap, to judge the open. To trace a gap like this
 again: hook `WebSocket`, `fetch` and `setTimeout` in the page with
 `page.evaluate`, and log every `response` (the harness records only the project
 service's).
+
+**Nothing from the GUI competes with the welcome table** (traces of 12 opens of
+#509's build with debug engine logs and the hold instrumented, 6 per host, plus
+8 of develop at `4bece789f1`). Before `welcomeShown` the engine sees only the
+welcome node's three attaches: the default-visualization query and the node's
+first visualization at connect, and the table visualization that replaces it
+when the first execution reports the type. The welcome node's widget query
+(`Data.read`'s `format`, on the `Data` subject) cannot be configured before the
+suggestion database is loaded, which waits for the first execution (`loadGroups`
+in `suggestionDatabase/index.ts`); the GUI configures it 0.35 to 1.2 s after
+`firstExecution`, always after the table's JSON was generated, and the engine
+attaches it ~1 s later still. Column-name queries come only from the
+table-expression editor. So holding widget queries back at open (#509) changed
+nothing: in the 12 opens it held one query once, for 12 ms, and the interleaved
+A/B below shows no gain. Holding them longer would do harm, because what the
+table actually waits for is the engine:
+
+- **A deferred visualization can wait for an unrelated execution.** The
+  replacement often arrives while the first `ExecuteJob` is finishing and is
+  deferred after that job's own pass over unevaluated visualizations has run
+  (#510). The `ExecuteJob` its attach schedules then starts late (0.85 and 1.4
+  s) or not at all: `ExecuteJob` is a `SkipSchedulingUniqueJob`, so it is
+  probably skipped as a duplicate of the one still running (the skip is logged
+  only at trace level; inferred). With no run of its own, the table waits for
+  the next `ExecuteJob`, which on Linux was the widget query's, 2.5 to 2.7 s
+  after the attach, in 3 of 10 opens (2 of 6 of #509, 1 of 4 of develop).
+- **Evaluated directly, it can still take 0.5 to 1.3 s** (Linux, attach after
+  the execution), and on Windows the deferred one's `ExecuteJob` started up to
+  0.7 s late in opens where the Language Server's catalogue insert ("Inserted
+  834 catalogue entries", 0.1 to 1.5 s, right after the first execution) ran at
+  the same time; correlation only, not traced further.
+- **The GUI then takes 0.35 to 1.2 s** from the engine's `TableVizOperation` log
+  line to `welcomeShown`.
+
+To read an open like this: set `ENSO_LOGSERVER_LOG_TO_FILE_LOG_LEVEL=debug` for
+the engine (the harness drops `ENSO_*`, so patch its `env` locally) and line up
+`AttachVisualizationCmd(…expressionId=…)`, `Starting ExecuteJob[…, trigger=…]`,
+`The first execution finished.` and `TableVizOperation` against `marks.json`;
+the template's id map (`Main.enso` metadata) names each expression id.
+
+**The plan's effect, measured once on both hosts** (2026-11-02; release builds
+2026.1.1-rc.1, native, core template; 3 interleaved rounds of 5 launches per
+build; `welcomeShown` medians over the 15 launches, first / second open, ms):
+
+| Build                                      | Linux (WSL) |     Windows |
+| ------------------------------------------ | ----------: | ----------: |
+| `a80dd14348` (develop at the plan's start) | 6790 / 6397 |           – |
+| `488acf5998` (develop after #490 to #511)  | 5570 / 5130 | 4857 / 4298 |
+| #509 (`26cb40fdf8`, the widget hold)       | 5905 / 5242 | 4946 / 4975 |
+
+Per-round first-open medians spread by up to 1.9 s on Linux (`a80dd14348`: 5864
+to 7766) and 0.4 s on Windows, so differences under ~0.5 s are noise. Linux
+gained ~1.2 s on both opens and is still ~1.6 s over the 4 s target; Windows is
+~0.9 s over it. No Windows build of `a80dd14348` was made here; the spec's
+pre-plan spike gave 6811 ms for its first open.
