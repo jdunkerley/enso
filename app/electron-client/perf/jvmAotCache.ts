@@ -71,7 +71,10 @@ const TRAINING_STARTUP_TIMEOUT_MS = 180_000
  * runner, more on Windows). Closing the IDE right after the project closed killed the engine in
  * the middle of it (run 41515109556: the Windows log stops at "Rewriting and linking classes"),
  * so no file, and a `launcher-trained` cache. The training launch keeps the IDE open until the
- * file has been written and has stopped growing, for at most `TRAINING_FILE_WAIT_MS`.
+ * file has been written and has stopped growing, for at most `TRAINING_FILE_WAIT_MS`. The project
+ * service also kills an engine that has not exited 10 s after it was asked to, and the Windows JVM
+ * took longer than that to write the file (run 41521383312: killed while "Relocating embedded
+ * pointers"), so the training launch gives it as long (`ENSO_ENGINE_TERMINATE_TIMEOUT_MS`).
  */
 const TRAINING_FILE_WAIT_MS = 180_000
 
@@ -126,6 +129,7 @@ async function prepareJvmAotCache(
       ENSO_ENGINE_ARGS: '--jvm',
       JAVA_TOOL_OPTIONS: `-XX:AOTMode=record -XX:AOTConfiguration=${config} ${AOT_LOGGING}`,
       ENSO_ENGINE_STARTUP_TIMEOUT_MS: String(TRAINING_STARTUP_TIMEOUT_MS),
+      ENSO_ENGINE_TERMINATE_TIMEOUT_MS: String(TRAINING_FILE_WAIT_MS),
     },
     ['first'],
     'jvm-aot-train',

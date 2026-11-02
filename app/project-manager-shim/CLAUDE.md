@@ -77,7 +77,8 @@ the first second and every 250 ms after (Note [Start-up Health Polling] in
 killed; `ENSO_ENGINE_STARTUP_TIMEOUT_MS` lengthens that in
 `ProjectService.default` (the open-time harness's JDK AOT training launch needs
 it on Windows, where a `--jvm` engine with no class data sharing, recording its
-classes, took longer).
+classes, took longer), and `ENSO_ENGINE_TERMINATE_TIMEOUT_MS` the 10 s an engine
+has to exit when asked (the same JVM writes its training data as it exits).
 
 `project/open` is also answered only once the engine's ydoc port accepts a
 connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
