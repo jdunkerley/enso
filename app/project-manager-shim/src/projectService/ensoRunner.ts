@@ -37,10 +37,14 @@ export function loadHealthcheckDelay(elapsedMs: number): number {
  * Server passes its health check, which is when `project/open` used to be answered. The GUI
  * connects to the ydoc port as soon as it has the answer. Measured: the port was refused at the
  * answer and accepted about 300 ms later, the ydoc socket opened ~525 ms after the answer on
- * Windows (Linux ~35 ms), and the renderer sat idle all that time (a profile shows ~80% `(idle)`
- * and nothing waiting in the GUI's code). That is consistent with Windows retrying a refused
- * loopback connect after ~500 ms (inferred from the constant 510-525 ms gap, not observed). So the
- * open also waits until the ydoc port accepts a connection, polling it as the health check is. It
+ * Windows, and the renderer sat idle all that time (a profile shows ~80% `(idle)` and nothing
+ * waiting in the GUI's code). That is consistent with Windows retrying a refused loopback connect
+ * after ~500 ms (inferred from the constant 510-525 ms gap, not observed). On Linux the refusal is
+ * immediate and y-websocket retries after 200, 400 and 800 ms: before this wait the GUI's fourth
+ * socket was the first to open, ~1.4 s after the answer (PR #504's CI run). So the open also waits
+ * until the ydoc port accepts a connection, polling it as the health check is. On Linux the probe
+ * succeeds within a poll of the port appearing in the kernel's listen table (measured in WSL with
+ * a native engine: 300 to 450 ms after `/_health`, the same with or without probing). It
  * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
  * delays the answer by that), and the startup timeout does not apply once the health check has
  * passed, so the wait can never get a healthy engine killed.

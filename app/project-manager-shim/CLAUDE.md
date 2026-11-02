@@ -80,10 +80,17 @@ connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
 `ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
 listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
 refused (measured). That is consistent with Windows retrying a refused loopback
-connect after ~500 ms (inferred from the constant 510 to 525 ms gap). The wait
-is bounded, the startup timeout stops applying once `/_health` has passed, and
-`EnsoRunner` defaults to none, because the fake engines of the tests have no
-ydoc server (`healthPolling.test.ts` has the one that does).
+connect after ~500 ms (inferred from the constant 510 to 525 ms gap). On Linux
+the GUI was refused too and connected only on y-websocket's third retry, ~1.4 s
+after the answer, so the wait helps there as well; the open-time harness hid it
+until `guiConnected` was changed to mean the socket is open (Note [The GUI Is
+Connected When Its Socket Is Open] in
+`app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
+`localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
+Linux), the address the probe and the GUI use. The wait is bounded, the startup
+timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
+none, because the fake engines of the tests have no ydoc server
+(`healthPolling.test.ts` has the one that does).
 
 ## Child processes
 
