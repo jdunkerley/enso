@@ -203,15 +203,6 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
                           Option<?> outcome =
                               ProgramExecutionSupport$.MODULE$.runProgram(
                                   contextId, stack, Option.apply(runInEnv), ctx);
-                          // Note [Visualisations Evaluated Alone Or By Their Execution]
-                          try {
-                            ProgramExecutionSupport$.MODULE$.processPendingVisualizations(
-                                contextId, ctx);
-                          } catch (Exception e) {
-                            // The program ran: a failing visualisation must not turn its
-                            // ExecutionComplete into an ExecutionFailed.
-                            logger.error("Failed to evaluate the pending visualizations", e);
-                          }
                           handleOutcome(outcome, ctx);
                         } catch (ExecutionException e) {
                           ctx.endpoint()

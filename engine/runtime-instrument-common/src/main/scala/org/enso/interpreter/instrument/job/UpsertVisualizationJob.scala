@@ -9,12 +9,7 @@ import org.enso.compiler.core.ir.module.scope.{definition, Definition}
 import org.enso.compiler.refactoring.IRUtils
 import org.enso.compiler.pass.analyse.CachePreferenceAnalysis
 import org.enso.compiler.pass.analyse.DependencyInfo
-import org.enso.interpreter.instrument.execution.{
-  ContextLock,
-  Executable,
-  Locking,
-  RuntimeContext
-}
+import org.enso.interpreter.instrument.execution.{Executable, RuntimeContext}
 import org.enso.interpreter.instrument.job.UpsertVisualizationJob.{
   EvaluationFailed,
   EvaluationResult,
@@ -92,28 +87,52 @@ class UpsertVisualizationJob(
       case _ => ()
     }
 
+    // Try non-blocking lock acquisition first
     val contextLock =
       ctx.locking.getOrCreateContextLock(config.executionContextId)
+
     var result: Option[Executable] = None
-    // Note [Visualisations Evaluated Alone Or By Their Execution]
-    val evaluated = UpsertVisualizationJob.evaluateWithoutBlocking(
-      ctx.locking,
-      contextLock,
-      classOf[UpsertVisualizationJob],
-      hasWriteLock => {
-        val (requiresCompilation, maybeResult) =
-          evaluateAndExecuteVisualization(hasWriteLock.booleanValue())
-        if (!requiresCompilation) result = maybeResult
-        !requiresCompilation
+
+    val contextAction: Runnable = () => {
+      val compilationAction: Runnable = () => {
+        UpsertVisualizationJob.logger.trace(
+          "Acquired write compilation lock for visualization {}, executing visualization",
+          visualizationId
+        )
+        val (_, maybeResult) =
+          evaluateAndExecuteVisualization(hasWriteLock = true)
+        result = maybeResult
       }
-    )
-    if (!evaluated) {
+
+      // Try write compilation lock (non-blocking) to allow module loading/compilation
+      if (
+        !ctx.locking.tryWithWriteCompilationLock(
+          classOf[UpsertVisualizationJob],
+          compilationAction
+        )
+      ) {
+        UpsertVisualizationJob.logger.trace(
+          "Could not acquire write compilation lock for visualization {}, deferring evaluation",
+          visualizationId
+        )
+        result = deferVisualizationEvaluation()
+      }
+    }
+
+    if (
+      !ctx.locking.tryWithReadContextLock(
+        contextLock,
+        classOf[UpsertVisualizationJob],
+        contextAction
+      )
+    ) {
       UpsertVisualizationJob.logger.trace(
-        "Could not evaluate visualization {} without blocking, deferring evaluation",
+        "Could not acquire context lock for visualization {}, deferring evaluation",
         visualizationId
       )
       result = deferVisualizationEvaluation()
     }
+
     result
   }
 
@@ -349,65 +368,6 @@ object UpsertVisualizationJob {
 
   /** The number of times to retry the expression evaluation. */
   private val MaxEvaluationRetryCount: Int = 5
-
-  /* Note [Visualisations Evaluated Alone Or By Their Execution]
-   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   * A running `ExecuteJob` holds its context's read lock and the compilation read lock for its whole
-   * run, and owns the frame's runtime cache and sync state, so a visualisation is never evaluated
-   * beside it. The job first tries what it always did: the context read lock and the compilation
-   * write lock. When the write lock is busy, it tries the context *write* lock with the compilation
-   * *read* lock: the first fails while any execution of the context runs, the second while a
-   * compile runs, so the visualisation is evaluated alone, beside only readers that do not touch
-   * this context's frames (`SerializeModuleJob`, the file commands, rename). `ExecuteJob`s of
-   * *other* contexts may run meanwhile: they hold their own contexts' locks and the compilation
-   * read lock, which this path shares. That is safe because each context has its own stack,
-   * frames, runtime caches and sync state, so this evaluation touches none of theirs, and
-   * evaluating Enso code in parallel with another context's execution is what two contexts'
-   * `ExecuteJob`s already do on `job-pool` (`jobParallelism` threads). Otherwise it defers,
-   * and `ExecuteJob` evaluates what was deferred during its run before it releases its locks
-   * (`ProgramExecutionSupport.processPendingVisualizations`), so a deferral during the first
-   * execution no longer waits for a new execution queued behind a compile.
-   */
-
-  /** Runs `evaluate` without blocking: under the context read lock and the compilation write lock
-    * if both are free, else under the context write lock and the compilation read lock if those are.
-    * `evaluate` is told whether it holds the compilation write lock and answers whether it is done.
-    *
-    * @return whether `evaluate` ran and was done; false means the caller defers
-    */
-  def evaluateWithoutBlocking(
-    locking: Locking,
-    contextLock: ContextLock,
-    where: Class[_],
-    evaluate: java.util.function.Predicate[java.lang.Boolean]
-  ): Boolean = {
-    var ran  = false
-    var done = false
-    locking.tryWithReadContextLock(
-      contextLock,
-      where,
-      () =>
-        locking.tryWithWriteCompilationLock(
-          where,
-          () => {
-            ran  = true
-            done = evaluate.test(java.lang.Boolean.TRUE)
-          }
-        )
-    )
-    if (!ran) {
-      locking.tryWithWriteContextLock(
-        contextLock,
-        where,
-        () =>
-          locking.tryWithReadCompilationLock(
-            where,
-            () => done = evaluate.test(java.lang.Boolean.FALSE)
-          )
-      )
-    }
-    done
-  }
 
   /** Base trait for evaluation failures.
     */

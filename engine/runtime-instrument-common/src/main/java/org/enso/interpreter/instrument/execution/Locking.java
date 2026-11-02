@@ -125,27 +125,4 @@ public interface Locking {
    * @return {@code true} if {@code action} was executed or {@code false} otherwise
    */
   boolean tryWithReadContextLock(ContextLock contextLock, Class<?> where, Runnable action);
-
-  /**
-   * If one can enter read compilation lock without blocking, then invokes {@code action.run()}
-   * while holding the lock and releasing it then. In such case this method returns {@code true}.
-   * Otherwise it performs no action and returns {@code false}.
-   *
-   * @param where the class requesting the lock
-   * @param action code to be executed while holding the lock
-   * @return {@code true} if {@code action} was executed or {@code false} otherwise
-   */
-  boolean tryWithReadCompilationLock(Class<?> where, Runnable action);
-
-  /**
-   * If one can enter write context lock without blocking, then invokes {@code action.run()} while
-   * holding the lock and releasing it then. In such case this method returns {@code true}.
-   * Otherwise it performs no action and returns {@code false}.
-   *
-   * @param contextLock lock used to ensure exclusive access
-   * @param where the class requesting the lock
-   * @param action code to be executed while holding the lock
-   * @return {@code true} if {@code action} was executed or {@code false} otherwise
-   */
-  boolean tryWithWriteContextLock(ContextLock contextLock, Class<?> where, Runnable action);
 }
