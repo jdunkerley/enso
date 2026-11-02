@@ -504,10 +504,33 @@ public final class EnsoContext {
    * @return the relevant module, if exists.
    */
   public Optional<Module> findModuleByExpressionId(UUID expressionId) {
-    return getTopScope().getModules().stream()
-        .filter(m -> m.containsUUID(expressionId))
-        .findFirst();
+    var modules = getTopScope().getModules();
+    var mainPackage = getPackageRepository().getMainProjectPackage();
+    if (mainPackage.isDefined()) {
+      var projectPackage = mainPackage.get();
+      var inProject =
+          modules.stream()
+              .filter(m -> m.getPackage() == projectPackage && m.containsUUID(expressionId))
+              .findFirst();
+      if (inProject.isPresent()) {
+        return inProject;
+      }
+    }
+    return modules.stream().filter(m -> m.containsUUID(expressionId)).findFirst();
   }
+
+  /* Note [Look For An Expression Id In The Project First]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The expression ids the IDE sends are the project's, but the top scope also
+   * holds every library module loaded so far, in no useful order, and
+   * `Module.containsUUID` walks a module's whole IR the first time it is asked.
+   * At project open, before those walks are cached, a scan that reached the
+   * project's `Main` late took 0.3 to 4 s on Linux (#510): long enough for a
+   * visualization attached during the first execution to be deferred after
+   * that execution's last pass, and for one attached just after it to show
+   * that much later. The project's own modules are searched first; the
+   * libraries only when the id is not there.
+   */
 
   /**
    * Modifies the classpath to use to lookup {@code polyglot java} imports.
