@@ -26,8 +26,11 @@ class RuntimeVisualizationsTest
 
   // === Test Utilities =======================================================
 
-  class TestContext(packageName: String, sequentialExecution: Boolean)
-      extends InstrumentTestContext(packageName) {
+  class TestContext(
+    packageName: String,
+    sequentialExecution: Boolean,
+    randomDelayedCommands: Boolean
+  ) extends InstrumentTestContext(packageName) {
 
     val out: ByteArrayOutputStream = new ByteArrayOutputStream()
 
@@ -49,7 +52,7 @@ class RuntimeVisualizationsTest
           )
           .option(
             RuntimeOptions.INTERPRETER_RANDOM_DELAYED_COMMAND_EXECUTION,
-            (!sequentialExecution).toString
+            randomDelayedCommands.toString
           )
           .option(RuntimeOptions.ENABLE_PROJECT_SUGGESTIONS, "false")
           .option(RuntimeOptions.ENABLE_PROGRESS_REPORT, "false")
@@ -399,9 +402,14 @@ class RuntimeVisualizationsTest
   }
 
   def withContext(
-    sequentialExecution: Boolean = true
+    sequentialExecution: Boolean           = true,
+    randomDelayedCommands: Option[Boolean] = None
   )(f: TestContext => Unit): Unit = {
-    val context = new TestContext("Test", sequentialExecution)
+    val context = new TestContext(
+      "Test",
+      sequentialExecution,
+      randomDelayedCommands.getOrElse(!sequentialExecution)
+    )
     try {
       context.init()
       val Some(Api.Response(_, Api.InitializedNotification())) = context.receive
@@ -543,6 +551,276 @@ class RuntimeVisualizationsTest
           data
       }
       data2.sameElements("50".getBytes) shouldBe true
+  }
+
+  /** `main` binds `x = 6 * 7`, then, with `sleep`, `y = Thread.sleep 1000`, and returns `x`. */
+  private class SleepingMain(sleep: Boolean) {
+    val metadata = new Metadata
+    private val body =
+      if (sleep)
+        """from Standard.Base import all
+          |polyglot java import java.lang.Thread
+          |
+          |main =
+          |    x = 6 * 7
+          |    y = Thread.sleep 1000
+          |    x
+          |""".stripMargin.linesIterator.mkString("\n")
+      else
+        """from Standard.Base import all
+          |
+          |main =
+          |    x = 6 * 7
+          |    x
+          |""".stripMargin.linesIterator.mkString("\n")
+    val idX: UUID = metadata.addItem(body.indexOf("6 * 7"), "6 * 7".length)
+    val idY: Option[UUID] =
+      Option.when(sleep)(
+        metadata.addItem(
+          body.indexOf("Thread.sleep 1000"),
+          "Thread.sleep 1000".length
+        )
+      )
+    val code: String = metadata.appendToCode(body)
+    metadata.assertInCode(idX, body, "6 * 7")
+    idY.foreach(metadata.assertInCode(_, body, "Thread.sleep 1000"))
+  }
+
+  /** Receives responses until `last` matches one, which is included. */
+  private def receiveUntil(context: TestContext, timeoutSeconds: Long = 30)(
+    last: Api.Response => Boolean
+  ): List[Api.Response] = {
+    val received = List.newBuilder[Api.Response]
+    var done     = false
+    while (!done) {
+      context.receiveWithTimeout(timeoutSeconds) match {
+        case Some(response) =>
+          received += response
+          done = last(response)
+        case None =>
+          fail(s"Timed out waiting; received ${received.result()}")
+      }
+    }
+    received.result()
+  }
+
+  private def updatesExpression(
+    response: Api.Response,
+    expressionId: UUID
+  ): Boolean =
+    response match {
+      case Api.Response(None, Api.ExpressionUpdates(_, updates)) =>
+        updates.exists(u =>
+          u.expressionId == expressionId && !u.payload
+            .isInstanceOf[Api.ExpressionUpdate.Payload.Pending]
+        )
+      case _ => false
+    }
+
+  private def endsExecution(contextId: UUID)(response: Api.Response): Boolean =
+    response.payload match {
+      case Api.ExecutionComplete(`contextId`)  => true
+      case Api.ExecutionFailed(`contextId`, _) => true
+      case _                                   => false
+    }
+
+  /** Opens the visualization module and `main`, and pushes `main`. */
+  private def openAndPush(
+    context: TestContext,
+    main: SleepingMain,
+    contextId: UUID,
+    requestId: UUID
+  ): Unit = {
+    val visualizationFile =
+      context.writeInSrcDir("Visualization", context.Visualization.code)
+    context.send(
+      Api.Request(
+        requestId,
+        Api.OpenFileRequest(visualizationFile, context.Visualization.code)
+      )
+    )
+    context.receive shouldEqual Some(
+      Api.Response(Some(requestId), Api.OpenFileResponse)
+    )
+    context.send(Api.Request(requestId, Api.CreateContextRequest(contextId)))
+    context.receive shouldEqual Some(
+      Api.Response(requestId, Api.CreateContextResponse(contextId))
+    )
+    val mainFile = context.writeMain(main.code)
+    context.send(
+      Api.Request(requestId, Api.OpenFileRequest(mainFile, main.code))
+    )
+    context.receive shouldEqual Some(
+      Api.Response(Some(requestId), Api.OpenFileResponse)
+    )
+    context.send(
+      Api.Request(
+        requestId,
+        Api.PushContextRequest(
+          contextId,
+          Api.StackItem.ExplicitCall(
+            Api.MethodPointer(
+              "Enso_Test.Test.Main",
+              "Enso_Test.Test.Main",
+              "main"
+            ),
+            None,
+            Vector()
+          )
+        )
+      )
+    )
+  }
+
+  private def attach(
+    context: TestContext,
+    requestId: UUID,
+    visualizationId: UUID,
+    expressionId: UUID,
+    contextId: UUID,
+    module: String,
+    expression: String
+  ): Unit =
+    context.send(
+      Api.Request(
+        requestId,
+        Api.AttachVisualization(
+          visualizationId,
+          expressionId,
+          Api.VisualizationConfiguration(
+            contextId,
+            Api.VisualizationExpression.Text(module, expression, Vector()),
+            module
+          )
+        )
+      )
+    )
+
+  // A visualisation attached during an execution is deferred and evaluated by that execution's own
+  // pass over the unevaluated visualisations (ProgramExecutionSupport), never beside it. The
+  // commands run concurrently, as in the IDE, so the attach arrives while `main` sleeps.
+  it should "evaluate a visualisation attached during an execution in that execution, not beside it" in withContext(
+    sequentialExecution   = false,
+    randomDelayedCommands = Some(false)
+  ) { context =>
+    val main            = new SleepingMain(sleep = true)
+    val contextId       = UUID.randomUUID()
+    val requestId       = UUID.randomUUID()
+    val visualizationId = UUID.randomUUID()
+    openAndPush(context, main, contextId, requestId)
+    receiveUntil(context)(updatesExpression(_, main.idX))
+
+    attach(
+      context,
+      requestId,
+      visualizationId,
+      main.idX,
+      contextId,
+      "Enso_Test.Test.Visualization",
+      "x -> encode x"
+    )
+    val responses = receiveUntil(context)(endsExecution(contextId))
+
+    responses.last shouldEqual context.executionComplete(contextId)
+    val visualizationUpdates = responses.zipWithIndex.collect {
+      case (
+            Api.Response(
+              None,
+              Api.VisualizationUpdate(
+                Api.VisualizationContext(`visualizationId`, `contextId`, _),
+                data
+              )
+            ),
+            index
+          ) =>
+        (new String(data, StandardCharsets.UTF_8), index)
+    }
+    visualizationUpdates.map(_._1) shouldEqual Seq("42")
+    val yUpdated = responses.indexWhere(updatesExpression(_, main.idY.get))
+    yUpdated should be >= 0
+    visualizationUpdates.head._2 should be > yUpdated
+  }
+
+  it should "report the execution as complete when a visualisation deferred during it fails" in withContext(
+    sequentialExecution   = false,
+    randomDelayedCommands = Some(false)
+  ) { context =>
+    val main            = new SleepingMain(sleep = true)
+    val contextId       = UUID.randomUUID()
+    val requestId       = UUID.randomUUID()
+    val visualizationId = UUID.randomUUID()
+    openAndPush(context, main, contextId, requestId)
+    receiveUntil(context)(updatesExpression(_, main.idX))
+
+    attach(
+      context,
+      requestId,
+      visualizationId,
+      main.idX,
+      contextId,
+      "Enso_Test.Test.Main",
+      "x -> Panic.throw \"boom\""
+    )
+    val responses = receiveUntil(context)(endsExecution(contextId))
+
+    responses.last shouldEqual context.executionComplete(contextId)
+    responses.map(_.payload).collect { case f: Api.ExecutionFailed =>
+      f
+    } shouldBe empty
+    responses.map(_.payload).exists {
+      case Api.VisualizationExpressionFailed(ctx, _, _) =>
+        ctx.visualizationId == visualizationId
+      case Api.VisualizationEvaluationFailed(ctx, _, _) =>
+        ctx.visualizationId == visualizationId
+      case _ => false
+    } shouldBe true
+  }
+
+  it should "evaluate a visualisation attached to an idle context without an execution" in withContext() {
+    context =>
+      val main            = new SleepingMain(sleep = false)
+      val contextId       = UUID.randomUUID()
+      val requestId       = UUID.randomUUID()
+      val visualizationId = UUID.randomUUID()
+      openAndPush(context, main, contextId, requestId)
+      receiveUntil(context)(endsExecution(contextId)).last shouldEqual context
+        .executionComplete(contextId)
+
+      attach(
+        context,
+        requestId,
+        visualizationId,
+        main.idX,
+        contextId,
+        "Enso_Test.Test.Visualization",
+        "x -> encode x"
+      )
+      val responses = context.receiveNIgnoreExpressionUpdates(2)
+      responses.length shouldEqual 2
+      responses should contain(
+        Api.Response(requestId, Api.VisualizationAttached())
+      )
+      val Some(data) = responses.collectFirst {
+        case Api.Response(
+              None,
+              Api.VisualizationUpdate(
+                Api.VisualizationContext(`visualizationId`, `contextId`, _),
+                data
+              )
+            ) =>
+          data
+      }
+      new String(data, StandardCharsets.UTF_8) shouldEqual "42"
+
+      Thread.sleep(1000)
+      val later =
+        Iterator.continually(context.receiveNone).takeWhile(_.isDefined).flatten
+      later
+        .map(_.payload)
+        .collect { case c: Api.ExecutionComplete =>
+          c
+        }
+        .toList shouldBe empty
   }
 
   it should "emit visualization update when expression is cached" in withContext() {

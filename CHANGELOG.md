@@ -2,6 +2,7 @@
 
 #### Enso IDE
 
+- [Projects open faster: a new project shows its first table sooner.][509]
 - [New projects import only Base, Table, Database, Examples and Visualization
   instead of a dozen libraries. Components of other libraries stay in the
   component browser, and using one adds its import.][482]
@@ -382,6 +383,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[509]: https://github.com/jdunkerley/enso/pull/509
 [476]: https://github.com/jdunkerley/enso/pull/476
 [482]: https://github.com/jdunkerley/enso/pull/482
 [466]: https://github.com/jdunkerley/enso/pull/466
