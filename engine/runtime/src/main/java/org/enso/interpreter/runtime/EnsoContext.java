@@ -504,10 +504,43 @@ public final class EnsoContext {
    * @return the relevant module, if exists.
    */
   public Optional<Module> findModuleByExpressionId(UUID expressionId) {
-    return getTopScope().getModules().stream()
-        .filter(m -> m.containsUUID(expressionId))
+    var modules = getTopScope().getModules();
+    var mainPackage = getPackageRepository().getMainProjectPackage();
+    if (mainPackage.isEmpty()) {
+      return modules.stream().filter(m -> m.containsUUID(expressionId)).findFirst();
+    }
+    var projectName = mainPackage.get().libraryName();
+    var inProject =
+        modules.stream()
+            .filter(m -> isInLibrary(m, projectName) && m.containsUUID(expressionId))
+            .findFirst();
+    if (inProject.isPresent()) {
+      return inProject;
+    }
+    return modules.stream()
+        .filter(m -> !isInLibrary(m, projectName) && m.containsUUID(expressionId))
         .findFirst();
   }
+
+  private static boolean isInLibrary(Module module, LibraryName libraryName) {
+    var pkg = module.getPackage();
+    return pkg != null && libraryName.equals(pkg.libraryName());
+  }
+
+  /* Note [Look For An Expression Id In The Project First]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * The expression ids the IDE sends are the project's, but the top scope also
+   * holds every library module loaded so far, in no useful order, and
+   * `Module.containsUUID` walks a module's whole IR the first time it is asked.
+   * At project open, before those walks are cached, a scan that reached the
+   * project's `Main` late took 0.3 to 4 s on Linux (#510): long enough for a
+   * visualization attached during the first execution to be deferred after
+   * that execution's last pass, and for one attached just after it to show
+   * that much later. The project's own modules (matched by library name) are
+   * searched first; the other modules only when the id is not there. An id in
+   * no module (say, a node an edit removed) still walks every library module
+   * the first time.
+   */
 
   /**
    * Modifies the classpath to use to lookup {@code polyglot java} imports.

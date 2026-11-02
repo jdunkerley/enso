@@ -29,7 +29,6 @@ import scala.Option;
 public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedulingUniqueJob {
 
   private static final Logger logger = LoggerFactory.getLogger(ExecuteJob.class);
-  private static final String PENDING_VISUALIZATIONS_TRIGGER_CONTEXT = "pending visualizations";
 
   private final UUID contextId;
   private final scala.collection.immutable.List<InstrumentFrame> stack;
@@ -39,6 +38,7 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
 
   private String threadName = "<unknown>";
   private volatile boolean hasStarted = false;
+  private volatile boolean programStarted = false;
   private UUID jobId;
 
   /**
@@ -131,6 +131,18 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
     return hasStarted;
   }
 
+  /**
+   * An execution covers an equal one requested now until it starts running the program: the
+   * program's passes over deferred visualizations, after each computed value and once at the end,
+   * all come after that. A job waiting for its locks still covers it. (Note [A Duplicate Must Not
+   * Drop A Needed Job] in {@code JobExecutionEngine}.)
+   *
+   * @return whether an equal job requested now can be dropped
+   */
+  public boolean coversJobsRequestedNow() {
+    return !programStarted;
+  }
+
   @Override
   public void setJobId(UUID id) {
     this.jobId = id;
@@ -200,6 +212,7 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
                             var env = (Runtime$Api$ExecutionEnvironment) executionEnvironment.get();
                             runInEnv = ExecutionEnvironment.forName(env.name());
                           }
+                          programStarted = true;
                           Option<?> outcome =
                               ProgramExecutionSupport$.MODULE$.runProgram(
                                   contextId, stack, Option.apply(runInEnv), ctx);
@@ -214,7 +227,6 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
                                               e.getMessage(), scala.Option.empty()))));
                           throw e;
                         }
-                        rescheduleIfNeeded(ctx);
                         return null;
                       });
               return null;
@@ -251,34 +263,6 @@ public class ExecuteJob extends Job<Void> implements UniqueJob<Void>, SkipSchedu
       ctx.endpoint()
           .sendToClient(
               Runtime$Api$Response$.MODULE$.apply(new Runtime$Api$ExecutionComplete(contextId)));
-    }
-  }
-
-  private void rescheduleIfNeeded(RuntimeContext ctx) {
-    if (!mayInterruptIfRunning()) {
-      return;
-    }
-    var holder = ctx.contextManager().getVisualizationHolder(contextId);
-    var unevaluatedVisualizations = holder.getAllUnevaluated();
-    var unevaluatedVisualizationIds = unevaluatedVisualizations.toList().map(v -> v.id());
-    if (unevaluatedVisualizationIds.nonEmpty()) {
-      if (unevaluatedVisualizationIds.equals(visualizationTriggered)
-          || PENDING_VISUALIZATIONS_TRIGGER_CONTEXT.equals(triggerContext)) {
-        // This is a retry that made no progress
-        return;
-      }
-      logger.trace(
-          "Rescheduling ExecuteJob[{}] to process pending visualizations {}",
-          jobId,
-          unevaluatedVisualizationIds);
-      ctx.jobProcessor()
-          .run(
-              new ExecuteJob(
-                  contextId,
-                  stack,
-                  executionEnvironment,
-                  PENDING_VISUALIZATIONS_TRIGGER_CONTEXT,
-                  unevaluatedVisualizationIds));
     }
   }
 
