@@ -21,6 +21,7 @@ type Launch = (
   env: Record<string, string>,
   opens: readonly OpenTag[],
   label: string,
+  beforeClose?: () => Promise<void>,
 ) => Promise<RunResult & { readonly stdout: string }>
 
 /** Runs a new project to its end with the launcher, under the given environment. */
@@ -62,6 +63,28 @@ const AOT_LOGGING = '-Xlog:aot=info,cds=info'
  * 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`, read by `ProjectService.default`).
  */
 const TRAINING_STARTUP_TIMEOUT_MS = 180_000
+
+/*
+ * Note [The Training File Is Written After The Project Closes]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The recording JVM writes its configuration as it exits, which takes seconds (~6 s on the Linux
+ * runner, more on Windows). Closing the IDE right after the project closed killed the engine in
+ * the middle of it (run 41515109556: the Windows log stops at "Rewriting and linking classes"),
+ * so no file, and a `launcher-trained` cache. The training launch keeps the IDE open until the
+ * file has been written and has stopped growing, for at most `TRAINING_FILE_WAIT_MS`.
+ */
+const TRAINING_FILE_WAIT_MS = 180_000
+
+async function waitForTrainingFile(config: string): Promise<void> {
+  const end = Date.now() + TRAINING_FILE_WAIT_MS
+  let size = -1
+  while (Date.now() < end) {
+    const now = fs.existsSync(config) ? fs.statSync(config).size : -1
+    if (now > 0 && now === size) return
+    size = now
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+  }
+}
 
 /** How long `-XX:AOTMode=create` may take. */
 const CREATE_TIMEOUT_MS = 5 * 60_000
@@ -106,6 +129,7 @@ async function prepareJvmAotCache(
     },
     ['first'],
     'jvm-aot-train',
+    () => waitForTrainingFile(config),
   )
   let trained: JvmAotCache['training'] = 'ide-trained'
   if (!fs.existsSync(config)) {

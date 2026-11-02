@@ -397,6 +397,7 @@ async function measureLaunch(
   extraEnv: Record<string, string>,
   opens: readonly OpenTag[] = ['first', 'second'],
   label = `${engine}-${run}`,
+  beforeClose: () => Promise<void> = async () => {},
 ): Promise<RunResult & { readonly stdout: string }> {
   const dir = path.join(options.out, label)
   fs.rmSync(dir, { recursive: true, force: true })
@@ -478,6 +479,7 @@ async function measureLaunch(
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
     }
+    await beforeClose()
   } catch (e) {
     error = String(e).slice(0, 2000)
     // What the page showed when the launch gave up (uploaded by CI with the extras' screenshots).
@@ -590,7 +592,8 @@ async function main() {
         aot = await createJvmAotCache(
           options.out,
           options.exe,
-          (env, opens, label) => measureLaunch(options, 'jvm', 0, env, opens, label),
+          (env, opens, label, beforeClose) =>
+            measureLaunch(options, 'jvm', 0, env, opens, label, beforeClose),
           (env) => runProjectOnJvm(options, env),
         )
       } catch (e) {

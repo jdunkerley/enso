@@ -784,12 +784,16 @@ report warns). `LAUNCHER_JVM_OPTIONS` copies the options of `Main.launchJvm`; a
 unit test fails when they drift. The training and check launches keep their own
 directories (`jvm-aot-train/`, `jvm-aot-check/`, with the JVM's `aot` and `cds`
 records at `info` in `electron-out.log`), and a launch that fails saves
-`failed.png`. On Windows the IDE training launch was always `launcher-trained`:
-the recording JVM, which has no class data sharing at all (the bundled runtime
-has no default CDS archive), had not passed its first health check after 30 s,
-so the project service killed it before it could write the file. The training
-launch now gives it 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`; Note [The Training
-Launch Needs A Longer Start-up Timeout] in `perf/jvmAotCache.ts`).
+`failed.png`. On Windows the IDE training launch was always `launcher-trained`,
+for two reasons. The recording JVM, which has no class data sharing at all (the
+bundled runtime has no default CDS archive), had not passed its first health
+check after 30 s, so the project service killed it; the training launch now
+gives it 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`; Note [The Training Launch
+Needs A Longer Start-up Timeout]). And the JVM writes the file as it exits,
+which takes seconds, while the harness closed the IDE right after the project
+and so killed it; the training launch now waits for the file (Note [The Training
+File Is Written After The Project Closes]). Both Notes are in
+`perf/jvmAotCache.ts`.
 
 `--engines jvm-nocache` is the JVM with no AOT cache of ours, what `--jvm` gives
 a user, so `native,jvm-nocache,jvm` measures what the cache is worth. Every JVM
