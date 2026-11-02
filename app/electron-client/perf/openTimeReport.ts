@@ -92,6 +92,21 @@ export function comparable(
   return baseline != null && baseline.template === report.template && report.template !== 'other'
 }
 
+/** A baseline: develop's report, or several of them (newest first); see Note [Noisy Medians]. */
+export type Baseline = OpenTimeReport | readonly OpenTimeReport[] | undefined
+
+/** The newest develop reports a comparison pools. */
+export const BASELINE_RUNS = 5
+
+/** The baseline reports that measured the same template as `report`, newest first. */
+export function baselineReports(report: OpenTimeReport, baseline: Baseline): OpenTimeReport[] {
+  const list =
+    baseline == null ? []
+    : 'runs' in baseline ? [baseline]
+    : baseline
+  return list.filter((b) => comparable(report, b))
+}
+
 export interface LsLogLine {
   readonly time: number
   readonly logger: string
@@ -122,10 +137,11 @@ export function parseLsLogLine(line: string): LsLogLine | null {
 
 /* Note [The GUI Is Connected When Its Socket Is Open]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * Playwright's `websocket` event (the driver's `wsOpen` mark) fires when the page creates a
- * WebSocket, before it connects, and again for every retry. When the ydoc port refuses the GUI,
- * y-websocket retries after 200, 400 and 800 ms (`2 ** failures * 100`), so the first `wsOpen`
- * is a refused attempt. On Linux, before the shim waited for the port, every open went so: four
+ * Playwright's `websocket` event (the driver's `wsOpen` mark) fires once per connection attempt,
+ * at a point that differs by platform: on Linux each refused attempt emitted one, on Windows the
+ * event came at the open (a page hook saw `new WebSocket` ~500 ms earlier). When the ydoc port
+ * refuses the GUI, y-websocket retries after 200, 400 and 800 ms (`2 ** failures * 100`), so on
+ * Linux the first `wsOpen` is a refused attempt. On Linux, before the shim waited for the port, every open went so: four
  * `/project/index` sockets, the first ~50 ms after the answer and the one that opened ~1.4 s
  * later (PR #504's CI run), and `guiConnected` read the first. `guiConnected` is therefore the
  * first frame the page sends on the socket (`wsUp`): y-websocket sends its sync step 1 in
@@ -182,6 +198,8 @@ export interface EngineSummary {
   readonly launches: number
   readonly first: OpenTimes
   readonly second: OpenTimes
+  /** The fastest and slowest first open's headline, `undefined` when none reached it. */
+  readonly range?: { readonly min: number; readonly max: number }
 }
 
 /** The medians per engine, over the launches that did not fail. */
@@ -197,40 +215,87 @@ export function summarise(report: OpenTimeReport): EngineSummary[] {
       }
       return out
     }
+    const headlines = runs.flatMap((r) => r.first[HEADLINE] ?? [])
     return {
       engine,
-      succeeded: runs.filter((r) => r.first[HEADLINE] != null).length,
+      succeeded: headlines.length,
       launches: runs.length,
       first: medians((r) => r.first),
       second: medians((r) => r.second),
+      ...(headlines.length > 0 ?
+        { range: { min: Math.min(...headlines), max: Math.max(...headlines) } }
+      : {}),
     }
+  })
+}
+
+/** develop's first-open medians for one engine, pooled over `reports` of its runs. */
+export interface Develop {
+  readonly engine: Engine
+  /** How many develop reports were pooled. */
+  readonly reports: number
+  readonly first: OpenTimes
+}
+
+/* Note [Noisy Medians]
+ * ~~~~~~~~~~~~~~~~~~~~
+ * A shared runner's open time is noisy: in CI the 5 launches of one run span 6.6 to 15.9 s, and
+ * the medians of seven develop runs with no relevant change span 8.1 to 12.6 s (the open-performance
+ * review, finding I1). Comparing with the newest develop run alone flagged a docs-only PR as "47%
+ * worse". So a comparison is made with the median of develop's last `BASELINE_RUNS` reports (the
+ * median of their per-run medians, phase by phase), and a regression needs both the percentage
+ * and an absolute delta (`minDeltaMs`) to be exceeded. The spread of the launches is reported
+ * beside the median, so a reader can tell a slow run from a noisy one. Replaying the review's
+ * data, this raises no warning for the docs-only PR and still catches a +3 s slowdown.
+ */
+
+/** develop's medians per engine, pooled over the newest `BASELINE_RUNS` comparable reports. */
+export function developMedians(report: OpenTimeReport, baseline: Baseline): Develop[] {
+  const reports = baselineReports(report, baseline).slice(0, BASELINE_RUNS)
+  return [...new Set(report.runs.map((r) => r.engine))].flatMap((engine) => {
+    // JVM numbers are comparable only when the cache was made the same way.
+    const summaries = reports
+      .filter((b) => engine !== 'jvm' || b.jvmAot === report.jvmAot)
+      .flatMap(
+        (b) => summarise(b).find((s) => s.engine === engine && s.succeeded >= MIN_SUCCESSFUL) ?? [],
+      )
+    if (summaries.length === 0) return []
+    const first: OpenTimes = {}
+    for (const key of [...PHASES, ...EXTRAS]) {
+      const value = median(summaries.flatMap((s) => s.first[key] ?? []))
+      if (value != null) first[key] = value
+    }
+    return [{ engine, reports: summaries.length, first }]
   })
 }
 
 const cell = (value: number | undefined) => (value == null ? '–' : String(Math.round(value)))
 
 /** The medians as a Markdown table, with develop's first-open medians when there is a baseline. */
-export function renderMarkdown(
-  report: OpenTimeReport,
-  baseline: OpenTimeReport | undefined,
-): string {
-  if (!comparable(report, baseline)) baseline = undefined
+export function renderMarkdown(report: OpenTimeReport, baseline: Baseline): string {
   const ours = summarise(report)
-  const theirs = baseline ? summarise(baseline) : []
+  const theirs = developMedians(report, baseline)
   const header = ['Phase (end mark), ms from the click']
   for (const s of ours) {
     header.push(`${s.engine} first`, `${s.engine} second`)
-    if (baseline) header.push(`${s.engine} first, develop`)
+    const n = theirs.find((t) => t.engine === s.engine)?.reports
+    if (n != null) header.push(`${s.engine} first, develop${n > 1 ? ` (median of ${n} runs)` : ''}`)
   }
   const rows = [...PHASES, ...EXTRAS].map((key) => {
     const row = [key === HEADLINE ? `**${LABELS[key]}**` : LABELS[key]]
     for (const s of ours) {
       row.push(cell(s.first[key]), cell(s.second[key]))
-      if (baseline) row.push(cell(theirs.find((t) => t.engine === s.engine)?.first[key]))
+      const t = theirs.find((d) => d.engine === s.engine)
+      if (t) row.push(cell(t.first[key]))
     }
     return `| ${row.join(' | ')} |`
   })
-  const counts = ours.map((s) => `${s.engine}: ${s.succeeded} of ${s.launches} launches`).join(', ')
+  const counts = ours
+    .map(
+      (s) =>
+        `${s.engine}: ${s.succeeded} of ${s.launches} launches${s.range ? `, welcome table from ${Math.round(s.range.min)} to ${Math.round(s.range.max)} ms` : ''}`,
+    )
+    .join('; ')
   return [
     `Medians, ${report.platform}, ${report.template} template${report.commit ? ` at \`${report.commit.slice(0, 10)}\`` : ''} (${counts})${report.jvmAot ? `; JVM AOT cache: ${report.jvmAot}` : ''}.`,
     '',
@@ -241,19 +306,22 @@ export function renderMarkdown(
   ].join('\n')
 }
 
-/** The spec's thresholds: a median over 4 s, or more than 15% worse than develop's last run. */
-export const DEFAULT_LIMITS = { limitMs: 4000, tolerance: 0.15 } as const
+/**
+ * The spec's thresholds: a median over 4 s, or more than 15% and more than `minDeltaMs` worse than
+ * develop's (Note [Noisy Medians]).
+ */
+export const DEFAULT_LIMITS = { limitMs: 4000, tolerance: 0.15, minDeltaMs: 2000 } as const
 /** Fewer successful first opens than this give no median. */
 export const MIN_SUCCESSFUL = 3
 
 /** The warnings for the headline median of each engine; empty when all is well. */
 export function regressionWarnings(
   report: OpenTimeReport,
-  baseline: OpenTimeReport | undefined,
-  limits: { limitMs: number; tolerance: number } = DEFAULT_LIMITS,
+  baseline: Baseline,
+  limits: { limitMs: number; tolerance: number; minDeltaMs: number } = DEFAULT_LIMITS,
 ): string[] {
   const warnings: string[] = []
-  const previous = comparable(report, baseline) ? summarise(baseline) : []
+  const previous = developMedians(report, baseline)
   for (const engine of new Set(report.runs.map((r) => r.engine))) {
     const missing = new Set(
       report.runs
@@ -289,14 +357,22 @@ export function regressionWarnings(
         `${s.engine}: the cold open takes ${Math.round(ours)} ms, over ${limits.limitMs} ms`,
       )
     }
-    // JVM numbers are comparable only when the cache was made the same way.
-    const jvmComparable = s.engine !== 'jvm' || baseline?.jvmAot === report.jvmAot
-    const theirs =
-      jvmComparable ? previous.find((p) => p.engine === s.engine)?.first[HEADLINE] : undefined
-    if (theirs != null && ours > theirs * (1 + limits.tolerance)) {
+    const develop = previous.find((p) => p.engine === s.engine)
+    const theirs = develop?.first[HEADLINE]
+    // Note [Noisy Medians]: both the percentage and the absolute delta.
+    if (
+      develop != null &&
+      theirs != null &&
+      ours > theirs * (1 + limits.tolerance) &&
+      ours - theirs > limits.minDeltaMs
+    ) {
       const worse = Math.round((ours / theirs - 1) * 100)
+      const spread =
+        s.range ? ` (launches ${Math.round(s.range.min)} to ${Math.round(s.range.max)} ms)` : ''
+      const of =
+        develop.reports > 1 ? `the median of develop's last ${develop.reports} runs` : "develop's"
       warnings.push(
-        `${s.engine}: the cold open takes ${Math.round(ours)} ms, ${worse}% worse than develop's ${Math.round(theirs)} ms`,
+        `${s.engine}: the cold open takes ${Math.round(ours)} ms${spread}, ${worse}% worse than ${of}, ${Math.round(theirs)} ms`,
       )
     }
   }

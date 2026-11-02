@@ -708,7 +708,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json>] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -738,14 +738,26 @@ The Language Server's log times carry no offset and are read as local time (Note
 that misses a phase or an extra records it in `notMeasured`, and the report
 warns about it; nothing is silently skipped.
 
+The extras share one budget per open, `--extras-seconds` (15 by default; a
+working extra takes ~5 s), then the rest are skipped and recorded as not
+measured, with a screenshot (`<tag>-extras.png`, uploaded by CI) of what the
+page showed (Note [Extras Are Bounded] in `perf/openTime.ts`). On the Windows
+runner none of the extras has ever been reached, and each waited out its own
+timeout: ~212 s per open, so only 2 launches fitted the budget and there was no
+median. Why the selectors do not match there is not yet known; the screenshots
+will say.
+
 Output in `--out`: `open-time.json` (an `OpenTimeReport`), `open-time.md` (the
 medians table, with develop's first-open medians when `--baseline` is a report
-of the same template) and, per launch, `<engine>-<n>/` with `marks.json`,
-`electron-out.log` and `logs/` (and with `--profile` a renderer
-`first.cpuprofile` and `second.cpuprofile`). Warnings: a median over 4 s, more
-than 15% worse than the baseline, or fewer than 3 successful first opens. They
-are printed (as `::warning` under GitHub Actions) and never change the exit
-code.
+of the same template, or a directory of them: the newest five are pooled) and,
+per launch, `<engine>-<n>/` with `marks.json`, `electron-out.log` and `logs/`
+(and with `--profile` a renderer `first.cpuprofile` and `second.cpuprofile`).
+Warnings: a median over 4 s (always true on a shared runner, 2.5 to 3 times
+slower than a desk), more than 15% **and** 2 s worse than the median of
+develop's last five runs (CI downloads them; Note [Noisy Medians] in
+`perf/openTimeReport.ts`), or fewer than 3 successful first opens. The spread of
+the launches is printed with the median. They are printed (as `::warning` under
+GitHub Actions) and never change the exit code.
 
 Every child process starts without credentials: `credentialFreeEnv` drops the
 `ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*`, `DATABRICKS*`,
