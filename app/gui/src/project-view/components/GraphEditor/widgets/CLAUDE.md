@@ -67,8 +67,10 @@ is already on the row, drawn by `WidgetIcon` at the root.
   that sees every argument's update and every sibling's widget configuration
   (#489). A dropdown option's own `requires` is applied by
   `WidgetSelection/tags.ts`. A file dropped on the graph (`GraphEditor.vue`'s
-  `uploadedFormatImports`) has no node and so no widget configuration: it asks
-  the engine for `Data.read`'s `format` options
-  (`DATA_READ_FORMAT_WIDGET_QUERY`, evaluated in an existing node's context) and
-  matches the file with `formatTypeForDroppedFile`; the import goes in the node
-  creation's edit.
+  `uploadedFormatImports`) has no node of its own: it uses the `format` options
+  that any `path`-and-`format` node has loaded (`rememberFormatConfig`, filled
+  by `WidgetFunction.vue`), and otherwise asks the engine
+  (`DATA_READ_FORMAT_WIDGET_QUERY`, in the `main` method body's context, 1 s
+  timeout, so the node creation waits at most that long and one undo still
+  removes node and import); `formatTypeForDrop` does both. The import goes in
+  the node creation's edit.
