@@ -41,9 +41,9 @@ const tooltipEnabled = computed(
       <!-- The close button is a sibling of the tab, not inside it: a control must not be nested in
         a `role="tab"` element. The tab's `::after` stretches its click area over the whole wrapper,
         so the tab looks and clicks as before. -->
-      <div class="SelectableTab" :class="{ [orientation]: true, selected, enabled }">
+      <div role="none" class="SelectableTab" :class="{ [orientation]: true, selected, enabled }">
         <div class="underlying" :class="orientation" />
-        <div class="tabContent tabLayout" :class="{ enabled }">
+        <div role="none" class="tabContent tabLayout" :class="{ enabled }">
           <button
             role="tab"
             :aria-selected="selected"
