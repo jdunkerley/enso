@@ -183,3 +183,44 @@ test('dropping a file no format claims adds the node without an import', async (
   await expect.poll(() => moduleCode(page)).toContain(`Data.read '${UNKNOWN_FILE}'`)
   expect(await moduleCode(page)).not.toContain('Standard.SQLite')
 })
+
+// With no `Data.read` node in the graph, no format options are loaded: the engine is asked. The
+// mock answers only in the context the engine would run the query in, the `main` method's body.
+test.describe('a graph without a Data.read node', () => {
+  test.use({
+    setupApi: {
+      local: () => {
+        setMockMainFile('from Standard.Base import all\n\nmain =\n    value = 1\n')
+        setMockPublicTypes([{ name: 'SQLite_Format', library: 'Standard.SQLite' }])
+      },
+    },
+  })
+
+  test('dropping a .db file asks the engine and adds the SQLite import; one undo removes both', async ({
+    editorPage,
+    page,
+  }) => {
+    await editorPage
+    updateVisualizationData('.read', FORMAT_CONFIG)
+    await dropFile(page, DB_FILE)
+    await expect.poll(() => moduleCode(page)).toContain(`Data.read '${DB_FILE}'`)
+    expect(await moduleCode(page)).toContain(SQLITE_IMPORT)
+
+    await page.getByTestId('action:graph.undo').click()
+    await expect.poll(() => moduleCode(page)).not.toContain(SQLITE_IMPORT)
+    expect(await moduleCode(page)).not.toContain('Sales.db')
+  })
+
+  test('an engine that never answers delays the node by about a second and adds no import', async ({
+    editorPage,
+    page,
+  }) => {
+    await editorPage
+    // The mock has no answer for `.read` here: the query stays pending until the client gives up.
+    const started = Date.now()
+    await dropFile(page, DB_FILE)
+    await expect.poll(() => moduleCode(page)).toContain(`Data.read '${DB_FILE}'`)
+    expect(Date.now() - started).toBeLessThan(4000)
+    expect(await moduleCode(page)).not.toContain(SQLITE_IMPORT)
+  })
+})

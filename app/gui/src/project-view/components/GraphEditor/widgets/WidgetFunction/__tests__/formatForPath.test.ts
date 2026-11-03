@@ -10,16 +10,18 @@ import {
 } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentAst, interpretCall } from '@/util/callTree'
-import { assert, describe, expect, test } from 'vitest'
+import { assert, describe, expect, test, vi } from 'vitest'
 import { assertDefined } from 'ydoc-shared/util/assert'
 import {
   fileNameOf,
+  formatTypeForDrop,
   formatTypeForDroppedFile,
   formatTypeForPath,
   formatTypeForPathUpdate,
   isAutoDetect,
   matchesNamePattern,
   pathTextOf,
+  rememberFormatConfig,
 } from '../formatForPath'
 
 const SQLITE = 'Standard.SQLite.SQLite_Format.SQLite_Format'
@@ -265,6 +267,49 @@ describe('formatTypeForPathUpdate', () => {
       },
     }
     expect(formatTypeForPathUpdate(app, update)).toBeUndefined()
+  })
+})
+
+describe('formatTypeForDrop', () => {
+  const answer = [
+    [
+      'format',
+      {
+        type: 'Widget',
+        constructor: 'Single_Choice',
+        label: null,
+        values: [
+          {
+            label: 'SQLite',
+            value: '..SQLite',
+            parameters: [],
+            icon: '',
+            requires: SQLITE,
+            patterns: ['*.db'],
+          },
+        ],
+        display: { type: 'Display', constructor: 'When_Modified' },
+      },
+    ],
+  ]
+  test('asks the engine when no node has loaded the options', async () => {
+    const query = vi.fn(async () => answer)
+    expect(await formatTypeForDrop('S.db', 'project-none', query)).toBe(SQLITE)
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+  test('uses the options a node has loaded, without asking the engine', async () => {
+    rememberFormatConfig('project-loaded', dataRead("Data.read '/d/a.csv'"))
+    const query = vi.fn(async () => undefined)
+    expect(await formatTypeForDrop('S.db', 'project-loaded', query)).toBe(SQLITE)
+    expect(query).not.toHaveBeenCalled()
+    expect(await formatTypeForDrop('notes.xyz', 'project-loaded', query)).toBeUndefined()
+  })
+  test('a failed or empty query names no format', async () => {
+    const failing = vi.fn(async () => {
+      throw new Error('timed out')
+    })
+    expect(await formatTypeForDrop('S.db', 'project-fail', failing)).toBeUndefined()
+    expect(await formatTypeForDrop('S.db', 'project-fail', async () => undefined)).toBeUndefined()
   })
 })
 

@@ -139,6 +139,46 @@ export function formatTypeForPathUpdate(
   return formatTypeForPath(after, format.dynamicConfig)
 }
 
+const rememberedFormatConfigs = new Map<string, WidgetConfiguration>()
+
+/**
+ * Remember the `format` options (with their libraries and patterns) that a `path`-and-`format`
+ * call in the graph has loaded, per `owner` (the project's id), so that a dropped file can be matched
+ * without asking the engine.
+ */
+export function rememberFormatConfig(owner: string, app: ArgumentApplication) {
+  const args = [...app.iterApplications()].map((a) => a.argument)
+  if (!args.some((a) => a.argInfo?.name === PATH_ARGUMENT)) return
+  const config = args.find((a) => a.argInfo?.name === FORMAT_ARGUMENT)?.dynamicConfig
+  if (
+    config?.kind === 'Single_Choice' &&
+    config.values.flatMap(flattenChoice).some((c) => c.requires)
+  ) {
+    rememberedFormatConfigs.set(owner, config)
+  }
+}
+
+/**
+ * The format type whose library reads a file dropped on the graph. Uses the options a call in the
+ * graph has already loaded ({@link rememberFormatConfig}); only without them is `query` called
+ * (it should itself give up quickly): it resolves to the engine's answer to
+ * {@link DATA_READ_FORMAT_WIDGET_QUERY}. Any failure of the query gives `undefined`.
+ */
+export async function formatTypeForDrop(
+  fileName: string,
+  owner: string,
+  query: () => Promise<unknown>,
+): Promise<string | undefined> {
+  const remembered = rememberedFormatConfigs.get(owner)
+  if (remembered) return formatTypeForPath(fileName, remembered)
+  try {
+    return formatTypeForDroppedFile(fileName, await query())
+  } catch (error) {
+    console.info('Could not find the format library of a dropped file', error)
+    return undefined
+  }
+}
+
 /**
  * The expression that asks the engine for `Data.read`'s `format` widget configuration, as the
  * `format` argument's own query does (`widgetFunctionCallInfo.ts`), but without a node to hang it

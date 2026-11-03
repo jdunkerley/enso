@@ -44,7 +44,7 @@ import { uploadedExpression, Uploader, type UploadResult } from '@/components/Gr
 import {
   DATA_READ_FORMAT_WIDGET_QUERY,
   fileNameOf,
-  formatTypeForDroppedFile,
+  formatTypeForDrop,
 } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import GraphMissingView from '@/components/GraphMissingView.vue'
 import GraphMouse from '@/components/GraphMouse.vue'
@@ -761,19 +761,32 @@ function collapseNodes(nodes: Node[]) {
  * context of an existing node (or the current method): the new node has none yet. Any failure
  * means no import: the node is created as before.
  */
+/** How long a dropped file's node waits for the engine to name the format options. */
+const FORMAT_QUERY_TIMEOUT_MS = 1000
+
 async function uploadedFormatImports(result: UploadResult): Promise<RequiredImport[] | undefined> {
   if (result.source !== 'FileSystemRoot') return undefined
   try {
+    // The options a node in the graph has loaded are used as they are. Otherwise the engine is
+    // asked in the method body's context, for at most `FORMAT_QUERY_TIMEOUT_MS`: the node's
+    // creation waits for the answer, so that one undo removes the node and its import.
     const context =
-      iter.first(graphStore.db.nodeIdToNode.values())?.outerAst.externalId ??
-      (graphStore.currentMethod.ast.ok ? graphStore.currentMethod.ast.value.externalId : undefined)
-    if (context == null) return undefined
-    const answer = await projectStore.queuedExecuteExpression(
-      context,
-      DATA_READ_FORMAT_WIDGET_QUERY,
+      graphStore.currentMethod.ast.ok ?
+        graphStore.currentMethod.ast.value.body?.externalId
+      : undefined
+    const formatType = await formatTypeForDrop(
+      fileNameOf(result.name),
+      projectStore.id,
+      async () => {
+        if (context == null) return undefined
+        const answer = await projectStore.queuedExecuteExpression(
+          context,
+          DATA_READ_FORMAT_WIDGET_QUERY,
+          FORMAT_QUERY_TIMEOUT_MS,
+        )
+        return answer?.ok ? answer.value : undefined
+      },
     )
-    if (!answer?.ok) return undefined
-    const formatType = formatTypeForDroppedFile(fileNameOf(result.name), answer.value)
     if (formatType == null) return undefined
     return requiredImportsForTypeName(
       suggestionDb.entries,

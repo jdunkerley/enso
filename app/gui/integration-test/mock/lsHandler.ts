@@ -620,12 +620,37 @@ function writeSlotResponse(slot: YMap<unknown>, bytes: Uint8Array): void {
   })
 }
 
+/** The mocked module documents, to tell which expression ids the engine would execute. */
+const mockModuleDocs = new Set<Doc>()
+
+/** Whether `id` is the external id of the body of a method of a mocked module. */
+function isMethodBodyId(id: string | undefined): boolean {
+  if (id == null) return false
+  for (const doc of mockModuleDocs) {
+    const root = new Ast.MutableModule(doc).root()
+    const main = root instanceof Ast.BodyBlock ? Ast.findModuleMethod(root, 'main') : undefined
+    if (main?.statement.body?.externalId === id) return true
+  }
+  return false
+}
+
 /** If the slot's preprocessor is mocked, write the mock bytes into it. */
 function maybeRespondToSlot(slot: YMap<unknown>): void {
   const request = slot.get(VIS_SLOT_FIELDS.request) as VisRequestPreprocessor | undefined
   if (!request) return
   const key = slotPreprocessorKey(request)
   if (!key) return
+  // A direct widget query (the format of a dropped file, #489) is answered only in the context
+  // the engine would run it in: the `main` method's body. In the definition itself nothing ever
+  // runs, so the real engine never answers there.
+  if (
+    typeof request.expression === 'object' &&
+    'inFrame' in request.expression &&
+    request.expression.inFrame.includes(GET_WIDGETS_METHOD) &&
+    !isMethodBodyId(slot.get(VIS_SLOT_FIELDS.nodeExternalId) as string | undefined)
+  ) {
+    return
+  }
   const bytes = responseBytesFor(key, slotPositionalArgs(request))
   if (bytes) writeSlotResponse(slot, bytes)
 }
@@ -707,7 +732,10 @@ export const mockYdocProvider = (room: string, doc: Doc) => {
     })
   } else if (room.startsWith('mock-')) {
     const fileContents = srcFiles[room.slice('mock-'.length)]
-    if (fileContents) new Ast.MutableModule(doc).syncToCode(fileContents)
+    if (fileContents) {
+      new Ast.MutableModule(doc).syncToCode(fileContents)
+      mockModuleDocs.add(doc)
+    }
   }
 }
 
