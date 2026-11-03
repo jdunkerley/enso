@@ -139,3 +139,21 @@ It waits for the owner's OK.
   shipped format's patterns.
 - **Widget JSON size:** the patterns add a few strings per format. That is
   negligible.
+
+## Corrections found while planning
+
+The plan (`docs/superpowers/plans/2026-11-03-data-read-library-imports.md`)
+corrects these against the code; it is authoritative where they differ:
+
+- `Data.read` and `File.read` use `File_Format.default_widget`
+  (`System/File_Format.enso`), not `format_widget_with_raw_response` (that one
+  serves `Data.fetch`/`post` and the `URI` extensions). Both are filled by one
+  new helper.
+- `Auto_Detect` chooses by each format's `for_read` (extension, content type,
+  file header), not by `get_name_patterns`. The IDE matches the file name
+  against the options' patterns with `*`/`?`, ignoring case.
+- "Exactly one match" means exactly one distinct `requires`: Excel's and
+  Tableau's several options share one type.
+- XML's option already inserts a qualified name.
+- Typing into an existing path changes text in place, so the IDE compares old
+  and new path text, not only port updates.
