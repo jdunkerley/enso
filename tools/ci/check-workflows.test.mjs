@@ -1425,7 +1425,7 @@ ${MATRIX_MAC}    steps: []
   test('a matrix job with a macOS leg counts as a macOS job (unexpected here)', () => {
     const repo = fixture({ 'workflows/release.yml': releaseWithMatrixMac })
     assert.ok(
-      checkOnlyMacosReleaseJobsMayFail(repo).some((p) =>
+      checkMacosReleaseJobsAreRequired(repo).some((p) =>
         p.includes('matrix-mac: unexpected macOS job'),
       ),
     )
@@ -1470,7 +1470,7 @@ jobs:
         '  upload-ide:\n    runs-on: ${{ matrix.runner }}\n    strategy:\n      matrix:\n        runner: [ubuntu-latest, windows-latest]',
       ),
     })
-    assert.deepEqual(checkOnlyMacosReleaseJobsMayFail(repo), [])
+    assert.deepEqual(checkMacosReleaseJobsAreRequired(repo), [])
     assert.deepEqual(checkMacosJobsAreGated(repo), [])
   })
   describe('checkRunsOnResolvesAgainstItsMatrix', () => {
