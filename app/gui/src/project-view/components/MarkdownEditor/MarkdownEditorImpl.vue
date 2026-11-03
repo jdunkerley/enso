@@ -15,6 +15,7 @@ import VueHostRender, { VueHostInstance } from '@/components/VueHostRender.vue'
 import { type StartedUpload, useAsyncResources } from '@/providers/asyncResources'
 import { useCurrentProjectResourceContext } from '@/providers/asyncResources/context'
 import { type AnyUploadSource, selectResourceFiles } from '@/providers/asyncResources/upload'
+import { useText } from '$/providers/text'
 import { useCodeMirror, useEditorFocus } from '@/util/codemirror'
 import { highlightStyle } from '@/util/codemirror/highlight'
 import { useLinkTitles } from '@/util/codemirror/links'
@@ -103,6 +104,7 @@ async function insertStartedUploads(uploads: Promise<StartedUpload>[], coords: V
   }
 }
 
+const { getText } = useText()
 const vueHost = new VueHostInstance()
 const editorRoot = useTemplateRef<ComponentInstance<typeof CodeMirrorRoot>>('editorRoot')
 const { editorView, setExtraExtensions } = useCodeMirror(editorRoot, {
@@ -110,6 +112,8 @@ const { editorView, setExtraExtensions } = useCodeMirror(editorRoot, {
     drawSelection(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
     EditorView.lineWrapping,
+    // The editor is a textbox; screen readers need its name.
+    EditorView.contentAttributes.of({ 'aria-label': getText('docs') }),
     highlightStyle(useCssModule()),
     ensoMarkdown({ customClipboardAction: handleUpload, customDropAction: handleUpload }),
     replaceablePlaceholders,

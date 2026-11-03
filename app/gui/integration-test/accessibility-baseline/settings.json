@@ -1,25 +1,5 @@
 [
   {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(1)"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(3)"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": ".SelectableTab.vertical[role=\"tab\"]:nth-child(4)"
-  },
-  {
-    "rule": "aria-required-parent",
-    "impact": "critical",
-    "target": "button[aria-label=\"Activity\"]"
-  },
-  {
     "rule": "button-name",
     "impact": "critical",
     "target": ".CloseButton"

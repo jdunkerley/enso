@@ -1,5 +1,6 @@
 /** @file The yearly reminder to rotate the secrets key: when it is due, and the start-up toast. */
 import { isKeyDue, snoozeForAMonth, useSecretsKeyReminder } from '$/composables/secretsKeyReminder'
+import SettingsTabType from '$/configurations/settingsTabs'
 import { useToasts } from '$/providers/toasts'
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -47,6 +48,12 @@ describe('isKeyDue', () => {
     expect(isKeyDue(created, now, new Date(now.getTime() - DAY).toISOString())).toBe(true)
   })
 
+  test('is due exactly when the snooze ends', () => {
+    const now = daysAfterCreation(400)
+    expect(isKeyDue(created, now, now.toISOString())).toBe(true)
+    expect(isKeyDue(created, now, new Date(now.getTime() + 1).toISOString())).toBe(false)
+  })
+
   test('is not due for an unreadable date', () => {
     expect(isKeyDue('not a date', daysAfterCreation(900), null)).toBe(false)
   })
@@ -88,6 +95,41 @@ describe('useSecretsKeyReminder', () => {
     expect(shown()).toHaveLength(1)
     expect(shown()[0]?.autoClose).toBe(false)
     expect(typeof shown()[0]?.content).toBe('object')
+    scope.stop()
+  })
+
+  test('Rotate dismisses the toast and opens the Local settings tab', async () => {
+    fake.status.mockResolvedValue({
+      state: 'ready',
+      keyCreated: created,
+      keyFromEnvironment: false,
+    })
+    const scope = await run()
+    const content = shown()[0]?.content as { props: { onRotate: () => void } }
+    content.props.onRotate()
+    expect(shown()).toEqual([])
+    expect(fake.push).toHaveBeenCalledOnce()
+    const [location] = fake.push.mock.calls[0] as [{ path: string; query: Record<string, string> }]
+    expect(location.path).toBe('/settings')
+    expect(Object.values(location.query)).toEqual([JSON.stringify(SettingsTabType.local)])
+    scope.stop()
+  })
+
+  test('Remind me later dismisses the toast and snoozes it for 30 days', async () => {
+    fake.status.mockResolvedValue({
+      state: 'ready',
+      keyCreated: created,
+      keyFromEnvironment: false,
+    })
+    const scope = await run()
+    const content = shown()[0]?.content as { props: { onSnooze: () => void } }
+    content.props.onSnooze()
+    expect(shown()).toEqual([])
+    expect(fake.push).not.toHaveBeenCalled()
+    const stored = JSON.parse(localStorage.getItem('enso-secrets-reminder') ?? '{}') as {
+      state: { snoozedUntil: string }
+    }
+    expect(stored.state.snoozedUntil).toBe(new Date(Date.now() + 30 * DAY).toISOString())
     scope.stop()
   })
 
