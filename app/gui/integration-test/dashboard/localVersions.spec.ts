@@ -7,6 +7,10 @@ import { Path, type VersionEntry } from 'enso-common/src/services/ProjectManager
 import { expect, test, type Page } from 'integration-test/base'
 import * as locate from 'integration-test/project-view/locate'
 import { posix } from 'node:path'
+import { expectScreenshot } from '../screenshot'
+
+/** The dialog is translucent over a blurred page, which renders slightly differently each time. */
+const BLUR_TOLERANT = { threshold: 0.3, maxDiffPixelRatio: 0.02 }
 
 const ROOT = '/home/user/enso/enso-projects'
 const MOCK_PROJECT_PATH = posix.join(ROOT, 'Mock_Project')
@@ -26,6 +30,9 @@ const VERSIONS = [
   entry(2, 'Saved on close'),
   entry(1, 'Saved'),
 ]
+
+/** The dates are fixed, but their readable format follows the machine's time zone: mask them. */
+const maskedTimes = (page: Page) => [page.locator('time')]
 
 /** The right panel's Versions tab. */
 async function openVersions(page: Page) {
@@ -67,6 +74,7 @@ test.describe('with versions kept', () => {
     await expect(panel.getByText('Latest', { exact: true }).first()).toBeVisible()
     await expect(panel.getByLabel('Add tag')).toHaveCount(0)
     await expect(panel.getByRole('button', { name: /tag/i })).toHaveCount(0)
+    await expectScreenshot(panel, 'versions-list.png', { mask: maskedTimes(page) })
   })
 
   test('See changes shows the Main.enso diff with the previous version', async ({
@@ -80,12 +88,17 @@ test.describe('with versions kept', () => {
     await expect(dialog).toContainText('Compare Version 3 with Version 2')
     await expect(dialog).toContainText('Joined the sales table')
     await expect(dialog).toContainText('Saved on close')
+    await expectScreenshot(dialog, 'compare-dialog.png', {
+      ...BLUR_TOLERANT,
+      mask: maskedTimes(page),
+    })
   })
 
   test('Compare with... compares two chosen versions', async ({ page, drivePage }) => {
     await drivePage.goToCategory.local().driveTable.clickRow('Mock Project')
     await openVersions(page)
     const menu = await openVersionMenu(page, 1)
+    await expectScreenshot(menu, 'restore-menu.png')
     await menu.getByRole('menuitem', { name: 'Compare with...' }).click()
     // Chosen by keyboard, not clicked. Once the right panel has finished opening, the menu sits at
     // the window's edge and the submenu opens on its left. A click moves the pointer there in a
@@ -95,6 +108,10 @@ test.describe('with versions kept', () => {
     const dialog = page.getByRole('dialog')
     await expect(dialog).toContainText('Compare Version 2 with Version 1')
     await expect(dialog).toContainText('Saved on close')
+    await expectScreenshot(dialog, 'compare-chosen-dialog.png', {
+      ...BLUR_TOLERANT,
+      mask: maskedTimes(page),
+    })
   })
 
   test('restores an older version of a closed project', async ({ page, drivePage, localApi }) => {
@@ -239,6 +256,7 @@ test.describe('placeholders', () => {
       await drivePage.goToCategory.local().driveTable.clickRow('Data')
       const panel = await openVersions(page)
       await expect(panel).toContainText('In the local drive, only projects have versions.')
+      await expectScreenshot(panel, 'placeholder-folder.png')
     })
   })
 
@@ -263,6 +281,7 @@ test.describe('placeholders', () => {
       await expect(panel).toContainText(
         'This project is not in a git repository, so it has no versions.',
       )
+      await expectScreenshot(panel, 'placeholder-no-repository.png')
     })
   })
 
@@ -280,6 +299,7 @@ test.describe('placeholders', () => {
       await drivePage.goToCategory.local().driveTable.clickRow('Mock Project')
       const panel = await openVersions(page)
       await expect(panel).toContainText("Versions are not kept in this project's git repository.")
+      await expectScreenshot(panel, 'placeholder-not-enabled.png')
     })
   })
 
@@ -287,5 +307,6 @@ test.describe('placeholders', () => {
     await drivePage.goToCategory.local().driveTable.clickRow('Mock Project')
     const panel = await openVersions(page)
     await expect(panel).toContainText('Install git to keep versions of local projects.')
+    await expectScreenshot(panel, 'placeholder-no-git.png')
   })
 })
