@@ -22,7 +22,7 @@ import BottomPanel from '@/components/BottomPanel.vue'
 import { dockTabActions, provideCodeTabFocus, useDockTab } from '@/components/BottomPanel/dockTab'
 import CodeEditor from '@/components/CodeEditor.vue'
 import EngineLogPanel from '@/components/EngineLogs/EngineLogPanel.vue'
-import { useEngineLogStream } from '@/components/EngineLogs/engineLogStream'
+import { markSeenWhile, useEngineLogStream } from '@/components/EngineLogs/engineLogStream'
 import ComponentBrowser, { type AiPromptSubmission } from '@/components/ComponentBrowser.vue'
 import { useAiToolHandler } from '@/components/ComponentBrowser/aiToolHandler'
 import type { Usage } from '@/components/ComponentBrowser/input'
@@ -438,10 +438,7 @@ const engineLogs = useEngineLogStream({
   active: isActive,
 })
 const logsVisible = computed(() => showCodeEditor.value && dockTab.value === 'logs')
-// Whenever the Logs tab is showing, whatever arrives counts as seen.
-watchEffect(() => {
-  if (logsVisible.value && engineLogs.state.unseenErrors > 0) engineLogs.markSeen()
-})
+markSeenWhile(logsVisible, engineLogs)
 
 useGraphPaletteActions(actionHandlers, isActive)
 

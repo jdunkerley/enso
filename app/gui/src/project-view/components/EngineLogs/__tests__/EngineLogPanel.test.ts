@@ -961,6 +961,37 @@ describe("the live view's older lines", () => {
     )
   })
 
+  test('cannot be paged back while its history is being fetched, so that fetch is never doubled', async () => {
+    const { source, wrapper, flush } = await mountPanel()
+    source.emit('hello', {
+      channel: 'c1',
+      oldestSeq: 1,
+      nextSeq: 1,
+      sessionId: 's1',
+      logFile: null,
+    })
+    await fillToCap(source, 's1', 1)
+    await flush()
+    const gate = createDeferred<string[]>()
+    mocks.listProjectSessionPages.mockImplementationOnce(() => gate.promise)
+    await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
+    await flush()
+    expect(mocks.listProjectSessionPages).toHaveBeenCalledTimes(1)
+    // The one way out of the live view, and back (#283: a second fetch of the same lines), is
+    // closed while the fetch runs: the divider's button is disabled, and so is another reach of
+    // the top.
+    const button = wrapper.find<HTMLButtonElement>('.row.divider button')
+    expect(button.element.disabled).toBe(true)
+    await button.trigger('click')
+    await wrapper.find('[role="log"]').trigger('wheel', { deltaY: -100 })
+    await flush()
+    expect(mocks.listProjectSessionPages).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).not.toContain('Showing earlier lines')
+    gate.resolve(['active'])
+    await flush()
+    expect(wrapper.find<HTMLButtonElement>('.row.divider button').element.disabled).toBe(false)
+  })
+
   test('is not offered while its session has no id yet', async () => {
     const { source, wrapper, flush } = await mountPanel()
     source.emit('hello', {

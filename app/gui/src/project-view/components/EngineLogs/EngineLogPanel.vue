@@ -24,6 +24,7 @@ import EngineLogList from './EngineLogList.vue'
 import {
   DEFAULT_ORIGINS,
   filterRows,
+  IncrementalRowFilter,
   LIVE_ROW_CAP,
   originSummary,
   rowsFromLines,
@@ -301,14 +302,23 @@ const windowRows = shallowRef<readonly LogRow[]>([])
 /** Whether the session shown from its files has none (it was deleted, or is unknown). */
 const windowHasNoFiles = ref(false)
 
+const liveFilter = new IncrementalRowFilter()
+
 /**
- * The live rows, under a `truncated` divider while there are lines above them (`olderLines`, bound
- * to their session: its button pages through that session, and is not offered while it is unknown).
+ * The rows of the view that the filters show. The live rows are filtered incrementally (only the
+ * rows added since the last frame are tested), under a `truncated` divider while there are lines
+ * above them (`olderLines`, bound to their session: its button pages through that session, and is
+ * not offered while it is unknown). A divider always shows, so it goes on after the filtering.
  */
-const liveRows = computed<readonly LogRow[]>(() => {
-  if (stream == null) return []
+const shownRows = computed<readonly LogRow[]>(() => {
+  const filter = {
+    level: level.value,
+    text: filterText.value,
+    origins: originFilter.value,
+  }
+  if (!live.value || stream == null) return filterRows(windowRows.value, filter)
   // `toValue`: a test harness may hand the stream over reactive, which unwraps `rows`.
-  const rows = toValue(stream.rows)
+  const rows = liveFilter.apply(toValue(stream.rows), filter)
   const older = stream.state.olderLines
   if (older == null) return rows
   const divider: LogRow = {
@@ -319,19 +329,6 @@ const liveRows = computed<readonly LogRow[]>(() => {
   }
   return [divider, ...rows]
 })
-
-/** The rows of the view, before the filters. */
-const sourceRows = computed<readonly LogRow[]>(() =>
-  live.value ? liveRows.value : windowRows.value,
-)
-
-const shownRows = computed(() =>
-  filterRows(sourceRows.value, {
-    level: level.value,
-    text: filterText.value,
-    origins: originFilter.value,
-  }),
-)
 
 /** The latest history or session request; only it may set `loading` and `loadError`. */
 let latestRequest = 0

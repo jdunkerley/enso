@@ -109,7 +109,11 @@ watch(
     while (before[anchorIndex]?.kind === 'divider') anchorIndex += 1
     const anchor = before[anchorIndex]
     if (anchor == null) return
-    const index = now.findIndex((row) => row.key === anchor.key)
+    // Rows added at the end leave it where it was: no search then.
+    const index =
+      now[anchorIndex]?.key === anchor.key ?
+        anchorIndex
+      : now.findIndex((row) => row.key === anchor.key)
     if (index >= 0 && index !== anchorIndex) {
       element.scrollTop += (index - anchorIndex) * ROW_HEIGHT_PX
       scrollTop.value = element.scrollTop

@@ -46,6 +46,18 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
     held) gates the top-of-view history load.
   - The 20,000-row cap, `prependHistory` (a session's history spliced above the
     first live file line), `filterRows` and `rowsFromLines`.
+  - Per-frame cost (#281). Rows wait in `pending` until the stream's frame
+    commits them; a frame does not fire while the window is minimised, so
+    `pending` is bounded too: past twice the cap the oldest are dropped down to
+    the cap (`queue`, and the dropped lines become `olderLines` as at the cap;
+    the error badge still counts them). The panel filters the live rows with an
+    `IncrementalRowFilter`: it tests only the rows added since the last frame,
+    and falls back to filtering whole when the rows changed any other way
+    (history spliced in, another project) or the filter did.
+    `__tests__/engineLogModel.test.ts` counts the rows tested (`visited`) for
+    100 frames of 50 lines over a full view: 5,000, not 2,000,000. What is still
+    O(rows) per frame is a copy of the row array (`rows.slice()` in the stream,
+    and the filter's result), which is memory copying, not row tests.
 - `engineLogStream.ts` — `useEngineLogStream`:
   - one `EventSource` on `/api/engine-logs/stream`, connected only while the
     project tab is active (HTTP/1.1 allows six connections per origin);
