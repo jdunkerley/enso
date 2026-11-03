@@ -1,0 +1,46 @@
+from Standard.Base import all
+import Standard.Base.Metadata.Choice
+import Standard.Base.System.File_Format.Auto_Detect
+import Standard.Base.System.File_Format.File_Format
+from Standard.Base.Data import Raw_Response
+
+from Standard.Test import all
+
+add_specs suite_builder =
+    suite_builder.group "Choice.Option to_json" group_builder->
+        group_builder.specify "is unchanged for an option without requires or patterns" <|
+            Choice.Option "SQLite" "..SQLite" . to_json . should_equal '{"label":"SQLite","value":"..SQLite","parameters":[],"icon":""}'
+
+        group_builder.specify "emits requires and patterns when both are set" <|
+            option = Choice.Option "SQLite" "..SQLite" requires="Standard.SQLite.SQLite_Format.SQLite_Format" patterns=["*.sqlite", "*.db"]
+            option.to_json . should_equal '{"label":"SQLite","value":"..SQLite","parameters":[],"icon":"","requires":"Standard.SQLite.SQLite_Format.SQLite_Format","patterns":["*.sqlite","*.db"]}'
+
+        group_builder.specify "emits only the field that is set" <|
+            Choice.Option "X" "..X" requires="A.B.C" . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","requires":"A.B.C"}'
+            Choice.Option "X" "..X" patterns=["*.x"] . to_json . should_equal '{"label":"X","value":"..X","parameters":[],"icon":"","patterns":["*.x"]}'
+
+    suite_builder.group "File_Format.dropdown_options" group_builder->
+        group_builder.specify "names a registered format's type and file patterns" <|
+            options = File_Format.dropdown_options [Auto_Detect]
+            json = options.find o-> o.label == "JSON"
+            json.value . should_equal "Standard.Base.System.File_Format.JSON_Format"
+            json.requires . should_equal "Standard.Base.System.File_Format.JSON_Format"
+            json.patterns . should_equal ["*.json", "*.geojson"]
+
+        group_builder.specify "leaves Auto_Detect and Raw_Response without them" <|
+            options = File_Format.dropdown_options [Auto_Detect, Raw_Response]
+            options.first.label . should_equal "Auto Detect"
+            options.first.requires . should_equal ""
+            options.first.patterns . should_equal []
+            raw = options.find o-> o.label == "Raw HTTP Response"
+            raw.requires . should_equal ""
+            raw.patterns . should_equal []
+
+        group_builder.specify "uses the registered types it is given" <|
+            options = File_Format.dropdown_options [Auto_Detect] []
+            options.map .label . should_equal ["Auto Detect"]
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

@@ -67,7 +67,7 @@ add_specs suite_builder =
         Locale.uk . should_not_equal Locale.us
 
     group_builder.specify "Should correctly auto-discover static Locales" <|
-        locale_names = Locale.widget_options.map x-> case x of Option locale_name _ _ _ -> locale_name
+        locale_names = Locale.widget_options.map x-> case x of Option locale_name _ _ _ _ _ -> locale_name
         locale_names . should_equal ['Bangladesh', 'Brazil', 'Canada English', 'Canada French', 'China', 'France', 'Germany', 'India English', 'India Hindi', 'Indonesia', 'Italy', 'Japan', 'Mexico', 'Nigeria', 'Pakistan English', 'Pakistan Urdu', 'Poland', 'Russia', 'South Korea', 'UK', 'US']
 
 main filter=Nothing =
