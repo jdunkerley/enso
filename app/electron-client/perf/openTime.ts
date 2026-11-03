@@ -56,6 +56,7 @@ interface Options {
   readonly jvmDiagnostics: boolean
   readonly jvmOptions: string
   readonly template: TemplateName
+  readonly engineLogLevel: string | undefined
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -74,6 +75,7 @@ function parseOptions(argv: readonly string[]): Options {
       'jvm-diagnostics': { type: 'boolean', default: false },
       'jvm-options': { type: 'string', default: '' },
       template: { type: 'string', default: 'welcome' },
+      'engine-log-level': { type: 'string' },
     },
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
@@ -92,6 +94,7 @@ function parseOptions(argv: readonly string[]): Options {
     jvmDiagnostics: values['jvm-diagnostics'] ?? false,
     jvmOptions: values['jvm-options'] ?? '',
     template: parseTemplateName(values.template ?? 'welcome'),
+    engineLogLevel: values['engine-log-level'],
   }
 }
 
@@ -448,6 +451,11 @@ async function measureLaunch(
     ENSO_TEST_PROJECTS_DIR: projectsDir.replace(/\\/g, '/'),
     ENSO_AI_DISABLED: '1',
     ENSO_LOG_DIRECTORY: logDir,
+    // `--engine-log-level debug`: the engine's own log at that level, to split an open (e.g.
+    // `AttachVisualizationCmd`, `Starting ExecuteJob`, module loading); slower, so not for medians.
+    ...(options.engineLogLevel ?
+      { ENSO_LOGSERVER_LOG_TO_FILE_LOG_LEVEL: options.engineLogLevel }
+    : {}),
     ...extraEnv,
   }
   let app: ElectronApplication | undefined

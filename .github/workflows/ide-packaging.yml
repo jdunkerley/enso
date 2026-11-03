@@ -62,6 +62,11 @@ on:
         required: false
         type: string
         default: welcome
+      open_perf_engine_log_level:
+        description: The engine's log level for the measured launches (e.g. `debug`), to split an open.
+        required: false
+        type: string
+        default: ""
       open_perf_jvm_options:
         description: >-
           JVM options added to the measured JVM launches, for an experiment (e.g.
@@ -335,6 +340,7 @@ jobs:
       OPEN_PERF_BUDGET: ${{ inputs.open_perf_budget || '12' }}
       OPEN_PERF_DIAGNOSTICS: ${{ inputs.open_perf_diagnostics == true }}
       OPEN_PERF_JVM_OPTIONS: ${{ inputs.open_perf_jvm_options }}
+      OPEN_PERF_ENGINE_LOG_LEVEL: ${{ inputs.open_perf_engine_log_level }}
       OPEN_PERF_TEMPLATE: ${{ inputs.open_perf_template || 'welcome' }}
     strategy:
       fail-fast: false
@@ -465,6 +471,7 @@ jobs:
           extra=()
           if [ "$OPEN_PERF_DIAGNOSTICS" = true ]; then extra+=(--jvm-diagnostics); fi
           if [ -n "$OPEN_PERF_JVM_OPTIONS" ]; then extra+=("--jvm-options=$OPEN_PERF_JVM_OPTIONS"); fi
+          if [ -n "$OPEN_PERF_ENGINE_LOG_LEVEL" ]; then extra+=(--engine-log-level "$OPEN_PERF_ENGINE_LOG_LEVEL"); fi
           # Several templates (comma-separated) are measured one after the other on the same runner,
           # each in open-perf/<template>; one alone writes open-perf itself, as develop's baseline
           # download expects.
@@ -487,6 +494,7 @@ jobs:
           $extra = @()
           if ($env:OPEN_PERF_DIAGNOSTICS -eq 'true') { $extra += '--jvm-diagnostics' }
           if ($env:OPEN_PERF_JVM_OPTIONS) { $extra += "--jvm-options=$env:OPEN_PERF_JVM_OPTIONS" }
+          if ($env:OPEN_PERF_ENGINE_LOG_LEVEL) { $extra += @('--engine-log-level', $env:OPEN_PERF_ENGINE_LOG_LEVEL) }
           $templates = @($env:OPEN_PERF_TEMPLATE -split ',')
           foreach ($template in $templates) {
             $out = "$env:GITHUB_WORKSPACE/open-perf"
