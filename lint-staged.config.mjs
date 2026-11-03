@@ -8,8 +8,7 @@ const quote = (files) => files.map((f) => JSON.stringify(f)).join(' ')
 export default {
   '*.{js,jsx,cjs,mjs,cts,mts,ts,tsx,vue,json,jsonc,md,mdx,yml,yaml,html,css,scss}':
     'node ./node_modules/prettier/bin/prettier.cjs --write',
-  // Whole workspace, so the staged file list is discarded (see the script).
-  '*.rs': () => `${script} rust`,
+  '*.rs': (files) => `${script} rust ${quote(files)}`,
   '*.java': (files) => `${script} java ${quote(files)}`,
   '*.{scala,sbt}': (files) => `${script} scala ${quote(files)}`,
 }

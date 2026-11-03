@@ -55,7 +55,7 @@ Say what you're trying to do, not only the change you have in mind.
 | Staged files                                  | Formatter                                                              |
 | --------------------------------------------- | ---------------------------------------------------------------------- |
 | TypeScript, Vue, JSON, Markdown, YAML, CSS, … | Prettier                                                               |
-| `.rs`                                         | `cargo fmt` (edition and `rustfmt.toml` from the repo)                 |
+| `.rs`                                         | `rustfmt`, edition from the owning crate, `rustfmt.toml` from the repo |
 | `.java`                                       | google-java-format, the version in `project/plugins.sbt`, Google style |
 | `.scala`, `.sbt`                              | scalafmt, the version in `.scalafmt.conf`                              |
 
@@ -63,15 +63,19 @@ A language's tool only starts when files of that language are staged, so a
 Markdown-only commit starts no JVM. Rust, Java and Scala are handled by
 `tools/pre-commit/format-staged.mjs`:
 
-- **A missing tool never blocks a commit.** Without `cargo`, a JDK 21+, or
-  Coursier (`cs`) the hook prints a `pre-commit: skipping ...` notice and the
-  commit goes ahead; CI will still check that language.
-- Java downloads the pinned google-java-format jar once, checksum-verified, to
-  `~/.cache/enso-format/`. Scala runs `cs launch` of the pinned scalafmt-cli (or
-  a `scalafmt` on `PATH` reporting that exact version).
-- `cargo fmt` covers the whole workspace, because `rustfmt` on one file knows
-  neither the edition nor the module tree. The hook puts back any other `.rs`
-  files you had modified, so only staged files change.
+- **A missing tool never blocks a commit.** Without `rustfmt`, a JDK 21+, or
+  Coursier (`cs`), or when a download or Coursier fetch fails (offline), the
+  hook prints a `pre-commit: skipping ...` notice and the commit goes ahead; CI
+  will still check that language. Only a formatter rejecting a staged file (a
+  syntax error) fails the commit.
+- Java downloads the pinned google-java-format jar once, to
+  `~/.cache/enso-format/`, verified against a SHA-256 pinned in the script.
+  Scala runs `cs launch` of the pinned scalafmt-cli (or a `scalafmt` on `PATH`
+  reporting that exact version).
+- Rust is formatted one staged file at a time, through `rustfmt`'s stdin, with
+  the edition read from the file's `Cargo.toml` (or the workspace's). Nothing
+  else is read or written, so untracked, deleted or broken files elsewhere in
+  the workspace don't matter.
 - To bypass the hook, use `git commit --no-verify`. The same checks run in CI
   (`sbt scalafmtCheckAll javafmtCheckAll`, `cargo fmt -- --check`, Prettier).
 
