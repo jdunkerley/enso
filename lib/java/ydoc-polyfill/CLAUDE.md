@@ -45,6 +45,9 @@ sockets on a 32-core machine with 40 busy processes, none when idle.
 
 `close()` on a socket the peer already closed must not throw, and JS sees one
 `close` event however many times Helidon and the fallback path report it (#409).
-The WebSocket tests take their locks from `TimedLock` (10 s, then fail) and
-their ports from `TimedLock.freePort()`, so a missed handler fails a test
-instead of hanging the job.
+`close()` without a code is `terminate()`, which also dispatches `close` itself:
+Helidon does not always report a close for a socket torn down locally, and the
+event was lost when the peer's close raced it (#494). The WebSocket tests take
+their locks from `TimedLock` (10 s, then fail) and their ports from
+`TimedLock.freePort()`, so a missed handler fails a test instead of hanging the
+job.

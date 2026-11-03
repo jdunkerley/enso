@@ -209,6 +209,10 @@ final class WebSocket implements ProxyExecutable {
         if (session != null) {
           try {
             session.terminate();
+            // Helidon does not always report a close for a socket torn down locally (it did not
+            // when the peer's close raced the terminate, #494), and `ws` emits `close` from
+            // `terminate()`. `onClose` dedups against Helidon's own report.
+            connection.onClose(session, WsCloseCodes.CLOSED_ABNORMALLY, SOCKET_CLOSED_REASON);
           } catch (IllegalStateException | UncheckedIOException socketClosed) {
             // The peer already closed the socket (#409). Like `WebSocket.close()` in browsers and
             // Node, closing a closed socket must not throw.
