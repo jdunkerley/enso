@@ -4598,6 +4598,9 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
     // in #302). The `-XX:+ExitOnOutOfMemoryError` in the native image's build arguments is not
     // this JVM's.
     javaOptions += "-XX:+ExitOnOutOfMemoryError",
+    // The million-row groups peak above the default quarter of RAM (about 4 GB on a 16 GB runner),
+    // so give this JVM 75%. With the groups' contexts released, the heap after each group stays
+    // at about 250 MB (the `HEAP after group` lines the generated benchmarks print).
     javaOptions += "-XX:MaxRAMPercentage=75"
   )
   .settings(
