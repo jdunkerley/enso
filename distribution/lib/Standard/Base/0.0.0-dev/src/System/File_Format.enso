@@ -175,9 +175,19 @@ type File_Format
     ## ---
        private: true
        ---
+    dropdown_options (fixed : Vector) (registered : Vector = File_Format_SPI.get_types) -> Vector Option =
+        with_library typ =
+            requires = Meta.meta typ . qualified_name
+            patterns = typ.get_name_patterns . flat_map .patterns . distinct
+            typ.get_dropdown_options . map option->
+                Option option.label option.value option.parameters option.icon requires patterns
+        (fixed.flat_map .get_dropdown_options) + (registered.flat_map with_library)
+
+    ## ---
+       private: true
+       ---
     default_widget display:Display=..When_Modified -> Widget =
-        options = ([Auto_Detect]+File_Format_SPI.get_types).flat_map .get_dropdown_options
-        Single_Choice display=display values=options
+        Single_Choice display=display values=(File_Format.dropdown_options [Auto_Detect])
 
     ## ---
        private: true

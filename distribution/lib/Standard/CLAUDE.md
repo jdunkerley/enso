@@ -153,6 +153,12 @@ services:
 or not (a library is loaded when its provider is first resolved), so a new
 backend or format shows in the dropdowns without an import.
 
+A format dropdown builds its options with `File_Format.dropdown_options`, which
+gives each registered format's options `requires` (the format type's qualified
+name) and `patterns` (its `get_name_patterns`). The IDE adds the format's
+library import from them when the user picks the format, or picks a file the
+format reads (#489). `Choice.Option` emits both in its JSON only when set.
+
 ## Public types
 
 A library outside the core set (Base, Table, Database, Visualization, Test)

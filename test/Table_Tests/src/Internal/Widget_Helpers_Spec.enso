@@ -21,7 +21,7 @@ add_specs suite_builder =
         group_builder.specify "make_column_name_multi_selector with regex and by_type" <|
             w = make_column_name_multi_selector table add_regex=True add_by_type=True
             j = (Widgets.get_widget_json w) . to_text
-            j.should_contain "(Multiple_Choice [(Option '<Regular Expression>' 'regex' [] ''), (Option '<By Type>' '(..By_Type ..Integer)' [] ''), (Option 'X' '\'X\'' [] ''), (Option 'Y' '\'Y\'' [] '')"
+            j.should_contain "(Multiple_Choice [(Option '<Regular Expression>' 'regex' [] '' '' []), (Option '<By Type>' '(..By_Type ..Integer)' [] '' '' []), (Option 'X' '\'X\'' [] '' '' []), (Option 'Y' '\'Y\'' [] '' '' [])"
         group_builder.specify "make_column_ref_by_name_selector with named_pattern" <|
             w = make_column_ref_by_name_selector table add_named_pattern=True
             j = (Widgets.get_widget_json w) . to_text
@@ -40,19 +40,19 @@ add_specs suite_builder =
         group_builder.specify "make_column_ref_by_name_selector_for_type with integer column includes integer columns" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer
             j = (Widgets.get_widget_json w) . to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] ''), (Option '<Expression>' '(expr \'[Ints1]\')' [] ''), (Option 'Ints1' '(..Name \'Ints1\')' [] ''), (Option 'Ints2' '(..Name \'Ints2\')' [] '')]"
+            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Ints1' '(..Name \'Ints1\')' [] '' '' []), (Option 'Ints2' '(..Name \'Ints2\')' [] '' '' [])]"
         group_builder.specify "make_column_ref_by_name_selector_for_type with Float column includes matching Float column" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Float
             j = (Widgets.get_widget_json w) . to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] ''), (Option '<Expression>' '(expr \'[Ints1]\')' [] ''), (Option 'Floats' '(..Name \'Floats\')' [] '')]"
+            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Floats' '(..Name \'Floats\')' [] '' '' [])]"
         group_builder.specify "make_column_ref_by_name_selector_for_type with numeric column and if_value_type_numeric_include_all_numeric=True includes all nummeric columns" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Integer if_value_type_numeric_include_all_numeric=True
             j = (Widgets.get_widget_json w) . to_text
-            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] ''), (Option '<Expression>' '(expr \'[Ints1]\')' [] ''), (Option 'Ints1' '(..Name \'Ints1\')' [] ''), (Option 'Ints2' '(..Name \'Ints2\')' [] ''), (Option 'Floats' '(..Name \'Floats\')' [] '')]"
+            j.should_contain "Single_Choice [(Option '<Number Value>' '0' [] '' '' []), (Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Ints1' '(..Name \'Ints1\')' [] '' '' []), (Option 'Ints2' '(..Name \'Ints2\')' [] '' '' []), (Option 'Floats' '(..Name \'Floats\')' [] '' '' [])]"
         group_builder.specify "make_column_ref_by_name_selector_for_type with text column and if_value_type_numeric_include_all_numeric=True just includes Text columns" <|
             w = make_column_ref_by_name_selector_for_type table2 value_type=Value_Type.Char if_value_type_numeric_include_all_numeric=True
             j = (Widgets.get_widget_json w) . to_text
-            j.should_contain "(Option '<Expression>' '(expr \'[Ints1]\')' [] ''), (Option 'Texts' '(..Name \'Texts\')' [] ''), (Option 'Texts2' '(..Name \'Texts2\')' [] '')]"
+            j.should_contain "(Option '<Expression>' '(expr \'[Ints1]\')' [] '' '' []), (Option 'Texts' '(..Name \'Texts\')' [] '' '' []), (Option 'Texts2' '(..Name \'Texts2\')' [] '' '' [])]"
 
 
             

@@ -18,6 +18,7 @@
     - all -> Standard.Base.Any.Any
     - all_known_name_patterns -> (Standard.Base.Data.Vector.Vector Standard.Base.Data.Text.Text)
     - default_widget display:Standard.Base.Metadata.Display= -> Standard.Base.Metadata.Widget
+    - dropdown_options fixed:Standard.Base.Data.Vector.Vector registered:Standard.Base.Data.Vector.Vector= -> (Standard.Base.Data.Vector.Vector Standard.Base.Metadata.Choice.Option)
     - get_dropdown_options -> Standard.Base.Any.Any
     - get_name_patterns -> (Standard.Base.Data.Vector.Vector Standard.Base.System.File_Format.File_Name_Pattern)
     - name_filter_widget -> Standard.Base.Metadata.Widget
