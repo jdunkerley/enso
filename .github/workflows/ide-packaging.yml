@@ -58,6 +58,7 @@ on:
         description: >-
           The project to open: `welcome` (the new-project template) or `image` (a project that
           calls Standard.Image, whose Java runs in a guest JVM under native; projectTemplates.ts).
+          Several, comma-separated, are measured in turn on the same runner, in open-perf/<name>.
         required: false
         type: string
         default: welcome
@@ -464,12 +465,19 @@ jobs:
           extra=()
           if [ "$OPEN_PERF_DIAGNOSTICS" = true ]; then extra+=(--jvm-diagnostics); fi
           if [ -n "$OPEN_PERF_JVM_OPTIONS" ]; then extra+=("--jvm-options=$OPEN_PERF_JVM_OPTIONS"); fi
-          extra+=(--template "$OPEN_PERF_TEMPLATE")
-          xvfb-run corepack pnpm --filter enso run perf:open --out \
-            "$GITHUB_WORKSPACE/open-perf" --runs "$OPEN_PERF_RUNS" --engines "$OPEN_PERF_ENGINES" \
-            --budget-minutes "$OPEN_PERF_BUDGET" --baseline \
-            "$GITHUB_WORKSPACE/open-perf-baseline" --summary \
-            "$GITHUB_STEP_SUMMARY" "${extra[@]}"
+          # Several templates (comma-separated) are measured one after the other on the same runner,
+          # each in open-perf/<template>; one alone writes open-perf itself, as develop's baseline
+          # download expects.
+          IFS=',' read -ra templates <<< "$OPEN_PERF_TEMPLATE"
+          for template in "${templates[@]}"; do
+            out="$GITHUB_WORKSPACE/open-perf"
+            if [ "${#templates[@]}" -gt 1 ]; then out="$out/$template"; fi
+            xvfb-run corepack pnpm --filter enso run perf:open --out \
+              "$out" --runs "$OPEN_PERF_RUNS" --engines "$OPEN_PERF_ENGINES" \
+              --budget-minutes "$OPEN_PERF_BUDGET" --baseline \
+              "$GITHUB_WORKSPACE/open-perf-baseline" --summary \
+              "$GITHUB_STEP_SUMMARY" --template "$template" "${extra[@]}"
+          done
       - if: env.OPEN_PERF == 'true' && matrix.os == 'windows'
         name: Measure the open time
         continue-on-error: true
@@ -479,12 +487,16 @@ jobs:
           $extra = @()
           if ($env:OPEN_PERF_DIAGNOSTICS -eq 'true') { $extra += '--jvm-diagnostics' }
           if ($env:OPEN_PERF_JVM_OPTIONS) { $extra += "--jvm-options=$env:OPEN_PERF_JVM_OPTIONS" }
-          $extra += @('--template', $env:OPEN_PERF_TEMPLATE)
-          corepack pnpm --filter enso run perf:open --out `
-            "$env:GITHUB_WORKSPACE/open-perf" --runs "$env:OPEN_PERF_RUNS" --engines `
-            "$env:OPEN_PERF_ENGINES" --budget-minutes "$env:OPEN_PERF_BUDGET" --baseline `
-            "$env:GITHUB_WORKSPACE/open-perf-baseline" --summary `
-            "$env:GITHUB_STEP_SUMMARY" @extra
+          $templates = @($env:OPEN_PERF_TEMPLATE -split ',')
+          foreach ($template in $templates) {
+            $out = "$env:GITHUB_WORKSPACE/open-perf"
+            if ($templates.Count -gt 1) { $out = "$out/$template" }
+            corepack pnpm --filter enso run perf:open --out `
+              "$out" --runs "$env:OPEN_PERF_RUNS" --engines `
+              "$env:OPEN_PERF_ENGINES" --budget-minutes "$env:OPEN_PERF_BUDGET" --baseline `
+              "$env:GITHUB_WORKSPACE/open-perf-baseline" --summary `
+              "$env:GITHUB_STEP_SUMMARY" --template $template @extra
+          }
       - if: env.OPEN_PERF == 'true' && !cancelled()
         name: Upload the open time
         continue-on-error: true
@@ -500,6 +512,13 @@ jobs:
             open-perf/*/logs
             open-perf/*/electron-out.log
             open-perf/*/hsperf
+            open-perf/*/open-time.json
+            open-perf/*/open-time.md
+            open-perf/*/*/marks.json
+            open-perf/*/*/*.png
+            open-perf/*/*/logs
+            open-perf/*/*/electron-out.log
+            open-perf/*/*/hsperf
           if-no-files-found: warn
       - if: failure()
         name: Upload Test Traces
