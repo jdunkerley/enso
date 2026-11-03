@@ -27,8 +27,8 @@ const CUSTOM: SettingsSearchableEntry = {
   getExtraAliases: () => ['an extra alias'],
 }
 const TAB: SettingsSearchableTab<Section> = {
-  nameId: 'accountSettingsTab',
-  settingsTab: SettingsTabType.account,
+  nameId: 'appearanceSettingsTab',
+  settingsTab: SettingsTabType.appearance,
   icon: 'settings',
   sections: [
     { nameId: 'firstSettingsSection' as never, entries: [FORM, CUSTOM] },
@@ -70,7 +70,7 @@ describe('search', () => {
       doesSettingsTabMatch(
         TAB,
         'generalSettingsTabSection',
-        settingsQueryMatcher('account'),
+        settingsQueryMatcher('appearance'),
         getText,
       ),
     ).toBe(true)
@@ -106,7 +106,7 @@ describe('search', () => {
       filterSettingsSections(TAB, settingsQueryMatcher('firstSettings'), getText, NO_RESULTS),
     ).toEqual([TAB.sections[0]])
     expect(
-      filterSettingsSections(TAB, settingsQueryMatcher('accountSettings'), getText, NO_RESULTS),
+      filterSettingsSections(TAB, settingsQueryMatcher('appearanceSettings'), getText, NO_RESULTS),
     ).toBe(TAB.sections)
   })
 

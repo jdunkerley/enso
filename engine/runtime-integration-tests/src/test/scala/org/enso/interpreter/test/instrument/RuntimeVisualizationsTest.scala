@@ -6,17 +6,24 @@ import org.enso.interpreter.test.Metadata
 import org.enso.pkg.QualifiedName
 import org.enso.common.RuntimeOptions
 import org.enso.polyglot._
+import org.enso.logger.ObservedMessage
 import org.enso.polyglot.runtime.Runtime.Api
+import org.enso.polyglot.runtime.serde.ApiSerde
 import org.enso.text.editing.model
 import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.io.{MessageEndpoint, MessageTransport}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.slf4j.LoggerFactory
 
 import java.io.{ByteArrayOutputStream, File}
+import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.nio.file.{Files, Paths}
 import java.util.UUID
+import java.util.concurrent.{CountDownLatch, TimeUnit}
 import java.util.logging.Level
+import scala.util.Success
 
 @scala.annotation.nowarn("msg=multiarg infix syntax")
 class RuntimeVisualizationsTest
@@ -25,6 +32,51 @@ class RuntimeVisualizationsTest
     with org.enso.testkit.ReportLogsOnFailure {
 
   // === Test Utilities =======================================================
+
+  /** Stops the runtime's thread that sends the next `ExecutionComplete` until
+    * the test releases it.
+    *
+    * The runtime sends `ExecutionComplete` from the `ExecuteJob` itself, after
+    * the end-of-run pass over deferred visualizations and while the job still
+    * holds its locks and is still registered as running. Holding it there
+    * gives a test the window between that pass and the end of the job,
+    * deterministically.
+    */
+  final class ExecutionCompleteGate {
+    @volatile private var armed  = false
+    private val reachedLatch     = new CountDownLatch(1)
+    private val releasedLatch    = new CountDownLatch(1)
+    private val interruptedLatch = new CountDownLatch(1)
+
+    /** Holds the next `ExecutionComplete`. */
+    def arm(): Unit = armed = true
+
+    /** Waits until an `ExecutionComplete` is held. */
+    def awaitReached(): Boolean = reachedLatch.await(30, TimeUnit.SECONDS)
+
+    /** Lets the held `ExecutionComplete` (and anything after it) through. */
+    def release(): Unit = releasedLatch.countDown()
+
+    /** Waits until the held job was interrupted, i.e. aborted. */
+    def awaitInterrupted(): Boolean =
+      interruptedLatch.await(30, TimeUnit.SECONDS)
+
+    private[RuntimeVisualizationsTest] def onResponse(data: ByteBuffer): Unit =
+      if (armed) {
+        ApiSerde.deserializeApiEnvelope(data.duplicate()) match {
+          case Success(Api.Response(_, Api.ExecutionComplete(_))) =>
+            armed = false
+            reachedLatch.countDown()
+            try releasedLatch.await(60, TimeUnit.SECONDS)
+            catch {
+              case e: InterruptedException =>
+                interruptedLatch.countDown()
+                throw e
+            }
+          case _ =>
+        }
+      }
+  }
 
   class TestContext(packageName: String, sequentialExecution: Boolean)
       extends InstrumentTestContext(packageName) {
@@ -68,10 +120,36 @@ class RuntimeVisualizationsTest
           )
           .logHandler(System.err)
           .out(out)
-          .serverTransport(runtimeServerEmulator.makeServerTransport)
+          .serverTransport(gatedServerTransport)
           .build()
       }
       _context
+    }
+
+    /** Holds the runtime's next `ExecutionComplete` while armed. */
+    val executionCompleteGate = new ExecutionCompleteGate
+
+    /** The emulator's transport, with the runtime's responses passing
+      * through [[executionCompleteGate]] first.
+      */
+    private def gatedServerTransport: MessageTransport = { (uri, peer) =>
+      val endpoint =
+        runtimeServerEmulator.makeServerTransport.open(uri, peer)
+      if (endpoint == null) null
+      else
+        new MessageEndpoint {
+          override def sendText(text: String): Unit =
+            endpoint.sendText(text)
+          override def sendBinary(data: ByteBuffer): Unit = {
+            executionCompleteGate.onResponse(data)
+            endpoint.sendBinary(data)
+          }
+          override def sendPing(data: ByteBuffer): Unit =
+            endpoint.sendPing(data)
+          override def sendPong(data: ByteBuffer): Unit =
+            endpoint.sendPong(data)
+          override def sendClose(): Unit = endpoint.sendClose()
+        }
     }
 
     override def close(): Unit = {
@@ -5758,6 +5836,240 @@ class RuntimeVisualizationsTest
 
       new String(dataSelf, StandardCharsets.UTF_8) shouldEqual "[4]"
       new String(dataUpdated, StandardCharsets.UTF_8) shouldEqual "[]"
+  }
+
+  /** Pushes `main` with its `ExecutionComplete` held (so after its end-of-run
+    * pass, while it still runs and holds its locks), attaches one
+    * visualization per expression in `on`, and waits until the scheduler has
+    * decided what to do with each `ExecuteJob` the attaches ask for. The held
+    * execution is not released.
+    *
+    * @return the context id, the request id and the visualization ids
+    */
+  private def attachWhileTheFirstExecutionIsHeld(
+    context: TestContext,
+    on: Seq[UUID]
+  ): (UUID, UUID, Seq[UUID]) = {
+    val contents   = context.Main.code
+    val mainFile   = context.writeMain(contents)
+    val moduleName = "Enso_Test.Test.Main"
+    val visualizationFile =
+      context.writeInSrcDir("Visualization", context.Visualization.code)
+
+    val contextId        = UUID.randomUUID()
+    val requestId        = UUID.randomUUID()
+    val visualizationIds = on.map(_ => UUID.randomUUID())
+
+    context.send(
+      Api.Request(
+        requestId,
+        Api.OpenFileRequest(visualizationFile, context.Visualization.code)
+      )
+    )
+    context.receive shouldEqual Some(
+      Api.Response(Some(requestId), Api.OpenFileResponse)
+    )
+    context.send(Api.Request(requestId, Api.CreateContextRequest(contextId)))
+    context.receive shouldEqual Some(
+      Api.Response(requestId, Api.CreateContextResponse(contextId))
+    )
+    context.send(
+      Api.Request(requestId, Api.OpenFileRequest(mainFile, contents))
+    )
+    context.receive shouldEqual Some(
+      Api.Response(Some(requestId), Api.OpenFileResponse)
+    )
+
+    // Hold the first execution at its ExecutionComplete: its end-of-run pass
+    // is over, and it still holds its locks and is still running.
+    context.executionCompleteGate.arm()
+    context.send(
+      Api.Request(
+        requestId,
+        Api.PushContextRequest(
+          contextId,
+          Api.StackItem.ExplicitCall(
+            Api.MethodPointer(moduleName, "Enso_Test.Test.Main", "main"),
+            None,
+            Vector()
+          )
+        )
+      )
+    )
+    context.executionCompleteGate.awaitReached() shouldBe true
+
+    // The scheduler logs, at trace level, what it did with the ExecuteJob an
+    // attach asks for: submitted it, or found a duplicate of it running. The
+    // log sites in JobExecutionEngine say that this test relies on them.
+    val schedulerLogger = LoggerFactory.getLogger(
+      "org.enso.interpreter.instrument.execution.JobExecutionEngine"
+    ) match {
+      case logger: ch.qos.logback.classic.Logger => logger
+      case other =>
+        fail(s"Expected a logback logger, got ${other.getClass}")
+    }
+    val previousLevel = schedulerLogger.getLevel
+    val scheduled     = new CountDownLatch(on.size)
+    val observing = ObservedMessage.observe(
+      schedulerLogger,
+      { message: ObservedMessage =>
+        val text = message.getFormattedMessage
+        if (
+          text.contains("duplicate job [ExecuteJob") ||
+          text.startsWith("Submitting job: ExecuteJob")
+        ) {
+          scheduled.countDown()
+        }
+      }
+    )
+    schedulerLogger.setLevel(ch.qos.logback.classic.Level.TRACE)
+    try {
+      on.zip(visualizationIds).foreach { case (expressionId, visualizationId) =>
+        context.send(
+          Api.Request(
+            requestId,
+            Api.AttachVisualization(
+              visualizationId,
+              expressionId,
+              Api.VisualizationConfiguration(
+                contextId,
+                Api.VisualizationExpression.Text(
+                  "Enso_Test.Test.Visualization",
+                  "x -> encode x",
+                  Vector()
+                ),
+                "Enso_Test.Test.Visualization"
+              )
+            )
+          )
+        )
+      }
+      scheduled.await(30, TimeUnit.SECONDS) shouldBe true
+    } finally {
+      schedulerLogger.setLevel(previousLevel)
+      observing.close()
+    }
+    (contextId, requestId, visualizationIds)
+  }
+
+  /** Every response until none arrives for `quietSeconds`. */
+  private def receiveUntilQuiet(
+    context: TestContext,
+    quietSeconds: Long
+  ): List[Api.Response] =
+    Iterator
+      .continually(context.receiveWithTimeout(quietSeconds))
+      .takeWhile(_.isDefined)
+      .flatten
+      .toList
+
+  private def visualizationUpdates(
+    responses: Seq[Api.Response],
+    visualizationId: UUID
+  ): Seq[String] =
+    responses.collect {
+      case Api.Response(
+            None,
+            Api.VisualizationUpdate(
+              Api.VisualizationContext(`visualizationId`, _, _),
+              data
+            )
+          ) =>
+        new String(data, StandardCharsets.UTF_8)
+    }
+
+  it should "evaluate a visualization attached while an execution is finishing" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    // #510: a visualization attached after the execution's end-of-run pass,
+    // but before that execution has ended, is deferred and asks for an
+    // ExecuteJob. That job must run, although an equal one is still running.
+    val (_, _, Seq(visualizationId)) =
+      try attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+      finally context.executionCompleteGate.release()
+
+    val update = Iterator
+      .continually(context.receiveWithTimeout(20))
+      .takeWhile(_.isDefined)
+      .flatten
+      .flatMap(response => visualizationUpdates(Seq(response), visualizationId))
+      .nextOption()
+    update shouldEqual Some("6")
+  }
+
+  it should "run one execution for all visualizations attached while an execution is finishing" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, _, visualizationIds) =
+      try attachWhileTheFirstExecutionIsHeld(
+        context,
+        Seq(context.Main.idMainX, context.Main.idMainZ)
+      )
+      finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    visualizationUpdates(responses, visualizationIds(0)) shouldEqual Seq("6")
+    visualizationUpdates(responses, visualizationIds(1)) shouldEqual Seq("50")
+    // The held execution's ExecutionComplete, and one for the single
+    // execution that ran after it.
+    responses.count(
+      _ == context.executionComplete(contextId)
+    ) shouldEqual 2
+  }
+
+  it should "not run the execution a deferred visualization asked for after the context is pushed" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, requestId, Seq(visualizationId)) =
+      attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+    try {
+      // Entering `foo` aborts the held execution of `main`.
+      context.send(
+        Api.Request(
+          requestId,
+          Api.PushContextRequest(
+            contextId,
+            Api.StackItem.LocalCall(context.Main.idMainY)
+          )
+        )
+      )
+      context.executionCompleteGate.awaitInterrupted() shouldBe true
+    } finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    responses should contain(
+      Api.Response(requestId, Api.PushContextResponse(contextId))
+    )
+    // An execution of the stack the user left would evaluate it.
+    visualizationUpdates(responses, visualizationId) shouldBe empty
+  }
+
+  it should "not run the execution a deferred visualization asked for after the context is destroyed" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    val (contextId, requestId, Seq(visualizationId)) =
+      attachWhileTheFirstExecutionIsHeld(context, Seq(context.Main.idMainX))
+    try {
+      context.send(
+        Api.Request(requestId, Api.DestroyContextRequest(contextId))
+      )
+      context.executionCompleteGate.awaitInterrupted() shouldBe true
+    } finally context.executionCompleteGate.release()
+
+    val responses = receiveUntilQuiet(context, 5)
+    val destroyed = responses.indexOf(
+      Api.Response(requestId, Api.DestroyContextResponse(contextId))
+    )
+    destroyed should be >= 0
+    // An execution of the destroyed context would evaluate it, report on the
+    // context, and re-create its lock (`getOrCreateContextLock`).
+    visualizationUpdates(responses, visualizationId) shouldBe empty
+    // (The aborted execution may still report its failure after the response.)
+    responses.drop(destroyed + 1).filter {
+      case Api.Response(_, Api.ExecutionComplete(`contextId`))    => true
+      case Api.Response(_, Api.ExpressionUpdates(`contextId`, _)) => true
+      case _                                                      => false
+    } shouldBe empty
   }
 
 }

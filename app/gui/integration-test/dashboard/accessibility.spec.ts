@@ -163,9 +163,7 @@ test('user menu tree', async ({ drivePage }) => {
     const menu = page.getByTestId('user-menu')
     await expect(menu).toBeVisible()
     await expect(menu).toMatchAriaSnapshot(`
-      - dialog "User Settings":
-        - img "Offline user"
-        - text: Offline user Working locally
+      - dialog "Settings menu":
         - button /^Settings/
         - button /^About Enso/
     `)
@@ -176,11 +174,10 @@ test('settings: no new axe violations; settings sidebar tree', async ({ drivePag
   await drivePage.goToPage.settings().do(async (page) => {
     const sidebar = page.getByLabel(TEXT.settingsSidebarLabel)
     await expect(sidebar).toBeVisible()
-    await expect(page.getByText(TEXT.settingsFor, { exact: false }).first()).toBeVisible()
+    await expect(page.getByText(TEXT.settingsPageTitle, { exact: false }).first()).toBeVisible()
     await expectNoNewAxeViolations(page, 'settings')
     await expect(sidebar).toMatchAriaSnapshot(`
       - heading "General" [level=1]
-      - button "Account"
       - button "Local"
       - heading "Look and feel" [level=1]
       - button "Appearance"

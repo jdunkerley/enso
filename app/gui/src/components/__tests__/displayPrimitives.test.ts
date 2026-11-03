@@ -1,11 +1,10 @@
 /**
  * @file The Vue display primitives: their ARIA roles and the shared `variants.ts` classes they
- * render with. (`Icon`, `Badge`, `StatusBadge`, `Alert`, `ProgressBar`, `Separator`, `Spinner`,
+ * render with. (`Icon`, `Badge`, `Alert`, `ProgressBar`, `Separator`, `Spinner`,
  * `Loader`, `Result`, `Scroller`.)
  */
 import Alert from '$/components/Alert/Alert.vue'
 import Badge from '$/components/Badge/Badge.vue'
-import StatusBadge from '$/components/Badge/StatusBadge.vue'
 import Icon from '$/components/Icon/Icon.vue'
 import ProgressBar from '$/components/ProgressBar/ProgressBar.vue'
 import Result from '$/components/Result/Result.vue'
@@ -41,22 +40,13 @@ describe('Icon', () => {
   })
 })
 
-describe('Badge and StatusBadge', () => {
+describe('Badge', () => {
   test('Badge uses BADGE_STYLES, rounded by default', () => {
     mountWithProviders(() => h(Badge, { color: 'accent', class: 'badge' }, () => 'New'))
     const badge = document.querySelector('.badge')!
     expect(badge.textContent).toBe('New')
     expect(badge.classList).toContain('rounded-4xl')
     expect(badge.className).toContain('--badge-bg-color:var(--color-accent)')
-  })
-
-  test('StatusBadge draws a dot over its content, which hidden hides', () => {
-    mountWithProviders(() => [
-      h(StatusBadge, { color: 'danger' }, () => h('span', { 'data-testid': 'a' })),
-      h(StatusBadge, { color: 'danger', hidden: true }, () => h('span', { 'data-testid': 'b' })),
-    ])
-    expect(byTestId('a')!.nextElementSibling!.classList).toContain('after:bg-danger')
-    expect(byTestId('b')!.nextElementSibling!.classList).toContain('invisible')
   })
 })
 

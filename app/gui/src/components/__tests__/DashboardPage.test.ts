@@ -64,9 +64,9 @@ describe('DashboardPage', () => {
 
   test('leaves the palette once unmounted', async () => {
     const { unmount } = await mountWithProviders(DashboardPage)
-    expect(paletteActions(getText('goToAccountSettingsShortcut'))).toHaveLength(1)
+    expect(paletteActions(getText('goToKeyboardShortcutsSettingsShortcut'))).toHaveLength(1)
     unmount()
-    expect(paletteActions(getText('goToAccountSettingsShortcut'))).toHaveLength(0)
+    expect(paletteActions(getText('goToKeyboardShortcutsSettingsShortcut'))).toHaveLength(0)
   })
 
   test('Escape closes the open modals, and is left alone when there are none', async () => {

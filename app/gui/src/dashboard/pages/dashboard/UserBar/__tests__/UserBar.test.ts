@@ -1,22 +1,17 @@
 /**
- * @file The Vue user bar (#83): the user menu (a dialog of buttons), its entries as global actions,
- * the notification tray and the offline notice; no cloud-only buttons, whatever the plan.
+ * @file The Vue user bar (#83): the settings cog and the menu it opens (a dialog of buttons), its
+ * entries as global actions; no account, notifications or offline notice, no cloud-only buttons.
  */
 import { useAboutModal } from '$/components/AboutModal/aboutModal'
 import { useActionsStore } from '$/providers/actions'
 import { useText } from '$/providers/text'
 import { useToasts } from '$/providers/toasts'
 import { mountWithProviders } from '$/utils/testing/mountWithProviders'
-import { onlineManager } from '@tanstack/vue-query'
 import userEvent from '@testing-library/user-event'
 import { flushPromises } from '@vue/test-utils'
-import { EmailAddress, UserId, type User } from 'enso-common/src/services/Backend'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { reactive, shallowRef } from 'vue'
 import UserBar from '../UserBar.vue'
-
-const auth = reactive<{ session: { user: User } }>({ session: { user: makeUser() } })
-vi.mock('$/providers/auth', () => ({ useAuth: () => auth }))
 
 const localBackend = shallowRef<object | null>({})
 vi.mock('$/providers/backends', () => ({
@@ -53,15 +48,6 @@ function must<T>(value: T | null | undefined): T {
 /** An element's text, trimmed. */
 const textOf = (element: Element | null | undefined) => element?.textContent.trim()
 
-function makeUser(overrides: Partial<User> = {}): User {
-  return {
-    userId: UserId('user-1'),
-    name: 'Ada Lovelace',
-    email: EmailAddress('ada@example.com'),
-    ...overrides,
-  }
-}
-
 async function mountUserBar() {
   const goToSettingsPage = vi.fn()
   const mounted = await mountWithProviders(UserBar, { props: { goToSettingsPage } })
@@ -83,18 +69,26 @@ const entry = (name: string) =>
   )
 
 beforeEach(() => {
-  auth.session = { user: makeUser() }
   localBackend.value = {}
 })
 
 afterEach(() => {
   useAboutModal().isOpen.value = false
-  onlineManager.setOnline(true)
   useToasts().dismiss()
 })
 
 describe('UserBar', () => {
-  test('the user menu: a "User Settings" dialog of buttons, focused as it opens', async () => {
+  test('the bar holds the settings cog and nothing else', async () => {
+    await mountUserBar()
+    const buttons = [...document.querySelectorAll('button')]
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0]).toBe(userMenuButton())
+    // The cog is the `settings` icon.
+    expect(userMenuButton().querySelector('use')?.getAttribute('data-icon')).toBe('settings')
+    expect(document.body.textContent).not.toContain('Ada Lovelace')
+  })
+
+  test('the settings menu: a dialog of buttons, focused as it opens', async () => {
     await mountUserBar()
     const user = userEvent.setup()
     userMenuButton().focus()
@@ -105,8 +99,6 @@ describe('UserBar', () => {
     expect(menu.getAttribute('aria-label')).toBe(getText('userMenuLabel'))
     // The dialog itself takes the focus, then Tab goes to the entries.
     expect(document.activeElement).toBe(menu)
-    expect(menu.textContent).toContain('Ada Lovelace')
-    expect(menu.textContent).toContain(getText('userMenuWorkingLocally'))
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
     await user.tab()
     expect(document.activeElement).toBe(entry(getText('settingsShortcut')))
@@ -118,7 +110,6 @@ describe('UserBar', () => {
 
   test('"Download app" without a local backend', async () => {
     localBackend.value = null
-    auth.session = { user: makeUser() }
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
@@ -129,15 +120,11 @@ describe('UserBar', () => {
     ])
   })
 
-  test('local mode: "Working locally", no "Upgrade Plan" or "Logout", in menu or actions', async () => {
-    // The local session: the one local user, with no sign-in.
-    auth.session = { user: makeUser() }
+  test('local mode: no "Upgrade Plan" or "Logout", in menu or actions', async () => {
     await mountUserBar()
     await userEvent.setup().click(userMenuButton())
     await flushPromises()
     expect(entryNames()).toEqual([getText('settingsShortcut'), getText('aboutThisAppShortcut')])
-    expect(must(userMenu()).textContent).not.toContain(getText('free'))
-    expect(must(userMenu()).textContent).toContain('Working locally')
     const names = useActionsStore()
       .findActions('')
       .map((action) => action.name)
@@ -146,7 +133,6 @@ describe('UserBar', () => {
   })
 
   test('no trial, "Invite" or "Upgrade"', async () => {
-    auth.session = { user: makeUser() }
     await mountUserBar()
     const controls = [...document.querySelectorAll('a, button')].map(textOf)
     expect(controls).not.toContain(getText('upgrade'))
@@ -200,26 +186,5 @@ describe('UserBar', () => {
     await flushPromises()
     // The key of `Mod+,`, after its modifier.
     expect(entry(getText('settingsShortcut')).textContent).toMatch(/,$/)
-  })
-
-  test('offline, it says so', async () => {
-    onlineManager.setOnline(false)
-    await mountUserBar()
-    expect(document.body.textContent).toContain(getText('youAreOffline'))
-  })
-})
-
-describe('NotificationTray', () => {
-  const trayButton = () =>
-    must(document.querySelector<HTMLElement>(`button[aria-label="${getText('notifications')}"]`))
-  const tray = () => must(document.querySelector<HTMLElement>(`[role="dialog"]`))
-
-  test('empty: "You are all caught up"', async () => {
-    await mountUserBar()
-    await userEvent.setup().click(trayButton())
-    await flushPromises()
-    expect(tray().getAttribute('aria-label')).toBe(getText('notifications'))
-    expect(textOf(tray().querySelector('h3'))).toBe(getText('notifications'))
-    expect(tray().textContent).toContain(getText('youAreAllCaughtUp'))
   })
 })

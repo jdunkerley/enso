@@ -15,8 +15,8 @@ Each subdir mirrors a standard-library module name.
   for its upload specs.
 - `postgres/` — `Standard.Postgres`. The `postgresql` JDBC driver; no Java of
   its own.
-- `sqlite/` — `Standard.SQLite`. The `sqlite-jdbc` driver and its native-image
-  feature.
+- `sqlite/` — `Standard.SQLite`. Packaging only: the `sqlite-jdbc` driver and
+  its native library (it runs in the guest JVM, not in the native image).
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`
   — SDK integrations.
 - `image/` — OpenCV-backed image helpers (pair with `lib/java/opencv-wrapper`).
