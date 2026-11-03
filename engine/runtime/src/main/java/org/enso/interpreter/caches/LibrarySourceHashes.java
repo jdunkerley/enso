@@ -51,26 +51,23 @@ public final class LibrarySourceHashes {
    * A library's bindings cache (`ImportExportCache`) and suggestions cache
    * (`SuggestionsCache`) record the library's `Package.sourceHash` (the hash
    * its `catalogue.json` records too) as their source digest, and are used only
-   * while it matches the library's sources. A module's IR cache (`ModuleCache`)
-   * records the digest of the module's own source together with that hash: the
-   * IR holds what the module's names resolved to in the other modules of its
-   * library, which its own source does not determine. (`Compiler.runInternal`
-   * recompiles a cached module whose import was compiled from source, but not
-   * under `--no-compile-dependencies`, which is how `indexStdLibs` compiles.)
+   * while it matches the library's sources.
    *
-   * Before #473 the two library caches were keyed by the library's name, and
-   * the IR cache by the module's source alone. Two trees of a library with the
-   * same name and version then used each other's caches (every checkout of a
-   * development build shares the per-user IR caches, and a bindings cache
-   * travels with a copied tree), and a library edited on disk kept loading its
-   * old IR until its `.enso` directory was deleted. A cache written before
-   * records another digest, so it is discarded and rebuilt once, never read.
+   * A module's IR cache (`ModuleCache`) is not keyed by this hash: it records
+   * the digest of the module's own source, so an edit to one module costs only
+   * that module and the modules that import it (Note [A Cached Module Follows
+   * Its Library's Imports] in `Compiler`), not the whole library.
+   *
+   * Before #473 the two library caches were keyed by the library's name. Two
+   * trees of a library with the same name and version then used each other's
+   * caches (a bindings cache travels with a copied tree), and a library edited
+   * on disk kept loading its old IR from its bindings cache until its `.enso`
+   * directory was deleted. A cache written before records another digest, so
+   * it is discarded and rebuilt once, never read.
    *
    * The hash is computed once per library per context (Base, about 200 files
-   * and 1.6 MB: ~40 ms warm, ~170 ms in a cold JVM) and then kept. So the IR
-   * caches written in a session that edited a library's files record the hash
-   * the library had when the session first asked, and the next session
-   * rebuilds them once: a stale hash makes a cache miss, never a wrong hit.
+   * and 1.6 MB: 24 ms in the native runner, ~170 ms in a cold JVM) and then
+   * kept; the language server writes neither cache during a session.
    * `serializeLibrary` forgets the hash first, so that `enso --compile`
    * records the sources it compiled.
    *

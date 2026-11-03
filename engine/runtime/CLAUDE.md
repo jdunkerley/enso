@@ -56,11 +56,12 @@ and links the required Graal/Truffle background reading.
   from the suggestions cache's list, filtered to what the component browser
   shows; see Note [Library Catalogue] in `TruffleCompilerContext`.
 - **Library caches are keyed by the library's sources.** The bindings and
-  suggestions caches record `Package.sourceHash`, and a module's IR cache its
-  own source's digest plus that hash, computed once per library per context
-  (`LibrarySourceHashes`). Two checkouts of a library with the same name and
-  version never share a cache unless their sources match; see Note [Library
-  Caches Are Keyed By The Sources].
+  suggestions caches record `Package.sourceHash`, computed once per library per
+  context (`LibrarySourceHashes`), so two checkouts of a library with the same
+  name and version share them only when their sources match; see Note [Library
+  Caches Are Keyed By The Sources]. A module's IR cache stays keyed by its own
+  source; a cached module whose same-library import changed is recompiled (Note
+  [A Cached Module Follows Its Library's Imports] in `Compiler`).
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].

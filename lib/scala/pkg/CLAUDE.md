@@ -16,8 +16,8 @@ and loads packages. Used by the compiler, the runtime and every CLI tool.
 - **`Package.sourceHash` is a file format.** A library's `catalogue.json`
   records it and the language server compares it with the library on disk, so
   changing the definition makes every existing catalogue stale (they are skipped
-  until recompiled). It also keys the library's bindings, suggestions and IR
-  caches (Note [Library Caches Are Keyed By The Sources] in the engine's
+  until recompiled). It also keys the library's bindings and suggestions caches
+  (Note [Library Caches Are Keyed By The Sources] in the engine's
   `LibrarySourceHashes`), so changing it makes every user rebuild those once.
   The definition is in its doc comment.
 

@@ -185,6 +185,56 @@ public class LibraryCacheDigestTest {
     assertTrue("the same sources load Main's IR from its cache", loadedFromCache[0]);
   }
 
+  @Test
+  public void editingAModuleRecompilesOnlyItAndItsImporters() throws IOException {
+    var modules =
+        Map.of(
+            "Main",
+            """
+            from project.Helpers import all
+            from project.Other import all
+
+            main = other
+            unused = answer
+            """,
+            "Helpers",
+            "answer = 1\n",
+            "Other",
+            "other = 10\n");
+    var root = createLibrary("edited", modules);
+    assertEquals(10L, run(root, ctx -> {}));
+    assertEquals(
+        "an unedited reopen loads every module from its cache",
+        Map.of("Main", true, "Helpers", true, "Other", true),
+        loadedFromCache(root, 10L));
+
+    Files.writeString(root.resolve("src").resolve("Other.enso"), "other = 20\n");
+    assertEquals(
+        "the edited module and its importer are recompiled, the other module is not",
+        Map.of("Main", false, "Helpers", true, "Other", false),
+        loadedFromCache(root, 20L));
+    assertEquals(
+        "the next reopen loads every module from its cache again",
+        Map.of("Main", true, "Helpers", true, "Other", true),
+        loadedFromCache(root, 20L));
+  }
+
+  /** Runs the tree, checks `main`, and tells which of its modules were loaded from their caches. */
+  private Map<String, Boolean> loadedFromCache(Path root, long expected) {
+    var loaded = new java.util.HashMap<String, Boolean>();
+    var answer =
+        run(
+            root,
+            ctx -> {
+              for (var module : new String[] {"Main", "Helpers", "Other"}) {
+                var found = ctx.findModule("local." + name + "." + module);
+                loaded.put(module, found.isPresent() && found.get().wasLoadedFromCache());
+              }
+            });
+    assertEquals(expected, answer);
+    return loaded;
+  }
+
   private Path createLibrary(String dir, Map<String, String> modules) throws IOException {
     var root = tmp.newFolder(dir).toPath();
     ProjectUtils.createProject(

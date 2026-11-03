@@ -94,28 +94,19 @@ public final class ModuleCache
   }
 
   /**
-   * The digest of the module's source and its library's source hash. See Note [Library Caches Are
-   * Keyed By The Sources] in {@link LibrarySourceHashes}.
+   * The digest of the module's own source. What its names resolved to in the modules it imports is
+   * not part of it: see Note [A Cached Module Follows Its Library's Imports] in {@code Compiler}.
    */
-  private Optional<String> computeDigest(EnsoContext context, Source source, TruffleLogger logger) {
-    var own = computeDigestOfModuleSources(source);
-    var pkg = module.getPackage();
-    if (own.isEmpty() || pkg == null) {
-      return own;
-    }
-    return context.getLibrarySourceHashes().of(pkg, logger).map(lib -> own.get() + "/" + lib);
-  }
-
   @Override
   public Optional<String> computeDigest(
       EnsoContext context, CachedModule entry, TruffleLogger logger) {
-    return computeDigest(context, entry.source(), logger);
+    return computeDigestOfModuleSources(entry.source());
   }
 
   @Override
   public Optional<String> computeDigestFromSource(EnsoContext context, TruffleLogger logger) {
     try {
-      return computeDigest(context, module.getSource(), logger);
+      return computeDigestOfModuleSources(module.getSource());
     } catch (IOException e) {
       logger.log(Level.FINEST, "failed to retrieve the source of " + module.getName(), e);
       return Optional.empty();

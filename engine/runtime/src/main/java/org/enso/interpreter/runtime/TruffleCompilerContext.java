@@ -864,9 +864,10 @@ final class TruffleCompilerContext implements CompilerContext {
    * .isPublished`), and it records a hash of the library's sources
    * (`Package.sourceHash`), so a reader can tell whether it still describes the
    * library; for that claim to hold, the compiled library's IR never comes from
-   * its bindings cache (Note [Compile Target Skips Its Bindings Cache]), and
-   * its IR caches are keyed by the same hash (Note [Library Caches Are Keyed By
-   * The Sources] in `LibrarySourceHashes`). Failing to write it only logs a warning: the library still
+   * its bindings cache (Note [Compile Target Skips Its Bindings Cache]), and a
+   * module whose IR cache it uses is recompiled when a module of the library
+   * it imports changed (Note [A Cached Module Follows Its Library's Imports] in
+   * `Compiler`). Failing to write it only logs a warning: the library still
    * compiles, and its components appear once it is loaded, as without one.
    * It is generated, never committed (`.gitignore`).
    * Design: docs/superpowers/specs/2026-10-31-library-catalogue-design.md.
