@@ -37,6 +37,8 @@ export class LogFileTailer {
   private running: Promise<void> | undefined
   private rerun = false
   private stopped = false
+  /** The failure last logged, while reads keep failing the same way. */
+  private lastFailure: string | undefined
   private readonly pollMs: number
 
   /** Follow `file`, calling `onLines` with each batch of completed lines. */
@@ -64,6 +66,13 @@ export class LogFileTailer {
 
   /** Read whatever has been appended. Calls made while a read runs are merged into one more read. */
   poll(): Promise<void> {
+    // After `stop`, a late change notification must not read again (nor emit after the last lines).
+    if (this.stopped) return this.running ?? Promise.resolve()
+    return this.run()
+  }
+
+  /** Read now, or once more after the read that is running. */
+  private run(): Promise<void> {
     if (this.running != null) {
       this.rerun = true
       return this.running
@@ -87,7 +96,7 @@ export class LogFileTailer {
     this.stopped = true
     clearTimeout(this.timer)
     this.closeWatcher()
-    await this.poll()
+    await this.run()
     this.emit(this.splitter.flush())
   }
 
@@ -107,38 +116,50 @@ export class LogFileTailer {
     if (lines.length > 0) this.onLines(lines)
   }
 
+  /**
+   * One read. A failure is logged once: the same failure on the polls that follow is not logged
+   * again (a file that cannot be read fails every 500 ms), until a read succeeds or it changes.
+   */
   private async readOnce(): Promise<void> {
     try {
-      let stat: fsSync.Stats
-      try {
-        stat = await fs.stat(this.file)
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
-        throw error
-      }
-      const identity = `${stat.ino}:${stat.birthtimeMs}`
-      if (this.identity != null && (identity !== this.identity || stat.size < this.offset)) {
-        // Rolled over: what is left of the old file's last line is all of it we will read.
-        this.emit(this.splitter.flush())
-        this.offset = 0
-      }
-      this.identity = identity
-      if (stat.size <= this.offset) return
-      const handle = await fs.open(this.file, 'r')
-      try {
-        const buffer = Buffer.alloc(READ_CHUNK_BYTES)
-        while (this.offset < stat.size) {
-          const length = Math.min(buffer.length, stat.size - this.offset)
-          const { bytesRead } = await handle.read(buffer, 0, length, this.offset)
-          if (bytesRead === 0) break
-          this.offset += bytesRead
-          this.emit(this.splitter.push(buffer.subarray(0, bytesRead)))
-        }
-      } finally {
-        await handle.close()
-      }
+      await this.readFile()
+      this.lastFailure = undefined
     } catch (error) {
+      const failure = `${(error as NodeJS.ErrnoException).code ?? ''} ${String(error)}`
+      if (failure === this.lastFailure) return
+      this.lastFailure = failure
       console.error(`Failed to read the engine log '${this.file}':`, error)
+    }
+  }
+
+  private async readFile(): Promise<void> {
+    let stat: fsSync.Stats
+    try {
+      stat = await fs.stat(this.file)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    const identity = `${stat.ino}:${stat.birthtimeMs}`
+    if (this.identity != null && (identity !== this.identity || stat.size < this.offset)) {
+      // Rolled over: what is left of the old file's last line is all of it we will read.
+      this.emit(this.splitter.flush())
+      this.offset = 0
+    }
+    this.identity = identity
+    if (stat.size <= this.offset) return
+    const handle = await fs.open(this.file, 'r')
+    try {
+      const buffer = Buffer.alloc(READ_CHUNK_BYTES)
+      while (this.offset < stat.size) {
+        const length = Math.min(buffer.length, stat.size - this.offset)
+        const { bytesRead } = await handle.read(buffer, 0, length, this.offset)
+        if (bytesRead === 0) break
+        this.offset += bytesRead
+        this.emit(this.splitter.push(buffer.subarray(0, bytesRead)))
+      }
+    } finally {
+      await handle.close()
     }
   }
 }

@@ -25,6 +25,11 @@ server.listen(Number(value('--rpc-port')), '127.0.0.1')
 const startsFile = project + '.starts'
 const starts = (fs.existsSync(startsFile) ? Number(fs.readFileSync(startsFile, 'utf8')) : 0) + 1
 fs.writeFileSync(startsFile, String(starts))
+if (fs.existsSync(project + '.noisy')) {
+  // Far more than a pipe holds: a write blocks (and so does everything after it) until it is read.
+  const filler = 'x'.repeat(1023) + '\\n'
+  for (let i = 0; i < 2048; i += 1) process.stderr.write(filler)
+}
 process.stderr.write('engine ' + starts + ' started\\n')
 const stop = () => process.exit(0)
 process.stdin.on('data', stop)
@@ -152,6 +157,28 @@ test("an engine's last output, still in the pipe when it exits, comes before the
       'started',
       'engine 2 started',
     ])
+  } finally {
+    vi.restoreAllMocks()
+    await runner.closeProject(project)
+  }
+}, 45_000)
+
+test('a runner given no sink still reads the engine stderr, so a chatty engine is not blocked', async () => {
+  let echoed = 0
+  let last = ''
+  vi.spyOn(process.stderr, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+    echoed += chunk.length
+    last = Buffer.from(chunk).toString('utf8')
+    return true
+  }) as typeof process.stderr.write)
+  const project = Path(path.join(root, 'Project'))
+  await fs.writeFile(`${project}.noisy`, '')
+  try {
+    // The engine writes 2 MB to stderr before it is up; unread, its first write past the pipe's
+    // buffer would block it and the health check would never pass.
+    await runner.openProject(project, 'id')
+    await vi.waitFor(() => expect(last).toContain('engine 1 started'), { timeout: 15_000 })
+    expect(echoed).toBeGreaterThan(2048 * 1024)
   } finally {
     vi.restoreAllMocks()
     await runner.closeProject(project)

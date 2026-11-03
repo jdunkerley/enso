@@ -329,19 +329,98 @@ export interface RowFilter {
  * that contain the text.
  */
 export function filterRows(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
+  return rows.filter(prepareFilter(filter))
+}
+
+/** Whether a row passes a filter, with the filter's parts prepared once. */
+function prepareFilter(filter: RowFilter): (row: LogRow) => boolean {
   const needle = filter.text.trim().toLowerCase()
   const maxLevel = MAX_LEVEL[filter.level]
   const origins = filter.origins
   if (needle === '' && Object.values(origins).every((shown) => shown)) {
-    return rows.filter((row) => row.kind === 'divider' || row.level <= maxLevel)
+    return (row) => row.kind === 'divider' || row.level <= maxLevel
   }
-  return rows.filter(
-    (row) =>
-      row.kind === 'divider' ||
-      (row.level <= maxLevel &&
-        origins[row.origin] &&
-        (needle === '' || row.text.toLowerCase().includes(needle))),
-  )
+  return (row) =>
+    row.kind === 'divider' ||
+    (row.level <= maxLevel &&
+      origins[row.origin] &&
+      (needle === '' || row.text.toLowerCase().includes(needle)))
+}
+
+/** Two filters that show the same rows have the same key. */
+function filterKey(filter: RowFilter): string {
+  const origins = Object.entries(filter.origins)
+    .map(([origin, shown]) => `${origin}:${shown ? 1 : 0}`)
+    .join(',')
+  return `${filter.level}\n${filter.text.trim().toLowerCase()}\n${origins}`
+}
+
+/**
+ * {@link filterRows} for a row list that grows at its end and loses rows from its start, as the
+ * live view's does: each call tests only the rows added since the last one, instead of all of them.
+ * (A row list that changes any other way, or a changed filter, is filtered whole again.) Rows are
+ * never changed once made, so a row that is still in the list keeps its verdict.
+ */
+export class IncrementalRowFilter {
+  /** How many rows have been tested over this filter's life; for tests and measurements. */
+  visited = 0
+  private source: readonly LogRow[] = []
+  private key = ''
+  /** The shown rows of {@link source}, and where each one was: `base` + its index there. */
+  private kept: LogRow[] = []
+  private keptAt: number[] = []
+  /** How many rows have left the start of the list since the whole filtering. */
+  private base = 0
+  private result: readonly LogRow[] = []
+
+  /** The rows of `rows` that `filter` shows. The same array while nothing changed. */
+  apply(rows: readonly LogRow[], filter: RowFilter): readonly LogRow[] {
+    const key = filterKey(filter)
+    if (rows === this.source && key === this.key) return this.result
+    const test = prepareFilter(filter)
+    const from = key === this.key ? this.firstNewRow(rows) : undefined
+    if (from === undefined) {
+      this.kept = []
+      this.keptAt = []
+      this.base = 0
+    }
+    for (let index = from ?? 0; index < rows.length; index += 1) {
+      const row = rows[index]!
+      this.visited += 1
+      if (test(row)) {
+        this.kept.push(row)
+        this.keptAt.push(this.base + index)
+      }
+    }
+    this.source = rows
+    this.key = key
+    this.result = this.kept.slice()
+    return this.result
+  }
+
+  /**
+   * Where the rows new since the last call begin in `rows`, after dropping the shown rows that have
+   * left its start; `undefined` when `rows` is not the last list grown at the end and cut at the
+   * start.
+   */
+  private firstNewRow(rows: readonly LogRow[]): number | undefined {
+    const previous = this.source
+    const last = previous[previous.length - 1]
+    if (last === undefined) return undefined
+    let at = rows.length - 1
+    while (at >= 0 && rows[at] !== last) at -= 1
+    const retained = at + 1
+    const dropped = previous.length - retained
+    if (at < 0 || dropped < 0 || rows[0] !== previous[dropped]) return undefined
+    this.base += dropped
+    let gone = 0
+    while (gone < this.keptAt.length && this.keptAt[gone]! < this.base) gone += 1
+    if (gone > 0) {
+      this.kept.splice(0, gone)
+      this.keptAt.splice(0, gone)
+    }
+    return retained
+  }
 }
 
 /** The Logs tab's rows and state, built from the stream's events. */
@@ -393,6 +472,11 @@ export class EngineLogModel {
     )
   }
 
+  /** How many rows wait for {@link commit}; never more than twice {@link LIVE_ROW_CAP}. */
+  get pendingCount(): number {
+    return this.pending.length
+  }
+
   /** Whether reaching the top of the live view should splice in the session's history. */
   get canLoadHistory(): boolean {
     return !this.historySpliced && !this.sessionStartHeld
@@ -432,7 +516,7 @@ export class EngineLogModel {
     if (!this.accept(data.seq)) return
     this.hadEngine = true
     const { level, entryStart, origin } = this.classifier.classify(data.text, data.source)
-    this.pending.push({
+    this.queue({
       kind: 'line',
       key: this.nextKey++,
       source: data.source,
@@ -489,20 +573,35 @@ export class EngineLogModel {
     for (const row of this.pending) this.rows.push(row)
     this.pending = []
     const excess = this.rows.length - LIVE_ROW_CAP
-    if (excess > 0) {
-      const dropped = this.rows.splice(0, excess)
-      const first = this.sessionFirstKey
-      const currentDropped =
-        first != null &&
-        dropped.some((row) => row.key >= first || (this.historySpliced && row.key < 0))
-      if (currentDropped) {
-        this.sessionRowsDropped = true
-        this.setOlderLinesOfCurrent()
-      } else if (this.olderLines == null) {
-        this.olderLines = { sessionId: null }
-      }
-    }
+    if (excess > 0) this.noteDropped(this.rows.splice(0, excess))
     return true
+  }
+
+  /**
+   * Add a row to {@link pending}, which is bounded: a frame that does not come (the window is
+   * minimised, the tab is in the background) must not let it grow for as long as lines arrive. Past
+   * twice the cap the oldest are dropped down to the cap, which {@link commit} would drop anyway;
+   * trimming in halves keeps the cost per row constant.
+   */
+  private queue(row: LogRow): void {
+    this.pending.push(row)
+    if (this.pending.length > 2 * LIVE_ROW_CAP) {
+      this.noteDropped(this.pending.splice(0, this.pending.length - LIVE_ROW_CAP))
+    }
+  }
+
+  /** Rows have gone from the start of the view: the lines above it are now {@link olderLines}. */
+  private noteDropped(dropped: readonly LogRow[]): void {
+    const first = this.sessionFirstKey
+    const currentDropped =
+      first != null &&
+      dropped.some((row) => row.key >= first || (this.historySpliced && row.key < 0))
+    if (currentDropped) {
+      this.sessionRowsDropped = true
+      this.setOlderLinesOfCurrent()
+    } else if (this.olderLines == null) {
+      this.olderLines = { sessionId: null }
+    }
   }
 
   /** The unseen errors have been seen. */
@@ -592,6 +691,6 @@ export class EngineLogModel {
   }
 
   private addDivider(divider: DividerKind): void {
-    this.pending.push({ kind: 'divider', key: this.nextKey++, divider })
+    this.queue({ kind: 'divider', key: this.nextKey++, divider })
   }
 }

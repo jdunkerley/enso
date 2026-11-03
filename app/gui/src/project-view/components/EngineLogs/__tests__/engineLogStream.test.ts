@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { effectScope, nextTick, ref, type EffectScope } from 'vue'
+import { LIVE_ROW_CAP } from '../engineLogModel'
 import {
+  markSeenWhile,
   RECONNECT_DELAYS_MS,
   useEngineLogStream,
   type EngineLogStreamOptions,
@@ -222,4 +224,46 @@ test('an unrelated change in a getter does not reconnect or clear a closed strea
   await nextTick()
   expect(FakeEventSource.created).toHaveLength(1)
   expect(stream.state.ended).toBe('closed')
+})
+
+test('lines that arrive while no frame runs (a minimised window) are bounded', () => {
+  const stream = start()
+  const source = FakeEventSource.latest()
+  source.emit('hello', HELLO)
+  const total = 4 * LIVE_ROW_CAP
+  for (let seq = 1; seq <= total; seq += 1) source.emit('line', line(seq, `l${seq}`))
+  // Only one frame was ever requested, and it has not run.
+  expect(frames).toHaveLength(1)
+  runFrames()
+  expect(stream.rows.value).toHaveLength(LIVE_ROW_CAP)
+  expect(texts(stream).at(-1)).toBe(`l${total}`)
+  expect(texts(stream)[0]).toBe(`l${total - LIVE_ROW_CAP + 1}`)
+  expect(stream.state.olderLines).not.toBeNull()
+})
+
+test('markSeenWhile marks errors seen only while the Logs tab shows', async () => {
+  const visible = ref(false)
+  const stream = start()
+  scope.run(() => markSeenWhile(visible, stream))
+  const source = FakeEventSource.latest()
+  source.emit('hello', HELLO)
+  source.emit('line', line(1, '[ERROR] [2026-10-20T10:00:00.000Z] [org.enso.Test] failed'))
+  runFrames()
+  await nextTick()
+  expect(stream.state.unseenErrors).toBe(1)
+  // Showing the tab counts what is waiting as seen...
+  visible.value = true
+  await nextTick()
+  expect(stream.state.unseenErrors).toBe(0)
+  // ...and whatever arrives meanwhile.
+  source.emit('line', line(2, '[ERROR] [2026-10-20T10:00:01.000Z] [org.enso.Test] again'))
+  runFrames()
+  await nextTick()
+  expect(stream.state.unseenErrors).toBe(0)
+  // Hidden again, errors count once more.
+  visible.value = false
+  source.emit('line', line(3, '[ERROR] [2026-10-20T10:00:02.000Z] [org.enso.Test] third'))
+  runFrames()
+  await nextTick()
+  expect(stream.state.unseenErrors).toBe(1)
 })

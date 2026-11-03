@@ -12,7 +12,15 @@ import {
   type EngineLogSessionData,
   type EngineLogWaitingData,
 } from 'enso-common/src/services/engineLogs'
-import { onScopeDispose, reactive, shallowRef, toValue, watch, type ShallowRef } from 'vue'
+import {
+  onScopeDispose,
+  reactive,
+  shallowRef,
+  toValue,
+  watch,
+  watchEffect,
+  type ShallowRef,
+} from 'vue'
 import { EngineLogModel, type LogRow, type OlderLines } from './engineLogModel'
 
 /** The waits before each reconnection attempt; the last repeats. A `hello` starts over. */
@@ -197,3 +205,16 @@ export function useEngineLogStream(options: EngineLogStreamOptions) {
 
 /** The project's engine log, as the dock and the Logs tab use it. */
 export type EngineLogStream = ReturnType<typeof useEngineLogStream>
+
+/**
+ * Whenever the Logs tab is showing (`visible`), whatever arrives counts as seen: the stream's
+ * unseen errors are marked seen as soon as there are any.
+ */
+export function markSeenWhile(
+  visible: ToValue<boolean>,
+  stream: Pick<EngineLogStream, 'markSeen'> & { readonly state: { readonly unseenErrors: number } },
+) {
+  watchEffect(() => {
+    if (toValue(visible) && stream.state.unseenErrors > 0) stream.markSeen()
+  })
+}

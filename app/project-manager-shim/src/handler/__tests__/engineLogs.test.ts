@@ -194,7 +194,10 @@ describe('handleEngineLogStream', () => {
     vi.advanceTimersByTime(15_000)
     expect(response.body.endsWith(': heartbeat\n\n')).toBe(true)
     const written = response.chunks.length
+    // The heartbeat is the only timer the stream holds: it is cleared, not just quiet.
+    expect(vi.getTimerCount()).toBe(1)
     request.emit('close')
+    expect(vi.getTimerCount()).toBe(0)
     vi.advanceTimersByTime(60_000)
     expect(response.chunks).toHaveLength(written)
   })

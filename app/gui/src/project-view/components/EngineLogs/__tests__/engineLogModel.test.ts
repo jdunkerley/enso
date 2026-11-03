@@ -4,6 +4,7 @@ import {
   EngineLogModel,
   ERROR_LEVEL,
   filterRows,
+  IncrementalRowFilter,
   INFO_LEVEL,
   LIVE_ROW_CAP,
   overlapStart,
@@ -347,5 +348,120 @@ describe('helpers', () => {
     expect(filterRows(withDivider, { level: 'all', text: '', origins: ALL_ORIGINS })).toHaveLength(
       5,
     )
+  })
+})
+
+describe('rows pending while no frame comes (a minimised window)', () => {
+  test('are bounded, and the newest are kept', () => {
+    const f = feed()
+    f.hello()
+    f.waiting()
+    const total = 5 * LIVE_ROW_CAP
+    let most = 0
+    for (let n = 0; n < total; n += 1) {
+      f.line(entry('INFO', `line ${n}`))
+      most = Math.max(most, f.model.pendingCount)
+    }
+    // Before: `pendingCount` reached `total`. Now it never passes twice the cap.
+    expect(most).toBeLessThanOrEqual(2 * LIVE_ROW_CAP)
+    expect(f.model.commit()).toBe(true)
+    expect(f.model.rows).toHaveLength(LIVE_ROW_CAP)
+    const last = f.model.rows.at(-1)
+    expect(last?.kind === 'line' && last.text).toBe(entry('INFO', `line ${total - 1}`))
+    const first = f.model.rows[0]
+    expect(first?.kind === 'line' && first.text).toBe(entry('INFO', `line ${total - LIVE_ROW_CAP}`))
+    // The lines that were dropped unseen are offered as older lines, as any dropped at the cap.
+    expect(f.model.olderLines).toEqual({ sessionId: null })
+    expect(f.model.sessionStartHeld).toBe(false)
+  })
+
+  test('the error count still counts lines dropped before they were shown', () => {
+    const f = feed()
+    f.hello()
+    for (let n = 0; n < 3 * LIVE_ROW_CAP; n += 1) f.line(entry('ERROR', `e${n}`))
+    expect(f.model.unseenErrors).toBe(3 * LIVE_ROW_CAP)
+  })
+})
+
+describe('IncrementalRowFilter', () => {
+  const all = { level: 'all', text: '', origins: ALL_ORIGINS } as const
+  const line = (key: number, level: string, message: string): LogRow => ({
+    kind: 'line',
+    key,
+    source: 'file',
+    text: entry(level, message),
+    level:
+      level === 'ERROR' ? ERROR_LEVEL
+      : level === 'WARN' ? WARN_LEVEL
+      : INFO_LEVEL,
+    entryStart: true,
+    origin: 'library',
+  })
+
+  test('gives what filterRows gives as rows are added at the end and cut at the start', () => {
+    const incremental = new IncrementalRowFilter()
+    const filter = { level: 'warn', text: 'x', origins: ALL_ORIGINS } as const
+    let rows: LogRow[] = []
+    let key = 0
+    for (let round = 0; round < 40; round += 1) {
+      const added = Array.from({ length: 7 }, () => {
+        key += 1
+        return line(
+          key,
+          key % 3 === 0 ? 'ERROR'
+          : key % 3 === 1 ? 'WARN'
+          : 'INFO',
+          `x${key}`,
+        )
+      })
+      if (round % 9 === 4) added.push({ kind: 'divider', key: ++key, divider: 'skipped' })
+      rows = [...rows, ...added].slice(round % 5 === 0 ? 11 : 0)
+      expect(incremental.apply(rows, filter)).toEqual(filterRows(rows, filter))
+    }
+  })
+
+  test('filters again from scratch when the filter changes, or rows are inserted above', () => {
+    const incremental = new IncrementalRowFilter()
+    const rows = [line(1, 'INFO', 'a'), line(2, 'ERROR', 'b'), line(3, 'WARN', 'c')]
+    expect(texts(incremental.apply(rows, all))).toHaveLength(3)
+    const errors = { ...all, level: 'error' } as const
+    expect(incremental.apply(rows, errors)).toEqual([rows[1]])
+    // History spliced in the middle of the list, with the end unchanged.
+    const spliced = [rows[0]!, line(-1, 'ERROR', 'older'), ...rows.slice(1)]
+    expect(incremental.apply(spliced, errors)).toEqual(filterRows(spliced, errors))
+    // Everything replaced (a project switch).
+    const other = [line(9, 'ERROR', 'new')]
+    expect(incremental.apply(other, errors)).toEqual(other)
+    expect(incremental.apply([], errors)).toEqual([])
+  })
+
+  test('returns the same array while nothing changed', () => {
+    const incremental = new IncrementalRowFilter()
+    const rows = [line(1, 'INFO', 'a')]
+    expect(incremental.apply(rows, all)).toBe(incremental.apply(rows, all))
+  })
+
+  test('tests only the rows added in a frame, not the whole view again', () => {
+    const incremental = new IncrementalRowFilter()
+    const filter = { level: 'warn', text: 'slow', origins: ALL_ORIGINS } as const
+    let rows: LogRow[] = Array.from({ length: LIVE_ROW_CAP }, (_, n) =>
+      line(n, 'WARN', `slow ${n}`),
+    )
+    incremental.apply(rows, filter)
+    const frames = 100
+    const perFrame = 50
+    const before = incremental.visited
+    let naive = 0
+    for (let frame = 0; frame < frames; frame += 1) {
+      const added = Array.from({ length: perFrame }, (_, n) =>
+        line(LIVE_ROW_CAP + frame * perFrame + n, 'WARN', `slow ${frame}`),
+      )
+      rows = [...rows, ...added].slice(perFrame)
+      naive += rows.length // what `filterRows` tests: every row, every frame
+      expect(incremental.apply(rows, filter)).toHaveLength(LIVE_ROW_CAP)
+    }
+    // Before: frames * LIVE_ROW_CAP = 2,000,000 rows tested. Now: only the new ones.
+    expect(naive).toBe(frames * LIVE_ROW_CAP)
+    expect(incremental.visited - before).toBe(frames * perFrame)
   })
 })
