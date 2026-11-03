@@ -5,6 +5,10 @@ import logic (`imports.ts`).
 
 - `requiredImports` is what a suggestion entry needs; `addMissingImports` adds
   them, skipping covered and conflicting ones.
+- `requiredImportsForTypeName` turns a widget option's `requires` (a type's
+  qualified name, from the format dropdowns since #489) into the imports it
+  needs: the suggestion entry (a catalogue entry counts), else the type its own
+  library declares, else nothing (logged).
 - `importedLibraries` is the set of libraries the module's imports name; the
   component browser ranks their entries first while searching.
 - `missingImports` is the unresolved-name detector: the capitalised names a

@@ -60,3 +60,10 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `localSecrets.ts` (the local secrets and **New secret…**, which set
   `Enso_Secret.get 'secret://<name>'`), and `browsableTypes.ts` (which kind an
   argument takes, its current path, and the edit that sets one).
+- `WidgetFunction/formatForPath.ts` — with `format` on `Auto_Detect`, which
+  format library a call's new `path` needs: the one format type whose options'
+  `patterns` match the file name (case ignored). `WidgetFunction.vue`'s
+  `handleArgUpdate` adds its import in the update's edit; it is the one handler
+  that sees every argument's update and every sibling's widget configuration
+  (#489). A dropdown option's own `requires` is applied by
+  `WidgetSelection/tags.ts`.

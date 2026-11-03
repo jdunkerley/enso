@@ -2,6 +2,7 @@ import type { ModuleStore } from '$/providers/openedProjects/module'
 import {
   printRequiredImport,
   requiredImports,
+  requiredImportsForTypeName,
   type RequiredImport,
 } from '$/providers/openedProjects/module/imports'
 import type { ProjectNameStore } from '$/providers/openedProjects/projectNames'
@@ -250,6 +251,8 @@ export interface DynamicConfigTagsOptions {
   staticTags: ToValue<Opt<string[]>>
   suggestionDb: ToValue<SuggestionDb>
   projectNames: Readonly<Ref<ProjectNameStore>>
+  /** The types the installed libraries declare, for a choice's `requires` (#489). */
+  libraryPublicTypes?: ToValue<Opt<ReadonlyMap<string, readonly ProjectPath[]>>>
 }
 /** @returns The dropdown tags applicable to an expression. */
 export function useExpressionTags({
@@ -257,6 +260,7 @@ export function useExpressionTags({
   staticTags,
   suggestionDb,
   projectNames,
+  libraryPublicTypes,
 }: DynamicConfigTagsOptions): ComputedRef<(ExpressionTag | NestedChoiceTag)[]> {
   const staticExpressionTags = computed((): ExpressionTag[] | null => {
     const tags = toValue(staticTags)
@@ -269,16 +273,32 @@ export function useExpressionTags({
     const config = toValue(dynamicConfig)
     if (config?.kind !== 'Single_Choice' && config?.kind !== 'Multiple_Choice') return null
 
-    const choiceToTag = (choice: Choice): ExpressionTag | NestedChoiceTag =>
-      Array.isArray(choice.value) ?
-        new NestedChoiceTag(choice.label ?? '…', choice.value.map(choiceToTag))
-      : ExpressionTag.FromExpression(
-          toValue(suggestionDb),
-          projectNames.value,
-          choice.value,
-          choice.label,
-          choice.icon,
-        )
+    // A choice that names the type it requires gets that type's imports, unless its value
+    // already resolved to a suggestion entry with imports of its own.
+    const withRequiredType = (tag: ExpressionTag, requires: string): ExpressionTag => {
+      if (tag.requiredImports) return tag
+      const imports = requiredImportsForTypeName(
+        toValue(suggestionDb),
+        projectNames.value,
+        toValue(libraryPublicTypes) ?? new Map(),
+        requires,
+      )
+      return imports ? new ExpressionTag(tag.expression, tag.explicitLabel, tag.icon, imports) : tag
+    }
+
+    const choiceToTag = (choice: Choice): ExpressionTag | NestedChoiceTag => {
+      if (Array.isArray(choice.value)) {
+        return new NestedChoiceTag(choice.label ?? '…', choice.value.map(choiceToTag))
+      }
+      const tag = ExpressionTag.FromExpression(
+        toValue(suggestionDb),
+        projectNames.value,
+        choice.value,
+        choice.label,
+        choice.icon,
+      )
+      return choice.requires ? withRequiredType(tag, choice.requires) : tag
+    }
 
     return config.values.map(choiceToTag)
   })
