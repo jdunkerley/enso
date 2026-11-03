@@ -129,6 +129,38 @@ describe('automatic updates', () => {
     expect(dialog()).toBeNull()
   })
 
+  test('turning on prereleases checks at once, with them; turning off does not', async () => {
+    const updater = fakeUpdater({ state: 'none' })
+    await mountWithProviders(VersionChecker)
+    await vi.waitFor(() => expect(updater.check).toHaveBeenCalledTimes(1))
+    expect(updater.check).toHaveBeenLastCalledWith(false)
+    setIncludePrereleases(true)
+    await vi.waitFor(() => expect(updater.check).toHaveBeenCalledTimes(2))
+    expect(updater.check).toHaveBeenLastCalledWith(true)
+    setIncludePrereleases(false)
+    await flushPromises()
+    expect(updater.check).toHaveBeenCalledTimes(2)
+  })
+
+  test('the dialog is titled for each state', async () => {
+    const states: [UpdateStatus, string][] = [
+      [{ state: 'available', version: '2026.2.0', releaseDate: '' }, 'versionOutdatedTitle'],
+      [{ state: 'downloading', version: '2026.2.0', percent: 10 }, 'updateDownloadingTitle'],
+      [{ state: 'ready', version: '2026.2.0' }, 'updateReadyTitle'],
+      [{ state: 'error', message: 'offline', version: '2026.2.0' }, 'updateFailedTitle'],
+    ]
+    for (const [status, key] of states) {
+      fakeUpdater(status)
+      const wrapper = await mountWithProviders(VersionChecker)
+      await vi.waitFor(() => expect(dialog()).not.toBeNull())
+      expect(dialog()!.querySelector('h2')!.textContent!.trim()).toBe(
+        getText(key as 'updateReadyTitle'),
+      )
+      wrapper.unmount()
+      await vi.waitFor(() => expect(dialog()).toBeNull())
+    }
+  })
+
   test('a reloaded window shows a download in progress, and a ready update', async () => {
     fakeUpdater({ state: 'downloading', version: '2026.2.0', percent: 30 })
     const wrapper = await mountWithProviders(VersionChecker)
