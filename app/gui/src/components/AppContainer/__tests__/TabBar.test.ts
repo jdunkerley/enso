@@ -63,4 +63,15 @@ describe('TabBar', () => {
     expect(indicator()).toBeNull()
     expect(tab()?.getAttribute('aria-label')).toBe('P')
   })
+
+  test('names the close button and keeps it out of the tab', async () => {
+    current.changed = false
+    await mountWithProviders(TabBar)
+    const tab = document.querySelector('[role="tab"]')!
+    const close = document.querySelector('.CloseButton')!
+    expect(close.getAttribute('aria-label')).toBe('Close P')
+    // A control must not be nested in a `role="tab"` element (axe `nested-interactive`).
+    expect(tab.contains(close)).toBe(false)
+    expect(tab.querySelector('button, [role="button"]')).toBeNull()
+  })
 })

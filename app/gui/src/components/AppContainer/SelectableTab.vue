@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import CloseButton from '$/components/CloseButton.vue'
+import { useText } from '$/providers/text'
 import { isOverflowing } from '$/utils/dom'
 import SvgIcon from '@/components/SvgIcon.vue'
 import TooltipTrigger from '@/components/TooltipTrigger.vue'
@@ -25,6 +26,7 @@ const {
 // change.
 const emit = defineEmits<{ 'update:selected': [value: boolean] }>()
 
+const { getText } = useText()
 const labelElement = useTemplateRef('label')
 
 const tooltipPlacement = computed(() => (orientation === 'horizontal' ? 'top' : 'left'))
@@ -36,24 +38,35 @@ const tooltipEnabled = computed(
 <template>
   <TooltipTrigger :placement="tooltipPlacement" :enabled="tooltipEnabled">
     <template #default="triggerProps">
-      <button
-        role="tab"
-        :aria-label="tooltip ?? label ?? ''"
-        :disabled="!enabled"
-        class="SelectableTab"
-        :class="{ [orientation]: true, selected, enabled }"
-        @click="emit('update:selected', !selected)"
-      >
+      <!-- The close button is a sibling of the tab, not inside it: a control must not be nested in
+        a `role="tab"` element. The tab's `::after` stretches its click area over the whole wrapper,
+        so the tab looks and clicks as before. -->
+      <div class="SelectableTab" :class="{ [orientation]: true, selected, enabled }">
         <div class="underlying" :class="orientation" />
         <div class="tabContent tabLayout" :class="{ enabled }">
-          <span class="tabLayout" v-bind="triggerProps">
-            <SvgIcon v-if="icon" :name="icon" />
-            <slot />
-            <span v-if="label" ref="label" class="label">{{ label }}</span>
-          </span>
-          <CloseButton v-if="onClose" @click="onClose" />
+          <button
+            role="tab"
+            :aria-selected="selected"
+            :aria-label="tooltip ?? label ?? ''"
+            :disabled="!enabled"
+            class="tab tabLayout"
+            :class="{ selected }"
+            @click="emit('update:selected', !selected)"
+          >
+            <span class="tabLayout" v-bind="triggerProps">
+              <SvgIcon v-if="icon" :name="icon" />
+              <slot />
+              <span v-if="label" ref="label" class="label">{{ label }}</span>
+            </span>
+          </button>
+          <CloseButton
+            v-if="onClose"
+            class="close"
+            :aria-label="getText('closeTab', label ?? '')"
+            @click="onClose"
+          />
         </div>
-      </button>
+      </div>
     </template>
     <template v-if="$slots.tooltip || tooltip || label" #tooltip>
       <slot name="tooltip">{{ tooltip ?? label }}</slot>
@@ -78,6 +91,11 @@ const tooltipEnabled = computed(
     cursor: pointer;
   }
 
+  &:has(.tab:focus-visible) {
+    outline: 2px solid currentColor;
+    outline-offset: -2px;
+  }
+
   &.horizontal {
     height: 100%;
   }
@@ -93,6 +111,26 @@ const tooltipEnabled = computed(
   &:hover:not(.selected).enabled .underlying {
     opacity: 0.6;
   }
+}
+
+.tab {
+  cursor: inherit;
+  text-align: left;
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+}
+
+.close {
+  position: relative;
+  z-index: 1;
 }
 
 .underlying {
