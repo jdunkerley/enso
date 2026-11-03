@@ -75,10 +75,10 @@ descriptor; `test/DuckDB_Tests/src/DuckDB_Spec.enso` is the smallest one.
 
    ```enso
    import Standard.Database_Test_Suite
-   from Standard.Database_Test_Suite import Backend, Known_Issue, Suite_Part
+   from Standard.Database_Test_Suite import Backend, Suite_Part
 
    duckdb_backend =
-       Backend.Value "DuckDB In-Memory" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False known_failures=[Known_Issue.Filter_After_Distinct] parts=[Suite_Part.Common, Suite_Part.Table_Operations]
+       Backend.Value "DuckDB In-Memory" (_ -> Database.connect DuckDB.In_Memory) temporary_tables=False parts=[Suite_Part.Common, Suite_Part.Table_Operations]
 
    add_specs suite_builder =
        Database_Test_Suite.add_specs suite_builder duckdb_backend
