@@ -4591,15 +4591,7 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
       )
     },
     javaOptions ++= testLogProviderOptions,
-    javaOptions ++= benchOnlyOptions,
-    // Note [Standard Library Benchmarks Heap]
-    // The JVM that runs the benchmarks defaults to a quarter of the machine's RAM, about 4 GB on
-    // a 16 GB hosted runner, and the benchmarks with a million-row table exhaust it
-    // (`PolyglotException: Java heap space`, #302). `bench.compileOnly` runs every benchmark in
-    // this one JVM (`forks(0)`), so what earlier benchmarks leave behind counts too. JMH forks
-    // inherit the host's JVM arguments, so this reaches them as well. A percentage rather than
-    // `-Xmx`, so that it scales with the machine.
-    javaOptions += "-XX:MaxRAMPercentage=75"
+    javaOptions ++= benchOnlyOptions
   )
   .settings(
     bench := Def
