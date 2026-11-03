@@ -244,7 +244,9 @@ final class Package[F](
 
   /** A hash of this package's sources: what a library's `catalogue.json`
     * records, so that a reader can tell whether the catalogue still describes
-    * the library (Note [Library Catalogue] in `TruffleCompilerContext`).
+    * the library (Note [Library Catalogue] in `TruffleCompilerContext`), and
+    * what keys the library's caches (Note [Library Caches Are Keyed By The
+    * Sources] in `LibrarySourceHashes`).
     *
     * SHA-256 over every `.enso` file under `src/`, in the order of their paths
     * relative to `src/` with the segments joined by `/` (so that Windows and

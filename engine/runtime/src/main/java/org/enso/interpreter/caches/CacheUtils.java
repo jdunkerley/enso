@@ -1,14 +1,17 @@
 package org.enso.interpreter.caches;
 
+import com.oracle.truffle.api.TruffleLogger;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import org.enso.compiler.context.CompilerContext;
 import org.enso.compiler.pass.IRPass;
 import org.enso.editions.LibraryName;
+import org.enso.interpreter.runtime.EnsoContext;
 import org.enso.persist.Persistance;
 import org.enso.text.Hex;
 
@@ -72,10 +75,18 @@ final class CacheUtils {
     return Hex.toHexString(sha.digest());
   }
 
-  public static String computeDigestFromLibName(LibraryName libName) {
-    var digest = messageDigest();
-    digest.update(libName.qualifiedName().getBytes());
-    return Hex.toHexString(digest.digest());
+  /**
+   * The source hash of a loaded library, which keys its caches. See Note [Library Caches Are Keyed
+   * By The Sources] in {@link LibrarySourceHashes}.
+   *
+   * @return empty if the library is not loaded or its sources cannot be read
+   */
+  static Optional<String> librarySourceHash(
+      EnsoContext context, LibraryName libraryName, TruffleLogger logger) {
+    return context
+        .getPackageRepository()
+        .getPackageForLibraryJava(libraryName)
+        .flatMap(pkg -> context.getLibrarySourceHashes().of(pkg, logger));
   }
 
   @SuppressWarnings("unchecked")

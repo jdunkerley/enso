@@ -6,15 +6,18 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.fixture.ConfigMapFixture
 
-import java.io.File
+import java.io.{DataInputStream, File}
 import java.nio.file.Files
+import scala.jdk.CollectionConverters.IteratorHasAsScala
 
 /** Checks the `catalogue.json` of every library in a built distribution with
   * the language server's own rule (`LibraryCatalogue.validate`): each one must
   * be accepted, with no entry left out, so that a packaging step, a hashing
   * difference between `TruffleFile` and `File` or a codec change cannot turn
   * the catalogues off unnoticed (Note [Library Catalogue] in
-  * `TruffleCompilerContext`).
+  * `TruffleCompilerContext`). It also checks that the shipped bindings and
+  * suggestions caches record their libraries' source hashes, so that they are
+  * used rather than rebuilt by every user.
   *
   * It needs the distribution's `lib` directory as the `lib` config entry, and
   * is cancelled without it, as in `sbt test`. CI's engine distribution build
@@ -77,6 +80,55 @@ class ShippedCataloguesSpec
         found.count { case (_, root) =>
           Files.isRegularFile(root.toPath.resolve(LibraryCatalogue.FileName))
         } should be >= 10
+    }
+
+    "ship bindings and suggestions caches keyed by their libraries' sources" in {
+      (configMap: ConfigMap) =>
+        // Note [Library Caches Are Keyed By The Sources] in
+        // `LibrarySourceHashes`: a shipped cache whose recorded hash is not
+        // the shipped sources' is discarded on first use, and every user
+        // rebuilds it.
+        val lib = configMap.getOptional[String]("lib") match {
+          case Some(path) => new File(path)
+          case None =>
+            cancel("No `lib` given: run with `-- -Dlib=<distribution>/lib`.")
+        }
+        val found = libraries(lib)
+        val metas = found.flatMap { case (library, root) =>
+          val cache = root.toPath.resolve(".enso").resolve("cache")
+          val files =
+            if (Files.isDirectory(cache))
+              scala.util.Using.resource(Files.walk(cache)) { walk =>
+                walk
+                  .iterator()
+                  .asScala
+                  .filter { f =>
+                    val n = f.getFileName.toString
+                    n.endsWith(".bindings.meta") || n.endsWith(
+                      ".suggestions.meta"
+                    )
+                  }
+                  .toVector
+              }
+            else Vector()
+          files.map(f => (library, root, f))
+        }
+        val hashes = collection.mutable.Map[File, String]()
+        val problems = metas.flatMap { case (library, root, meta) =>
+          val expected = hashes.getOrElseUpdate(
+            root,
+            PackageManager.Default.loadPackage(root).get.sourceHash()
+          )
+          val recorded = scala.util.Using.resource(
+            new DataInputStream(Files.newInputStream(meta))
+          )(_.readUTF())
+          Option.when(recorded != expected)(
+            s"$library: ${meta.getFileName} records $recorded, sources are $expected"
+          )
+        }
+        problems shouldEqual Seq()
+        // Base, at least, ships both.
+        metas.count(_._1 == "Standard.Base") shouldEqual 2
     }
   }
 }

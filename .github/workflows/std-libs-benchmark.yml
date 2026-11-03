@@ -44,6 +44,8 @@ jobs:
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
       # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
       - name: Run the benchmarks
+        # A hung benchmark otherwise holds the runner for the job's whole 4 hours.
+        timeout-minutes: 150
         run: |-
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
@@ -54,11 +56,15 @@ jobs:
           ENSO_LAUNCHER: native,-ls
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
+      # Check mode (`just-check`) writes no report on purpose: it runs every benchmark once, in
+      # the sbt JVM, only to see that they run (`BenchmarksRunner.runCompileOnly`).
       - name: Upload benchmark results
+        if: ${{ !inputs.just-check }}
         uses: actions/upload-artifact@v5
         with:
           name: benchmark-results.xml
           path: std-bits/benchmarks/bench-report.xml
+          if-no-files-found: error
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

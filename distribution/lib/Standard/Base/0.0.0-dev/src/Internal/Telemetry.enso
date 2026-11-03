@@ -1,12 +1,16 @@
-private
-
 import project.Data.Text.Text
 import project.Data.Vector.Vector
 import project.Nothing.Nothing
 
 polyglot java import org.slf4j.LoggerFactory
 
-## Schedules a single telemetry message for sending.
+## ---
+   private: true
+   ---
+   Schedules a single telemetry message for sending.
+
+   Shared by the standard libraries (`import Standard.Base.Internal.Telemetry`);
+   a library that does not import it pays nothing.
 
    ## Arguments
     - `logger_name`: Name of the (telemetry) logger

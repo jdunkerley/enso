@@ -93,8 +93,13 @@ public final class ModuleCache
     }
   }
 
+  /**
+   * The digest of the module's own source. What its names resolved to in the modules it imports is
+   * not part of it: see Note [A Cached Module Follows Its Library's Imports] in {@code Compiler}.
+   */
   @Override
-  public Optional<String> computeDigest(CachedModule entry, TruffleLogger logger) {
+  public Optional<String> computeDigest(
+      EnsoContext context, CachedModule entry, TruffleLogger logger) {
     return computeDigestOfModuleSources(entry.source());
   }
 

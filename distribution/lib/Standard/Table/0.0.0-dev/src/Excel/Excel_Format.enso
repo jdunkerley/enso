@@ -17,7 +17,7 @@ import project.Headers.Headers
 import project.Internal.Excel_Reader
 import project.Internal.Excel_Section.Excel_Section
 import project.Internal.Excel_Writer
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 import project.Match_Columns.Match_Columns
 import project.Rows_To_Read.Rows_To_Read
 import project.Table.Table

@@ -37,7 +37,7 @@ public final class ImportExportCache
   public static Cache<ImportExportCache.CachedBindings, ImportExportCache.Metadata> create(
       LibraryName libraryName) {
     var impl = new ImportExportCache(libraryName);
-    return Cache.create(impl, Level.FINEST, libraryName.toString(), false, false);
+    return Cache.create(impl, Level.FINEST, libraryName.toString(), true, false);
   }
 
   @Override
@@ -83,14 +83,16 @@ public final class ImportExportCache
     return Metadata.read(bytes);
   }
 
+  /** See Note [Library Caches Are Keyed By The Sources] in {@link LibrarySourceHashes}. */
   @Override
-  public Optional<String> computeDigest(CachedBindings entry, TruffleLogger logger) {
-    return Optional.of(CacheUtils.computeDigestFromLibName(entry.libraryName));
+  public Optional<String> computeDigest(
+      EnsoContext context, CachedBindings entry, TruffleLogger logger) {
+    return CacheUtils.librarySourceHash(context, entry.libraryName(), logger);
   }
 
   @Override
   public Optional<String> computeDigestFromSource(EnsoContext context, TruffleLogger logger) {
-    throw new IllegalStateException("unreachable");
+    return CacheUtils.librarySourceHash(context, libraryName, logger);
   }
 
   @Override

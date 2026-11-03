@@ -4595,7 +4595,13 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
       )
     },
     javaOptions ++= testLogProviderOptions,
-    javaOptions ++= benchOnlyOptions
+    javaOptions ++= benchOnlyOptions,
+    // Note [Standard Library Benchmarks Exit On OOM]
+    // An OutOfMemoryError in a JMH worker thread does not stop the run: the uncaught-exception
+    // handler runs out of memory too, and the JVM then hangs until the job is cancelled (3 hours
+    // in #302). The `-XX:+ExitOnOutOfMemoryError` in the native image's build arguments is not
+    // this JVM's.
+    javaOptions += "-XX:+ExitOnOutOfMemoryError"
   )
   .settings(
     bench := Def

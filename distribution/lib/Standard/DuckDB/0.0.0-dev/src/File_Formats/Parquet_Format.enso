@@ -13,7 +13,7 @@ import project.DuckDB.DuckDB
 import project.DuckDB_Format.DuckDB_Format
 import project.DuckDB_Format.DuckDB_Parquet_Compression
 import project.DuckDB_Format.DuckDB_Parquet_Version
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 
 ## Read a file in Parquet format.
 type Parquet_Format

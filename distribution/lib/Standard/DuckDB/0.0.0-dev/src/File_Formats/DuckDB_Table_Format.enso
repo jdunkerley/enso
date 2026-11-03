@@ -12,7 +12,7 @@ from Standard.Table import Match_Columns, Table
 
 import project.DuckDB.DuckDB
 import project.DuckDB_Format.DuckDB_Format
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 from project.File_Formats.Parquet_Format import _read_file
 
 ## Read a file into Enso using DuckDB.

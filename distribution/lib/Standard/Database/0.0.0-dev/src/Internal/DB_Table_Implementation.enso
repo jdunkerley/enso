@@ -70,7 +70,7 @@ import project.Internal.IR.SQL_IR_Statement.SQL_IR_Statement
 import project.Internal.IR.SQL_Join_Kind.SQL_Join_Kind
 import project.Internal.SQL_Type_Reference.SQL_Type_Reference
 import project.Internal.Take_Drop_Helpers
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 import project.Internal.Type_Refinements.DB_Table_Refinements
 import project.SQL.SQL_Type
 from project.DB_Table import DB_Table, make_literal_table, MAX_LITERAL_ELEMENT_COUNT
