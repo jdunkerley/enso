@@ -40,7 +40,10 @@ const tooltipEnabled = computed(
     <template #default="triggerProps">
       <!-- The close button is a sibling of the tab, not inside it: a control must not be nested in
         a `role="tab"` element. The tab's `::after` stretches its click area over the whole wrapper,
-        so the tab looks and clicks as before. -->
+        so the tab looks and clicks as before. A `tablist` may own only tabs (axe
+        `aria-required-children`), so the button is also hidden from assistive technology and left
+        out of the tab order: it is a pointer shortcut, and the keyboard closes a tab with Mod+W
+        (`app.closeTab`). It keeps its `aria-label` for anything that shows it. -->
       <div role="none" class="SelectableTab" :class="{ [orientation]: true, selected, enabled }">
         <div class="underlying" :class="orientation" />
         <div role="none" class="tabContent tabLayout" :class="{ enabled }">
@@ -62,6 +65,8 @@ const tooltipEnabled = computed(
           <CloseButton
             v-if="onClose"
             class="close"
+            aria-hidden="true"
+            tabindex="-1"
             :aria-label="getText('closeTab', label ?? '')"
             @click="onClose"
           />

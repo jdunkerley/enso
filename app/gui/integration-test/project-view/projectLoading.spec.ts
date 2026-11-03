@@ -90,7 +90,7 @@ test('A project that fails to open shows the failure in the graph pane', async (
   await expect(locate.graphEditor(page)).toHaveCount(0)
 
   const tab = page.getByRole('tab', { name: 'Mock Project' })
-  await page.getByRole('button', { name: 'Close Mock Project' }).click()
+  await page.locator('[aria-label="Close Mock Project"]').click()
   await expect(tab).toHaveCount(0)
   await expect(pane).toHaveCount(0)
 })
@@ -103,7 +103,7 @@ test('Closing the tab of a project that is still opening leaves it closed', asyn
   await drivePage.driveTable.openProject('Mock Project')
   await expectLoadingSpinner(page)
   const tab = page.getByRole('tab', { name: 'Mock Project' })
-  await page.getByRole('button', { name: 'Close Mock Project' }).click()
+  await page.locator('[aria-label="Close Mock Project"]').click()
   await expect(tab).toHaveCount(0)
   // Once the held-back open request has gone through, the tab still does not come back.
   await page.waitForTimeout(OPEN_DELAY_MS + 1_000)
