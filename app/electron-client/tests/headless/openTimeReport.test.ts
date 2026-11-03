@@ -7,13 +7,16 @@ import {
   classifyTemplate,
   credentialFreeEnv,
   developMedians,
+  joinJvmOptions,
   LAUNCHER_JVM_OPTIONS,
   median,
   notMeasured,
   openTimes,
+  parseEngines,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
+  type Engine,
   type Mark,
   type OpenTimeReport,
   type RunResult,
@@ -104,7 +107,7 @@ describe('median', () => {
 
 function report(
   welcome: readonly (number | undefined)[],
-  engine: 'native' | 'jvm' = 'native',
+  engine: Engine = 'native',
   template: 'core' | 'full' = 'core',
 ) {
   const runs: RunResult[] = welcome.map((welcomeShown, i) => ({
@@ -356,6 +359,12 @@ describe('aotRejection', () => {
   test('ignores other output', () => {
     expect(aotRejection('[LOG] started\n[0.1s][warning][gc] something')).toBeUndefined()
   })
+  test('ignores info records, which can name a feature of a cache in use as disabled', () => {
+    expect(
+      aotRejection('[0.1s][info][cds] full module graph: disabled\n[0.2s][info][aot] mismatch'),
+    ).toBeUndefined()
+    expect(aotRejection('[0.1s][info][aot] ok\n[0.2s][error][aot] bad')).toContain('[error][aot]')
+  })
 })
 
 describe('JVM cache state', () => {
@@ -379,5 +388,39 @@ describe('a launch whose second open failed', () => {
     expect(regressionWarnings({ ...ok, runs }, undefined)).toEqual([
       expect.stringContaining('second: no welcome table'),
     ])
+  })
+})
+
+describe('parseEngines', () => {
+  test('reads a comma-separated list, the JVM without a cache included', () => {
+    expect(parseEngines('native')).toEqual(['native'])
+    expect(parseEngines('native, jvm-nocache,jvm')).toEqual(['native', 'jvm-nocache', 'jvm'])
+  })
+  test('refuses an unknown engine', () => {
+    expect(() => parseEngines('native,graal')).toThrow('Unknown engine: graal')
+  })
+})
+
+describe('joinJvmOptions', () => {
+  test('joins the parts it is given, leaving out missing and blank ones', () => {
+    expect(joinJvmOptions('-XX:AOTMode=on', undefined, ' ', '-Dx=1 ')).toBe('-XX:AOTMode=on -Dx=1')
+    expect(joinJvmOptions(undefined, '')).toBe('')
+  })
+})
+
+describe('jvm-nocache', () => {
+  test('has columns of its own beside the cached JVM', () => {
+    const nocache = report([27000, 28000, 27500], 'jvm-nocache')
+    const cached = report([19000, 19500, 18800], 'jvm')
+    const both = {
+      ...nocache,
+      jvmAot: 'ide-trained' as const,
+      runs: [...nocache.runs, ...cached.runs],
+    }
+    const markdown = renderMarkdown(both, undefined)
+    expect(markdown).toContain('jvm-nocache first')
+    expect(markdown).toContain('jvm first')
+    expect(markdown).toContain('27500')
+    expect(markdown).toContain('19000')
   })
 })
