@@ -10,15 +10,18 @@ import {
 } from '$/providers/openedProjects/widgetRegistry/configuration'
 import { Ast } from '@/util/ast'
 import { ArgumentApplication, ArgumentAst, interpretCall } from '@/util/callTree'
-import { assert, describe, expect, test } from 'vitest'
+import { assert, describe, expect, test, vi } from 'vitest'
 import { assertDefined } from 'ydoc-shared/util/assert'
 import {
   fileNameOf,
+  formatTypeForDrop,
+  formatTypeForDroppedFile,
   formatTypeForPath,
   formatTypeForPathUpdate,
   isAutoDetect,
   matchesNamePattern,
   pathTextOf,
+  trackFormatConfig,
 } from '../formatForPath'
 
 const SQLITE = 'Standard.SQLite.SQLite_Format.SQLite_Format'
@@ -264,5 +267,110 @@ describe('formatTypeForPathUpdate', () => {
       },
     }
     expect(formatTypeForPathUpdate(app, update)).toBeUndefined()
+  })
+})
+
+describe('formatTypeForDrop', () => {
+  const answer = [
+    [
+      'format',
+      {
+        type: 'Widget',
+        constructor: 'Single_Choice',
+        label: null,
+        values: [
+          {
+            label: 'SQLite',
+            value: '..SQLite',
+            parameters: [],
+            icon: '',
+            requires: SQLITE,
+            patterns: ['*.db'],
+          },
+        ],
+        display: { type: 'Display', constructor: 'When_Modified' },
+      },
+    ],
+  ]
+  test('asks the engine when no node has loaded the options', async () => {
+    const query = vi.fn(async () => answer)
+    expect(await formatTypeForDrop('S.db', 'project-none', query)).toBe(SQLITE)
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+  test('uses the options a node has loaded, without asking the engine', async () => {
+    const untrack = trackFormatConfig(
+      'project-loaded',
+      Symbol('node'),
+      dataRead("Data.read '/d/a.csv'"),
+    )
+    const query = vi.fn(async () => undefined)
+    expect(await formatTypeForDrop('S.db', 'project-loaded', query)).toBe(SQLITE)
+    expect(query).not.toHaveBeenCalled()
+    expect(await formatTypeForDrop('notes.xyz', 'project-loaded', query)).toBeUndefined()
+    untrack()
+  })
+  test('options of a node that is gone are not used: the engine is asked', async () => {
+    const untrack = trackFormatConfig(
+      'project-deleted',
+      Symbol('node'),
+      dataRead("Data.read '/d/a.csv'"),
+    )
+    untrack()
+    const query = vi.fn(async () => answer)
+    expect(await formatTypeForDrop('S.db', 'project-deleted', query)).toBe(SQLITE)
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+  test('options of another project are not used', async () => {
+    const untrack = trackFormatConfig('project-a', Symbol('node'), dataRead("Data.read '/d/a.csv'"))
+    const query = vi.fn(async () => undefined)
+    expect(await formatTypeForDrop('S.db', 'project-b', query)).toBeUndefined()
+    expect(query).toHaveBeenCalledTimes(1)
+    untrack()
+  })
+  test('a failed or empty query names no format', async () => {
+    const failing = vi.fn(async () => {
+      throw new Error('timed out')
+    })
+    expect(await formatTypeForDrop('S.db', 'project-fail', failing)).toBeUndefined()
+    expect(await formatTypeForDrop('S.db', 'project-fail', async () => undefined)).toBeUndefined()
+  })
+})
+
+describe('formatTypeForDroppedFile', () => {
+  // What the `get_widget_json` query for `Data.read`'s `format` returns.
+  const choice = (label: string, value: string, requires?: string, patterns?: string[]) => ({
+    label,
+    value,
+    parameters: [],
+    icon: '',
+    ...(requires ? { requires, patterns } : {}),
+  })
+  const widgetJson = [
+    [
+      'format',
+      {
+        type: 'Widget',
+        constructor: 'Single_Choice',
+        label: null,
+        values: [
+          choice('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
+          choice('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
+          choice('Delimited', '..Delimited', TABLE_DELIMITED, ['*.csv']),
+        ],
+        display: { type: 'Display', constructor: 'When_Modified' },
+      },
+    ],
+  ]
+  test('a file the patterns of one format match names that format type', () => {
+    expect(formatTypeForDroppedFile('Sales.db', widgetJson)).toBe(SQLITE)
+    expect(formatTypeForDroppedFile('DATA.CSV', widgetJson)).toBe(TABLE_DELIMITED)
+  })
+  test('a file no format claims names none', () => {
+    expect(formatTypeForDroppedFile('notes.xyz', widgetJson)).toBeUndefined()
+  })
+  test('a missing, malformed or format-less configuration names none', () => {
+    expect(formatTypeForDroppedFile('Sales.db', undefined)).toBeUndefined()
+    expect(formatTypeForDroppedFile('Sales.db', 'nonsense')).toBeUndefined()
+    expect(formatTypeForDroppedFile('Sales.db', [['path', null]])).toBeUndefined()
   })
 })
