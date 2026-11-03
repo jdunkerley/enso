@@ -386,7 +386,8 @@ object StdBits {
     val result = DistributionPackage.copyDirectoryIncremental(
       source      = file(s"distribution/lib/$prefix/$name/$defaultDevEnsoVersion"),
       destination = targetPkgRoot,
-      cache       = cacheFactory.sub("engine-libraries").make(s"$prefix.$name")
+      cache       = cacheFactory.sub("engine-libraries").make(s"$prefix.$name"),
+      exclude     = DistributionPackage.contributorOnlyFiles
     )
     if (result) {
       log.info(s"Package '$name' has been updated")

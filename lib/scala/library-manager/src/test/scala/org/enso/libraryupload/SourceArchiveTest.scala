@@ -69,5 +69,23 @@ class SourceArchiveTest
       rebuilt should contain("src/Main.enso")
       rebuilt should not contain LibraryUploader.mainArchiveName
     }
+
+    "not pack contributor notes (CLAUDE.md) at any level" in {
+      val projectRoot = getTestDirectory.resolve("lib_notes")
+      PackageManager.Default.create(
+        projectRoot.toFile,
+        name      = "Notes_Test",
+        namespace = "tester",
+        version   = "1.2.3"
+      )
+      Files.writeString(projectRoot.resolve("CLAUDE.md"), "notes")
+      Files.writeString(projectRoot.resolve("src").resolve("CLAUDE.md"), "n")
+      Files.writeString(projectRoot.resolve("src").resolve("Main.enso"), "x = 1")
+
+      uploader.createMainArchive(projectRoot, noProgress)
+      val packed = entries(projectRoot.resolve(LibraryUploader.mainArchiveName))
+      packed should contain("src/Main.enso")
+      packed.filter(_.endsWith("CLAUDE.md")) shouldBe empty
+    }
   }
 }
