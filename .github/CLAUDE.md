@@ -137,7 +137,14 @@ settings. Every workflow is hand-written YAML (build simplification;
   name its shell, and on Windows `tar` behaves differently under Git Bash.
 - **`ENSO_CI_CLEAN_BUILD`**, set at the top of a workflow, decides whether
   `git-clean` cleans: the `CI: Clean build required` label, a run on `develop`,
-  or the `clean_build_required` input.
+  or the `clean_build_required` input. A workflow that uses `git-clean` defines
+  it as a string (top level or job), the cleanup after the work runs
+  `if: always()`, and every local action comes after `actions/checkout`;
+  `check-workflows.mjs` fails one that does not.
+- **A job's `runs-on` (and a caller's `with.os`) that reads `matrix.<key>` must
+  find the key in the job's own `strategy.matrix`**, so the macOS rules can see
+  which legs are macOS. `paths:` and `paths-ignore:` are matched as real globs
+  against a spec file (`'**'` does not leave the specs out).
 - **Actions are pinned by major tag** (`@v5`), as everywhere here; a new
   third-party action or image must be at least two weeks old. The actionlint
   image is pinned to an exact version.

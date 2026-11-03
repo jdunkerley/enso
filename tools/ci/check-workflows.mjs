@@ -261,12 +261,101 @@ function triggers(doc) {
   return on ?? {}
 }
 
-const runsOnLabels = (job) => [job?.['runs-on'] ?? []].flat().map(String)
+const MATRIX_EXPRESSION = /^\s*\$\{\{\s*matrix\.([\w-]+)\s*\}\}\s*$/
+
+/**
+ * What `${{ matrix.<key> }}` can be in `job`, from its `strategy.matrix` (a key of the matrix, and
+ * the `include` entries), or `null` when it cannot be read: no such matrix, a matrix computed with
+ * `fromJSON`, or a leg that does not define the key.
+ */
+function matrixValues(job, key) {
+  const matrix = job?.strategy?.matrix
+  if (matrix == null || typeof matrix !== 'object' || Array.isArray(matrix)) return null
+  const include = matrix.include ?? []
+  if (!Array.isArray(include)) return null
+  const entries = include.filter((entry) => entry != null && typeof entry === 'object')
+  const base = key !== 'include' && key !== 'exclude' && Array.isArray(matrix[key]) ? matrix[key] : null
+  if (base == null && (entries.length === 0 || entries.some((entry) => !(key in entry)))) return null
+  return [...(base ?? []), ...entries.filter((entry) => key in entry).map((entry) => entry[key])]
+}
+
+/**
+ * The values of one `runs-on` / `with` value of `job`: a `${{ matrix.<key> }}` is read from the
+ * job's matrix (`null` when it cannot be), any other value stands for itself. Nested lists are
+ * flattened, so a leg's runner may be a list of labels.
+ */
+function resolveMatrix(job, value) {
+  const key = typeof value === 'string' ? MATRIX_EXPRESSION.exec(value)?.[1] : undefined
+  if (key === undefined) return [value].flat(Infinity)
+  return matrixValues(job, key)?.flat(Infinity) ?? null
+}
+
+/** Every label `runs-on` can take, over all the legs of a matrix (the unreadable ones left out). */
+const runsOnLabels = (job) =>
+  [job?.['runs-on'] ?? []]
+    .flat()
+    .flatMap((label) => resolveMatrix(job, label) ?? [])
+    .map(String)
 const isMacos = (job) => runsOnLabels(job).some((label) => /^macos/i.test(label))
 const isWindowsOnly = (job) =>
   runsOnLabels(job).length > 0 && runsOnLabels(job).every((label) => /^windows/i.test(label))
 
-/** Every `pull_request` trigger ignores specs and plans (CLAUDE.md, "PR CI skips ..."). */
+/** A file under `SPEC_PATHS`, to ask whether a `paths` filter would start a workflow for it. */
+const SAMPLE_SPEC = 'docs/superpowers/specs/sample.md'
+
+/**
+ * Whether a GitHub Actions filter pattern matches `file`: `*` within a path segment, `**` across
+ * segments (`**\/` also matches none), `?` one character, `[…]` a class.
+ */
+export function globMatches(pattern, file) {
+  let re = ''
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i]
+    if (c === '*') {
+      if (pattern[i + 1] === '*') {
+        i++
+        if (pattern[i + 1] === '/') {
+          i++
+          re += '(?:.*/)?'
+        } else {
+          re += '.*'
+        }
+      } else {
+        re += '[^/]*'
+      }
+    } else if (c === '?') {
+      re += '[^/]'
+    } else if (c === '[' && pattern.indexOf(']', i) > i) {
+      const end = pattern.indexOf(']', i)
+      re += pattern.slice(i, end + 1)
+      i = end
+    } else {
+      re += c.replace(/[.+^${}()|\\\]]/g, '\\$&')
+    }
+  }
+  return new RegExp(`^${re}$`).test(file)
+}
+
+/**
+ * Whether a `paths` / `paths-ignore` list selects `file`: a pattern matching includes it and a
+ * later `!` pattern that matches excludes it again (a `!` before any match does nothing).
+ */
+export function pathsMatch(patterns, file) {
+  let matched = false
+  for (const pattern of patterns) {
+    if (pattern.startsWith('!')) {
+      if (matched && globMatches(pattern.slice(1), file)) matched = false
+    } else if (globMatches(pattern, file)) {
+      matched = true
+    }
+  }
+  return matched
+}
+
+/**
+ * Every `pull_request` trigger ignores specs and plans (CLAUDE.md, "PR CI skips ..."): its
+ * `paths-ignore` globs match a spec file, or its `paths` whitelist does not (a `'**'` would).
+ */
 export function checkPullRequestsIgnoreSpecs({ workflows }) {
   const problems = []
   for (const [file, { doc }] of Object.entries(workflows)) {
@@ -277,8 +366,8 @@ export function checkPullRequestsIgnoreSpecs({ workflows }) {
       const ignored = filter['paths-ignore'] ?? []
       const only = filter.paths
       const ignoresSpecs =
-        ignored.includes(SPEC_PATHS) ||
-        (Array.isArray(only) && !only.some((pattern) => String(pattern).startsWith('docs/')))
+        pathsMatch(ignored.map(String), SAMPLE_SPEC) ||
+        (Array.isArray(only) && !pathsMatch(only.map(String), SAMPLE_SPEC))
       if (!ignoresSpecs) {
         problems.push(`${file}: its \`${event}\` trigger lacks \`paths-ignore: ["${SPEC_PATHS}"]\``)
       }
@@ -389,7 +478,7 @@ export function checkOnlyMacosReleaseJobsMayFail({ workflows }) {
 }
 
 /** A job that calls a reusable workflow for macOS (`with: { os: macos }`). */
-const isMacosCaller = (job) => job?.with?.os === 'macos'
+const isMacosCaller = (job) => (resolveMatrix(job, job?.with?.os) ?? []).includes('macos')
 
 /**
  * The jobs of `file` that run on the Mac, or call a workflow for it, but do not wait for
@@ -803,10 +892,14 @@ const localAction = (step) =>
 function sbtBeforeSetupJvm(steps, actions, sbt, seen = new Set()) {
   const late = []
   let ready = false
+  // A `setup-jvm` with an `if:` may be skipped: it covers only the steps under the same condition.
+  const readyUnder = new Set()
+  const condition = (step) => String(step?.if ?? '').trim()
   for (const step of steps ?? []) {
     const action = localAction(step)
     if (action === 'setup-jvm') {
-      ready = true
+      if (step.if === undefined) ready = true
+      else readyUnder.add(condition(step))
       continue
     }
     let runs = callsSbt(String(step?.run ?? ''), sbt.commands, sbt.entries)
@@ -819,7 +912,7 @@ function sbtBeforeSetupJvm(steps, actions, sbt, seen = new Set()) {
       )
       runs = inner.length > 0
     }
-    if (runs && !ready) late.push(step)
+    if (runs && !ready && !readyUnder.has(condition(step))) late.push(step)
   }
   return late
 }
@@ -1218,8 +1311,108 @@ export function checkOpenPerf({ workflows }) {
   return problems
 }
 
+/**
+ * A step that uses a local composite action (`./.github/actions/...`) needs the repository on the
+ * runner, so `actions/checkout` runs before it in the same job.
+ */
+export function checkLocalActionsFollowCheckout({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      let checkedOut = false
+      for (const step of Array.isArray(job?.steps) ? job.steps : []) {
+        if (String(step?.uses ?? '').startsWith('actions/checkout@')) checkedOut = true
+        if (localAction(step) == null || checkedOut) continue
+        problems.push(
+          `${file} › ${id}: \`${step.name ?? step.uses}\` uses a local action before \`actions/checkout\` (the action is not on the runner until then)`,
+        )
+      }
+    }
+  }
+  return problems
+}
+
+/** The `git-clean` steps of a job, with their position among the job's `git-clean` steps. */
+const gitCleanSteps = (job) =>
+  (Array.isArray(job?.steps) ? job.steps : []).filter((step) => localAction(step) === 'git-clean')
+
+/**
+ * The cleanup after a job's work (a `git-clean` step named "Clean after", or any `git-clean` step
+ * but the job's first) runs `if: always()`: without it a failed job leaves its working tree for the
+ * next job on a self-hosted runner.
+ */
+export function checkCleanAfterAlwaysRuns({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      gitCleanSteps(job).forEach((step, index) => {
+        const after = index > 0 || /^clean after\b/i.test(String(step.name ?? ''))
+        if (!after || /\balways\(\)/.test(String(step.if ?? ''))) return
+        problems.push(
+          `${file} › ${id}: \`${step.name ?? step.uses}\` runs after the job's work, so it needs \`if: always()\` (a failed job would skip it)`,
+        )
+      })
+    }
+  }
+  return problems
+}
+
+/**
+ * `git-clean` cleans only when `env.ENSO_CI_CLEAN_BUILD == 'true'`, so a workflow that uses it
+ * defines the variable, at its top or on the job, as a string (`"true"`, or an expression): a YAML
+ * boolean would be a different type from what the action's comparison expects.
+ */
+export function checkCleanBuildVariableIsDefined({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      if (gitCleanSteps(job).length === 0) continue
+      const value = job?.env?.ENSO_CI_CLEAN_BUILD ?? doc?.env?.ENSO_CI_CLEAN_BUILD
+      if (value === undefined) {
+        problems.push(
+          `${file} › ${id}: uses \`git-clean\` but defines no \`ENSO_CI_CLEAN_BUILD\` (at the top of the workflow or on the job)`,
+        )
+      } else if (typeof value !== 'string') {
+        problems.push(
+          `${file} › ${id}: \`ENSO_CI_CLEAN_BUILD\` must be a string (\`"true"\`), not ${value}`,
+        )
+      }
+    }
+  }
+  return problems
+}
+
+/**
+ * The macOS rules read `runs-on` and a caller's `with.os` (`isMacos`, `isMacosCaller`). When these
+ * are `${{ matrix.<key> }}`, the rules see only what the job's own `strategy.matrix` says, so every
+ * leg must define the key there; otherwise a macOS leg could slip past them.
+ */
+export function checkRunsOnResolvesAgainstItsMatrix({ workflows }) {
+  const problems = []
+  for (const [file, { doc }] of Object.entries(workflows)) {
+    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+      const values = [
+        ...[job?.['runs-on'] ?? []].flat().map((value) => ['runs-on', value]),
+        ['with.os', job?.with?.os],
+      ]
+      for (const [where, value] of values) {
+        if (typeof value !== 'string' || !MATRIX_EXPRESSION.test(value)) continue
+        if (resolveMatrix(job, value) != null) continue
+        problems.push(
+          `${file} › ${id}: \`${where}\` reads \`${value.replace(/^\s*\$\{\{\s*|\s*\}\}\s*$/g, '')}\`, which the job's \`strategy.matrix\` does not define for every leg (or computes), so the macOS rules cannot see it`,
+        )
+      }
+    }
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
+  checkLocalActionsFollowCheckout,
+  checkCleanAfterAlwaysRuns,
+  checkCleanBuildVariableIsDefined,
+  checkRunsOnResolvesAgainstItsMatrix,
   checkSetupNodeCache,
   checkReleaseIsIdeOnly,
   checkOnlyMacosReleaseJobsMayFail,
