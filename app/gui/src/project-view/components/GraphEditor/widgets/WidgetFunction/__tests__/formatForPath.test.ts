@@ -14,6 +14,7 @@ import { assert, describe, expect, test } from 'vitest'
 import { assertDefined } from 'ydoc-shared/util/assert'
 import {
   fileNameOf,
+  formatTypeForDroppedFile,
   formatTypeForPath,
   formatTypeForPathUpdate,
   isAutoDetect,
@@ -264,5 +265,44 @@ describe('formatTypeForPathUpdate', () => {
       },
     }
     expect(formatTypeForPathUpdate(app, update)).toBeUndefined()
+  })
+})
+
+describe('formatTypeForDroppedFile', () => {
+  // What the `get_widget_json` query for `Data.read`'s `format` returns.
+  const choice = (label: string, value: string, requires?: string, patterns?: string[]) => ({
+    label,
+    value,
+    parameters: [],
+    icon: '',
+    ...(requires ? { requires, patterns } : {}),
+  })
+  const widgetJson = [
+    [
+      'format',
+      {
+        type: 'Widget',
+        constructor: 'Single_Choice',
+        label: null,
+        values: [
+          choice('Auto Detect', 'Standard.Base.System.File_Format.Auto_Detect'),
+          choice('SQLite', '..SQLite', SQLITE, ['*.sqlite', '*.db']),
+          choice('Delimited', '..Delimited', TABLE_DELIMITED, ['*.csv']),
+        ],
+        display: { type: 'Display', constructor: 'When_Modified' },
+      },
+    ],
+  ]
+  test('a file the patterns of one format match names that format type', () => {
+    expect(formatTypeForDroppedFile('Sales.db', widgetJson)).toBe(SQLITE)
+    expect(formatTypeForDroppedFile('DATA.CSV', widgetJson)).toBe(TABLE_DELIMITED)
+  })
+  test('a file no format claims names none', () => {
+    expect(formatTypeForDroppedFile('notes.xyz', widgetJson)).toBeUndefined()
+  })
+  test('a missing, malformed or format-less configuration names none', () => {
+    expect(formatTypeForDroppedFile('Sales.db', undefined)).toBeUndefined()
+    expect(formatTypeForDroppedFile('Sales.db', 'nonsense')).toBeUndefined()
+    expect(formatTypeForDroppedFile('Sales.db', [['path', null]])).toBeUndefined()
   })
 })

@@ -66,4 +66,9 @@ is already on the row, drawn by `WidgetIcon` at the root.
   `handleArgUpdate` adds its import in the update's edit; it is the one handler
   that sees every argument's update and every sibling's widget configuration
   (#489). A dropdown option's own `requires` is applied by
-  `WidgetSelection/tags.ts`.
+  `WidgetSelection/tags.ts`. A file dropped on the graph (`GraphEditor.vue`'s
+  `uploadedFormatImports`) has no node and so no widget configuration: it asks
+  the engine for `Data.read`'s `format` options
+  (`DATA_READ_FORMAT_WIDGET_QUERY`, evaluated in an existing node's context) and
+  matches the file with `formatTypeForDroppedFile`; the import goes in the node
+  creation's edit.

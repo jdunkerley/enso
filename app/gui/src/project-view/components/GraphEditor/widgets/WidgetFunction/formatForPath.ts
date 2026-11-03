@@ -5,6 +5,7 @@
  */
 import type { WidgetUpdate } from '$/providers/openedProjects/widgetRegistry'
 import {
+  argsWidgetConfigurationSchema,
   flattenChoice,
   type WidgetConfiguration,
 } from '$/providers/openedProjects/widgetRegistry/configuration'
@@ -136,4 +137,28 @@ export function formatTypeForPathUpdate(
   const after = newPathText(path, update)
   if (after == null || after === before) return undefined
   return formatTypeForPath(after, format.dynamicConfig)
+}
+
+/**
+ * The expression that asks the engine for `Data.read`'s `format` widget configuration, as the
+ * `format` argument's own query does (`widgetFunctionCallInfo.ts`), but without a node to hang it
+ * on: a file dropped on the graph has none yet.
+ */
+export const DATA_READ_FORMAT_WIDGET_QUERY =
+  'Standard.Visualization.Widgets.get_widget_json Standard.Base.Data .read ["format"] "{}"'
+
+/**
+ * The format type whose library reads a file dropped on the graph (which becomes
+ * `Data.read '<name>'` with `format` on `Auto_Detect`): `widgetJson` is the answer to
+ * {@link DATA_READ_FORMAT_WIDGET_QUERY}, matched as a `path` update is
+ * ({@link formatTypeForPath}). `undefined` when the answer is unusable.
+ */
+export function formatTypeForDroppedFile(
+  fileName: string,
+  widgetJson: unknown,
+): string | undefined {
+  const parsed = argsWidgetConfigurationSchema.safeParse(widgetJson)
+  if (!parsed.success) return undefined
+  const format = parsed.data.find(([name]) => name === FORMAT_ARGUMENT)?.[1]
+  return formatTypeForPath(fileName, format ?? undefined)
 }

@@ -10,7 +10,10 @@ import {
 import { panelEquals, useContainerData } from '$/providers/container'
 import type { Node, NodeId } from '$/providers/openedProjects/graph'
 import { isInputNode, nodeId } from '$/providers/openedProjects/graph/graphDatabase'
-import type { RequiredImport } from '$/providers/openedProjects/module/imports'
+import {
+  requiredImportsForTypeName,
+  type RequiredImport,
+} from '$/providers/openedProjects/module/imports'
 import { provideNodeExecution } from '$/providers/openedProjects/project/nodeExecution'
 import type { SuggestionId, Typename } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
@@ -37,7 +40,12 @@ import { selectionActionHandlers } from '@/components/GraphEditor/selectionActio
 import { createSelectionAlignmentHandlers } from '@/components/GraphEditor/selectionAlignment'
 import { useGraphTidy } from '@/components/GraphEditor/tidy/useGraphTidy'
 import { useGraphEditorToasts, useImportsAddedOnOpenToast } from '@/components/GraphEditor/toasts'
-import { uploadedExpression, Uploader } from '@/components/GraphEditor/upload'
+import { uploadedExpression, Uploader, type UploadResult } from '@/components/GraphEditor/upload'
+import {
+  DATA_READ_FORMAT_WIDGET_QUERY,
+  fileNameOf,
+  formatTypeForDroppedFile,
+} from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import GraphMissingView from '@/components/GraphMissingView.vue'
 import GraphMouse from '@/components/GraphMouse.vue'
 import PopoverRootProvider from '@/components/PopoverRootProvider.vue'
@@ -746,6 +754,39 @@ function collapseNodes(nodes: Node[]) {
 
 // === Drag and drop ===
 
+/**
+ * A dropped file becomes `Data.read '<name>'` with `format` on `Auto_Detect`; its node also needs
+ * the import of the library whose format reads it (#489), added in the node's own edit so that one
+ * undo removes both. The format options' patterns come from the engine, which is asked in the
+ * context of an existing node (or the current method): the new node has none yet. Any failure
+ * means no import: the node is created as before.
+ */
+async function uploadedFormatImports(result: UploadResult): Promise<RequiredImport[] | undefined> {
+  if (result.source !== 'FileSystemRoot') return undefined
+  try {
+    const context =
+      iter.first(graphStore.db.nodeIdToNode.values())?.outerAst.externalId ??
+      (graphStore.currentMethod.ast.ok ? graphStore.currentMethod.ast.value.externalId : undefined)
+    if (context == null) return undefined
+    const answer = await projectStore.queuedExecuteExpression(
+      context,
+      DATA_READ_FORMAT_WIDGET_QUERY,
+    )
+    if (!answer?.ok) return undefined
+    const formatType = formatTypeForDroppedFile(fileNameOf(result.name), answer.value)
+    if (formatType == null) return undefined
+    return requiredImportsForTypeName(
+      suggestionDb.entries,
+      projectNames,
+      suggestionDb.libraryPublicTypes,
+      formatType,
+    )
+  } catch (error) {
+    console.info('Could not find the format library of a dropped file', error)
+    return undefined
+  }
+}
+
 async function handleFileDrop(event: DragEvent) {
   // A vertical gap between created nodes when multiple files were dropped together.
   const MULTIPLE_FILES_GAP = 50
@@ -772,6 +813,7 @@ async function handleFileDrop(event: DragEvent) {
         scheduleCreateNode({
           placement: { type: 'mouseEvent', position: pos },
           expression: uploadedExpression(uploadResult.value),
+          requiredImports: await uploadedFormatImports(uploadResult.value),
         })
       } else {
         uploadResult.error.log(`Uploading file failed`)

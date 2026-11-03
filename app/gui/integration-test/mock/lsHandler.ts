@@ -553,7 +553,13 @@ function slotPreprocessorKey(request: VisRequestPreprocessor): string | null {
     if (!exprAst) return null
     const { func } = Ast.analyzeAppLike(exprAst)
     if (!(func instanceof Ast.PropertyAccess && func.lhs)) return null
-    return `${func.lhs.code()}.${func.rhs.code()}`
+    const key = `${func.lhs.code()}.${func.rhs.code()}`
+    // A widget query evaluated directly (the format of a dropped file, #489): `get_widget_json
+    // <type> <call name> …`, routed like the visualization form, by its call name (`.read`).
+    if (key === `${WIDGETS_ENSO_MODULE}.${GET_WIDGETS_METHOD}`) {
+      return Ast.analyzeAppLike(exprAst).args.at(1)?.code() ?? null
+    }
+    return key
   }
   if (expression.module === WIDGETS_ENSO_MODULE && expression.name === GET_WIDGETS_METHOD) {
     return request.positionalArgumentsExpressions?.at(0) ?? null
