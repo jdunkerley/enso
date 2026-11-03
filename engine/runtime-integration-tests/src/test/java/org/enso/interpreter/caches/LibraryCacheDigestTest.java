@@ -251,6 +251,9 @@ public class LibraryCacheDigestTest {
         .withModifiedContext(
             bldr ->
                 bldr.option(RuntimeOptions.DISABLE_IR_CACHES, "false")
+                    // The IR caches are written in the background: closing waits for them, so
+                    // the next run finds them (without it, CI's slower runners did not).
+                    .option(RuntimeOptions.WAIT_FOR_PENDING_SERIALIZATION_JOBS, "true")
                     .option(RuntimeOptions.STRICT_ERRORS, "true"))
         .withProjectRoot(root);
   }
