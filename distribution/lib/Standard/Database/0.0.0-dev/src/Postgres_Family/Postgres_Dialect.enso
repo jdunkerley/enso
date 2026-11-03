@@ -161,7 +161,22 @@ type Postgres_Dialect
         table_name_deduplicator = table_connection.base_connection.table_naming_helper.create_unique_name_strategy
         table_name_deduplicator.mark_used table.name
         inner_table_alias = table_name_deduplicator.make_unique table.name+"_inner"
-        setup = table.context.as_subquery inner_table_alias [table.internal_columns]
+
+        ## See Note [DISTINCT ON Needs Its Ordering At Its Own Level]: the
+           subquery exposes each ordering expression that is not already a
+           column as a helper column, so that the `DISTINCT ON` level can order
+           by it. Without a limit, the subquery's own ordering is then
+           redundant.
+        orderings = table.context.orders
+        renamer = table_connection.base_connection.column_naming_helper.create_unique_name_strategy
+        renamer.mark_used (table.internal_columns.map .name)
+        ordering_columns = orderings.map ordering->
+            existing = table.internal_columns.find (c-> c.expression == ordering.expression) if_missing=Nothing
+            existing.if_nothing <|
+                Internal_Column.Value (renamer.make_unique "__enso_distinct_order") SQL_Type_Reference.null ordering.expression
+        helper_columns = ordering_columns.filter c-> table.internal_columns.contains c . not
+        inner_context = if table.context.limit.is_nothing then table.context.set_orders [] else table.context
+        setup = inner_context.as_subquery inner_table_alias [table.internal_columns, helper_columns]
         new_columns = setup.new_columns.first
         column_mapping = Dictionary.from_vector <| new_columns.map c-> [c.name, c]
         new_key_columns = key_columns.map c-> column_mapping.at c.name
@@ -169,7 +184,13 @@ type Postgres_Dialect
         distinct_expressions = new_key_columns.map column->
             value_type = mapping.sql_type_to_value_type column.sql_type_reference.get
             Database_Distinct_Helper.make_distinct_expression case_sensitivity problem_builder column value_type
-        new_context = SQL_IR_Source.for_subquery setup.subquery . add_extension (make_distinct_extension distinct_expressions)
+
+        key_orders = distinct_expressions.map expression-> Order_Descriptor.Value expression Sort_Direction.Ascending
+        requested_orders = orderings.zip ordering_columns ordering-> column->
+            Order_Descriptor.Value (setup.remap_column column).expression ordering.direction ordering.nulls_order ordering.collation
+        new_context = SQL_IR_Source.for_subquery setup.subquery
+            . add_extension (make_distinct_extension distinct_expressions)
+            . set_orders key_orders+requested_orders
         table.updated_context_and_columns new_context new_columns subquery=True
 
     ## ---
@@ -1080,6 +1101,23 @@ as_int64 expr =
    choice for integers in Postgres).
 as_int32 expr =
     SQL_Builder.code "(" ++ expr ++ "::int4)"
+
+## Note [DISTINCT ON Needs Its Ordering At Its Own Level]
+   `DISTINCT ON` keeps the first row of each group only by the `ORDER BY` of
+   its own query level; an `ORDER BY` in a subquery is not guaranteed to reach
+   it. DuckDB, for one, then pushes a later filter on a non-key column below
+   the distinct, and so keeps different rows (#491, duckdb/duckdb#19830).
+   `prepare_distinct` therefore orders the `DISTINCT ON` level itself by the
+   key expressions (which must lead its `ORDER BY`) and then by the table's
+   ordering. The ordering is expressed in the context of the subquery, so the
+   subquery exposes each ordering expression that is not already one of its
+   columns as a helper column, which the outer level orders by but does not
+   select. The subquery keeps its own `ORDER BY` only if it has a limit, which
+   the ordering decides.
+
+   The result's row order is unspecified, as it was before: the table that
+   `distinct` returns wraps the `DISTINCT ON` level in a subquery with no
+   ordering of its own.
 
 ## ---
    private: true

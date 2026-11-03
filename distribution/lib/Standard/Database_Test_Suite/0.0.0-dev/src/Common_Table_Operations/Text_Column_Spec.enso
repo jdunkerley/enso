@@ -36,9 +36,7 @@ add_text_columns_specs suite_builder setup =
             column = text_column.get
             column.value_type.is_text . should_be_true
             check_column_refinements column x->
-                # Bound first: a lone ascription as a block's value cannot be cached as IR.
-                refined = (x:Text_Column)
-                refined
+                (x:Text_Column)
 
     suite_builder.group prefix+"Text_Column (to_case)" group_builder->
         group_builder.specify "to_case works" <|

@@ -39,6 +39,15 @@ a warning in the log, an undecodable or duplicate entry likewise (the rest of
 the library's entries still go in), and a library declaring `catalogue: false`
 in its `package.yaml` (Visualization) is skipped quietly.
 
+## Suggestions database snapshot
+
+`search/getSuggestionsDatabase` is answered only after the runtime has
+invalidated its index and the repository is clean, with the clean repository's
+version; the clean moves the version on. A client applies only the update
+notifications not older than that version, so those of updates applied before
+the clean (whose entries it removed) are dropped. See Note [The Snapshot Follows
+The Clear] in `SuggestionsHandler` (#477).
+
 ## Source layout
 
 - `src/main/java/` — Java code: JSON-RPC endpoints, handlers, data-link

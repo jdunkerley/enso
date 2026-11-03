@@ -17,7 +17,7 @@ from Standard.Table.Match_Columns import Match_Columns
 
 import project.Hyper_Errors
 import project.Hyper_File.Hyper_File
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 from project.Hyper_Errors import Hyper_Unsupported_Type
 
 polyglot java import org.enso.tableau.HyperFormat

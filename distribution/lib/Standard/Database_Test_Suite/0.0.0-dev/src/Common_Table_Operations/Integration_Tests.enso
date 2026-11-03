@@ -9,7 +9,6 @@ import Standard.Database.Dialects.Feature.Feature
 
 from project.Common_Table_Operations.Util import run_default_backend
 from project.Common_Table_Operations.Core_Spec import weird_names
-import project.Known_Issue.Known_Issue
 
 main filter=Nothing = run_default_backend add_specs filter
 
@@ -156,18 +155,46 @@ add_integration_specs suite_builder setup =
                 expected_b = if r2.at "A" . to_vector . first == "a" then [1, 5] else [5, 1]
                 r2.at "B" . to_vector . should_equal expected_b
 
-                ## Known_Issue.Filter_After_Distinct: a filter after distinct changes which rows it kept.
-                if (setup.has_known_issue Known_Issue.Filter_After_Distinct).not then
-                    t3 = t2.filter "B" (Filter_Condition.Equal 5)
-                    r3 = t3 |> materialize
-                    r3.at "A" . to_vector . should_equal ["b"]
-                    r3.at "B" . to_vector . should_equal [5]
+                t3 = t2.filter "B" (Filter_Condition.Equal 5)
+                r3 = t3 |> materialize
+                r3.at "A" . to_vector . should_equal ["b"]
+                r3.at "B" . to_vector . should_equal [5]
 
                 t4 = t.filter "B" (Filter_Condition.Equal 5)
                 t5 = t4.distinct ["A"] on_problems=..Report_Error
                 r5 = t5 |> materialize
                 r5.at "A" . to_vector . should_equal_ignoring_order ["b", "a"]
                 r5.at "B" . to_vector . should_equal [5, 5]
+
+            ## A filter on a non-key column after `distinct` must see the rows
+               the `distinct` kept. A database may push the filter below the
+               distinct unless the ordering that picks the first row is at the
+               same query level as the distinct (#491).
+            group_builder.specify "a filter after distinct keeps the rows the distinct chose" <|
+                a = ["A", ["a", "a", "b", "b"]]
+                b = ["B", [1, 2, 1, 2]]
+                c = ["C", [0.1, 0.2, 0.3, 0.4]]
+                t = table_builder [a, b, c] . sort (..Name "C" ..Descending)
+
+                # The distinct keeps (a, 2, 0.2) and (b, 2, 0.4).
+                t2 = t.distinct ["A"] on_problems=..Report_Error
+                (t2.filter "B" (Filter_Condition.Equal 1) |> materialize) . row_count . should_equal 0
+                r2 = t2.filter "B" (Filter_Condition.Equal 2) |> materialize |> _.sort "A"
+                r2.at "A" . to_vector . should_equal ["a", "b"]
+                r2.at "C" . to_vector . should_equal [0.2, 0.4]
+
+                # The ordering column need not be in the distinct's input.
+                t3 = t.select_columns ["A", "B"] . distinct ["A"] on_problems=..Report_Error
+                (t3.filter "B" (Filter_Condition.Equal 1) |> materialize) . row_count . should_equal 0
+                r3 = t3.filter "B" (Filter_Condition.Equal 2) |> materialize |> _.sort "A"
+                r3.at "A" . to_vector . should_equal ["a", "b"]
+
+                # A limit before the distinct still takes the first rows.
+                t4 = t.take 3 . distinct ["A"] on_problems=..Report_Error
+                r4 = t4 |> materialize |> _.sort "A"
+                r4.at "A" . to_vector . should_equal ["a", "b"]
+                r4.at "C" . to_vector . should_equal [0.2, 0.4]
+                (t4.filter "B" (Filter_Condition.Equal 1) |> materialize) . row_count . should_equal 0
 
             ## This mostly checks that various operations handle all kinds of Integer storage implementations
                (add_row_number may use a different storage than regular columns)

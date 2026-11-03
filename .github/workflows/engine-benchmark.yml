@@ -69,11 +69,15 @@ jobs:
           JUST_CHECK: ${{ inputs.just-check }}
           LC_ALL: C.UTF-8
           SBT_SERVER_FORCESTART: "true"
+      # Check mode (`just-check`) writes no report on purpose: it runs every benchmark once, in
+      # the sbt JVM, only to see that they run (`BenchmarksRunner.runCompileOnly`).
       - name: Upload benchmark results
+        if: ${{ !inputs.just-check }}
         uses: actions/upload-artifact@v5
         with:
           name: benchmark-results.xml
           path: engine/runtime-benchmarks/bench-report.xml
+          if-no-files-found: error
       - name: Clean after
         if: always()
         uses: ./.github/actions/git-clean

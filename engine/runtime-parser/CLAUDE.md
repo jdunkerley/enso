@@ -16,10 +16,12 @@ constructor.
   identity.
 - **IR persistance ids are explicit.** `ir/IrPersistance.java` registers each
   persisted IR class with `@Persistable(clazz = …, id = N)`. Not every IR class
-  is persisted (`Type.Ascription` is not, for instance). Removing one does not
-  shift the others; do not reuse a freed id. IR caches are keyed by the engine
-  version (`BuildVersion.ensoVersion()`), so there is no separate cache version
-  to bump.
+  is persisted: a class only needs it if it can survive the compiler passes, and
+  writing a cache that holds one that is missing fails with
+  `No persistance for …` (#495: `Type.Ascription`, which `TypeSignatures` keeps
+  when it is the last line of a block). Removing one does not shift the others;
+  do not reuse a freed id. IR caches are keyed by the engine version
+  (`BuildVersion.ensoVersion()`), so there is no separate cache version to bump.
 - **`T in Ctx` in a type is a syntax error** (`Syntax.TypeContextUnsupported`);
   the `Type.Context` IR node was removed. `in` itself is not reserved.
 

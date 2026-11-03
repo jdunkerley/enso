@@ -73,6 +73,11 @@ Generated code uses only the public API:
 - Any module whose first non-blank source line is `private` is a private module
   — do not import.
 - `@Builtin_Method` marks internal builtins; call the public wrapper.
+- A helper that several standard libraries share lives in `Standard.Base` under
+  `src/Internal/` as a module that is **not** `private` (so other libraries can
+  import it) whose entities carry `private: true` (so the component browser and
+  the catalogue skip them), e.g. `Standard.Base.Internal.Telemetry`. Libraries
+  other than the standard ones must not import it.
 
 ### Library layout
 

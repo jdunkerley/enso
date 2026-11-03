@@ -1,6 +1,7 @@
 package org.enso.languageserver.websocket.json
 import io.circe.literal._
 import org.enso.languageserver.websocket.json.{SearchJsonMessages => json}
+import org.enso.polyglot.runtime.Runtime.Api
 import org.enso.testkit.{FlakySpec, ReportLogsOnFailure, RetrySpec}
 
 class SuggestionsHandlerTest
@@ -29,13 +30,22 @@ class SuggestionsHandlerTest
       val client = getInitialisedWsClient()
 
       client.send(json.getSuggestionsDatabase(0))
+      // Answered once the runtime has invalidated its index and the
+      // repository is clean, which moves the version on.
+      runtimeConnectorProbe.fishForMessage() {
+        case Api.Request(_, Api.InvalidateModulesIndexRequest()) => true
+        case _                                                   => false
+      }
+      runtimeConnectorProbe.lastSender ! Api.Response(
+        Api.InvalidateModulesIndexResponse()
+      )
       client.expectJson(json"""
           { "jsonrpc" : "2.0",
             "id" : 0,
             "result" : {
               "entries" : [
               ],
-              "currentVersion" : 0
+              "currentVersion" : 1
             }
           }
       """)
