@@ -16,7 +16,10 @@ and loads packages. Used by the compiler, the runtime and every CLI tool.
 - **`Package.sourceHash` is a file format.** A library's `catalogue.json`
   records it and the language server compares it with the library on disk, so
   changing the definition makes every existing catalogue stale (they are skipped
-  until recompiled). The definition is in its doc comment.
+  until recompiled). It also keys the library's bindings, suggestions and IR
+  caches (Note [Library Caches Are Keyed By The Sources] in the engine's
+  `LibrarySourceHashes`), so changing it makes every user rebuild those once.
+  The definition is in its doc comment.
 
 - **The new-project template ships its full id map.**
   `src/main/resources/default/src/Main.enso` names every AST's id, so the first

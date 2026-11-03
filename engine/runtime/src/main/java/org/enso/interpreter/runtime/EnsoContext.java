@@ -46,6 +46,7 @@ import org.enso.distribution.locking.LockManager;
 import org.enso.editions.LibraryName;
 import org.enso.interpreter.EnsoLanguage;
 import org.enso.interpreter.OptionsHelper;
+import org.enso.interpreter.caches.LibrarySourceHashes;
 import org.enso.interpreter.runtime.builtin.Builtins;
 import org.enso.interpreter.runtime.data.Type;
 import org.enso.interpreter.runtime.error.DataflowError;
@@ -95,6 +96,7 @@ public final class EnsoContext {
   private final NotificationHandler notificationHandler;
   private final TruffleLogger logger = TruffleLogger.getLogger(LanguageInfo.ID, EnsoContext.class);
   private final DistributionManager distributionManager;
+  private final LibrarySourceHashes librarySourceHashes = new LibrarySourceHashes();
   private final LockManager lockManager;
   private final AtomicLong clock = new AtomicLong();
 
@@ -837,6 +839,14 @@ public final class EnsoContext {
    */
   public DistributionManager getDistributionManager() {
     return distributionManager;
+  }
+
+  /**
+   * @return the source hashes of the libraries, which key their caches. See Note [Library Caches
+   *     Are Keyed By The Sources].
+   */
+  public LibrarySourceHashes getLibrarySourceHashes() {
+    return librarySourceHashes;
   }
 
   /**

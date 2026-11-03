@@ -398,6 +398,11 @@ final class TruffleCompilerContext implements CompilerContext {
     // Note [One Bindings Cache Read Per Library]: before the request is logged, so that a test can
     // hold the request there (`LibraryBindingsInvalidationTest`).
     invalidateLibraryBindings(libraryName);
+    // Note [Library Caches Are Keyed By The Sources]: the caches record the sources compiled.
+    context
+        .getPackageRepository()
+        .getPackageForLibraryJava(libraryName)
+        .ifPresent(pkg -> context.getLibrarySourceHashes().forget(pkg));
     logSerializationManager(Level.INFO, "Requesting serialization for library [{0}].", libraryName);
 
     var write = doSerializeLibrary(compiler, libraryName);
@@ -611,8 +616,10 @@ final class TruffleCompilerContext implements CompilerContext {
    * per-module IR caches, so in practice it parses the target from source every
    * time (a second compile of an unchanged Standard.Geo: ~1 s before, ~3 s
    * after); dependencies are unaffected.
-   * The root fix, verifying the bindings and suggestions caches against the
-   * library's sources, is a separate change.
+   * Since #473 the bindings cache is checked against the library's sources
+   * (Note [Library Caches Are Keyed By The Sources] in `LibrarySourceHashes`),
+   * so the skip is no longer needed for correctness; lifting it, and getting
+   * the faster second compile back, is a separate change.
    */
 
   @Override
@@ -857,8 +864,9 @@ final class TruffleCompilerContext implements CompilerContext {
    * .isPublished`), and it records a hash of the library's sources
    * (`Package.sourceHash`), so a reader can tell whether it still describes the
    * library; for that claim to hold, the compiled library's IR never comes from
-   * its unchecked bindings cache (Note [Compile Target Skips Its Bindings
-   * Cache]). Failing to write it only logs a warning: the library still
+   * its bindings cache (Note [Compile Target Skips Its Bindings Cache]), and
+   * its IR caches are keyed by the same hash (Note [Library Caches Are Keyed By
+   * The Sources] in `LibrarySourceHashes`). Failing to write it only logs a warning: the library still
    * compiles, and its components appear once it is loaded, as without one.
    * It is generated, never committed (`.gitignore`).
    * Design: docs/superpowers/specs/2026-10-31-library-catalogue-design.md.
