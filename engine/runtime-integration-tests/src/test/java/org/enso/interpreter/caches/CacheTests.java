@@ -231,7 +231,8 @@ public final class CacheTests {
     }
 
     @Override
-    public Optional<String> computeDigest(CachedData entry, TruffleLogger logger) {
+    public Optional<String> computeDigest(
+        EnsoContext context, CachedData entry, TruffleLogger logger) {
       return Optional.of("42");
     }
 

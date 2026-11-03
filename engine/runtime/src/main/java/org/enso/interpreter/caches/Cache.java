@@ -167,10 +167,9 @@ public final class Cache<T, M> {
       byte[] bytesToWrite = spi.serialize(context, entry);
 
       String blobDigest = CacheUtils.computeDigestFromBytes(ByteBuffer.wrap(bytesToWrite));
-      String sourceDigest = spi.computeDigest(entry, logger).get();
-      if (sourceDigest == null) {
-        throw new IOException("unable to compute digest");
-      }
+      String sourceDigest =
+          spi.computeDigest(context, entry, logger)
+              .orElseThrow(() -> new IOException("unable to compute digest"));
       byte[] metadataBytes = spi.metadata(sourceDigest, blobDigest, entry);
 
       TruffleFile cacheDataFile = getCacheDataPath(cacheRoot);
@@ -506,13 +505,16 @@ public final class Cache<T, M> {
     public abstract M metadataFromBytes(byte[] bytes, TruffleLogger logger) throws IOException;
 
     /**
-     * Compute digest of cache's data
+     * Compute the digest of the sources of the data being saved; {@link #computeDigestFromSource}
+     * must compute the same one from the sources on load.
      *
+     * @param context the language context in which saving is taking place
      * @param entry data for which digest should be computed
      * @param logger Truffle's logger
      * @return non-empty digest, if successful
      */
-    public abstract Optional<String> computeDigest(T entry, TruffleLogger logger);
+    public abstract Optional<String> computeDigest(
+        EnsoContext context, T entry, TruffleLogger logger);
 
     /**
      * Compute digest of data's source

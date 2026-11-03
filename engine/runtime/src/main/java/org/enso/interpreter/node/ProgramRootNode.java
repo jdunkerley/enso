@@ -123,7 +123,8 @@ public final class ProgramRootNode extends RootNode {
       Package<TruffleFile> pkg, TruffleFile src, String srcName) {
     if (pkg != null) {
       try {
-        var rel = pkg.sourceDir().relativize(src.getParent());
+        // Note [A Module's Name Does Not Depend On How Its Path Is Spelt]
+        var rel = canonical(pkg.sourceDir()).relativize(canonical(src.getParent()));
         var names = new LinkedList<String>();
         while (rel != null) {
           if (!rel.getName().isEmpty()) {
@@ -140,6 +141,27 @@ public final class ProgramRootNode extends RootNode {
       }
     }
     return QualifiedName.simpleName(srcName);
+  }
+
+  /* Note [A Module's Name Does Not Depend On How Its Path Is Spelt]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * `getPackageOf` finds the package by canonical paths, but the module's name
+   * was taken from the path relative to the package's `src`, as both were
+   * spelt. When they are spelt differently (on Windows, an 8.3 short name such
+   * as `C:\Users\RUNNER~1\...` against the long one), `relativize` returns the
+   * rest of the whole path, and the module evaluated from the file was named
+   * after it (`local.Proj.<folders>.Proj.src.Main`). Its IR cache then
+   * went to a directory of that name, which another tree of the same project
+   * never looks in, and the module was compiled from source every time (found
+   * by `LibraryCacheDigestTest` on CI's Windows runner). Both sides are
+   * canonicalised first.
+   */
+  private static TruffleFile canonical(TruffleFile file) {
+    try {
+      return file.getCanonicalFile();
+    } catch (java.io.IOException e) {
+      return file;
+    }
   }
 
   /* Note [Static Passes]

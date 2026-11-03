@@ -90,14 +90,16 @@ public final class SuggestionsCache
     return Metadata.read(bytes);
   }
 
+  /** See Note [Library Caches Are Keyed By The Sources] in {@link LibrarySourceHashes}. */
   @Override
-  public Optional<String> computeDigest(CachedSuggestions entry, TruffleLogger logger) {
-    return Optional.of(CacheUtils.computeDigestFromLibName(entry.libraryName));
+  public Optional<String> computeDigest(
+      EnsoContext context, CachedSuggestions entry, TruffleLogger logger) {
+    return CacheUtils.librarySourceHash(context, entry.libraryName(), logger);
   }
 
   @Override
   public Optional<String> computeDigestFromSource(EnsoContext context, TruffleLogger logger) {
-    return Optional.of(CacheUtils.computeDigestFromLibName(libraryName));
+    return CacheUtils.librarySourceHash(context, libraryName, logger);
   }
 
   @Override
