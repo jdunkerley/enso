@@ -438,6 +438,25 @@ export function aotRejection(output: string): string | undefined {
  */
 const UNIFIED_LOG_INFO = /^(?:\[[^\]]*\])*?\[(?:info|debug|trace)\]\[/
 
+/** The engines named by `--engines` (comma-separated); throws on an unknown one. */
+export function parseEngines(value: string): Engine[] {
+  return value.split(',').map((e) => {
+    const engine = e.trim()
+    if (engine !== 'native' && engine !== 'jvm' && engine !== 'jvm-nocache') {
+      throw new Error(`Unknown engine: ${engine}`)
+    }
+    return engine
+  })
+}
+
+/** `JAVA_TOOL_OPTIONS` made of several parts, the missing or blank ones left out. */
+export function joinJvmOptions(...parts: readonly (string | undefined)[]): string {
+  return parts
+    .map((p) => p?.trim())
+    .filter((p): p is string => p != null && p !== '')
+    .join(' ')
+}
+
 /** The libraries the new-project template may import for `core`. */
 const CORE_LIBRARIES = new Set(['Base', 'Table', 'Database', 'Examples', 'Visualization'])
 

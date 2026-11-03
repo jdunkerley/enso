@@ -12,12 +12,15 @@ import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
 import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
+import { hsperfDirectory, parseHsperfData, summariseJvmCounters } from './jvmCounters'
 import {
   classifyTemplate,
   credentialFreeEnv,
   developMedians,
+  joinJvmOptions,
   notMeasured,
   openTimes,
+  parseEngines,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
@@ -67,16 +70,11 @@ function parseOptions(argv: readonly string[]): Options {
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
   if (!values.out) throw new Error('--out <dir> is required')
-  const engines = (values.engines ?? 'native').split(',').map((e) => e.trim())
-  for (const engine of engines) {
-    if (engine !== 'native' && engine !== 'jvm' && engine !== 'jvm-nocache') {
-      throw new Error(`Unknown engine: ${engine}`)
-    }
-  }
+  const engines = parseEngines(values.engines ?? 'native')
   return {
     out: path.resolve(values.out),
     runs: Number(values.runs ?? '5'),
-    engines: engines as Engine[],
+    engines,
     baseline: values.baseline ?? [],
     summary: values.summary,
     exe: values.exe ?? electronExecutablePath,
@@ -239,9 +237,8 @@ async function openProject(
  * `--jvm-diagnostics` adds one launch per JVM engine that traces them (Note [Truffle
  * Diagnostics]).
  */
-function snapshotJvmCounters(dir: string, phase: string) {
-  const base = process.platform === 'win32' ? os.tmpdir() : '/tmp'
-  const src = path.join(base, `hsperfdata_${os.userInfo().username}`)
+function snapshotJvmCounters(dir: string, phase: string, marks: Marks) {
+  const src = hsperfDirectory(process.platform, os.tmpdir(), os.userInfo().username)
   let names: string[]
   try {
     names = fs.readdirSync(src)
@@ -254,7 +251,10 @@ function snapshotJvmCounters(dir: string, phase: string) {
     try {
       // Read, not copied: on Windows the JVM holds the file open for writing, which `CopyFile`'s
       // share mode refuses.
-      fs.writeFileSync(path.join(out, `${phase}-${name}`), fs.readFileSync(path.join(src, name)))
+      const data = fs.readFileSync(path.join(src, name))
+      fs.writeFileSync(path.join(out, `${phase}-${name}`), data)
+      // The summary in `marks.json` too (`jvm` marks), so a run is read without a parser.
+      marks.add('jvm', { phase, pid: name, ...summariseJvmCounters(parseHsperfData(data)) })
     } catch {
       // The JVM exited meanwhile.
     }
@@ -426,7 +426,7 @@ async function measureLaunch(
   let page: Page | undefined
   let error: string | undefined
   const snapshot =
-    engine === 'native' ? () => {} : (phase: string) => snapshotJvmCounters(dir, phase)
+    engine === 'native' ? () => {} : (phase: string) => snapshotJvmCounters(dir, phase, marks)
   try {
     marks.add('launch')
     app = await _electron.launch({
@@ -629,9 +629,7 @@ async function main() {
       console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
       extraEnv = {
         ...extraEnv,
-        JAVA_TOOL_OPTIONS: [extraEnv.JAVA_TOOL_OPTIONS, options.jvmOptions]
-          .filter((o) => o != null)
-          .join(' '),
+        JAVA_TOOL_OPTIONS: joinJvmOptions(extraEnv.JAVA_TOOL_OPTIONS, options.jvmOptions),
       }
     }
     for (let run = 1; run <= options.runs; run++) {
@@ -653,9 +651,7 @@ async function main() {
         0,
         {
           ...extraEnv,
-          JAVA_TOOL_OPTIONS: [extraEnv.JAVA_TOOL_OPTIONS, TRUFFLE_DIAGNOSTICS]
-            .filter((o) => o != null)
-            .join(' '),
+          JAVA_TOOL_OPTIONS: joinJvmOptions(extraEnv.JAVA_TOOL_OPTIONS, TRUFFLE_DIAGNOSTICS),
         },
         ['first', 'second'],
         `${engine}-diag`,

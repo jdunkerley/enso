@@ -11,6 +11,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
+import { timeoutFromEnv } from './timeouts.js'
 import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
@@ -181,7 +182,8 @@ export interface ShutdownHookRegistry {
 export type ShutdownHookType = keyof ShutdownHookRegistry
 
 const DEFAULT_JSONRPC_PORT = 30616
-const LANGUAGE_SERVER_STARTUP_TIMEOUT = 30000
+/** How long an engine has to pass its first health check before it is killed. */
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = 30_000
 
 /**
  * How long an engine has to exit after it was asked to, before it is killed: 10 s, or
@@ -190,8 +192,7 @@ const LANGUAGE_SERVER_STARTUP_TIMEOUT = 30000
  * Windows runner.
  */
 function terminateTimeoutMs(): number {
-  const fromEnv = Number(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS)
-  return fromEnv > 0 ? fromEnv : 10_000
+  return timeoutFromEnv(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, 10_000)
 }
 
 /**
@@ -678,7 +679,7 @@ export class EnsoRunner implements Runner {
               }),
             ),
           logSink,
-          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT,
+          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
           this.options.ydocWaitMs ?? 0,
         )
         project.shutdownHooks.set('remove-from-list', () => {

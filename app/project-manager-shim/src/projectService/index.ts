@@ -18,6 +18,7 @@ import {
   DEFAULT_YDOC_WAIT_MS,
   EnsoRunner,
   findEnsoExecutable,
+  LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
   type LanguageServerSockets,
   type Runner,
   type Socket,
@@ -29,6 +30,7 @@ import {
   type ProjectMetadata,
   type ProjectRepository,
 } from './projectRepository.js'
+import { timeoutFromEnv } from './timeouts.js'
 import { UUID, type Path } from './types.js'
 
 export interface RunningLanguageServerInfo {
@@ -118,10 +120,13 @@ export class ProjectService {
     // open-time harness's JDK AOT training launch, a JVM with no class data sharing at all that
     // also records every class, does not pass its first health check within 30 s on the Windows
     // runner, and is killed before it can write its training data.
-    const startupTimeoutMs = Number(process.env.ENSO_ENGINE_STARTUP_TIMEOUT_MS)
+    const startupTimeoutMs = timeoutFromEnv(
+      process.env.ENSO_ENGINE_STARTUP_TIMEOUT_MS,
+      LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
+    )
     const runner = new EnsoRunner(ensoPath, {
       ydocWaitMs: DEFAULT_YDOC_WAIT_MS,
-      ...(startupTimeoutMs > 0 ? { startupTimeoutMs } : {}),
+      startupTimeoutMs,
     })
 
     // Read extra arguments from environment variable

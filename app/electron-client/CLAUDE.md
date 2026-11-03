@@ -810,7 +810,8 @@ and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and
-the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
+the harness share it. The harness's pure logic (`perf/openTimeReport.ts`, and
+`perf/jvmCounters.ts`, which reads the copied counters into `jvm` marks) has
 unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
 runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).
 
