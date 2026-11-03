@@ -4512,6 +4512,38 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
     commands += WithDebugCommand.withDebug
   )
   .settings(
+    // Note [Benchmark Processor Needs The Packaged std-bits]
+    // The annotation processor runs inside `Compile / compile` and evaluates `test/Benchmarks`,
+    // which imports the standard library from `distribution/lib`. The Java classes it calls
+    // (`org.enso.base.Text_Utils`, ...) are only there once each `std-*` project has been
+    // packaged (`packageBin` copies the jars into `polyglot/java`). `bench` ran
+    // `buildEngineDistribution` as a sibling of `run`, not before `compile`, so sbt could start
+    // the processor first. It then logged `Unknown identifier: org.enso.base.Text_Utils`,
+    // collected no benchmark, and the run died with `Unable to find the resource:
+    // /META-INF/BenchmarkList` (#554). The list is the one `runtime / Runtime / compile` has.
+    Compile / compile := (Compile / compile)
+      .dependsOn(Def.task {
+        (`benchmark-java-helpers` / Compile / packageBin).value
+        (`exploratory-benchmark-java-helpers` / Compile / packageBin).value
+        (`std-aws` / Compile / packageBin).value
+        (`std-base` / Compile / packageBin).value
+        (`std-database` / Compile / packageBin).value
+        (`std-duckdb` / Compile / packageBin).value
+        (`std-generic-jdbc` / Compile / packageBin).value
+        (`std-google` / Compile / packageBin).value
+        (`std-image` / Compile / packageBin).value
+        (`std-microsoft` / Compile / packageBin).value
+        (`std-saas` / Compile / packageBin).value
+        (`std-sqlite` / Compile / packageBin).value
+        (`std-postgres` / Compile / packageBin).value
+        (`std-snowflake` / Compile / packageBin).value
+        (`std-table` / Compile / packageBin).value
+        (`std-tableau` / Compile / packageBin).value
+        ()
+      })
+      .value
+  )
+  .settings(
     parallelExecution := false,
     run / fork := true,
     run / connectInput := true,

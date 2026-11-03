@@ -5,9 +5,12 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.logging.ConsoleHandler;
+import java.util.logging.Handler;
 import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.stream.Collectors;
 import org.enso.benchmarks.BenchGroup;
 import org.enso.benchmarks.BenchSpec;
@@ -124,6 +127,7 @@ public final class SpecCollector {
       throw new IllegalArgumentException(
           "Project root directory " + projectRootDir + "does not exist or is not readable.");
     }
+    var warnings = new WarningCollector();
     try (var ctx =
         Context.newBuilder()
             .allowExperimentalOptions(true)
@@ -133,7 +137,7 @@ public final class SpecCollector {
             .option(RuntimeOptions.CHECK_CWD, "false")
             .option(RuntimeOptions.DISABLE_PRIVATE_CHECK, "true")
             .option(RuntimeOptions.DISABLE_IR_CACHES, "true")
-            .logHandler(new ConsoleHandler())
+            .logHandler(warnings)
             .option(RuntimeOptions.PROJECT_ROOT, projectRootDir.getAbsolutePath())
             .option(RuntimeOptions.LANGUAGE_HOME_OVERRIDE, ensoHomeOverride.getAbsolutePath())
             .build()) {
@@ -141,15 +145,64 @@ public final class SpecCollector {
       assert module != null;
       List<ModuleBenchSuite> benchSuites =
           SpecCollector.collectBenchSpecsFromModule(module, varName);
+      var generated = 0;
       for (ModuleBenchSuite benchSuite : benchSuites) {
         for (BenchGroup group : benchSuite.getGroups()) {
           validateGroup(group);
           generateClassForGroup(group, benchSuite.getModuleQualifiedName(), varName);
+          generated++;
         }
       }
+      // Note [No Benchmarks Is An Error]
+      // When the module cannot be evaluated (a Java class of the standard library is not on the
+      // class path yet, #554) the suites variable is missing or empty, and nothing here throws:
+      // the processor wrote no source, JMH wrote no `META-INF/BenchmarkList`, and the run died
+      // much later with `Unable to find the resource: /META-INF/BenchmarkList`. The project
+      // exists to hold benchmarks, so none found is a failure of the compilation.
+      if (generated == 0) {
+        throw new SpecCollectionException(
+            "No benchmark group found in variable '"
+                + varName
+                + "' of module '"
+                + moduleName
+                + "'. "
+                + warnings.describe());
+      }
+    } catch (SpecCollectionException e) {
+      throw e;
     } catch (Exception e) {
       throw new SpecCollectionException(
           "Uncaught exception in " + getClass().getName() + ": " + e.getMessage(), e);
+    }
+  }
+
+  /** Prints the engine's log to the console, and remembers the warnings to report them. */
+  private static final class WarningCollector extends Handler {
+    private final ConsoleHandler console = new ConsoleHandler();
+    private final List<String> warnings = new CopyOnWriteArrayList<>();
+
+    @Override
+    public void publish(LogRecord record) {
+      console.publish(record);
+      if (record.getLevel().intValue() >= Level.WARNING.intValue()) {
+        warnings.add(record.getMessage());
+      }
+    }
+
+    @Override
+    public void flush() {
+      console.flush();
+    }
+
+    @Override
+    public void close() {
+      console.close();
+    }
+
+    String describe() {
+      return warnings.isEmpty()
+          ? "The engine logged no warning."
+          : "The engine logged: " + String.join("; ", warnings);
     }
   }
 
