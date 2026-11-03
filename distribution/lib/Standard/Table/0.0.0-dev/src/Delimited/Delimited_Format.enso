@@ -18,7 +18,7 @@ import project.Headers.Headers
 import project.In_Memory_Table.In_Memory_Table
 import project.Internal.Delimited_Reader
 import project.Internal.Delimited_Writer
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 import project.Match_Columns.Match_Columns
 import project.Rows_To_Read.Rows_To_Read
 import project.Table.Table
