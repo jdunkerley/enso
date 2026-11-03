@@ -119,7 +119,7 @@ describe('SettingsPage', () => {
       getText('generalSettingsTabSection'),
       getText('lookAndFeelSettingsTabSection'),
     ])
-    expect(document.querySelector('h1.flex')?.textContent).toContain('user name')
+    expect(document.querySelector('h1.flex')?.textContent).toContain(getText('settingsPageTitle'))
     expect(sidebarButton(getText('localSettingsTab')).className).toContain('bg-white')
     expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
       'hello user name',

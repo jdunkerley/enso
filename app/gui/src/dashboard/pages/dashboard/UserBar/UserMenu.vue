@@ -57,13 +57,7 @@ const entries = useMenuEntries<MenuEntryAction>(() => [
 <template>
   <Popover testId="user-menu" size="xxsmall" :aria-label="getText('userMenuLabel')">
     <template #trigger>
-      <Button
-        size="custom"
-        variant="icon"
-        class="ml-2"
-        icon="settings"
-        :aria-label="getText('userMenuLabel')"
-      />
+      <Button variant="icon" class="ml-2" icon="settings" :aria-label="getText('userMenuLabel')" />
     </template>
     <div class="flex flex-col overflow-hidden">
       <MenuEntry

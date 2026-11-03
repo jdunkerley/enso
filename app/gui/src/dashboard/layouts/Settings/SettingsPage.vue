@@ -147,8 +147,6 @@ const sections = computed((): readonly SettingsSectionData[] => {
   if (isQueryBlank.value) return data.sections
   return filterSettingsSections(data, isMatch.value, getText, SETTINGS_NO_RESULTS_SECTION_DATA)
 })
-
-const title = computed(() => auth.session.user.name)
 </script>
 
 <template>
@@ -171,15 +169,7 @@ const title = computed(() => auth.session.user.name)
           />
         </Popover>
         <Text nowrap variant="h1" class="cursor-default font-bold">
-          {{ getText('settingsFor') }}
-        </Text>
-        <Text
-          variant="h1"
-          truncate="1"
-          class="ml-2.5 mr-8 max-w-[min(32rem,_100%)] cursor-default rounded-full bg-white px-2.5 font-bold"
-          aria-hidden="true"
-        >
-          {{ title }}
+          {{ getText('settingsPageTitle') }}
         </Text>
       </h1>
       <div class="sm:ml-[14rem]">

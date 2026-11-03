@@ -174,7 +174,7 @@ test('settings: no new axe violations; settings sidebar tree', async ({ drivePag
   await drivePage.goToPage.settings().do(async (page) => {
     const sidebar = page.getByLabel(TEXT.settingsSidebarLabel)
     await expect(sidebar).toBeVisible()
-    await expect(page.getByText(TEXT.settingsFor, { exact: false }).first()).toBeVisible()
+    await expect(page.getByText(TEXT.settingsPageTitle, { exact: false }).first()).toBeVisible()
     await expectNoNewAxeViolations(page, 'settings')
     await expect(sidebar).toMatchAriaSnapshot(`
       - heading "General" [level=1]
