@@ -518,6 +518,14 @@ async function measureLaunch(
     error = String(e).slice(0, 2000)
     // What the page showed when the launch gave up (uploaded by CI with the extras' screenshots).
     await page?.screenshot({ path: path.join(dir, 'failed.png'), timeout: 5000 }).catch(() => {})
+    // And the nodes' text, which holds an error message too small to read in the screenshot.
+    const nodes = await page
+      ?.locator('.GraphNode')
+      .allTextContents()
+      .catch(() => [])
+    if (nodes != null && nodes.length > 0) {
+      out.write(`${Date.now()} nodes ${JSON.stringify(nodes).slice(0, 4000)}\n`)
+    }
   } finally {
     await Promise.race([app?.close(), new Promise((resolve) => setTimeout(resolve, 20_000))]).catch(
       () => {},

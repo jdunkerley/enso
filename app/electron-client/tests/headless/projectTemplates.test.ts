@@ -44,7 +44,7 @@ describe('projectTemplate', () => {
   })
   test('image calls Standard.Image on a bundled PNG and shows the result in a table', () => {
     const image = projectTemplate('image')!
-    expect(image.main).toContain('import Standard.Image.Image')
+    expect(image.main).toContain('from Standard.Image import Image')
     expect(image.main).toContain('Image.read (enso_project.data / "sample.png")')
     const png = image.files['data/sample.png']!
     expect(Buffer.from(png.subarray(1, 4)).toString('ascii')).toBe('PNG')

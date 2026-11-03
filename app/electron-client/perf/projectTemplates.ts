@@ -48,7 +48,7 @@ const SAMPLE_PNG =
 
 const IMAGE_CODE = `from Standard.Base import all
 from Standard.Table import all
-import Standard.Image.Image
+from Standard.Image import Image
 import Standard.Visualization
 
 main =
