@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { readValueForTests } from '../crypto.js'
 import {
   decodeKey,
@@ -150,6 +150,40 @@ describe('errors', () => {
     await expectKind(store.update('x', 'v'), 'NOT_FOUND')
     await expectKind(store.delete('x'), 'NOT_FOUND')
     await expect(store.delete('x')).rejects.toThrow('Cannot find secret: secret://x')
+  })
+
+  test('update and delete of a missing name leave the file byte for byte', async () => {
+    const store = storeFor(FIXTURE_KEY)
+    await store.create('a', 'v')
+    const before = await fs.readFile(file, 'utf8')
+    await expectKind(store.update('missing', 'w'), 'NOT_FOUND')
+    await expectKind(store.delete('missing'), 'NOT_FOUND')
+    expect(await fs.readFile(file, 'utf8')).toBe(before)
+    expect(await fs.readdir(path.dirname(file))).toEqual(['secrets.json'])
+  })
+
+  test('update and delete with no file create neither its directory nor a lock', async () => {
+    const store = storeFor(FIXTURE_KEY)
+    await expectKind(store.update('x', 'v'), 'NOT_FOUND')
+    await expectKind(store.delete('x'), 'NOT_FOUND')
+    await expect(fs.access(path.dirname(file))).rejects.toThrow()
+  })
+
+  test('a write gives up waiting for a lock another process holds', async () => {
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(`${file}.lock`, '')
+    // Only the clock is faked: the wait loop compares Date.now() with its 10 s deadline.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() })
+    try {
+      const pending = rejection(storeFor(FIXTURE_KEY).create('a', 'v'))
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      vi.setSystemTime(Date.now() + 11_000)
+      const error = await pending
+      expect(error).toBeInstanceOf(Error)
+      expect((error as Error).message).toMatch(/Timed out waiting for/)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test('ALREADY_EXISTS', async () => {
