@@ -1,9 +1,11 @@
-package org.enso.base;
+package org.enso.xml;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -56,7 +58,7 @@ public class XML_Utils {
     if (exception instanceof SAXParseException parseException) {
       var parseError =
           EnsoMeta.makeInstance(
-              "Standard.Base.Data.XML",
+              "Standard.XML.XML",
               "XML_Error",
               "Parse_Error",
               parseException.getLineNumber(),
@@ -66,10 +68,7 @@ public class XML_Utils {
 
     var ensoError =
         EnsoMeta.makeInstance(
-            "Standard.Base.Data.XML",
-            "XML_Error",
-            "Other",
-            "An Exception has occurred: " + exception);
+            "Standard.XML.XML", "XML_Error", "Other", "An Exception has occurred: " + exception);
     return EnsoMeta.asDataflowError(ensoError);
   }
 
@@ -154,23 +153,21 @@ public class XML_Utils {
   }
 
   /**
-   * Read an XML document from an input stream and return it as an Enso XML_Document.
+   * Read an XML document from a file and return it as an Enso XML_Document.
    *
-   * @param is the input stream to read the XML document from.
+   * <p>It takes a path, not an {@code InputStream}: under the native launcher this class runs in
+   * the guest JVM, and a stream opened by the host's Base library cannot be passed to it.
+   *
+   * @param path the path of the file to read the XML document from.
    * @param makeXMLDocument a function that takes a Document and returns an Enso XML_Document
    *     instance.
-   * @return the parsed XML document or an Enso error if parsing failed.
-   * @throws IOException if an IO exception occurs reading the stream.
+   * @return the parsed XML document, or an Enso error if reading or parsing failed.
    */
-  public static Value parseStream(InputStream is, Function<Document, Value> makeXMLDocument)
-      throws IOException {
-    try {
+  public static Value parseFile(String path, Function<Document, Value> makeXMLDocument) {
+    try (InputStream is = Files.newInputStream(Path.of(path))) {
       var document = doParse(new InputSource(is));
       var value = makeXMLDocument.apply(document);
       return Value.asValue(value);
-    } catch (IOException e) {
-      // Pass through any IO exception to be handled in Enso
-      throw e;
     } catch (Exception e) {
       return handleExceptions(e);
     }

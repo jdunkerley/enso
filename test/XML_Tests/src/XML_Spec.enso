@@ -4,6 +4,8 @@ from Standard.Base.Runtime import assert
 
 from Standard.Test import all
 
+from Standard.XML import all
+
 depretty xmlText =
     xmlText.replace (Regex.compile "\r?\n\s*") ""
 

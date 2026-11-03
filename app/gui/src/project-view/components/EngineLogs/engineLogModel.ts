@@ -182,6 +182,7 @@ export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
   'org.enso.sqlite',
   'org.enso.table',
   'org.enso.tableau',
+  'org.enso.xml',
 ]
 
 /** Whether `name` is `root` or lies under it, by whole dot-separated segments. */

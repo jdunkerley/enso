@@ -1,33 +1,18 @@
-import project.Any.Any
-import project.Data.Dictionary.Dictionary
-import project.Data.Json.Extensions
-import project.Data.Json.JS_Object
-import project.Data.Numbers.Integer
-import project.Data.Text.Encoding.Encoding
-import project.Data.Text.Text
-import project.Data.Vector.Vector
-import project.Error.Error
-import project.Errors.Common.Index_Out_Of_Bounds
-import project.Errors.Common.Missing_Argument
-import project.Errors.Deprecated.Deprecated
-import project.Errors.File_Error.File_Error
-import project.Errors.Illegal_State.Illegal_State
-import project.Errors.No_Such_Key.No_Such_Key
-import project.Errors.Problem_Behavior.Problem_Behavior
-import project.System.File.Existing_File_Behavior.Existing_File_Behavior
-import project.System.File.File
-import project.System.File.File_Access.File_Access
-import project.System.File.Generic.Writable_File.Writable_File
-import project.System.File.Write_Extensions
-import project.System.Input_Stream.Input_Stream
-import project.Warning.Warning
-from project.Data.Boolean import Boolean, False, True
-from project.Data.Range.Extensions import all
-from project.Data.Text.Extensions import all
-from project.Metadata import Display, make_single_choice, Widget
-from project.Nothing import all
+from Standard.Base import all
+import Standard.Base.Errors.Common.Index_Out_Of_Bounds
+import Standard.Base.Errors.Common.Type_Error
+import Standard.Base.Errors.Deprecated.Deprecated
+import Standard.Base.Errors.File_Error.File_Error
+import Standard.Base.Errors.No_Such_Key.No_Such_Key
+import Standard.Base.System.File.Generic.Writable_File.Writable_File
+import Standard.Base.System.Input_Stream.Input_Stream
+import Standard.Base.Visualization.Table_Viz_Data.Table_Viz_Data
+from Standard.Base.Metadata import Display, make_single_choice, Widget
 
-polyglot java import org.enso.base.XML_Utils
+import Standard.Table.Conversions.Convertible_To_Columns.Convertible_To_Columns
+from Standard.Table import Prefix_Name, Table
+
+polyglot java import org.enso.xml.XML_Utils
 
 type XML_Document
     ## ---
@@ -48,8 +33,13 @@ type XML_Document
              doc = XML_Document.from_file test_file
        ```
     from_file file:File=(Missing_Argument.throw "file") -> XML_Document ! XML_Error | File_Error =
-        File_Error.handle_java_exceptions file <|
-            file.with_input_stream [File_Access.Read] XML_Document.from_stream
+        # The parser runs in the guest JVM under the native launcher, so it
+        # reads the file by its path. Opening the file here first reports a
+        # missing or unreadable file as the usual `File_Error`.
+        opened = File_Error.handle_java_exceptions file <|
+            file.with_input_stream [File_Access.Read] _-> file
+        opened.if_not_error <|
+            XML_Utils.parseFile file.absolute.path (d-> XML_Document.Value d)
 
     ## ---
        private: true
@@ -68,8 +58,13 @@ type XML_Document
              doc = XML_Document.from_stream input_stream
        ```
     from_stream input_stream:Input_Stream -> XML_Document ! XML_Error =
-       input_stream.with_java_stream java_stream->
-            XML_Utils.parseStream java_stream (d-> XML_Document.Value d)
+        # The stream is the host's: the parser, in the guest JVM under the
+        # native launcher, cannot read it. It reads a temporary copy instead.
+        tmp_file = File.create_temporary_file "xml-" ".xml"
+        Panic.with_finalizer tmp_file.delete <|
+            written = input_stream.write_to_file tmp_file
+            written.if_not_error <|
+                XML_Utils.parseFile tmp_file.absolute.path (d-> XML_Document.Value d)
 
     ## ---
        group: Conversions
@@ -104,7 +99,7 @@ type XML_Document
        ## Arguments
         - `xml_string`: The string to read the XML document from.
     from_text xml_string:Text -> XML_Document ! XML_Error =
-        Warning.attach (Deprecated.Warning "Standard.Base.Data.XML.XML_Document" "from_text" "Deprecated: use `XML_Document.parse` instead.") <|
+        Warning.attach (Deprecated.Warning "Standard.XML.XML.XML_Document" "from_text" "Deprecated: use `XML_Document.parse` instead.") <|
             XML_Document.parse xml_string
 
     ## ---
@@ -444,6 +439,14 @@ type XML_Document
     get_descendants_by_tag_name self tag_name:Text=(Missing_Argument.throw "tag_name") -> Vector XML_Element ! XML_Error =
         root = if tag_name == self.root_element.name then [self.root_element] else []
         root + (self.root_element.get_descendants_by_tag_name tag_name)
+
+    ## ---
+       group: Standard.Base.Conversions
+       icon: convert
+       ---
+       Converts this `XML_Document` into a `Table`.
+    to_table self -> Table ! Type_Error =
+        self.to Table
 
     ## ---
        private: true
@@ -802,6 +805,14 @@ type XML_Element
         XML_Utils.getElementsByTagName self.java_element tag_name (e-> XML_Element.new e)
 
     ## ---
+       group: Standard.Base.Conversions
+       icon: convert
+       ---
+       Converts this `XML_Element` into a `Table`.
+    to_table self -> Table ! Type_Error =
+        self.to Table
+
+    ## ---
        private: true
        ---
        Convert to a display representation of this XML_Element.
@@ -896,5 +907,96 @@ XML_Element.from (that:XML_Document) = that.root_element
 ## ---
    private: true
    ---
-   Helper function to create an XML_Document from a Java XML Document object.
-from_java_document doc = XML_Document.Value doc
+   Convert an `XML_Element` into a `Table` Generates a single-row table with
+   columns for the tag's contents.
+
+   The columns generated are:
+   - Name: the root tag name
+   - @[attribute name]: the attribute with that name.
+   - Children: the children of the tag, including `XML_Element`s and text
+     elements. This is only generated if the tag has `XML_Element` children
+   - Value: the text content of the tag. This is only generated if the tag does
+     not have `XML_Element` children Either `Children` or `Value` will be
+     generated, but not both.
+
+   ## Arguments
+    - `that`: The XML_Element to convert
+Table.from (that:XML_Element) =
+    # Generating a table from an `XML_Element` is the same logic as `expand_column`
+    Table.new [["x", [that]]] . expand_column 'x' prefix=Prefix_Name.None
+
+## ---
+   private: true
+   ---
+   Convert an `XML_Document` into a `Table` Generates a single-row table with
+   columns for the root tag's contents.
+
+   The columns generated are:
+   - Name: the root tag name
+   - @[attribute name]: the attribute with that name
+   - Children: the children of the tag, including `XML_Element`s and text
+     elements. This is only generated if the tag has `XML_Element` children
+   - Value: the text content of the tag. This is only generated if the tag does
+     not have `XML_Element` children Either `Children` or `Value` will be
+     generated, but not both.
+
+   ## Arguments
+    - `that`: The XML_Document to convert
+Table.from (that:XML_Document) = Table.from that.root_element
+
+## ---
+   private: true
+   ---
+   How `Table.expand_column` and `Table.from_objects` turn an `XML_Element`
+   into columns: its name, its attributes (as `@name`), and either its
+   children or its text.
+Convertible_To_Columns.from (that:XML_Element) =
+    name = [["Name", that.name]]
+    tags = that.attributes.map_keys ("@"+_) . to_vector
+    that_children = that.children
+    has_child_nodes = that_children.any (_.is_a XML_Element)
+    children = if that_children.is_empty.not && has_child_nodes then [["Children", that_children]] else []
+    value = if that_children.is_empty.not && has_child_nodes.not then [["Value", that.text]] else []
+    as_dict = Dictionary.from_vector (name + tags + children + value)
+    Convertible_To_Columns.from as_dict
+
+## ---
+   private: true
+   ---
+   The data of the Table visualisation of an `XML_Element`.
+Table_Viz_Data.from (that:XML_Element) =
+    Table_Viz_Data.Value (_table_viz_json that "XML_Element")
+
+## ---
+   private: true
+   ---
+   The data of the Table visualisation of an `XML_Document`: its root element,
+   with links that get the child elements of the document.
+Table_Viz_Data.from (that:XML_Document) =
+    Table_Viz_Data.Value (_table_viz_json that.root_element "XML_Document")
+
+## ---
+   private: true
+   ---
+   Renders an `XML_Element`'s attributes and children (at most `max_items` of
+   them, the Table visualisation's default row limit) as a key/type/value grid.
+private _table_viz_json xml_element:XML_Element type:Text max_items:Integer=1000 -> JS_Object =
+    header = ["header", ["key", "type", "value"]]
+    all_rows = ["all_rows_count", xml_element.attributes.length + xml_element.children.length]
+
+    attribs = xml_element.attributes.to_vector.take max_items . map a-> ["@" + a.first, "Attribute", a.second]
+    children = xml_element.children.take (max_items - attribs.length) . map_with_index i->c-> if c.is_a Text then [i.to_text, "Text", c] else
+        render_start = "<"+c.name
+        render_attribs = if c.attributes.length == 0 then "" else
+            " " + ((c.attributes.to_vector.take 5 . map a-> a.first+'="'+a.second+'"') . join " ") + (if c.attributes.length > 5 then " ..." else "")
+        render_end = case c.child_count of
+            0 -> "/>"
+            1 -> if c.children.first.is_a Text then ">" + c.children.first + "</" + c.name + ">" else "> ... 1 child element ... </" + c.name + ">"
+            _ -> ">..." + c.child_count.to_text + " child elements...</" + c.name + ">"
+        [i.to_text, "Element", render_start+render_attribs+render_end]
+    map_vector = Warning.clear (attribs + children)
+
+    data = ["data", [map_vector.map .first, map_vector.map .second, map_vector.map i-> i.at 2]]
+    child_node_action = if type == "XML_Element" then "get" else "get_child_element"
+    get_child_node_fields = [["get_child_node_action", child_node_action + " {{#key}}"], ["get_child_node_link_name", "key"]]
+    JS_Object.from_pairs <| [header, data, all_rows, ["type", type]] + get_child_node_fields

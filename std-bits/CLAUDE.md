@@ -17,6 +17,8 @@ Each subdir mirrors a standard-library module name.
   its own.
 - `sqlite/` — `Standard.SQLite`. The `sqlite-jdbc` driver and its native-image
   feature.
+- `xml/` — `Standard.XML`. XML parsing, XPath and `Table.to_xml` on the JDK's
+  XML APIs; runs in the guest JVM under the native launcher.
 - `aws/`, `google/`, `microsoft/`, `snowflake/`, `tableau/`, `duckdb/`, `saas/`
   — SDK integrations.
 - `image/` — OpenCV-backed image helpers (pair with `lib/java/opencv-wrapper`).

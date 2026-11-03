@@ -1,0 +1,29 @@
+from Standard.Base import all
+
+import Standard.Visualization.Table.Visualization
+
+from Standard.Test import all
+
+from Standard.XML import all
+
+add_specs suite_builder =
+    suite_builder.group "Table visualisation of XML" group_builder->
+        doc = XML_Document.parse '<foo id="10"><bar>hello</bar>text</foo>'
+
+        group_builder.specify "An XML_Document shows its root element's attributes and children" <|
+            json = Visualization.prepare_visualization doc . parse_json
+            json.get "type" . should_equal "XML_Document"
+            json.get "get_child_node_action" . should_equal "get_child_element {{#key}}"
+            json.get "all_rows_count" . should_equal 3
+            json.get "data" . should_equal [["@id", "0", "1"], ["Attribute", "Element", "Text"], ["10", "<bar>hello</bar>", "text"]]
+
+        group_builder.specify "An XML_Element shows its attributes and children" <|
+            json = Visualization.prepare_visualization doc.root_element . parse_json
+            json.get "type" . should_equal "XML_Element"
+            json.get "get_child_node_action" . should_equal "get {{#key}}"
+            json.get "data" . at 0 . should_equal ["@id", "0", "1"]
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        add_specs suite_builder
+    suite.run_with_filter filter

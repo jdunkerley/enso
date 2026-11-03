@@ -150,6 +150,7 @@ GatherLicenses.distributions := Seq(
     "Saas",
     Distribution.sbtProjects(`std-saas`)
   ),
+  makeStdLibDistribution("XML", Distribution.sbtProjects(`std-xml`)),
   makeStdLibDistribution(
     "DuckDB",
     // `duckdb_jdbc` is `provided` to `std-duckdb` and shipped through
@@ -513,6 +514,7 @@ lazy val enso = (project in file("."))
     `std-tests`,
     `std-tableau`,
     `std-saas`,
+    `std-xml`,
     `std-sqlite`,
     `std-postgres`,
     `std-duckdb`,
@@ -2835,6 +2837,7 @@ lazy val runtime = (project in file("engine/runtime"))
       .dependsOn(`std-image` / Compile / packageBin)
       .dependsOn(`std-microsoft` / Compile / packageBin)
       .dependsOn(`std-saas` / Compile / packageBin)
+      .dependsOn(`std-xml` / Compile / packageBin)
       .dependsOn(`std-sqlite` / Compile / packageBin)
       .dependsOn(`std-postgres` / Compile / packageBin)
       .dependsOn(`std-snowflake` / Compile / packageBin)
@@ -5023,6 +5026,8 @@ val `std-tableau-native-libs` =
   stdLibComponentRoot("Tableau") / "polyglot" / "lib"
 val `std-saas-polyglot-root` =
   stdLibComponentRoot("Saas") / "polyglot" / "java"
+val `std-xml-polyglot-root` =
+  stdLibComponentRoot("XML") / "polyglot" / "java"
 val `std-duckdb-polyglot-root` =
   stdLibComponentRoot("DuckDB") / "polyglot" / "java"
 val `std-duckdb-native-libs` =
@@ -6359,6 +6364,41 @@ lazy val `std-saas` = project
   )
   .dependsOn(`std-base` % "provided")
   .dependsOn(`std-table` % "provided")
+
+// Standard.XML's Java uses only the JDK's XML APIs. It is deliberately not on
+// the native image class path (`stdLibsJars`): under the native launcher it
+// runs in the guest JVM (see `std-bits/xml/CLAUDE.md`).
+lazy val `std-xml` = project
+  .in(file("std-bits") / "xml")
+  .settings(
+    frgaalJavaCompilerSetting,
+    autoScalaLibrary := false,
+    Compile / compile / compileInputs := (Compile / compile / compileInputs)
+      .dependsOn(SPIHelpers.ensureSPIConsistency)
+      .value,
+    Compile / packageBin / artifactPath :=
+      `std-xml-polyglot-root` / "std-xml.jar",
+    Compile / packageBin := {
+      val result            = (Compile / packageBin).value
+      val cacheStoreFactory = streams.value.cacheStoreFactory
+      StdBits
+        .copyDependencies(
+          `std-xml-polyglot-root`,
+          Seq("std-xml.jar"),
+          ignoreScalaLibrary = true,
+          libraryUpdates     = (Compile / update).value,
+          unmanagedClasspath = (Compile / unmanagedClasspath).value,
+          logger             = streams.value.log,
+          cacheStoreFactory
+        )
+      result
+    },
+    clean := Def.task {
+      val _ = clean.value
+      IO.delete(`std-xml-polyglot-root`)
+    }.value
+  )
+  .dependsOn(`std-base` % "provided")
 
 lazy val `std-duckdb` = project
   .in(file("std-bits") / "duckdb")

@@ -74,6 +74,9 @@ libraries:
   - name: Standard.Saas
     repository: release
     version: {{LIBS_VERSION}}
+  - name: Standard.XML
+    repository: release
+    version: {{LIBS_VERSION}}
   - name: Standard.DuckDB
     repository: release
     version: {{LIBS_VERSION}}

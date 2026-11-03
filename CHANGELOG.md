@@ -346,6 +346,13 @@
   and `Generic_JDBC` connections to their URLs, need
   `from Standard.Postgres import all` or `from Standard.SQLite import all` added
   by hand.
+- [XML is now its own library, `Standard.XML`][NNN]: `XML_Document`,
+  `XML_Element`, `XML_Error`, `XML_Format` and `Table.to_xml` are no longer part
+  of `Standard.Base` and `Standard.Table`. `Data.read` and `Data.fetch` of XML
+  work without the import, and the IDE adds `from Standard.XML import …` where
+  code names an XML type, including when an older project opens. Code that calls
+  `to_xml` on a table, and code run outside the IDE (`enso --run`), needs
+  `from Standard.XML import all` added by hand.
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -462,6 +469,7 @@
 [468]: https://github.com/jdunkerley/enso/pull/468
 [481]: https://github.com/jdunkerley/enso/pull/481
 [492]: https://github.com/jdunkerley/enso/pull/492
+[NNN]: https://github.com/jdunkerley/enso/pull/NNN
 
 # Enso 2026.1
 

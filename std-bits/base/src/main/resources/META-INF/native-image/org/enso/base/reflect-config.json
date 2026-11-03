@@ -51,9 +51,6 @@
         "name": "org.enso.base.WithProblems"
     },
     {
-        "name": "org.enso.base.XML_Utils"
-    },
-    {
         "name": "org.enso.base.arrays.LongArrayList"
     },
     {

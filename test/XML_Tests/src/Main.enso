@@ -1,0 +1,16 @@
+from Standard.Base import all
+
+from Standard.Test import all
+
+import project.Table_Conversion_Spec
+import project.Table_Xml_Spec
+import project.Visualization_Spec
+import project.XML_Spec
+
+main filter=Nothing =
+    suite = Test.build suite_builder->
+        XML_Spec.add_specs suite_builder
+        Table_Xml_Spec.add_specs suite_builder
+        Table_Conversion_Spec.add_specs suite_builder
+        Visualization_Spec.add_specs suite_builder
+    suite.run_with_filter filter

@@ -103,7 +103,7 @@ type Fixed_Width_Format
        ---
        If this File_Format should be used for writing to that file, return a
        configured instance.
-    for_file_write : Writable_File -> XML_Format | Nothing
+    for_file_write : Writable_File -> Fixed_Width_Format | Nothing
     for_file_write file:Writable_File =
         _ = [file]
         Nothing

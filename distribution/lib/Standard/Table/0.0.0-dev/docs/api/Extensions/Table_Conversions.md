@@ -9,5 +9,3 @@
 - Standard.Table.Table.Table.from_objects value:Standard.Base.Any.Any fields:(Standard.Base.Data.Vector.Vector|Standard.Base.Nothing.Nothing)= -> Standard.Base.Any.Any
 - Standard.Base.Data.Text.Text.parse_to_table self pattern:(Standard.Base.Data.Text.Text|Standard.Base.Data.Text.Regex.Regex) case_sensitivity:Standard.Base.Data.Text.Case_Sensitivity.Case_Sensitivity= parse_values:Standard.Base.Any.Any= on_problems:Standard.Base.Errors.Problem_Behavior.Problem_Behavior= -> Standard.Base.Any.Any
 - Standard.Base.Data.Vector.Vector.to_table self fields:Standard.Base.Any.Any= -> Standard.Base.Any.Any
-- Standard.Base.Data.XML.XML_Document.to_table self -> Standard.Base.Any.Any
-- Standard.Base.Data.XML.XML_Element.to_table self -> Standard.Base.Any.Any

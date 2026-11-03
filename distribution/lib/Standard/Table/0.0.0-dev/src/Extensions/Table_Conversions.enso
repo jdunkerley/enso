@@ -68,24 +68,6 @@ JS_Object.to_table self fields=Nothing =
     self.to Table fields
 
 ## ---
-   group: Standard.Base.Conversions
-   icon: convert
-   ---
-   Converts this `XML_Document` into a `Table`.
-XML_Document.to_table : Table ! Type_Error
-XML_Document.to_table self =
-    self.to Table
-
-## ---
-   group: Standard.Base.Conversions
-   icon: convert
-   ---
-   Converts this `XML_Document` into a `Table`.
-XML_Element.to_table : Table ! Type_Error
-XML_Element.to_table self =
-    self.to Table
-
-## ---
    private: true
    icon: data_input
    ---

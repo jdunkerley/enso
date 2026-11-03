@@ -42,8 +42,6 @@ services:
 
   - provides: Standard.Base.System.File_Format.File_Format_SPI
     with: Standard.Base.System.Internal.File_Helpers.Default_File_Formats
-  - provides: Standard.Base.System.File_Format.File_Format_SPI
-    with: Standard.Base.Data.XML.XML_Format.XML_Format
 
   # Data_Link_SPI definitions
 
