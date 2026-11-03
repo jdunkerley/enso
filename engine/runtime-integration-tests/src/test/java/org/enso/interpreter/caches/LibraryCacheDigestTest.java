@@ -219,6 +219,40 @@ public class LibraryCacheDigestTest {
         loadedFromCache(root, 20L));
   }
 
+  /**
+   * Note [A Module's Name Does Not Depend On How Its Path Is Spelt] in {@code ProgramRootNode}: a
+   * project run through a Windows 8.3 short path still reuses its IR caches.
+   */
+  @Test
+  public void aShortWindowsPathStillUsesTheModuleIR() throws Exception {
+    var longRoot = createLibrary("A_Directory_With_A_Long_Name", FIRST);
+    var shortRoot = shortWindowsPath(longRoot);
+    org.junit.Assume.assumeTrue(
+        "needs Windows with 8.3 names", shortRoot != null && !shortRoot.equals(longRoot));
+    assertEquals(1L, run(shortRoot, ctx -> {}));
+    var loaded = new boolean[1];
+    run(
+        shortRoot,
+        ctx -> {
+          var main = ctx.findModule("local." + name + ".Main");
+          loaded[0] = main.isPresent() && main.get().wasLoadedFromCache();
+        });
+    assertTrue("Main's IR is loaded from its cache", loaded[0]);
+  }
+
+  /** The 8.3 short form of a path, from `cmd`; {@code null} if there is none. */
+  private static Path shortWindowsPath(Path path) throws Exception {
+    if (!System.getProperty("os.name").toLowerCase().contains("windows")) {
+      return null;
+    }
+    var process =
+        new ProcessBuilder("cmd", "/c", "for %I in (\"" + path + "\") do @echo %~sI")
+            .redirectErrorStream(true)
+            .start();
+    var output = new String(process.getInputStream().readAllBytes()).trim();
+    return process.waitFor() == 0 && !output.isEmpty() ? Path.of(output) : null;
+  }
+
   /** Runs the tree, checks `main`, and tells which of its modules were loaded from their caches. */
   private Map<String, Boolean> loadedFromCache(Path root, long expected) {
     var loaded = new java.util.HashMap<String, Boolean>();
