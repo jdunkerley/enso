@@ -11,6 +11,7 @@ Utility binaries and scripts that aid engine/GUI development. **Not** a catch-al
 - `build-scripts/` — TypeScript package with the build logic: `version`,
   `toolchain-check`, `ide-local` (a developer's whole IDE build) and the CI
   commands. Node runs it directly; see its CLAUDE.md.
+- `pre-commit/` — `format-staged.mjs`, the Rust/Java/Scala half of the pre-commit hook (`lint-staged.config.mjs` at the root calls it). Must skip with a notice, never fail, when a tool is missing; see "Formatting hook" in `docs/CONTRIBUTING.md`.
 - `legal-review/`, `legal-review-helper/` — Third-party dependency license-review inputs and helpers.
 - `simple-library-server/` — Minimal HTTP library-server stub for testing the library download flow without touching the real library repository.
 
