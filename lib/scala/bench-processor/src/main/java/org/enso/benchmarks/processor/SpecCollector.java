@@ -423,16 +423,9 @@ public final class SpecCollector {
           @TearDown
           public void closeContext() {
             if (ctx != null) {
-              var rt = Runtime.getRuntime();
-              var usedBefore = (rt.totalMemory() - rt.freeMemory()) >> 20;
               ctx.close(true);
               ctx = null;
               releaseValues();
-              System.gc();
-              var usedAfter = (rt.totalMemory() - rt.freeMemory()) >> 20;
-              System.out.println(
-                  "HEAP after group: " + usedBefore + " MB before close, " + usedAfter
-                      + " MB after close and gc, max " + (rt.maxMemory() >> 20) + " MB");
             }
           }
 
