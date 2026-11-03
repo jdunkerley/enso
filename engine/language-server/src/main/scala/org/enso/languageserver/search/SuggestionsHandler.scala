@@ -27,6 +27,7 @@ import org.enso.languageserver.runtime.{
   ContextRegistryProtocol,
   RuntimeFailureMapper
 }
+import org.enso.languageserver.requesthandler.RequestTimeout
 import org.enso.languageserver.search.SearchProtocol._
 import org.enso.languageserver.search.handler.InvalidateModulesIndexHandler
 import org.enso.languageserver.session.SessionRouter.DeliverToJsonController
@@ -113,8 +114,11 @@ import scala.util.{Failure, Success}
  *
  * A request waits for the clear its own invalidation sends, not for an
  * earlier one still waiting for a running update (`State.clearsReceived`,
- * `State.snapshotRequests`). If the invalidation fails, nothing is cleared,
- * and the answer is the repository as it is.
+ * `State.snapshotRequests`). The invalidations are counted by their results,
+ * not their clears: a clear stashed while one invalidation runs can be
+ * stashed again by the next, which a request stashed ahead of it starts. If
+ * the invalidation fails, or the runtime never answers it, nothing is
+ * cleared, and the answer is the repository as it is.
  */
 
 /** The handler of search requests.
@@ -259,14 +263,14 @@ final class SuggestionsHandler(
     requester: Option[ActorRef],
     snapshotRequester: Option[ActorRef]
   ): Receive = {
-    case ClearSuggestionsDatabase =>
-      // Every clear arrives here: a successful invalidation sends it just
-      // before its result. Counted, so that the snapshot goes out after
-      // this clear and not an earlier one still waiting (Note [The Snapshot
-      // Follows The Clear]).
-      state.clearsReceived += 1
-      stash()
     case SearchProtocol.InvalidateSuggestionsDatabaseResult =>
+      // A successful invalidation sends its clear just before this result.
+      // Counted here, and not at the clear: a clear stashed here can be
+      // handled here again, after a request stashed ahead of it starts
+      // another invalidation, but a result cannot. The snapshot goes out
+      // after this clear and not an earlier one still waiting (Note [The
+      // Snapshot Follows The Clear]).
+      state.clearsReceived += 1
       requester.foreach(_ ! SearchProtocol.InvalidateSuggestionsDatabaseResult)
       snapshotRequester.foreach { ref =>
         state.snapshotRequests.enqueue(state.clearsReceived -> ref)
@@ -284,6 +288,14 @@ final class SuggestionsHandler(
     case failure: Status.Failure =>
       // The runtime's error could not be mapped to a failure.
       requester.foreach(_ ! failure)
+      snapshotRequester.foreach(sendSnapshot)
+      unstashAll()
+      context.become(initialized(projectName, graph, clients, state))
+    case RequestTimeout =>
+      // The runtime never answered (`InvalidateModulesIndexHandler` gave up
+      // after its retries): nothing is cleared, as for a failure.
+      logger.error("The runtime did not invalidate its modules index.")
+      requester.foreach(_ ! RequestTimeout)
       snapshotRequester.foreach(sendSnapshot)
       unstashAll()
       context.become(initialized(projectName, graph, clients, state))
@@ -1119,8 +1131,9 @@ object SuggestionsHandler {
     /** How many times the database has been cleared. */
     var fill: Long = 0
 
-    /** How many `ClearSuggestionsDatabase` requests have arrived. The `n`th
-      * is the `n`th clear (`fill`): they are handled in order.
+    /** How many invalidations have succeeded. Each sends one
+      * `ClearSuggestionsDatabase`, and the clears are handled in order, so
+      * the `n`th is the `n`th clear (`fill`).
       */
     var clearsReceived: Long = 0
 

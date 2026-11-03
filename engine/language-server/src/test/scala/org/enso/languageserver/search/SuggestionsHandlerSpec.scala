@@ -13,6 +13,7 @@ import org.enso.languageserver.capability.CapabilityProtocol.{
 import org.enso.languageserver.data._
 import org.enso.languageserver.event.InitializedEvent
 import org.enso.languageserver.filemanager._
+import org.enso.languageserver.requesthandler.RequestTimeout
 import org.enso.languageserver.search.SearchProtocol.{
   SuggestionsDatabaseUpdate,
   SuggestionsDatabaseUpdateNotification
@@ -1179,6 +1180,65 @@ class SuggestionsHandlerSpec
           entries.map(e => e.id -> e.suggestion).toMap
           client.values should contain(Catalogue.barMethod)
       }
+    }
+
+    "answer database requests that overlap, and later ones" taggedAs Retry in withDb {
+      (_, _, _, connector, handler) =>
+        val first  = TestProbe()
+        val second = TestProbe()
+        first.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        val firstInvalidation = connector.lastSender
+        // Arrives while the runtime invalidates for the first: stashed ahead
+        // of the first clear, which it then sees again.
+        second.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        firstInvalidation ! Api.Response(Api.InvalidateModulesIndexResponse())
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+        startBackground(handler, connector)
+
+        first
+          .expectMsgType[SearchProtocol.GetSuggestionsDatabaseResult]
+          .entries shouldBe empty
+        second.expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(2L, Seq()))
+
+        // Not left waiting for a clear that never comes.
+        startBackground(handler, connector)
+        val third = TestProbe()
+        third.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+        third.expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(3L, Seq()))
+    }
+
+    "answer with the database as it is when the invalidation times out" taggedAs Retry in withDb {
+      (_, repo, _, connector, handler) =>
+        val (_, Seq(id)) =
+          Await.result(repo.insertAll(Seq(Suggestions.constructor)), Timeout)
+        handler ! SearchProtocol.GetSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        // What `InvalidateModulesIndexHandler` sends when the runtime never
+        // answers.
+        handler ! RequestTimeout
+
+        expectMsg(
+          SearchProtocol.GetSuggestionsDatabaseResult(
+            1L,
+            Seq(
+              SearchProtocol.SuggestionDatabaseEntry(
+                id,
+                Suggestions.constructor
+              )
+            )
+          )
+        )
+        // The handler is not left waiting for the invalidation.
+        handler ! SearchProtocol.GetSuggestionsDatabaseVersion
+        expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(1L))
     }
 
     "remove a library's catalogue entries even if its suggestions cannot be inserted" taggedAs Retry in {
