@@ -12,7 +12,6 @@ import {
 } from '$/providers/openedProjects/widgetRegistry'
 import { proxyRefs } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
-import { formatTypeForPathUpdate } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
   formatTypeForPathUpdate,
   trackFormatConfig,
