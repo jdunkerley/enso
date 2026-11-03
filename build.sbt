@@ -4597,7 +4597,8 @@ lazy val `std-benchmarks` = (project in file("std-bits/benchmarks"))
     // handler runs out of memory too, and the JVM then hangs until the job is cancelled (3 hours
     // in #302). The `-XX:+ExitOnOutOfMemoryError` in the native image's build arguments is not
     // this JVM's.
-    javaOptions += "-XX:+ExitOnOutOfMemoryError"
+    javaOptions += "-XX:+ExitOnOutOfMemoryError",
+    javaOptions += "-XX:MaxRAMPercentage=75"
   )
   .settings(
     bench := Def
