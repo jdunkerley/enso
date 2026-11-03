@@ -1,0 +1,10 @@
+import project.Checks
+import project.Checks.Box
+
+apply x f = f x
+
+## The lambda's body is a block whose only line is an ascription (#495).
+main =
+    boxed = apply (Box.Value 42) x->
+        (x:Box)
+    (Checks.checked boxed).v

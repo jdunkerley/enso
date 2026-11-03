@@ -73,6 +73,8 @@ import scala.collection.immutable.Seq;
 @Persistable(clazz = Warning.NoSuchMethod.class, id = 793)
 @Persistable(clazz = Warning.NonUnitTypeUsedOnValueLevel.class, id = 794)
 @Persistable(clazz = Warning.NonPrivateBuiltinMethod.class, id = 795)
+// TypeSignatures keeps an ascription that ends a block as a type check (#495)
+@Persistable(clazz = Type.Ascription.class, id = 796)
 @Persistable(clazz = Operator.Binary.class, id = 790)
 public final class IrPersistance {
   private IrPersistance() {}

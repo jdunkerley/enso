@@ -1,0 +1,6 @@
+type Box
+    Value v
+
+## A method whose last line is an ascription: it stays a `Type.Ascription`.
+checked b =
+    b:Box

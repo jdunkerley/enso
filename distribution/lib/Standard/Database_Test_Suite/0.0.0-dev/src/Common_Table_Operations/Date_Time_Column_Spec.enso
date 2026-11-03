@@ -31,9 +31,7 @@ add_date_time_columns_specs suite_builder setup =
             column = date_time_column.get
             column.value_type.is_date_time . should_be_true
             check_column_refinements column x->
-                # Bound first: a lone ascription as a block's value cannot be cached as IR.
-                refined = (x:Date_Time_Column)
-                refined
+                (x:Date_Time_Column)
 
     if setup.is_database.not then
         suite_builder.group prefix+"Date_Time_Column (time zones)" group_builder->
