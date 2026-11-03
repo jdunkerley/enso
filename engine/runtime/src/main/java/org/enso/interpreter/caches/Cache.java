@@ -14,11 +14,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import org.enso.interpreter.runtime.EnsoContext;
 import org.enso.logger.masking.MaskedPath;
+import org.enso.pkg.QualifiedName;
 
 /**
  * Cache encapsulates a common functionality needed to serialize and de-serialize objects, while
@@ -164,13 +167,16 @@ public final class Cache<T, M> {
       EnsoContext context, TruffleFile cacheRoot, T entry, TruffleLogger logger)
       throws IOException {
     if (ensureRoot(cacheRoot)) {
-      byte[] bytesToWrite = spi.serialize(context, entry);
+      // Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`.
+      var referencedModules = new HashSet<QualifiedName>();
+      byte[] bytesToWrite = spi.serialize(context, entry, referencedModules);
 
       String blobDigest = CacheUtils.computeDigestFromBytes(ByteBuffer.wrap(bytesToWrite));
       String sourceDigest =
           spi.computeDigest(context, entry, logger)
               .orElseThrow(() -> new IOException("unable to compute digest"));
-      byte[] metadataBytes = spi.metadata(sourceDigest, blobDigest, entry);
+      byte[] metadataBytes =
+          spi.metadata(context, sourceDigest, blobDigest, entry, referencedModules, logger);
 
       TruffleFile cacheDataFile = getCacheDataPath(cacheRoot);
       TruffleFile metadataFile = getCacheMetadataPath(cacheRoot);
@@ -261,10 +267,12 @@ public final class Cache<T, M> {
     var meta = loadCacheMetadata(metadataPath, logger);
     if (meta != null) {
       boolean sourceDigestValid =
-          !needsSourceDigestVerification
-              || spi.computeDigestFromSource(context, logger)
-                  .map(digest -> digest.equals(spi.sourceHash(meta)))
-                  .orElseGet(() -> false);
+          (!needsSourceDigestVerification
+                  || spi.computeDigestFromSource(context, logger)
+                      .map(digest -> digest.equals(spi.sourceHash(meta)))
+                      .orElseGet(() -> false))
+              // Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`.
+              && spi.dependenciesAreCurrent(context, meta, logger);
       var file = new File(dataPath.toUri());
       ByteBuffer blobBytes;
       var threeMbs = 3 * 1024 * 1024;
@@ -309,6 +317,16 @@ public final class Cache<T, M> {
         } catch (ClassNotFoundException ex) {
           invalidateCache(cacheRoot, logger);
           throw new IOException("Cannot load " + dataPath + " due to: " + ex.getMessage(), ex);
+        } catch (IOException | RuntimeException ex) {
+          // Note [A Cache That Does Not Load Is A Miss]
+          logger.log(
+              Level.WARNING,
+              "Discarding the cache for [{0}], which no longer loads ({1}); compiling from source.",
+              new Object[] {logName, ex.getMessage()});
+          logger.log(Level.FINE, "The cache for [" + logName + "] failed to load.", ex);
+          closeMemoryArena();
+          invalidateCache(cacheRoot, logger);
+          throw new IOException("Cannot load " + dataPath + " due to: " + ex.getMessage(), ex);
         }
       } else {
         invalidateCache(cacheRoot, logger);
@@ -324,6 +342,23 @@ public final class Cache<T, M> {
               + "].");
     }
   }
+
+  /* Note [A Cache That Does Not Load Is A Miss]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Restoring a cache can fail in ways its digests do not predict: most often
+   * `CacheUtils.readResolve` cannot restore a module reference ("Cannot
+   * convert"), because IR written before Note [A Cache Records The Libraries
+   * It Refers To] (`LibraryDependencies`) names a module that has since moved
+   * to another library (#542). Whatever `Spi.deserialize` throws, the cache is
+   * deleted and the load is a miss, so the caller compiles from source: a
+   * warning in the log, never an error for the user.
+   *
+   * This covers what `deserialize` reads. Method bodies are read lazily, long
+   * after the load, when a method is first called, and a failure there cannot
+   * be turned into a miss. For them `Spi.dependenciesAreCurrent` checks, before
+   * anything is read, that every module the IR names in another library still
+   * exists (and that those libraries' sources are unchanged).
+   */
 
   /**
    * Close any previous arena and creates a new one. Closing the previous arena invalidates all byte
@@ -477,22 +512,48 @@ public final class Cache<T, M> {
      *
      * @param context context we operate in
      * @param entry entry to persist
+     * @param referencedModules to collect the modules the written data refers to, if the cache
+     *     records them (see {@link #dependenciesAreCurrent})
      * @return array of bytes
      * @throws java.io.IOException if something goes wrong
      */
-    public abstract byte[] serialize(EnsoContext context, T entry) throws IOException;
+    public abstract byte[] serialize(
+        EnsoContext context, T entry, Set<QualifiedName> referencedModules) throws IOException;
 
     /**
      * Return serialized representation of data's metadata.
      *
+     * @param context the language context in which saving is taking place
      * @param sourceDigest digest of data's source
      * @param blobDigest digest of serialized data
      * @param entry data to serialize
+     * @param referencedModules what {@link #serialize} collected
+     * @param logger Truffle's logger
      * @return raw bytes representing serialized metadata
      * @throws java.io.IOException in case of I/O error
      */
-    public abstract byte[] metadata(String sourceDigest, String blobDigest, T entry)
+    public abstract byte[] metadata(
+        EnsoContext context,
+        String sourceDigest,
+        String blobDigest,
+        T entry,
+        Set<QualifiedName> referencedModules,
+        TruffleLogger logger)
         throws IOException;
+
+    /**
+     * Whether the other libraries the cached data refers to still have the sources it was written
+     * from, and the modules it names in them still exist. Checked before the data is deserialised.
+     * See Note [A Cache Records The Libraries It Refers To] in {@link LibraryDependencies}.
+     *
+     * @param context the language context in which loading is taking place
+     * @param meta the cache's metadata
+     * @param logger Truffle's logger
+     * @return {@code true} unless the cache must not be used
+     */
+    default boolean dependenciesAreCurrent(EnsoContext context, M meta, TruffleLogger logger) {
+      return true;
+    }
 
     /**
      * De-serializes raw bytes to data's metadata.

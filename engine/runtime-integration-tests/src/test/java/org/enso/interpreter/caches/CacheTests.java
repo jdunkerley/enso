@@ -216,12 +216,21 @@ public final class CacheTests {
     }
 
     @Override
-    public byte[] serialize(EnsoContext context, CachedData entry) {
+    public byte[] serialize(
+        EnsoContext context,
+        CachedData entry,
+        java.util.Set<org.enso.pkg.QualifiedName> referencedModules) {
       return new byte[] {42};
     }
 
     @Override
-    public byte[] metadata(String sourceDigest, String blobDigest, CachedData entry) {
+    public byte[] metadata(
+        EnsoContext context,
+        String sourceDigest,
+        String blobDigest,
+        CachedData entry,
+        java.util.Set<org.enso.pkg.QualifiedName> referencedModules,
+        TruffleLogger logger) {
       return new byte[0];
     }
 

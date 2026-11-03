@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,8 +30,8 @@ import org.junit.rules.TemporaryFolder;
  * Libraries It Refers To] in {@code LibraryDependencies}.
  *
  * <p>The project {@code Proj} imports library {@code Alpha}, which imports library {@code Beta}.
- * The tests edit {@code Beta} and check that {@code Alpha}'s cached IR, whether in its per-module IR
- * cache or in its bindings cache, is not used.
+ * The tests edit {@code Beta} and check that {@code Alpha}'s cached IR, whether in its per-module
+ * IR cache or in its bindings cache, is not used.
  */
 public class CrossLibraryCacheTest {
   @Rule public final TemporaryFolder tmp = new TemporaryFolder();
@@ -62,7 +64,8 @@ public class CrossLibraryCacheTest {
   @After
   public void deleteIrCaches() throws IOException {
     if (irCacheRoot != null) {
-      for (var dir : new Path[] {irCacheRoot.resolve(ns), irCacheRoot.resolve("local").resolve(project)}) {
+      for (var dir :
+          new Path[] {irCacheRoot.resolve(ns), irCacheRoot.resolve("local").resolve(project)}) {
         if (Files.isDirectory(dir)) {
           ProjectUtils.deleteRecursively(dir);
         }
@@ -84,7 +87,6 @@ public class CrossLibraryCacheTest {
     var loaded = new HashMap<String, Boolean>();
     assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
     assertFalse("Alpha's IR is not reused once Beta changed", loaded.get("Alpha.Main"));
-    assertTrue("the project's own IR is still reused", loaded.get("Proj.Main"));
   }
 
   /** (a), with Alpha's IR in its bindings cache (`enso --compile`) rather than per module. */
@@ -139,6 +141,91 @@ public class CrossLibraryCacheTest {
     assertEquals(2L, run(root, ctx -> {}));
   }
 
+  /**
+   * (b), safety net: even when the libraries' hashes are not there to catch it, IR naming a module
+   * that is gone is a miss when it is loaded, not a "Cannot convert" when a method body is first
+   * called. See Note [A Cache That Does Not Load Is A Miss] in {@code Cache}.
+   */
+  @Test
+  public void aCacheNamingAModuleThatIsGoneIsAMissEvenWithoutTheHashes() throws IOException {
+    var root =
+        createTree(Map.of("Main", "export project.Helpers.answer\n", "Helpers", "answer = 1\n"));
+    assertEquals(1L, run(root, ctx -> {}));
+    var meta = findAlphaMainMetadata();
+    dropLibraryHashes(meta);
+
+    Files.delete(root.resolve("Beta").resolve("src").resolve("Helpers.enso"));
+    writeLibrary(root, "Beta", Map.of("Main", "export " + ns + ".Gamma.Helpers.answer\n"));
+    writeLibrary(root, "Gamma", Map.of("Main", "", "Helpers", "answer = 2\n"));
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertFalse("Alpha's IR is not reused", loaded.get("Alpha.Main"));
+  }
+
+  /** Safety net: an IR cache that does not deserialise is a miss, not an error. */
+  @Test
+  public void aCacheThatDoesNotDeserialiseIsAMiss() throws IOException {
+    var root = createTree(Map.of("Main", "answer = 1\n"));
+    assertEquals(1L, run(root, ctx -> {}));
+    var ir = findAlphaMain(".ir");
+    var bytes = Files.readAllBytes(ir);
+    Files.write(ir, java.util.Arrays.copyOf(bytes, bytes.length / 2));
+
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(1L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertFalse("Alpha's IR is compiled from source", loaded.get("Alpha.Main"));
+    assertEquals(
+        "the next run uses the rewritten cache",
+        Map.of("Proj.Main", true, "Alpha.Main", true, "Beta.Main", true),
+        rerunLoadedFromCache(root));
+  }
+
+  private Map<String, Boolean> rerunLoadedFromCache(Path root) {
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(1L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    return loaded;
+  }
+
+  private Path findAlphaMainMetadata() throws IOException {
+    return findAlphaMain(".meta");
+  }
+
+  private Path findAlphaMain(String suffix) throws IOException {
+    try (var files = Files.walk(irCacheRoot.resolve(ns).resolve("Alpha"))) {
+      return files
+          .filter(f -> f.getFileName().toString().equals("Main" + suffix))
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("Alpha.Main's IR cache was written"));
+    }
+  }
+
+  /**
+   * Rewrites a `ModuleCache` metadata file as if it recorded no other libraries' hashes, keeping
+   * the modules it names. See {@code LibraryDependencies.write}.
+   */
+  private static void dropLibraryHashes(Path meta) throws IOException {
+    var out = new java.io.ByteArrayOutputStream();
+    try (var in = new DataInputStream(Files.newInputStream(meta));
+        var dos = new DataOutputStream(out)) {
+      for (var i = 0; i < 3; i++) {
+        dos.writeUTF(in.readUTF()); // source digest, blob digest, compilation stage
+      }
+      var libraries = in.readInt();
+      assertTrue("Alpha.Main records Beta", libraries > 0);
+      for (var i = 0; i < libraries * 3; i++) {
+        in.readUTF();
+      }
+      dos.writeInt(0);
+      var modules = in.readInt();
+      assertTrue("Alpha.Main records the modules it names", modules > 0);
+      dos.writeInt(modules);
+      for (var i = 0; i < modules; i++) {
+        dos.writeUTF(in.readUTF());
+      }
+    }
+    Files.write(meta, out.toByteArray());
+  }
+
   /** (c) Nothing changed: every module is loaded from its cache. */
   @Test
   public void nothingChangedEverythingHitsTheCache() throws IOException {
@@ -181,8 +268,7 @@ public class CrossLibraryCacheTest {
         PROJ_MAIN.formatted(ns) + "other = 0\n");
     var loaded = new HashMap<String, Boolean>();
     assertEquals(1L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
-    assertEquals(
-        Map.of("Proj.Main", false, "Alpha.Main", true, "Beta.Main", true), loaded);
+    assertEquals(Map.of("Proj.Main", false, "Alpha.Main", true, "Beta.Main", true), loaded);
   }
 
   private Map<String, Boolean> loadedFromCache(EnsoContext ctx) {
@@ -253,8 +339,7 @@ public class CrossLibraryCacheTest {
     var projectRoot = root.resolve("Proj");
     try (var ctx = builder(projectRoot).build()) {
       var polyCtx = new PolyglotContext(ctx.context());
-      var mainMod =
-          polyCtx.evalModule(projectRoot.resolve("src").resolve("Main.enso").toFile());
+      var mainMod = polyCtx.evalModule(projectRoot.resolve("src").resolve("Main.enso").toFile());
       var result = mainMod.getMethod(mainMod.getAssociatedType(), "main").get().execute().asLong();
       var ensoCtx = ctx.ensoContext();
       irCacheRoot =

@@ -11,11 +11,13 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import org.enso.editions.LibraryName;
 import org.enso.interpreter.caches.SuggestionsCache.CachedSuggestions;
 import org.enso.interpreter.runtime.EnsoContext;
 import org.enso.persist.Persistable;
+import org.enso.pkg.QualifiedName;
 import org.enso.polyglot.Suggestion;
 import org.enso.version.BuildVersion;
 
@@ -63,14 +65,26 @@ public final class SuggestionsCache
     return libraryName.name();
   }
 
+  /**
+   * Records no other libraries: suggestions name other libraries' types only as text. See Note [A
+   * Cache Records The Libraries It Refers To] in {@link LibraryDependencies}.
+   */
   @Override
-  public byte[] metadata(String sourceDigest, String blobDigest, CachedSuggestions entry)
+  public byte[] metadata(
+      EnsoContext context,
+      String sourceDigest,
+      String blobDigest,
+      CachedSuggestions entry,
+      Set<QualifiedName> referencedModules,
+      TruffleLogger logger)
       throws IOException {
     return new Metadata(sourceDigest, blobDigest).toBytes();
   }
 
   @Override
-  public byte[] serialize(EnsoContext context, CachedSuggestions entry) throws IOException {
+  public byte[] serialize(
+      EnsoContext context, CachedSuggestions entry, Set<QualifiedName> referencedModules)
+      throws IOException {
     var pool = CacheUtils.createPool(context.getCompiler().context(), true);
     return pool.write(entry);
   }

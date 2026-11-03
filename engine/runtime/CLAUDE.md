@@ -62,6 +62,12 @@ and links the required Graal/Truffle background reading.
   Caches Are Keyed By The Sources]. A module's IR cache stays keyed by its own
   source; a cached module whose same-library import changed is recompiled (Note
   [A Cached Module Follows Its Library's Imports] in `Compiler`).
+- **IR caches record the other libraries they refer to.** A module's IR cache
+  and a library's bindings cache record the source hash of every other library
+  their IR names, and the modules it names there, and miss when one changed
+  (Note [A Cache Records The Libraries It Refers To] in `LibraryDependencies`).
+  A cache that fails to deserialise is deleted and is a miss, with a warning in
+  the log (Note [A Cache That Does Not Load Is A Miss] in `Cache`).
 - **A library's bindings cache is read once per context**, by
   `TruffleCompilerContext.libraryBindings`, which import resolution and module
   loading share; see Note [One Bindings Cache Read Per Library].

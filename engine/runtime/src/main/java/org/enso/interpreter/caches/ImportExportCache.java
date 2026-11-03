@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.Set;
 import java.util.logging.Level;
 import org.enso.compiler.data.BindingsMap;
 import org.enso.compiler.data.BindingsMap.DefinedEntity;
@@ -56,16 +57,34 @@ public final class ImportExportCache
   }
 
   @Override
-  public byte[] metadata(String sourceDigest, String blobDigest, CachedBindings entry)
+  public byte[] metadata(
+      EnsoContext context,
+      String sourceDigest,
+      String blobDigest,
+      CachedBindings entry,
+      Set<QualifiedName> referencedModules,
+      TruffleLogger logger)
       throws IOException {
-    return new Metadata(sourceDigest, blobDigest).toBytes();
+    var dependencies =
+        LibraryDependencies.of(context, referencedModules, libraryName, logger)
+            .orElseThrow(
+                () -> new IOException("unable to hash the libraries " + libraryName + " uses"));
+    return new Metadata(sourceDigest, blobDigest, dependencies).toBytes();
   }
 
   @Override
-  public byte[] serialize(EnsoContext context, CachedBindings entry) throws IOException {
-    var pool = CacheUtils.createPool(context.getCompiler().context(), true);
+  public byte[] serialize(
+      EnsoContext context, CachedBindings entry, Set<QualifiedName> referencedModules)
+      throws IOException {
+    var pool = CacheUtils.createPool(context.getCompiler().context(), true, referencedModules);
     var arr = pool.write(entry.bindings());
     return arr;
+  }
+
+  /** See Note [A Cache Records The Libraries It Refers To] in {@link LibraryDependencies}. */
+  @Override
+  public boolean dependenciesAreCurrent(EnsoContext context, Metadata meta, TruffleLogger logger) {
+    return meta.dependencies().areCurrent(context, libraryName.toString(), logger);
   }
 
   @Override
@@ -152,12 +171,14 @@ public final class ImportExportCache
 
   public static record CachedBindings(LibraryName libraryName, MapToBindings bindings) {}
 
-  public record Metadata(String sourceHash, String blobHash) {
+  /** The source hash comes first: {@code ShippedCataloguesSpec} reads it. */
+  public record Metadata(String sourceHash, String blobHash, LibraryDependencies dependencies) {
     byte[] toBytes() throws IOException {
       try (var os = new ByteArrayOutputStream();
           var dos = new DataOutputStream(os)) {
         dos.writeUTF(sourceHash());
         dos.writeUTF(blobHash());
+        dependencies().write(dos);
         return os.toByteArray();
       }
     }
@@ -165,7 +186,7 @@ public final class ImportExportCache
     static Metadata read(byte[] arr) throws IOException {
       try (var is = new ByteArrayInputStream(arr);
           var dis = new DataInputStream(is)) {
-        return new Metadata(dis.readUTF(), dis.readUTF());
+        return new Metadata(dis.readUTF(), dis.readUTF(), LibraryDependencies.read(dis));
       }
     }
   }
