@@ -52,14 +52,17 @@ object DistributionPackage {
     * @param source source directory
     * @param destination target directory
     * @param cache cache used for persisting the cached information
+    * @param exclude names of files that are neither copied nor tracked, at any depth
     * @return true, if copying was necessary, false if no change was detected between the directories
     */
   def copyDirectoryIncremental(
     source: File,
     destination: File,
-    cache: CacheStore
+    cache: CacheStore,
+    exclude: Set[String] = Set.empty
   ): Boolean = {
-    val allFiles = source.allPaths.get().toSet
+    val allFiles =
+      source.allPaths.get().filterNot(f => exclude(f.getName)).toSet
     Tracked.diffInputs(cache, FileInfo.lastModified)(allFiles) { diff =>
       val missing = diff.unmodified.exists { f =>
         val relativePath = f.relativeTo(source).get
@@ -70,11 +73,24 @@ object DistributionPackage {
 
       if (diff.modified.nonEmpty || diff.removed.nonEmpty || missing) {
         IO.delete(destination)
-        IO.copyDirectory(source, destination)
+        if (exclude.isEmpty) IO.copyDirectory(source, destination)
+        else {
+          IO.createDirectory(destination)
+          IO.copy(
+            allFiles.toSeq.flatMap(f =>
+              f.relativeTo(source).map(rel => (f, destination / rel.getPath))
+            )
+          )
+        }
         true
       } else false
     }
   }
+
+  /** Files that live in a library's source tree for contributors and must not
+    * ship in the distribution.
+    */
+  val contributorOnlyFiles: Set[String] = Set("CLAUDE.md")
 
   def copyFilesIncremental(
     sources: Seq[File],
@@ -781,7 +797,8 @@ object DistributionPackage {
           val copied = copyDirectoryIncremental(
             source      = libSourceDir,
             destination = targetPackageRoot,
-            cache       = cacheFactory.make(s"$prefix.$libName")
+            cache       = cacheFactory.make(s"$prefix.$libName"),
+            exclude     = contributorOnlyFiles
           )
           val bindingsDir = targetPackageRoot / ".enso" / "cache" / "bindings"
           if (copied && bindingsDir.exists()) {

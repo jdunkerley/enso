@@ -182,7 +182,9 @@ class LibraryUploader(dependencyExtractor: DependencyExtractor[File]) {
     def relativePath(file: Path): String = projectRoot.relativize(file).toString
     def shouldBeUploaded(file: Path): Boolean = {
       def isIgnored = rootFilesToIgnore.contains(relativePath(file))
-      Files.isRegularFile(file) && !isIgnored
+      // CLAUDE.md files are contributor notes, not part of the library.
+      def isContributorNote = file.getFileName.toString == "CLAUDE.md"
+      Files.isRegularFile(file) && !isIgnored && !isContributorNote
     }
 
     logger.trace("Gathering files to compress.")
