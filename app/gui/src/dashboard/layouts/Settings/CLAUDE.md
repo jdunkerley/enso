@@ -12,20 +12,22 @@ context entries receive, and the search over tabs, sections and entries are in
 `$/configurations/settings.ts`, framework-free, so that one search spans every
 tab.
 
-- **The tabs** (`tabs.ts`), all Vue since #88: Account, Local, Appearance and
-  Keyboard shortcuts. The cloud's tabs (Organization, Billing & Plans, Members,
-  User groups, Activity log, API keys, Usage) were deleted with the cloud UI,
-  and so were their `SettingsTabType` values. `SettingsTab.vue` lays out a tab's
-  sections; a form entry is `SettingsFormEntry.vue`, a component entry reads the
-  page's context with `useSettingsContext` (`$/providers/settingsContext`). A
-  tab with no sections is not listed.
-- **The Account tab has one section of its own: the local user.** There is no
-  sign-in (the context's `user` is always the local user), so it shows the local
-  user and why there are no account settings (`OfflineUserSettingsSection.vue`).
-  Other sections could come through `$/providers/settingsContributions` (see
-  "Contribution registries" in `app/gui/CLAUDE.md`), which nothing uses now; the
-  settings route waits for them to load. Nothing may reach for Enso Cloud: the
-  session has no tokens.
+- **The tabs** (`tabs.ts`), all Vue since #88: Local, Appearance and Keyboard
+  shortcuts. The page opens on Local (`DEFAULT_TAB`), or on the first tab shown
+  when there is no local backend. There is no Account tab: the local user has no
+  account settings (it showed only the stand-in name and a note), so it went
+  with the settings cog (the user bar's menu opens the page). The cloud's tabs
+  (Organization, Billing & Plans, Members, User groups, Activity log, API keys,
+  Usage) were deleted with the cloud UI, and so were their `SettingsTabType`
+  values. `SettingsTab.vue` lays out a tab's sections; a form entry is
+  `SettingsFormEntry.vue`, a component entry reads the page's context with
+  `useSettingsContext` (`$/providers/settingsContext`). A tab with no sections
+  is not listed.
+- **Further sections could come through `$/providers/settingsContributions`**
+  (see "Contribution registries" in `app/gui/CLAUDE.md`), which nothing uses
+  now; the settings route waits for them to load. There is no sign-in (the
+  context's `user` is always the local user). Nothing may reach for Enso Cloud:
+  the session has no tokens.
 
 ## Local directories
 
@@ -76,6 +78,6 @@ scopes) and names it; a conflict a reset brings back is shown in red.
 
 `__tests__/`: the shell (`SettingsPage.test.ts`), the Local tab
 (`localTab.test.ts`) and the Keyboard shortcuts tab with its capture modal. The
-Playwright specs are `integration-test/dashboard/` `userSettings.spec.ts`,
-`organizationSettings.spec.ts` and `localModeSettings.spec.ts`, and the settings
-check of `accessibility.spec.ts`.
+Playwright specs are `integration-test/dashboard/` `localModeSettings.spec.ts`,
+`localDirectories.spec.ts` and `localVersioningSettings.spec.ts`, and the
+settings check of `accessibility.spec.ts`.

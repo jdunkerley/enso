@@ -1,6 +1,6 @@
 /**
- * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`: Account,
- * Local, Appearance and Keyboard shortcuts. A tab may also show sections contributed through
+ * @file The settings tabs, in their sidebar groups, each rendered by `SettingsTab.vue`: Local,
+ * Appearance and Keyboard shortcuts. A tab may also show sections contributed through
  * `$/providers/settingsContributions`, after its own.
  */
 // ESLint's TypeScript program does not resolve `.vue` modules (vue-tsc, which typechecks this file,
@@ -25,7 +25,6 @@ import KeyboardShortcutsSettingsSection from './KeyboardShortcutsSettingsSection
 import LocalDirectoryButtons from './LocalDirectoryButtons.vue'
 import LocalVersionsSettingsSection from './LocalVersionsSettingsSection.vue'
 import NoResults from './NoResults.vue'
-import OfflineUserSettingsSection from './OfflineUserSettingsSection.vue'
 import SecretsSettingsSection from './SecretsSettingsSection.vue'
 import UpdatesSettingsSection from './UpdatesSettingsSection.vue'
 
@@ -34,19 +33,6 @@ export const SETTINGS_NO_RESULTS_SECTION_DATA: SettingsSectionData = {
   nameId: 'noResultsSettingsSection',
   heading: false,
   entries: [{ type: 'custom', component: NoResults }],
-}
-
-const ACCOUNT_TAB: SettingsTabData = {
-  nameId: 'accountSettingsTab',
-  settingsTab: SettingsTabType.account,
-  icon: SETTINGS_TAB_ICONS[SettingsTabType.account],
-  // Its one section is the local user.
-  sections: [
-    {
-      nameId: 'offlineUserSettingsSection',
-      entries: [{ type: 'custom', component: OfflineUserSettingsSection }],
-    },
-  ],
 }
 
 const LOCAL_TAB: SettingsTabData = {
@@ -212,6 +198,6 @@ const KEYBOARD_SHORTCUTS_TAB: SettingsTabData = {
 
 /** The settings tabs, in their sidebar groups. */
 export const SETTINGS_DATA: readonly SettingsTabSectionData<SettingsTabData>[] = [
-  { nameId: 'generalSettingsTabSection', tabs: [ACCOUNT_TAB, LOCAL_TAB] },
+  { nameId: 'generalSettingsTabSection', tabs: [LOCAL_TAB] },
   { nameId: 'lookAndFeelSettingsTabSection', tabs: [APPEARANCE_TAB, KEYBOARD_SHORTCUTS_TAB] },
 ]

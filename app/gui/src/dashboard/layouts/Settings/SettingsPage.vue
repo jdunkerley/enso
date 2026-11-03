@@ -45,7 +45,7 @@ const { getText } = useText()
 // === The current tab ===
 
 const TAB_PARAM = `${SEARCH_PARAMS_PREFIX}SettingsTab`
-const DEFAULT_TAB = SettingsTabType.account
+const DEFAULT_TAB = SettingsTabType.local
 const isSettingsTab = includesPredicate(Object.values(SettingsTabType))
 const queryParams = useQueryParams()
 const tabParam = computed((): unknown => {
