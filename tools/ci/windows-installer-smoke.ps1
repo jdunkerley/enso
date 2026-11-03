@@ -23,7 +23,8 @@ function Get-MachineEnsoEntries {
 
 function Assert-NoMachineInstallChange($before) {
   $after = Get-MachineEnsoEntries
-  if (@(Compare-Object @($before) @($after)).Count -gt 0) {
+  # Compared as sorted text: `Compare-Object` refuses an empty list, and a runner normally has none.
+  if ((@($before | Sort-Object) -join "`n") -ne (@($after | Sort-Object) -join "`n")) {
     throw "The machine-wide (HKLM) Enso uninstall entries changed: before [$($before -join ', ')], after [$($after -join ', ')]."
   }
 }
