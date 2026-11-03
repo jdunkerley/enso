@@ -96,11 +96,6 @@ const tooltipEnabled = computed(
     cursor: pointer;
   }
 
-  &:has(.tab:focus-visible) {
-    outline: 2px solid currentColor;
-    outline-offset: -2px;
-  }
-
   &.horizontal {
     height: 100%;
   }
