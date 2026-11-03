@@ -1,0 +1,23 @@
+from Standard.Base import all
+
+## A group or a spec of the suite that a backend marks pending, for a reason of
+   its own: the open counterpart of `Known_Issue`, for a backend outside this
+   repository. A backend lists them in `Backend.Value`'s `extra_pending`.
+type Pending
+    ## A pending group, or one pending spec of a group.
+
+       ## Arguments
+       - `group`: The group's name, as the test report shows it but without the
+         backend's `[Name] ` prefix (`"Table.aggregate should correctly handle
+         Nothing"`), and compared exactly. A name that already starts with the
+         prefix is also accepted.
+       - `reason`: Why it is pending.
+       - `url`: The issue that tracks it, or `Nothing`.
+       - `spec`: The spec's name within the group, compared exactly. With
+         `Nothing` (the default) the whole group is pending.
+    Value group:Text reason:Text url:(Text | Nothing)=Nothing spec:(Text | Nothing)=Nothing
+
+    ## The text a pending group or spec reports.
+    message self -> Text = case self.url of
+        Nothing -> self.reason
+        url -> self.reason + " (" + url + ")."

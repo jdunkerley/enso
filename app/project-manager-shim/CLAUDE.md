@@ -71,7 +71,26 @@ exits while starting with a bind failure on stderr (`Address already in use`,
 `BindException`, `EADDRINUSE`) makes the open probe again and start another
 engine, up to `PORT_ATTEMPTS` (3) times; any other early exit fails the open
 (#336). Not covered: another program that answers `/_health` with a success
-before the engine has failed to bind.
+before the engine has failed to bind. The start-up checks run every 25 ms for
+the first second and every 250 ms after (Note [Start-up Health Polling] in
+`ensoRunner.ts`).
+
+`project/open` is also answered only once the engine's ydoc port accepts a
+connection (`EnsoRunner`'s `ydocWaitMs`, `DEFAULT_YDOC_WAIT_MS` in
+`ProjectService.default`; Note [Open Waits For The Ydoc Port]). The ydoc server
+listens ~300 ms after `/_health` passes, and a GUI that connected earlier was
+refused (measured). That is consistent with Windows retrying a refused loopback
+connect after ~500 ms (inferred from the constant 510 to 525 ms gap). On Linux
+the GUI was refused too and connected only on y-websocket's third retry, ~1.4 s
+after the answer, so the wait helps there as well; the open-time harness hid it
+until `guiConnected` was changed to mean the socket is open (Note [The GUI Is
+Connected When Its Socket Is Open] in
+`app/electron-client/perf/openTimeReport.ts`). The ydoc server binds
+`localhost`, which the JVM resolves to `127.0.0.1` (an IPv4-mapped address on
+Linux), the address the probe and the GUI use. The wait is bounded, the startup
+timeout stops applying once `/_health` has passed, and `EnsoRunner` defaults to
+none, because the fake engines of the tests have no ydoc server
+(`healthPolling.test.ts` has the one that does).
 
 ## Child processes
 
@@ -79,6 +98,30 @@ Always attach an `'error'` listener to a child's stdin (`EnsoRunner` does at
 spawn): a write to an exited child fails asynchronously with `EPIPE`, and with
 no listener that is an unhandled error that fails vitest runs and can crash the
 Electron main process (#401).
+
+## A second project's engine start on Windows (measured, no fix)
+
+The project-open performance spec expected a Windows engine start of ~780 ms for
+the second project of a session. The open-time harness (release build
+2026.1.1-rc.1, native engine, `core` template, 10 launches, Windows 11) does not
+show it: `engineUp` (click to the launcher's first output) has a median of 171
+ms for the first open and **130 ms for the second**, and `lsReady` 227 / 192 ms.
+The second is faster at the median (the first pays for cold file caches) and by
+the mean it is 94 ms slower (164 vs 258 ms), under the 150 ms bar for tracing
+it. The same Windows build's earlier 5-launch run gave 159 / 114 ms.
+
+What is real is intermittent: 3 of the 10 second opens took 414 to 652 ms
+(`engineUp`), the other seven 109 to 223 ms; the first opens stayed within 136
+to 199 ms. Those slow ones are about 300 to 500 ms later than the rest. The
+cause was not traced (the stage timing in `EnsoRunner` was not instrumented,
+since the median does not call for a fix); the candidates are the first
+project's engine still shutting down while the second is spawned (the port
+search steps over its ports) and antivirus scanning of the launcher after a
+recent run. If a future report shows a consistently slow second open, instrument
+`EnsoRunner.openProject` (before `loadingProjects`, around `findServerPorts`,
+before `spawn`, at the child's `spawn` event) and `OpenedProject.close` around
+`gracefulShutdown` to split it before changing anything. Reproduce with
+`perf:open --runs 10` (`app/electron-client/CLAUDE.md`, "Open-time harness").
 
 ## Local secrets (`src/localSecrets/`)
 

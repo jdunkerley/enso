@@ -9,7 +9,7 @@ from Standard.Table.Errors import all
 
 from Standard.Test import all
 
-import project.Util
+import Standard.Database_Test_Suite.Util
 
 add_specs suite_builder =
     suite_builder.group "Delimited File Parsing" group_builder->

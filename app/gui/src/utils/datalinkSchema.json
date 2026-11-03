@@ -8,6 +8,7 @@
         { "$ref": "#/$defs/EnsoFileDataLink" },
         { "$ref": "#/$defs/HttpFetchDataLink" },
         { "$ref": "#/$defs/PostgresDataLink" },
+        { "$ref": "#/$defs/PostgresLegacyDataLink" },
         { "$ref": "#/$defs/SnowflakeDataLink" },
         { "$ref": "#/$defs/SQLServerDataLink" }
       ],
@@ -146,6 +147,57 @@
     },
     "PostgresDataLink": {
       "title": "Postgres Database Connection",
+      "type": "object",
+      "properties": {
+        "type": {
+          "title": "Type",
+          "const": "Postgres_Connection",
+          "type": "string"
+        },
+        "libraryName": { "const": "Standard.Postgres" },
+        "host": {
+          "title": "Hostname",
+          "type": "string"
+        },
+        "port": {
+          "title": "Port",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 5432
+        },
+        "database_name": {
+          "title": "Database Name",
+          "type": "string"
+        },
+        "schema": {
+          "title": "Schema",
+          "type": "string"
+        },
+        "credentials": {
+          "title": "Credentials",
+          "type": "object",
+          "properties": {
+            "username": {
+              "title": "Username",
+              "$ref": "#/$defs/SecureValue"
+            },
+            "password": {
+              "title": "Password",
+              "$ref": "#/$defs/SecureValue"
+            }
+          },
+          "required": ["username", "password"]
+        },
+        "table": {
+          "title": "Table to access",
+          "$ref": "#/$defs/DatabaseTableDefinition"
+        }
+      },
+      "required": ["type", "libraryName", "host", "port", "database_name"]
+    },
+    "PostgresLegacyDataLink": {
+      "title": "Postgres Database Connection (Standard.Database)",
       "type": "object",
       "properties": {
         "type": {

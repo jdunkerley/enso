@@ -699,3 +699,178 @@ challenges plus app-demo workflows like Colorado COVID and FX Rates History).
 It's gated on `ENSO_TEST_AI_CHALLENGES_DIR=/abs/path` pointing at
 manually-downloaded inputs (see `tests/README.md` for the expected layout)
 because the inputs aren't checked in and the agent budget is real.
+
+## Open-time harness
+
+`perf/openTime.ts` measures how long opening a project takes in the packaged IDE
+(spec `docs/superpowers/specs/2026-11-01-project-open-performance-design.md`,
+section 2). It is not a Playwright Test run: it drives Electron through
+`playwright`'s `_electron` and is started with
+
+```
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
+```
+
+It needs a built `dist/ide/` (or `--exe`), and under Linux a display
+(`xvfb-run`). The IDE allows one instance per user profile, so a launch quits at
+once ("Target page, context or browser has been closed") while another IDE of
+the same name runs; close it first, or point `--exe` at a copy whose `app.asar`
+`package.json` `name` has been changed (same length), which has a profile of its
+own. Each launch creates two new projects with the bundled launcher
+(`enso --new`), starts the IDE, opens the first from the dashboard (the cold
+open), waits for the welcome table, opens the component browser and the `format`
+dropdown, closes the project, and does the same with the second. Times are
+milliseconds from the click on the project's row:
+
+| Phase            | Ends at                                                                      |
+| ---------------- | ---------------------------------------------------------------------------- |
+| `engineUp`       | the launcher's first stdout line, else the Language Server log's first line  |
+| `lsReady`        | the Language Server log's `Started server at json`                           |
+| `openAnswered`   | the response to `project/open`                                               |
+| `guiConnected`   | the GUI's `/project/index` WebSocket is open (its first frame sent)          |
+| `firstNode`      | the first `.GraphNode` is visible                                            |
+| `firstExecution` | the log's `The first execution finished.` (INFO, `SuggestionsHandler`)       |
+| `welcomeShown`   | the table visualisation shows `Welcome To Enso!` (the headline)              |
+| extras           | after the headline: component browser entries, `format` widget, its dropdown |
+
+The Language Server's log times carry no offset and are read as local time (Note
+[Language Server Log Times Are Local] in `perf/openTimeReport.ts`). A launch
+that misses a phase or an extra records it in `notMeasured`, and the report
+warns about it; nothing is silently skipped.
+
+The extras share one budget per open, `--extras-seconds` (15 by default; a
+working extra takes ~5 s), then the rest are skipped and recorded as not
+measured, with a screenshot (`<tag>-extras.png`, uploaded by CI) of what the
+page showed (Note [Extras Are Bounded] in `perf/openTime.ts`). On the Windows
+runner none of the extras has ever been reached, and each waited out its own
+timeout: ~212 s per open, so only 2 launches fitted the budget and there was no
+median. Why the selectors do not match there is not yet known; the screenshots
+will say.
+
+Output in `--out`: `open-time.json` (an `OpenTimeReport`), `open-time.md` (the
+medians table, with develop's first-open medians when `--baseline` is a report
+of the same template, or a directory of them: the newest five are pooled) and,
+per launch, `<engine>-<n>/` with `marks.json`, `electron-out.log` and `logs/`
+(and with `--profile` a renderer `first.cpuprofile` and `second.cpuprofile`).
+Warnings: a median over 4 s (always true on a shared runner, 2.5 to 3 times
+slower than a desk), more than 15% **and** 2 s worse than the median of
+develop's last five runs (CI downloads them; Note [Noisy Medians] in
+`perf/openTimeReport.ts`), or fewer than 3 successful first opens. The spread of
+the launches is printed with the median. They are printed (as `::warning` under
+GitHub Actions) and never change the exit code.
+
+Every child process starts without credentials: `credentialFreeEnv` drops the
+`ENSO_*`, `AWS_*`, `SNOWFLAKE*`, `GOOGLE_*`, `AZURE_*`, `GCP_*`, `DATABRICKS*`,
+`ANTHROPIC*`, `OPENAI*`, `PG*` and `ACTIONS_*` variables, the GitHub tokens, and
+any variable named `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_KEY` or
+`*_CREDENTIALS`, whatever the caller's environment holds. It also drops
+`JAVA_TOOL_OPTIONS`, `_JAVA_OPTIONS` and `JDK_JAVA_OPTIONS`, so a native
+measurement is not changed by them. Still unset the credentials in the shell
+before a manual run.
+
+`--engines jvm` runs the engine on the bundled JDK instead of the native image
+(`ENSO_ENGINE_ARGS=--jvm`). It first builds a JDK AOT cache under `<out>/aot/`
+(`perf/jvmAotCache.ts`: a training launch, `-XX:AOTMode=create` with the
+bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
+it: with `on` a JVM that cannot use the cache fails to start, and so does every
+measured launch). So a JVM run takes several minutes longer than a native one.
+The report says how the cache was made (`jvmAot`): `ide-trained` (the training
+is a launch of the IDE), `launcher-trained` (where the IDE kills the engine, as
+on Windows, the JVM never writes the training file, so it is `enso --jvm --run`
+of an empty project: it never loads the Language Server or `project/open`
+classes, so those JVM numbers are pessimistic and not comparable with
+`ide-trained` ones) or `uncached` (the JVM refused the cache; the numbers are
+those of a JVM with no AOT cache, and the report warns). `LAUNCHER_JVM_OPTIONS`
+copies the options of `Main.launchJvm`; a unit test fails when they drift.
+
+`tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
+`java` and its engine component are; the Playwright specs, `globalSetup.ts` and
+the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
+unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
+runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).
+
+**`guiConnected` is when the socket opened, not when it was created** (Note [The
+GUI Is Connected When Its Socket Is Open] in `perf/openTimeReport.ts`). It used
+to be the first `websocket` event, which fires for a socket that is then
+refused: on Linux before #507 the GUI was refused three times and y-websocket
+retried after 200, 400 and 800 ms, so the real connection came ~1.4 s after the
+answer while `guiConnected` said ~50 ms. Count the `/project/index` `wsOpen`
+marks in `marks.json` to see retries.
+
+**The connect gap (`openAnswered` to `guiConnected`) was a refused connect.** On
+Windows it was ~525 ms against ~25 ms on Linux (medians of 5 launches, native
+release build, develop at `b0bb59fee2`; the Linux figure is the refused first
+attempt, see above). A renderer profile of the window (`first.cpuprofile`, three
+launches) showed the renderer ~80% `(idle)` (404 to 422 ms of ~525) and the rest
+almost all `(program)` (92 to 101 ms): no function of ours above 2 ms self time,
+so no work and no timer in the GUI. A hook on `WebSocket` in the page showed the
+GUI calling `new WebSocket` for `/project/index` 15 ms after the answer, and the
+socket opening 510 ms later; a TCP probe of the ydoc port from the harness was
+refused when `project/open` was answered and accepted ~300 ms later. The
+engine's ydoc server (GraalJS) listens after the Language Server passes
+`/_health`, which is when the shim answered; that is consistent with Windows
+retrying a refused loopback connect after ~500 ms (inferred from the constant
+510 to 525 ms gap, not observed; Linux fails at once). The fix is in the shim,
+which now also waits for the ydoc port to accept before answering (Note [Open
+Waits For The Ydoc Port] in
+`project-manager-shim/src/projectService/ensoRunner.ts`): the gap is ~27 ms on
+Windows, `guiConnected` 769 to 588 ms. `openAnswered` moves later by the wait,
+so read `guiConnected`, not the gap, to judge the open. To trace a gap like this
+again: hook `WebSocket`, `fetch` and `setTimeout` in the page with
+`page.evaluate`, and log every `response` (the harness records only the project
+service's).
+
+**Nothing from the GUI competes with the welcome table** (traces of 12 opens of
+#509's build with debug engine logs and the hold instrumented, 6 per host, plus
+8 of develop at `4bece789f1`). Before `welcomeShown` the engine sees only the
+welcome node's three attaches: the default-visualization query and the node's
+first visualization at connect, and the table visualization that replaces it
+when the first execution reports the type. The welcome node's widget query
+(`Data.read`'s `format`, on the `Data` subject) cannot be configured before the
+suggestion database is loaded, which waits for the first execution (`loadGroups`
+in `suggestionDatabase/index.ts`); the GUI configures it 0.35 to 1.2 s after
+`firstExecution`, always after the table's JSON was generated, and the engine
+attaches it ~1 s later still. Column-name queries come only from the
+table-expression editor. So holding widget queries back at open (#509) changed
+nothing: in the 12 opens it held one query once, for 12 ms, and the interleaved
+A/B below shows no gain. Holding them longer would do harm, because what the
+table actually waits for is the engine:
+
+- **A deferred visualization can wait for an unrelated execution.** The
+  replacement often arrives while the first `ExecuteJob` is finishing and is
+  deferred after that job's own pass over unevaluated visualizations has run
+  (#510). The `ExecuteJob` its attach schedules then starts late (0.85 and 1.4
+  s) or not at all: `ExecuteJob` is a `SkipSchedulingUniqueJob`, so it is
+  probably skipped as a duplicate of the one still running (the skip is logged
+  only at trace level; inferred). With no run of its own, the table waits for
+  the next `ExecuteJob`, which on Linux was the widget query's, 2.5 to 2.7 s
+  after the attach, in 3 of 10 opens (2 of 6 of #509, 1 of 4 of develop).
+- **Evaluated directly, it can still take 0.5 to 1.3 s** (Linux, attach after
+  the execution), and on Windows the deferred one's `ExecuteJob` started up to
+  0.7 s late in opens where the Language Server's catalogue insert ("Inserted
+  834 catalogue entries", 0.1 to 1.5 s, right after the first execution) ran at
+  the same time; correlation only, not traced further.
+- **The GUI then takes 0.35 to 1.2 s** from the engine's `TableVizOperation` log
+  line to `welcomeShown`.
+
+To read an open like this: set `ENSO_LOGSERVER_LOG_TO_FILE_LOG_LEVEL=debug` for
+the engine (the harness drops `ENSO_*`, so patch its `env` locally) and line up
+`AttachVisualizationCmd(…expressionId=…)`, `Starting ExecuteJob[…, trigger=…]`,
+`The first execution finished.` and `TableVizOperation` against `marks.json`;
+the template's id map (`Main.enso` metadata) names each expression id.
+
+**The plan's effect, measured once on both hosts** (2026-11-02; release builds
+2026.1.1-rc.1, native, core template; 3 interleaved rounds of 5 launches per
+build; `welcomeShown` medians over the 15 launches, first / second open, ms):
+
+| Build                                      | Linux (WSL) |     Windows |
+| ------------------------------------------ | ----------: | ----------: |
+| `a80dd14348` (develop at the plan's start) | 6790 / 6397 |           – |
+| `488acf5998` (develop after #490 to #511)  | 5570 / 5130 | 4857 / 4298 |
+| #509 (`26cb40fdf8`, the widget hold)       | 5905 / 5242 | 4946 / 4975 |
+
+Per-round first-open medians spread by up to 1.9 s on Linux (`a80dd14348`: 5864
+to 7766) and 0.4 s on Windows, so differences under ~0.5 s are noise. Linux
+gained ~1.2 s on both opens and is still ~1.6 s over the 4 s target; Windows is
+~0.9 s over it. No Windows build of `a80dd14348` was made here; the spec's
+pre-plan spike gave 6811 ms for its first open.

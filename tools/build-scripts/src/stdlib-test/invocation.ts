@@ -103,8 +103,8 @@ export function missingServiceWarnings(
 ): string[] {
   if (platform !== 'linux') return []
   const warnings: string[] = []
-  if (projects.includes('Table_Tests') && (env.ENSO_POSTGRES_DATABASE ?? '') === '') {
-    warnings.push('Table_Tests runs without a Postgres database (ENSO_POSTGRES_* is not set).')
+  if (projects.includes('Postgres_Tests') && (env.ENSO_POSTGRES_DATABASE ?? '') === '') {
+    warnings.push('Postgres_Tests runs without a Postgres database (ENSO_POSTGRES_* is not set).')
   }
   if (projects.includes('Microsoft_Tests') && (env.ENSO_SQLSERVER_DATABASE ?? '') === '') {
     warnings.push(

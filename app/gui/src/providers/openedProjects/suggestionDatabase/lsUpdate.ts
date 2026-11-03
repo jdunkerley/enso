@@ -45,6 +45,7 @@ interface UpdateContext {
 
 abstract class BaseSuggestionEntry implements SuggestionEntryCommon {
   abstract readonly kind: SuggestionKind
+  fromCatalogue = false
   private documentationData: DocumentationData
   abstract name: IdentifierOrOperatorIdentifier
   abstract returnType(projectNames: ProjectNameStore): Typename
@@ -589,28 +590,34 @@ export class SuggestionUpdateProcessor {
     return withContext(
       () => `when creating entry`,
       (): Result<SuggestionEntry> => {
-        const context = {
-          groups: toValue(this.groups),
-          projectNames: this.projectNames,
-        }
-        switch (lsEntry.type) {
-          case 'function':
-            return FunctionSuggestionEntryImpl.parse(lsEntry, context)
-          case 'module':
-            return ModuleSuggestionEntryImpl.parse(lsEntry, context)
-          case 'type':
-            return TypeSuggestionEntryImpl.parse(lsEntry, context)
-          case 'constructor':
-            return ConstructorSuggestionEntryImpl.parse(lsEntry, context)
-          case 'method':
-            return MethodSuggestionEntryImpl.parse(lsEntry, context)
-          case 'local':
-            return LocalSuggestionEntryImpl.parse(lsEntry, context)
-          default:
-            assertNever(lsEntry)
-        }
+        const entry = this.parseLsEntry(lsEntry)
+        if (entry.ok) entry.value.fromCatalogue = isFromCatalogue(lsEntry)
+        return entry
       },
     )
+  }
+
+  private parseLsEntry(lsEntry: lsTypes.SuggestionEntry): Result<SuggestionEntry> {
+    const context = {
+      groups: toValue(this.groups),
+      projectNames: this.projectNames,
+    }
+    switch (lsEntry.type) {
+      case 'function':
+        return FunctionSuggestionEntryImpl.parse(lsEntry, context)
+      case 'module':
+        return ModuleSuggestionEntryImpl.parse(lsEntry, context)
+      case 'type':
+        return TypeSuggestionEntryImpl.parse(lsEntry, context)
+      case 'constructor':
+        return ConstructorSuggestionEntryImpl.parse(lsEntry, context)
+      case 'method':
+        return MethodSuggestionEntryImpl.parse(lsEntry, context)
+      case 'local':
+        return LocalSuggestionEntryImpl.parse(lsEntry, context)
+      default:
+        assertNever(lsEntry)
+    }
   }
 
   private applyUpdate(
@@ -742,4 +749,9 @@ function parseProjectPath<K extends string>(
     () =>
       lsEntry[field] != null ? projectNames.parseProjectPathRaw(lsEntry[field]) : Ok(undefined),
   )
+}
+
+/** Whether the language server sent the entry from a library's catalogue. */
+function isFromCatalogue(lsEntry: lsTypes.SuggestionEntry): boolean {
+  return 'fromCatalogue' in lsEntry && lsEntry.fromCatalogue === true
 }

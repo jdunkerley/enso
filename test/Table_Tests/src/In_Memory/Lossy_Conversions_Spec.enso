@@ -5,7 +5,7 @@ from Standard.Table.Errors import Loss_Of_Integer_Precision
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 main filter=Nothing =
     suite = Test.build suite_builder->

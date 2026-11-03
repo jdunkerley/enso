@@ -2,16 +2,20 @@
 
 SQL abstraction for relational databases. Returns a deferred `DB_Table` (query
 plan, not data) that mirrors the in-memory `Table` API; call `.read` to
-materialize. Backends (SQLite, Postgres, DuckDB, Snowflake, SQL Server, …) ship
-in their own libraries — `Standard.SQLite`, `Standard.DuckDB`,
-`Standard.Snowflake`, `Standard.Microsoft`, etc. (SQLite is no longer in
-`Standard.Database`: `from Standard.SQLite import all`.)
+materialize. Database has no backend of its own: backends (Postgres, SQLite,
+DuckDB, Snowflake, SQL Server, …) ship in their own libraries —
+`Standard.Postgres`, `Standard.SQLite`, `Standard.DuckDB`, `Standard.Snowflake`,
+`Standard.Microsoft`, etc. (Postgres and SQLite are no longer in
+`Standard.Database`: `from Standard.Postgres import all`,
+`from Standard.SQLite import all`.) The PostgreSQL dialect base that Postgres,
+DuckDB and Redshift share stays here, in `Postgres_Family`, with `SSL_Mode` and
+`Client_Certificate`.
 
 ## Main entry points
 
 - `Database.connect <details>` — open a connection. `<details>` is a backend
-  type, e.g. `DuckDB.In_Memory`, `Postgres.Postgres host port db creds`,
-  `SQLServer_Details.SQLServer …`.
+  type, e.g. `DuckDB.In_Memory`, `Postgres.Server host port db creds` (from
+  `Standard.Postgres`), `SQLServer_Details.SQLServer …`.
 - `connection.tables` — list tables in the connection.
 - `connection.query "table_name"` — get a deferred `DB_Table` for an existing
   table.
@@ -60,7 +64,11 @@ raw = conn.query (..Raw_SQL "SELECT id, name FROM users WHERE active = true")
 
 - `src/Connection/Connection.enso` — connection methods.
 - `src/DB_Table.enso` — deferred table operations.
-- `test/Table_Tests/src/Common_Table_Operations/` — the same suite runs against
-  both in-memory and database backends.
-- `test/DuckDB_Tests/`, `test/Snowflake_Tests/`, `test/Microsoft_Tests/` —
-  backend-specific examples.
+- `distribution/lib/Standard/Database_Test_Suite/` — the same suite runs against
+  the in-memory table and every database backend.
+- Which aggregates a backend runs is its dialect's `check_aggregate_support`;
+  how they behave, its `flagged` answers (`First_Last_Respects_Row_Order`,
+  `Reports_Aggregation_Problems`, `Concatenate_Follows_Row_Order`): a new
+  `Dialect_Flag` must be answered by every dialect, whose `case` has no default.
+- `test/SQLite_Tests/`, `test/Postgres_Tests/`, `test/DuckDB_Tests/`,
+  `test/Snowflake_Tests/`, `test/Microsoft_Tests/` — one project per backend.

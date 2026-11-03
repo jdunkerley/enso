@@ -136,7 +136,7 @@ describe('DatalinkInput', () => {
     await chooseType('Postgres Database Connection')
     expect(value.value).toMatchObject({
       type: 'Postgres_Connection',
-      libraryName: 'Standard.Database',
+      libraryName: 'Standard.Postgres',
       port: 5432,
     })
     const port = element().querySelector<HTMLInputElement>('input[type="number"]')!

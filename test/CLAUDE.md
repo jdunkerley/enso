@@ -20,10 +20,16 @@ One directory per suite, typically:
 
 - `Base_Tests/`, `Base_Internal_Tests/` — `Standard.Base`. Requires
   `http-test-helper/` running (see `Base_Tests/README.md`).
-- `Table_Tests/`, `Table_Internal_Tests/` — `Standard.Table`.
+- `Table_Tests/`, `Table_Internal_Tests/` — `Standard.Table`, and the shared
+  suite against the in-memory table.
+- `SQLite_Tests/`, `Postgres_Tests/` — the SQLite and PostgreSQL backends: the
+  shared suite and their own specs. `Postgres_Tests` needs a server
+  (`README.md`), and holds the library discovery spec, which needs none.
 - `AWS_Tests/`, `Snowflake_Tests/`, `Microsoft_Tests/`, `Google_Test/`,
   `Tableau_Tests/`, `DuckDB_Tests/`, `Generic_JDBC_Tests/`, `Cloud_Tests/`,
   `Saas_Tests/` — provider suites. Most need live credentials via env vars.
+- Database backends run `Standard.Database_Test_Suite` with a `Backend`
+  descriptor; see that library's `CLAUDE.md`.
 - `Geo_Tests/`, `Image_Tests/` — media suites.
 - `Examples_Tests/` — runs the `Standard.Examples` workflows and asserts their
   outputs.
@@ -57,6 +63,8 @@ variables — skipped tests are visible in the report, not silently dropped.
    `Test.build suite_builder-> ...`, by calling
    `Your_Spec.add_specs suite_builder`. `main filter=Nothing` ends with
    `suite.run_with_filter filter`.
+5. A database backend runs the shared suite: see "Testing a database backend" in
+   `distribution/lib/Standard/Database_Test_Suite/0.0.0-dev/CLAUDE.md`.
 
 ## Changing Java helpers
 

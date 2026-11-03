@@ -8,15 +8,15 @@ import project.Internal.Statement_Setter.Statement_Setter
 from project.Errors import SQL_Error, Unsupported_Database_Encoding
 from project.Internal.Result_Set import result_set_to_table
 
-polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
-
 ## ---
    private: true
    ---
-get_encoding_name jdbc_connection:JDBC_Connection -> Text =
-    server_encoding = _get_pragma_value jdbc_connection "SHOW server_encoding" . catch SQL_Error _-> "SQL_ASCII"
+   The `column_fetcher_factory` is the connection's own (its type mapping's), so
+   that a library running on the guest JVM does not use Database's hosted one.
+get_encoding_name jdbc_connection:JDBC_Connection column_fetcher_factory -> Text =
+    server_encoding = _get_pragma_value jdbc_connection column_fetcher_factory "SHOW server_encoding" . catch SQL_Error _-> "SQL_ASCII"
     if server_encoding != "SQL_ASCII" then server_encoding else
-        _get_pragma_value jdbc_connection "SHOW client_encoding"
+        _get_pragma_value jdbc_connection column_fetcher_factory "SHOW client_encoding"
 
 ## ---
    private: true
@@ -56,10 +56,10 @@ parse_postgres_encoding encoding_name:Text -> Encoding =
 ## ---
    private: true
    ---
-private _get_pragma_value jdbc_connection:JDBC_Connection sql:Text -> Any =
+private _get_pragma_value jdbc_connection:JDBC_Connection column_fetcher_factory sql:Text -> Any =
     table = jdbc_connection.with_prepared_statement sql Statement_Setter.null stmt->
         rs = stmt.executeQuery
-        table = result_set_to_table rs ColumnFetcherFactory.DEFAULT
+        table = result_set_to_table rs column_fetcher_factory
         SQL_Warning_Helper.process_warnings stmt table
 
     if table.row_count != 1 then

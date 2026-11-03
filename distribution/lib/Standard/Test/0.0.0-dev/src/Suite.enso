@@ -17,7 +17,21 @@ type Suite_Builder
 
        ## Arguments
         - `builder`: Vector builder that holds all the groups.
-    private Impl builder
+        - `pending_override`: `Nothing`, or a function from a group name and a
+          spec name (`Nothing` for the group itself) to a reason that makes
+          the group or the spec pending, or `Nothing`.
+    private Impl builder pending_override=Nothing
+
+    ## A builder that adds to the same suite, but can make groups and specs
+       pending by name.
+
+       ## Arguments
+        - `pending_override`: A function from a group name and a spec name
+          (`Nothing` when asking about the group itself) to the reason the
+          group or spec is pending, or `Nothing` to leave it as it is. It is
+          called when the group or spec is added.
+    with_pending_override self (pending_override : (Text -> (Text | Nothing) -> (Text | Nothing))) -> Suite_Builder =
+        Suite_Builder.Impl self.builder pending_override
 
     ## Add a group to the suite builder.
 
@@ -31,9 +45,10 @@ type Suite_Builder
           If Nothing, the test is not ignored.
     group : Text -> (Group_Builder -> Any) -> (Text | Nothing) -> Nothing
     group self (name:Text) (fn : (Group_Builder -> Any)) (~pending : (Text | Nothing) = Nothing) =
-        group_builder = Group_Builder.Impl name
+        group_builder = Group_Builder.Impl name pending_override=self.pending_override
         fn group_builder
-        group = Group.Impl name group_builder.teardown_ref.get group_builder.builder.to_vector pending
+        override = if self.pending_override.is_nothing then Nothing else self.pending_override name Nothing
+        group = Group.Impl name group_builder.teardown_ref.get group_builder.builder.to_vector (if override.is_nothing then pending else override)
         self.builder.append group
 
 

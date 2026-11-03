@@ -2,6 +2,14 @@
 
 #### Enso IDE
 
+- [Projects open faster: a new project shows its first table sooner.][514]
+- [New projects import only Base, Table, Database, Examples and Visualization
+  instead of a dozen libraries. Components of other libraries stay in the
+  component browser, and using one adds its import.][482]
+- [The component browser finds the components of every installed library as soon
+  as a project opens, whether or not the project imports the library, and
+  picking one adds the import. Where two components match a search equally,
+  those of the libraries the project imports come first.][476]
 - [The Windows installer is a standard installer: it can install silently (`/S`)
   and shows a single entry under installed apps.][255]
 - [Enso updates itself: when a new version is out, it offers to download it and
@@ -216,7 +224,7 @@
 - [The IDE adds the imports your code needs][466]: when a new or edited
   component, or a dropdown choice, uses a type from a library the project does
   not import, the import is added with it. Opening a project adds any imports
-  its code is missing, and a notice says which.
+  its `Main.enso` is missing, and a notice says which.
 
 #### Enso Language & Runtime
 
@@ -321,16 +329,23 @@
 
 #### Enso Standard Library
 
+- [Standard.Database_Test_Suite: a conformance suite for database backends. A
+  backend describes itself in a few lines and runs the same table and database
+  tests as the built-in ones. The suite is not in the IDE installer; for now it
+  can be used only from a source build of the repository, and publishing it for
+  libraries outside the repository is tracked in #502.][492]
 - [Connection, file format, return type and e-mail dropdowns list the installed
   libraries' choices, even those not imported yet][465]
 - [Redshift connections no longer read the PostgreSQL `.pgpass` file][464]: pass
   credentials explicitly or use AWS credentials.
-- [SQLite is now its own library, `Standard.SQLite`][468]: the IDE adds
-  `from Standard.SQLite import SQLite` where code uses it, and fixes older
-  projects when they open; `Database.connect`'s list and `Data.read` of a SQLite
-  file work without the import. Code run outside the IDE (`enso --run`), and
-  `Generic_JDBC` connections to a `jdbc:sqlite:` URL, need
-  `from Standard.SQLite import all` added by hand.
+- [PostgreSQL][481] and [SQLite][468] are now their own libraries,
+  `Standard.Postgres` and `Standard.SQLite`: the IDE adds their imports where
+  code uses them and fixes a project's `Main.enso` when it opens, and
+  `Database.connect`'s list, `Data.read` of a SQLite file and saved PostgreSQL
+  data links work without the import. Code run outside the IDE (`enso --run`),
+  and `Generic_JDBC` connections to their URLs, need
+  `from Standard.Postgres import all` or `from Standard.SQLite import all` added
+  by hand.
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
@@ -368,6 +383,9 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[514]: https://github.com/jdunkerley/enso/pull/514
+[476]: https://github.com/jdunkerley/enso/pull/476
+[482]: https://github.com/jdunkerley/enso/pull/482
 [466]: https://github.com/jdunkerley/enso/pull/466
 [465]: https://github.com/jdunkerley/enso/pull/465
 [116]: https://github.com/jdunkerley/enso/pull/116
@@ -442,6 +460,8 @@
 [412]: https://github.com/jdunkerley/enso/pull/412
 [464]: https://github.com/jdunkerley/enso/pull/464
 [468]: https://github.com/jdunkerley/enso/pull/468
+[481]: https://github.com/jdunkerley/enso/pull/481
+[492]: https://github.com/jdunkerley/enso/pull/492
 
 # Enso 2026.1
 

@@ -3,9 +3,13 @@ package org.enso.polyglot
 import io.circe.Json
 import io.circe.parser.parse
 import io.circe.syntax._
+import org.enso.pkg.PackageManager
 import org.enso.polyglot.SuggestionJson.{suggestionDecoder, suggestionEncoder}
 
+import java.io.File
+import java.nio.file.Files
 import scala.jdk.CollectionConverters._
+import scala.util.{Failure, Success, Try}
 
 /** A library's `catalogue.json`: its global suggestions that the component
   * browser shows, in the language server's JSON form ([[SuggestionJson]]), so
@@ -50,7 +54,10 @@ object LibraryCatalogue {
   val FileName: String = "catalogue.json"
 
   /** The GUI's rule for an internal module (`isInternalModulePath` in
-    * `filtering.ts`), on the module's path inside its library.
+    * `filtering.ts`), on the module's path inside its library. Unlike the GUI,
+    * which hides such modules only for `Standard.*` libraries and shows their
+    * methods when the self type is known, the catalogue leaves them out of
+    * every library, always: those entries appear once the library is loaded.
     */
   private val InternalModule = "Internal(?:[._]|$)".r
 
@@ -136,6 +143,66 @@ object LibraryCatalogue {
       )
       (catalogue, skipped)
     }
+
+  /** Whether a library's catalogue can be used. */
+  sealed trait Validation
+  object Validation {
+
+    /** The library's `package.yaml` says `catalogue: false`. */
+    case object Declined extends Validation
+
+    /** @param reason why the catalogue cannot be used */
+    final case class Unusable(reason: String) extends Validation
+
+    /** @param catalogue the catalogue
+      * @param skipped why each entry left out of it was
+      */
+    final case class Usable(catalogue: LibraryCatalogue, skipped: Seq[String])
+        extends Validation
+  }
+
+  /** Checks the catalogue of a library, as the language server uses it: it
+    * is there, its header parses, its format is [[Format]], it names the
+    * library and its `sourceHash` equals `Package.sourceHash` of the
+    * library's sources.
+    *
+    * @param library the library's qualified name
+    * @param root the library's root directory
+    * @param checkHash whether to hash the sources (false when they are known
+    * to match already)
+    * @return whether the catalogue can be used, with its entries if it can
+    */
+  def validate(
+    library: String,
+    root: File,
+    checkHash: Boolean = true
+  ): Validation = {
+    val file = root.toPath.resolve(FileName)
+    PackageManager.Default.loadPackage(root) match {
+      case Failure(error) =>
+        Validation.Unusable(
+          s"the library cannot be read (${error.getMessage})"
+        )
+      case Success(pkg) if !pkg.getConfig().catalogue => Validation.Declined
+      case Success(_) if !Files.isRegularFile(file) =>
+        Validation.Unusable("there is none")
+      case Success(pkg) =>
+        Try(Files.readString(file)).toEither.left
+          .map(_.getMessage)
+          .flatMap(read) match {
+          case Left(error) => Validation.Unusable(s"it cannot be read ($error)")
+          case Right((catalogue, _)) if catalogue.library != library =>
+            Validation.Unusable(s"it describes ${catalogue.library}")
+          case Right((catalogue, _))
+              if checkHash && pkg.sourceHash() != catalogue.sourceHash =>
+            Validation.Unusable(
+              "the library's sources changed after it was written"
+            )
+          case Right((catalogue, skipped)) =>
+            Validation.Usable(catalogue, skipped)
+        }
+    }
+  }
 
   /** @return the catalogue in `text`, or why it is not one this code reads,
     * including any entry it cannot decode

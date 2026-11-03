@@ -709,7 +709,7 @@
         ]
     },
     {
-        "name": "org.enso.table_test_helpers.ExplodingStoragePayload",
+        "name": "org.enso.database_test_suite.ExplodingStoragePayload",
         "methods": [
             {
                 "name": "<init>",
@@ -718,7 +718,7 @@
         ]
     },
     {
-        "name": "org.enso.table_test_helpers.ExplodingStorage",
+        "name": "org.enso.database_test_suite.ExplodingStorage",
         "methods": [
             {
                 "name": "<init>",

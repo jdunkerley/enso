@@ -1,0 +1,115 @@
+private
+
+from Standard.Base import all
+
+from Standard.Table import Value_Type
+
+import Standard.Database.Internal.IR.SQL_IR_Expression.SQL_IR_Expression
+import Standard.Database.Internal.SQL_Type_Reference.SQL_Type_Reference
+import Standard.Database.Internal.Statement_Setter.Statement_Setter
+import Standard.Database.Postgres_Family.Postgres_Error_Mapper.Postgres_Error_Mapper
+import Standard.Database.Postgres_Family.Postgres_Type_Mapping.Postgres_Type_Mapping as Family_Type_Mapping
+import Standard.Database.SQL.SQL_Type
+
+# The Java helpers are imported here, not taken from `Standard.Database`: this
+# library runs on the guest JVM, and a helper created by Database's hosted
+# classes would not be usable with its driver. Everything else is the shared
+# Postgres-family mapping.
+polyglot java import org.enso.database.fetchers.ColumnFetcherFactory
+polyglot java import org.enso.database.JDBCValueSetter
+
+## ---
+   private: true
+   ---
+   The type mapping of the Postgres library: the Postgres-family mapping, with
+   the Java helpers imported by this library.
+type Postgres_Type_Mapping
+    ## ---
+       private: true
+       ---
+    value_type_to_sql : Value_Type -> Problem_Behavior -> SQL_Type
+    value_type_to_sql value_type on_problems:Problem_Behavior =
+        Family_Type_Mapping.value_type_to_sql value_type on_problems
+
+    ## ---
+       private: true
+       ---
+    sql_type_to_value_type : SQL_Type -> Boolean -> Value_Type
+    sql_type_to_value_type sql_type json_as_text:Boolean=False =
+        Family_Type_Mapping.sql_type_to_value_type sql_type json_as_text
+
+    ## ---
+       private: true
+       advanced: true
+       ---
+       Gets the ColumnFetcherFactory to be used for Postgres.
+    column_fetcher_factory : Any
+    column_fetcher_factory =
+        ColumnFetcherFactory.DEFAULT
+
+    ## ---
+       private: true
+       ---
+    sql_type_to_text : SQL_Type -> Text
+    sql_type_to_text sql_type =
+        Family_Type_Mapping.sql_type_to_text sql_type
+
+    ## ---
+       private: true
+       ---
+    infer_return_type : (SQL_IR_Expression -> SQL_Type_Reference) -> Text -> Vector -> SQL_IR_Expression -> SQL_Type_Reference
+    infer_return_type infer_from_database_callback op_name arguments expression =
+        Family_Type_Mapping.infer_return_type infer_from_database_callback op_name arguments expression
+
+    ## ---
+       private: true
+       ---
+    prepare_type_overrides : Nothing | Vector SQL_Type_Reference -> Nothing | Vector (Nothing | SQL_Type)
+    prepare_type_overrides column_type_suggestions =
+        Family_Type_Mapping.prepare_type_overrides column_type_suggestions
+
+    ## ---
+       private: true
+       ---
+    is_implicit_conversion (source_type : Value_Type) (target_type : Value_Type) -> Boolean =
+        Family_Type_Mapping.is_implicit_conversion source_type target_type
+
+    ## ---
+       private: true
+       ---
+    should_warn_on_materialize (db_type : Value_Type) (in_memory_type : Value_Type) -> Boolean =
+        Family_Type_Mapping.should_warn_on_materialize db_type in_memory_type
+
+    ## ---
+       private: true
+       ---
+    is_integer_type (value_type : Value_Type) -> Boolean =
+        Family_Type_Mapping.is_integer_type value_type
+
+    ## ---
+       private: true
+       ---
+    is_same_type (value_type1 : Value_Type) (value_type2 : Value_Type) -> Boolean =
+        Family_Type_Mapping.is_same_type value_type1 value_type2
+
+    ## ---
+       private: true
+       ---
+       Creates a Statement_Setter for Postgres.
+    statement_setter =
+        fill_home = Statement_Setter.create_fill_hole Postgres_Type_Mapping.value_setter
+        Statement_Setter.for_fill_hole fill_home
+
+    ## ---
+       private: true
+       ---
+    value_setter =
+        JDBCValueSetter.create "Postgres"
+
+    ## ---
+       private: true
+       ---
+       Returns a helper for mapping database-specific SQL errors into our common
+       error types.
+    error_mapper : Postgres_Error_Mapper
+    error_mapper self = Postgres_Error_Mapper

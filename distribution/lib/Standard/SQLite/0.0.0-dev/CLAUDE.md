@@ -38,5 +38,6 @@ result = t.read
 
 ## Where to read more
 
-- `test/Table_Tests/src/Database/SQLite_Spec.enso` — the SQLite test suite.
+- `test/SQLite_Tests/` — the SQLite test project (the shared suite and
+  `SQLite_Spec.enso`).
 - `distribution/lib/Standard/Database/CLAUDE.md` — `DB_Table` semantics.

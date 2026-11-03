@@ -72,6 +72,28 @@ export function readJUnitDir(dir: string): Map<string, TestCase[]> {
   return projects
 }
 
+/** The label of a group's backend: the leading `[…]` of its name, if any. */
+export function groupPrefix(suite: string): string {
+  return /^\[[^\]]+\]/.exec(suite)?.[0] ?? '(no prefix)'
+}
+
+/**
+ * Every project's test cases pooled and keyed by `groupPrefix` instead of by project, so that
+ * groups which moved from one project to another compare with themselves.
+ */
+export function byGroupPrefix(
+  run: ReadonlyMap<string, readonly TestCase[]>,
+): Map<string, TestCase[]> {
+  const grouped = new Map<string, TestCase[]>()
+  for (const cases of run.values()) {
+    for (const testCase of cases) {
+      const key = groupPrefix(testCase.suite)
+      grouped.set(key, [...(grouped.get(key) ?? []), testCase])
+    }
+  }
+  return new Map([...grouped.entries()].sort(([a], [b]) => a.localeCompare(b)))
+}
+
 /** One project's row in the comparison. */
 export interface ProjectComparison {
   readonly project: string

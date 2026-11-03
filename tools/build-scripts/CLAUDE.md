@@ -35,7 +35,10 @@ prints one.
   `ide build --backend-source local --gui-source local` did: from `dist/gui` and
   `dist/backend`, `pnpm install`, then `build:ide` and `dist:ide` with the
   variables electron-builder reads (and without the empty code-signing ones),
-  into `dist/ide`. `--sign` signs (release only). Locally, use `ide-local`.
+  into `dist/ide`. `--sign` signs (release only). On macOS it then mounts each
+  dmg and runs `codesign --verify --deep --strict` on its app, since `dmgbuild`
+  drops files from an image that is too small without failing
+  (`src/ide-build/verifyDmg.ts`). Locally, use `ide-local`.
 - `ide-local [--mode <vite mode>]` — the whole IDE from this checkout: sbt
   `buildEngineBundle` (`ENSO_LAUNCHER=native` unless set; on Windows, from a
   Visual Studio developer prompt, which it checks), the bundle copied to
@@ -62,9 +65,10 @@ prints one.
   (`tools/ci/stdlib-test-map.yaml`), split into the map's shards, as a `matrix`
   output; every project outside a pull request. It must not start sbt (its job
   has no `setup-jvm`).
-- `junit-compare <old> <new>` — compares two JUnit directories project by
-  project (pass, fail, skip); the gate for moving the tests off the retired
-  build CLI.
+- `junit-compare <old> <new> [--by-group-prefix]` — compares two JUnit
+  directories project by project (pass, fail, skip), or with `--by-group-prefix`
+  backend by backend across projects (for groups that moved between projects);
+  the gate for moving tests.
 - `release <action>` — the release workflow's steps (`release.yml`,
   `promote.yml`), as the retired build CLI's `release …` and the retired build
   CLI's `ide upload` ran them: `create-draft` drafts release `ENSO_VERSION` at

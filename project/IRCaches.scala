@@ -27,7 +27,13 @@ object IRCaches {
     for (libName <- stdLibRoot.listFiles()) {
       val libDir    = libName / ensoVersion
       val cacheSize = getCacheSizeForLib(libDir, log)
-      totalBytes += cacheSize
+      if (EngineBundle.librariesNotBundled.contains(libName.getName)) {
+        log.info(
+          f"Not counted (not in the IDE bundle): ${libName.getName} ${cacheSize / (1024 * 1024)}%.2f MB"
+        )
+      } else {
+        totalBytes += cacheSize
+      }
     }
     val totalMBs = totalBytes / (1024 * 1024)
     if (totalMBs > EXPECTED_MAX_SIZE_MB) {

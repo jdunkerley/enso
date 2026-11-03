@@ -171,6 +171,7 @@ export const STD_BITS_PACKAGE_ROOTS: readonly string[] = [
   'org.enso.base',
   'org.enso.benchmarks',
   'org.enso.database',
+  'org.enso.database_test_suite',
   'org.enso.duckdb',
   'org.enso.google',
   'org.enso.image',

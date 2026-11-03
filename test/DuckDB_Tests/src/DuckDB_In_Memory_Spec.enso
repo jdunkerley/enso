@@ -10,7 +10,7 @@ from Standard.DuckDB import all
 
 from Standard.Test import all
 
-import enso_dev.Table_Tests.Database.Postgres_Spec.JSON_Table_Data
+import Standard.Database_Test_Suite.Database.JSON_Table_Data.JSON_Table_Data
 
 make_table start:Integer length:Integer=10 =
     node1 = start.up_to (start + length) True

@@ -233,6 +233,12 @@ export function createElectronBuilderConfig(passedArgs: Arguments): electronBuil
       // For more details see step (4) at
       // https://kilianvalkhof.com/2019/electron/notarizing-your-electron-application/
       sign: false,
+      // `dmgbuild` underestimates the volume for an app this large and made of this many small
+      // files (the engine, GraalVM and the Python home), and when the copy runs out of space it
+      // drops files without failing. Every dmg up to 2026.1.1-nightly.2026.11.2 shipped without
+      // `Electron Framework`, so the app aborted at launch. Unused space costs nothing: the image is
+      // compressed and shrunk once filled. `ide-build` checks the result (`verifyDmg.ts`).
+      size: '4g',
     },
     afterAllArtifactBuild: computeHashes,
     afterPack: async (context: electronBuilder.AfterPackContext) => {

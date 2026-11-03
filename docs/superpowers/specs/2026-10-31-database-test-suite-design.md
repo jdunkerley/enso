@@ -124,8 +124,10 @@ closed set, `Known_Issue` (e.g. `Join_Nulls_8243`, `Upload_Key_Order_10737`),
 each with a description and an issue number. A spec affected by one asks
 `backend.has_known_issue Known_Issue.X` and, if so, is `pending` with "Known
 issue #8243". A backend lists its issues in `known_failures`; a misspelt one
-does not compile. Each of the 11 name checks becomes a capability check (a
-genuine difference) or a known issue (a bug); the plan rules on each.
+fails with `No_Such_Method` when the descriptor is used (checked: it is a run
+time error, not a compile error). Each of the 11 name checks becomes a
+capability check (a genuine difference) or a known issue (a bug); the plan rules
+on each.
 
 **Policy stays on the descriptor.** `run_advanced_edge_cases` is policy, not a
 fact about the dialect; `ENSO_ADVANCED_EDGE_CASE_TESTS` still overrides it.

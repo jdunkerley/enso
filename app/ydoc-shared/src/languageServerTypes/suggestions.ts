@@ -67,6 +67,12 @@ export namespace SuggestionEntry {
 
     /** The fully qualified module name re-exporting this module. */
     reexport?: string
+
+    /**
+     * The entry comes from the catalogue of an installed library that is not loaded yet. Absent
+     * means `false`.
+     */
+    fromCatalogue?: boolean
   }
 
   export interface Type {
@@ -91,6 +97,12 @@ export namespace SuggestionEntry {
 
     /** The documentation string. */
     documentation?: string
+
+    /**
+     * The entry comes from the catalogue of an installed library that is not loaded yet. Absent
+     * means `false`.
+     */
+    fromCatalogue?: boolean
   }
 
   export interface Constructor {
@@ -118,6 +130,12 @@ export namespace SuggestionEntry {
 
     /** The list of annotations. */
     annotations: string[]
+
+    /**
+     * The entry comes from the catalogue of an installed library that is not loaded yet. Absent
+     * means `false`.
+     */
+    fromCatalogue?: boolean
   }
 
   export interface Method {
@@ -151,6 +169,12 @@ export namespace SuggestionEntry {
 
     /** The list of annotations. */
     annotations: string[]
+
+    /**
+     * The entry comes from the catalogue of an installed library that is not loaded yet. Absent
+     * means `false`.
+     */
+    fromCatalogue?: boolean
   }
 
   export interface Function {

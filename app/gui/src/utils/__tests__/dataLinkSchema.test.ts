@@ -34,6 +34,7 @@ const REPO_ROOT = url.fileURLToPath(new URL('../'.repeat(DIR_DEPTH), import.meta
 const BASE_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Base_Tests/data/datalinks/')
 const S3_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/AWS_Tests/data/')
 const TABLE_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Table_Tests/data/datalinks/')
+const POSTGRES_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Postgres_Tests/data/datalinks/')
 const SNOWFLAKE_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Snowflake_Tests/data/datalinks/')
 const SQLSERVER_DATA_LINKS_ROOT = path.resolve(REPO_ROOT, 'test/Microsoft_Tests/data/datalinks/')
 
@@ -100,9 +101,20 @@ v.test('correctly validates example Database .datalink files with the schema', (
     'postgres-serialized-query.datalink',
   ]
   for (const schema of schemas) {
-    const json = loadDataLinkFile(path.resolve(TABLE_DATA_LINKS_ROOT, schema))
+    const json = loadDataLinkFile(path.resolve(POSTGRES_DATA_LINKS_ROOT, schema))
     testSchema(json, schema)
   }
+})
+
+v.test('validates Postgres data links of both library names', () => {
+  const current = loadDataLinkFile(
+    path.resolve(REPO_ROOT, 'tools/http-test-helper/www-files/some-postgres.datalink'),
+  )
+  v.expect((current as { libraryName: string }).libraryName).toBe('Standard.Postgres')
+  testSchema(current, 'some-postgres.datalink')
+  const old = loadDataLinkFile(path.resolve(POSTGRES_DATA_LINKS_ROOT, 'postgres-db.datalink'))
+  v.expect((old as { libraryName: string }).libraryName).toBe('Standard.Database')
+  testSchema(old, 'postgres-db.datalink')
 })
 
 v.test('correctly validates example Snowflake .datalink files with the schema', () => {

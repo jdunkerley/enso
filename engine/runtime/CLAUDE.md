@@ -55,6 +55,9 @@ and links the required Graal/Truffle background reading.
 - **Compiling a library writes its `catalogue.json`.** Next to `package.yaml`,
   from the suggestions cache's list, filtered to what the component browser
   shows; see Note [Library Catalogue] in `TruffleCompilerContext`.
+- **A library's bindings cache is read once per context**, by
+  `TruffleCompilerContext.libraryBindings`, which import resolution and module
+  loading share; see Note [One Bindings Cache Read Per Library].
 
 ## Language Server integration
 

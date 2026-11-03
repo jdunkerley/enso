@@ -20,10 +20,13 @@ Drive's New/Edit Datalink actions
   kept and shown as it is.
 - `DatalinkInput.vue` — `JSONSchemaInput` over `$/utils/datalinkSchema.json`,
   validated by `$/utils/datalinkValidator`'s compiled validators. Its
-  `UNAVAILABLE_SCHEMAS` (`EnsoFileDataLink`) is left out of the `anyOf` lists
-  (`JSONSchemaInput`'s `unavailable` prop), so `Enso File` is not offered; an
-  `Enso_File` file opens with its path as plain text. Schema and validator are
-  unchanged.
+  `UNAVAILABLE_SCHEMAS` (`EnsoFileDataLink`, `PostgresLegacyDataLink`) is left
+  out of the `anyOf` lists (`JSONSchemaInput`'s `unavailable` prop), so
+  `Enso File` is not offered; an `Enso_File` file opens with its path as plain
+  text. `PostgresLegacyDataLink` is the Postgres link as written before
+  PostgreSQL moved to `Standard.Postgres` (`libraryName: Standard.Database`):
+  valid, so an old file still opens in the form, but never offered for a new
+  link.
 - `DatalinkFormInput.vue` — the editor as a form field. The Properties tab is
   gone: the dialog is the only editor.
 - `UpsertDatalinkModal.vue` — the dialog, for the modal stack (`useModals()`

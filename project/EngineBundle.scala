@@ -23,6 +23,13 @@ import java.nio.file.attribute.BasicFileAttributes
   */
 object EngineBundle {
 
+  /** The standard libraries that the engine distribution has and the IDE's bundle leaves out: a
+    * test library, to be fetched later like any library that is not bundled (the user's decision;
+    * docs/superpowers/plans/2026-10-31-database-test-suite.md). `IRCaches.checkCacheSizes` does
+    * not count them either, since its budget is what users get.
+    */
+  val librariesNotBundled: Seq[String] = Seq("Database_Test_Suite")
+
   /** The bundle's root directory for this platform. */
   def root(
     artifactRoot: File,
@@ -50,7 +57,13 @@ object EngineBundle {
   ): File = {
     IO.delete(bundleRoot)
     IO.createDirectory(bundleRoot)
-    copyTree(enginePackage, bundleRoot / "dist" / ensoVersion)
+    copyTree(
+      enginePackage,
+      bundleRoot / "dist" / ensoVersion,
+      skip = librariesNotBundled.map(name =>
+        (enginePackage / "lib" / "Standard" / name).toPath
+      )
+    )
     copyTree(smallJdk, bundleRoot / "runtime" / runtimeDir)
     IO.touch(bundleRoot / ".enso.bundle")
     log.info(s"Engine bundle created at $bundleRoot.")
@@ -62,7 +75,11 @@ object EngineBundle {
     * `../java.base/...`), and files keep their permissions and modification times. sbt's
     * `IO.copyDirectory` follows links, so it would turn each into a copy of its target.
     */
-  private def copyTree(source: File, target: File): Unit = {
+  private def copyTree(
+    source: File,
+    target: File,
+    skip: Seq[Path] = Seq.empty
+  ): Unit = {
     val from = source.toPath
     val to   = target.toPath
     Files.walkFileTree(
@@ -71,10 +88,12 @@ object EngineBundle {
         override def preVisitDirectory(
           dir: Path,
           attrs: BasicFileAttributes
-        ): FileVisitResult = {
-          Files.createDirectories(to.resolve(from.relativize(dir)))
-          FileVisitResult.CONTINUE
-        }
+        ): FileVisitResult =
+          if (skip.contains(dir)) FileVisitResult.SKIP_SUBTREE
+          else {
+            Files.createDirectories(to.resolve(from.relativize(dir)))
+            FileVisitResult.CONTINUE
+          }
 
         override def visitFile(
           file: Path,

@@ -10,8 +10,8 @@ from Standard.Database.Errors import Implicit_DB_Table_Read
 
 from Standard.Test import all
 
-from project.Util import all
-from project.Common_Table_Operations.Util import within_table
+from Standard.Database_Test_Suite.Util import all
+from Standard.Database_Test_Suite.Common_Table_Operations.Util import within_table
 
 main filter=Nothing =
     suite = Test.build suite_builder->

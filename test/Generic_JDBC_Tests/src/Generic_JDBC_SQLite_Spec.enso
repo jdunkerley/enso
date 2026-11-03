@@ -10,7 +10,7 @@ from Standard.Test import all
 import Standard.Generic_JDBC.Generic_JDBC_Connection.Generic_JDBC_Connection
 
 import project.Generic_JDBC_Connection_Spec
-import enso_dev.Table_Tests.Database.Helpers.Name_Generator
+import Standard.Database_Test_Suite.Database.Helpers.Name_Generator
 
 add_specs_for_config config suite_builder =
     Generic_JDBC_Connection_Spec.add_specs_for_backend config suite_builder

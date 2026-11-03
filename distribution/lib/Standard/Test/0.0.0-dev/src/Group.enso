@@ -17,7 +17,10 @@ type Group_Builder
         - `name`: The name of the group.
         - `builder`: Vector builder used for storing specs.
         - `teardown_ref`: A reference to a teardown method.
-    private Impl (_name : Text) (builder = Builder.new) (teardown_ref = Ref.new (_ -> Nothing))
+        - `pending_override`: `Nothing`, or a function from a group name and a
+          spec name to a reason that makes the spec pending (see
+          `Suite_Builder.with_pending_override`).
+    private Impl (_name : Text) (builder = Builder.new) (teardown_ref = Ref.new (_ -> Nothing)) (pending_override = Nothing)
 
     ## ---
        private: true
@@ -32,7 +35,8 @@ type Group_Builder
         - `pending`: Contains a reason for why the test should be ignored. If
           Nothing, the test is not ignored.
     specify self (name : Text) (~code : Any) (~pending : (Text | Nothing) = Nothing) =
-        impl = Spec.Impl name=name pending=pending... code=_->
+        override = if self.pending_override.is_nothing then Nothing else self.pending_override self.name name
+        impl = Spec.Impl name=name pending=(if override.is_nothing then pending else override)... code=_->
             code
         self.builder.append impl
 

@@ -17,6 +17,7 @@ import {
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
   checkOnlyMacosReleaseJobsMayFail,
+  checkOpenPerf,
   checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
   checkReleaseIsIdeOnly,
@@ -25,6 +26,7 @@ import {
   checkSetupNodeCache,
   checkStdlibTestMap,
   checkStdlibTestsGetTheGroupFilter,
+  checkSuiteIgnoresBackendNames,
   checkNativeLibsFixtures,
   checkToolchainPins,
   checkWasmBindgenPins,
@@ -498,6 +500,71 @@ ${steps}
   })
 })
 
+describe('open time', () => {
+  const measure = (continueOnError, timeout = true) =>
+    `      - name: Measure the open time\n        if: env.OPEN_PERF == 'true'\n        ${continueOnError ? 'continue-on-error: true\n        ' : ''}${timeout ? 'timeout-minutes: 25\n        ' : ''}run: corepack pnpm --filter enso run perf:open --out x`
+  // The other open-time steps (find, download and upload the baseline) have no `run: perf:open`.
+  const baselineStep = (continueOnError, timeout = true) =>
+    `      - name: Find develop's last open time\n        if: env.OPEN_PERF == 'true'\n        ${continueOnError ? 'continue-on-error: true\n        ' : ''}${timeout ? 'timeout-minutes: 5\n        ' : ''}uses: actions/download-artifact@v5`
+  const tests =
+    '      - name: Run Package Tests\n        run: corepack pnpm -r --filter enso ide-integration-test'
+  const conditionalJobTimeout = "${{ inputs.open_perf == true && 60 || 30 }}"
+  const packagingWith = (steps, jobTimeout = conditionalJobTimeout) => `
+on: workflow_call
+jobs:
+  package-ide:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${jobTimeout}
+    steps:
+${steps.join('\n')}
+`
+  const label = (name) => `github.event.label.name != '${name}'`
+  const pullRequest = (conditions) => `
+on: pull_request
+jobs:
+${conditions.map((c, i) => `  job${i}:\n    if: "\${{ ${c} }}"\n`).join('')}`
+  const both = `${label('CI: Build IDE')} && ${label('CI: Open perf')}`
+  const repoWith = (steps, conditions = [both], jobTimeout) =>
+    fixture({
+      'workflows/ide-packaging.yml': packagingWith(steps, jobTimeout),
+      'workflows/ide-pull-request.yml': pullRequest(conditions),
+    })
+  test('accepts a step after the package tests that continues on error', () => {
+    assert.deepEqual(checkOpenPerf(repoWith([tests, measure(true)])), [])
+  })
+  test('rejects a step before the package tests, and one that can fail the job', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true), tests])).length, 1)
+    assert.equal(checkOpenPerf(repoWith([tests, measure(false)])).length, 1)
+  })
+  test('accepts the baseline steps too, when they continue on error with a timeout', () => {
+    assert.deepEqual(checkOpenPerf(repoWith([tests, baselineStep(true), measure(true)])), [])
+  })
+  test('rejects an open-time step with no timeout, so a hang cannot reach the job timeout', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true, false)]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /timeout-minutes/)
+    assert.equal(checkOpenPerf(repoWith([tests, baselineStep(true, false), measure(true)])).length, 1)
+  })
+  test('rejects a baseline step that can fail the job', () => {
+    const problems = checkOpenPerf(repoWith([tests, baselineStep(false), measure(true)]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /continue on error/)
+  })
+  test('rejects a job timeout raised for every run, not only the measuring ones', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true)], [both], '90'))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /job timeout/)
+  })
+  test('rejects a step with no package tests at all', () => {
+    assert.equal(checkOpenPerf(repoWith([measure(true)])).length, 1)
+  })
+  test('rejects a label test that does not exempt the open-time label', () => {
+    const problems = checkOpenPerf(repoWith([tests, measure(true)], [both, label('CI: Build IDE')]))
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /1 unrelated-label test/)
+  })
+})
+
 describe('checkToolchainPins', () => {
   const build = {
     'project/Dependencies.scala':
@@ -928,6 +995,29 @@ shards:
   })
 })
 
+describe('checkStdlibTestMap: a shard that needs a database', () => {
+  test('accepts a shard that needs postgres, and rejects another database or a "*" shard with needs', () => {
+    const map = (shards) => STDLIB_MAP_OK.replace(/^shards:[\s\S]*$/m, `shards:\n${shards}`)
+    const ok =
+      '  - { name: Table, projects: [Table_Tests], needs: postgres }\n  - { name: Others, projects: "*" }\n'
+    assert.deepEqual(
+      checkStdlibTestMap(fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': map(ok) })),
+      [],
+    )
+    const bad =
+      '  - { name: Table, projects: [Table_Tests], needs: mysql }\n  - { name: Others, projects: "*", needs: postgres }\n'
+    assert.deepEqual(
+      checkStdlibTestMap(
+        fixture({}, { ...STDLIB_FILES, 'tools/ci/stdlib-test-map.yaml': map(bad) }),
+      ),
+      [
+        `${at} shard \`Table\` has \`needs: mysql\`; only \`postgres\` is known`,
+        `${at} the "*" shard cannot have \`needs\` (its projects would run nowhere)`,
+      ],
+    )
+  })
+})
+
 describe('checkStdlibTestMap: a split shard', () => {
   const withShards = (shards) =>
     fixture(
@@ -1088,6 +1178,52 @@ describe('checkPublicTypes', () => {
         fixture({}, lib('name: Geo\npublic-types: [Geo]\n', main + 'from project.X export all\n')),
       ),
       ['distribution/lib/Standard/Geo/0.0.0-dev/src/Main.enso:3: `export all` (list the exported names)'],
+    )
+  })
+})
+
+describe('checkSuiteIgnoresBackendNames', () => {
+  const at = 'distribution/lib/Standard/Database_Test_Suite/0.0.0-dev/src/X_Spec.enso'
+  const repo = (code) => fixture({}, { [at]: code })
+  const why =
+    "decides by the backend's name; ask the setup (`flagged`, `is_feature_supported`, `is_operation_supported`, `is_aggregate_supported`) or list a `Known_Issue`"
+
+  test('accepts the prefix used as a name, questions to the setup, comments, docs and text', () => {
+    const code = [
+      '## Adds a group with the given `prefix` as its name prefix.',
+      '   The prefix. is prose here, in a doc block.',
+      'add_specs suite_builder prefix setup =',
+      '    prefix_text = setup.prefix',
+      '    suite_builder.group prefix+"Table.aggregate" group_builder->',
+      '    # Snowflake once needed setup.prefix.contains "Snowflake" here.',
+      '    if setup.flagged ..Date_Time then group_builder.specify "x" <| 1',
+      '    group_builder.specify "reads the prefix. of a name" <| 1',
+      '    in_file_prefix = "[SQLite File] "',
+    ].join('\n')
+    assert.deepEqual(checkSuiteIgnoresBackendNames(repo(code)), [])
+  })
+  test('rejects a test of the prefix, the group name, the dialect name and the backend name', () => {
+    const code = [
+      '    if setup.prefix.contains "SQLite" then 1',
+      '    if prefix == "[SQLite] " then 1',
+      '    if group_builder.name.contains "Snowflake" then 1',
+      '    if t.dialect_name != "DuckDB" then 1',
+      '    n = backend.name',
+    ].join('\n')
+    assert.deepEqual(
+      checkSuiteIgnoresBackendNames(repo(code)),
+      [1, 2, 3, 4, 5].map((line) => `${at}:${line}: ${why}`),
+    )
+  })
+  test('checks the code after a doc block ends', () => {
+    const code = ['## A spec.', '   More prose.', 'x = if prefix == "a" then 1'].join('\n')
+    assert.deepEqual(checkSuiteIgnoresBackendNames(repo(code)), [`${at}:3: ${why}`])
+  })
+  test('looks only at the suite', () => {
+    const other = 'distribution/lib/Standard/Table/0.0.0-dev/src/X.enso'
+    assert.deepEqual(
+      checkSuiteIgnoresBackendNames(fixture({}, { [other]: 'if prefix == "x" then 1\n' })),
+      [],
     )
   })
 })

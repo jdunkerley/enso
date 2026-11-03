@@ -17,7 +17,7 @@ manager cache before pnpm is set up, releases are IDE-only and read only
 allow-listed secrets, only macOS release jobs may fail, macOS jobs are gated on
 the self-hosted Mac, the release's latest-version update follows its publish job, `macos-checks.yml` runs only what is requested, IDE
 packaging needs no cloud account, Windows packaging smoke-tests the installer,
-the toolchain pins in `build-config.yaml` equal the build's own copies, the standard library test map names every library, `std-bits` directory and test project, with their imports exactly, no job
+the toolchain pins in `build-config.yaml` equal the build's own copies, the standard library test map names every library, `std-bits` directory and test project, with their imports exactly, the database test suite decides nothing by a backend's name, no job
 runs sbt before `setup-jvm`, and in `tools/build-scripts` only `src/lib/sbt.ts`
 starts sbt (its unit tests aside). "Runs sbt" covers wrappers (`timeout`, `env`,
 `xvfb-run`, `cmd /c`, …), `bash -c`/`pwsh -Command` scripts, local composite

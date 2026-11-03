@@ -6,6 +6,7 @@ import {
 } from 'enso-common/src/utilities/childProcess'
 import * as childProcess from 'node:child_process'
 import * as fs from 'node:fs'
+import * as net from 'node:net'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
@@ -14,6 +15,63 @@ import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
 const LOAD_HEALTHCHECK_INTERVAL = 250
+/* Note [Start-up Health Polling]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A native engine answers `/_health` some 200 ms after it is spawned, and the open waits for that
+ * answer. Polling every 250 ms (the first check 250 ms after the spawn) added up to 250 ms to every
+ * open, so the first second polls every 25 ms; a slow start (the JVM, a cold machine) then falls
+ * back to 250 ms, so the checks never pile up.
+ */
+const LOAD_HEALTHCHECK_FAST_INTERVAL = 25
+const LOAD_HEALTHCHECK_FAST_PERIOD_MS = 1000
+
+/** The delay before the next start-up health check, `elapsedMs` after the engine was spawned. */
+export function loadHealthcheckDelay(elapsedMs: number): number {
+  return elapsedMs < LOAD_HEALTHCHECK_FAST_PERIOD_MS ?
+      LOAD_HEALTHCHECK_FAST_INTERVAL
+    : LOAD_HEALTHCHECK_INTERVAL
+}
+/* Note [Open Waits For The Ydoc Port]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * The ydoc server runs inside the engine and starts listening some 300 ms after the Language
+ * Server passes its health check, which is when `project/open` used to be answered. The GUI
+ * connects to the ydoc port as soon as it has the answer. Measured: the port was refused at the
+ * answer and accepted about 300 ms later, the ydoc socket opened ~525 ms after the answer on
+ * Windows, and the renderer sat idle all that time (a profile shows ~80% `(idle)` and nothing
+ * waiting in the GUI's code). That is consistent with Windows retrying a refused loopback connect
+ * after ~500 ms (inferred from the constant 510-525 ms gap, not observed). On Linux the refusal is
+ * immediate and y-websocket retries after 200, 400 and 800 ms: before this wait the GUI's fourth
+ * socket was the first to open, ~1.4 s after the answer (PR #504's CI run). So the open also waits
+ * until the ydoc port accepts a connection, polling it as the health check is. On Linux the probe
+ * succeeds within a poll of the port appearing in the kernel's listen table (measured in WSL with
+ * a native engine: 300 to 450 ms after `/_health`, the same with or without probing). It
+ * is bounded by `ydocWaitMs` (an engine without a ydoc server, such as a fake one in a test, only
+ * delays the answer by that), and the startup timeout does not apply once the health check has
+ * passed, so the wait can never get a healthy engine killed.
+ */
+const YDOC_POLL_INTERVAL = 10
+/** How long one connection attempt to the ydoc port may take. */
+const YDOC_CONNECT_TIMEOUT_MS = 250
+
+/** The default for how long an open waits for the engine's ydoc port to accept connections. */
+export const DEFAULT_YDOC_WAIT_MS = 5000
+
+/** Whether a TCP connection to `socket` is accepted right now. */
+function acceptsConnections(socket: Socket): Promise<boolean> {
+  return new Promise((resolve) => {
+    const connection = net.connect(socket.port, socket.host)
+    connection.setTimeout(YDOC_CONNECT_TIMEOUT_MS)
+    connection.once('connect', () => {
+      connection.destroy()
+      resolve(true)
+    })
+    connection.once('timeout', () => {
+      connection.destroy()
+      resolve(false)
+    })
+    connection.once('error', () => resolve(false))
+  })
+}
 const WATCHDOG_HEALTHCHECK_INTERVAL = 3000
 const LANGUAGE_SERVER_CRASH_LOOP_MAX = 5
 const LANGUAGE_SERVER_CRASH_LOOP_WINDOW_MS = 60_000
@@ -159,6 +217,7 @@ class OpenedProject {
     spawner: () => Promise<childProcess.ChildProcess>,
     private readonly logSink: EngineLogSink | undefined,
     private readonly startupTimeoutMs: number,
+    private readonly ydocWaitMs: number,
   ) {
     this.loaded = this.loadedDeferred.promise
     this.loadedDeferred.promise.catch(() => undefined)
@@ -183,12 +242,13 @@ class OpenedProject {
     spawner: () => Promise<childProcess.ChildProcess>,
     logSink: EngineLogSink | undefined,
     startupTimeoutMs: number,
+    ydocWaitMs: number,
   ) {
     const sockets = {
       jsonSocket: { host: '127.0.0.1', port: jsonPort },
       ydocSocket: { host: '127.0.0.1', port: ydocPort },
     }
-    const project = new OpenedProject(path, sockets, spawner, logSink, startupTimeoutMs)
+    const project = new OpenedProject(path, sockets, spawner, logSink, startupTimeoutMs, ydocWaitMs)
     // Surface synchronous spawn failures (bad executable path, etc.) to the caller.
     await project.watcher.firstSpawn
     return project
@@ -281,6 +341,8 @@ class OpenedProject {
     // respawn doesn't kill the new child or reject the new deferred.
     const handle = this.watcher.current
     let resolved = false
+    let passedHealth = false
+    const startedAt = Date.now()
 
     // Over once this attempt has an answer, or its engine is gone: a health check of the port after
     // that could be answered by another engine, and must not count as this one starting.
@@ -290,6 +352,11 @@ class OpenedProject {
       const healthy = await this.checkServerHealth()
       if (over()) return
       if (healthy) {
+        // The engine has started: the startup timeout below no longer applies, and must not kill
+        // it while the (bounded) wait for its ydoc port runs.
+        passedHealth = true
+        await this.waitForYdocPort(over)
+        if (over()) return
         resolved = true
         this.started = true
         this.startWatchdog()
@@ -297,16 +364,16 @@ class OpenedProject {
         return
       }
       // Not using setInterval to not pile slow-responding healthchecks.
-      setTimeout(healthCheck, LOAD_HEALTHCHECK_INTERVAL)
+      setTimeout(healthCheck, loadHealthcheckDelay(Date.now() - startedAt))
     }
-    setTimeout(healthCheck, 250)
+    setTimeout(healthCheck, loadHealthcheckDelay(0))
 
     // Timeout if server doesn't start (skip timeout in debug mode)
     const javaToolOptions = process.env.JAVA_TOOL_OPTIONS
     const isDebugMode = javaToolOptions?.includes('jdwp')
     if (!isDebugMode) {
       setTimeout(() => {
-        if (resolved || this.closed) return
+        if (resolved || passedHealth || this.closed) return
         resolved = true
         // SIGKILL the *specific* child this routine was waiting on. `onUnexpectedExit` decides
         // whether to respawn: not while the project is still opening, by default after.
@@ -398,6 +465,15 @@ class OpenedProject {
     await handle.waitForDrain()
   }
 
+  /** Wait, for at most `ydocWaitMs`, until the ydoc port accepts a connection (Note [Open Waits For The Ydoc Port]). */
+  private async waitForYdocPort(over: () => boolean): Promise<void> {
+    const deadline = Date.now() + this.ydocWaitMs
+    while (!over() && Date.now() < deadline) {
+      if (await acceptsConnections(this.sockets.ydocSocket)) return
+      await new Promise((resolve) => setTimeout(resolve, YDOC_POLL_INTERVAL))
+    }
+  }
+
   // Health check function
   async checkServerHealth(): Promise<boolean> {
     try {
@@ -421,13 +497,16 @@ export class EnsoRunner implements Runner {
   /**
    * Creates a new EnsoRunner with the path to the Enso executable. `firstPort` is where the search
    * for an engine's free ports starts; `startupTimeoutMs` is how long an engine has to pass its
-   * first health check before it is killed.
+   * first health check before it is killed. `ydocWaitMs` is how long an open then waits for the
+   * engine's ydoc port to accept connections (0, the default, does not wait: an engine that has no
+   * ydoc server, as the fakes of the tests, would only delay its open).
    */
   constructor(
     private ensoPath: Path,
     private readonly options: {
       readonly firstPort?: number
       readonly startupTimeoutMs?: number
+      readonly ydocWaitMs?: number
     } = {},
   ) {}
 
@@ -591,6 +670,7 @@ export class EnsoRunner implements Runner {
             ),
           logSink,
           this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT,
+          this.options.ydocWaitMs ?? 0,
         )
         project.shutdownHooks.set('remove-from-list', () => {
           this.runningProjects.delete(projectPath)

@@ -6,7 +6,7 @@ from Standard.Table import Table, Value_Type
 from Standard.Table.Columns_To_Add import Columns_To_Add
 from Standard.Table.Errors import Invalid_Value_Type, Column_Count_Exceeded, Duplicate_Output_Column_Names, Missing_Input_Columns, No_Such_Column
 from Standard.Test import all
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 add_specs suite_builder =
     suite_builder.group "Table.split" group_builder->

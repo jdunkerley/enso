@@ -11,23 +11,28 @@ on:
     # (`tools/ci/check-workflows.mjs` checks it).
     paths-ignore:
       - "docs/superpowers/**"
-    # `labeled`/`unlabeled` so that adding or removing `CI: Build IDE` re-evaluates the packaging.
+    # `labeled`/`unlabeled` so that adding or removing `CI: Build IDE` or `CI: Open perf` re-evaluates
+    # the packaging.
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 # Note [Ignoring Unrelated Label Events]
 # ======================================
-# Every label change on a PR starts a run of this workflow, but only `CI: Build IDE` can change what
-# it does. A run started by any other label (an "unrelated label event") must be inert:
+# Every label change on a PR starts a run of this workflow, but only `CI: Build IDE` and `CI: Open
+# perf` can change what it does. A run started by any other label (an "unrelated label event") must
+# be inert:
 # - it gets a concurrency group of its own, so it does not cancel a packaging run in progress;
 # - all its jobs are skipped;
 # - its summary job is given a different name. A skipped job reports success, and GitHub judges a
 #   required check by the most recent check run with that name on the commit, so a skipped
 #   "IDE Required Checks" would override (and could hide) the real result of the earlier run.
 # The test for an unrelated label event is repeated in each job, as workflow-level `env` is not
-# available in `jobs.<id>.if`. Keep the copies (here and in `gui-pull-request.yml`) in sync.
+# available in `jobs.<id>.if`. Keep the copies (here and in `gui-pull-request.yml`) in sync. Here two
+# labels are related, `CI: Build IDE` and `CI: Open perf` (which measures the open time, Note [Open
+# Time In CI] in `ide-packaging.yml`); `gui-pull-request.yml`'s copy names only the first, since the
+# GUI checks do not measure it.
 
 concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}-ide-pull-request${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && format('-unrelated-label-{0}', github.run_id) || '' }}"
+  group: "${{ github.workflow }}-${{ github.ref }}-ide-pull-request${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') && format('-unrelated-label-{0}', github.run_id) || '' }}"
   cancel-in-progress: ${{ github.ref != 'refs/heads/develop' }}
 
 permissions:
@@ -38,19 +43,19 @@ jobs:
   gui-changed-files:
     name: 🔍 GUI Files Changed
     uses: ./.github/workflows/gui-changed-files.yml
-    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
+    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') }}"
     secrets: inherit
 
   ide-changed-files:
     name: 🔍 IDE Files Changed
     uses: ./.github/workflows/ide-changed-files.yml
-    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
+    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') }}"
     secrets: inherit
 
   engine-changed-files:
     name: 🔍 Engine Files Changed
     uses: ./.github/workflows/engine-changed-files.yml
-    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
+    if: "${{ !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') }}"
     secrets: inherit
 
   # Pull requests package the IDE only when something that goes into the package (or builds it)
@@ -71,17 +76,21 @@ jobs:
             || needs.ide-changed-files.outputs.backend_changed == 'true'
             || contains(github.event.pull_request.labels.*.name, 'CI: Build IDE')
         }}
+      # Every develop push, and pull requests with the label (Note [Open Time In CI] in
+      # `ide-packaging.yml`).
+      open_perf: "${{ github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'CI: Open perf') }}"
     if: >-
       needs.gui-changed-files.outputs.any_changed_excluding_tests == 'true'
       || needs.ide-changed-files.outputs.any_changed == 'true'
       || needs.engine-changed-files.outputs.any_changed == 'true'
       || contains(github.event.pull_request.labels.*.name, 'CI: Build IDE')
+      || contains(github.event.pull_request.labels.*.name, 'CI: Open perf')
       || github.event_name != 'pull_request'
     secrets: inherit
 
   required-checks:
     # See Note [Ignoring Unrelated Label Events].
-    name: "${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') && 'IDE Checks (unrelated label change, ignored)' || 'IDE Required Checks' }}"
+    name: "${{ ((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') && 'IDE Checks (unrelated label change, ignored)' || 'IDE Required Checks' }}"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
@@ -89,7 +98,7 @@ jobs:
       - ide-changed-files
       - engine-changed-files
       - ide-packaging
-    if: "${{ always() && !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE') }}"
+    if: "${{ always() && !((github.event.action == 'labeled' || github.event.action == 'unlabeled') && github.event.label.name != 'CI: Build IDE' && github.event.label.name != 'CI: Open perf') }}"
     steps:
       - name: Checks Summary
         env:
@@ -104,6 +113,7 @@ jobs:
               || needs.ide-changed-files.outputs.any_changed == 'true'
               || needs.engine-changed-files.outputs.any_changed == 'true'
               || contains(github.event.pull_request.labels.*.name, 'CI: Build IDE')
+              || contains(github.event.pull_request.labels.*.name, 'CI: Open perf')
               || github.event_name != 'pull_request'
             }}
         run: |

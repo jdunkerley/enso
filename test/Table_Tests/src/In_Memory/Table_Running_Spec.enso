@@ -4,7 +4,7 @@ from Standard.Test import all
 from Standard.Table.Errors import all
 import Standard.Base.Errors.Illegal_Argument.Illegal_Argument
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 type Data
     #   | Flight | Passenger | Ticket Price

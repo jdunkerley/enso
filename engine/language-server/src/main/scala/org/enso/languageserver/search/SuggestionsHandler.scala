@@ -229,7 +229,16 @@ final class SuggestionsHandler(
       unstashAll()
       context.become(initialized(projectName, graph, clients, state))
     case failure: ContextRegistryProtocol.Failure =>
+      // The invalidation failed: nothing is cleared, and only the failure is
+      // sent (`InvalidateModulesIndexHandler.negativeResponse`).
       requester.foreach(_ ! failure)
+      unstashAll()
+      context.become(initialized(projectName, graph, clients, state))
+    case failure: Status.Failure =>
+      // The runtime's error could not be mapped to a failure.
+      requester.foreach(_ ! failure)
+      unstashAll()
+      context.become(initialized(projectName, graph, clients, state))
     case _ => stash()
   }
 
@@ -285,7 +294,7 @@ final class SuggestionsHandler(
           state.suggestionLoadingRunning()
         )
       )
-      applyLoadedSuggestions(msg.suggestions, catalogueIds)
+      applyLoadedSuggestions(msg.libraryName, msg.suggestions, catalogueIds)
         .onComplete {
           case Success(notification) =>
             logger.debug(
@@ -430,7 +439,8 @@ final class SuggestionsHandler(
 
     case _: Api.ExecutionComplete | _: Api.ExecutionFailed =>
       if (!state.executionFinished) {
-        logger.debug("The first execution finished.")
+        // Read by the open-time harness (`app/electron-client/perf/openTime.ts`): once per project.
+        logger.info("The first execution finished.")
         state.executionFinished = true
         if (state.cataloguesPending) self ! InsertCatalogues(state.fill)
       }
@@ -636,15 +646,31 @@ final class SuggestionsHandler(
     * @return the API suggestions database update notification
     */
   private def applyLoadedSuggestions(
+    library: LibraryName,
     suggestions: Vector[Suggestion],
     catalogueIds: Seq[Long]
   ): Future[SuggestionsDatabaseUpdateNotification] =
     for {
-      removals       <- removeCatalogueEntries(catalogueIds)
-      (version, ids) <- suggestionsRepo.insertAll(suggestions)
+      removals <- removeCatalogueEntries(catalogueIds)
+      // The catalogue entries are gone from the repository either way, so
+      // their removal is sent even if the suggestions cannot be inserted.
+      inserted <- suggestionsRepo
+        .insertAll(suggestions)
+        .map(Some(_))
+        .recover { case error =>
+          logger.error(
+            "Error inserting the suggestions of loaded library [{}]",
+            library,
+            error
+          )
+          None
+        }
+      version <- suggestionsRepo.currentVersion
     } yield {
-      val additions = ids.zip(suggestions).map { case (id, suggestion) =>
-        SuggestionsDatabaseUpdate.Add(id, suggestion)
+      val additions = inserted.toSeq.flatMap { case (_, ids) =>
+        ids.zip(suggestions).map { case (id, suggestion) =>
+          SuggestionsDatabaseUpdate.Add(id, suggestion)
+        }
       }
       SuggestionsDatabaseUpdateNotification(version, removals ++ additions)
     }
@@ -658,7 +684,7 @@ final class SuggestionsHandler(
     loaded: Set[LibraryName]
   ): Future[CataloguesInserted] = {
     val started = System.nanoTime()
-    catalogues.load().flatMap { installed =>
+    catalogues.load(loaded).flatMap { installed =>
       val wanted = installed.filterNot(c => loaded.contains(c.library))
       val start = Future.successful(
         (Map[LibraryName, Seq[Long]](), Vector[SuggestionsDatabaseUpdate](), 0L)

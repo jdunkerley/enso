@@ -1,0 +1,59 @@
+## Enso Signatures 1.0
+## module Standard.Database_Test_Suite.Common_Table_Operations.Column_Operations_Spec
+- type Arithmetic_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - x self -> Standard.Base.Any.Any
+    - y self -> Standard.Base.Any.Any
+    - z self -> Standard.Base.Any.Any
+- type Connection_Data
+    - Value ~data:Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - setup create_connection_fn:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- type Lazy_Ref
+    - Value ~get:Standard.Base.Any.Any
+- type Literal_Data
+    - Value ~data:Standard.Base.Any.Any
+    - col0 self -> Standard.Base.Any.Any
+    - col1 self -> Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- type Min_Max_Data
+    - Value ~data:Standard.Base.Any.Any
+    - a self -> Standard.Base.Any.Any
+    - b self -> Standard.Base.Any.Any
+    - c self -> Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t self -> Standard.Base.Any.Any
+- type Min_Max_Datetime_Data
+    - Value ~table:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- type Mixed_Type_Object
+- type Names_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - t self -> Standard.Base.Any.Any
+- type Replace_Data
+    - Value ~data:Standard.Base.Any.Any
+    - col self -> Standard.Base.Any.Any
+    - patterns self -> Standard.Base.Any.Any
+    - replacements self -> Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- type Text_Replace_Data
+    - Value ~data:Standard.Base.Any.Any
+    - a self -> Standard.Base.Any.Any
+    - b self -> Standard.Base.Any.Any
+    - c self -> Standard.Base.Any.Any
+    - d self -> Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- type Trim_Data
+    - Value ~data:Standard.Base.Any.Any
+    - a self -> Standard.Base.Any.Any
+    - b self -> Standard.Base.Any.Any
+    - c self -> Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- add_column_operation_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- add_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- all_combinations variables:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- drop_table connection:Standard.Base.Any.Any table:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- main filter:Standard.Base.Any.Any= -> Standard.Base.Any.Any

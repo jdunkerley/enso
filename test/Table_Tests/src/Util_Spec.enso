@@ -8,7 +8,7 @@ from Standard.Test import all
 
 from enso_dev.Test_Tests.Helpers import expect_test_failure
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 add_specs suite_builder =
     suite_builder.group "Table/Column.should_equal helpers" group_builder->

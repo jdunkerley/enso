@@ -8,7 +8,8 @@ from Standard.Table.Errors import all
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
+from project.IO.File_Util import set_writable
 
 type My_Type
     Value x

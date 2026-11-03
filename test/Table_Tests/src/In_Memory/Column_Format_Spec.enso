@@ -10,7 +10,7 @@ from Standard.Table.Internal.Column_Format import all
 
 from Standard.Test import all
 
-from project.Util import all
+from Standard.Database_Test_Suite.Util import all
 
 add_specs suite_builder =
     suite_builder.group "Date Column.format, with format string" group_builder->

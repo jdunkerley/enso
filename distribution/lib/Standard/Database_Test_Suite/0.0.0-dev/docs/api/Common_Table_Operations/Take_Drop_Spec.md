@@ -1,0 +1,22 @@
+## Enso Signatures 1.0
+## module Standard.Database_Test_Suite.Common_Table_Operations.Take_Drop_Spec
+- type Column_Take_Drop_Data
+    - Value ~data:Standard.Base.Any.Any
+    - alpha self -> Standard.Base.Any.Any
+    - beta self -> Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - empty_alpha self -> Standard.Base.Any.Any
+    - empty_beta self -> Standard.Base.Any.Any
+    - setup create_connection_fn:Standard.Base.Any.Any table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- type Table_Take_Drop_Data
+    - Value ~data:Standard.Base.Any.Any
+    - connection self -> Standard.Base.Any.Any
+    - empty self -> Standard.Base.Any.Any
+    - setup create_connection_fn:Standard.Base.Any.Any table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+    - teardown self -> Standard.Base.Any.Any
+- add_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- add_take_drop_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- main filter:Standard.Base.Any.Any= -> Standard.Base.Any.Any

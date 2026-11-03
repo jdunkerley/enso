@@ -567,14 +567,14 @@ jobs:
   # Note [Standard Library Test Selection]
   # ======================================
   # The standard library suites run as parallel jobs, one per shard of
-  # `tools/ci/stdlib-test-map.yaml` (Table_Tests alone; Base, DuckDB and Cloud; the rest), and on a
+  # `tools/ci/stdlib-test-map.yaml` (Table_Tests; SQLite_Tests; Postgres_Tests where the suite has a Postgres;
+  # Base, DuckDB and Cloud; the rest), and on a
   # pull request only the projects its changed files can affect: a library's change selects every
   # project importing it or a library that depends on it, a test project's change selects it and the
   # projects importing it, and anything else selects every project. develop, hand-started runs and
   # the other callers pass no changed files and run every project. `tools/build-scripts`'
   # `stdlib-test-plan` decides, writes why in this job's summary, and returns the jobs as `matrix`;
-  # `stdlib-test --only` runs each job's projects. A split shard (Table_Tests, by database
-  # backend) is several jobs that each run a slice of that one project's test groups
+  # `stdlib-test --only` runs each job's projects. A split shard (none at present) is several jobs that each run a slice of that one project's test groups
   # (`ENSO_TEST_GROUP_FILTER`, from the matrix's `group-filter`); `stdlib-test` fails a job whose
   # filter ran no test, so a filter that matches nothing cannot pass silently. A new library or
   # test project must be added to the map (`tools/ci/check-workflows.mjs` fails until it is). The

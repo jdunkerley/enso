@@ -78,6 +78,21 @@ export function* analyzeImports(
   }
 }
 
+/**
+ * The libraries the module's imports name, by qualified name (`Standard.Base`). Imports of the
+ * current project's own modules name none.
+ */
+export function importedLibraries(
+  ast: Ast.BodyBlock,
+  projectNames: ProjectNameStore,
+): Set<QualifiedName> {
+  const libraries = new Set<QualifiedName>()
+  for (const { from } of analyzeImports(ast, projectNames)) {
+    if (from.project != null) libraries.add(from.project)
+  }
+  return libraries
+}
+
 /** Information about parsed import statement. */
 export interface Import<ModulePath = QualifiedName> {
   from: ModulePath

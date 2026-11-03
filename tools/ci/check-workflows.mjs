@@ -40,6 +40,19 @@ export const BUILD_SCRIPTS = 'tools/build-scripts'
 /** The standard library test map; see `checkStdlibTestMap`. */
 export const STDLIB_TEST_MAP = 'tools/ci/stdlib-test-map.yaml'
 
+/** The database test suite's sources; see `checkSuiteIgnoresBackendNames`. */
+export const DATABASE_TEST_SUITE = 'distribution/lib/Standard/Database_Test_Suite'
+
+/**
+ * A spec line that decides by the backend's name: a test of the group prefix (`prefix ==`,
+ * `prefix.contains …`), of a group's name, of the dialect's name, or of `backend.name`.
+ */
+const BACKEND_NAME_TEST =
+  /\bprefix\s*(?:==|!=|\.)|\bgroup_builder\s*\.\s*name\b|\bdialect_name\b|\bbackend\s*\.\s*name\b/
+
+/** An Enso text literal, which the rule blanks out before it looks at a line. */
+const ENSO_TEXT_LITERAL = /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g
+
 /**
  * A top-level import of a standard library or of a test project. An indented one is an example in
  * a doc comment and does not count.
@@ -147,6 +160,15 @@ function ensoImports(dir, self) {
   return { libraries: [...libraries].sort(), tests: [...tests].sort() }
 }
 
+/** The `.enso` sources of the database test suite, by path relative to `root`, with `/`. */
+function loadSuiteSources(root) {
+  const sources = {}
+  for (const file of ensoFiles(path.join(root, DATABASE_TEST_SUITE))) {
+    sources[path.relative(root, file).split(path.sep).join('/')] = readFileSync(file, 'utf8')
+  }
+  return sources
+}
+
 /**
  * What `checkStdlibTestMap` compares the map with: the libraries under
  * `distribution/lib/Standard` (their first version directory with a `package.yaml`), the
@@ -228,6 +250,7 @@ export function loadRepo(root) {
     files,
     buildScripts: loadBuildScripts(root),
     stdlib: loadStdlib(root),
+    suiteSources: loadSuiteSources(root),
   }
 }
 
@@ -1021,6 +1044,17 @@ export function checkStdlibTestMap({ stdlib }) {
     }
   }
   for (const shard of shards) {
+    if (shard.needs == null) continue
+    if (shard.needs !== 'postgres') {
+      problems.push(
+        `${at} shard \`${shard.name}\` has \`needs: ${shard.needs}\`; only \`postgres\` is known`,
+      )
+    }
+    if (shard.projects === '*') {
+      problems.push(`${at} the "*" shard cannot have \`needs\` (its projects would run nowhere)`)
+    }
+  }
+  for (const shard of shards) {
     if (shard.split == null) continue
     const parts = Array.isArray(shard.split) ? shard.split : []
     if (!Array.isArray(shard.projects) || shard.projects.length !== 1) {
@@ -1070,6 +1104,35 @@ export function checkPublicTypes({ stdlib }) {
 }
 
 /**
+ * The database test suite asks the backend what it supports (its dialect, through the setup's
+ * `flagged`, `is_feature_supported`, `is_operation_supported` and `is_aggregate_supported`) or
+ * what is broken (`has_known_issue`), never its name (spec 2026-10-31-database-test-suite,
+ * section 2). Only code counts: comment lines, doc blocks (a `##` line and the lines indented
+ * under it) and text literals are skipped.
+ */
+export function checkSuiteIgnoresBackendNames({ suiteSources }) {
+  const problems = []
+  for (const [file, text] of Object.entries(suiteSources ?? {})) {
+    let docIndent = null
+    text.split('\n').forEach((line, i) => {
+      const indent = line.length - line.trimStart().length
+      if (/^\s*##/.test(line)) {
+        docIndent = indent
+        return
+      }
+      if (docIndent != null && (line.trim() === '' || indent > docIndent)) return
+      docIndent = null
+      if (/^\s*#/.test(line)) return
+      if (!BACKEND_NAME_TEST.test(line.replace(ENSO_TEXT_LITERAL, '""'))) return
+      problems.push(
+        `${file}:${i + 1}: decides by the backend's name; ask the setup (\`flagged\`, \`is_feature_supported\`, \`is_operation_supported\`, \`is_aggregate_supported\`) or list a \`Known_Issue\``,
+      )
+    })
+  }
+  return problems
+}
+
+/**
  * The group filter reaches every standard library test job that the plan (`stdlib-test-plan`)
  * builds: a step that runs `stdlib-test` for `matrix.only` must set `ENSO_TEST_GROUP_FILTER` from
  * `matrix.group-filter`, or a split job (Table_Tests by database backend) would silently run its
@@ -1096,6 +1159,65 @@ export function checkStdlibTestsGetTheGroupFilter({ workflows }) {
   return problems
 }
 
+/**
+ * The open-time steps (Note [Open Time In CI] in `ide-packaging.yml`) warn and never fail, and run
+ * after the package tests; and the IDE pull-request workflow treats `CI: Open perf` as a related
+ * label wherever it treats `CI: Build IDE` as one, or adding the label would start an inert run.
+ */
+export function checkOpenPerf({ workflows }) {
+  const problems = []
+  const job = workflows['ide-packaging.yml']?.doc?.jobs?.['package-ide']
+  const steps = job?.steps ?? []
+  const lastTests = steps.findLastIndex((s) => String(s?.name ?? '') === 'Run Package Tests')
+  const measures = steps.some((s) => String(s?.run ?? '').includes('perf:open'))
+  if (measures && lastTests < 0) {
+    problems.push(
+      'ide-packaging.yml › package-ide: measures the open time but has no "Run Package Tests" step',
+    )
+  }
+  // An open-time step is one that measures, or one that only serves the measuring (it is gated on
+  // `env.OPEN_PERF`): finding, downloading and uploading the baseline.
+  const isOpenTime = (step) =>
+    String(step?.run ?? '').includes('perf:open') || String(step?.if ?? '').includes('env.OPEN_PERF')
+  steps.forEach((step, index) => {
+    if (!isOpenTime(step)) return
+    const name = step.name ?? `step ${index}`
+    if (step['continue-on-error'] !== true) {
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" must continue on error`,
+      )
+    }
+    // A step's own timeout is absorbed by `continue-on-error`; the job's would fail packaging.
+    if (step['timeout-minutes'] == null) {
+      problems.push(
+        `ide-packaging.yml › package-ide: the open-time step "${name}" needs its own timeout-minutes`,
+      )
+    }
+    if (String(step?.run ?? '').includes('perf:open') && index < lastTests) {
+      problems.push(
+        'ide-packaging.yml › package-ide: the open time is measured after the package tests',
+      )
+    }
+  })
+  // Measuring is not allowed to lengthen the runs that do not measure.
+  if (measures && !/inputs\.open_perf/.test(String(job?.['timeout-minutes'] ?? ''))) {
+    problems.push(
+      'ide-packaging.yml › package-ide: the job timeout must be raised only when measuring (an expression on inputs.open_perf)',
+    )
+  }
+  const text = workflows['ide-pull-request.yml']?.text ?? ''
+  const buildIde = (text.match(/!= 'CI: Build IDE'/g) ?? []).length
+  const both = (
+    text.match(/!= 'CI: Build IDE' && github\.event\.label\.name != 'CI: Open perf'/g) ?? []
+  ).length
+  if (buildIde !== both) {
+    problems.push(
+      `ide-pull-request.yml: ${buildIde - both} unrelated-label test(s) do not exempt 'CI: Open perf'`,
+    )
+  }
+  return problems
+}
+
 export const CHECKS = [
   checkPullRequestsIgnoreSpecs,
   checkSetupNodeCache,
@@ -1115,7 +1237,9 @@ export const CHECKS = [
   checkChangedFilesCountDeletions,
   checkStdlibTestMap,
   checkPublicTypes,
+  checkSuiteIgnoresBackendNames,
   checkStdlibTestsGetTheGroupFilter,
+  checkOpenPerf,
 ]
 
 /** Every violation in the repository at `root`, one message each. */

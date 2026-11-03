@@ -29,6 +29,8 @@ const DEFS: Record<string, object> = SCHEMA.$defs
  */
 const UNAVAILABLE_SCHEMAS: ReadonlyMap<string, TextId | null> = new Map([
   ['#/$defs/EnsoFileDataLink', null],
+  // Links written before PostgreSQL moved to `Standard.Postgres`: valid, never offered.
+  ['#/$defs/PostgresLegacyDataLink', null],
 ])
 
 /**

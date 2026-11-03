@@ -10,6 +10,7 @@ import {
   type Locator,
   type Page,
 } from 'playwright/test'
+import { electronExecutablePath } from './packagedIde'
 
 const LOADING_TIMEOUT = 10000
 
@@ -24,23 +25,7 @@ const LOADING_TIMEOUT = 10000
 export const SKIP_ON_WINDOWS_CI = process.env.CI != null && process.platform === 'win32'
 export const SKIP_ON_WINDOWS_CI_REASON =
   'Slow on the Windows CI runner (see SKIP_ON_WINDOWS_CI in electronTest.ts)'
-const POSSIBLE_ELECTRON_PATHS = [
-  '../../../dist/ide/linux-unpacked/enso',
-  '../../../dist/ide/win-unpacked/Enso.exe',
-  '../../../dist/ide/mac/Enso.app/Contents/MacOS/Enso',
-  '../../../dist/ide/mac-arm64/Enso.app/Contents/MacOS/Enso',
-]
-
-export const electronExecutablePath = await (async () => {
-  try {
-    const promises = POSSIBLE_ELECTRON_PATHS.map((p) => path.resolve(import.meta.dirname, p)).map(
-      (p) => fs.access(p, fs.constants.X_OK).then(() => p),
-    )
-    return await Promise.any(promises)
-  } catch {
-    throw Error('Cannot find Enso package')
-  }
-})()
+export { electronExecutablePath }
 
 /**
  * Tests run on electron executable.

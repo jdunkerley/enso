@@ -139,11 +139,11 @@ describe('the environment', () => {
 })
 
 test('a Linux run warns when a database the suite expects is missing', () => {
-  expect(missingServiceWarnings(['Table_Tests', 'Microsoft_Tests'], 'linux', {})).toHaveLength(2)
+  expect(missingServiceWarnings(['Postgres_Tests', 'Microsoft_Tests'], 'linux', {})).toHaveLength(2)
   expect(
-    missingServiceWarnings(['Table_Tests'], 'linux', { ENSO_POSTGRES_DATABASE: 'enso_test_db' }),
+    missingServiceWarnings(['Postgres_Tests'], 'linux', { ENSO_POSTGRES_DATABASE: 'enso_test_db' }),
   ).toEqual([])
-  expect(missingServiceWarnings(['Table_Tests'], 'win32', {})).toEqual([])
+  expect(missingServiceWarnings(['Postgres_Tests'], 'win32', {})).toEqual([])
 })
 
 test('the IR cache directory', () => {

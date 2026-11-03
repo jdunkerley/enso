@@ -52,8 +52,9 @@ final class InvalidateModulesIndexHandler(
   override protected def negativeResponse(replyTo: ActorRef, error: Api.Error)(
     implicit ec: ExecutionContext
   ): Unit = {
+    // Only the failure: a result sent as well would arrive first and report
+    // success.
     runtimeFailureMapper.mapApiError(error).pipeTo(replyTo)
-    replyTo ! SearchProtocol.InvalidateSuggestionsDatabaseResult
   }
 }
 

@@ -1,0 +1,21 @@
+## Enso Signatures 1.0
+## module Standard.Database_Test_Suite.Common_Table_Operations.Select_Columns_Spec
+- type Mixed_Columns_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+- type Rename_Columns_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+- type Select_Columns_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+- type Sort_Columns_Data
+    - Value ~data:Standard.Base.Any.Any
+    - setup table_builder:Standard.Base.Any.Any -> Standard.Base.Any.Any
+    - table self -> Standard.Base.Any.Any
+- add_select_column_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- add_specs suite_builder:Standard.Base.Any.Any setup:Standard.Base.Any.Any -> Standard.Base.Any.Any
+- main filter:Standard.Base.Any.Any= -> Standard.Base.Any.Any

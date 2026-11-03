@@ -2,6 +2,7 @@ import {
   addImports,
   covers,
   detectImportConflicts,
+  importedLibraries,
   recognizeImport,
   requiredImportToAst,
   requiredImports,
@@ -27,6 +28,15 @@ import { assertDefined } from 'ydoc-shared/util/assert'
 const qn = (s: string) => unwrap(tryQualifiedName(s))
 
 const projectNames = mockProjectNameStore('local', 'Project')
+
+test('importedLibraries lists the libraries a module imports', () => {
+  const root = Ast.parseBlock(
+    'from Standard.Base import all\nimport Standard.Visualization\nfrom Standard.Table import Table\nfrom local.Project.Helpers import helper\n\nmain = 42\n',
+  )
+  expect(importedLibraries(root, projectNames)).toEqual(
+    new Set(['Standard.Base', 'Standard.Visualization', 'Standard.Table']),
+  )
+})
 
 function projectPath(path: string) {
   return unwrap(projectNames.parseProjectPath(unwrap(tryQualifiedName(path))))
