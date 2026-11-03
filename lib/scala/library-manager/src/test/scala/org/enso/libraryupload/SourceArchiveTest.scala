@@ -80,7 +80,10 @@ class SourceArchiveTest
       )
       Files.writeString(projectRoot.resolve("CLAUDE.md"), "notes")
       Files.writeString(projectRoot.resolve("src").resolve("CLAUDE.md"), "n")
-      Files.writeString(projectRoot.resolve("src").resolve("Main.enso"), "x = 1")
+      Files.writeString(
+        projectRoot.resolve("src").resolve("Main.enso"),
+        "x = 1"
+      )
 
       uploader.createMainArchive(projectRoot, noProgress)
       val packed = entries(projectRoot.resolve(LibraryUploader.mainArchiveName))
