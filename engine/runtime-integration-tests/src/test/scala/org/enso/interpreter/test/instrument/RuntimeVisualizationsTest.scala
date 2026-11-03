@@ -186,23 +186,24 @@ class RuntimeVisualizationsTest
       val idFooY  = metadata.addItem(133, 8, "ad")
       val idFooZ  = metadata.addItem(150, 5, "ae")
 
-      def code =
-        metadata.appendToCode(
-          """
-            |from Standard.Base.Data.Numbers import Number
-            |
-            |main =
-            |    x = 6
-            |    y = x.foo 5
-            |    z = y + 5
-            |    z
-            |
-            |Number.foo self = x ->
-            |    y = self + 3
-            |    z = y * x
-            |    z
-            |""".stripMargin.linesIterator.mkString("\n")
-        )
+      /** The source of [[code]], without its metadata. */
+      val text: String =
+        """
+          |from Standard.Base.Data.Numbers import Number
+          |
+          |main =
+          |    x = 6
+          |    y = x.foo 5
+          |    z = y + 5
+          |    z
+          |
+          |Number.foo self = x ->
+          |    y = self + 3
+          |    z = y * x
+          |    z
+          |""".stripMargin.linesIterator.mkString("\n")
+
+      def code = metadata.appendToCode(text)
 
       object Update {
 
@@ -5844,13 +5845,15 @@ class RuntimeVisualizationsTest
     * decided what to do with each `ExecuteJob` the attaches ask for. The held
     * execution is not released.
     *
+    * @param module the source of `main`'s module, by default `Main.code`
     * @return the context id, the request id and the visualization ids
     */
   private def attachWhileTheFirstExecutionIsHeld(
     context: TestContext,
-    on: Seq[UUID]
+    on: Seq[UUID],
+    module: Option[String] = None
   ): (UUID, UUID, Seq[UUID]) = {
-    val contents   = context.Main.code
+    val contents   = module.getOrElse(context.Main.code)
     val mainFile   = context.writeMain(contents)
     val moduleName = "Enso_Test.Test.Main"
     val visualizationFile =
@@ -5995,6 +5998,33 @@ class RuntimeVisualizationsTest
       .flatMap(response => visualizationUpdates(Seq(response), visualizationId))
       .nextOption()
     update shouldEqual Some("6")
+  }
+
+  it should "evaluate a deferred visualization of an expression whose value is not cached" in withContext(
+    sequentialExecution = false
+  ) { context =>
+    // #546: a deferred visualization was evaluated only once its expression's
+    // value was in the cache, which keeps the values of bindings only. One on
+    // `main`'s last line, which is not a binding, was never evaluated.
+    val metadata     = new Metadata
+    val idMainResult = metadata.addItem(99, 1, "af")
+    metadata.assertInCode(idMainResult, context.Main.text, "z")
+
+    val (_, _, Seq(visualizationId)) =
+      try attachWhileTheFirstExecutionIsHeld(
+        context,
+        Seq(idMainResult),
+        Some(metadata.appendToCode(context.Main.text))
+      )
+      finally context.executionCompleteGate.release()
+
+    val update = Iterator
+      .continually(context.receiveWithTimeout(20))
+      .takeWhile(_.isDefined)
+      .flatten
+      .flatMap(response => visualizationUpdates(Seq(response), visualizationId))
+      .nextOption()
+    update shouldEqual Some("50")
   }
 
   it should "run one execution for all visualizations attached while an execution is finishing" in withContext(

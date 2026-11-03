@@ -15,6 +15,12 @@ caches and visualizations.
   running one has not started its program yet; otherwise it runs once that one
   ends (Note [A Duplicate Must Not Drop A Needed Job] in `JobExecutionEngine`).
   A visualization deferred after an execution's last pass relies on this.
+- A visualization is **deferred** (`UpsertVisualizationJob`) when it cannot take
+  the write compilation lock, e.g. while a background `SerializeModuleJob` holds
+  the read lock. `ProgramExecutionSupport` evaluates it from the value just
+  computed or, failing that, from the cache, which keeps only bindings' values;
+  so it must look at the computed value, or one on a non-binding expression is
+  never sent (#546).
 - Not every command needs a job: `StartBackgroundProcessingCmd` calls
   `JobControlPlane.startBackgroundJobs()` directly. Before adding a `Job`
   subclass, check something will actually submit it.
