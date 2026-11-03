@@ -1,9 +1,11 @@
-import { expect, test } from 'vitest'
+import { assert, expect, test } from 'vitest'
 import {
   type Choice,
   DisplayMode,
+  flattenChoice,
   multipleChoiceConfiguration,
   singleChoiceConfiguration,
+  widgetConfigurationSchema,
 } from '../configuration'
 
 const dynamicConfig = (): { label: string; values: Choice[] } => ({
@@ -90,5 +92,39 @@ test('Configuration of the inner widget', () => {
   expect(multipleChoiceInnerConfig).toEqual({
     kind: 'SomeOfFunctionCalls',
     possibleFunctions: expectedPossibleFunctions,
+  })
+})
+
+test('a choice keeps the type it requires and its file name patterns', () => {
+  const parsed = widgetConfigurationSchema.parse({
+    type: 'Widget',
+    constructor: 'Single_Choice',
+    label: null,
+    values: [
+      {
+        label: 'Auto Detect',
+        value: 'Standard.Base.System.File_Format.Auto_Detect',
+        parameters: [],
+        icon: '',
+      },
+      {
+        label: 'SQLite',
+        value: '..SQLite',
+        parameters: [],
+        icon: '',
+        requires: 'Standard.SQLite.SQLite_Format.SQLite_Format',
+        patterns: ['*.sqlite', '*.db'],
+      },
+    ],
+    display: { type: 'Display', constructor: 'When_Modified' },
+  })
+  assert(parsed.kind === 'Single_Choice')
+  expect(parsed.values[0]).not.toHaveProperty('requires')
+  expect(parsed.values[0]).not.toHaveProperty('patterns')
+  const flattened = parsed.values.flatMap(flattenChoice)
+  expect(flattened[1]).toMatchObject({
+    value: '..SQLite',
+    requires: 'Standard.SQLite.SQLite_Format.SQLite_Format',
+    patterns: ['*.sqlite', '*.db'],
   })
 })

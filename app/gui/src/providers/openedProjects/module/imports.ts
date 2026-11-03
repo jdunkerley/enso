@@ -268,6 +268,41 @@ export function requiredImportsByProjectPath(
   return entry ? requiredImports(db, entry, directConImport) : []
 }
 
+/**
+ * The imports that a widget option's `requires` needs: `typeName` is a type's fully qualified name
+ * (`Standard.SQLite.SQLite_Format.SQLite_Format`). It is looked up among the suggestion entries,
+ * where a catalogue entry counts like any other, and failing that among the types its own library
+ * declares (`libraryPublicTypes`). `undefined` when it is neither, for example when the library
+ * is not installed: the caller then adds nothing
+ * (`docs/superpowers/specs/2026-11-03-data-read-library-imports-design.md`, section 3).
+ */
+export function requiredImportsForTypeName(
+  db: SuggestionDb,
+  projectNames: ProjectNameStore,
+  libraryPublicTypes: ReadonlyMap<string, readonly ProjectPath[]>,
+  typeName: string,
+): RequiredImport[] | undefined {
+  const path = projectNames.parseProjectPathRaw(typeName)
+  if (path.ok) {
+    const entry = db.getEntryByProjectPath(path.value)
+    if (entry?.kind === SuggestionKind.Type) return requiredImports(db, entry)
+    const name = path.value.path && qnLastSegment(path.value.path)
+    const library =
+      name && libraryPublicTypes.get(name)?.find((lib) => lib.project === path.value.project)
+    if (name && library) {
+      return [
+        {
+          kind: 'Unqualified',
+          from: library.normalized(),
+          import: name as Identifier,
+        },
+      ]
+    }
+  }
+  console.info('No suggestion entry or declared type for a widget option’s type:', typeName)
+  return undefined
+}
+
 function selfTypeEntry(db: SuggestionDb, entry: SuggestionEntry): SuggestionEntry | undefined {
   if (
     (entry.kind === SuggestionKind.Method || entry.kind === SuggestionKind.Constructor) &&

@@ -50,6 +50,7 @@ const expressionTags = useExpressionTags({
   staticTags: () => props.input[ArgumentInfoKey]?.info?.tagValues,
   suggestionDb: () => suggestionDbStore.value?.entries,
   projectNames,
+  libraryPublicTypes: () => suggestionDbStore.value?.libraryPublicTypes,
 })
 
 const entries = useTagEntries(expressionTags, (expression) =>

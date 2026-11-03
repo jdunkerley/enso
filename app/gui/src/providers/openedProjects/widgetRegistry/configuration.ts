@@ -48,18 +48,30 @@ const choiceSchema: z.ZodType<Choice> = z.object({
   label: z.string().nullable(),
   parameters: z.lazy(() => z.array(argumentSchema)),
   icon: z.string().nullable().optional(),
+  requires: z.string().optional(),
+  patterns: z.array(z.string()).optional(),
 })
+/**
+ * `requires` is the fully qualified name of a type whose library the choice needs: picking the
+ * choice adds that library's import. `patterns` are the file name patterns (`*.db`) of the files
+ * the choice reads: with format on `Auto_Detect`, a path that only one type's patterns match adds
+ * its import (`WidgetFunction/formatForPath.ts`).
+ */
 export type Choice = {
   value: ChoiceValue
   label: string | null
   parameters: ArgsWidgetConfiguration
   icon?: string | null | undefined
+  requires?: string | undefined
+  patterns?: string[] | undefined
 }
 export type FlattenedChoice = {
   value: string
   label: string | null
   parameters: ArgsWidgetConfiguration
   icon?: string | null | undefined
+  requires?: string | undefined
+  patterns?: string[] | undefined
 }
 
 const fileTypeSchema: z.ZodType<FileType> = z.object({
