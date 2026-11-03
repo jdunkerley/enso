@@ -1,11 +1,5 @@
 name: Visualization
 namespace: Standard
 version: 0.0.0-dev
-license: APLv2
-authors:
-  - name: Enso Team
-    email: contact@enso.org
-maintainers:
-  - name: Enso Team
-    email: contact@enso.org
+license: Apache-2.0
 catalogue: false
