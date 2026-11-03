@@ -268,6 +268,7 @@ public final class SpecCollector {
     out.println(
         "  private final List<LogRecord> messages = new"
             + " java.util.concurrent.CopyOnWriteArrayList<>();");
+    out.println("  private Context ctx;");
     out.println("  private Value groupInputArg;");
     for (var specJavaName : specJavaNames) {
       out.println("  private Value benchFunc_" + specJavaName + ";");
@@ -305,7 +306,7 @@ public final class SpecCollector {
     out.println("    ctxFactory.executionEnvironment(\"live\");");
     out.println("    ctxFactory.options(options);");
     out.println("    ctxFactory.logHandler(logHandler);");
-    out.println("    var ctx = ctxFactory.build();");
+    out.println("    this.ctx = ctxFactory.build();");
 
     out.println("    Value bindings = ctx.getBindings(LanguageInfo.ID);");
     out.println(
@@ -401,6 +402,20 @@ public final class SpecCollector {
                   compilationLog.append("No compilation messages.\\n");
                 }
               }
+            }
+          }
+
+          // Note [Benchmark Context Is Closed]
+          // The context holds the whole standard library and the benchmark's tables. A forked
+          // run exits after one group, but `bench.compileOnly` runs every group in one JVM
+          // (`forks(0)`): a context left open there stays reachable, and the heap fills up
+          // after a dozen groups (#302).
+          @TearDown
+          public void closeContext() {
+            if (ctx != null) {
+              ctx.close(true);
+              ctx = null;
+              groupInputArg = null;
             }
           }
 
