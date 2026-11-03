@@ -139,28 +139,43 @@ export function formatTypeForPathUpdate(
   return formatTypeForPath(after, format.dynamicConfig)
 }
 
-const rememberedFormatConfigs = new Map<string, WidgetConfiguration>()
+/** The `format` options of the `path`-and-`format` calls in the graph right now, per project. */
+const liveFormatConfigs = new Map<string, Map<symbol, WidgetConfiguration>>()
 
 /**
- * Remember the `format` options (with their libraries and patterns) that a `path`-and-`format`
- * call in the graph has loaded, per `owner` (the project's id), so that a dropped file can be matched
- * without asking the engine.
+ * Publish the `format` options (with their libraries and patterns) that a `path`-and-`format`
+ * call in the graph has loaded, under `owner` (the project's id) and the call's own `key`, so that
+ * a dropped file can be matched without asking the engine. Returns the function that withdraws
+ * them: call it when the call goes away or its configuration changes, so that only options a
+ * widget holds right now are ever used.
  */
-export function rememberFormatConfig(owner: string, app: ArgumentApplication) {
+export function trackFormatConfig(
+  owner: string,
+  key: symbol,
+  app: ArgumentApplication,
+): () => void {
   const args = [...app.iterApplications()].map((a) => a.argument)
-  if (!args.some((a) => a.argInfo?.name === PATH_ARGUMENT)) return
+  if (!args.some((a) => a.argInfo?.name === PATH_ARGUMENT)) return () => {}
   const config = args.find((a) => a.argInfo?.name === FORMAT_ARGUMENT)?.dynamicConfig
   if (
-    config?.kind === 'Single_Choice' &&
-    config.values.flatMap(flattenChoice).some((c) => c.requires)
+    config?.kind !== 'Single_Choice' ||
+    !config.values.flatMap(flattenChoice).some((c) => c.requires)
   ) {
-    rememberedFormatConfigs.set(owner, config)
+    return () => {}
+  }
+  const configs = liveFormatConfigs.get(owner) ?? new Map<symbol, WidgetConfiguration>()
+  liveFormatConfigs.set(owner, configs)
+  configs.set(key, config)
+  return () => {
+    configs.delete(key)
+    if (configs.size === 0 && liveFormatConfigs.get(owner) === configs)
+      liveFormatConfigs.delete(owner)
   }
 }
 
 /**
  * The format type whose library reads a file dropped on the graph. Uses the options a call in the
- * graph has already loaded ({@link rememberFormatConfig}); only without them is `query` called
+ * graph holds right now ({@link trackFormatConfig}); only without them is `query` called
  * (it should itself give up quickly): it resolves to the engine's answer to
  * {@link DATA_READ_FORMAT_WIDGET_QUERY}. Any failure of the query gives `undefined`.
  */
@@ -169,8 +184,8 @@ export async function formatTypeForDrop(
   owner: string,
   query: () => Promise<unknown>,
 ): Promise<string | undefined> {
-  const remembered = rememberedFormatConfigs.get(owner)
-  if (remembered) return formatTypeForPath(fileName, remembered)
+  const live = liveFormatConfigs.get(owner)?.values().next().value
+  if (live) return formatTypeForPath(fileName, live)
   try {
     return formatTypeForDroppedFile(fileName, await query())
   } catch (error) {

@@ -21,7 +21,7 @@ import {
   isAutoDetect,
   matchesNamePattern,
   pathTextOf,
-  rememberFormatConfig,
+  trackFormatConfig,
 } from '../formatForPath'
 
 const SQLITE = 'Standard.SQLite.SQLite_Format.SQLite_Format'
@@ -298,11 +298,34 @@ describe('formatTypeForDrop', () => {
     expect(query).toHaveBeenCalledTimes(1)
   })
   test('uses the options a node has loaded, without asking the engine', async () => {
-    rememberFormatConfig('project-loaded', dataRead("Data.read '/d/a.csv'"))
+    const untrack = trackFormatConfig(
+      'project-loaded',
+      Symbol('node'),
+      dataRead("Data.read '/d/a.csv'"),
+    )
     const query = vi.fn(async () => undefined)
     expect(await formatTypeForDrop('S.db', 'project-loaded', query)).toBe(SQLITE)
     expect(query).not.toHaveBeenCalled()
     expect(await formatTypeForDrop('notes.xyz', 'project-loaded', query)).toBeUndefined()
+    untrack()
+  })
+  test('options of a node that is gone are not used: the engine is asked', async () => {
+    const untrack = trackFormatConfig(
+      'project-deleted',
+      Symbol('node'),
+      dataRead("Data.read '/d/a.csv'"),
+    )
+    untrack()
+    const query = vi.fn(async () => answer)
+    expect(await formatTypeForDrop('S.db', 'project-deleted', query)).toBe(SQLITE)
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+  test('options of another project are not used', async () => {
+    const untrack = trackFormatConfig('project-a', Symbol('node'), dataRead("Data.read '/d/a.csv'"))
+    const query = vi.fn(async () => undefined)
+    expect(await formatTypeForDrop('S.db', 'project-b', query)).toBeUndefined()
+    expect(query).toHaveBeenCalledTimes(1)
+    untrack()
   })
   test('a failed or empty query names no format', async () => {
     const failing = vi.fn(async () => {

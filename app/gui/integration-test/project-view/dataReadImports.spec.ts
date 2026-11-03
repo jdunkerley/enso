@@ -185,7 +185,7 @@ test('dropping a file no format claims adds the node without an import', async (
 })
 
 // With no `Data.read` node in the graph, no format options are loaded: the engine is asked. The
-// mock answers only in the context the engine would run the query in, the `main` method's body.
+// mock answers only in the context the engine would run the query in, a method's body.
 test.describe('a graph without a Data.read node', () => {
   test.use({
     setupApi: {

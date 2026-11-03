@@ -628,8 +628,10 @@ function isMethodBodyId(id: string | undefined): boolean {
   if (id == null) return false
   for (const doc of mockModuleDocs) {
     const root = new Ast.MutableModule(doc).root()
-    const main = root instanceof Ast.BodyBlock ? Ast.findModuleMethod(root, 'main') : undefined
-    if (main?.statement.body?.externalId === id) return true
+    if (!(root instanceof Ast.BodyBlock)) continue
+    for (const statement of root.statements()) {
+      if (statement instanceof Ast.FunctionDef && statement.body?.externalId === id) return true
+    }
   }
   return false
 }
@@ -641,7 +643,7 @@ function maybeRespondToSlot(slot: YMap<unknown>): void {
   const key = slotPreprocessorKey(request)
   if (!key) return
   // A direct widget query (the format of a dropped file, #489) is answered only in the context
-  // the engine would run it in: the `main` method's body. In the definition itself nothing ever
+  // the engine would run it in: a method's body. In the definition itself nothing ever
   // runs, so the real engine never answers there.
   if (
     typeof request.expression === 'object' &&

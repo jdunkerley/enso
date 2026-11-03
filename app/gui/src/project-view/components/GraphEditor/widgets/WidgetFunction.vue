@@ -14,7 +14,7 @@ import { proxyRefs } from '$/utils/reactivity'
 import NodeWidget from '@/components/GraphEditor/NodeWidget.vue'
 import {
   formatTypeForPathUpdate,
-  rememberFormatConfig,
+  trackFormatConfig,
 } from '@/components/GraphEditor/widgets/WidgetFunction/formatForPath'
 import {
   getPotentialModuleFunctionPointer,
@@ -59,9 +59,11 @@ const { methodCallInfo, application, subject, subjectInfo } = useWidgetFunctionC
 )
 
 // A file dropped on the graph (#489) matches the format options a node here has already loaded.
-watchEffect(() => {
+// Withdrawn when this call's configuration changes or the node goes away.
+const formatConfigKey = Symbol('formatConfig')
+watchEffect((onCleanup) => {
   if (application.value instanceof ArgumentApplication) {
-    rememberFormatConfig(project.value.id, application.value)
+    onCleanup(trackFormatConfig(project.value.id, formatConfigKey, application.value))
   }
 })
 
