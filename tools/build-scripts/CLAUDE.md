@@ -74,8 +74,8 @@ prints one.
   CLI's `ide upload` ran them: `create-draft` drafts release `ENSO_VERSION` at
   `GITHUB_SHA` with the top section of `CHANGELOG.md`; `upload-ide` uploads this
   platform's installer, its `.sha256` and the update feeds from `dist/ide` to
-  the draft `ENSO_RELEASE_ID`; `publish` publishes it, noting missing
-  installers, and checks that the installers download;
+  the draft `ENSO_RELEASE_ID`; `publish` publishes it (refusing a draft that
+  lacks an installer) and checks that the installers download;
   `promote <stable|patch|rc|nightly>` computes the next version from `origin`'s
   tags; `update-latest-version` records a stable version as `latest-release` in
   `build-config.yaml`. They need `GITHUB_TOKEN` and `GITHUB_REPOSITORY` (except

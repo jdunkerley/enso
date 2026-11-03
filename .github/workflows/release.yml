@@ -1,6 +1,6 @@
 # Hand-written. Releases one version of the IDE: drafts a GitHub release, builds the engine bundle
-# and the GUI, packages the installers for Windows, Linux and (on the self-hosted Mac, when it is
-# online) macOS, uploads them with their checksums and update feeds to the draft, publishes it, and
+# and the GUI, packages the installers for Windows, Linux and (on the self-hosted Mac) macOS,
+# uploads them with their checksums and update feeds to the draft, publishes it, and
 # records a stable version as `latest-release`. Called by `promote.yml`, which computes the version;
 # can be started by hand with one. The logic is `tools/build-scripts`' `release` command (build
 # simplification, Phase 4; docs/superpowers/specs/2026-10-20-build-simplification-design.md). Change
@@ -107,14 +107,17 @@ permissions:
   contents: read
 
 jobs:
-  # The Mac is a self-hosted runner that may be offline. Its jobs wait for it for one minute and are
-  # skipped when it does not appear; publishing then notes the missing installer. Keep in step with
-  # `engine-checks-nightly.yml` and `macos-pull-request.yml`.
+  # The Mac is a self-hosted runner that may be offline, and a release without the macOS `.dmg` is
+  # not worth making (#258). This job waits for it for 12 minutes (it may be waking, or finishing
+  # another job) and fails the run when it does not appear, before a draft exists. The macOS jobs
+  # are required too: a failed Mac build fails the release and publishing is skipped. The checks
+  # (`engine-checks-nightly.yml`, `macos-pull-request.yml`) may go ahead without the Mac; a
+  # release may not.
   check-the-mac-os-runner:
     name: Check the macOS runner
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 20
     outputs:
       online: ${{ steps.wait.outputs.online }}
     steps:
@@ -122,12 +125,13 @@ jobs:
         uses: actions/checkout@v5
       - id: wait
         name: Wait for the macOS runner
-        run: ./tools/ci/wait-for-macos-runner.sh 1 skip
+        run: ./tools/ci/wait-for-macos-runner.sh 12 fail
         env:
           RUNNER_STATUS_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
 
   draft-release:
     name: Create a release draft.
+    needs: [check-the-mac-os-runner]
     if: inputs.release-id == ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -297,7 +301,6 @@ jobs:
     if: needs.check-the-mac-os-runner.outputs.online == 'true'
     runs-on: [self-hosted, macOS]
     timeout-minutes: 45
-    continue-on-error: true
     env:
       ENSO_LAUNCHER: native
     steps:
@@ -413,7 +416,6 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: write
-    continue-on-error: true
     env:
       ENSO_BUILD_UPDATE_INFO: "true"
       ENSO_RELEASE_ID: ${{ needs.draft-release.outputs.ENSO_RELEASE_ID }}
@@ -460,13 +462,14 @@ jobs:
         if: always()
         uses: ./.github/actions/git-clean
 
-  # Publishes when asked to (`publish`) and the draft, the license check and both hosted platforms
-  # succeeded; macOS may have failed or been skipped, and the notes then say so. With `release-id`
-  # it publishes that draft alone (Note [Publishing Later]).
+  # Publishes when asked to (`publish`) and the draft, the license check and every platform's
+  # installers, macOS's included, succeeded. A failed Mac build leaves the draft unpublished. With
+  # `release-id` it publishes that draft alone (Note [Publishing Later]); `release publish` itself
+  # refuses a draft that lacks an installer.
   publish-release:
     name: Publish release (linux, amd64)
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
-    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success' && needs.upload-ide-macos.result == 'success'))"
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -485,7 +488,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # Tests the publish job's result itself: by default a job is skipped when any job before it
-  # failed, and a failed macOS job would then skip this one (the 2026.10.23 nightly's was).
+  # failed.
   update-latest-release-version:
     name: Update the latest release version (linux, amd64)
     needs: [draft-release, publish-release]

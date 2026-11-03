@@ -34,12 +34,18 @@ settings. Every workflow is hand-written YAML (build simplification;
   `promote.yml` (by hand, or from `nightly.yml`'s daily cron) computes the
   version and calls `release.yml`, which drafts the release, builds and uploads
   the installers and publishes it with `tools/build-scripts`' `release` command
-  (Note [Where The Release Logic Lives] in `release.yml`). Change them only
-  together with an rc release test. `engine-checks-nightly.yml` (by hand) adds
-  macOS and Oracle GraalVM to the engine checks, `extra-nightly-tests.yml` (by
-  hand) the suites that need the Snowflake and Enso Cloud secrets, and
-  `macos-checks.yml` the self-hosted Mac's checks for `macos-pull-request.yml`;
-  all three call `engine-checks-platform.yml`.
+  (Note [Where The Release Logic Lives] in `release.yml`). A release needs the
+  macOS `.dmg` (#258): `release.yml` waits 12 minutes for the self-hosted Mac
+  (`enso-mac`) and fails when it is offline, before a draft exists; the macOS
+  jobs have no `continue-on-error`; and `publish-release` needs their success
+  (`release publish` also refuses a draft with no installer for a platform). The
+  checks (`engine-checks-nightly.yml`, `macos-pull-request.yml`) may still skip
+  the Mac; `check-workflows.mjs` encodes both. Change them only together with an
+  rc release test. `engine-checks-nightly.yml` (by hand) adds macOS and Oracle
+  GraalVM to the engine checks, `extra-nightly-tests.yml` (by hand) the suites
+  that need the Snowflake and Enso Cloud secrets, and `macos-checks.yml` the
+  self-hosted Mac's checks for `macos-pull-request.yml`; all three call
+  `engine-checks-platform.yml`.
 - `workflows/engine-benchmark.yml`, `std-libs-benchmark.yml` — benchmarks,
   started by hand. Their artifacts are the only output: the upstream
   `bench-upload.yml` was removed (#307), as the fork has no results repository.
