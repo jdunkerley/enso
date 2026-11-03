@@ -57,8 +57,8 @@ export function checksumPath(file: string): string {
 }
 
 /**
- * The installers named in `uploaded`, and the targets whose installer is not there. The macOS jobs
- * do not block publishing, so a release can go out without its `.dmg`.
+ * The installers named in `uploaded`, and the targets whose installer is not there. `publish` refuses a
+ * draft with any missing: the release needs every installer, the `.dmg` included.
  */
 export function splitUploaded(
   version: string,
@@ -71,15 +71,6 @@ export function splitUploaded(
     else missing.push(target)
   }
   return { present, missing }
-}
-
-/** The note `publish` appends to the body when installers are missing. */
-export function missingInstallersNote(missing: readonly ReleaseTarget[]): string {
-  const platforms = missing.map((target) => target.pretty).join(', ')
-  return (
-    `\n\n> [!NOTE]\n> This release was published without an installer for ${platforms}: that ` +
-    'build failed or was skipped. Re-running its jobs in the release workflow uploads it here.'
-  )
 }
 
 /**

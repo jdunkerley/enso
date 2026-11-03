@@ -7,7 +7,6 @@ import {
   downloadUrl,
   ideUploadFiles,
   installerName,
-  missingInstallersNote,
   RELEASE_TARGETS,
   releaseTarget,
   splitUploaded,
@@ -53,14 +52,6 @@ describe('splitUploaded (uploaded_manifest_leaves_out_missing_installers)', () =
     ])
     expect(present.map((target) => target.os)).toEqual(['windows', 'linux'])
     expect(missing.map((target) => target.pretty)).toEqual(['macOS (Apple silicon)'])
-  })
-  test('the note names the missing platforms', () => {
-    const { missing } = splitUploaded('2026.2.0', [])
-    expect(missingInstallersNote(missing)).toBe(
-      '\n\n> [!NOTE]\n> This release was published without an installer for Windows, Linux, ' +
-        'macOS (Apple silicon): that build failed or was skipped. Re-running its jobs in the ' +
-        'release workflow uploads it here.',
-    )
   })
 })
 

@@ -15,7 +15,6 @@ import {
   contentType,
   downloadUrl,
   installerName,
-  missingInstallersNote,
   splitUploaded,
   type ReleaseTarget,
   type UploadFile,
@@ -123,17 +122,17 @@ async function getRelease(api: GitHub, id: number): Promise<Release> {
 /**
  * Publishes the draft `id`, which must be release `version` (its tag) and hold only fully
  * uploaded assets: a `starter` asset is an upload that died part-way, and would be published
- * broken. Installers that were not uploaded (a skipped or failed macOS build) are named in a note
- * appended to the body. The tag and target are restated in the same call: editing a draft
- * without them turns it into `untagged-…`, and it would publish without a tag. Then checks that
- * every uploaded installer downloads. Returns the targets left out.
+ * broken. A draft missing any installer (a failed or skipped macOS build included) is not
+ * published: the release needs every one. The tag and target are restated in the same call:
+ * editing a draft without them turns it into `untagged-…`, and it would publish without a tag.
+ * Then checks that every installer downloads.
  */
 export async function publishRelease(
   api: GitHub,
   id: number,
   version: Version,
   log: (line: string) => void,
-): Promise<ReleaseTarget[]> {
+): Promise<void> {
   const release = await getRelease(api, id)
   if (!release.draft) throw new Error('Release has been already published!')
   if (release.tag_name !== version.text) {
@@ -150,20 +149,18 @@ export async function publishRelease(
     version.text,
     release.assets.map((asset) => asset.name),
   )
-  let body = release.body ?? ''
   if (missing.length > 0) {
-    log(`::warning::Publishing without installers for: ${missing.map((t) => t.pretty).join(', ')}.`)
-    body += missingInstallersNote(missing)
+    const names = missing.map((target) => target.pretty).join(', ')
+    throw new Error(`Not publishing: no installer for ${names}. The release needs every one.`)
   }
   await api.json('PATCH', `/repos/${api.repository}/releases/${id}`, {
     tag_name: release.tag_name,
     target_commitish: release.target_commitish,
-    body,
+    body: release.body ?? '',
     draft: false,
   })
   log(`Published ${release.tag_name}: ${release.html_url}`)
   await validateRelease(api, id, present)
-  return missing
 }
 
 /**

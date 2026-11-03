@@ -169,32 +169,22 @@ describe('publishRelease', () => {
         return answer
       },
     })
-    expect(await publishRelease(api, 9, version('2026.1.1-rc.5'), () => {})).toEqual([])
+    await publishRelease(api, 9, version('2026.1.1-rc.5'), () => {})
     expect(calls[1]).toEqual({
       method: 'PATCH',
       route: '/repos/o/r/releases/9',
       body: { tag_name: '2026.1.1-rc.5', target_commitish: 'abc', body: 'notes', draft: false },
     })
   })
-  test('without the dmg: a note, and macOS is not checked', async () => {
+  test('without the dmg: refuses to publish, and does not touch the draft', async () => {
     const two = all.slice(0, 2)
-    let first = true
     const { api, calls } = fakeGitHub({
-      'GET /repos/o/r/releases/9': () => {
-        const answer = first ? release({ assets: two }) : release({ draft: false, assets: two })
-        first = false
-        return answer
-      },
+      'GET /repos/o/r/releases/9': release({ assets: two }),
     })
-    const logged: string[] = []
-    const missing = await publishRelease(api, 9, version('2026.1.1-rc.5'), (l) => logged.push(l))
-    expect(missing.map((target) => target.os)).toEqual(['macos'])
-    expect((calls[1]?.body as { body: string }).body).toBe(
-      'notes\n\n> [!NOTE]\n> This release was published without an installer for macOS (Apple ' +
-        'silicon): that build failed or was skipped. Re-running its jobs in the release workflow ' +
-        'uploads it here.',
+    await expect(publishRelease(api, 9, version('2026.1.1-rc.5'), () => {})).rejects.toThrow(
+      'Not publishing: no installer for macOS (Apple silicon).',
     )
-    expect(logged[0]).toBe('::warning::Publishing without installers for: macOS (Apple silicon).')
+    expect(calls.some((call) => call.method === 'PATCH')).toBe(false)
   })
   test('refuses a published release and a missing one', async () => {
     const done = fakeGitHub({ 'GET /repos/o/r/releases/9': release({ draft: false }) })

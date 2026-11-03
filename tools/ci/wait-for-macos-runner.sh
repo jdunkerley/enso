@@ -7,9 +7,10 @@
 # `macOS`, and writes `online=true` or `online=false` to `$GITHUB_OUTPUT`. GitHub has no queue
 # timeout, so without this a job for an offline runner waits a day before failing.
 #
-# - `skip`: never fails. Workflows that can go ahead without macOS (the release, the nightly
-#   checks) skip their macOS jobs on `online=false`.
-# - `fail`: exits 1 when the runner is not online. Used when macOS was asked for explicitly.
+# - `skip`: never fails. Workflows that can go ahead without macOS (the nightly checks) skip their
+#   macOS jobs on `online=false`.
+# - `fail`: exits 1 when the runner is not online. Used when macOS was asked for explicitly, or is
+#   required (the pull request label; the release, which waits 12 minutes, #258).
 #
 # Listing runners needs "Administration: read", which `GITHUB_TOKEN` cannot be given, so this reads
 # a fine-grained token from `RUNNER_STATUS_TOKEN` (the secret of the same name). Pull requests from
