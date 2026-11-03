@@ -268,6 +268,9 @@ export function requiredImportsByProjectPath(
   return entry ? requiredImports(db, entry, directConImport) : []
 }
 
+/** Type names already reported as unresolvable: the dropdown's tags are rebuilt often. */
+const reportedUnresolvedTypes = new Set<string>()
+
 /**
  * The imports that a widget option's `requires` needs: `typeName` is a type's fully qualified name
  * (`Standard.SQLite.SQLite_Format.SQLite_Format`). It is looked up among the suggestion entries,
@@ -299,7 +302,10 @@ export function requiredImportsForTypeName(
       ]
     }
   }
-  console.info('No suggestion entry or declared type for a widget option’s type:', typeName)
+  if (!reportedUnresolvedTypes.has(typeName)) {
+    reportedUnresolvedTypes.add(typeName)
+    console.info('No suggestion entry or declared type for a widget option’s type:', typeName)
+  }
   return undefined
 }
 

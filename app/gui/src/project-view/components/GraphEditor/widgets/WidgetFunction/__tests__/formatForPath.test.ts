@@ -98,6 +98,8 @@ describe('fileNameOf', () => {
     ['Sales.db', 'Sales.db'],
     ['https://example.com/files/sales.csv?raw=1#top', 'sales.csv'],
     ['/home/user/', ''],
+    ['/d/report#1.db', 'report#1.db'],
+    ['C:\\d\\what?.db', 'what?.db'],
   ])('%s is %s', (path, name) => expect(fileNameOf(path)).toBe(name))
 })
 

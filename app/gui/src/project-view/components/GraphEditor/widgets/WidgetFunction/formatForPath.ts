@@ -18,9 +18,12 @@ export const PATH_ARGUMENT = 'path'
 /** The argument whose widget lists the formats and their file name patterns. */
 export const FORMAT_ARGUMENT = 'format'
 
-/** The file name at the end of `path`: after the last `/` or `\`, without a URL's query or fragment. */
+/**
+ * The file name at the end of `path`: after the last `/` or `\`. A URL (`scheme://`) loses its
+ * query and fragment; in a local path `?` and `#` are part of the name.
+ */
 export function fileNameOf(path: string): string {
-  const withoutQuery = path.replace(/[?#].*$/s, '')
+  const withoutQuery = /^[a-z][a-z0-9+.-]*:\/\//i.test(path) ? path.replace(/[?#].*$/s, '') : path
   const lastSeparator = Math.max(withoutQuery.lastIndexOf('/'), withoutQuery.lastIndexOf('\\'))
   return withoutQuery.slice(lastSeparator + 1)
 }
