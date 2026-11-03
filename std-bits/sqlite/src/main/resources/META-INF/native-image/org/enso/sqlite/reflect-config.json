@@ -1,8 +1,0 @@
-[
-  {
-    "name": "org.sqlite.SQLiteErrorCode"
-  },
-  {
-    "name": "org.sqlite.SQLiteException"
-  }
-]

@@ -11,6 +11,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as portfinder from 'portfinder'
 import { CommandError, runCommand as runChildCommand } from '../childProcess/runCommand.js'
+import { timeoutFromEnv } from './timeouts.js'
 import { Path } from './types.js'
 
 const HEALTHCHECK_FAILURES_TO_RESTART = 3
@@ -181,9 +182,18 @@ export interface ShutdownHookRegistry {
 export type ShutdownHookType = keyof ShutdownHookRegistry
 
 const DEFAULT_JSONRPC_PORT = 30616
-const LANGUAGE_SERVER_STARTUP_TIMEOUT = 30000
+/** How long an engine has to pass its first health check before it is killed. */
+export const LANGUAGE_SERVER_STARTUP_TIMEOUT_MS = 30_000
 
-const TERMINATE_TIMEOUT_MS = 10_000
+/**
+ * How long an engine has to exit after it was asked to, before it is killed: 10 s, or
+ * `ENSO_ENGINE_TERMINATE_TIMEOUT_MS`. The open-time harness's JDK AOT training launch needs longer:
+ * the recording JVM writes its training data as it exits, which took more than 10 s on the
+ * Windows runner.
+ */
+function terminateTimeoutMs(): number {
+  return timeoutFromEnv(process.env.ENSO_ENGINE_TERMINATE_TIMEOUT_MS, 10_000)
+}
 
 /**
  * How many times an open looks for ports and starts an engine, when each engine fails to bind
@@ -426,7 +436,7 @@ class OpenedProject {
         )
         // The respawn triggers `onUnexpectedExit` followed by `onChildStarted`, which restarts
         // this watchdog loop on the new child. Don't schedule another `check` here.
-        void this.watcher.respawn(TERMINATE_TIMEOUT_MS)
+        void this.watcher.respawn(terminateTimeoutMs())
       } else {
         // Not using setInterval to not pile slow-responding healthchecks.
         this.nextWatchdogCheck = setTimeout(check, WATCHDOG_HEALTHCHECK_INTERVAL)
@@ -450,7 +460,7 @@ class OpenedProject {
           console.error('Language Server process of', this.path, "didn't finish in time. Killing.")
           handle.child.kill('SIGKILL')
         }
-      }, TERMINATE_TIMEOUT_MS)
+      }, terminateTimeoutMs())
       try {
         await handle.waitForExit()
       } finally {
@@ -459,7 +469,7 @@ class OpenedProject {
       console.log('Language server process of', this.path, 'exited')
     } else {
       // No stdin to write to — fall back to SIGTERM with SIGKILL after timeout.
-      await handle.terminate({ timeoutMs: TERMINATE_TIMEOUT_MS })
+      await handle.terminate({ timeoutMs: terminateTimeoutMs() })
     }
     // Its last stderr may still be in the pipe at the exit: the log must not end before it.
     await handle.waitForDrain()
@@ -669,7 +679,7 @@ export class EnsoRunner implements Runner {
               }),
             ),
           logSink,
-          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT,
+          this.options.startupTimeoutMs ?? LANGUAGE_SERVER_STARTUP_TIMEOUT_MS,
           this.options.ydocWaitMs ?? 0,
         )
         project.shutdownHooks.set('remove-from-list', () => {

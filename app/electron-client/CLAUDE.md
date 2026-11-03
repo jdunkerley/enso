@@ -708,7 +708,7 @@ section 2). It is not a Playwright Test run: it drives Electron through
 `playwright`'s `_electron` and is started with
 
 ```
-corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native|jvm|native,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12]
+corepack pnpm --filter enso run perf:open --out <dir> [--runs 5] [--engines native,jvm-nocache,jvm] [--baseline <open-time.json | dir>]... [--extras-seconds 15] [--summary <file>] [--exe <path>] [--profile] [--budget-minutes 12] [--jvm-diagnostics] [--jvm-options <opts>]
 ```
 
 It needs a built `dist/ide/` (or `--exe`), and under Linux a display
@@ -775,17 +775,43 @@ bundle's `java`, then a launch with `-XX:AOTMode=on` that checks the JVM accepts
 it: with `on` a JVM that cannot use the cache fails to start, and so does every
 measured launch). So a JVM run takes several minutes longer than a native one.
 The report says how the cache was made (`jvmAot`): `ide-trained` (the training
-is a launch of the IDE), `launcher-trained` (where the IDE kills the engine, as
-on Windows, the JVM never writes the training file, so it is `enso --jvm --run`
-of an empty project: it never loads the Language Server or `project/open`
-classes, so those JVM numbers are pessimistic and not comparable with
-`ide-trained` ones) or `uncached` (the JVM refused the cache; the numbers are
-those of a JVM with no AOT cache, and the report warns). `LAUNCHER_JVM_OPTIONS`
-copies the options of `Main.launchJvm`; a unit test fails when they drift.
+is a launch of the IDE), `launcher-trained` (when the IDE training launch wrote
+no training file, it is `enso --jvm --run` of an empty project: it never loads
+the Language Server or `project/open` classes, so those JVM numbers are
+pessimistic and not comparable with `ide-trained` ones) or `uncached` (the JVM
+refused the cache; the numbers are those of a JVM with no AOT cache, and the
+report warns). `LAUNCHER_JVM_OPTIONS` copies the options of `Main.launchJvm`; a
+unit test fails when they drift. The training and check launches keep their own
+directories (`jvm-aot-train/`, `jvm-aot-check/`, with the JVM's `aot` and `cds`
+records at `info` in `electron-out.log`), and a launch that fails saves
+`failed.png`. On Windows the IDE training launch was always `launcher-trained`,
+for two reasons. The recording JVM, which has no class data sharing at all (the
+bundled runtime has no default CDS archive), had not passed its first health
+check after 30 s, so the project service killed it; the training launch now
+gives it 180 s (`ENSO_ENGINE_STARTUP_TIMEOUT_MS`; Note [The Training Launch
+Needs A Longer Start-up Timeout]). And the JVM writes the file as it exits,
+which takes seconds, while the harness closed the IDE right after the project
+and so killed it; the training launch now waits for the file (Note [The Training
+File Is Written After The Project Closes]). Both Notes are in
+`perf/jvmAotCache.ts`.
+
+`--engines jvm-nocache` is the JVM with no AOT cache of ours, what `--jvm` gives
+a user, so `native,jvm-nocache,jvm` measures what the cache is worth. Every JVM
+launch copies the JVM's performance counters (`hsperf/`: class loading, linking
+and initialisation time, classes from the AOT cache, HotSpot compiler and GC
+time) when the first node and the welcome table show and after the extras (Note
+[JVM Counters At Each Phase]). `--jvm-diagnostics` adds one launch per JVM
+engine, outside the medians (`<engine>-diag/`), that traces Truffle's
+compilations (Note [Truffle Diagnostics]), and `--jvm-options` adds JVM options
+to the measured JVM launches, for an experiment. CI uploads `electron-out.log`
+and `hsperf/` too; by hand, `ide-packaging.yml` takes `open_perf_engines`,
+`open_perf_runs`, `open_perf_budget`, `open_perf_diagnostics` and
+`open_perf_jvm_options`.
 
 `tests/packagedIde.ts` holds where the packaged app, its engine launcher, its
 `java` and its engine component are; the Playwright specs, `globalSetup.ts` and
-the harness share it. The harness's pure logic (`perf/openTimeReport.ts`) has
+the harness share it. The harness's pure logic (`perf/openTimeReport.ts`, and
+`perf/jvmCounters.ts`, which reads the copied counters into `jvm` marks) has
 unit tests: `corepack pnpm --filter enso exec vitest --run tests/headless`. CI
 runs the harness in `ide-packaging.yml` (Note [Open Time In CI]).
 

@@ -6,17 +6,21 @@
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import { _electron, type ElectronApplication, type Page } from 'playwright'
 import { electronExecutablePath, findEngineLauncher } from '../tests/packagedIde'
 import { createJvmAotCache, measuredJvmToolOptions, type JvmAotCache } from './jvmAotCache'
+import { hsperfDirectory, parseHsperfData, summariseJvmCounters } from './jvmCounters'
 import {
   classifyTemplate,
   credentialFreeEnv,
   developMedians,
+  joinJvmOptions,
   notMeasured,
   openTimes,
+  parseEngines,
   parseLsLogLine,
   regressionWarnings,
   renderMarkdown,
@@ -43,6 +47,8 @@ interface Options {
   readonly profile: boolean
   readonly budgetMinutes: number
   readonly extrasMs: number
+  readonly jvmDiagnostics: boolean
+  readonly jvmOptions: string
 }
 
 function parseOptions(argv: readonly string[]): Options {
@@ -58,24 +64,25 @@ function parseOptions(argv: readonly string[]): Options {
       profile: { type: 'boolean', default: false },
       'budget-minutes': { type: 'string', default: '12' },
       'extras-seconds': { type: 'string', default: '15' },
+      'jvm-diagnostics': { type: 'boolean', default: false },
+      'jvm-options': { type: 'string', default: '' },
     },
   })
   // `parseArgs` types an option with a default as possibly undefined: apply the defaults here.
   if (!values.out) throw new Error('--out <dir> is required')
-  const engines = (values.engines ?? 'native').split(',').map((e) => e.trim())
-  for (const engine of engines) {
-    if (engine !== 'native' && engine !== 'jvm') throw new Error(`Unknown engine: ${engine}`)
-  }
+  const engines = parseEngines(values.engines ?? 'native')
   return {
     out: path.resolve(values.out),
     runs: Number(values.runs ?? '5'),
-    engines: engines as Engine[],
+    engines,
     baseline: values.baseline ?? [],
     summary: values.summary,
     exe: values.exe ?? electronExecutablePath,
     profile: values.profile ?? false,
     budgetMinutes: Number(values['budget-minutes'] ?? '12'),
     extrasMs: Number(values['extras-seconds'] ?? '15') * 1000,
+    jvmDiagnostics: values['jvm-diagnostics'] ?? false,
+    jvmOptions: values['jvm-options'] ?? '',
   }
 }
 
@@ -181,6 +188,7 @@ async function openProject(
   dir: string,
   profile: boolean,
   extrasMs: number,
+  snapshot: (phase: string) => void,
 ) {
   const row = page.getByTestId('drive-view').getByText(name, { exact: true })
   await row.waitFor({ state: 'visible', timeout: 60_000 })
@@ -194,6 +202,7 @@ async function openProject(
   await row.dblclick()
   await page.locator('.GraphNode').first().waitFor({ state: 'visible', timeout: OPEN_TIMEOUT_MS })
   marks.add(`${tag}:firstNode`)
+  snapshot(`${tag}-firstNode`)
   const shown = await poll(
     async () =>
       (
@@ -203,13 +212,66 @@ async function openProject(
   )
   if (!shown) throw new Error(`${tag}: no welcome table within ${OPEN_TIMEOUT_MS} ms`)
   marks.add(`${tag}:welcomeShown`)
+  snapshot(`${tag}-welcomeShown`)
   if (cdp) {
     const { profile: cpuProfile } = await cdp.send('Profiler.stop')
     fs.writeFileSync(path.join(dir, `${tag}.cpuprofile`), JSON.stringify(cpuProfile))
     await cdp.detach()
   }
   await measureExtras(page, tag, marks, dir, extrasMs)
+  snapshot(`${tag}-extras`)
 }
+
+/* Note [JVM Counters At Each Phase]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A JVM publishes its performance counters (`-XX:+UsePerfData`, on by default) in a file named by
+ * its pid under `hsperfdata_<user>` in the temporary directory (`/tmp` on Linux, whatever the
+ * environment names on Windows), and keeps it current while it runs. They include the time spent
+ * loading, linking, verifying and initialising classes, how many classes came from the AOT cache
+ * (`java.cls.sharedLoadedClasses`), the HotSpot compilers' time and the GC's. A JVM launch copies
+ * every such file when the first node shows, when the welcome table shows and after the extras
+ * (`<launch>/hsperf/<open>-<phase>-<pid>`), which costs a read of a few tens of kilobytes: the
+ * phases of an open can then be split without a profiler (the bundled runtime has no `jdk.jfr`).
+ * The engine of the open is the file whose `sun.rt.createVmBeginTime` is after the click. Truffle's
+ * own compilations run on its compiler threads through libgraal and are not in these counters;
+ * `--jvm-diagnostics` adds one launch per JVM engine that traces them (Note [Truffle
+ * Diagnostics]).
+ */
+function snapshotJvmCounters(dir: string, phase: string, marks: Marks) {
+  const src = hsperfDirectory(process.platform, os.tmpdir(), os.userInfo().username)
+  let names: string[]
+  try {
+    names = fs.readdirSync(src)
+  } catch {
+    return
+  }
+  const out = path.join(dir, 'hsperf')
+  fs.mkdirSync(out, { recursive: true })
+  for (const name of names) {
+    try {
+      // Read, not copied: on Windows the JVM holds the file open for writing, which `CopyFile`'s
+      // share mode refuses.
+      const data = fs.readFileSync(path.join(src, name))
+      fs.writeFileSync(path.join(out, `${phase}-${name}`), data)
+      // The summary in `marks.json` too (`jvm` marks), so a run is read without a parser.
+      marks.add('jvm', { phase, pid: name, ...summariseJvmCounters(parseHsperfData(data)) })
+    } catch {
+      // The JVM exited meanwhile.
+    }
+  }
+}
+
+/* Note [Truffle Diagnostics]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * With `--jvm-diagnostics`, each JVM engine gets one more launch after its measured ones, which is
+ * not in the medians (`<engine>-diag/`): Truffle traces every compilation (`TraceCompilation`,
+ * with the call target and its time) and prints its statistics when the engine closes
+ * (`CompilationStatistics`). The records go to the engine's log handler, so they are in the
+ * Language Server log or the launch's `electron-out.log`. On a JVM where Truffle has no optimizing
+ * runtime these options do not exist and the engine fails to start, which says so too.
+ */
+const TRUFFLE_DIAGNOSTICS =
+  '-Dpolyglot.engine.TraceCompilation=true -Dpolyglot.engine.CompilationStatistics=true'
 
 /* Note [Extras Are Bounded]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -334,8 +396,10 @@ async function measureLaunch(
   run: number,
   extraEnv: Record<string, string>,
   opens: readonly OpenTag[] = ['first', 'second'],
+  label = `${engine}-${run}`,
+  beforeClose: () => Promise<void> = async () => {},
 ): Promise<RunResult & { readonly stdout: string }> {
-  const dir = path.join(options.out, `${engine}-${run}`)
+  const dir = path.join(options.out, label)
   fs.rmSync(dir, { recursive: true, force: true })
   const projectsDir = path.join(dir, 'projects')
   const logDir = path.join(dir, 'logs')
@@ -359,7 +423,10 @@ async function measureLaunch(
     ...extraEnv,
   }
   let app: ElectronApplication | undefined
+  let page: Page | undefined
   let error: string | undefined
+  const snapshot =
+    engine === 'native' ? () => {} : (phase: string) => snapshotJvmCounters(dir, phase, marks)
   try {
     marks.add('launch')
     app = await _electron.launch({
@@ -377,7 +444,7 @@ async function measureLaunch(
     }
     app.process().stdout?.on('data', onOutput('o'))
     app.process().stderr?.on('data', onOutput('e'))
-    const page = await app.firstWindow()
+    page = await app.firstWindow()
     page.on('response', (r) => {
       const url = r.url()
       if (url.includes('/api/project-service/')) {
@@ -399,12 +466,24 @@ async function measureLaunch(
     await page.getByTestId('drive-view').waitFor({ state: 'visible', timeout: 120_000 })
     await ensureWindowSize(app, page, marks)
     for (const tag of opens) {
-      await openProject(page, names[tag], tag, marks, dir, options.profile, options.extrasMs)
+      await openProject(
+        page,
+        names[tag],
+        tag,
+        marks,
+        dir,
+        options.profile,
+        options.extrasMs,
+        snapshot,
+      )
       await closeProject(page, names[tag])
       await page.waitForTimeout(2000)
     }
+    await beforeClose()
   } catch (e) {
     error = String(e).slice(0, 2000)
+    // What the page showed when the launch gave up (uploaded by CI with the extras' screenshots).
+    await page?.screenshot({ path: path.join(dir, 'failed.png'), timeout: 5000 }).catch(() => {})
   } finally {
     await Promise.race([app?.close(), new Promise((resolve) => setTimeout(resolve, 20_000))]).catch(
       () => {},
@@ -513,7 +592,8 @@ async function main() {
         aot = await createJvmAotCache(
           options.out,
           options.exe,
-          (env, opens) => measureLaunch(options, 'jvm', 0, env, opens),
+          (env, opens, label, beforeClose) =>
+            measureLaunch(options, 'jvm', 0, env, opens, label, beforeClose),
           (env) => runProjectOnJvm(options, env),
         )
       } catch (e) {
@@ -540,6 +620,17 @@ async function main() {
         jvmAot = 'uncached'
         extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
       }
+    } else if (engine === 'jvm-nocache') {
+      extraEnv = { ENSO_ENGINE_ARGS: '--jvm' }
+    }
+    if (engine !== 'native' && options.jvmOptions.trim() !== '') {
+      // An experiment (`--jvm-options`, e.g. `-XX:TieredStopAtLevel=1`): the measured launches
+      // only, not the AOT cache's training. Said in the log, as the report does not record it.
+      console.warn(`Open time: ${engine} launches with ${options.jvmOptions}`)
+      extraEnv = {
+        ...extraEnv,
+        JAVA_TOOL_OPTIONS: joinJvmOptions(extraEnv.JAVA_TOOL_OPTIONS, options.jvmOptions),
+      }
     }
     for (let run = 1; run <= options.runs; run++) {
       if (Date.now() > deadline) {
@@ -552,6 +643,22 @@ async function main() {
       void stdout // Read only by the AOT cache check.
       console.log(`${engine} ${run}: ${JSON.stringify(result)}`)
       runs.push(result)
+    }
+    if (options.jvmDiagnostics && engine !== 'native') {
+      const { stdout, ...result } = await measureLaunch(
+        options,
+        engine,
+        0,
+        {
+          ...extraEnv,
+          JAVA_TOOL_OPTIONS: joinJvmOptions(extraEnv.JAVA_TOOL_OPTIONS, TRUFFLE_DIAGNOSTICS),
+        },
+        ['first', 'second'],
+        `${engine}-diag`,
+      )
+      void stdout
+      // Not in the medians: Note [Truffle Diagnostics].
+      console.log(`${engine} diagnostics: ${JSON.stringify(result)}`)
     }
   }
   const report: OpenTimeReport = {

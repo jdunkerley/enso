@@ -1,10 +1,11 @@
-/** @file Actions for the default tab of the "settings" page. */
-import SettingsAccountTabActions from './SettingsAccountTabActions'
+/** @file Actions for the "settings" page, which opens on its Local tab. */
+import BaseSettingsTabActions from './BaseSettingsTabActions'
+import { goToSettingsTabActions, type GoToSettingsTabActions } from './gotoSettingsTabActions'
 
-/** Actions for the default tab of the "settings" page. */
-type SettingsPageActions<Context> = SettingsAccountTabActions<Context>
-
-/** Actions for the default tab of the "settings" page. */
-const SettingsPageActions = SettingsAccountTabActions
-
-export default SettingsPageActions
+/** Actions for the "settings" page, which opens on its Local tab. */
+export default class SettingsPageActions<Context> extends BaseSettingsTabActions<Context> {
+  /** Actions for navigating to a settings tab. */
+  get goToSettingsTab(): GoToSettingsTabActions<Context> {
+    return goToSettingsTabActions(this.step.bind(this))
+  }
+}
