@@ -337,14 +337,28 @@ object NativeImage {
     *                    build, usually one returned by [[buildNativeImage]]
     * @param artifactName name of the artifact that is expected to be created
     *                     by the native image build
+    * @param extraInputs further files or directories that go into the image
+    *                    but are on neither the project's classpath nor
+    *                    `additionalCp`, typically its module path
     * @return
+    *
+    * Note [Native Image Up-To-Date Inputs]
+    * The inputs compared are the project's own classpath, everything in
+    * `additionalCp` (the classes and jars of the other projects that
+    * [[buildNativeImage]] puts on the image class path: runtime, instruments,
+    * language server, standard library jars) and `extraInputs`. Deriving them
+    * from what the image build is given, instead of listing projects here,
+    * means an input added to the image is checked without touching this
+    * method. Before, only the project's own classpath was compared, so a
+    * change confined to an instrument left the old binary in place.
     */
   def incrementalNativeImageBuild(
     actualBuild: TaskKey[Unit],
     name: String,
-    targetDir: File           = null,
-    shared: Boolean           = false,
-    useTestClassPath: Boolean = false
+    targetDir: File                              = null,
+    shared: Boolean                              = false,
+    useTestClassPath: Boolean                    = false,
+    extraInputs: Def.Initialize[Task[Seq[File]]] = Def.task(Seq.empty[File])
   ): Def.Initialize[Task[Unit]] =
     Def.taskDyn {
       def rebuild(reason: String) = {
@@ -365,7 +379,12 @@ object NativeImage {
       } else {
         (Compile / fullClasspath).value
       }
-      val filesSet = classpath.flatMap(f => f.data.allPaths.get()).toSet
+      val imageInputs =
+        additionalCp.value.map(new File(_)) ++ extraInputs.value
+      val filesSet =
+        (classpath.map(_.data) ++ imageInputs)
+          .flatMap(f => f.allPaths.get())
+          .toSet
 
       val store =
         streams.value.cacheStoreFactory.make("incremental_native_image")

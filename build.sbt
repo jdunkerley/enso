@@ -1966,7 +1966,10 @@ lazy val `ydoc-server` = project
           rebuildNativeImage,
           "org.enso.ydoc.server",
           targetDir = engineDistributionRoot.value / "component",
-          shared    = true
+          shared    = true,
+          extraInputs = Def.task(
+            (Compile / modulePath).value ++ Seq((Compile / packageBin).value)
+          )
         )
     }.value
   )
@@ -4064,7 +4067,8 @@ lazy val `engine-runner` = project
         .incrementalNativeImageBuild(
           rebuildNativeImage,
           "enso",
-          targetDir = engineDistributionRoot.value / "bin"
+          targetDir   = engineDistributionRoot.value / "bin",
+          extraInputs = Def.task((Runtime / modulePath).value)
         )
     }.value,
     checkNativeImageSize := Def
