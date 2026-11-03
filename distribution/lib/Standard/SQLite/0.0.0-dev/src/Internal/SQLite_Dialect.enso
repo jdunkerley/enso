@@ -175,22 +175,55 @@ type SQLite_Dialect
        private: true
        ---
        Prepares a distinct operation.
+
+       See Note [SQLite Distinct Keeps The First Row With A Window Function].
     prepare_distinct : DB_Table -> Vector -> Case_Sensitivity -> Problem_Builder -> Table & DB_Table
     prepare_distinct self table key_columns case_sensitivity problem_builder =
         table_connection = Internals_Access.get_connection table
         table_name_deduplicator = table_connection.base_connection.table_naming_helper.create_unique_name_strategy
         table_name_deduplicator.mark_used table.name
         inner_table_alias = table_name_deduplicator.make_unique table.name+"_inner"
-        setup = (Internals_Access.get_context table).as_subquery inner_table_alias [Internals_Access.internal_columns table]
-        new_columns = setup.new_columns.first
-        column_mapping = Dictionary.from_vector <| new_columns.map c-> [c.name, c]
-        new_key_columns = key_columns.map c-> column_mapping.at c.name
+        table_context = Internals_Access.get_context table
+        table_columns = Internals_Access.internal_columns table
+        orderings = table_context.orders
         mapping = table_connection.type_mapping
-        distinct_expressions = new_key_columns.map column->
+        make_distinct_expressions column_mapping = key_columns.map key_column->
+            column = column_mapping.at key_column.name
             value_type = mapping.sql_type_to_value_type column.sql_type_reference.get
             Database_Distinct_Helper.make_distinct_expression case_sensitivity problem_builder column value_type
-        new_context = SQL_IR_Source.for_subquery setup.subquery . set_groups distinct_expressions
-        table.updated_context_and_columns new_context new_columns subquery=True
+
+        case orderings.is_empty of
+            True ->
+                setup = table_context.as_subquery inner_table_alias [table_columns]
+                new_columns = setup.new_columns.first
+                distinct_expressions = make_distinct_expressions (Dictionary.from_vector <| new_columns.map c-> [c.name, c])
+                new_context = SQL_IR_Source.for_subquery setup.subquery . set_groups distinct_expressions
+                table.updated_context_and_columns new_context new_columns subquery=True
+            False ->
+                ## The subquery exposes each ordering expression that is not
+                   already one of its columns as a helper column, which the
+                   row number orders by but the result does not select.
+                renamer = table_connection.base_connection.column_naming_helper.create_unique_name_strategy
+                renamer.mark_used (table_columns.map .name)
+                ordering_columns = orderings.map ordering->
+                    existing = table_columns.find (c-> c.expression == ordering.expression) if_missing=Nothing
+                    existing.if_nothing <|
+                        Internal_Column.Value (renamer.make_unique "__enso_distinct_order") SQL_Type_Reference.null ordering.expression
+                helper_columns = ordering_columns.filter c-> table_columns.contains c . not
+                inner_context = if table_context.limit.is_nothing then table_context.set_orders [] else table_context
+                setup = inner_context.as_subquery inner_table_alias [table_columns, helper_columns]
+                new_columns = setup.new_columns.first
+                distinct_expressions = make_distinct_expressions (Dictionary.from_vector <| new_columns.map c-> [c.name, c])
+                requested_orders = orderings.zip ordering_columns ordering-> column->
+                    Order_Descriptor.Value (setup.remap_column column).expression ordering.direction ordering.nulls_order ordering.collation
+                row_number_expression = Row_Number_Helpers.make_row_number 1 1 requested_orders distinct_expressions
+                row_number_column = Internal_Column.Value (renamer.make_unique "__enso_distinct_row_number") SQL_Type_Reference.null row_number_expression
+
+                numbered = table.updated_context_and_columns (SQL_IR_Source.for_subquery setup.subquery) (new_columns + [row_number_column]) subquery=True
+                numbered_columns = Internals_Access.internal_columns numbered
+                keep_first_row = SQL_IR_Expression.Operation "==" [numbered_columns.last.expression, SQL_IR_Expression.Literal "1"]
+                filtered_context = (Internals_Access.get_context numbered).add_where_filters [keep_first_row]
+                numbered.updated_context_and_columns filtered_context (numbered_columns.drop (..Last 1)) subquery=True
 
     ## ---
        private: true
@@ -869,3 +902,23 @@ make_runtime_error_op arguments =
     variable_to_defer = arguments.at 1
     # We have to ensure that the implementation of SQLite that we use does not have a MATCH function defined which would make the code below succeed.
     SQL_Builder.code "match('[ENSO INVARIANT VIOLATED: '||" ++ error_message ++ "||'] ', " ++ variable_to_defer ++ ")"
+
+## Note [SQLite Distinct Keeps The First Row With A Window Function]
+   SQLite has no `DISTINCT ON`. `prepare_distinct` used to `GROUP BY` the keys
+   with the other columns bare, over an ordered subquery. SQLite takes a bare
+   column of an aggregate query from an arbitrary row of its group (unless the
+   query uses `min` or `max`; "Bare columns in an aggregate query" in
+   sqlite.org/lang_select.html), so nothing made it keep the first row by the
+   table's ordering (#545).
+
+   An ordered table therefore numbers the rows of each group with
+   `ROW_NUMBER() OVER (PARTITION BY keys ORDER BY ordering)` and keeps those
+   numbered 1, one level above, as Redshift does. As for `DISTINCT ON` (Note
+   [DISTINCT ON Needs Its Ordering At Its Own Level] in `Postgres_Dialect`),
+   the subquery exposes each ordering expression that is not one of its
+   columns as a helper column, and keeps its own `ORDER BY` only if it has a
+   limit. Neither the helper columns nor the row number are in the result.
+
+   A table with no ordering promises any row of each group, so it keeps the
+   `GROUP BY`, which is cheaper. The result's row order is unspecified either
+   way: the table that `distinct` returns has no ordering of its own.
