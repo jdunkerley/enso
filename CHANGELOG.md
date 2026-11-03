@@ -2,6 +2,10 @@
 
 #### Enso IDE
 
+- [A settings cog replaces the account menu at the top right of the dashboard;
+  it opens Settings and About. The Account settings page, the empty notification
+  tray and the offline notice are gone, and Settings opens on the Local
+  tab.][519]
 - [Projects open faster: a new project shows its first table sooner.][514]
 - [New projects import only Base, Table, Database, Examples and Visualization
   instead of a dozen libraries. Components of other libraries stay in the
@@ -383,6 +387,7 @@
   respectively). Strava's `stats` function keeps its own `statistics` tag, which
   now has a real bar-chart icon rather than falling back to the logo too.
 
+[519]: https://github.com/jdunkerley/enso/pull/519
 [514]: https://github.com/jdunkerley/enso/pull/514
 [476]: https://github.com/jdunkerley/enso/pull/476
 [482]: https://github.com/jdunkerley/enso/pull/482

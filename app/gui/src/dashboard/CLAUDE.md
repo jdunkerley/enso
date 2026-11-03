@@ -10,8 +10,8 @@ only Dashboard-specific code.
 
 ## Structure
 
-- `pages/` — Route-level parts. `pages/dashboard/UserBar/` is the user bar, user
-  menu and notification tray (#83), mounted by `AppContainer.vue`; the drive's
+- `pages/` — Route-level parts. `pages/dashboard/UserBar/` is the user bar (a
+  settings cog and its menu, #83), mounted by `AppContainer.vue`; the drive's
   rows, cells, column headings and drive bar are under `pages/dashboard/`. The
   `dashboard` route itself renders `$/components/DashboardPage.vue`, which holds
   the dashboard's global shortcuts and mounts `AppContainer.vue`.

@@ -70,7 +70,7 @@ beforeEach(async () => {
   // The local session: the only one there is.
   auth.session = { user: USER, email: USER.email }
   backends.hasLocalBackend = true
-  contributeSettingsSections(SettingsTabType.account, () =>
+  contributeSettingsSections(SettingsTabType.local, () =>
     Promise.resolve([
       {
         nameId: 'userAccountSettingsSection',
@@ -108,10 +108,9 @@ const headings = () =>
 const searchBox = () => required(document.querySelector<HTMLInputElement>('input[type="search"]'))
 
 describe('SettingsPage', () => {
-  test('lists the visible tabs in their groups, and opens the Account tab', async () => {
+  test('lists the visible tabs in their groups, and opens the Local tab', async () => {
     await mountWithProviders(SettingsPage)
     expect(sidebarTabs()).toEqual([
-      getText('accountSettingsTab'),
       getText('localSettingsTab'),
       getText('appearanceSettingsTab'),
       getText('keyboardShortcutsSettingsTab'),
@@ -120,38 +119,20 @@ describe('SettingsPage', () => {
       getText('generalSettingsTabSection'),
       getText('lookAndFeelSettingsTabSection'),
     ])
-    expect(document.querySelector('h1.flex')?.textContent).toContain('user name')
-    expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
+    expect(document.querySelector('h1.flex')?.textContent).toContain(getText('settingsPageTitle'))
+    expect(sidebarButton(getText('localSettingsTab')).className).toContain('bg-white')
     expect(document.querySelector('[data-testid="contributed"]')?.textContent).toBe(
       'hello user name',
     )
-    expect(document.querySelector('[data-testid="offline-user-settings"]')).not.toBeNull()
+    // There is no Account tab: the local user has no account settings.
+    expect(headings()[0]).toBe(getText('localSettingsSection'))
   })
 
-  test('in local-only mode, the Account tab shows the offline user', async () => {
-    const offlineUser = { ...USER, name: getText('offlineUserName') }
-    auth.session = { user: offlineUser, email: 'local@enso.localhost' }
-    await mountWithProviders(SettingsPage)
-    expect(document.querySelector('h1.flex')?.textContent).toContain(getText('offlineUserName'))
-    expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
-    const offline = required(
-      document.querySelector<HTMLElement>('[data-testid="offline-user-settings"]'),
-    )
-    expect(headings()[0]).toBe(getText('offlineUserSettingsSection'))
-    expect(offline.querySelector('[data-testid="offline-user-name"]')?.textContent.trim()).toBe(
-      getText('offlineUserName'),
-    )
-    expect(offline.textContent).toContain(getText('offlineUserStatus'))
-    expect(offline.textContent).toContain(getText('offlineUserDescription'))
-    // The default picture: there is no account to have one.
-    expect(offline.querySelector('img')).toBeNull()
-    expect(offline.querySelector('svg')).not.toBeNull()
-  })
-
-  test('hides the Local tab without a local backend', async () => {
+  test('hides the Local tab without a local backend, and opens the first tab left', async () => {
     backends.hasLocalBackend = false
     await mountWithProviders(SettingsPage)
     expect(sidebarTabs()).not.toContain(getText('localSettingsTab'))
+    expect(sidebarButton(getText('appearanceSettingsTab')).className).toContain('bg-white')
   })
 
   test('opens the tab a link names', async () => {
@@ -162,25 +143,25 @@ describe('SettingsPage', () => {
     expect(headings()).toEqual([getText('keyboardShortcutsSettingsSection')])
   })
 
-  test('keeps the current tab in the query, without it for the Account tab', async () => {
+  test('keeps the current tab in the query, without it for the Local tab', async () => {
     const { router } = await mountWithProviders(SettingsPage, { route: '/settings' })
     const user = userEvent.setup()
     await user.click(sidebarButton(getText('appearanceSettingsTab')))
     await flushPromises()
     expect(router.currentRoute.value.query[TAB_PARAM]).toBe('"appearance"')
     expect(headings()).toEqual([getText('codeSettingsSection')])
-    await user.click(sidebarButton(getText('accountSettingsTab')))
+    await user.click(sidebarButton(getText('localSettingsTab')))
     await flushPromises()
     expect(router.currentRoute.value.query[TAB_PARAM]).toBeUndefined()
   })
 
-  test('drops an invalid tab from the query, and shows the Account tab', async () => {
+  test('drops an invalid tab from the query, and shows the Local tab', async () => {
     const { router } = await mountWithProviders(SettingsPage, {
       route: `/settings?${TAB_PARAM}=${encodeURIComponent('"no-such-tab"')}`,
     })
     await flushPromises()
     expect(router.currentRoute.value.query[TAB_PARAM]).toBeUndefined()
-    expect(sidebarButton(getText('accountSettingsTab')).className).toContain('bg-white')
+    expect(sidebarButton(getText('localSettingsTab')).className).toContain('bg-white')
   })
 
   test('the search narrows the tabs, sections and entries', async () => {
@@ -207,7 +188,7 @@ describe('SettingsPage', () => {
     await user.clear(searchBox())
     await user.type(searchBox(), 'profile picture')
     await flushPromises()
-    expect(sidebarTabs()).toEqual([getText('accountSettingsTab')])
+    expect(sidebarTabs()).toEqual([getText('localSettingsTab')])
     expect(document.querySelector('[data-testid="contributed"]')).not.toBeNull()
     // Nothing.
     await user.clear(searchBox())

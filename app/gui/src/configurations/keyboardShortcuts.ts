@@ -68,7 +68,6 @@ const DASHBOARD_APP_ACTIONS: ReadonlySet<DashboardBindingKey> = new Set<Dashboar
   'downloadApp',
   'goBack',
   'goForward',
-  'goToAccountSettings',
   'goToLocalSettings',
   'goToKeyboardShortcutsSettings',
   'closeModal',

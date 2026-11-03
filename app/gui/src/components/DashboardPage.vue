@@ -52,7 +52,6 @@ const handlers = computed((): Partial<Record<DashboardBindingKey, Handler>> => (
     goForward: () => {
       window.api?.navigation.goForward()
     },
-    goToAccountSettings: () => goToSettingsTab(SettingsTabType.account),
     ...(backends.localBackend != null && {
       goToLocalSettings: () => goToSettingsTab(SettingsTabType.local),
     }),
