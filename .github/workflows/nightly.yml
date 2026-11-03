@@ -4,8 +4,8 @@
 
 name: Nightly Release
 on:
-  # Every day at 02:00 UTC. The macOS installer is built on the self-hosted Mac when it is online;
-  # otherwise the release goes out without it (see `check-the-mac-os-runner` in `release.yml`).
+  # Every day at 02:00 UTC. The macOS installer is built on the self-hosted Mac; when it is
+  # offline the run fails and nothing is released (see `check-the-mac-os-runner` in `release.yml`).
   schedule:
     - cron: "0 2 * * *"
   workflow_dispatch: {}

@@ -16,7 +16,7 @@ import {
   checkJobsHaveTimeouts,
   checkMacosChecksRunWhatIsRequested,
   checkMacosJobsAreGated,
-  checkOnlyMacosReleaseJobsMayFail,
+  checkMacosReleaseJobsAreRequired,
   checkOpenPerf,
   checkPublicTypes,
   checkPullRequestsIgnoreSpecs,
@@ -72,7 +72,8 @@ env:
 jobs:
   check-the-mac-os-runner:
     runs-on: ubuntu-latest
-    steps: []
+    steps:
+      - run: ./tools/ci/wait-for-macos-runner.sh 12 fail
   draft-release:
     runs-on: ubuntu-latest
     steps:
@@ -83,7 +84,6 @@ jobs:
     needs: [check-the-mac-os-runner]
     ${GATE_IF}
     runs-on: [self-hosted, macOS]
-    continue-on-error: true
     steps: []
   upload-ide:
     runs-on: ubuntu-latest
@@ -93,13 +93,12 @@ jobs:
     needs: [check-the-mac-os-runner, build-backend-macos]
     ${GATE_IF}
     runs-on: [self-hosted, macOS]
-    continue-on-error: true
     steps:
       - run: corepack pnpm --filter build-scripts run release upload-ide
   publish-release:
     runs-on: ubuntu-latest
     needs: [draft-release, license-check, upload-ide, upload-ide-macos]
-    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success'))"
+    if: "!cancelled() && (inputs.release-id != '' || (inputs.publish && needs.draft-release.result == 'success' && needs.license-check.result == 'success' && needs.upload-ide.result == 'success' && needs.upload-ide-macos.result == 'success'))"
     steps:
       - run: corepack pnpm --filter build-scripts run release publish
   update-latest-release-version:
@@ -258,24 +257,28 @@ describe('checkReleaseIsIdeOnly', () => {
   })
 })
 
-describe('checkOnlyMacosReleaseJobsMayFail', () => {
+describe('checkMacosReleaseJobsAreRequired', () => {
   const problems = (text) =>
-    checkOnlyMacosReleaseJobsMayFail(fixture({ 'workflows/release.yml': text }))
-  test('accepts tolerant macOS backend and IDE jobs', () => {
+    checkMacosReleaseJobsAreRequired(fixture({ 'workflows/release.yml': text }))
+  test('accepts required macOS jobs and a runner check that fails', () => {
     assert.deepEqual(problems(RELEASE_OK), [])
   })
-  test('rejects a tolerant Linux job and a blocking macOS upload', () => {
+  test('rejects continue-on-error on any job, macOS included', () => {
     const text = RELEASE_OK.replace(
-      '    runs-on: [self-hosted, macOS]\n    continue-on-error: true\n    steps:\n',
-      '    runs-on: [self-hosted, macOS]\n    steps:\n',
+      '    runs-on: [self-hosted, macOS]\n    steps:\n      - run',
+      '    runs-on: [self-hosted, macOS]\n    continue-on-error: true\n    steps:\n      - run',
     ).replace(
       '  draft-release:\n    runs-on: ubuntu-latest',
       '  draft-release:\n    runs-on: ubuntu-latest\n    continue-on-error: true',
     )
     const found = problems(text)
     assert.equal(found.length, 2)
-    assert.ok(found.some((p) => p.includes('draft-release: only macOS jobs')))
-    assert.ok(found.some((p) => p.includes('upload-ide-macos: a macOS backend or IDE job')))
+    assert.ok(found.some((p) => p.includes('draft-release: must not set')))
+    assert.ok(found.some((p) => p.includes('upload-ide-macos: must not set')))
+  })
+  test('rejects a runner check that skips instead of failing', () => {
+    const found = problems(RELEASE_OK.replace('12 fail', '1 skip'))
+    assert.ok(found.some((p) => p.includes('check-the-mac-os-runner: must run')))
   })
   test('rejects a release without its macOS IDE upload job, and an unexpected macOS job', () => {
     const found = problems(RELEASE_OK.replace('upload-ide-macos:', 'something-else:'))
@@ -286,7 +289,7 @@ describe('checkOnlyMacosReleaseJobsMayFail', () => {
 
 describe('checkMacosJobsAreGated', () => {
   const problems = (text) => checkMacosJobsAreGated(fixture({ 'workflows/release.yml': text }))
-  test('accepts a gated release whose publish job does not wait on macOS', () => {
+  test('accepts a gated release whose publish job waits on macOS', () => {
     assert.deepEqual(problems(RELEASE_OK), [])
   })
   test('accepts a gated nightly', () => {
@@ -326,7 +329,7 @@ jobs:
   })
   test('rejects macOS jobs when the gate job is missing', () => {
     const text = RELEASE_OK.replace(
-      '  check-the-mac-os-runner:\n    runs-on: ubuntu-latest\n    steps: []\n',
+      '  check-the-mac-os-runner:\n    runs-on: ubuntu-latest\n    steps:\n      - run: ./tools/ci/wait-for-macos-runner.sh 12 fail\n',
       '',
     )
     assert.ok(problems(text).some((p) => p.includes('no `check-the-mac-os-runner` gate job')))
@@ -349,14 +352,11 @@ jobs:
     )
     assert.ok(problems(text).some((p) => p.includes('must still need the macOS IDE upload')))
   })
-  test('rejects a publish job that waits on macOS, and one that drops a required result', () => {
-    const waits = problems(
-      RELEASE_OK.replace(
-        'inputs.publish && needs.draft-release',
-        "inputs.publish && needs.upload-ide-macos.result == 'success' && needs.draft-release",
-      ),
+  test('rejects a publish job that does not require macOS, and one that drops a required result', () => {
+    const skips = problems(
+      RELEASE_OK.replace(" && needs.upload-ide-macos.result == 'success'", ''),
     )
-    assert.ok(waits.some((p) => p.includes('must not wait on a macOS job')))
+    assert.ok(skips.some((p) => p.includes("lacks `needs.upload-ide-macos.result == 'success'`")))
     const drops = problems(RELEASE_OK.replace(" && needs.license-check.result == 'success'", ''))
     assert.ok(drops.some((p) => p.includes("lacks `needs.license-check.result == 'success'`")))
     const unheld = problems(RELEASE_OK.replace('inputs.publish && ', ''))

@@ -22,11 +22,11 @@ intended for commercial use or distribution.
 Installers are on this repository's
 [releases page](https://github.com/jdunkerley/enso/releases):
 
-| Platform              | Installer                                  |
-| --------------------- | ------------------------------------------ |
-| Windows               | `enso-win-x64-<version>.exe`               |
-| Linux                 | `enso-linux-x86_64-<version>.AppImage`     |
-| macOS (Apple silicon) | `enso-mac-arm64-<version>.dmg`, when built |
+| Platform              | Installer                              |
+| --------------------- | -------------------------------------- |
+| Windows               | `enso-win-x64-<version>.exe`           |
+| Linux                 | `enso-linux-x86_64-<version>.AppImage` |
+| macOS (Apple silicon) | `enso-mac-arm64-<version>.dmg`         |
 
 Stable releases are marked "Latest". Release candidates and nightly builds are
 prereleases. The installers are unsigned. See
