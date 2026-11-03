@@ -26,7 +26,7 @@ import project.Internal.Excel_Section.Excel_Section
 import project.Internal.Java_Problems
 import project.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Merged_Table_Strategy
 import project.Internal.Read_Many_As_Merged_Table_Strategy.Read_Many_As_Table_Result
-import project.Internal.Telemetry
+import Standard.Base.Internal.Telemetry
 import project.Match_Columns.Match_Columns
 import project.Return_As_Table.Return_As_Table
 import project.Rows_To_Read.Rows_To_Read
