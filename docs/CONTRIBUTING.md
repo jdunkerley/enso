@@ -34,7 +34,8 @@ Say what you're trying to do, not only the change you have in mind.
    rest.
 3. Run the formatters and the tests for what you changed. The commands are in
    [Building and Running](https://github.com/jdunkerley/enso/wiki/Building-and-Running#formatting-and-lint).
-   The pre-commit hook runs Prettier on staged files; don't skip it.
+   The pre-commit hook formats staged files; see
+   [Formatting hook](#formatting-hook).
 4. **Changelog:** a new feature, or a change users can see, needs an entry in
    `CHANGELOG.md` under `# Next Release`. Anything else (bug fixes, docs,
    refactoring, tests, CI, dependency bumps) takes the `CI: No changelog needed`
@@ -45,6 +46,34 @@ Say what you're trying to do, not only the change you have in mind.
    [wiki](https://github.com/jdunkerley/enso/wiki) page wrong, update the page
    too, and say so in the pull request. Wiki edits aren't reviewed and run no
    CI.
+
+### Formatting hook
+
+`corepack pnpm install` installs a Husky pre-commit hook that runs lint-staged
+(`lint-staged.config.mjs`) on the files you staged, and only on those:
+
+| Staged files                                  | Formatter                                                              |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| TypeScript, Vue, JSON, Markdown, YAML, CSS, … | Prettier                                                               |
+| `.rs`                                         | `cargo fmt` (edition and `rustfmt.toml` from the repo)                 |
+| `.java`                                       | google-java-format, the version in `project/plugins.sbt`, Google style |
+| `.scala`, `.sbt`                              | scalafmt, the version in `.scalafmt.conf`                              |
+
+A language's tool only starts when files of that language are staged, so a
+Markdown-only commit starts no JVM. Rust, Java and Scala are handled by
+`tools/pre-commit/format-staged.mjs`:
+
+- **A missing tool never blocks a commit.** Without `cargo`, a JDK 21+, or
+  Coursier (`cs`) the hook prints a `pre-commit: skipping ...` notice and the
+  commit goes ahead; CI will still check that language.
+- Java downloads the pinned google-java-format jar once, checksum-verified, to
+  `~/.cache/enso-format/`. Scala runs `cs launch` of the pinned scalafmt-cli (or
+  a `scalafmt` on `PATH` reporting that exact version).
+- `cargo fmt` covers the whole workspace, because `rustfmt` on one file knows
+  neither the edition nor the module tree. The hook puts back any other `.rs`
+  files you had modified, so only staged files change.
+- To bypass the hook, use `git commit --no-verify`. The same checks run in CI
+  (`sbt scalafmtCheckAll javafmtCheckAll`, `cargo fmt -- --check`, Prettier).
 
 [CI and Workflows](https://github.com/jdunkerley/enso/wiki/CI-and-Workflows)
 explains which checks run on a pull request and what the labels do.
