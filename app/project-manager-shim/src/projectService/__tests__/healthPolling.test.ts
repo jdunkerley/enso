@@ -68,10 +68,10 @@ http
 // written down, so that a test can compare it with the moment the open resolved.
 if (name !== 'NoYdoc' && name !== 'SlowHealth')
   setTimeout(() => {
-    const server = net.createServer()
-    server.listen(Number(process.env.LANGUAGE_SERVER_YDOC_PORT), '127.0.0.1', () =>
-      fs.writeFileSync(project + '.listening', String(Date.now())),
-    )
+    // Written before listen(): the kernel accepts a connection as soon as the socket listens, before
+    // listen's callback runs, so a file written there could be read before it exists.
+    fs.writeFileSync(project + '.listening', String(Date.now()))
+    net.createServer().listen(Number(process.env.LANGUAGE_SERVER_YDOC_PORT), '127.0.0.1')
   }, 400)
 const stop = () => process.exit(0)
 process.stdin.on('data', stop)
@@ -142,7 +142,7 @@ test('answers an open only once the ydoc port accepts connections', async () => 
   try {
     const sockets = await lateRunner.openProject(project, 'id')
     const resolvedAt = Date.now()
-    // The fake writes down the moment its ydoc port started listening (400 ms after it is
+    // The fake writes down the moment just before its ydoc port starts listening (400 ms after it is
     // healthy): an open that did not wait would have resolved before it.
     const listeningAt = Number(await fs.readFile(`${project}.listening`, 'utf8'))
     expect(resolvedAt).toBeGreaterThanOrEqual(listeningAt)
