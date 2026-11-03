@@ -336,6 +336,16 @@ public final class SpecCollector {
     out.println("    this.groupInputArg = Value.asValue(null);");
     out.println("  } "); // end of setup method
     out.println("  ");
+    // JMH keeps the state object of every finished group in check mode (forks(0)), so the
+    // values it holds must be dropped by hand: each one keeps its closed context's heap alive.
+    out.println("  private void releaseValues() {");
+    for (var specJavaName : specJavaNames) {
+      out.println("    this.benchFunc_" + specJavaName + " = null;");
+    }
+    out.println("    this.groupInputArg = null;");
+    out.println("    this.messages.clear();");
+    out.println("  }");
+    out.println("  ");
 
     out.println(
         """
@@ -417,7 +427,7 @@ public final class SpecCollector {
               var usedBefore = (rt.totalMemory() - rt.freeMemory()) >> 20;
               ctx.close(true);
               ctx = null;
-              groupInputArg = null;
+              releaseValues();
               System.gc();
               var usedAfter = (rt.totalMemory() - rt.freeMemory()) >> 20;
               System.out.println(
