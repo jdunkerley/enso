@@ -346,7 +346,7 @@
   and `Generic_JDBC` connections to their URLs, need
   `from Standard.Postgres import all` or `from Standard.SQLite import all` added
   by hand.
-- [XML is now its own library, `Standard.XML`][NNN]: `XML_Document`,
+- [XML is now its own library, `Standard.XML`][521]: `XML_Document`,
   `XML_Element`, `XML_Error`, `XML_Format` and `Table.to_xml` are no longer part
   of `Standard.Base` and `Standard.Table`. `Data.read` and `Data.fetch` of XML
   work without the import, and the IDE adds `from Standard.XML import …` where
@@ -469,7 +469,7 @@
 [468]: https://github.com/jdunkerley/enso/pull/468
 [481]: https://github.com/jdunkerley/enso/pull/481
 [492]: https://github.com/jdunkerley/enso/pull/492
-[NNN]: https://github.com/jdunkerley/enso/pull/NNN
+[521]: https://github.com/jdunkerley/enso/pull/521
 
 # Enso 2026.1
 
