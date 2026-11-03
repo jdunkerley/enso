@@ -304,36 +304,47 @@ const isWindowsOnly = (job) =>
 const SAMPLE_SPEC = 'docs/superpowers/specs/sample.md'
 
 /**
- * Whether a GitHub Actions filter pattern matches `file`: `*` within a path segment, `**` across
- * segments (`**\/` also matches none), `?` one character, `[…]` a class.
+ * Whether a GitHub Actions filter pattern matches `file`, by the documented filter pattern cheat
+ * sheet: `*` zero or more characters but not `/`, `**` zero or more of any character (`**\/` also
+ * matches none), `?` zero or one of the preceding character, `+` one or more of the preceding
+ * character, `[…]` one character of a set or range. Braces and every other character are literal,
+ * and so is a `[` with no closing `]`. A `?` or `+` with nothing before it is literal too.
  */
 export function globMatches(pattern, file) {
-  let re = ''
+  const atoms = []
+  const escape = (text) => text.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&')
   for (let i = 0; i < pattern.length; i++) {
     const c = pattern[i]
+    const last = atoms.at(-1)
     if (c === '*') {
       if (pattern[i + 1] === '*') {
         i++
         if (pattern[i + 1] === '/') {
           i++
-          re += '(?:.*/)?'
+          atoms.push({ re: '(?:.*/)?', single: false })
         } else {
-          re += '.*'
+          atoms.push({ re: '.*', single: false })
         }
       } else {
-        re += '[^/]*'
+        atoms.push({ re: '[^/]*', single: false })
       }
-    } else if (c === '?') {
-      re += '[^/]'
-    } else if (c === '[' && pattern.indexOf(']', i) > i) {
-      const end = pattern.indexOf(']', i)
-      re += pattern.slice(i, end + 1)
+    } else if ((c === '?' || c === '+') && last?.single) {
+      last.re += c
+      last.single = false
+    } else if (c === '[' && pattern.indexOf(']', i + 2) > i) {
+      const end = pattern.indexOf(']', i + 2)
+      const set = pattern.slice(i + 1, end).replace(/[\\^[\]]/g, '\\$&')
+      atoms.push({ re: `[${set}]`, single: true })
       i = end
     } else {
-      re += c.replace(/[.+^${}()|\\\]]/g, '\\$&')
+      atoms.push({ re: escape(c), single: true })
     }
   }
-  return new RegExp(`^${re}$`).test(file)
+  try {
+    return new RegExp(`^${atoms.map((atom) => atom.re).join('')}$`).test(file)
+  } catch {
+    throw new Error(`cannot read the filter pattern \`${pattern}\` as a glob`)
+  }
 }
 
 /**
@@ -365,9 +376,15 @@ export function checkPullRequestsIgnoreSpecs({ workflows }) {
       const filter = on[event] ?? {}
       const ignored = filter['paths-ignore'] ?? []
       const only = filter.paths
-      const ignoresSpecs =
-        pathsMatch(ignored.map(String), SAMPLE_SPEC) ||
-        (Array.isArray(only) && !pathsMatch(only.map(String), SAMPLE_SPEC))
+      let ignoresSpecs
+      try {
+        ignoresSpecs =
+          pathsMatch(ignored.map(String), SAMPLE_SPEC) ||
+          (Array.isArray(only) && !pathsMatch(only.map(String), SAMPLE_SPEC))
+      } catch (error) {
+        problems.push(`${file}: its \`${event}\` trigger: ${error.message}`)
+        continue
+      }
       if (!ignoresSpecs) {
         problems.push(`${file}: its \`${event}\` trigger lacks \`paths-ignore: ["${SPEC_PATHS}"]\``)
       }
