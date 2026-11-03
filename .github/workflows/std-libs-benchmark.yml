@@ -44,6 +44,8 @@ jobs:
       # `std-benchmarks/bench` builds the engine distribution first (its annotation processor
       # needs one), with the native runner that `ENSO_LAUNCHER` asks for.
       - name: Run the benchmarks
+        # A hung benchmark otherwise holds the runner for the job's whole 4 hours.
+        timeout-minutes: 150
         run: |-
           task="std-benchmarks/bench"
           if [ -n "$BENCH_NAME" ]; then task="std-benchmarks/benchOnly $BENCH_NAME"; fi
