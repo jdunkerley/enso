@@ -343,9 +343,43 @@ public final class Module extends EnsoObject {
         this.uuidsMap = null;
         return;
       }
+    } else if (isCompiledFrom(source)) {
+      // See Note [Opening A Module With The Text It Was Compiled From]
+      return;
     }
     this.sources = this.sources.newWith(source);
     this.compilationStage = CompilationStage.INITIAL;
+  }
+
+  /* Note [Opening A Module With The Text It Was Compiled From]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Opening a file (`OpenFileCmd`) gives its module the client's text. That
+   * text is usually the one on disk, which the module was already compiled
+   * from, typically by an execution context pushed before the open (#505).
+   * Resetting the module to `INITIAL` then only makes the next execution
+   * compile it again, on every project open (#506). So the module is left
+   * as it is when it is compiled and its current text is the new one.
+   *
+   * The current text is what its IR was built from: the compiler reads the
+   * text through `getSource()`, which keeps it in `sources`, and from cache
+   * as well (the cache is checked against the digest of that text), and
+   * while the module stays compiled its text changes only by a simple
+   * update, which patches the IR to match. A module with no text kept
+   * (`sources.rope()` is null) has not been read yet, so is not compiled.
+   *
+   * Expression ids are not part of the open: the text carries the ids in its
+   * metadata, which are equal when the text is, and ids sent separately
+   * (`EditFileCmd` with an id map) are kept on the module, which the open
+   * does not change, and force a compilation of their own. The cached
+   * Truffle `Source` is kept too, so source sections of the compiled nodes
+   * still belong to the module's current source.
+   */
+  private boolean isCompiledFrom(Rope source) {
+    if (needsCompilation()) {
+      return false;
+    }
+    var current = sources.rope();
+    return current != null && current.toString().equals(source.toString());
   }
 
   /**

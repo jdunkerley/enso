@@ -55,9 +55,11 @@ public final class SerializeModuleJob extends BackgroundJob<Void> {
   /* Note [Serialising A Module That Changed Since It Was Compiled]
    * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
    * The compiler asks for this job when it has compiled a module, but the job
-   * runs later, in the background. In between, opening or closing the module's
-   * file gives it new sources and resets it to `INITIAL`, while its IR stays the
-   * compiled one until it is compiled again. Serialising it then would store
+   * runs later, in the background. In between, closing the module's file, or
+   * opening it with text other than the one it was compiled from (Note [Opening
+   * A Module With The Text It Was Compiled From] in `Module`), gives it new
+   * sources and resets it to `INITIAL`, while its IR stays the compiled one
+   * until it is compiled again. Serialising it then would store
    * that compiled IR labelled `INITIAL`; the next compilation loads the cache
    * and runs every pass again over IR that has already been through them, and
    * fails (`MatchError` in the first mini pass), so the program does not run.
