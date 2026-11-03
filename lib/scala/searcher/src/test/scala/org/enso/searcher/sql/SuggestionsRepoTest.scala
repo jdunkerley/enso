@@ -166,6 +166,22 @@ class SuggestionsRepoTest
       v1 should not equal v2
     }
 
+    "move the version on when cleaned, keeping the ids unique" taggedAs Retry in withRepo {
+      repo =>
+        val action = for {
+          (v1, ids1) <- repo.insertAll(Seq(suggestion.constructor))
+          _          <- repo.clean
+          v2         <- repo.currentVersion
+          (_, ids2)  <- repo.insertAll(Seq(suggestion.constructor))
+          all        <- repo.getAll
+        } yield (v1, v2, ids1, ids2, all)
+
+        val (v1, v2, ids1, ids2, (_, entries)) = Await.result(action, Timeout)
+        v2 should be > v1
+        ids2.intersect(ids1) shouldBe empty
+        entries.map(_.id) shouldEqual ids2
+    }
+
     "not change version after failed insert" taggedAs Retry in withRepo {
       repo =>
         val action = for {

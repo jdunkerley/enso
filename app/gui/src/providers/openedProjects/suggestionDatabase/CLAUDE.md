@@ -7,8 +7,12 @@ component browser, the documentation panel and the widgets.
   and constructor field) and `createSuggestionDbStore`, whose `Synchronizer`
   acquires `search/receivesSuggestionsDatabaseUpdates`, requests
   `search/getSuggestionsDatabase` as soon as it holds that capability (Note [The
-  Suggestion Database Is Requested At Connect Time]) and applies every
-  `search/suggestionsDatabaseUpdates` notification in order. The store loads the
+  Suggestion Database Is Requested At Connect Time]) and applies, in order,
+  every `search/suggestionsDatabaseUpdates` notification not older than the
+  database it loaded (`currentVersion`), including those that arrived before it.
+  The language server answers with its repository right after clearing it, so
+  older notifications are of entries the clear removed (Note [The Snapshot
+  Follows The Clear] in `SuggestionsHandler`, #477). The store loads the
   component groups after the first execution, and the libraries' declared public
   types.
 - `lsUpdate.ts` — `SuggestionUpdateProcessor`: turns the language server's

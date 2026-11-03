@@ -13,6 +13,7 @@ import org.enso.languageserver.capability.CapabilityProtocol.{
 import org.enso.languageserver.data._
 import org.enso.languageserver.event.InitializedEvent
 import org.enso.languageserver.filemanager._
+import org.enso.languageserver.requesthandler.RequestTimeout
 import org.enso.languageserver.search.SearchProtocol.{
   SuggestionsDatabaseUpdate,
   SuggestionsDatabaseUpdateNotification
@@ -39,6 +40,7 @@ import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.immutable.ListSet
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.jdk.CollectionConverters._
@@ -725,19 +727,52 @@ class SuggestionsHandlerSpec
     }
 
     "get initial suggestions database" taggedAs Retry in withDb {
-      (_, _, _, _, handler) =>
+      (_, _, _, connector, handler) =>
         handler ! SearchProtocol.GetSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        // Not before the repository is clean.
+        expectNoMessage(300.millis)
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
 
-        expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(0, Seq()))
+        // The clean moves the version on.
+        expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(1, Seq()))
     }
 
     "get suggestions database return empty result" taggedAs Retry in withDb {
-      (_, repo, _, _, handler) =>
+      (_, repo, _, connector, handler) =>
         Await.ready(repo.insert(Suggestions.constructor), Timeout)
         handler ! SearchProtocol.GetSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
 
         expectMsg(
-          SearchProtocol.GetSuggestionsDatabaseResult(0, Seq())
+          SearchProtocol.GetSuggestionsDatabaseResult(2, Seq())
+        )
+    }
+
+    "get the suggestions database as it is when the invalidation fails" taggedAs Retry in withDb {
+      (_, repo, _, connector, handler) =>
+        val (_, Seq(id)) =
+          Await.result(repo.insertAll(Seq(Suggestions.constructor)), Timeout)
+        handler ! SearchProtocol.GetSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(
+          Api.Response(Api.ContextNotExistError(UUID.randomUUID()))
+        )
+
+        expectMsg(
+          SearchProtocol.GetSuggestionsDatabaseResult(
+            1,
+            Seq(
+              SearchProtocol.SuggestionDatabaseEntry(
+                id,
+                Suggestions.constructor
+              )
+            )
+          )
         )
     }
 
@@ -772,7 +807,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            1L,
+            2L,
             Seq(
               SuggestionsDatabaseUpdate
                 .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -803,7 +838,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            1L,
+            2L,
             Seq(
               SuggestionsDatabaseUpdate
                 .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -828,7 +863,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            1L,
+            2L,
             Seq(
               SuggestionsDatabaseUpdate
                 .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -860,7 +895,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            3L,
+            4L,
             Seq(
               SuggestionsDatabaseUpdate.Remove(1L),
               SuggestionsDatabaseUpdate.Remove(2L),
@@ -888,7 +923,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            3L,
+            4L,
             Seq(
               SuggestionsDatabaseUpdate.Remove(1L),
               SuggestionsDatabaseUpdate.Remove(2L),
@@ -918,7 +953,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            2L,
+            4L,
             Seq(
               SuggestionsDatabaseUpdate
                 .Add(3L, Catalogue.barType, fromCatalogue = true),
@@ -930,7 +965,7 @@ class SuggestionsHandlerSpec
       )
       // The handler is no longer stuck waiting for the invalidation's result.
       handler ! SearchProtocol.GetSuggestionsDatabaseVersion
-      expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(2L))
+      expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(4L))
     }
 
     "wait for a running module update before inserting, and hold the next" taggedAs Retry in {
@@ -957,7 +992,7 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                1L,
+                2L,
                 Seq(SuggestionsDatabaseUpdate.Add(1L, Catalogue.barType))
               )
             )
@@ -966,7 +1001,7 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                2L,
+                3L,
                 Seq(
                   SuggestionsDatabaseUpdate
                     .Add(2L, Catalogue.bazType, fromCatalogue = true)
@@ -978,7 +1013,7 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                3L,
+                4L,
                 Seq(SuggestionsDatabaseUpdate.Add(3L, Catalogue.barMethod))
               )
             )
@@ -1005,7 +1040,7 @@ class SuggestionsHandlerSpec
           DeliverToJsonController(
             clientId,
             SuggestionsDatabaseUpdateNotification(
-              2L,
+              3L,
               Seq(
                 SuggestionsDatabaseUpdate
                   .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -1021,7 +1056,7 @@ class SuggestionsHandlerSpec
           DeliverToJsonController(
             clientId,
             SuggestionsDatabaseUpdateNotification(
-              4L,
+              5L,
               Seq(
                 SuggestionsDatabaseUpdate.Remove(3L),
                 SuggestionsDatabaseUpdate.Add(4L, Catalogue.bazType)
@@ -1033,7 +1068,7 @@ class SuggestionsHandlerSpec
           DeliverToJsonController(
             clientId,
             SuggestionsDatabaseUpdateNotification(
-              6L,
+              7L,
               Seq(
                 SuggestionsDatabaseUpdate.Remove(1L),
                 SuggestionsDatabaseUpdate.Remove(2L),
@@ -1051,7 +1086,6 @@ class SuggestionsHandlerSpec
       val clientId = UUID.randomUUID()
       acquireUpdates(handler, clientId)
       handler ! SearchProtocol.GetSuggestionsDatabase
-      expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(0, Seq()))
       expectRequest(connector) { case Api.InvalidateModulesIndexRequest() => }
       // The handler waits for the invalidation's result: the update is
       // stashed ahead of the clear that comes with the result.
@@ -1067,6 +1101,9 @@ class SuggestionsHandlerSpec
           )
         )
       )
+      // The database is sent after the clear, newer than the update: the
+      // client drops it.
+      expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(2L, Seq()))
       startBackground(handler, connector)
       handler ! Api.ExecutionComplete(UUID.randomUUID())
       // Foo.Baz counts as loaded: the runtime, whose index the invalidation
@@ -1075,7 +1112,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            2L,
+            3L,
             Seq(
               SuggestionsDatabaseUpdate
                 .Add(2L, Catalogue.barType, fromCatalogue = true),
@@ -1088,6 +1125,120 @@ class SuggestionsHandlerSpec
       // The clear removed the update's entry.
       val (_, entries) = Await.result(repo.getAll, Timeout)
       entries.map(_.id) should contain theSameElementsAs Seq(2L, 3L)
+    }
+
+    "keep a client in step when module updates run around the database request" taggedAs Retry in {
+      // #477: the snapshot `search/getSuggestionsDatabase` returns, and the
+      // updates the client applies on top of it (those not older than it, as
+      // the protocol's version says), must add up to the repository.
+      val repo = new GatedRepo
+      withCatalogues(CatalogueSource.Empty, repo) {
+        (_, _, router, connector, handler) =>
+          val clientId = UUID.randomUUID()
+          acquireUpdates(handler, clientId)
+          val running = Promise[Unit]()
+          repo.gate = running.future
+          // A module update is running when the client asks for the
+          // database...
+          handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barType)
+          handler ! SearchProtocol.GetSuggestionsDatabase
+          expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+          }
+          // ...and another arrives while the runtime invalidates its index.
+          handler ! moduleUpdate("Foo.Baz.Main", Catalogue.bazType)
+          running.success(())
+          connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+          expectStartBackgroundProcessing(connector)
+          // One that arrives after the clear.
+          handler ! moduleUpdate("Foo.Bar.Main", Catalogue.barMethod)
+
+          val snapshot =
+            expectMsgType[SearchProtocol.GetSuggestionsDatabaseResult]
+          val sent = router
+            .receiveWhile(max = 10.seconds, idle = 1.second) {
+              case DeliverToJsonController(
+                    `clientId`,
+                    n: SuggestionsDatabaseUpdateNotification
+                  ) =>
+                n
+            }
+          val client = mutable.Map[Long, Suggestion]()
+          snapshot.entries.foreach(e => client(e.id) = e.suggestion)
+          sent
+            .filter(_.currentVersion >= snapshot.currentVersion)
+            .flatMap(_.updates)
+            .foreach {
+              case SuggestionsDatabaseUpdate.Add(id, suggestion, _) =>
+                client(id) = suggestion
+              case SuggestionsDatabaseUpdate.Remove(id) =>
+                client.remove(id)
+              case other => fail(s"Unexpected update: $other")
+            }
+
+          val (_, entries) = Await.result(repo.getAll, Timeout)
+          client.toMap shouldEqual
+          entries.map(e => e.id -> e.suggestion).toMap
+          client.values should contain(Catalogue.barMethod)
+      }
+    }
+
+    "answer database requests that overlap, and later ones" taggedAs Retry in withDb {
+      (_, _, _, connector, handler) =>
+        val first  = TestProbe()
+        val second = TestProbe()
+        first.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        val firstInvalidation = connector.lastSender
+        // Arrives while the runtime invalidates for the first: stashed ahead
+        // of the first clear, which it then sees again.
+        second.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        firstInvalidation ! Api.Response(Api.InvalidateModulesIndexResponse())
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+        startBackground(handler, connector)
+
+        first
+          .expectMsgType[SearchProtocol.GetSuggestionsDatabaseResult]
+          .entries shouldBe empty
+        second.expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(2L, Seq()))
+
+        // Not left waiting for a clear that never comes.
+        startBackground(handler, connector)
+        val third = TestProbe()
+        third.send(handler, SearchProtocol.GetSuggestionsDatabase)
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+        third.expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(3L, Seq()))
+    }
+
+    "answer with the database as it is when the invalidation times out" taggedAs Retry in withDb {
+      (_, repo, _, connector, handler) =>
+        val (_, Seq(id)) =
+          Await.result(repo.insertAll(Seq(Suggestions.constructor)), Timeout)
+        handler ! SearchProtocol.GetSuggestionsDatabase
+        expectRequest(connector) { case Api.InvalidateModulesIndexRequest() =>
+        }
+        // What `InvalidateModulesIndexHandler` sends when the runtime never
+        // answers.
+        handler ! RequestTimeout
+
+        expectMsg(
+          SearchProtocol.GetSuggestionsDatabaseResult(
+            1L,
+            Seq(
+              SearchProtocol.SuggestionDatabaseEntry(
+                id,
+                Suggestions.constructor
+              )
+            )
+          )
+        )
+        // The handler is not left waiting for the invalidation.
+        handler ! SearchProtocol.GetSuggestionsDatabaseVersion
+        expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(1L))
     }
 
     "remove a library's catalogue entries even if its suggestions cannot be inserted" taggedAs Retry in {
@@ -1108,7 +1259,7 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                2L,
+                3L,
                 Seq(
                   SuggestionsDatabaseUpdate.Remove(1L),
                   SuggestionsDatabaseUpdate.Remove(2L)
@@ -1154,13 +1305,13 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                1L,
+                2L,
                 Seq(SuggestionsDatabaseUpdate.Add(1L, Catalogue.barType))
               )
             )
           )
           handler ! SearchProtocol.GetSuggestionsDatabaseVersion
-          expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(1L))
+          expectMsg(SearchProtocol.GetSuggestionsDatabaseVersionResult(2L))
         }
       } finally observing.close()
     }
@@ -1184,7 +1335,7 @@ class SuggestionsHandlerSpec
             DeliverToJsonController(
               clientId,
               SuggestionsDatabaseUpdateNotification(
-                1L,
+                2L,
                 Seq(
                   SuggestionsDatabaseUpdate
                     .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -1228,7 +1379,7 @@ class SuggestionsHandlerSpec
         DeliverToJsonController(
           clientId,
           SuggestionsDatabaseUpdateNotification(
-            4L,
+            6L,
             Seq(
               SuggestionsDatabaseUpdate.Add(5L, Catalogue.barType),
               SuggestionsDatabaseUpdate.Add(6L, Catalogue.barMethod)
@@ -1260,7 +1411,7 @@ class SuggestionsHandlerSpec
           DeliverToJsonController(
             clientId,
             SuggestionsDatabaseUpdateNotification(
-              1L,
+              2L,
               Seq(
                 SuggestionsDatabaseUpdate
                   .Add(1L, Catalogue.barType, fromCatalogue = true),
@@ -1275,7 +1426,7 @@ class SuggestionsHandlerSpec
           DeliverToJsonController(
             clientId,
             SuggestionsDatabaseUpdateNotification(
-              3L,
+              4L,
               Seq(
                 SuggestionsDatabaseUpdate.Remove(1L),
                 SuggestionsDatabaseUpdate.Remove(2L),
@@ -1582,9 +1733,10 @@ class SuggestionsHandlerSpec
     */
   private def openDatabase(handler: ActorRef, connector: TestProbe): Unit = {
     handler ! SearchProtocol.GetSuggestionsDatabase
-    expectMsg(SearchProtocol.GetSuggestionsDatabaseResult(0, Seq()))
     expectRequest(connector) { case Api.InvalidateModulesIndexRequest() => }
     connector.reply(Api.Response(Api.InvalidateModulesIndexResponse()))
+    expectMsgType[SearchProtocol.GetSuggestionsDatabaseResult].entries shouldBe
+    empty
   }
 
   private def expectRequest(connector: TestProbe)(

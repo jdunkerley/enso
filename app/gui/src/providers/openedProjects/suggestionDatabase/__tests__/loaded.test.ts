@@ -5,6 +5,7 @@ import { Err, Ok } from 'enso-common/src/utilities/data/result'
 import { describe, expect, test, vi } from 'vitest'
 import { effectScope } from 'vue'
 import { LsRpcError, type LanguageServer } from 'ydoc-shared/languageServer'
+import type { SuggestionDatabaseUpdates } from 'ydoc-shared/languageServerTypes'
 
 /** A language server whose initial suggestion database is sent only when `sendDatabase` is called. */
 function mockLanguageServer(overrides: Partial<LanguageServer> = {}) {
@@ -120,6 +121,39 @@ test('the store is loaded only once the initial suggestion database is, not mere
   expect(store.loaded).toBe(false)
   sendDatabase()
   await vi.waitFor(() => expect(store.loaded).toBe(true))
+  scope.stop()
+})
+
+test('updates older than the initial database are dropped, even when they arrive before it', async () => {
+  // #477: the language server answers `search/getSuggestionsDatabase` with the version of its
+  // cleared repository. Updates sent before the clear are older, and their entries are gone.
+  const listeners = new Set<(param: SuggestionDatabaseUpdates) => void>()
+  const { lsRpc, sendDatabase } = mockLanguageServer({
+    on: ((_event: unknown, callback: (param: SuggestionDatabaseUpdates) => void) => {
+      listeners.add(callback)
+      return callback
+    }) as LanguageServer['on'],
+    off: ((_event: unknown, callback: (param: SuggestionDatabaseUpdates) => void) => {
+      listeners.delete(callback)
+    }) as LanguageServer['off'],
+  })
+  const send = (currentVersion: number, id: number, module: string) =>
+    listeners.forEach((listener) =>
+      listener({
+        currentVersion,
+        updates: [{ type: 'Add', id, suggestion: { type: 'module', module } }],
+      }),
+    )
+  const { store, scope } = createStore(lsRpc)
+  await vi.waitFor(() => expect(listeners.size).toBe(1))
+  // The mock's database has version 1.
+  send(0, 7, 'Standard.Base.Stale')
+  sendDatabase()
+  await vi.waitFor(() => expect(store.loaded).toBe(true))
+  send(1, 8, 'Standard.Base.Same')
+  send(2, 9, 'Standard.Base.Newer')
+  await vi.waitFor(() => expect(store.entries.get(9)).toBeDefined())
+  expect([...store.entries.keys()].sort()).toEqual([8, 9])
   scope.stop()
 })
 
