@@ -9,7 +9,7 @@ import { Ast } from '@/util/ast'
 import { arrayEquals, findIndexOpt } from '@/util/data/array'
 import { ProjectPath } from '@/util/projectPath'
 import { qnLastSegment, type QualifiedName } from '@/util/qualifiedName'
-import type { ColDef, DefaultMenuItem } from 'ag-grid-enterprise'
+import type { ColDef, DefaultMenuItem } from 'ag-grid-community'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import {
   Err,

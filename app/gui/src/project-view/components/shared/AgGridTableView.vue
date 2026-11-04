@@ -17,7 +17,7 @@ export type AgGridTableViewProps<TData, TValue> = {
   textFormatOption?: TextFormatOptions | undefined
   processDataFromClipboard?:
     ((params: ProcessDataFromClipboardParams<TData>) => string[][] | null) | undefined
-  datasource?: IServerSideDatasource | IDatasource | boolean | undefined
+  datasource?: IDatasource | boolean | undefined
   isServerSideModel?: boolean
   gridIdHash?: string | null | undefined
   getContextMenuItems?:
@@ -81,30 +81,17 @@ export const commonContextMenuActions = {
 } satisfies Record<string, MenuItem<unknown>>
 
 /**
- * Grid options controlling cell selection. Licensed builds use AG Grid Enterprise's native
- * `cellSelection`. Unlicensed builds disable it — the visual highlight instead comes from
- * `buildDefaultColDef` merging a `cellClassRules` entry into `defaultColDef` (NOT a top-level grid
- * option — `cellClassRules` only exists on `ColDef`, verified against
- * `ComponentUtil.ALL_PROPERTIES`, which is why this used to silently do nothing).
- */
-export function buildSelectionGridOptions(enterpriseAvailable: boolean): { cellSelection?: true } {
-  // Unlicensed omits the key rather than setting it to `undefined`: AG Grid's own prop types are
-  // `exactOptionalPropertyTypes`-strict, and off is already the default.
-  return enterpriseAvailable ? { cellSelection: true } : {}
-}
-
-/**
- * Merges the Community range-selection highlight into `defaultColDef` when unlicensed, closing
- * directly over this grid instance's own `isInRange` predicate — no module-level indirection
- * needed (a prior version routed through a module-level ref, which leaked state across
- * simultaneously-mounted grid instances; closing per-instance avoids that entirely).
+ * Merges the cell-range highlight into `defaultColDef`, closing directly over this grid instance's
+ * own `isInRange` predicate — no module-level indirection needed (a prior version routed through a
+ * module-level ref, which leaked state across simultaneously-mounted grid instances; closing
+ * per-instance avoids that entirely). It must be a `cellClassRules` entry on the `ColDef`, not a
+ * top-level grid option: `cellClassRules` only exists on `ColDef` (verified against
+ * `ComponentUtil.ALL_PROPERTIES`), which is why a grid-level version used to silently do nothing.
  */
 export function buildDefaultColDef<TData, TValue>(
   defaultColDef: ColDef<TData, TValue>,
-  enterpriseAvailable: boolean,
   isInRange: (coord: CellCoord) => boolean,
 ): ColDef<TData, TValue> {
-  if (enterpriseAvailable) return defaultColDef
   return {
     ...defaultColDef,
     cellClassRules: {
@@ -173,7 +160,6 @@ import type {
   IDatasource,
   IHeaderComp,
   IHeaderParams,
-  IServerSideDatasource,
   MenuItemDef,
   ProcessDataFromClipboardParams,
   RowDataUpdatedEvent,
@@ -181,7 +167,7 @@ import type {
   RowEditingStoppedEvent,
   RowHeightParams,
   SortChangedEvent,
-} from 'ag-grid-enterprise'
+} from 'ag-grid-community'
 import * as iter from 'enso-common/src/utilities/data/iter'
 import * as objects from 'enso-common/src/utilities/data/object'
 import {
@@ -197,7 +183,7 @@ import {
   type ComponentInstance,
 } from 'vue'
 import { AG_GRID_LOCALE_EN } from '@ag-grid-community/locale'
-import { AG_GRID_ENTERPRISE_AVAILABLE } from './AgGridTableView/agGridLicense'
+
 import { cellCoordFromEvent, useCommunityCellRange } from './AgGridTableView/communityCellRange'
 import {
   installCommunityClipboardPatch,
@@ -250,9 +236,7 @@ const {
   () => gridApi.value?.getAllDisplayedColumns().map((c) => c.getColId()) ?? [],
 )
 
-const effectiveDefaultColDef = computed(() =>
-  buildDefaultColDef(props.defaultColDef, AG_GRID_ENTERPRISE_AVAILABLE, isInRange),
-)
+const effectiveDefaultColDef = computed(() => buildDefaultColDef(props.defaultColDef, isInRange))
 
 function onGridReady(event: GridReadyEvent<TData>) {
   gridApi.value = event.api
@@ -261,21 +245,11 @@ function onGridReady(event: GridReadyEvent<TData>) {
   // the two places that otherwise clear the range — so a stale rectangle would survive and both
   // highlight and copy/cut the wrong cells.
   clear()
-  if (rowModelType.value === 'serverSide') {
-    gridApi.value.retryServerSideLoads()
-  }
-  installCommunityClipboardPatch(
-    event.api,
-    AG_GRID_ENTERPRISE_AVAILABLE,
-    clipboardDeps,
-    pasteClipboardDeps,
-    () => copyWithHeaders.value,
-  )
+  installCommunityClipboardPatch(event.api, clipboardDeps, pasteClipboardDeps)
 }
 
 function clipboardDeps(): ClipboardDeps {
   return {
-    enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
     // Deliberately not an `as unknown as` cast: these structural types name the exact grid API
     // this file depends on, and checking them against the real `GridApi` is the only thing that
     // catches a method disappearing under us. `api.getValue` vanishing in v33 reached CI as a
@@ -289,7 +263,6 @@ function clipboardDeps(): ClipboardDeps {
 
 function pasteClipboardDeps(): PasteDeps {
   return {
-    enterpriseAvailable: AG_GRID_ENTERPRISE_AVAILABLE,
     gridApi: gridApi.value as PasteDeps['gridApi'],
     readClipboardText: () => navigator.clipboard.readText(),
     processDataFromClipboard: (params) => props.processDataFromClipboard?.(params as any),
@@ -297,14 +270,9 @@ function pasteClipboardDeps(): PasteDeps {
   }
 }
 
-const rowModelType = computed(() => {
-  if (!props.isServerSideModel) return 'clientSide'
-  return AG_GRID_ENTERPRISE_AVAILABLE ? 'serverSide' : 'infinite'
-})
+// Server-side sorting and filtering is backed by AG Grid Community's Infinite Row Model.
+const rowModelType = computed(() => (props.isServerSideModel ? 'infinite' : 'clientSide'))
 
-const serverSideDatasourceValue = computed(() =>
-  rowModelType.value === 'serverSide' ? (props.datasource as IServerSideDatasource) : undefined,
-)
 const infiniteDatasourceValue = computed(() =>
   rowModelType.value === 'infinite' ? (props.datasource as IDatasource) : undefined,
 )
@@ -317,7 +285,7 @@ const gridKey = computed(() =>
 )
 
 const forceGridRefresh = () => {
-  //when using the ag grid severSide model this forces the grid to 'refresh' and call getRows
+  // With a server-side datasource this forces the grid to 'refresh' and call getRows.
   gridKeyIncrement.value++
 }
 
@@ -454,13 +422,7 @@ function suppressCopy(event: KeyboardEvent) {
 }
 
 function stopIfPrevented(event: Event) {
-  // Licensed path: Enterprise's own `MenuUtils.onContextMenu` calls `preventDefault()`
-  // synchronously, during the browser's native `contextmenu` dispatch — so by the time this
-  // handler runs (also synchronously, since it's bound to the native `contextmenu` event), it can
-  // already see `event.defaultPrevented` and stop propagation from reaching ancestors (e.g.
-  // `WidgetTableEditor`'s enclosing `GraphNode.vue`).
-  //
-  // Unlicensed path: AG Grid dispatches its own `cellContextMenu` event *asynchronously*
+  // AG Grid dispatches its own `cellContextMenu` event *asynchronously*
   // (`LocalEventService.dispatchAsync`, queued behind a `setTimeout(…, 0)` because
   // `cellContextMenu` isn't in `ALWAYS_SYNC_GLOBAL_EVENTS` and `suppressAsyncEvents` is never set
   // in this repo). `onCellContextMenu` below — and its `preventDefault()` — therefore runs a
@@ -472,13 +434,13 @@ function stopIfPrevented(event: Event) {
   // substitute, since under Community it's honored only for the body viewport background and
   // header cells, not for cells. This intentionally suppresses the native menu over every cell,
   // matching how the background/header already suppress theirs, even for a cell whose resolved
-  // item list later turns out empty — consistent Community behavior across the whole grid body,
-  // rather than a menu that sometimes appears and sometimes silently does nothing.
+  // item list later turns out empty — consistent behavior across the whole grid body, rather than
+  // a menu that sometimes appears and sometimes silently does nothing. Stopping propagation keeps
+  // the right-click from reaching ancestors (e.g. `WidgetTableEditor`'s enclosing `GraphNode.vue`).
   //
   // Right-clicks that aren't over a cell (the header — handled by `TableHeader.vue`'s own
   // `@click.right` — or outside the grid body entirely) are left alone and continue to bubble.
   if (
-    !AG_GRID_ENTERPRISE_AVAILABLE &&
     event instanceof MouseEvent &&
     event.target instanceof Element &&
     event.target.closest('.ag-cell')
@@ -490,7 +452,7 @@ function stopIfPrevented(event: Event) {
   if (event.defaultPrevented) event.stopPropagation()
 }
 
-// === Context menu fallback (no AG Grid Enterprise license) ===
+// === Context menu ===
 
 const contextMenuState = ref<{
   point: { x: number; y: number }
@@ -498,9 +460,9 @@ const contextMenuState = ref<{
 } | null>(null)
 
 /**
- * Resolves the items for the Community context-menu fallback.
+ * Resolves the items for the cell context menu.
  *
- * Async menu callbacks are deliberately unsupported: the fallback popup is positioned from a
+ * Async menu callbacks are deliberately unsupported: the popup is positioned from a
  * synchronously-read mouse position and rendered in the same tick, and nothing in this codebase
  * returns a promise here. A promise is dropped rather than awaited, so the menu simply does not
  * open — preferable to opening it late, detached from the click that asked for it.
@@ -534,7 +496,6 @@ function resolveColumnOrGridContextMenuItems(
 }
 
 function onCellContextMenu(event: CellContextMenuEvent<TData>) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE) return // native Enterprise context menu handles this instead
   const domEvent = event.event
   if (!(domEvent instanceof MouseEvent)) return
   const rawItems = resolveColumnOrGridContextMenuItems(event, domEvent)
@@ -562,7 +523,7 @@ function closeContextMenu() {
   contextMenuState.value = null
 }
 
-// === Community cell-range selection (unlicensed fallback for Enterprise `cellSelection`) ===
+// === Cell-range selection ===
 
 // Both handlers are bound to the wrapper's native `mousedown`/`mouseover`, not to AG Grid's
 // `cellMouseDown`/`cellMouseOver`: AG Grid dispatches those asynchronously (behind a
@@ -588,20 +549,18 @@ function repaintRange() {
 }
 
 function onCellMouseDown(event: MouseEvent) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE) return
   // Only the left/primary button starts or extends a range — right-click (context menu) and
   // middle-click must not collapse an existing selection.
   if (event.button !== 0) return
   const coord = cellCoordFromEvent(event)
   if (coord == null) return
-  // Shift+Click extends the existing range from its anchor, matching the licensed Set Filter's
-  // own Shift+Click behavior and the design spec's requirement for Shift+Click range extension.
+  // Shift+Click extends the existing range from its anchor.
   const changed = event.shiftKey && communityRange.value != null ? extendTo(coord) : startAt(coord)
   if (changed) repaintRange()
 }
 
 function onCellMouseOver(event: MouseEvent) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE || !mouseButtonDown) return
+  if (!mouseButtonDown) return
   const coord = cellCoordFromEvent(event)
   // Only repaint when the range actually moved. `mouseover` fires continuously while dragging
   // within a single cell, and `refreshCells({ force: true })` re-renders every displayed cell —
@@ -629,7 +588,7 @@ onUnmounted(() => {
 })
 
 function extendRangeByKeyboard(event: KeyboardEvent) {
-  if (AG_GRID_ENTERPRISE_AVAILABLE || !event.shiftKey) return
+  if (!event.shiftKey) return
   // Back off while a cell editor is active, matching AG Grid's own native Shift+Arrow handling —
   // otherwise this fights with text selection inside an active cell editor (e.g. Table Input).
   if ((gridApi.value?.getEditingCells().length ?? 0) > 0) return
@@ -734,17 +693,14 @@ const conditionalGridOptions = computed(() => ({
     suppressMoveWhenColumnDragging: props.suppressMoveWhenColumnDragging,
     processDataFromClipboard: props.processDataFromClipboard,
     components: mappedComponents.value,
-    serverSideDatasource: serverSideDatasourceValue.value,
     datasource: infiniteDatasourceValue.value,
-    getContextMenuItems: AG_GRID_ENTERPRISE_AVAILABLE ? props.getContextMenuItems : undefined,
   }),
-  ...(AG_GRID_ENTERPRISE_AVAILABLE ? { allowContextMenuWithControlKey: true } : {}),
   ...(rowModelType.value === 'clientSide' ? { getRowHeight } : { cacheBlockSize: 1000 }),
 }))
 
 // AG Grid's own Vue wrapper, rather than a vendored copy of it. The two things we used to
-// vendor it for are now first-class: every grid option is a typed prop, and `modules` selects
-// the Community or Enterprise bundle (see `./AgGridTableView/agGridModules`).
+// vendor it for are now first-class: every grid option is a typed prop, and `modules` registers
+// the module bundle (see `./AgGridTableView/agGridModules`).
 const { AgGridVue } = await import('ag-grid-vue3')
 const { agGridModules } = await import('./AgGridTableView/agGridModules')
 
@@ -772,11 +728,7 @@ const customLocale = {
          (distribution/lib/Standard/Visualization/0.0.0-dev/src/Table/Visualization.enso) —
          nothing currently links them, so a one-sided change would silently break paging. -->
     <AgGridVue
-      v-bind="{
-        ...$attrs,
-        ...buildSelectionGridOptions(AG_GRID_ENTERPRISE_AVAILABLE),
-        ...conditionalGridOptions,
-      }"
+      v-bind="{ ...$attrs, ...conditionalGridOptions }"
       ref="grid"
       :key="gridKey"
       class="ag-theme-alpine agGridTableView"

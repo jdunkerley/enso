@@ -23,10 +23,9 @@ const sortDirectionMap = {
 }
 
 /**
- * The subset of a row-fetch request that request-building logic here needs. Satisfied by both
- * `IServerSideGetRowsRequest` (AG Grid Enterprise's Server-Side Row Model) and `IGetRowsParams`
- * (AG Grid Community's Infinite Row Model) — see `TableVisualization.vue`'s two datasource
- * factories, which both build one of these and pass it to `createServer().getData()`.
+ * The subset of a row-fetch request that request-building logic here needs. Satisfied by
+ * `IGetRowsParams` (AG Grid's Infinite Row Model) — see `TableVisualization.vue`'s datasource
+ * factory, which passes one to `createServer().getData()`.
  */
 export interface RowsRequestParams {
   startRow: number | undefined

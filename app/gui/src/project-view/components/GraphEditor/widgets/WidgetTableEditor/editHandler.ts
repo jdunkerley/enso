@@ -5,9 +5,8 @@ import {
 import type { ToValue } from '$/utils/reactivity'
 import { NEW_COLUMN_ID } from '@/components/GraphEditor/widgets/WidgetTableEditor/tableInputArgument'
 // `import type`, not `import { type … }`: under `verbatimModuleSyntax` the latter is not erased —
-// it leaves a bare side-effect import that loads AG Grid Enterprise into the ProjectView chunk and
-// runs its LicenseManager even when we have fallen back to Community. See `agGridLicense.ts`.
-import type { EditingCellPosition, StartEditingCellParams } from 'ag-grid-enterprise'
+// it leaves a bare side-effect import that would load AG Grid into the ProjectView chunk.
+import type { EditingCellPosition, StartEditingCellParams } from 'ag-grid-community'
 import { computed, ref, type ShallowRef, toValue, watch } from 'vue'
 
 export interface EditedCell {

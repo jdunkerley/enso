@@ -5,8 +5,7 @@ import { defineComponent, h, Suspense } from 'vue'
 import AgGridTableView from '../../AgGridTableView.vue'
 
 // Prevent the real AgGridVue from mounting a real grid — this test only exercises the Vue-level
-// cellContextMenu handler wiring, not AG Grid's own DOM rendering (see agGridModules.test.ts for
-// why a real grid mount is out of scope for unit tests here).
+// cellContextMenu handler wiring, not AG Grid's own DOM rendering.
 vi.mock('ag-grid-vue3', () => ({
   AgGridVue: {
     name: 'StubAgGridVue',
@@ -19,7 +18,7 @@ vi.mock('ag-grid-vue3', () => ({
 // for no reason.
 vi.mock('../agGridModules', () => ({ agGridModules: [] }))
 
-describe('AgGridTableView context menu fallback (no AG Grid Enterprise license configured)', () => {
+describe('AgGridTableView context menu', () => {
   test('opens GridPopupMenu from a cellContextMenu event, using the column-level contextMenuItems when present', async () => {
     // `AgGridTableView.vue`'s `<script setup>` does a top-level `await import(...)` for
     // `AgGridVue`, making its own setup async. Vue requires an async-setup component to be nested
