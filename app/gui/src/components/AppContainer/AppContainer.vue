@@ -7,11 +7,10 @@ import { provideDriveLocation } from '$/providers/drive'
 import { useOpenedProjects } from '$/providers/openedProjects'
 import { useText } from '$/providers/text'
 import { provideRightPanelData } from '$/providers/rightPanel'
-import { useNavigateLink } from '$/utils/links'
 import { appContainerBindings } from '@/bindings'
 import PopoverRootProvider from '@/components/PopoverRootProvider.vue'
 import { useEvent } from '@/composables/events'
-import { registerHandlers, type ActionName } from '@/providers/action'
+import { registerHandlers } from '@/providers/action'
 import { provideAsyncResources } from '@/providers/asyncResources'
 import { provideFullscreenRoot } from '@/providers/fullscreenRoot'
 import { useGlobalEventRegistry } from '@/providers/globalEventRegistry'
@@ -40,25 +39,10 @@ provideRightPanelData(focusedPanel)
 provideFullscreenRoot(fullscreenRoot)
 provideDriveLocation()
 
-const HELP_URLS: Record<ActionName & `help.${string}`, string> = {
-  'help.whatsNew': 'https://community.ensoanalytics.com/c/what-is-new-in-enso/',
-  'help.community': 'https://community.ensoanalytics.com/',
-  'help.gettingStarted':
-    'https://community.ensoanalytics.com/c/start-here/welcome-to-enso-community',
-  'help.askAQuestion': 'https://community.ensoanalytics.com/c/q_and_a/',
-  'help.componentExamples': 'https://community.ensoanalytics.com/c/enso-component-examples/',
-  'help.exampleWorkflows': 'https://community.ensoanalytics.com/c/example-workflows/',
-  'help.docs': 'https://help.enso.org/',
-  'help.contactUs': 'https://ensoanalytics.com/contact',
-}
-
-const navigate = useNavigateLink()
-
 const actionHandlers = registerHandlers({
   'app.closeTab': {
     action: closeCurrentTab,
   },
-  ...objects.mapEntries(HELP_URLS, (key, value) => ({ action: () => navigate(value) })),
 })
 
 const keydownHandler = appContainerBindings.handler(

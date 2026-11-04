@@ -108,7 +108,6 @@
   "snowflakeCredentialClientId": "Client ID",
   "snowflakeCredentialClientSecret": "Client Secret",
   "snowflakeCredentialRole": "Role",
-  "snowflakeIntegrationGetHelp": "How to setup OAuth integration for Snowflake?",
   "googleCredentialType": "Google",
   "googleCredentialScopes": "Scopes",
   "googleCredentialScopesEmptyError": "Please select at least one scope for the integration.",

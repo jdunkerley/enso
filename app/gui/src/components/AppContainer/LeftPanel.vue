@@ -1,38 +1,23 @@
 <script setup lang="ts">
 import DriveView from '#/layouts/DriveView.vue'
-import HelpBar from '$/components/AppContainer/HelpBar.vue'
 import { useBackends } from '$/providers/backends'
 import { categoryKey, useCategories } from '$/providers/category'
 import { useContainerData } from '$/providers/container'
 import { useDriveLocation } from '$/providers/drive'
 import { useText } from '$/providers/text'
 import { optPx } from '$/utils/dom'
-import ActionMenu from '@/components/ActionMenu.vue'
-import DropdownMenu from '@/components/DropdownMenu.vue'
 import { useResizeHandles } from '@/components/resizeHandles'
 import ResizeHandles from '@/components/ResizeHandles.vue'
 import SizeTransition from '@/components/SizeTransition.vue'
 import SvgButton from '@/components/SvgButton.vue'
-import SvgIcon from '@/components/SvgIcon.vue'
 import { useResizeObserver } from '@/composables/events'
-import { registerHandlers, type DisplayableActionName } from '@/providers/action'
+import { registerHandlers } from '@/providers/action'
 import { Path } from 'enso-common/src/services/Backend'
 import { computed, ref, shallowRef, toRef, toRefs, useTemplateRef } from 'vue'
 import CategoryButton from './CategoryButton.vue'
 import PanelContents from './PanelContents.vue'
 
 const LEFT_BAR_EXTENSION_TIME_MS = 550
-const ENSO_ICON_MENU_ACTIONS: DisplayableActionName[] = [
-  'help.whatsNew',
-  'help.community',
-  'help.gettingStarted',
-  'help.askAQuestion',
-  'help.componentExamples',
-  'help.exampleWorkflows',
-  'help.docs',
-  'help.contactUs',
-]
-
 const categories = useCategories()
 const containerData = useContainerData()
 const { getText } = useText()
@@ -131,7 +116,6 @@ registerHandlers({
     <SizeTransition width :duration="250">
       <div v-if="visible" class="sizeWrapper">
         <div ref="content" class="panel" :class="cssClass" :style="widthStyle">
-          <HelpBar />
           <PanelContents
             v-model:fullscreen="fullscreen"
             @update:toolbarElement="driveToolbar = $event"
@@ -143,10 +127,6 @@ registerHandlers({
         <div class="shadow" />
       </div>
     </SizeTransition>
-    <DropdownMenu class="ensoIcon">
-      <template #button><SvgIcon name="enso_logo" /></template>
-      <template #menu><ActionMenu :actions="ENSO_ICON_MENU_ACTIONS" /></template>
-    </DropdownMenu>
   </div>
 </template>
 
@@ -265,15 +245,5 @@ registerHandlers({
     0 18px 85px 0 rgb(0 0 0 / 3%);
   clip-path: polygon(0 0, 100vw 0, 100vw 100%, 0 100%);
   z-index: -1;
-}
-
-.ensoIcon {
-  --icon-size: 32px;
-  --arrow-offset: 12px;
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  padding: 0;
-  z-index: 1;
 }
 </style>

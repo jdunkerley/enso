@@ -7,16 +7,6 @@
   {
     "rule": "button-name",
     "impact": "critical",
-    "target": ".DropdownMenu.helpButton > .toggledOff.MenuButton"
-  },
-  {
-    "rule": "button-name",
-    "impact": "critical",
-    "target": ".ensoIcon > .toggledOff.MenuButton"
-  },
-  {
-    "rule": "button-name",
-    "impact": "critical",
     "target": ".leftBarIcon"
   },
   {
