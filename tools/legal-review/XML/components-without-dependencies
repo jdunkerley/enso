@@ -1,2 +1,0 @@
-# See `componentsWithoutDependenciesFileName` in project/GatherLicenses.scala.
-std-xml: uses only the JDK's XML APIs, and std-base is provided, so it ships no third-party module.

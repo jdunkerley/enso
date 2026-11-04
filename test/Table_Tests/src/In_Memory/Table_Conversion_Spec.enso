@@ -39,10 +39,6 @@ type Data
 
 
 add_specs suite_builder =
-    trim_if_text x = case x of
-        _ : Text -> x.trim
-        _ -> x
-    
     data = Data.setup
 
     suite_builder.group "from_objects with single values" group_builder->

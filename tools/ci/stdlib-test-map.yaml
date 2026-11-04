@@ -36,7 +36,7 @@ libraries:
   Tableau: { stdBits: [tableau], dependsOn: [Base, Table] }
   Test: { stdBits: [], dependsOn: [Base] }
   Visualization: { stdBits: [], dependsOn: [Base, Database, Table] }
-  XML: { stdBits: [xml], dependsOn: [Base, Table] }
+  XML: { stdBits: [], dependsOn: [Base, Table] }
 
 testProjects:
   AWS_Tests:

@@ -54,7 +54,7 @@ prepare_visualization y max_rows=1000 = time_visualization Visualization ("prepa
                 JS_Object.from_pairs [["json", value]] . to_json
             v : Number ->
                 JS_Object.from_pairs [["json", _make_json_for_value v]] . to_json
-            _ -> (Table_Viz_Data.from x).get_js_object.to_json
+            _ -> (Table_Viz_Data.from x).get_js_object max_rows . to_json
 
 ## ---
    private: true

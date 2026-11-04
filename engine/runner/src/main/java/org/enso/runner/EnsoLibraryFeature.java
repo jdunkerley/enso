@@ -6,6 +6,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.TreeSet;
 import org.enso.compiler.core.EnsoParser;
@@ -35,6 +37,7 @@ public final class EnsoLibraryFeature implements Feature {
         }
       }
     }
+    libs.addAll(javaFreeLibraries());
 
     /*
       To run Standard.Test one shall analyze its polyglot/java files. But there are none
@@ -102,6 +105,39 @@ public final class EnsoLibraryFeature implements Feature {
       System.err.println("  " + className);
     }
     System.err.println("Registered " + classes.size() + " classes for reflection");
+  }
+
+  /**
+   * The libraries named by {@code enso.nativeImage.javaFreeLibraries} (separated by {@link
+   * File#pathSeparator}): libraries with no Java of their own, whose {@code polyglot java import}s
+   * are all classes already in the image (JDK ones). They are processed like the libraries found on
+   * the class path, so they are hosted rather than loaded in the guest JVM. See Note [Java-Free
+   * Libraries In The Image] in {@code build.sbt}.
+   *
+   * @return the libraries' root directories
+   * @throws IllegalStateException if one of them ships a jar, which would put its Java in the image
+   */
+  private static Collection<Path> javaFreeLibraries() {
+    var property = System.getProperty("enso.nativeImage.javaFreeLibraries");
+    var result = new ArrayList<Path>();
+    if (property == null || property.isBlank()) {
+      return result;
+    }
+    for (var entry : property.split(File.pathSeparator)) {
+      var root = Path.of(entry);
+      var jars = root.resolve("polyglot").resolve("java").toFile().listFiles();
+      if (jars != null) {
+        for (var jar : jars) {
+          if (jar.getName().endsWith(".jar")) {
+            throw new IllegalStateException(
+                root + " is listed as a Java-free library but ships " + jar);
+          }
+        }
+      }
+      System.err.println("Java-free library: " + root);
+      result.add(root);
+    }
+    return result;
   }
 
   private void makeEnsoLibAvailableForShims() {

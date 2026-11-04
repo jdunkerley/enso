@@ -17,6 +17,17 @@ add_specs suite_builder =
             json.get "all_rows_count" . should_equal 3
             json.get "data" . should_equal [["@id", "0", "1"], ["Attribute", "Element", "Text"], ["10", "<bar>hello</bar>", "text"]]
 
+        group_builder.specify "The row limit the visualisation asks for is honoured" <|
+            children = (0.up_to 1500).map (i-> "<c n='" + i.to_text + "'/>")
+            big = XML_Document.parse ("<root>" + children.join "" + "</root>")
+            default_json = Visualization.prepare_visualization big . parse_json
+            default_json.get "all_rows_count" . should_equal 1500
+            default_json.get "data" . at 0 . length . should_equal 1000
+            larger_json = Visualization.prepare_visualization big 2500 . parse_json
+            larger_json.get "data" . at 0 . length . should_equal 1500
+            smaller_json = Visualization.prepare_visualization big.root_element 10 . parse_json
+            smaller_json.get "data" . at 0 . length . should_equal 10
+
         group_builder.specify "An XML_Element shows its attributes and children" <|
             json = Visualization.prepare_visualization doc.root_element . parse_json
             json.get "type" . should_equal "XML_Element"

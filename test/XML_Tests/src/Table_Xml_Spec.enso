@@ -313,6 +313,12 @@ add_specs suite_builder =
             t = data.table
             r = Panic.recover Any (t.to_xml [] [] "Year" "Table" "row" 1.23)
             r.to_text.should_equal "(Error: Type error: expected `on_problems` to be Problem_Behavior, but got Float.)"
+        group_builder.specify "Dates, times, decimals and big integers are written as Java writes them" <|
+            t = Table.new [["D", [Date.new 2020 1 2]], ["T", [Time_Of_Day.new 3 4 5]], ["Dec", [Decimal.new "9.99"]], ["Big", [12345678901234567890123]], ["Small", [-7]]]
+            r = t.to_xml
+            r.outer_xml . should_equal "<Table><Row><D>2020-01-02</D><T>03:04:05</T><Dec>9.99</Dec><Big>12345678901234567890123</Big><Small>-7</Small></Row></Table>"
+            t.to_xml [] t.column_names . outer_xml . should_equal '<Table><Row Big="12345678901234567890123" D="2020-01-02" Dec="9.99" Small="-7" T="03:04:05"/></Table>'
+
         group_builder.specify "works with unicode characters" <|
             unicode_column = ["unicode", ['\u00A9', "👩‍🔬"]]
             #   | unicode

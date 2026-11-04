@@ -356,7 +356,8 @@
   work without the import, and the IDE adds `from Standard.XML import …` where
   code names an XML type, including when an older project opens. Code that calls
   `to_xml` on a table, and code run outside the IDE (`enso --run`), needs
-  `from Standard.XML import all` added by hand.
+  `from Standard.XML import all` added by hand, as does an import of the old
+  module (`import Standard.Base.Data.XML.XML_Document`).
 - [Every database connection can log its SQL queries][344], not only one opened
   from a data link: with the `Standard.Database.Connection` logger at `info`
   (the IDE's Log SQL queries setting), each statement is logged with the
