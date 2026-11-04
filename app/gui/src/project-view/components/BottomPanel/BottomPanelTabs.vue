@@ -109,9 +109,14 @@ function onKeydown(event: KeyboardEvent) {
   padding: 0 12px;
   border: none;
   border-radius: 8px 8px 0 0;
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: var(--color-dock-tab-bg);
   color: var(--color-text);
   font-size: 13px;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .tabIcon {
@@ -124,7 +129,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 .tab[aria-selected='true'] {
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: var(--color-dock-tab-selected-bg);
   font-weight: 600;
 }
 

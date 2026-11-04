@@ -72,3 +72,19 @@ test('a hidden (zero-height) list follows the newest row once it is shown', asyn
   await nextTick()
   expect(scroller.scrollTop).toBe(4000)
 })
+
+test('ArrowUp, PageUp and Home at the top ask for earlier lines, even when the rows fit the view', async () => {
+  size.ref = shallowRef(new Vec2(300, 100))
+  const rows = Array.from({ length: 3 }, (_, key) => lineRow(key))
+  const { wrapper } = await mountWithProviders(EngineLogList, {
+    props: { rows, follow: false },
+  })
+  const list = wrapper.find('.EngineLogList')
+  for (const key of ['ArrowUp', 'PageUp', 'Home']) await list.trigger('keydown', { key })
+  expect(wrapper.emitted('reachedTop')).toHaveLength(3)
+  // Other keys, and a list scrolled away from the top, do not.
+  await list.trigger('keydown', { key: 'ArrowDown' })
+  ;(list.element as HTMLElement).scrollTop = 40
+  await list.trigger('keydown', { key: 'ArrowUp' })
+  expect(wrapper.emitted('reachedTop')).toHaveLength(3)
+})

@@ -1,6 +1,7 @@
 /** @file The bottom dock's Logs tab: the open project's engine log, live (engine logs panel). */
 import { expect, test, type Locator, type Page } from 'integration-test/base'
 import * as fs from 'node:fs/promises'
+import { expectNoNewAxeViolations } from '../accessibility'
 import * as locate from './locate'
 
 async function box(locator: Locator) {
@@ -85,6 +86,17 @@ test('the Logs tab follows the engine log and filters by level', async ({
     // The shortcut closes the dock again while Logs shows.
     await page.keyboard.press('ControlOrMeta+L')
     await expect(dock).toBeHidden()
+  })
+})
+
+test('the Logs tab: no new axe violations', async ({ editorPage }) => {
+  await editorPage.do(async (page) => {
+    await page.keyboard.press('ControlOrMeta+L')
+    const dock = locate.bottomDock(page)
+    await expect(dock.getByRole('log').getByText('Something failed')).toBeVisible()
+    await expectNoNewAxeViolations(page, 'engine-logs', {
+      include: ['[data-testid="bottomDock"]'],
+    })
   })
 })
 

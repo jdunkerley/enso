@@ -128,7 +128,8 @@ is described in `app/project-manager-shim/CLAUDE.md` ("Engine logs").
 - `EngineLogList.vue` + `engineLogView.ts` — a virtualised list (`role="log"`)
   with 18 px rows. It follows the newest row until the user scrolls up, keeps
   its place when rows are added above or dropped (anchored on a line, not a
-  divider), emits `reachedTop` (on a scroll, or a wheel at the top) to load
+  divider), emits `reachedTop` (on a scroll, a wheel at the top, or ArrowUp,
+  PageUp or Home at the top: a list that fits the view cannot scroll) to load
   history, and `loadOlder`/`loadNewer` from its dividers' buttons.
 
 ## The dock and the shortcut
