@@ -79,8 +79,12 @@ export class Updater {
     updater.on('error', (error) => {
       // A downloaded update installs on quit whatever happens afterwards.
       if (this.current.state === 'ready') return
-      // A failed stable fallback is `none`, not an error.
-      if (this.pass === 'stable') return
+      // The passes of a prerelease check report through the rejection, which
+      // `checkWithStableFallback` weighs: a failed pass is not yet an error, and a failed stable
+      // fallback is `none`.
+      if (this.pass !== 'single') return
+      // A repository with no stable release is simply up to date; `check` sets `none`.
+      if (isNothingPublished(error)) return
       this.set({
         state: 'error',
         message: error.message,
@@ -113,25 +117,35 @@ export class Updater {
       // No event fires when the updater is inactive.
       if (this.status().state === 'checking') this.set({ state: 'none' })
     } catch (error) {
-      this.fail(error, null)
+      if (isNothingPublished(error)) this.set({ state: 'none' })
+      else this.fail(error, null)
     }
     return this.current
   }
 
   /**
-   * Checks including prereleases, then, if that finds nothing, for stable releases only.
+   * Checks including prereleases, then, if that finds nothing or throws, for stable releases only.
    *
    * `electron-updater`'s GitHub provider takes the channel from the current version, so an
    * `rc` install with `allowPrerelease` matches only `rc` tags and is never offered a stable
    * release. Without `allowPrerelease` it asks GitHub for `/releases/latest`, which is the newest
    * stable release. Setting `channel` instead would also enable `allowDowngrade`.
+   *
+   * The prerelease pass can throw (`ERR_UPDATER_NO_PUBLISHED_VERSIONS`, say), which must not hide
+   * a stable release. The check fails only when both passes do: the stable pass failing for a
+   * reason other than there being no stable release (see {@link isNothingPublished}), after the
+   * prerelease pass threw as well. A stable pass failing after a clean prerelease pass is `none`.
    */
   private async checkWithStableFallback() {
     const autoUpdater = this.deps.autoUpdater
+    let prereleaseError: unknown = null
     autoUpdater.allowPrerelease = true
     this.pass = 'prerelease'
     try {
       await autoUpdater.checkForUpdates()
+    } catch (error) {
+      prereleaseError = error
+      console.info('[Updater] The prerelease check failed:', messageOf(error))
     } finally {
       this.pass = 'single'
     }
@@ -143,6 +157,7 @@ export class Updater {
     } catch (error) {
       // A fork with no stable release yet answers 404; there is simply nothing newer.
       console.info('[Updater] The stable-release check failed:', messageOf(error))
+      if (prereleaseError != null && !isNothingPublished(error)) throw prereleaseError
     } finally {
       this.pass = 'single'
       autoUpdater.allowPrerelease = true
@@ -190,4 +205,19 @@ export class Updater {
 
 function messageOf(error: unknown) {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * Whether a check failed because the repository has nothing to offer, which is "no update", not a
+ * failure: no published versions at all, or (the stable feed asks `/releases/latest`) no stable
+ * release, which GitHub answers with 404. `electron-updater` wraps every failure of that request in
+ * `ERR_UPDATER_LATEST_VERSION_NOT_FOUND`, so an offline machine is told apart by the missing 404.
+ */
+function isNothingPublished(error: unknown) {
+  if (!(error instanceof Error)) return false
+  const code = 'code' in error ? error.code : undefined
+  return (
+    code === 'ERR_UPDATER_NO_PUBLISHED_VERSIONS' ||
+    (code === 'ERR_UPDATER_LATEST_VERSION_NOT_FOUND' && /\b404\b/.test(error.message))
+  )
 }

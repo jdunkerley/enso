@@ -39,7 +39,6 @@ import { isNewerRelease, parseVersion } from './versionChecker'
 const STALE_TIME = 24 * 60 * 60 * 1000 // 1 day
 const AUTO_CHECK_INTERVAL = 24 * 60 * 60 * 1000 // 1 day
 const STALE_TIME_ERROR = 10 * 60 * 1000 // 10 minutes
-const QUERY_KEY = ['latestRelease']
 
 /** The latest release, as cached: `isPostponed` once the user asked to be reminded later. */
 type CachedRelease = NonNullable<Awaited<ReturnType<typeof getLatestRelease>>> & {
@@ -81,13 +80,16 @@ watch(includePrereleases, (include) => {
   if (include && autoUpdate.mode.value === 'auto') checkAuto()
 })
 
+// Keyed on the prerelease setting: the newest release differs with it.
+const queryKey = computed(() => ['latestRelease', includePrereleases.value] as const)
+
 const shouldOverride = computed(() => devtools.showVersionChecker ?? false)
 
 const metadataQuery = useQuery({
-  queryKey: QUERY_KEY,
+  queryKey,
   enabled: computed(() => autoUpdate.mode.value === 'manual'),
   queryFn: async (): Promise<CachedRelease | null> => {
-    const latest = await getLatestRelease()
+    const latest = await getLatestRelease(includePrereleases.value)
     return latest && { ...latest, isPostponed: false }
   },
   select: (data: CachedRelease | null) => {
@@ -188,14 +190,14 @@ watchEffect(() => {
 function remindLater() {
   isOpen.value = false
   // The user asked to be reminded later: hide the dialog until the next check, a day from now.
-  const cached = queryClient.getQueryData<CachedRelease>(QUERY_KEY)
+  const cached = queryClient.getQueryData<CachedRelease>(queryKey.value)
   if (cached != null) {
-    queryClient.setQueryData<CachedRelease>(QUERY_KEY, { ...cached, isPostponed: true })
+    queryClient.setQueryData<CachedRelease>(queryKey.value, { ...cached, isPostponed: true })
   }
 }
 
 async function onDownload() {
-  const downloadUrl = await getDownloadUrl()
+  const downloadUrl = await getDownloadUrl(includePrereleases.value)
   if (downloadUrl == null) {
     const message = `${getText('noAppDownloadError')}.`
     toasts.show(message, { type: 'error' })

@@ -331,16 +331,79 @@ describe('Updater stable fallback', () => {
     expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
   })
 
-  test('a failed prerelease check is an error, with no second check', async () => {
+  /** An `electron-updater` failure, with its error code. */
+  function coded(code: string, message: string) {
+    return Object.assign(new Error(message), { code })
+  }
+
+  test('a prerelease check that throws falls back to the stable release', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    const seen: boolean[] = []
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      seen.push(autoUpdater.allowPrerelease)
+      if (autoUpdater.allowPrerelease) {
+        const error = coded('ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'No published versions on GitHub')
+        autoUpdater.emit('error', error)
+        throw error
+      }
+      autoUpdater.emit('update-available', { version: '2026.1.1', releaseDate: '' })
+      return null
+    })
+    expect(await updater.check(true)).toEqual({
+      state: 'available',
+      version: '2026.1.1',
+      releaseDate: '',
+    })
+    expect(seen).toEqual([true, false])
+    expect(statuses.some((s) => s.state === 'error')).toBe(false)
+  })
+
+  test('a throwing prerelease check and a stable release that is not there is none', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      const error =
+        autoUpdater.allowPrerelease ?
+          coded('ERR_UPDATER_NO_PUBLISHED_VERSIONS', 'No published versions on GitHub')
+        : coded('ERR_UPDATER_LATEST_VERSION_NOT_FOUND', 'Unable to find latest version: 404')
+      autoUpdater.emit('error', error)
+      throw error
+    })
+    expect(await updater.check(true)).toEqual({ state: 'none' })
+  })
+
+  test('both passes failing is an error, reporting the prerelease failure', async () => {
     const { autoUpdater, statuses, updater } = setup()
     autoUpdater.checkForUpdates.mockImplementation(async () => {
-      const error = new Error('offline')
+      const error = new Error(autoUpdater.allowPrerelease ? 'offline' : 'still offline')
       autoUpdater.emit('error', error)
       throw error
     })
     expect(await updater.check(true)).toEqual({ state: 'error', message: 'offline', version: null })
-    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(1)
+    expect(autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2)
+    expect(autoUpdater.allowPrerelease).toBe(true)
     expect(statuses.filter((s) => s.state === 'error')).toHaveLength(1)
+  })
+
+  test('no stable release (404) without prereleases is none, not an error', async () => {
+    const { autoUpdater, statuses, updater } = setup()
+    autoUpdater.checkForUpdates.mockImplementation(async () => {
+      const error = coded(
+        'ERR_UPDATER_LATEST_VERSION_NOT_FOUND',
+        'Unable to find latest version on GitHub: HttpError: 404 Not Found',
+      )
+      autoUpdater.emit('error', error)
+      throw error
+    })
+    expect(await updater.check(false)).toEqual({ state: 'none' })
+    expect(statuses.some((s) => s.state === 'error')).toBe(false)
+  })
+
+  test('a failed /releases/latest that is not a 404 stays an error', async () => {
+    const { autoUpdater, updater } = setup()
+    autoUpdater.checkForUpdates.mockRejectedValue(
+      coded('ERR_UPDATER_LATEST_VERSION_NOT_FOUND', 'Unable to find latest version: ENOTFOUND'),
+    )
+    expect(await updater.check(false)).toMatchObject({ state: 'error' })
   })
 
   test('without prereleases there is only one check', async () => {
