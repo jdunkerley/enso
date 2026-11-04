@@ -76,6 +76,113 @@ test.describe('with versions kept at the root, and changes', () => {
     expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
   })
 
+  test('Ctrl+S saves from the code editor too, and the browser’s own save does not fire', async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    await page.keyboard.press('ControlOrMeta+`')
+    const editor = page.locator('.CodeEditor .cm-content')
+    await editor.click()
+    await expect(editor).toBeFocused()
+    // Whoever handles the key must also keep the default (a "Save page" dialog in a browser).
+    await page.evaluate(() => {
+      const seen: string[] = ((window as any).preventedKeys = [])
+      const original = KeyboardEvent.prototype.preventDefault
+      KeyboardEvent.prototype.preventDefault = function (this: KeyboardEvent) {
+        seen.push(this.key.toLowerCase())
+        original.call(this)
+      }
+    })
+    await page.keyboard.press('ControlOrMeta+S')
+    await expect(page.getByTestId('toast-host')).toContainText('Version saved')
+    expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
+    expect(await page.evaluate(() => (window as any).preventedKeys)).toContain('s')
+  })
+
+  test('Ctrl+S in the drive beside the project does not save the project', async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    const drive = page.getByTestId('drive-view')
+    await expect(drive).toBeVisible()
+    await drive.getByRole('row').first().click()
+    await expect(page.locator('[data-panel-side="left"]').locator(':focus')).toHaveCount(1)
+    await page.keyboard.press('ControlOrMeta+S')
+    await page.keyboard.press('ControlOrMeta+Shift+S')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.getByTestId('toast-host')).not.toContainText('Version saved')
+    expect(localApi.versioning.commits).toEqual([])
+  })
+
+  test('Ctrl+Shift+S works from the code editor and opens the dialog', async ({
+    page,
+    editorPage,
+  }) => {
+    await editorPage
+    await page.keyboard.press('ControlOrMeta+`')
+    await page.locator('.CodeEditor .cm-content').click()
+    await page.keyboard.press('ControlOrMeta+Shift+S')
+    await expect(page.getByRole('textbox', { name: 'Comment (optional)' })).toBeFocused()
+  })
+
+  test('Ctrl+S saves from the documentation panel', async ({ page, editorPage, localApi }) => {
+    await editorPage
+    const docs = page.getByTestId('documentation-editor-content')
+    if (!(await docs.isVisible())) await editorPage.toggleDocsAssetPanel()
+    await expect(docs.locator('.cm-line').first()).toBeVisible()
+    await docs.focus()
+    await expect(docs).toBeFocused()
+    await page.keyboard.press('ControlOrMeta+S')
+    await expect(page.getByTestId('toast-host')).toContainText('Version saved')
+    expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
+  })
+
+  test('a loading toast shows while the version is saved', async ({ page, editorPage }) => {
+    await editorPage
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    await page.route('/api/project-service/versioning/commit', async (route) => {
+      await gate
+      await route.fallback()
+    })
+    await page.keyboard.press('ControlOrMeta+S')
+    const toast = page.getByTestId('toast-host')
+    await expect(toast).toContainText('Saving a version…')
+    release()
+    await expect(toast).toContainText('Version saved')
+    await expect(toast).not.toContainText('Saving a version…')
+  })
+
+  test('a comment that comes too late to join the running save is reported', async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    let reached!: () => void
+    const commitRequested = new Promise<void>((resolve) => (reached = resolve))
+    await page.route('/api/project-service/versioning/commit', async (route) => {
+      reached()
+      await gate
+      await route.fallback()
+    })
+    await page.keyboard.press('ControlOrMeta+S')
+    await commitRequested
+    await page.keyboard.press('ControlOrMeta+Shift+S')
+    await page.getByRole('textbox', { name: 'Comment (optional)' }).fill('Added a filter')
+    await page.getByTestId('save-version-save').click()
+    await expect(page.getByTestId('toast-host')).toContainText('your comment was not kept')
+    release()
+    await expect(page.getByTestId('toast-host')).toContainText('Version saved')
+    expect(localApi.versioning.commits).toEqual([[MOCK_PROJECT_PATH, 'Saved']])
+  })
+
   test('a close whose version could not be saved shows a warning toast', async ({
     page,
     editorPage,
@@ -96,6 +203,34 @@ test.describe('with versions kept at the root, and changes', () => {
     await expect(page.getByTestId('toast-host')).toContainText(
       'its version could not be saved: the repository is locked',
     )
+  })
+})
+
+test.describe('with versions kept and nothing changed', () => {
+  test.use({
+    setupApi: {
+      local: (api) => {
+        api.versioning.git = true
+        api.versioning.repoRoot = ROOT
+        api.versioning.enabled = true
+      },
+    },
+  })
+
+  test('Ctrl+S and Ctrl+Shift+S say there is nothing to save', async ({
+    page,
+    editorPage,
+    localApi,
+  }) => {
+    await editorPage
+    const toast = page.getByTestId('toast-host')
+    await expect(page.getByTestId(saveButton)).toBeDisabled()
+    await page.keyboard.press('ControlOrMeta+S')
+    await expect(toast).toContainText('Nothing has changed since the last version')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.keyboard.press('ControlOrMeta+Shift+S')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    expect(localApi.versioning.commits).toEqual([])
   })
 })
 

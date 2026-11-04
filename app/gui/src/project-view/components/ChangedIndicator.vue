@@ -3,6 +3,9 @@
  * @file The dot beside the project name in the top bar: the project has changed since its last
  * version. Shown only for a local project whose repository is enabled and whose status is known
  * (`$/providers/localVersioning`); an unknown status shows nothing rather than a stale dot.
+ *
+ * The dot's space is reserved wherever it can appear (a local project with git), so that its
+ * coming and going does not move what is beside it in the top bar, the zoom controls included.
  */
 import { useLocalVersioning } from '$/providers/localVersioning'
 import type { RunMode } from '$/providers/openedProjects/projectInfo'
@@ -18,6 +21,9 @@ const { projectId, mode } = defineProps<{
 const localVersioning = useLocalVersioning()
 const { getText } = useText()
 
+/** Whether a dot may show: the slot for it is kept even while there is none. */
+const reserved = computed(() => mode === 'local' && localVersioning.hasGit(projectId))
+
 const changed = computed(() => {
   if (mode !== 'local') return false
   const status = localVersioning.statusOf(projectId)
@@ -28,8 +34,9 @@ const changed = computed(() => {
 <template>
   <!-- The top bar gives its children a `min-height`; the wrapper takes it and stretches with the
        row, so the dot inside keeps its own size. -->
-  <span v-if="changed" class="ChangedIndicator">
+  <span v-if="reserved" class="ChangedIndicator" data-testid="project-changed-slot">
     <span
+      v-if="changed"
       role="img"
       class="dot"
       :aria-label="getText('changedSinceLastVersion')"
@@ -41,6 +48,9 @@ const changed = computed(() => {
 <style scoped>
 .ChangedIndicator {
   display: flex;
+  /* The dot's width, so that the slot is the same with or without it. */
+  width: 8px;
+  flex: none;
   align-items: center;
 }
 

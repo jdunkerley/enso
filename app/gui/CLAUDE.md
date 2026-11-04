@@ -265,5 +265,16 @@ flush, `flush.ts`, then `versioning/commit`) and the repository prompts;
 repository before it closes. Versions are saved when a project closes or is
 saved; quitting the app saves none. The Playwright mock is
 `integration-test/mock/localVersioning.ts` (routes in `mock/versioning/`); git
-is absent by default, and a spec opts in with `setupApi.local`. See the design,
-`docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`.
+is absent by default, and a spec opts in with `setupApi.local`.
+
+The save shortcuts (`Mod+S`, `Mod+Shift+S`) are handled by `GraphEditor.vue`
+through `saveFromShortcut`, not through the actions' `enabled`: they always say
+something (a toast when there is nothing to save, the status is not read, or the
+repository is blocked). They act wherever the focus is in the project view, code
+editor and documentation panel included, except in a side panel about something
+else (`@/util/saveShortcutScope`; `PanelContents` marks its content with
+`data-panel-side`, so the drive's left panel does not save the project beside
+it). A save shows a loading toast while it flushes and commits. A save asked for
+while one runs joins it: its comment is appended to the running one's until the
+commit is requested, and after that a toast says it was not kept. See the
+design, `docs/superpowers/specs/2026-10-16-local-git-versioning-design.md`.

@@ -19,6 +19,7 @@ import type { SuggestionId, Typename } from '$/providers/openedProjects/suggesti
 import { suggestionDocumentationUrl } from '$/providers/openedProjects/suggestionDatabase/entry'
 import { useLocalVersioning } from '$/providers/localVersioning'
 import { useRightPanelData } from '$/providers/rightPanel'
+import { saveShortcutInScope } from '@/util/saveShortcutScope'
 import { useText } from '$/providers/text'
 import { graphBindings } from '@/bindings'
 import BottomPanel from '@/components/BottomPanel.vue'
@@ -483,9 +484,29 @@ function handleBackgroundContextMenu(event: MouseEvent) {
 
 // === Keyboard/Mouse bindings ===
 
+/**
+ * The save shortcuts say why nothing happens (nothing to save, status not read) rather than do
+ * nothing, so they ignore `enabled`, which only dims the buttons; see
+ * `localVersioning.saveFromShortcut`. They act wherever the focus is in the project view, except
+ * in a side panel about something else (`saveShortcutInScope`). The value is whether the shortcut
+ * asks for a comment.
+ */
+const SAVE_SHORTCUTS: Partial<Record<keyof typeof graphBindings.bindings, boolean>> = {
+  'graph.saveVersion': false,
+  'graph.saveVersionWithComment': true,
+}
+
 const graphBindingsHandler = graphBindings.handler(
   objects.mapEntries(graphBindings.bindings, (actionName) => {
     const actionDef = actionHandlers[actionName]
+    const withComment = SAVE_SHORTCUTS[actionName]
+    if (withComment != null) {
+      return (event: KeyboardEvent) => {
+        const target = event.composedPath()[0] ?? event.target
+        if (!saveShortcutInScope(target, assetId.value, rightPanel.focusedProject)) return false
+        return localVersioning.saveFromShortcut(assetId.value, withComment)
+      }
+    }
     return () => {
       if (toValue(actionDef.enabled) === false) return false
       void actionDef.action()

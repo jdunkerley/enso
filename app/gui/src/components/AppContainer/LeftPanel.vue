@@ -134,6 +134,7 @@ registerHandlers({
           <HelpBar />
           <PanelContents
             v-model:fullscreen="fullscreen"
+            side="left"
             @update:toolbarElement="driveToolbar = $event"
           >
             <DriveView :toolbar="driveToolbar" />
