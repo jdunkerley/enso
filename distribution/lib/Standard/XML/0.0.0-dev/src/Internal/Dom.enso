@@ -19,6 +19,7 @@ polyglot java import java.io.StringReader
 polyglot java import java.lang.StringBuilder
 polyglot java import java.util.Objects
 polyglot java import java.util.regex.Pattern
+polyglot java import javax.xml.XMLConstants
 polyglot java import javax.xml.parsers.DocumentBuilderFactory
 polyglot java import javax.xml.xpath.XPathConstants
 polyglot java import javax.xml.xpath.XPathFactory
@@ -37,6 +38,14 @@ polyglot java import org.xml.sax.InputSource
    library calls on an object it did not construct. Without one, the native
    launcher fails with "Method `x` of type ...Impl could not be found", while
    the JVM works.
+
+   Nothing at build time catches a missing one: `EnsoLibraryFeature` checks
+   only that the imports are JDK classes. It fails at run time, under the
+   native launcher only, so a change here needs `XML_Tests` run natively (CI's
+   native standard library suite runs it). This list, and being a Java-free
+   library at all (Note [Java-Free Libraries In The Image] in `build.sbt`),
+   is for Standard.XML only: no other library is to copy the pattern without
+   the owner's agreement.
 polyglot java import java.util.regex.Matcher
 polyglot java import javax.xml.parsers.DocumentBuilder
 polyglot java import javax.xml.xpath.XPath
@@ -60,10 +69,33 @@ private _TEXT_NODE = 3
 
 ## A document builder whose errors are thrown, not printed: `DefaultHandler`
    ignores warnings and recoverable errors and throws fatal ones.
+
+   It reads nothing but the document (Note [No External Entities]).
 private _new_builder =
-    builder = DocumentBuilderFactory.newInstance.newDocumentBuilder
+    factory = DocumentBuilderFactory.newInstance
+    factory.setFeature XMLConstants.FEATURE_SECURE_PROCESSING True
+    factory.setFeature "http://xml.org/sax/features/external-general-entities" False
+    factory.setFeature "http://xml.org/sax/features/external-parameter-entities" False
+    factory.setFeature "http://apache.org/xml/features/nonvalidating/load-external-dtd" False
+    factory.setAttribute XMLConstants.ACCESS_EXTERNAL_DTD ""
+    factory.setAttribute XMLConstants.ACCESS_EXTERNAL_SCHEMA ""
+    factory.setXIncludeAware False
+    builder = factory.newDocumentBuilder
     builder.setErrorHandler DefaultHandler.new
     builder
+
+## Note [No External Entities]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   A document can name other files or URLs: an external entity
+   (`<!ENTITY x SYSTEM "file:///...">`), an external DTD or schema, an
+   XInclude. Resolving them would let a document read (and, through the
+   result, disclose) local files or reach the network (XXE). The parser and
+   XPath therefore use secure processing (which also limits entity
+   expansion), do not resolve external general or parameter entities, do not
+   load external DTDs, allow no external DTD or schema access at all, and do
+   not process XIncludes. A DOCTYPE is still accepted, so documents that have
+   one (XHTML) parse, and its internal entities are expanded. An external
+   entity is left out. `XML_Spec`'s "External entities" group checks this.
 
 ## Parses a `java.io.InputStream`. A Java exception (`SAXParseException`,
    `IOException`, ...) is thrown as a panic.
@@ -96,10 +128,12 @@ inner_xml node -> Text =
     serializer.setNewLine '\n'
     output = dom.createLSOutput
     output.setByteStream out
+    # The bytes are decoded as UTF-8 below, whatever the document's own encoding.
+    output.setEncoding "UTF-8"
     child_nodes = node.getChildNodes
     0.up_to child_nodes.getLength . each i->
         serializer.write (child_nodes.item i) output
-    out.toString
+    out.toString "UTF-8"
 
 private _ls_implementation = DOMImplementationRegistry.newInstance.getDOMImplementation "LS"
 
@@ -112,7 +146,9 @@ private _new_serializer =
 ## The nodes the XPath `expression` selects from `source` (an element or a
    document), converted by `to_vector`: at most one when `first_only`.
 xpath source expression:Text make_element first_only:Boolean -> Vector =
-    node_list = XPathFactory.newInstance.newXPath.evaluate expression source XPathConstants.NODESET
+    xpath_factory = XPathFactory.newInstance
+    xpath_factory.setFeature XMLConstants.FEATURE_SECURE_PROCESSING True
+    node_list = xpath_factory.newXPath.evaluate expression source XPathConstants.NODESET
     _convert_node_list node_list make_element (if first_only then 1 else Nothing)
 
 ## The child elements and the non-blank text nodes of `element`: the first
