@@ -1,12 +1,12 @@
 [package]
 name = "enso-zst"
 version = "0.1.0"
-authors = ["Enso Team <enso-dev@enso.org>"]
+authors = ["jdunkerley"]
 edition = "2024"
 description = "Zero-sized types, similar to PhantomData, but with more obvious behavior."
 readme = "README.md"
-homepage = "https://github.com/enso-org/enso/lib/rust/zst"
-repository = "https://github.com/enso-org/enso"
+homepage = "https://github.com/jdunkerley/enso/lib/rust/zst"
+repository = "https://github.com/jdunkerley/enso"
 license-file = "../../../LICENSE"
 keywords = ["zst"]
 

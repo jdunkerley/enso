@@ -52,8 +52,17 @@ public final class CloudAPI implements ReloadDetector.HasClearableCache {
    * Returns the URI to the root of the Cloud API.
    *
    * <p>It always ends with a slash.
+   *
+   * <p>There is no built-in default: the {@code ENSO_CLOUD_API_URL} environment variable must be
+   * set to use any Cloud feature.
+   *
+   * @throws IllegalStateException if {@code ENSO_CLOUD_API_URL} is not set
    */
   public String getAPIRootURI() {
+    if (apiRootUri == null) {
+      throw new IllegalStateException(
+          "Enso Cloud is not configured: the ENSO_CLOUD_API_URL environment variable is not set.");
+    }
     return apiRootUri;
   }
 
@@ -79,8 +88,11 @@ public final class CloudAPI implements ReloadDetector.HasClearableCache {
     var envUrl =
         EnsoMeta.callStaticModuleMethod(
             "Standard.Base.System.Environment", "get", "ENSO_CLOUD_API_URL");
-    var effectiveUrl = envUrl.isNull() ? "https://api.cloud.enso.org/" : envUrl.asString();
-    var apiRootUri = effectiveUrl.endsWith("/") ? effectiveUrl : effectiveUrl + "/";
+    String apiRootUri = null;
+    if (!envUrl.isNull()) {
+      var url = envUrl.asString();
+      apiRootUri = url.endsWith("/") ? url : url + "/";
+    }
 
     var projectId =
         EnsoMeta.callStaticModuleMethod(

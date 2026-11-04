@@ -2,7 +2,7 @@
 
 [![Enso Language Support for IGV](https://github.com/enso-org/enso/actions/workflows/enso4igv.yml/badge.svg)](https://github.com/enso-org/enso/actions/workflows/enso4igv.yml)
 
-[Enso language](http://enso.org) runtime engine is built on top of
+Enso language runtime engine is built on top of
 [GraalVM](http://graalvm.org) and its _Truffle framework_. Enso, as a good
 citizen of the GraalVM ecosystem, benefits from polyglot capabilities of GraalVM
 as well as its rich tooling offering. One of such tools is

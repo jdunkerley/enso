@@ -8,15 +8,15 @@
   "license": "SEE LICENSE IN dist/LICENSE",
   "publisher": "enso",
   "author": {
-    "name": "Enso.org"
+    "name": "jdunkerley"
   },
-  "homepage": "https://github.com/enso-org/enso/blob/develop/tools/enso4igv/README.md",
+  "homepage": "https://github.com/jdunkerley/enso/blob/develop/tools/enso4igv/README.md",
   "repository": {
     "type": "git",
-    "url": "https://github.com/enso-org/enso.git"
+    "url": "https://github.com/jdunkerley/enso.git"
   },
   "bugs": {
-    "url": "https://github.com/enso-org/enso/issues"
+    "url": "https://github.com/jdunkerley/enso/issues"
   },
   "engines": {
     "vscode": "^1.49.0"

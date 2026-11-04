@@ -1784,9 +1784,6 @@ type Table
        - `Value_Type.Date`  - `Value_Type.Date_Time`  - `Value_Type.Time`  -
        `Value_Type.Integer`  - `Value_Type.Float`  - `Value_Type.Boolean`
 
-       ### `Value_Type.Date`, `Value_Type.Date_Time`, `Value_Type.Time` formats
-       See https://help.enso.org/docs/using-enso/custom-formats for details.
-
        ### `Value_Type.Integer`, `Value_Type.Float` formats
        Numeric format strings are specified by the Java DecimalFormat class.
        See https://docs.oracle.com/javase/8/docs/api/java/text/DecimalFormat.html
@@ -2046,7 +2043,6 @@ type Table
        marked groups, the values are concatenated together; otherwise the whole
        match is returned.
        The values of other columns are repeated for the new rows.
-       For details on Enso's Regex syntax, see the [Help Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
        Returns
        - Returns a Table with the newly split columns.
@@ -2082,8 +2078,6 @@ type Table
        groups, the values are concatenated together; otherwise the whole match is
        returned.
        The values of other columns are repeated for the new rows.
-       For details on Enso's Regex syntax, see the [Help
-       Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
        Returns
        - Returns a Table with the newly split rows.
@@ -3764,9 +3758,7 @@ type Table
        If regex is used the replacement string can contain references to groups
        matched. The following syntaxes are supported:
        $0: the entire match string $&: the entire match string $n: the nth group
-       $&lt;foo&gt;: Named group `foo` For details on Enso's Regex syntax, see
-       the [Help
-       Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
+       $&lt;foo&gt;: Named group `foo`
 
        ## Arguments
         - `columns`: The column(s) to replace values on.

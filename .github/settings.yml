@@ -4,7 +4,7 @@
 repository:
   name: enso
   description: Hybrid visual and textual functional programming.
-  homepage: https://enso.org
+  homepage: https://github.com/jdunkerley/enso
   topics:
     enso, visual, textual, hybrid, functional, language, compiler, interpreter,
     graalvm, rts, jit, polyglot

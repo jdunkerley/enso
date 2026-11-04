@@ -89,4 +89,3 @@ explains which checks run on a pull request and what the labels do.
   or the [Runtime Guide](https://github.com/jdunkerley/enso/wiki/Runtime-Guide).
 - The `CLAUDE.md` files throughout the repository. Each describes its folder in
   detail, and they are kept current.
-- User documentation at [help.enso.org](https://help.enso.org).
