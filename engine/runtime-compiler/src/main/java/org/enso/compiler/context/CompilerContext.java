@@ -95,6 +95,18 @@ public interface CompilerContext {
 
   Future<Boolean> serializeLibrary(Compiler compiler, LibraryName libraryName);
 
+  /**
+   * Writes, to the user cache, the bindings cache of every library whose bindings cache this
+   * context found and rejected, from the modules of the library that were compiled. Called after a
+   * compilation that generated code.
+   *
+   * @param compiler the compiler
+   * @param cacheable whether a module's IR may be cached (it was loaded from a cache, or it was
+   *     compiled without errors and handed to {@link #serializeModule})
+   */
+  default void rewriteRejectedLibraryBindings(
+      Compiler compiler, java.util.function.Predicate<Module> cacheable) {}
+
   scala.Option<Object> deserializeSuggestions(LibraryName libraryName) throws InterruptedException;
 
   Future<Boolean> serializeModule(Compiler compiler, Module module, boolean usePool);

@@ -511,6 +511,25 @@ public final class Cache<T, M> {
     }
   }
 
+  /**
+   * Whether any of the cache's locations holds an entry, valid or not. Nothing is read.
+   *
+   * @param context the language context
+   * @return {@code true} if some location has the entry's metadata file
+   */
+  public final boolean hasEntry(EnsoContext context) {
+    for (var root : spi.getCacheRoots(context)) {
+      try {
+        if (getCacheMetadataPath(root).exists()) {
+          return true;
+        }
+      } catch (SecurityException e) {
+        // not readable: as if absent
+      }
+    }
+    return false;
+  }
+
   final <T> T asSpi(Class<T> type) {
     return type.cast(spi);
   }

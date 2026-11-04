@@ -754,6 +754,103 @@ final class TruffleCompilerContext implements CompilerContext {
     };
   }
 
+  /* Note [A Rejected Bindings Cache Is Rewritten]
+   * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   * Only `enso --compile` (`serializeLibrary`, so `indexStdLibs` for the
+   * standard libraries) writes a library's bindings cache. Once a library's
+   * sources, or those of a library it refers to, change, the cache is rejected
+   * and deleted (Note [A Cache Records The Libraries It Refers To] in
+   * `LibraryDependencies`), and nothing wrote it again: every later run read
+   * the library module by module from the per-module IR caches. After an edit
+   * to Base, a project importing Base, Table and Database stayed at ~6.5 s
+   * instead of ~2.4 s until the distribution was rebuilt (#562).
+   *
+   * So `readLibraryBindings` remembers a library whose cache it found and
+   * rejected, and after a compilation that generated code
+   * (`Compiler.runInternal`) `rewriteRejectedLibraryBindings` writes it again,
+   * once per library per context, from the library's modules that this run
+   * compiled or loaded from their IR caches: those past the static passes whose
+   * IR may be cached (loaded from a cache, or compiled without errors and
+   * handed to per-module serialisation). A library the run used only partly
+   * gets a partial cache; a module missing from it is read from its own IR
+   * cache or source, as before (`deserializeModule`,
+   * `DefaultPackageRepository.getLibraryBindings`).
+   *
+   * The rewrite goes to the user cache, next to the library's per-module IR
+   * caches (`ImportExportCache.createInUserCache`): an installed distribution
+   * may be read-only, and a partial cache must not stand in for the complete
+   * one `enso --compile` writes. A read tries the library's own location first,
+   * then the user cache. The rewritten cache records the source hashes like
+   * any other, so a further edit rejects it in turn. A library that never had a
+   * bindings cache, and the main project, are left alone: writing one costs the
+   * run that does it (the runner waits for pending serialisation at exit).
+   */
+  private final java.util.Set<LibraryName> rejectedBindings =
+      java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public void rewriteRejectedLibraryBindings(
+      Compiler compiler, java.util.function.Predicate<CompilerContext.Module> cacheable) {
+    if (rejectedBindings.isEmpty()) {
+      return;
+    }
+    var mainProject = getPackageRepository().getMainProjectPackage();
+    for (var libraryName : List.copyOf(rejectedBindings)) {
+      if (!rejectedBindings.remove(libraryName)) {
+        continue;
+      }
+      var pkg = getPackageRepository().getPackageForLibraryJava(libraryName);
+      if (pkg.isEmpty() || (mainProject.isDefined() && mainProject.get() == pkg.get())) {
+        continue;
+      }
+      // A snapshot taken here, on the compiling thread; the task only writes it.
+      var map = new HashMap<QualifiedName, org.enso.compiler.core.ir.Module>();
+      var it = getPackageRepository().getModulesForLibrary(libraryName);
+      while (it.nonEmpty()) {
+        var module = it.head();
+        if (module.getIr() != null
+            && !isInteractive(module)
+            && module.getCompilationStage().isAtLeast(CompilationStage.AFTER_STATIC_PASSES)
+            && cacheable.test(module)) {
+          map.put(module.getName(), module.getIr());
+        }
+        it = (scala.collection.immutable.List<CompilerContext.Module>) it.tail();
+      }
+      if (map.isEmpty()) {
+        continue;
+      }
+      logSerializationManager(
+          Level.FINE,
+          "Rewriting the bindings cache of [{0}] in the user cache: {1} modules.",
+          libraryName,
+          map.size());
+      var name = toQualifiedName(libraryName);
+      Callable<Boolean> task =
+          () -> {
+            var pool = serializationPool;
+            pool.waitWhileSerializing(name);
+            pool.startSerializing(name);
+            try {
+              var cache = ImportExportCache.createInUserCache(libraryName);
+              var bindings =
+                  new ImportExportCache.CachedBindings(
+                      libraryName, new ImportExportCache.MapToBindings(map));
+              return saveCache(cache, bindings) != null;
+            } catch (IOException e) {
+              logSerializationManager(
+                  Level.WARNING,
+                  "Rewriting the bindings cache of `" + libraryName + "` failed: " + e.getMessage(),
+                  e);
+              return false;
+            } finally {
+              pool.finishSerializing(name);
+            }
+          };
+      serializationPool.submitTask(task, isCreateThreadAllowed(), name);
+    }
+  }
+
   private boolean doSerializeLibrarySuggestions(Compiler compiler, LibraryName libraryName)
       throws IOException {
     var exportsBuilder = new ExportsBuilder();
@@ -915,11 +1012,16 @@ final class TruffleCompilerContext implements CompilerContext {
     } else {
       pool.waitWhileSerializing(toQualifiedName(libraryName));
       var cache = ImportExportCache.create(libraryName);
+      // Note [A Rejected Bindings Cache Is Rewritten]: a miss deletes what it rejects.
+      var existed = cache.hasEntry(context);
       var loaded = loadCache(cache);
       if (loaded.isPresent()) {
         logSerializationManager(Level.FINE, "Restored bindings for library [{0}].", libraryName);
         return new BindingsRead(scala.Option.apply(loaded.get()), true);
       } else {
+        if (existed) {
+          rejectedBindings.add(libraryName);
+        }
         logSerializationManager(
             Level.FINEST, "Unable to load bindings for library [{0}].", libraryName);
         return new BindingsRead(scala.Option.empty(), true);
