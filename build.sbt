@@ -3985,6 +3985,43 @@ lazy val `engine-runner` = project
               "-Dnic=nic"
             )
           else Seq()
+        // Note [Java-Free Libraries In The Image]
+        // A library with no Java of its own whose `polyglot java import`s are all
+        // JDK classes (Standard.XML) is hosted in the image: `EnsoLibraryFeature`
+        // registers those JDK classes and marks it AOT-ready, so its calls do not
+        // cross to the guest JVM. Such a library must ship no jar, or its Java
+        // would end up in the image.
+        //
+        // The cost is a hand-kept list. Host interop reaches the JDK's own
+        // implementation classes through the public interfaces they implement,
+        // and in the image it sees only those registered, so the library has to
+        // import every such interface it calls through (Note [Interfaces
+        // Imported For The Image] in Standard.XML's `Internal/Dom.enso`). The
+        // build checks only that it imports JDK classes (`EnsoLibraryFeature`);
+        // a missing interface fails at run time, under the native launcher only
+        // ("Method `x` of type ...Impl could not be found"), so run the
+        // library's tests natively (CI's native standard library suite does).
+        // This exists for Standard.XML alone: do not list another library here
+        // without the owner's agreement.
+        val javaFreeLibraries = javaFreeLibraryRoots
+        for (lib <- javaFreeLibraries) {
+          val jars = Option((lib / "polyglot" / "java").listFiles())
+            .getOrElse(Array[File]())
+            .filter(_.getName.endsWith(".jar"))
+          if (jars.nonEmpty) {
+            throw new IllegalStateException(
+              s"$lib is listed as a Java-free library but ships ${jars.mkString(", ")}"
+            )
+          }
+        }
+        val javaFreeLibrariesOpts =
+          if (javaFreeLibraries.isEmpty) Seq()
+          else
+            Seq(
+              "-Denso.nativeImage.javaFreeLibraries=" + javaFreeLibraries
+                .map(_.getAbsolutePath)
+                .mkString(java.io.File.pathSeparator)
+            )
         val mp = (Runtime / modulePath).value.map(_.getAbsolutePath)
         NativeImage
           .buildNativeImage(
@@ -4009,7 +4046,7 @@ lazy val `engine-runner` = project
               // Needed for grpc-gax
               "--add-opens=java.base/java.time=ALL-UNNAMED",
               "--enable-url-protocols=jar,https"
-            ) ++ enableHeapDumpOpts ++ debugOpts ++ linkOpts,
+            ) ++ enableHeapDumpOpts ++ debugOpts ++ linkOpts ++ javaFreeLibrariesOpts,
             mainModule = Some("org.enso.runner"),
             mainClass  = Some("org.enso.runner.Main"),
             initializeAtRuntime = Seq(
@@ -4067,8 +4104,12 @@ lazy val `engine-runner` = project
         .incrementalNativeImageBuild(
           rebuildNativeImage,
           "enso",
-          targetDir   = engineDistributionRoot.value / "bin",
-          extraInputs = Def.task((Runtime / modulePath).value)
+          targetDir = engineDistributionRoot.value / "bin",
+          // The Java-free libraries' sources too: `EnsoLibraryFeature` reads their
+          // `polyglot java import`s (Note [Java-Free Libraries In The Image]).
+          extraInputs = Def.task(
+            (Runtime / modulePath).value ++ javaFreeLibraryRoots.map(_ / "src")
+          )
         )
     }.value,
     checkNativeImageSize := Def
@@ -5002,6 +5043,17 @@ lazy val `locking-test-helper` = project
   )
 
 val `std-lib-root` = file("distribution/lib/Standard/")
+
+/** The Java-free libraries hosted in the native image (Note [Java-Free Libraries
+  * In The Image] in `engine-runner`'s `rebuildNativeImage`). None when the image
+  * leaves out every library but Base (`ENSO_LAUNCHER=fast`).
+  *
+  * Standard.XML only. Its hand-kept interface imports fail only at run time and
+  * only under the native launcher when one is missing (see the Note), so do
+  * not add a library here without the owner's agreement.
+  */
+def javaFreeLibraryRoots: Seq[File] =
+  if (GraalVM.EnsoLauncher.fast) Seq() else Seq(stdLibComponentRoot("XML"))
 
 def stdLibComponentRoot(name: String): File =
   `std-lib-root` / name / stdLibVersion

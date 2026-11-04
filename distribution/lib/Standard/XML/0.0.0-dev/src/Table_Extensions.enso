@@ -1,0 +1,100 @@
+from Standard.Base import all
+
+import Standard.Table.Internal.Problem_Builder.Problem_Builder
+import Standard.Table.Internal.Widget_Helpers
+from Standard.Table import Table
+from Standard.Table.Errors import Unexpected_Extra_Columns
+
+import project.Internal.Dom
+import project.XML.XML_Document
+
+
+
+## ---
+   group: Standard.Base.Conversions
+   icon: convert
+   ---
+   Returns an `XML_Document` representation of the table.
+
+   ## Arguments
+    - `element_columns`: Columns to be used as elements in the XML.
+    - `attribute_columns`: Columns to be used as attributes in the XML.
+    - `value_column`: Column to be used as the value for the row tag in the
+      XML.
+    - `root_name`: The name of the root tag in the XML.
+    - `row_name`: The name of the row tag in the XML.
+    - `on_problems`: Specifies how to handle warnings if they occur, reporting
+      them as warnings by default.
+
+   ## Examples
+   ### to_xml Operation
+
+     Input Table `table`:
+
+   ```
+        Title                  | Author              | Price | Year
+       ------------------------+---------------------+-------+------
+        A Tale Of Two Cities   | Charles Dickens     | 9.99  | 1859
+        The Great Gatsby       | F. Scott Fitzgerald | 5.99  | 1925
+   ```
+     Result `r = t.to_xml ["Year"] ["Author", "Price"] "Title" "Books" "Book"`:
+
+   ```
+        <Books>
+          <Book Author="Charles Dickens" Price="9.99">
+            A Tale Of Two Cities
+            <Year>1859</Year>
+          </Book>
+          <Book Author="F. Scott Fitzgerald" Price="5.99">
+            The Great Gatsby
+            <Year>1925</Year>
+          </Book>
+        </Books>
+   ```
+
+   ## Errors
+    - If a column in `element_columns`, `attribute_columns` or `value_column` is
+      not in the input table, a `Missing_Input_Columns` is raised as an error.
+    - If any incoming columns are not specified in one of `element_columns`,
+      `attribute_columns` or `value_column`, a `Unexpected_Extra_Columns` is
+      reported according to the `on_problems` setting.
+@element_columns Widget_Helpers.make_column_name_vector_selector
+@attribute_columns Widget_Helpers.make_column_name_vector_selector
+@value_column Widget_Helpers.make_column_name_selector
+Table.to_xml self (element_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = self.column_names) (attribute_columns : Vector (Integer | Text | Regex) | Text | Integer | Regex = []) (value_column : Text | Integer | Nothing = Nothing) root_name:Text="Table" row_name:Text="Row" on_problems:Problem_Behavior=..Report_Warning -> XML_Document =
+    columns_helper = self.columns_helper
+    problem_builder = Problem_Builder.new error_on_missing_columns=True
+
+    resolved_element_columns = columns_helper.select_columns_helper element_columns Case_Sensitivity.Default False problem_builder
+    resolved_attribute_columns = columns_helper.select_columns_helper attribute_columns Case_Sensitivity.Default False problem_builder
+    resolved_value_column = if value_column.is_nothing then Nothing else (self.at value_column)
+    used_names = resolved_element_columns.map .name + resolved_attribute_columns.map .name + (if Nothing == resolved_value_column then [] else [resolved_value_column.name])
+
+    unused_columns = columns_helper.internal_columns.filter (c-> used_names.contains c.name . not) . map .name
+    if unused_columns.length > 0 then problem_builder.report_other_warning (Unexpected_Extra_Columns.Warning unused_columns)
+
+    problem_builder.attach_problems_before on_problems <|
+        doc = Dom.new_document
+        root = doc.createElement (Dom.legal_tag_name root_name)
+        doc.appendChild root
+        row_tag = Dom.legal_tag_name row_name
+        to_pairs columns = columns.map c-> [Dom.legal_tag_name c.name, c.to_vector]
+        element_columns_with_tags = to_pairs resolved_element_columns
+        attribute_columns_with_tags = to_pairs resolved_attribute_columns
+        value_values = if Nothing == resolved_value_column then Nothing else resolved_value_column.to_vector
+        0.up_to self.row_count . each row->
+            row_element = doc.createElement row_tag
+            if Nothing != value_values then
+                value = value_values.at row
+                if Nothing != value then row_element.setTextContent (Dom.java_text value)
+            element_columns_with_tags.each pair->
+                value = pair.second.at row
+                if Nothing != value then
+                    child = doc.createElement pair.first
+                    child.setTextContent (Dom.java_text value)
+                    row_element.appendChild child
+            attribute_columns_with_tags.each pair->
+                value = pair.second.at row
+                if Nothing != value then row_element.setAttribute pair.first (Dom.java_text value)
+            root.appendChild row_element
+        XML_Document.Value doc

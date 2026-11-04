@@ -20,6 +20,7 @@ interface PlaceholderOverrides {
   readonly deleteLabelActionText: [labelName: string]
   readonly deleteSelectedAssetActionText: [assetName: string]
   readonly deleteSelectedAssetsActionText: [count: number]
+  readonly closeTab: [tabName: string]
   readonly confirmPrompt: [action: string]
   readonly deleteTheAssetTypeTitle: [assetType: string, assetName: string]
   readonly resolveDuplicatesTitleMany: [conflictingFileCount: number]

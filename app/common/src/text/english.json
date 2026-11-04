@@ -340,6 +340,7 @@
   "newDatalinkShortcut": "New Datalink",
   "useInNewProjectShortcut": "Use in New Project",
   "closeModalShortcut": "Close",
+  "closeTab": "Close $0",
   "cancelEditNameShortcut": "Cancel Editing",
   "downloadAppShortcut": "Download App",
   "cancelCutShortcut": "Cancel Cut",

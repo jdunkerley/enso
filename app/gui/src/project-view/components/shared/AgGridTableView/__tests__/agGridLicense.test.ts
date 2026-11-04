@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { AG_GRID_ENTERPRISE_AVAILABLE } from '../agGridLicense'
 
 describe('AG_GRID_ENTERPRISE_AVAILABLE', () => {
-  test('is false when no real AG Grid license key is configured (app/gui/.env sets an empty placeholder; only untracked .dev-env/* files carry a real key)', () => {
+  test('is false when no real AG Grid license key is configured (app/gui/.env sets an empty placeholder)', () => {
     expect($config.AG_GRID_LICENSE_KEY).toBeFalsy()
     expect(AG_GRID_ENTERPRISE_AVAILABLE).toBe(false)
   })
