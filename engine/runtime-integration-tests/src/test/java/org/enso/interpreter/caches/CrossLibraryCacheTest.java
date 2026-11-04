@@ -110,6 +110,51 @@ public class CrossLibraryCacheTest {
   }
 
   /**
+   * After an edit to Beta, the first run rejects Alpha's bindings cache and recompiles Alpha; the
+   * second run is warm again: it reads Alpha's IR from a bindings cache, rewritten into the user
+   * cache by the first, not from source (#562). A further edit to Beta still invalidates it. See
+   * Note [A Rejected Bindings Cache Is Rewritten] in {@code TruffleCompilerContext}.
+   */
+  @Test
+  public void afterAnEditTheSecondRunReadsTheImportersBindingsCacheAgain() throws IOException {
+    var root = createTree(Map.of("Main", "answer = 1\n"));
+    compile(root.resolve("Alpha"));
+    assertEquals(1L, run(root, ctx -> {}));
+
+    writeLibrary(root, "Beta", Map.of("Main", "answer = 2\n"));
+    var loaded = new HashMap<String, Boolean>();
+    assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertFalse("the first run after the edit recompiles Alpha", loaded.get("Alpha.Main"));
+
+    // Only a bindings cache can now give Alpha's IR.
+    deleteModuleCaches("Alpha");
+    loaded.clear();
+    assertEquals(2L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertTrue(
+        "the second run reads Alpha from its rewritten bindings cache", loaded.get("Alpha.Main"));
+
+    writeLibrary(root, "Beta", Map.of("Main", "answer = 3\n"));
+    deleteModuleCaches("Alpha");
+    loaded.clear();
+    assertEquals(3L, run(root, ctx -> loaded.putAll(loadedFromCache(ctx))));
+    assertFalse("the rewritten cache is invalidated by another edit", loaded.get("Alpha.Main"));
+  }
+
+  /** Deletes the library's per-module IR caches, keeping any bindings cache. */
+  private void deleteModuleCaches(String library) throws IOException {
+    try (var files = Files.walk(irCacheRoot.resolve(ns).resolve(library))) {
+      for (var f : files.toList()) {
+        var name = f.getFileName().toString();
+        if (name.endsWith(".ir") || name.endsWith(".meta")) {
+          if (!name.endsWith(".bindings.meta")) {
+            Files.delete(f);
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * (b) `Beta.Helpers` moves to another library, `Gamma`, as SQLite moved out of Database (#468).
    * Alpha's cached IR names a module that no longer exists: a cache miss, not an error.
    */
