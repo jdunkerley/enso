@@ -6,6 +6,7 @@
 - type Enso_Cloud_Error
     - Connection_Error cause:Standard.Base.Any.Any
     - Invalid_Response_Payload cause:(Standard.Base.Data.Text.Text|Standard.Base.Any.Any)
+    - Not_Configured
     - Unauthorized
     - Unexpected_Service_Error method:Standard.Base.Network.HTTP.HTTP_Method.HTTP_Method uri:Standard.Base.Network.URI.URI status_code:Standard.Base.Network.HTTP.HTTP_Status_Code.HTTP_Status_Code payload:Standard.Base.Data.Text.Text
     - to_display_text self -> Standard.Base.Any.Any

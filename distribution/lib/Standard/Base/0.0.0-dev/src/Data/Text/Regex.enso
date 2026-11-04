@@ -39,8 +39,6 @@ type Regex
        ---
        Compile the provided `expression` into a `Regex` that can be used for
        matching.
-       For details on Enso's Regex syntax, see the [Help
-       Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
        ## Arguments
         - `expression`: The text representing the regular expression that you

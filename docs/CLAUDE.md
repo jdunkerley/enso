@@ -1,7 +1,6 @@
 # docs/
 
-The developer documentation for the Enso Engine (not user docs, which live at
-https://help.enso.org) is in this repository's wiki:
+The developer documentation for the Enso Engine is in this repository's wiki:
 https://github.com/jdunkerley/enso/wiki. It moved there from this folder on
 2026-10-25. What stays here:
 

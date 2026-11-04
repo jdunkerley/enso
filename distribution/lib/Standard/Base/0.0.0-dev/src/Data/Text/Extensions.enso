@@ -350,7 +350,6 @@ Text.characters self =
    ---
    Find the regular expression `pattern` in `self`, returning the first match if
    present or `Nothing` if not found.
-   For details on Enso's Regex syntax, see the [Help Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
    ## Arguments
     - `pattern`: The pattern to match `self` against.
@@ -386,7 +385,6 @@ Text.find self pattern:(Regex | Text)=".*" case_sensitivity:Case_Sensitivity=..S
    ---
    Finds all the matches of the regular expression `pattern` in `self`, returning
    a Vector. If not found, will be an empty Vector.
-   For details on Enso's Regex syntax, see the [Help Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
    ## Arguments
     - `pattern`: The pattern to match `self` against.
@@ -421,8 +419,6 @@ Text.find_all self pattern:Text|Regex=".*" case_sensitivity:Case_Sensitivity=..S
    icon: preparation
    ---
    Checks if the whole text in `self` matches a provided `pattern`.
-   For details on Enso's Regex syntax, see the [Help
-   Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
 
    ## Arguments
     - `pattern`: The pattern to match `self` against.
@@ -436,11 +432,11 @@ Text.find_all self pattern:Text|Regex=".*" case_sensitivity:Case_Sensitivity=..S
          example_match =
              regex = ".+ct@.+"
              # Evaluates to true
-             "contact@enso.org".match regex
+             "contact@example.com".match regex
          example_match_insensitive =
              regex = ".+ct@.+"
              # Evaluates to true
-             "CONTACT@enso.org".match regex Case_Sensitivity.Insensitive
+             "CONTACT@example.com".match regex Case_Sensitivity.Insensitive
    ```
 
    ## Errors
@@ -600,8 +596,7 @@ Text.tokenize self pattern:Text|Regex=(Missing_Argument.throw "pattern") case_se
    The replacement string can contain references to groups matched by the regex.
    The following syntaxes are supported:
    $0: the entire match string $&: the entire match string $n: the nth group
-   $&lt;foo&gt;: Named group `foo` For details on Enso's Regex syntax, see the
-   [Help Documentation](https://help.enso.org/docs/using-enso/regular-expressions).
+   $&lt;foo&gt;: Named group `foo`
 
    ## Arguments
     - `term`: The `Text` or `Regex` to find.

@@ -3,9 +3,6 @@ contact_links:
   - name: Search existing issues
     url: https://github.com/jdunkerley/enso/issues?q=is%3Aissue
     about: Check whether the bug or idea has already been reported.
-  - name: User documentation
-    url: https://help.enso.org
-    about: How to use Enso, its language and its libraries.
   - name: Developer wiki
     url: https://github.com/jdunkerley/enso/wiki
     about: How the IDE and engine are built and how they work.
