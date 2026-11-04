@@ -145,7 +145,7 @@ test('the Sources popover opens from the text filter, which keeps the focus', as
     await page.keyboard.press('ControlOrMeta+L')
     const dock = locate.bottomDock(page)
     const log = dock.getByRole('log')
-    const filter = dock.getByRole('searchbox', { name: 'Filter logs' })
+    const filter = dock.getByRole('combobox', { name: 'Filter logs' })
     const sources = page.getByRole('dialog', { name: 'Sources' })
     await filter.click()
     await expect(sources).toBeVisible()
@@ -428,7 +428,7 @@ test('keys typed into the filter reach it, not the graph’s shortcuts', async (
     const nodeCount = await locate.graphNode(page).count()
     const node = locate.graphNodeByBinding(page, 'aggregated')
     await page.keyboard.press('ControlOrMeta+L')
-    const filter = locate.bottomDock(page).getByRole('searchbox', { name: 'Filter logs' })
+    const filter = locate.bottomDock(page).getByRole('combobox', { name: 'Filter logs' })
     await filter.click()
     // The component stays selected, so each key below would reach a graph action that applies.
     await expect(locate.selectedNodes(page)).toHaveCount(1)

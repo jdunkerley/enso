@@ -514,6 +514,7 @@ function sessionLabel({ id, number, session }: PickableSession) {
         ref="filterInput"
         v-model="filterText"
         type="search"
+        role="combobox"
         :aria-label="getText('engineLogsFilter')"
         :placeholder="getText('engineLogsFilter')"
         aria-haspopup="dialog"
@@ -675,7 +676,8 @@ function sessionLabel({ id, number, session }: PickableSession) {
 .toolbar select,
 .toolbar input[type='search'],
 .toolbar button {
-  height: 22px;
+  /* 24px: WCAG 2.2's minimum target size. */
+  height: 24px;
   padding: 0 6px;
   border-radius: 6px;
   border: 1px solid var(--color-dim);
